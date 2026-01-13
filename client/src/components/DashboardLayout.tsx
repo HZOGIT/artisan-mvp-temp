@@ -21,15 +21,21 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, Package, User, Settings, Bell } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
+  { icon: Users, label: "Clients", path: "/clients" },
+  { icon: FileText, label: "Devis", path: "/devis" },
+  { icon: Receipt, label: "Factures", path: "/factures" },
+  { icon: Calendar, label: "Interventions", path: "/interventions" },
+  { icon: Package, label: "Articles", path: "/articles" },
+  { icon: User, label: "Mon profil", path: "/profil" },
+  { icon: Settings, label: "Paramètres", path: "/parametres" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -171,7 +177,7 @@ function DashboardLayoutContent({
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-semibold tracking-tight truncate">
-                    Navigation
+                    Artisan MVP
                   </span>
                 </div>
               ) : null}

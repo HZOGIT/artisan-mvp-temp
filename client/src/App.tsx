@@ -5,31 +5,80 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
+import Devis from "./pages/Devis";
+import DevisDetail from "./pages/DevisDetail";
+import Factures from "./pages/Factures";
+import FactureDetail from "./pages/FactureDetail";
+import Interventions from "./pages/Interventions";
+import Articles from "./pages/Articles";
+import Profil from "./pages/Profil";
+import Parametres from "./pages/Parametres";
+import DashboardLayout from "./components/DashboardLayout";
+import { useAuth } from "./_core/hooks/useAuth";
+
+function AuthenticatedRoutes() {
+  return (
+    <DashboardLayout>
+      <Switch>
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/clients" component={Clients} />
+        <Route path="/clients/:id" component={ClientDetail} />
+        <Route path="/devis" component={Devis} />
+        <Route path="/devis/:id" component={DevisDetail} />
+        <Route path="/factures" component={Factures} />
+        <Route path="/factures/:id" component={FactureDetail} />
+        <Route path="/interventions" component={Interventions} />
+        <Route path="/articles" component={Articles} />
+        <Route path="/profil" component={Profil} />
+        <Route path="/parametres" component={Parametres} />
+        <Route component={NotFound} />
+      </Switch>
+    </DashboardLayout>
+  );
+}
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/" component={Home} />
+      {isAuthenticated && (
+        <>
+          <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
+          <Route path="/clients/:rest*" component={() => <AuthenticatedRoutes />} />
+          <Route path="/clients" component={() => <AuthenticatedRoutes />} />
+          <Route path="/devis/:rest*" component={() => <AuthenticatedRoutes />} />
+          <Route path="/devis" component={() => <AuthenticatedRoutes />} />
+          <Route path="/factures/:rest*" component={() => <AuthenticatedRoutes />} />
+          <Route path="/factures" component={() => <AuthenticatedRoutes />} />
+          <Route path="/interventions" component={() => <AuthenticatedRoutes />} />
+          <Route path="/articles" component={() => <AuthenticatedRoutes />} />
+          <Route path="/profil" component={() => <AuthenticatedRoutes />} />
+          <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
+        </>
+      )}
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
           <Router />

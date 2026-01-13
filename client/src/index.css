@@ -136,22 +136,12 @@
 @layer components {
   /**
    * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
    */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -162,16 +152,75 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
+  }
+
+  /* Styles spécifiques pour les statuts */
+  .status-brouillon {
+    @apply bg-gray-100 text-gray-700;
+  }
+  .status-envoye, .status-envoyee {
+    @apply bg-blue-100 text-blue-700;
+  }
+  .status-accepte, .status-payee {
+    @apply bg-green-100 text-green-700;
+  }
+  .status-refuse, .status-annulee {
+    @apply bg-red-100 text-red-700;
+  }
+  .status-en_retard {
+    @apply bg-orange-100 text-orange-700;
+  }
+  .status-planifiee {
+    @apply bg-blue-100 text-blue-700;
+  }
+  .status-en_cours {
+    @apply bg-yellow-100 text-yellow-700;
+  }
+  .status-terminee {
+    @apply bg-green-100 text-green-700;
+  }
+
+  /* Styles pour les badges de notification */
+  .notification-badge {
+    @apply absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-medium text-destructive-foreground;
+  }
+
+  /* Styles pour les tableaux */
+  .data-table {
+    @apply w-full text-sm;
+  }
+  .data-table th {
+    @apply px-4 py-3 text-left font-medium text-muted-foreground bg-muted/50;
+  }
+  .data-table td {
+    @apply px-4 py-3 border-t border-border;
+  }
+  .data-table tr:hover td {
+    @apply bg-muted/30;
+  }
+
+  /* Styles pour les cartes de statistiques */
+  .stat-card {
+    @apply bg-card rounded-lg border border-border p-6 shadow-sm;
+  }
+  .stat-card-value {
+    @apply text-3xl font-bold text-foreground;
+  }
+  .stat-card-label {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+  .stat-card-icon {
+    @apply h-10 w-10 rounded-lg flex items-center justify-center;
   }
 }
