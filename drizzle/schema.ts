@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
 
 // ============================================================================
 // USERS TABLE (Core authentication)
@@ -827,3 +827,44 @@ export const devisOptionsLignes = mysqlTable("devis_options_lignes", {
 
 export type DevisOptionLigne = typeof devisOptionsLignes.$inferSelect;
 export type InsertDevisOptionLigne = typeof devisOptionsLignes.$inferInsert;
+
+
+// ============================================================================
+// RAPPORTS PERSONNALISABLES
+// ============================================================================
+export const rapportsPersonnalises = mysqlTable("rapports_personnalises", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  nom: varchar("nom", { length: 100 }).notNull(),
+  description: text("description"),
+  type: mysqlEnum("type", ["ventes", "clients", "interventions", "stocks", "fournisseurs", "techniciens", "financier"]).notNull(),
+  filtres: json("filtres"), // Filtres JSON (période, client, statut, etc.)
+  colonnes: json("colonnes"), // Colonnes à afficher
+  groupement: varchar("groupement", { length: 50 }), // Grouper par (jour, semaine, mois, client, etc.)
+  tri: varchar("tri", { length: 50 }), // Tri par défaut
+  format: mysqlEnum("format", ["tableau", "graphique", "liste"]).default("tableau"),
+  graphiqueType: mysqlEnum("graphiqueType", ["bar", "line", "pie", "doughnut"]),
+  favori: boolean("favori").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type RapportPersonnalise = typeof rapportsPersonnalises.$inferSelect;
+export type InsertRapportPersonnalise = typeof rapportsPersonnalises.$inferInsert;
+
+// ============================================================================
+// EXECUTIONS DE RAPPORTS (Historique des rapports générés)
+// ============================================================================
+export const executionsRapports = mysqlTable("executions_rapports", {
+  id: int("id").autoincrement().primaryKey(),
+  rapportId: int("rapportId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  dateExecution: timestamp("dateExecution").defaultNow().notNull(),
+  parametres: json("parametres"), // Paramètres utilisés pour cette exécution
+  resultats: json("resultats"), // Résultats mis en cache
+  nombreLignes: int("nombreLignes").default(0),
+  tempsExecution: int("tempsExecution"), // En millisecondes
+});
+
+export type ExecutionRapport = typeof executionsRapports.$inferSelect;
+export type InsertExecutionRapport = typeof executionsRapports.$inferInsert;

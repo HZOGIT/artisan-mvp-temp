@@ -278,3 +278,28 @@
 - [x] Sélection d'option par le client
 - [x] Page de visualisation multi-options
 - [x] Conversion de l'option choisie en facture
+
+
+## Nouvelles Fonctionnalités (Sprint 11)
+
+### Intégration Google Maps
+- [x] Composant carte Google Maps pour la géolocalisation
+- [x] Affichage des marqueurs des techniciens sur la carte
+- [x] Mise à jour en temps réel des positions
+- [x] Info-bulle avec détails du technicien au clic
+- [x] Clustering des marqueurs si plusieurs techniciens proches
+
+### Planification Intelligente
+- [x] Calcul de distance entre technicien et adresse d'intervention
+- [x] Suggestion du technicien le plus proche
+- [x] Prise en compte des disponibilités
+- [x] Affichage du temps de trajet estimé
+- [x] Interface de sélection avec recommandation
+
+### Rapports Personnalisables
+- [x] Table des modèles de rapports
+- [x] Création de rapports avec filtres personnalisés
+- [x] Sélection des métriques à inclure
+- [x] Génération de graphiques dynamiques
+- [x] Export PDF et CSV des rapports
+- [x] Sauvegarde des modèles de rapports

@@ -41,7 +41,9 @@ import {
   ecrituresComptables, InsertEcritureComptable, EcritureComptable,
   planComptable, InsertCompteComptable, CompteComptable,
   devisOptions, InsertDevisOption, DevisOption,
-  devisOptionsLignes, InsertDevisOptionLigne, DevisOptionLigne
+  devisOptionsLignes, InsertDevisOptionLigne, DevisOptionLigne,
+  rapportsPersonnalises, InsertRapportPersonnalise, RapportPersonnalise,
+  executionsRapports, InsertExecutionRapport, ExecutionRapport
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -3082,4 +3084,415 @@ export async function convertirOptionEnDevis(optionId: number): Promise<void> {
     totalTVA: option.totalTVA,
     totalTTC: option.totalTTC
   }).where(eq(devis.id, option.devisId));
+}
+
+
+// ============================================================================
+// PLANIFICATION INTELLIGENTE
+// ============================================================================
+
+// Calcul de la distance entre deux points GPS (formule de Haversine)
+export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Rayon de la Terre en km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Estimer le temps de trajet en minutes (vitesse moyenne 40 km/h en ville)
+export function estimateTrajetTime(distanceKm: number): number {
+  const vitesseMoyenne = 40; // km/h
+  return Math.round((distanceKm / vitesseMoyenne) * 60);
+}
+
+export interface TechnicienSuggestion {
+  technicien: Technicien;
+  distance: number;
+  tempsTrajet: number;
+  disponible: boolean;
+  position: PositionTechnicien | null;
+  score: number;
+}
+
+// Obtenir les suggestions de techniciens pour une intervention
+export async function getSuggestionsTechniciens(
+  artisanId: number,
+  latitude: number,
+  longitude: number,
+  dateIntervention: Date
+): Promise<TechnicienSuggestion[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Récupérer tous les techniciens actifs de l'artisan
+  const techniciensList = await db.select().from(techniciens)
+    .where(and(
+      eq(techniciens.artisanId, artisanId),
+      eq(techniciens.statut, 'actif')
+    ));
+  
+  const suggestions: TechnicienSuggestion[] = [];
+  
+  for (const tech of techniciensList) {
+    // Récupérer la dernière position du technicien
+    const positions = await db.select().from(positionsTechniciens)
+      .where(eq(positionsTechniciens.technicienId, tech.id))
+      .orderBy(desc(positionsTechniciens.timestamp))
+      .limit(1);
+    
+    const position = positions[0] || null;
+    
+    // Calculer la distance et le temps de trajet
+    let distance = 0;
+    let tempsTrajet = 0;
+    
+    if (position) {
+      distance = calculateDistance(
+        parseFloat(position.latitude),
+        parseFloat(position.longitude),
+        latitude,
+        longitude
+      );
+      tempsTrajet = estimateTrajetTime(distance);
+    }
+    
+    // Vérifier la disponibilité du technicien
+    const jourSemaine = dateIntervention.getDay();
+    const heureIntervention = dateIntervention.getHours() * 60 + dateIntervention.getMinutes();
+    
+    const disponibilites = await db.select().from(disponibilitesTechniciens)
+      .where(and(
+        eq(disponibilitesTechniciens.technicienId, tech.id),
+        eq(disponibilitesTechniciens.jourSemaine, jourSemaine)
+      ));
+    
+    let disponible = false;
+    for (const dispo of disponibilites) {
+      const debut = parseInt(dispo.heureDebut.split(':')[0]) * 60 + parseInt(dispo.heureDebut.split(':')[1]);
+      const fin = parseInt(dispo.heureFin.split(':')[0]) * 60 + parseInt(dispo.heureFin.split(':')[1]);
+      if (heureIntervention >= debut && heureIntervention <= fin) {
+        disponible = true;
+        break;
+      }
+    }
+    
+    // Vérifier s'il n'a pas déjà une intervention à cette heure
+    const interventionsExistantes = await db.select().from(interventions)
+      .where(and(
+        eq(interventions.technicienId, tech.id),
+        eq(interventions.dateDebut, dateIntervention)
+      ));
+    
+    if (interventionsExistantes.length > 0) {
+      disponible = false;
+    }
+    
+    // Calculer un score (plus bas = meilleur)
+    // Priorité: disponibilité > distance > temps de trajet
+    let score = distance;
+    if (!disponible) score += 1000;
+    if (!position) score += 500;
+    
+    suggestions.push({
+      technicien: tech,
+      distance: Math.round(distance * 10) / 10,
+      tempsTrajet,
+      disponible,
+      position,
+      score
+    });
+  }
+  
+  // Trier par score (meilleur en premier)
+  suggestions.sort((a, b) => a.score - b.score);
+  
+  return suggestions;
+}
+
+// Obtenir le technicien le plus proche disponible
+export async function getTechnicienPlusProche(
+  artisanId: number,
+  latitude: number,
+  longitude: number,
+  dateIntervention: Date
+): Promise<TechnicienSuggestion | null> {
+  const suggestions = await getSuggestionsTechniciens(artisanId, latitude, longitude, dateIntervention);
+  const disponibles = suggestions.filter(s => s.disponible);
+  return disponibles[0] || null;
+}
+
+
+// ============================================================================
+// RAPPORTS PERSONNALISABLES
+// ============================================================================
+
+export async function createRapportPersonnalise(data: InsertRapportPersonnalise): Promise<RapportPersonnalise> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(rapportsPersonnalises).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(rapportsPersonnalises).where(eq(rapportsPersonnalises.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create rapport");
+  return created[0];
+}
+
+export async function getRapportsPersonnalisesByArtisanId(artisanId: number): Promise<RapportPersonnalise[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(rapportsPersonnalises)
+    .where(eq(rapportsPersonnalises.artisanId, artisanId))
+    .orderBy(desc(rapportsPersonnalises.createdAt));
+}
+
+export async function getRapportPersonnaliseById(id: number): Promise<RapportPersonnalise | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(rapportsPersonnalises).where(eq(rapportsPersonnalises.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function updateRapportPersonnalise(id: number, data: Partial<InsertRapportPersonnalise>): Promise<RapportPersonnalise | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(rapportsPersonnalises).set(data).where(eq(rapportsPersonnalises.id, id));
+  return await getRapportPersonnaliseById(id);
+}
+
+export async function deleteRapportPersonnalise(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(rapportsPersonnalises).where(eq(rapportsPersonnalises.id, id));
+}
+
+export async function toggleRapportFavori(id: number): Promise<RapportPersonnalise | null> {
+  const rapport = await getRapportPersonnaliseById(id);
+  if (!rapport) return null;
+  return await updateRapportPersonnalise(id, { favori: !rapport.favori });
+}
+
+// Exécuter un rapport et récupérer les données
+export interface RapportResultat {
+  colonnes: string[];
+  lignes: Record<string, unknown>[];
+  totaux?: Record<string, number>;
+}
+
+export async function executerRapport(rapportId: number, parametres?: Record<string, unknown>): Promise<RapportResultat> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const rapport = await getRapportPersonnaliseById(rapportId);
+  if (!rapport) throw new Error("Rapport non trouvé");
+  
+  const filtres = (rapport.filtres as Record<string, unknown>) || {};
+  const colonnesConfig = (rapport.colonnes as string[]) || [];
+  const dateDebut = (parametres?.dateDebut as string) || (filtres.dateDebut as string);
+  const dateFin = (parametres?.dateFin as string) || (filtres.dateFin as string);
+  
+  let lignes: Record<string, unknown>[] = [];
+  let totaux: Record<string, number> = {};
+  
+  switch (rapport.type) {
+    case "ventes": {
+      // Rapport des ventes (factures)
+      const facturesData = await db.select().from(factures)
+        .where(eq(factures.artisanId, rapport.artisanId));
+      
+      lignes = facturesData
+        .filter(f => {
+          if (dateDebut && new Date(f.dateFacture) < new Date(dateDebut)) return false;
+          if (dateFin && new Date(f.dateFacture) > new Date(dateFin)) return false;
+          return true;
+        })
+        .map(f => ({
+          id: f.id,
+          numero: f.numero,
+          date: f.dateFacture,
+          client: f.clientId,
+          totalHT: parseFloat(f.totalHT?.toString() || '0'),
+          totalTTC: parseFloat(f.totalTTC?.toString() || '0'),
+          statut: f.statut,
+        }));
+      
+      totaux = {
+        totalHT: lignes.reduce((sum, l) => sum + (l.totalHT as number), 0),
+        totalTTC: lignes.reduce((sum, l) => sum + (l.totalTTC as number), 0),
+        nombreFactures: lignes.length,
+      };
+      break;
+    }
+    
+    case "clients": {
+      // Rapport des clients
+      const clientsData = await db.select().from(clients)
+        .where(eq(clients.artisanId, rapport.artisanId));
+      
+      lignes = clientsData.map(c => ({
+        id: c.id,
+        nom: c.nom,
+        prenom: c.prenom,
+        email: c.email,
+        telephone: c.telephone,
+        ville: c.ville,
+        dateCreation: c.createdAt,
+      }));
+      
+      totaux = {
+        nombreClients: lignes.length,
+      };
+      break;
+    }
+    
+    case "interventions": {
+      // Rapport des interventions
+      const interventionsData = await db.select().from(interventions)
+        .where(eq(interventions.artisanId, rapport.artisanId));
+      
+      lignes = interventionsData
+        .filter(i => {
+          if (dateDebut && new Date(i.dateDebut) < new Date(dateDebut)) return false;
+          if (dateFin && new Date(i.dateDebut) > new Date(dateFin)) return false;
+          return true;
+        })
+        .map(i => ({
+          id: i.id,
+          titre: i.titre,
+          date: i.dateDebut,
+          statut: i.statut,
+          clientId: i.clientId,
+          technicienId: i.technicienId,
+        }));
+      
+      const parStatut: Record<string, number> = {};
+      for (const l of lignes) {
+        const statut = l.statut as string;
+        parStatut[statut] = (parStatut[statut] || 0) + 1;
+      }
+      
+      totaux = {
+        nombreInterventions: lignes.length,
+        ...parStatut,
+      };
+      break;
+    }
+    
+    case "stocks": {
+      // Rapport des stocks
+      const stocksData = await db.select().from(stocks)
+        .where(eq(stocks.artisanId, rapport.artisanId));
+      
+      lignes = stocksData.map(s => ({
+        id: s.id,
+        nom: s.designation,
+        reference: s.reference,
+        quantite: parseFloat(s.quantiteEnStock?.toString() || '0'),
+        seuilAlerte: parseFloat(s.seuilAlerte?.toString() || '0'),
+        prixAchat: parseFloat(s.prixAchat?.toString() || '0'),
+        emplacement: s.emplacement || '-',
+        valeurStock: parseFloat(s.quantiteEnStock?.toString() || '0') * parseFloat(s.prixAchat?.toString() || '0'),
+      }));
+      
+      totaux = {
+        nombreArticles: lignes.length,
+        valeurTotale: lignes.reduce((sum, l) => sum + (l.valeurStock as number), 0),
+        articlesEnAlerte: lignes.filter(l => (l.quantite as number) <= (l.seuilAlerte as number)).length,
+      };
+      break;
+    }
+    
+    case "techniciens": {
+      // Rapport des techniciens
+      const techniciensData = await db.select().from(techniciens)
+        .where(eq(techniciens.artisanId, rapport.artisanId));
+      
+      const technicienStats = await Promise.all(techniciensData.map(async (t) => {
+        const interventionsTech = await db.select().from(interventions)
+          .where(eq(interventions.technicienId, t.id));
+        
+        return {
+          id: t.id,
+          nom: t.nom,
+          specialite: t.specialite,
+          statut: t.statut,
+          nombreInterventions: interventionsTech.length,
+          interventionsTerminees: interventionsTech.filter(i => i.statut === 'terminee').length,
+        };
+      }));
+      
+      lignes = technicienStats;
+      
+      totaux = {
+        nombreTechniciens: lignes.length,
+        totalInterventions: lignes.reduce((sum, l) => sum + (l.nombreInterventions as number), 0),
+      };
+      break;
+    }
+    
+    case "financier": {
+      // Rapport financier global
+      const facturesData = await db.select().from(factures)
+        .where(eq(factures.artisanId, rapport.artisanId));
+      
+      const devisData = await db.select().from(devis)
+        .where(eq(devis.artisanId, rapport.artisanId));
+      
+      const facturesFiltrees = facturesData.filter(f => {
+        if (dateDebut && new Date(f.dateFacture) < new Date(dateDebut)) return false;
+        if (dateFin && new Date(f.dateFacture) > new Date(dateFin)) return false;
+        return true;
+      });
+      
+      const devisFiltres = devisData.filter(d => {
+        if (dateDebut && new Date(d.dateDevis) < new Date(dateDebut)) return false;
+        if (dateFin && new Date(d.dateDevis) > new Date(dateFin)) return false;
+        return true;
+      });
+      
+      lignes = [
+        { categorie: "Chiffre d'affaires", valeur: facturesFiltrees.filter(f => f.statut === 'payee').reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0) },
+        { categorie: "Factures en attente", valeur: facturesFiltrees.filter(f => f.statut === 'envoyee').reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0) },
+        { categorie: "Devis acceptés", valeur: devisFiltres.filter(d => d.statut === 'accepte').reduce((sum, d) => sum + parseFloat(d.totalTTC?.toString() || '0'), 0) },
+        { categorie: "Devis en attente", valeur: devisFiltres.filter(d => d.statut === 'envoye').reduce((sum, d) => sum + parseFloat(d.totalTTC?.toString() || '0'), 0) },
+      ];
+      
+      totaux = {
+        totalCA: lignes[0].valeur as number,
+        totalEnAttente: lignes[1].valeur as number,
+      };
+      break;
+    }
+    
+    default:
+      break;
+  }
+  
+  // Enregistrer l'exécution
+  const startTime = Date.now();
+  await db.insert(executionsRapports).values({
+    rapportId,
+    artisanId: rapport.artisanId,
+    parametres: parametres || {},
+    resultats: { lignes, totaux },
+    nombreLignes: lignes.length,
+    tempsExecution: Date.now() - startTime,
+  });
+  
+  return {
+    colonnes: colonnesConfig.length > 0 ? colonnesConfig : Object.keys(lignes[0] || {}),
+    lignes,
+    totaux,
+  };
+}
+
+export async function getHistoriqueExecutions(rapportId: number, limit: number = 10): Promise<ExecutionRapport[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(executionsRapports)
+    .where(eq(executionsRapports.rapportId, rapportId))
+    .orderBy(desc(executionsRapports.dateExecution))
+    .limit(limit);
 }

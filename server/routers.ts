@@ -1069,6 +1069,62 @@ const interventionsRouter = router({
       if (!artisan) return [];
       return await db.getUpcomingInterventions(artisan.id, input?.limit || 5);
     }),
+  
+  // Planification intelligente - Suggestions de techniciens
+  getSuggestionsTechniciens: protectedProcedure
+    .input(z.object({
+      latitude: z.number(),
+      longitude: z.number(),
+      dateIntervention: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getSuggestionsTechniciens(
+        artisan.id,
+        input.latitude,
+        input.longitude,
+        new Date(input.dateIntervention)
+      );
+    }),
+  
+  // Obtenir le technicien le plus proche disponible
+  getTechnicienPlusProche: protectedProcedure
+    .input(z.object({
+      latitude: z.number(),
+      longitude: z.number(),
+      dateIntervention: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      return await db.getTechnicienPlusProche(
+        artisan.id,
+        input.latitude,
+        input.longitude,
+        new Date(input.dateIntervention)
+      );
+    }),
+  
+  // Assigner un technicien à une intervention
+  assignerTechnicien: protectedProcedure
+    .input(z.object({
+      interventionId: z.number(),
+      technicienId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return await db.updateIntervention(input.interventionId, {
+        technicienId: input.technicienId
+      });
+    }),
 });
 
 // ============================================================================
@@ -3360,6 +3416,92 @@ const devisOptionsRouter = router({
 });
 
 // ============================================================================
+// RAPPORTS PERSONNALISABLES ROUTER
+// ============================================================================
+const rapportsRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getRapportsPersonnalisesByArtisanId(artisan.id);
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getRapportPersonnaliseById(input.id);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      nom: z.string().min(1),
+      description: z.string().optional(),
+      type: z.enum(["ventes", "clients", "interventions", "stocks", "fournisseurs", "techniciens", "financier"]),
+      filtres: z.record(z.string(), z.unknown()).optional(),
+      colonnes: z.array(z.string()).optional(),
+      groupement: z.string().optional(),
+      tri: z.string().optional(),
+      format: z.enum(["tableau", "graphique", "liste"]).optional(),
+      graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createRapportPersonnalise({
+        artisanId: artisan.id,
+        ...input,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      description: z.string().optional(),
+      filtres: z.record(z.string(), z.unknown()).optional(),
+      colonnes: z.array(z.string()).optional(),
+      groupement: z.string().optional(),
+      tri: z.string().optional(),
+      format: z.enum(["tableau", "graphique", "liste"]).optional(),
+      graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
+      favori: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      return await db.updateRapportPersonnalise(id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.deleteRapportPersonnalise(input.id);
+      return { success: true };
+    }),
+
+  toggleFavori: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.toggleRapportFavori(input.id);
+    }),
+
+  executer: protectedProcedure
+    .input(z.object({
+      rapportId: z.number(),
+      parametres: z.record(z.string(), z.unknown()).optional(),
+    }))
+    .query(async ({ input }) => {
+      return await db.executerRapport(input.rapportId, input.parametres);
+    }),
+
+  historique: protectedProcedure
+    .input(z.object({ rapportId: z.number(), limit: z.number().default(10) }))
+    .query(async ({ input }) => {
+      return await db.getHistoriqueExecutions(input.rapportId, input.limit);
+    }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({system: systemRouter,
@@ -3394,6 +3536,7 @@ export const appRouter = router({system: systemRouter,
   geolocalisation: geolocalisationRouter,
   comptabilite: comptabiliteRouter,
   devisOptions: devisOptionsRouter,
+  rapports: rapportsRouter,
 });
 
 export type AppRouter = typeof appRouter;

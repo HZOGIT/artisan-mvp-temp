@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -48,6 +48,8 @@ const menuItems = [
   { icon: MessageCircle, label: "Chat", path: "/chat" },
   { icon: Star, label: "Avis Clients", path: "/avis" },
   { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
+  { icon: Route, label: "Planification", path: "/planification" },
+  { icon: FileText, label: "Rapports", path: "/rapports" },
   { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
   { icon: User, label: "Mon profil", path: "/profil" },
   { icon: Settings, label: "Paramètres", path: "/parametres" },

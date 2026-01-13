@@ -37,6 +37,8 @@ import SoumettreAvis from "./pages/SoumettreAvis";
 import Geolocalisation from "./pages/Geolocalisation";
 import Comptabilite from "./pages/Comptabilite";
 import DevisOptions from "./pages/DevisOptions";
+import Planification from "./pages/Planification";
+import Rapports from "./pages/Rapports";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -67,6 +69,8 @@ function AuthenticatedRoutes() {
         <Route path="/techniciens" component={Techniciens} />
         <Route path="/avis" component={Avis} />
         <Route path="/geolocalisation" component={Geolocalisation} />
+        <Route path="/planification" component={Planification} />
+        <Route path="/rapports" component={Rapports} />
         <Route path="/comptabilite" component={Comptabilite} />
         <Route path="/devis/:id/options" component={DevisOptions} />
         <Route path="/profil" component={Profil} />
