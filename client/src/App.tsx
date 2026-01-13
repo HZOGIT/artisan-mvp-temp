@@ -27,6 +27,9 @@ import ModelesEmail from "./pages/ModelesEmail";
 import PerformancesFournisseurs from "./pages/PerformancesFournisseurs";
 import PaiementSucces from "./pages/PaiementSucces";
 import PaiementAnnule from "./pages/PaiementAnnule";
+import PortailClient from "./pages/PortailClient";
+import Contrats from "./pages/Contrats";
+import InterventionsMobile from "./pages/InterventionsMobile";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -51,6 +54,8 @@ function AuthenticatedRoutes() {
         <Route path="/relances" component={RelancesDevis} />
         <Route path="/modeles-email" component={ModelesEmail} />
         <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
+        <Route path="/contrats" component={Contrats} />
+        <Route path="/mobile" component={InterventionsMobile} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />
@@ -76,6 +81,7 @@ function Router() {
       <Route path="/signature/:token" component={SignatureDevis} />
       <Route path="/paiement/succes" component={PaiementSucces} />
       <Route path="/paiement/annule" component={PaiementAnnule} />
+      <Route path="/portail/:token" component={PortailClient} />
       {isAuthenticated && (
         <>
           <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
@@ -93,6 +99,8 @@ function Router() {
           <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
           <Route path="/profil" component={() => <AuthenticatedRoutes />} />
           <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
+          <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
+          <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
         </>
       )}
       <Route path="/404" component={NotFound} />

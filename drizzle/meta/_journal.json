@@ -43,6 +43,13 @@
       "when": 1768336232057,
       "tag": "0005_supreme_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1768337135362,
+      "tag": "0006_safe_chameleon",
+      "breakpoints": true
     }
   ]
 }

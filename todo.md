@@ -195,3 +195,32 @@
 - [x] Page de paiement publique
 - [x] Webhook pour confirmation de paiement
 - [x] Mise à jour automatique du statut de la facture
+
+
+## Nouvelles Fonctionnalités (Sprint 8)
+
+### Portail Client
+- [x] Système d'authentification client par lien magique
+- [x] Page d'accueil du portail client
+- [x] Liste des devis du client avec statuts
+- [x] Liste des factures du client avec statuts de paiement
+- [x] Historique des interventions
+- [x] Possibilité de signer les devis depuis le portail
+- [x] Possibilité de payer les factures depuis le portail
+
+### Application Mobile PWA
+- [x] Configuration du manifest.json pour PWA
+- [x] Service Worker pour le mode hors-ligne
+- [x] Page mobile optimisée pour les interventions
+- [x] Géolocalisation et navigation vers le client
+- [x] Prise de photos pendant l'intervention
+- [x] Signature client sur mobile
+- [x] Synchronisation des données hors-ligne
+
+### Facturation Récurrente
+- [x] Table des contrats de maintenance
+- [x] Configuration de la périodicité (mensuel, trimestriel, annuel)
+- [x] Génération automatique des factures
+- [x] Notifications de renouvellement
+- [x] Page de gestion des contrats
+- [x] Historique des factures générées par contrat

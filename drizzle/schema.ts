@@ -470,3 +470,118 @@ export const paiementsStripe = mysqlTable("paiements_stripe", {
 
 export type PaiementStripe = typeof paiementsStripe.$inferSelect;
 export type InsertPaiementStripe = typeof paiementsStripe.$inferInsert;
+
+
+// ============================================================================
+// CLIENT PORTAL ACCESS (Magic link authentication for clients)
+// ============================================================================
+export const clientPortalAccess = mysqlTable("client_portal_access", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  lastAccessAt: timestamp("lastAccessAt"),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ClientPortalAccess = typeof clientPortalAccess.$inferSelect;
+export type InsertClientPortalAccess = typeof clientPortalAccess.$inferInsert;
+
+// ============================================================================
+// CLIENT PORTAL SESSIONS (Active sessions for client portal)
+// ============================================================================
+export const clientPortalSessions = mysqlTable("client_portal_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  clientId: int("clientId").notNull(),
+  sessionToken: varchar("sessionToken", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  userAgent: text("userAgent"),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ClientPortalSession = typeof clientPortalSessions.$inferSelect;
+export type InsertClientPortalSession = typeof clientPortalSessions.$inferInsert;
+
+// ============================================================================
+// CONTRATS MAINTENANCE (Recurring billing contracts)
+// ============================================================================
+export const contratsMaintenance = mysqlTable("contrats_maintenance", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  clientId: int("clientId").notNull(),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  montantHT: decimal("montantHT", { precision: 10, scale: 2 }).notNull(),
+  tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  periodicite: mysqlEnum("periodicite", ["mensuel", "trimestriel", "semestriel", "annuel"]).notNull(),
+  dateDebut: timestamp("dateDebut").notNull(),
+  dateFin: timestamp("dateFin"),
+  prochainFacturation: timestamp("prochainFacturation"),
+  statut: mysqlEnum("statut", ["actif", "suspendu", "termine", "annule"]).default("actif"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type ContratMaintenance = typeof contratsMaintenance.$inferSelect;
+export type InsertContratMaintenance = typeof contratsMaintenance.$inferInsert;
+
+// ============================================================================
+// FACTURES RECURRENTES (Generated invoices from contracts)
+// ============================================================================
+export const facturesRecurrentes = mysqlTable("factures_recurrentes", {
+  id: int("id").autoincrement().primaryKey(),
+  contratId: int("contratId").notNull(),
+  factureId: int("factureId").notNull(),
+  periodeDebut: timestamp("periodeDebut").notNull(),
+  periodeFin: timestamp("periodeFin").notNull(),
+  genereeAutomatiquement: boolean("genereeAutomatiquement").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FactureRecurrente = typeof facturesRecurrentes.$inferSelect;
+export type InsertFactureRecurrente = typeof facturesRecurrentes.$inferInsert;
+
+// ============================================================================
+// INTERVENTIONS MOBILE (Mobile app data for field work)
+// ============================================================================
+export const interventionsMobile = mysqlTable("interventions_mobile", {
+  id: int("id").autoincrement().primaryKey(),
+  interventionId: int("interventionId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  heureArrivee: timestamp("heureArrivee"),
+  heureDepart: timestamp("heureDepart"),
+  notesIntervention: text("notesIntervention"),
+  signatureClient: text("signatureClient"),
+  signatureDate: timestamp("signatureDate"),
+  syncStatus: mysqlEnum("syncStatus", ["synced", "pending", "error"]).default("synced"),
+  lastSyncAt: timestamp("lastSyncAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type InterventionMobile = typeof interventionsMobile.$inferSelect;
+export type InsertInterventionMobile = typeof interventionsMobile.$inferInsert;
+
+// ============================================================================
+// PHOTOS INTERVENTIONS (Photos taken during field work)
+// ============================================================================
+export const photosInterventions = mysqlTable("photos_interventions", {
+  id: int("id").autoincrement().primaryKey(),
+  interventionMobileId: int("interventionMobileId").notNull(),
+  url: varchar("url", { length: 500 }).notNull(),
+  description: varchar("description", { length: 255 }),
+  type: mysqlEnum("type", ["avant", "pendant", "apres"]).default("pendant"),
+  takenAt: timestamp("takenAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PhotoIntervention = typeof photosInterventions.$inferSelect;
+export type InsertPhotoIntervention = typeof photosInterventions.$inferInsert;

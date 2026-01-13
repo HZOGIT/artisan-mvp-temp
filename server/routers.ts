@@ -2073,6 +2073,483 @@ const commandesFournisseursRouter = router({
 });
 
 // ============================================================================
+// CLIENT PORTAL ROUTER (Public access for clients)
+// ============================================================================
+const clientPortalRouter = router({
+  // Générer un lien d'accès au portail client
+  generateAccess: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      const client = await db.getClientById(input.clientId);
+      if (!client || client.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      if (!client.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+      
+      // Générer un token unique
+      const token = crypto.randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // Valide 30 jours
+      
+      await db.createClientPortalAccess({
+        clientId: client.id,
+        artisanId: artisan.id,
+        token,
+        email: client.email,
+        expiresAt,
+      });
+      
+      const origin = ctx.req.headers.origin || 'http://localhost:3000';
+      return { url: `${origin}/portail/${token}`, token };
+    }),
+
+  // Vérifier l'accès au portail (public)
+  verifyAccess: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) {
+        return { valid: false, client: null, artisan: null };
+      }
+      
+      await db.updateClientPortalAccessLastAccess(access.id);
+      
+      const client = await db.getClientById(access.clientId);
+      const artisan = await db.getArtisanById(access.artisanId);
+      
+      return {
+        valid: true,
+        client: client ? { id: client.id, nom: client.nom, prenom: client.prenom, email: client.email } : null,
+        artisan: artisan ? { id: artisan.id, nomEntreprise: artisan.nomEntreprise, telephone: artisan.telephone, email: artisan.email } : null,
+      };
+    }),
+
+  // Récupérer les devis du client (public avec token)
+  getDevis: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      }
+      const devisList = await db.getDevisByClientId(access.clientId);
+      return devisList.map(d => ({
+        id: d.id,
+        numero: d.numero,
+        objet: d.objet,
+        totalTTC: d.totalTTC,
+        statut: d.statut,
+        dateCreation: d.createdAt,
+        tokenSignature: (d as any).tokenSignature || null,
+      }));
+    }),
+
+  // Récupérer les factures du client (public avec token)
+  getFactures: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      }
+      const facturesList = await db.getFacturesByClientId(access.clientId);
+      // Récupérer les paiements pour chaque facture
+      const facturesWithPayments = await Promise.all(facturesList.map(async (f) => {
+        const paiements = await db.getPaiementsByFactureId(f.id);
+        const paiementEnCours = paiements.find(p => p.statut === 'en_attente');
+        return {
+          id: f.id,
+          numero: f.numero,
+          objet: f.objet,
+          totalTTC: f.totalTTC,
+          statut: f.statut,
+          dateCreation: f.createdAt,
+          dateEcheance: f.dateEcheance,
+          lienPaiement: paiementEnCours?.lienPaiement || null,
+        };
+      }));
+      return facturesWithPayments;
+    }),
+
+  // Récupérer les interventions du client (public avec token)
+  getInterventions: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      }
+      const interventionsList = await db.getInterventionsByClientId(access.clientId);
+      return interventionsList.map(i => ({
+        id: i.id,
+        titre: i.titre,
+        description: i.description,
+        dateIntervention: i.dateDebut,
+        statut: i.statut,
+        adresse: i.adresse,
+      }));
+    }),
+
+  // Récupérer les contrats du client (public avec token)
+  getContrats: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      }
+      return await db.getContratsByClientId(access.clientId);
+    }),
+});
+
+// ============================================================================
+// CONTRATS MAINTENANCE ROUTER
+// ============================================================================
+const contratsRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const contrats = await db.getContratsByArtisanId(artisan.id);
+    // Enrichir avec les infos client
+    return Promise.all(contrats.map(async (c) => {
+      const client = await db.getClientById(c.clientId);
+      return { ...c, client };
+    }));
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const contrat = await db.getContratById(input.id);
+      if (!contrat) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Contrat non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || contrat.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const client = await db.getClientById(contrat.clientId);
+      const facturesRecurrentes = await db.getFacturesRecurrentesByContratId(contrat.id);
+      return { ...contrat, client, facturesRecurrentes };
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      clientId: z.number(),
+      titre: z.string(),
+      description: z.string().optional(),
+      montantHT: z.string(),
+      tauxTVA: z.string().optional(),
+      periodicite: z.enum(["mensuel", "trimestriel", "semestriel", "annuel"]),
+      dateDebut: z.string(),
+      dateFin: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      const reference = await db.getNextContratNumber(artisan.id);
+      
+      // Calculer la prochaine date de facturation
+      const dateDebut = new Date(input.dateDebut);
+      let prochainFacturation = new Date(dateDebut);
+      
+      return await db.createContrat({
+        artisanId: artisan.id,
+        clientId: input.clientId,
+        reference,
+        titre: input.titre,
+        description: input.description,
+        montantHT: input.montantHT,
+        tauxTVA: input.tauxTVA || "20.00",
+        periodicite: input.periodicite,
+        dateDebut,
+        dateFin: input.dateFin ? new Date(input.dateFin) : undefined,
+        prochainFacturation,
+        statut: "actif",
+        notes: input.notes,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      titre: z.string().optional(),
+      description: z.string().optional(),
+      montantHT: z.string().optional(),
+      tauxTVA: z.string().optional(),
+      periodicite: z.enum(["mensuel", "trimestriel", "semestriel", "annuel"]).optional(),
+      dateFin: z.string().optional(),
+      statut: z.enum(["actif", "suspendu", "termine", "annule"]).optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const contrat = await db.getContratById(input.id);
+      if (!contrat) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Contrat non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || contrat.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const { id, ...updateData } = input;
+      return await db.updateContrat(id, {
+        ...updateData,
+        dateFin: updateData.dateFin ? new Date(updateData.dateFin) : undefined,
+      });
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const contrat = await db.getContratById(input.id);
+      if (!contrat) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Contrat non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || contrat.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      await db.deleteContrat(input.id);
+      return { success: true };
+    }),
+
+  // Générer une facture manuellement pour un contrat
+  generateFacture: protectedProcedure
+    .input(z.object({ contratId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const contrat = await db.getContratById(input.contratId);
+      if (!contrat) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Contrat non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || contrat.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      // Créer la facture
+      const numero = await db.getNextFactureNumber(artisan.id);
+      const montantHT = parseFloat(contrat.montantHT || "0");
+      const tauxTVA = parseFloat(contrat.tauxTVA || "20");
+      const montantTVA = montantHT * (tauxTVA / 100);
+      const montantTTC = montantHT + montantTVA;
+      
+      const facture = await db.createFacture({
+        artisanId: artisan.id,
+        clientId: contrat.clientId,
+        numero,
+        objet: `${contrat.titre} - ${contrat.reference}`,
+        totalHT: montantHT.toFixed(2),
+        totalTVA: montantTVA.toFixed(2),
+        totalTTC: montantTTC.toFixed(2),
+        statut: "envoyee",
+        notes: `Facture générée automatiquement pour le contrat ${contrat.reference}`,
+      });
+      
+      // Créer la ligne de facture
+      await db.createLigneFacture({
+        factureId: facture.id,
+        designation: contrat.titre,
+        description: contrat.description || undefined,
+        quantite: "1",
+        prixUnitaireHT: contrat.montantHT || "0",
+        tauxTVA: contrat.tauxTVA || "20.00",
+        montantHT: contrat.montantHT || "0",
+        montantTTC: montantTTC.toFixed(2),
+      });
+      
+      // Enregistrer la facture récurrente
+      const now = new Date();
+      let periodeFin = new Date(now);
+      switch (contrat.periodicite) {
+        case 'mensuel': periodeFin.setMonth(periodeFin.getMonth() + 1); break;
+        case 'trimestriel': periodeFin.setMonth(periodeFin.getMonth() + 3); break;
+        case 'semestriel': periodeFin.setMonth(periodeFin.getMonth() + 6); break;
+        case 'annuel': periodeFin.setFullYear(periodeFin.getFullYear() + 1); break;
+      }
+      
+      await db.createFactureRecurrente({
+        contratId: contrat.id,
+        factureId: facture.id,
+        periodeDebut: now,
+        periodeFin,
+        genereeAutomatiquement: false,
+      });
+      
+      // Mettre à jour la prochaine date de facturation
+      await db.updateContrat(contrat.id, { prochainFacturation: periodeFin });
+      
+      return facture;
+    }),
+});
+
+// ============================================================================
+// INTERVENTIONS MOBILE ROUTER
+// ============================================================================
+const interventionsMobileRouter = router({
+  // Récupérer les interventions du jour pour le mobile
+  getTodayInterventions: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const interventionsList = await db.getInterventionsByArtisanId(artisan.id);
+    const todayInterventions = interventionsList.filter(i => {
+      const date = new Date(i.dateDebut);
+      return date >= today && date < tomorrow;
+    });
+    
+    // Enrichir avec les données mobiles et client
+    return Promise.all(todayInterventions.map(async (i) => {
+      const client = await db.getClientById(i.clientId);
+      const mobileData = await db.getInterventionMobileByInterventionId(i.id);
+      return { ...i, client, mobileData };
+    }));
+  }),
+
+  // Démarrer une intervention (arrivée sur site)
+  startIntervention: protectedProcedure
+    .input(z.object({
+      interventionId: z.number(),
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      // Mettre à jour le statut de l'intervention
+      await db.updateIntervention(input.interventionId, { statut: 'en_cours' });
+      
+      // Créer ou mettre à jour les données mobiles
+      let mobileData = await db.getInterventionMobileByInterventionId(input.interventionId);
+      if (mobileData) {
+        mobileData = await db.updateInterventionMobile(mobileData.id, {
+          heureArrivee: new Date(),
+          latitude: input.latitude?.toString(),
+          longitude: input.longitude?.toString(),
+        });
+      } else {
+        mobileData = await db.createInterventionMobile({
+          interventionId: input.interventionId,
+          artisanId: artisan.id,
+          heureArrivee: new Date(),
+          latitude: input.latitude?.toString(),
+          longitude: input.longitude?.toString(),
+        });
+      }
+      
+      return mobileData;
+    }),
+
+  // Terminer une intervention
+  endIntervention: protectedProcedure
+    .input(z.object({
+      interventionId: z.number(),
+      notes: z.string().optional(),
+      signatureClient: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      // Mettre à jour le statut de l'intervention
+      await db.updateIntervention(input.interventionId, { statut: 'terminee' });
+      
+      // Mettre à jour les données mobiles
+      const mobileData = await db.getInterventionMobileByInterventionId(input.interventionId);
+      if (mobileData) {
+        await db.updateInterventionMobile(mobileData.id, {
+          heureDepart: new Date(),
+          notesIntervention: input.notes,
+          signatureClient: input.signatureClient,
+          signatureDate: input.signatureClient ? new Date() : undefined,
+        });
+      }
+      
+      return { success: true };
+    }),
+
+  // Ajouter une photo
+  addPhoto: protectedProcedure
+    .input(z.object({
+      interventionId: z.number(),
+      url: z.string(),
+      description: z.string().optional(),
+      type: z.enum(["avant", "pendant", "apres"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      // Récupérer ou créer les données mobiles
+      let mobileData = await db.getInterventionMobileByInterventionId(input.interventionId);
+      if (!mobileData) {
+        mobileData = await db.createInterventionMobile({
+          interventionId: input.interventionId,
+          artisanId: artisan.id,
+        });
+      }
+      
+      return await db.createPhotoIntervention({
+        interventionMobileId: mobileData.id,
+        url: input.url,
+        description: input.description,
+        type: input.type || 'pendant',
+      });
+    }),
+
+  // Récupérer les photos d'une intervention
+  getPhotos: protectedProcedure
+    .input(z.object({ interventionId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      const mobileData = await db.getInterventionMobileByInterventionId(input.interventionId);
+      if (!mobileData) return [];
+      
+      return await db.getPhotosByInterventionMobileId(mobileData.id);
+    }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({system: systemRouter,
@@ -2098,6 +2575,9 @@ export const appRouter = router({system: systemRouter,
   fournisseurs: fournisseursRouter,
   modelesEmail: modelesEmailRouter,
   commandesFournisseurs: commandesFournisseursRouter,
+  clientPortal: clientPortalRouter,
+  contrats: contratsRouter,
+  interventionsMobile: interventionsMobileRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -23,7 +23,13 @@ import {
   modelesEmail, InsertModeleEmail, ModeleEmail,
   commandesFournisseurs, InsertCommandeFournisseur, CommandeFournisseur,
   lignesCommandesFournisseurs, InsertLigneCommandeFournisseur, LigneCommandeFournisseur,
-  paiementsStripe, InsertPaiementStripe, PaiementStripe
+  paiementsStripe, InsertPaiementStripe, PaiementStripe,
+  clientPortalAccess, InsertClientPortalAccess, ClientPortalAccess,
+  clientPortalSessions, InsertClientPortalSession, ClientPortalSession,
+  contratsMaintenance, InsertContratMaintenance, ContratMaintenance,
+  facturesRecurrentes, InsertFactureRecurrente, FactureRecurrente,
+  interventionsMobile, InsertInterventionMobile, InterventionMobile,
+  photosInterventions, InsertPhotoIntervention, PhotoIntervention
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1988,4 +1994,271 @@ export async function markPaiementComplete(id: number, paymentIntentId: string):
   const updated = await db.select().from(paiementsStripe).where(eq(paiementsStripe.id, id)).limit(1);
   if (updated.length === 0) throw new Error("Payment not found");
   return updated[0];
+}
+
+
+// ============================================================================
+// CLIENT PORTAL ACCESS QUERIES
+// ============================================================================
+
+export async function createClientPortalAccess(data: InsertClientPortalAccess): Promise<ClientPortalAccess> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(clientPortalAccess).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(clientPortalAccess).where(eq(clientPortalAccess.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create portal access");
+  return created[0];
+}
+
+export async function getClientPortalAccessByToken(token: string): Promise<ClientPortalAccess | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(clientPortalAccess)
+    .where(and(
+      eq(clientPortalAccess.token, token),
+      eq(clientPortalAccess.isActive, true),
+      gte(clientPortalAccess.expiresAt, new Date())
+    ))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateClientPortalAccessLastAccess(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(clientPortalAccess).set({ lastAccessAt: new Date() }).where(eq(clientPortalAccess.id, id));
+}
+
+export async function deactivateClientPortalAccess(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(clientPortalAccess).set({ isActive: false }).where(eq(clientPortalAccess.id, id));
+}
+
+// ============================================================================
+// CLIENT PORTAL SESSION QUERIES
+// ============================================================================
+
+export async function createClientPortalSession(data: InsertClientPortalSession): Promise<ClientPortalSession> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(clientPortalSessions).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(clientPortalSessions).where(eq(clientPortalSessions.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create session");
+  return created[0];
+}
+
+export async function getClientPortalSessionByToken(token: string): Promise<ClientPortalSession | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(clientPortalSessions)
+    .where(and(
+      eq(clientPortalSessions.sessionToken, token),
+      gte(clientPortalSessions.expiresAt, new Date())
+    ))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function deleteClientPortalSession(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(clientPortalSessions).where(eq(clientPortalSessions.sessionToken, token));
+}
+
+// ============================================================================
+// CONTRATS MAINTENANCE QUERIES
+// ============================================================================
+
+export async function getContratsByArtisanId(artisanId: number): Promise<ContratMaintenance[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(contratsMaintenance)
+    .where(eq(contratsMaintenance.artisanId, artisanId))
+    .orderBy(desc(contratsMaintenance.createdAt));
+}
+
+export async function getContratById(id: number): Promise<ContratMaintenance | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(contratsMaintenance).where(eq(contratsMaintenance.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getContratsByClientId(clientId: number): Promise<ContratMaintenance[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(contratsMaintenance)
+    .where(eq(contratsMaintenance.clientId, clientId))
+    .orderBy(desc(contratsMaintenance.createdAt));
+}
+
+export async function getContratsAFacturer(): Promise<ContratMaintenance[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const now = new Date();
+  return await db.select().from(contratsMaintenance)
+    .where(and(
+      eq(contratsMaintenance.statut, 'actif'),
+      lte(contratsMaintenance.prochainFacturation, now)
+    ));
+}
+
+export async function createContrat(data: InsertContratMaintenance): Promise<ContratMaintenance> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(contratsMaintenance).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(contratsMaintenance).where(eq(contratsMaintenance.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create contract");
+  return created[0];
+}
+
+export async function updateContrat(id: number, data: Partial<InsertContratMaintenance>): Promise<ContratMaintenance> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(contratsMaintenance).set({ ...data, updatedAt: new Date() }).where(eq(contratsMaintenance.id, id));
+  const updated = await db.select().from(contratsMaintenance).where(eq(contratsMaintenance.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Contract not found");
+  return updated[0];
+}
+
+export async function deleteContrat(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(contratsMaintenance).where(eq(contratsMaintenance.id, id));
+}
+
+export async function getNextContratNumber(artisanId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) return `CONT-${Date.now()}`;
+  const year = new Date().getFullYear();
+  const result = await db.select().from(contratsMaintenance)
+    .where(eq(contratsMaintenance.artisanId, artisanId))
+    .orderBy(desc(contratsMaintenance.id))
+    .limit(1);
+  const lastNum = result.length > 0 ? parseInt(result[0].reference.split('-')[2] || '0') : 0;
+  return `CONT-${year}-${String(lastNum + 1).padStart(4, '0')}`;
+}
+
+// ============================================================================
+// FACTURES RECURRENTES QUERIES
+// ============================================================================
+
+export async function createFactureRecurrente(data: InsertFactureRecurrente): Promise<FactureRecurrente> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(facturesRecurrentes).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(facturesRecurrentes).where(eq(facturesRecurrentes.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create recurring invoice");
+  return created[0];
+}
+
+export async function getFacturesRecurrentesByContratId(contratId: number): Promise<FactureRecurrente[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(facturesRecurrentes)
+    .where(eq(facturesRecurrentes.contratId, contratId))
+    .orderBy(desc(facturesRecurrentes.createdAt));
+}
+
+// ============================================================================
+// INTERVENTIONS MOBILE QUERIES
+// ============================================================================
+
+export async function getInterventionMobileByInterventionId(interventionId: number): Promise<InterventionMobile | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(interventionsMobile)
+    .where(eq(interventionsMobile.interventionId, interventionId))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createInterventionMobile(data: InsertInterventionMobile): Promise<InterventionMobile> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(interventionsMobile).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(interventionsMobile).where(eq(interventionsMobile.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create mobile intervention");
+  return created[0];
+}
+
+export async function updateInterventionMobile(id: number, data: Partial<InsertInterventionMobile>): Promise<InterventionMobile> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(interventionsMobile).set({ ...data, updatedAt: new Date() }).where(eq(interventionsMobile.id, id));
+  const updated = await db.select().from(interventionsMobile).where(eq(interventionsMobile.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Mobile intervention not found");
+  return updated[0];
+}
+
+export async function getInterventionsMobilesPending(artisanId: number): Promise<InterventionMobile[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(interventionsMobile)
+    .where(and(
+      eq(interventionsMobile.artisanId, artisanId),
+      eq(interventionsMobile.syncStatus, 'pending')
+    ));
+}
+
+// ============================================================================
+// PHOTOS INTERVENTIONS QUERIES
+// ============================================================================
+
+export async function getPhotosByInterventionMobileId(interventionMobileId: number): Promise<PhotoIntervention[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(photosInterventions)
+    .where(eq(photosInterventions.interventionMobileId, interventionMobileId))
+    .orderBy(photosInterventions.takenAt);
+}
+
+export async function createPhotoIntervention(data: InsertPhotoIntervention): Promise<PhotoIntervention> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(photosInterventions).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(photosInterventions).where(eq(photosInterventions.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create photo");
+  return created[0];
+}
+
+export async function deletePhotoIntervention(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(photosInterventions).where(eq(photosInterventions.id, id));
+}
+
+// ============================================================================
+// CLIENT PORTAL DATA QUERIES
+// ============================================================================
+
+export async function getDevisByClientId(clientId: number): Promise<Devis[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(devis)
+    .where(eq(devis.clientId, clientId))
+    .orderBy(desc(devis.createdAt));
+}
+
+export async function getFacturesByClientId(clientId: number): Promise<Facture[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(factures)
+    .where(eq(factures.clientId, clientId))
+    .orderBy(desc(factures.createdAt));
+}
+
+export async function getInterventionsByClientId(clientId: number): Promise<Intervention[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(interventions)
+    .where(eq(interventions.clientId, clientId))
+    .orderBy(desc(interventions.dateDebut));
 }
