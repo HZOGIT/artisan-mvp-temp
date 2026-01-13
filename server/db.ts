@@ -15,7 +15,10 @@ import {
   parametresArtisan, InsertParametresArtisan, ParametresArtisan,
   signaturesDevis, InsertSignatureDevis, SignatureDevis,
   stocks, InsertStock, Stock,
-  mouvementsStock, InsertMouvementStock, MouvementStock
+  mouvementsStock, InsertMouvementStock, MouvementStock,
+  fournisseurs, InsertFournisseur, Fournisseur,
+  articlesFournisseurs, InsertArticleFournisseur, ArticleFournisseur,
+  smsVerifications, InsertSmsVerification, SmsVerification
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1352,4 +1355,127 @@ export async function getArtisanById(id: number): Promise<Artisan | undefined> {
   if (!db) return undefined;
   const result = await db.select().from(artisans).where(eq(artisans.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+
+// ============================================================================
+// FOURNISSEURS QUERIES
+// ============================================================================
+
+export async function getFournisseursByArtisan(artisanId: number): Promise<Fournisseur[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(fournisseurs).where(eq(fournisseurs.artisanId, artisanId)).orderBy(desc(fournisseurs.createdAt));
+}
+
+export async function getFournisseurById(id: number): Promise<Fournisseur | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(fournisseurs).where(eq(fournisseurs.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createFournisseur(data: InsertFournisseur): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(fournisseurs).values(data);
+  return Number(result[0].insertId);
+}
+
+export async function updateFournisseur(id: number, data: Partial<InsertFournisseur>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(fournisseurs).set(data).where(eq(fournisseurs.id, id));
+}
+
+export async function deleteFournisseur(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(fournisseurs).where(eq(fournisseurs.id, id));
+}
+
+// ============================================================================
+// ARTICLES FOURNISSEURS QUERIES
+// ============================================================================
+
+export async function getArticleFournisseurs(articleId: number): Promise<ArticleFournisseur[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(articlesFournisseurs).where(eq(articlesFournisseurs.articleId, articleId));
+}
+
+export async function getFournisseurArticles(fournisseurId: number): Promise<ArticleFournisseur[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(articlesFournisseurs).where(eq(articlesFournisseurs.fournisseurId, fournisseurId));
+}
+
+export async function createArticleFournisseur(data: InsertArticleFournisseur): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(articlesFournisseurs).values(data);
+  return Number(result[0].insertId);
+}
+
+export async function updateArticleFournisseur(id: number, data: Partial<InsertArticleFournisseur>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(articlesFournisseurs).set(data).where(eq(articlesFournisseurs.id, id));
+}
+
+export async function deleteArticleFournisseur(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(articlesFournisseurs).where(eq(articlesFournisseurs.id, id));
+}
+
+// ============================================================================
+// SMS VERIFICATION QUERIES
+// ============================================================================
+
+export async function createSmsVerification(data: InsertSmsVerification): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(smsVerifications).values(data);
+  return Number(result[0].insertId);
+}
+
+export async function getSmsVerificationBySignature(signatureId: number): Promise<SmsVerification | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(smsVerifications)
+    .where(eq(smsVerifications.signatureId, signatureId))
+    .orderBy(desc(smsVerifications.createdAt))
+    .limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function verifySmsCode(signatureId: number, code: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  
+  const verification = await db.select().from(smsVerifications)
+    .where(and(
+      eq(smsVerifications.signatureId, signatureId),
+      eq(smsVerifications.code, code),
+      eq(smsVerifications.verified, false)
+    ))
+    .limit(1);
+  
+  if (verification.length === 0) return false;
+  
+  const v = verification[0];
+  if (new Date(v.expiresAt) < new Date()) return false;
+  
+  await db.update(smsVerifications)
+    .set({ verified: true })
+    .where(eq(smsVerifications.id, v.id));
+  
+  return true;
+}
+
+export async function markSmsVerified(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(smsVerifications).set({ verified: true }).where(eq(smsVerifications.id, id));
 }

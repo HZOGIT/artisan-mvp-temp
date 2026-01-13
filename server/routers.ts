@@ -1198,12 +1198,103 @@ const signatureRouter = router({
       };
     }),
   
+  // Demander l'envoi d'un code SMS pour validation
+  requestSmsCode: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      telephone: z.string()
+    }))
+    .mutation(async ({ input }) => {
+      const signature = await db.getSignatureByToken(input.token);
+      if (!signature) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+      }
+      
+      if (new Date() > signature.expiresAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Lien de signature expiré" });
+      }
+      
+      if (signature.signedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été signé" });
+      }
+      
+      // Générer un code à 6 chiffres
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Expiration dans 10 minutes
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 10);
+      
+      // Enregistrer la vérification SMS
+      await db.createSmsVerification({
+        signatureId: signature.id,
+        telephone: input.telephone,
+        code,
+        expiresAt
+      });
+      
+      // En production, ici on enverrait le SMS via un service comme Twilio
+      // Pour le développement, on log le code
+      console.log(`[SMS] Code de vérification pour ${input.telephone}: ${code}`);
+      
+      // Simuler l'envoi SMS (en production, utiliser Twilio ou autre)
+      // await sendSms(input.telephone, `Votre code de vérification pour signer le devis: ${code}`);
+      
+      return { 
+        success: true, 
+        message: "Code de vérification envoyé",
+        // En mode développement, on retourne le code pour faciliter les tests
+        // En production, ne JAMAIS retourner le code
+        devCode: process.env.NODE_ENV === 'development' ? code : undefined
+      };
+    }),
+  
+  // Vérifier le code SMS
+  verifySmsCode: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      code: z.string()
+    }))
+    .mutation(async ({ input }) => {
+      const signature = await db.getSignatureByToken(input.token);
+      if (!signature) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+      }
+      
+      const isValid = await db.verifySmsCode(signature.id, input.code);
+      
+      if (!isValid) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Code de vérification invalide ou expiré" });
+      }
+      
+      return { success: true, message: "Code vérifié avec succès" };
+    }),
+  
+  // Vérifier si une vérification SMS est requise et son état
+  getSmsVerificationStatus: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const signature = await db.getSignatureByToken(input.token);
+      if (!signature) {
+        return { required: false, verified: false };
+      }
+      
+      const verification = await db.getSmsVerificationBySignature(signature.id);
+      
+      return {
+        required: true,
+        verified: verification?.verified || false,
+        telephone: verification?.telephone || null
+      };
+    }),
+  
   signDevis: publicProcedure
     .input(z.object({
       token: z.string(),
       signatureData: z.string(),
       signataireName: z.string(),
-      signataireEmail: z.string().email()
+      signataireEmail: z.string().email(),
+      smsVerified: z.boolean().optional()
     }))
     .mutation(async ({ input, ctx }) => {
       const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
@@ -1404,6 +1495,99 @@ const parametresRouter = router({
 });
 
 // ============================================================================
+// FOURNISSEURS ROUTER
+// ============================================================================
+const fournisseursRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getFournisseursByArtisan(artisan.id);
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getFournisseurById(input.id);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      nom: z.string(),
+      contact: z.string().optional(),
+      email: z.string().email().optional(),
+      telephone: z.string().optional(),
+      adresse: z.string().optional(),
+      codePostal: z.string().optional(),
+      ville: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      return await db.createFournisseur({ artisanId: artisan.id, ...input });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      contact: z.string().optional(),
+      email: z.string().email().optional(),
+      telephone: z.string().optional(),
+      adresse: z.string().optional(),
+      codePostal: z.string().optional(),
+      ville: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      await db.updateFournisseur(id, data);
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.deleteFournisseur(input.id);
+      return { success: true };
+    }),
+
+  // Article-Fournisseur associations
+  getArticleFournisseurs: protectedProcedure
+    .input(z.object({ articleId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getArticleFournisseurs(input.articleId);
+    }),
+
+  getFournisseurArticles: protectedProcedure
+    .input(z.object({ fournisseurId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getFournisseurArticles(input.fournisseurId);
+    }),
+
+  associateArticle: protectedProcedure
+    .input(z.object({
+      articleId: z.number(),
+      fournisseurId: z.number(),
+      referenceExterne: z.string().optional(),
+      prixAchat: z.string().optional(),
+      delaiLivraison: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createArticleFournisseur(input);
+    }),
+
+  dissociateArticle: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.deleteArticleFournisseur(input.id);
+      return { success: true };
+    }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({
@@ -1427,6 +1611,7 @@ export const appRouter = router({
   parametres: parametresRouter,
   signature: signatureRouter,
   stocks: stocksRouter,
+  fournisseurs: fournisseursRouter,
 });
 
 export type AppRouter = typeof appRouter;

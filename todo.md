@@ -126,3 +126,25 @@
 - [x] Notifications d'alerte stock bas
 - [x] Historique des mouvements de stock
 - [x] Page de gestion des stocks
+
+
+## Nouvelles Fonctionnalités (Sprint 5)
+
+### Export Tableau de Bord
+- [x] Export des statistiques en format PDF
+- [x] Export des données en format CSV
+- [x] Sélection de la période à exporter
+- [x] Mise en page professionnelle du PDF
+
+### Gestion des Fournisseurs
+- [x] Table des fournisseurs (nom, contact, email, téléphone)
+- [x] Association articles-fournisseurs
+- [x] Affichage du fournisseur sur la page de stocks
+- [x] Filtrage des articles par fournisseur
+- [x] Page de gestion des fournisseurs
+
+### Validation SMS pour Signature
+- [x] Envoi de code SMS au client avant signature
+- [x] Vérification du code SMS
+- [x] Enregistrement de la validation SMS avec la signature
+- [x] Configuration du numéro de téléphone du client

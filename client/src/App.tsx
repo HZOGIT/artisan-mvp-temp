@@ -19,6 +19,7 @@ import Parametres from "./pages/Parametres";
 import Calendrier from "./pages/Calendrier";
 import DashboardAdvanced from "./pages/DashboardAdvanced";
 import Stocks from "./pages/Stocks";
+import Fournisseurs from "./pages/Fournisseurs";
 import SignatureDevis from "./pages/SignatureDevis";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -39,6 +40,7 @@ function AuthenticatedRoutes() {
         <Route path="/calendrier" component={Calendrier} />
         <Route path="/statistiques" component={DashboardAdvanced} />
         <Route path="/stocks" component={Stocks} />
+        <Route path="/fournisseurs" component={Fournisseurs} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />
@@ -76,6 +78,7 @@ function Router() {
           <Route path="/calendrier" component={() => <AuthenticatedRoutes />} />
           <Route path="/statistiques" component={() => <AuthenticatedRoutes />} />
           <Route path="/stocks" component={() => <AuthenticatedRoutes />} />
+          <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
           <Route path="/profil" component={() => <AuthenticatedRoutes />} />
           <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
         </>

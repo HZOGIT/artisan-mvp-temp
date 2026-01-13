@@ -22,6 +22,13 @@
       "when": 1768326574875,
       "tag": "0002_flat_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1768328080305,
+      "tag": "0003_smart_dark_beast",
+      "breakpoints": true
     }
   ]
 }

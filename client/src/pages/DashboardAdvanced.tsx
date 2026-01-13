@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { Loader2, TrendingUp, TrendingDown, Users, FileText, Euro, BarChart3, PieChart, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Users, FileText, Euro, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, Download, FileSpreadsheet } from "lucide-react";
+import { exportDashboardToPDF, exportDashboardToCSV } from "@/lib/dashboardExport";
 import { Link } from "wouter";
 import {
   LineChart,
@@ -76,9 +77,83 @@ export default function DashboardAdvanced() {
             <h1 className="text-3xl font-bold tracking-tight">Tableau de Bord Avancé</h1>
             <p className="text-muted-foreground">Analyse détaillée de votre activité</p>
           </div>
-          <Link href="/dashboard">
-            <Button variant="outline">Tableau de bord simple</Button>
-          </Link>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const exportData = {
+                  stats: {
+                    caAnnuel: yearlyComparison?.currentYear || 0,
+                    caAnnuelPrecedent: yearlyComparison?.previousYear || 0,
+                    evolutionCA: yearlyComparison?.growth || 0,
+                    totalDevis: conversionRate?.totalDevis || 0,
+                    devisAcceptes: conversionRate?.devisAcceptes || 0,
+                    tauxConversion: Number(conversionRate?.rate) || 0,
+                    totalFactures: stats?.facturesImpayees?.count || 0,
+                    facturesPayees: 0,
+                    facturesImpayees: typeof stats?.facturesImpayees === 'object' ? stats.facturesImpayees.count : (stats?.facturesImpayees || 0),
+                    totalClients: stats?.totalClients || 0,
+                    nouveauxClients: clientEvolution?.[clientEvolution.length - 1]?.count || 0,
+                  },
+                  monthlyData: (monthlyCA || []).map((m: any) => ({
+                    mois: m.mois,
+                    ca: m.ca,
+                    caPrecedent: m.caPrecedent || 0,
+                  })),
+                  topClients: (topClients || []).map((c: any) => ({
+                    nom: c.nom,
+                    ca: c.totalCA,
+                    nombreFactures: c.nombreFactures,
+                  })),
+                  periode: new Date().getFullYear().toString(),
+                  artisanName: user?.name || 'Artisan',
+                };
+                exportDashboardToPDF(exportData);
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export PDF
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const exportData = {
+                  stats: {
+                    caAnnuel: yearlyComparison?.currentYear || 0,
+                    caAnnuelPrecedent: yearlyComparison?.previousYear || 0,
+                    evolutionCA: yearlyComparison?.growth || 0,
+                    totalDevis: conversionRate?.totalDevis || 0,
+                    devisAcceptes: conversionRate?.devisAcceptes || 0,
+                    tauxConversion: Number(conversionRate?.rate) || 0,
+                    totalFactures: stats?.facturesImpayees?.count || 0,
+                    facturesPayees: 0,
+                    facturesImpayees: typeof stats?.facturesImpayees === 'object' ? stats.facturesImpayees.count : (stats?.facturesImpayees || 0),
+                    totalClients: stats?.totalClients || 0,
+                    nouveauxClients: clientEvolution?.[clientEvolution.length - 1]?.count || 0,
+                  },
+                  monthlyData: (monthlyCA || []).map((m: any) => ({
+                    mois: m.mois,
+                    ca: m.ca,
+                    caPrecedent: m.caPrecedent || 0,
+                  })),
+                  topClients: (topClients || []).map((c: any) => ({
+                    nom: c.nom,
+                    ca: c.totalCA,
+                    nombreFactures: c.nombreFactures,
+                  })),
+                  periode: new Date().getFullYear().toString(),
+                  artisanName: user?.name || 'Artisan',
+                };
+                exportDashboardToCSV(exportData);
+              }}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+            <Link href="/dashboard">
+              <Button variant="outline">Tableau de bord simple</Button>
+            </Link>
+          </div>
         </div>
 
         {isLoading ? (

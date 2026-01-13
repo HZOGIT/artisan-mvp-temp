@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Check, FileText, Building2, User, Pen, AlertCircle } from "lucide-react";
+import { Loader2, Check, FileText, Building2, User, Pen, AlertCircle, Phone, Shield, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
+
+type SignatureStep = "info" | "sms" | "signature";
 
 export default function SignatureDevis() {
   const { token } = useParams<{ token: string }>();
@@ -16,13 +18,42 @@ export default function SignatureDevis() {
   const [hasSignature, setHasSignature] = useState(false);
   const [signataireName, setSignataireName] = useState("");
   const [signataireEmail, setSignataireEmail] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [smsCode, setSmsCode] = useState("");
   const [isSigning, setIsSigning] = useState(false);
   const [signatureComplete, setSignatureComplete] = useState(false);
+  const [currentStep, setCurrentStep] = useState<SignatureStep>("info");
+  const [smsVerified, setSmsVerified] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
 
   const { data, isLoading, error } = trpc.signature.getDevisForSignature.useQuery(
     { token: token || "" },
     { enabled: !!token }
   );
+
+  const requestSmsMutation = trpc.signature.requestSmsCode.useMutation({
+    onSuccess: (data) => {
+      toast.success("Code de vérification envoyé par SMS");
+      setCurrentStep("sms");
+      if (data.devCode) {
+        setDevCode(data.devCode);
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  const verifySmsMutation = trpc.signature.verifySmsCode.useMutation({
+    onSuccess: () => {
+      toast.success("Code vérifié avec succès");
+      setSmsVerified(true);
+      setCurrentStep("signature");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
 
   const signMutation = trpc.signature.signDevis.useMutation({
     onSuccess: () => {
@@ -51,7 +82,7 @@ export default function SignatureDevis() {
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-  }, [data]);
+  }, [data, currentStep]);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -118,9 +149,45 @@ export default function SignatureDevis() {
     setHasSignature(false);
   };
 
+  const handleRequestSms = () => {
+    if (!signataireName || !signataireEmail || !telephone) {
+      toast.error("Veuillez remplir tous les champs");
+      return;
+    }
+    
+    // Validation basique du numéro de téléphone
+    const phoneRegex = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
+    if (!phoneRegex.test(telephone.replace(/\s/g, ''))) {
+      toast.error("Veuillez entrer un numéro de téléphone valide");
+      return;
+    }
+
+    requestSmsMutation.mutate({
+      token: token || "",
+      telephone: telephone.replace(/\s/g, '')
+    });
+  };
+
+  const handleVerifySms = () => {
+    if (!smsCode || smsCode.length !== 6) {
+      toast.error("Veuillez entrer un code à 6 chiffres");
+      return;
+    }
+
+    verifySmsMutation.mutate({
+      token: token || "",
+      code: smsCode
+    });
+  };
+
   const handleSign = async () => {
     if (!hasSignature || !signataireName || !signataireEmail || !token) {
       toast.error("Veuillez remplir tous les champs et signer le document");
+      return;
+    }
+
+    if (!smsVerified) {
+      toast.error("Veuillez d'abord vérifier votre numéro de téléphone");
       return;
     }
 
@@ -134,7 +201,8 @@ export default function SignatureDevis() {
       token,
       signatureData,
       signataireName,
-      signataireEmail
+      signataireEmail,
+      smsVerified: true
     });
   };
 
@@ -218,6 +286,38 @@ export default function SignatureDevis() {
               <FileText className="h-12 w-12 text-primary" />
             </div>
           </CardHeader>
+        </Card>
+
+        {/* Progress Steps */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className={`flex items-center gap-2 ${currentStep === "info" ? "text-primary" : smsVerified ? "text-green-500" : "text-muted-foreground"}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "info" ? "bg-primary text-white" : smsVerified ? "bg-green-500 text-white" : "bg-muted"}`}>
+                  {smsVerified ? <Check className="h-4 w-4" /> : "1"}
+                </div>
+                <span className="hidden sm:inline font-medium">Informations</span>
+              </div>
+              <div className="flex-1 h-1 mx-4 bg-muted">
+                <div className={`h-full transition-all ${currentStep !== "info" ? "bg-primary" : "bg-muted"}`} style={{ width: currentStep === "info" ? "0%" : "100%" }} />
+              </div>
+              <div className={`flex items-center gap-2 ${currentStep === "sms" ? "text-primary" : smsVerified ? "text-green-500" : "text-muted-foreground"}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "sms" ? "bg-primary text-white" : smsVerified ? "bg-green-500 text-white" : "bg-muted"}`}>
+                  {smsVerified ? <Check className="h-4 w-4" /> : "2"}
+                </div>
+                <span className="hidden sm:inline font-medium">Vérification SMS</span>
+              </div>
+              <div className="flex-1 h-1 mx-4 bg-muted">
+                <div className={`h-full transition-all ${currentStep === "signature" ? "bg-primary" : "bg-muted"}`} style={{ width: currentStep === "signature" ? "100%" : "0%" }} />
+              </div>
+              <div className={`flex items-center gap-2 ${currentStep === "signature" ? "text-primary" : "text-muted-foreground"}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "signature" ? "bg-primary text-white" : "bg-muted"}`}>
+                  3
+                </div>
+                <span className="hidden sm:inline font-medium">Signature</span>
+              </div>
+            </div>
+          </CardContent>
         </Card>
 
         {/* Artisan & Client Info */}
@@ -317,90 +417,237 @@ export default function SignatureDevis() {
           </CardContent>
         </Card>
 
-        {/* Signature Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Pen className="h-5 w-5 text-primary" />
-              <CardTitle>Votre signature</CardTitle>
-            </div>
-            <CardDescription>
-              En signant ce devis, vous acceptez les conditions et le montant proposé.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nom complet *</Label>
-                <Input
-                  id="name"
-                  value={signataireName}
-                  onChange={(e) => setSignataireName(e.target.value)}
-                  placeholder="Votre nom complet"
-                />
+        {/* Step 1: Information */}
+        {currentStep === "info" && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                <CardTitle>Vos informations</CardTitle>
+              </div>
+              <CardDescription>
+                Renseignez vos informations pour procéder à la signature.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nom complet *</Label>
+                  <Input
+                    id="name"
+                    value={signataireName}
+                    onChange={(e) => setSignataireName(e.target.value)}
+                    placeholder="Votre nom complet"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={signataireEmail}
+                    onChange={(e) => setSignataireEmail(e.target.value)}
+                    placeholder="votre@email.com"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={signataireEmail}
-                  onChange={(e) => setSignataireEmail(e.target.value)}
-                  placeholder="votre@email.com"
-                />
+                <Label htmlFor="telephone">Numéro de téléphone *</Label>
+                <div className="flex gap-2">
+                  <Phone className="h-5 w-5 mt-2 text-muted-foreground" />
+                  <Input
+                    id="telephone"
+                    type="tel"
+                    value={telephone}
+                    onChange={(e) => setTelephone(e.target.value)}
+                    placeholder="06 12 34 56 78"
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Un code de vérification sera envoyé à ce numéro pour sécuriser la signature.
+                </p>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Signature manuscrite *</Label>
-              <div className="border-2 border-dashed rounded-lg p-2 bg-white">
-                <canvas
-                  ref={canvasRef}
-                  className="w-full cursor-crosshair touch-none"
-                  style={{ height: "200px" }}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                  onTouchStart={startDrawing}
-                  onTouchMove={draw}
-                  onTouchEnd={stopDrawing}
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-blue-500 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-blue-900">Signature sécurisée</p>
+                    <p className="text-sm text-blue-700">
+                      Pour garantir l'authenticité de votre signature, nous utilisons une vérification par SMS.
+                      Vous recevrez un code à 6 chiffres sur votre téléphone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={handleRequestSms}
+                disabled={requestSmsMutation.isPending || !signataireName || !signataireEmail || !telephone}
+              >
+                {requestSmsMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Envoi du code...
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Recevoir le code de vérification
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2: SMS Verification */}
+        {currentStep === "sms" && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                <CardTitle>Vérification SMS</CardTitle>
+              </div>
+              <CardDescription>
+                Entrez le code à 6 chiffres envoyé au {telephone}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {devCode && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Mode développement:</strong> Le code de vérification est <strong className="text-lg">{devCode}</strong>
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="smsCode">Code de vérification</Label>
+                <Input
+                  id="smsCode"
+                  type="text"
+                  maxLength={6}
+                  value={smsCode}
+                  onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="text-center text-2xl tracking-widest"
                 />
               </div>
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" onClick={clearSignature}>
-                  Effacer la signature
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep("info")}
+                  className="flex-1"
+                >
+                  Retour
+                </Button>
+                <Button
+                  onClick={handleVerifySms}
+                  disabled={verifySmsMutation.isPending || smsCode.length !== 6}
+                  className="flex-1"
+                >
+                  {verifySmsMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Vérification...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Vérifier le code
+                    </>
+                  )}
                 </Button>
               </div>
-            </div>
 
-            <div className="bg-muted p-4 rounded-lg text-sm text-muted-foreground">
-              <p>
-                En cliquant sur "Signer et accepter le devis", je certifie avoir lu et accepté les termes de ce devis.
-                Cette signature électronique a valeur légale conformément au règlement eIDAS.
-              </p>
-            </div>
+              <div className="text-center">
+                <Button
+                  variant="link"
+                  onClick={handleRequestSms}
+                  disabled={requestSmsMutation.isPending}
+                >
+                  Renvoyer le code
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={handleSign}
-              disabled={isSigning || !hasSignature || !signataireName || !signataireEmail}
-            >
-              {isSigning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signature en cours...
-                </>
-              ) : (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Signer et accepter le devis
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Step 3: Signature */}
+        {currentStep === "signature" && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Pen className="h-5 w-5 text-primary" />
+                <CardTitle>Votre signature</CardTitle>
+              </div>
+              <CardDescription>
+                En signant ce devis, vous acceptez les conditions et le montant proposé.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                <div className="flex items-center gap-2 text-green-700">
+                  <Check className="h-5 w-5" />
+                  <span className="font-medium">Numéro de téléphone vérifié: {telephone}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Signature manuscrite *</Label>
+                <div className="border-2 border-dashed rounded-lg p-2 bg-white">
+                  <canvas
+                    ref={canvasRef}
+                    className="w-full cursor-crosshair touch-none"
+                    style={{ height: "200px" }}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={clearSignature}>
+                    Effacer la signature
+                  </Button>
+                </div>
+              </div>
+
+              <div className="bg-muted p-4 rounded-lg text-sm text-muted-foreground">
+                <p>
+                  En cliquant sur "Signer et accepter le devis", je certifie avoir lu et accepté les termes de ce devis.
+                  Cette signature électronique a valeur légale conformément au règlement eIDAS.
+                </p>
+              </div>
+
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleSign}
+                disabled={isSigning || !hasSignature}
+              >
+                {isSigning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signature en cours...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Signer et accepter le devis
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

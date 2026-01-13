@@ -319,3 +319,57 @@ export const mouvementsStock = mysqlTable("mouvements_stock", {
 
 export type MouvementStock = typeof mouvementsStock.$inferSelect;
 export type InsertMouvementStock = typeof mouvementsStock.$inferInsert;
+
+
+// ============================================================================
+// FOURNISSEURS TABLE (Suppliers)
+// ============================================================================
+export const fournisseurs = mysqlTable("fournisseurs", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  contact: varchar("contact", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  telephone: varchar("telephone", { length: 20 }),
+  adresse: text("adresse"),
+  codePostal: varchar("codePostal", { length: 10 }),
+  ville: varchar("ville", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Fournisseur = typeof fournisseurs.$inferSelect;
+export type InsertFournisseur = typeof fournisseurs.$inferInsert;
+
+// ============================================================================
+// ARTICLES FOURNISSEURS (Article-Supplier relationship)
+// ============================================================================
+export const articlesFournisseurs = mysqlTable("articles_fournisseurs", {
+  id: int("id").autoincrement().primaryKey(),
+  articleId: int("articleId").notNull(),
+  fournisseurId: int("fournisseurId").notNull(),
+  referenceExterne: varchar("referenceExterne", { length: 100 }),
+  prixAchat: decimal("prixAchat", { precision: 10, scale: 2 }),
+  delaiLivraison: int("delaiLivraison"), // in days
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ArticleFournisseur = typeof articlesFournisseurs.$inferSelect;
+export type InsertArticleFournisseur = typeof articlesFournisseurs.$inferInsert;
+
+// ============================================================================
+// SMS VERIFICATION (For signature validation)
+// ============================================================================
+export const smsVerifications = mysqlTable("sms_verifications", {
+  id: int("id").autoincrement().primaryKey(),
+  signatureId: int("signatureId").notNull(),
+  telephone: varchar("telephone", { length: 20 }).notNull(),
+  code: varchar("code", { length: 6 }).notNull(),
+  verified: boolean("verified").default(false),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SmsVerification = typeof smsVerifications.$inferSelect;
+export type InsertSmsVerification = typeof smsVerifications.$inferInsert;
