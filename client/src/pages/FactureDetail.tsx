@@ -8,9 +8,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { generateFacturePDF } from "@/lib/pdfGenerator";
 import { fr } from "date-fns/locale";
 
 const statusLabels: Record<string, string> = {
@@ -54,6 +55,7 @@ export default function FactureDetail() {
     { enabled: !!id }
   );
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
+  const { data: artisan } = trpc.artisan.getProfile.useQuery();
 
   const updateMutation = trpc.factures.update.useMutation({
     onSuccess: () => {
@@ -133,6 +135,40 @@ export default function FactureDetail() {
     }
   };
 
+  const handleExportPDF = () => {
+    if (!facture || !facture.client) {
+      toast.error("Impossible de générer le PDF");
+      return;
+    }
+    const artisanData = artisan || {};
+    const lignes = (facture.lignes || []).map((l: any) => ({
+      designation: l.designation,
+      description: l.description,
+      quantite: parseFloat(l.quantite) || 1,
+      unite: l.unite,
+      prixUnitaire: parseFloat(l.prixUnitaireHT) || 0,
+      tauxTva: parseFloat(l.tauxTVA) || 20,
+    }));
+    generateFacturePDF(
+      artisanData,
+      facture.client,
+      {
+        numero: facture.numero,
+        dateCreation: facture.createdAt,
+        dateEcheance: facture.dateEcheance,
+        statut: facture.statut || "brouillon",
+        objet: facture.objet,
+        lignes,
+        totalHT: parseFloat(facture.totalHT as any) || 0,
+        totalTVA: parseFloat(facture.totalTVA as any) || 0,
+        totalTTC: parseFloat(facture.totalTTC as any) || 0,
+        montantPaye: parseFloat(facture.montantPaye as any) || 0,
+        conditions: (facture as any).conditions || null,
+      }
+    );
+    toast.success("PDF généré avec succès");
+  };
+
   const formatCurrency = (amount: string | number | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount || 0;
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
@@ -176,6 +212,10 @@ export default function FactureDetail() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
           <Select value={facture.statut || 'brouillon'} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-40">
               <SelectValue />

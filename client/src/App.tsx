@@ -16,6 +16,7 @@ import Interventions from "./pages/Interventions";
 import Articles from "./pages/Articles";
 import Profil from "./pages/Profil";
 import Parametres from "./pages/Parametres";
+import Calendrier from "./pages/Calendrier";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -32,6 +33,7 @@ function AuthenticatedRoutes() {
         <Route path="/factures/:id" component={FactureDetail} />
         <Route path="/interventions" component={Interventions} />
         <Route path="/articles" component={Articles} />
+        <Route path="/calendrier" component={Calendrier} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />
@@ -65,6 +67,7 @@ function Router() {
           <Route path="/factures" component={() => <AuthenticatedRoutes />} />
           <Route path="/interventions" component={() => <AuthenticatedRoutes />} />
           <Route path="/articles" component={() => <AuthenticatedRoutes />} />
+          <Route path="/calendrier" component={() => <AuthenticatedRoutes />} />
           <Route path="/profil" component={() => <AuthenticatedRoutes />} />
           <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
         </>

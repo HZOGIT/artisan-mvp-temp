@@ -8,9 +8,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, FileText, User, Receipt } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { generateDevisPDF } from "@/lib/pdfGenerator";
 import { fr } from "date-fns/locale";
 
 const statusLabels: Record<string, string> = {
@@ -49,6 +50,7 @@ export default function DevisDetail() {
     { enabled: !!id }
   );
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
+  const { data: artisan } = trpc.artisan.getProfile.useQuery();
 
   const updateMutation = trpc.devis.update.useMutation({
     onSuccess: () => {
@@ -123,6 +125,39 @@ export default function DevisDetail() {
     }
   };
 
+  const handleExportPDF = () => {
+    if (!devis || !devis.client) {
+      toast.error("Impossible de générer le PDF");
+      return;
+    }
+    const artisanData = artisan || {};
+    const lignes = (devis.lignes || []).map((l: any) => ({
+      designation: l.designation,
+      description: l.description,
+      quantite: parseFloat(l.quantite) || 1,
+      unite: l.unite,
+      prixUnitaire: parseFloat(l.prixUnitaireHT) || 0,
+      tauxTva: parseFloat(l.tauxTVA) || 20,
+    }));
+    generateDevisPDF(
+      artisanData,
+      devis.client,
+      {
+        numero: devis.numero,
+        dateCreation: devis.createdAt,
+        dateValidite: devis.dateValidite,
+        statut: devis.statut || "brouillon",
+        objet: devis.objet,
+        lignes,
+        totalHT: parseFloat(devis.totalHT as any) || 0,
+        totalTVA: parseFloat(devis.totalTVA as any) || 0,
+        totalTTC: parseFloat(devis.totalTTC as any) || 0,
+        conditions: (devis as any).conditions || null,
+      }
+    );
+    toast.success("PDF généré avec succès");
+  };
+
   const handleSelectArticle = (articleId: string) => {
     const article = articles?.find((a: any) => a.id === parseInt(articleId));
     if (article) {
@@ -191,6 +226,10 @@ export default function DevisDetail() {
               <SelectItem value="refuse">Refusé</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={handleExportPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            Export PDF
+          </Button>
           {devis.statut === "accepte" && (
             <Button onClick={handleConvertToFacture} disabled={convertToFactureMutation.isPending}>
               <Receipt className="h-4 w-4 mr-2" />

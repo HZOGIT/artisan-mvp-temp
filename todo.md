@@ -57,3 +57,24 @@
 - [x] Interface responsive
 - [x] Design professionnel et fonctionnel
 - [x] Thème adapté à un usage métier quotidien
+
+
+## Nouvelles Fonctionnalités (Sprint 2)
+
+### Export PDF
+- [x] Export PDF pour les devis
+- [x] Export PDF pour les factures
+- [x] Mise en page professionnelle avec logo et informations artisan
+
+### Calendrier Visuel
+- [x] Calendrier interactif pour les interventions
+- [x] Vue mensuelle des interventions planifiées
+- [x] Création d'intervention depuis le calendrier
+- [x] Affichage des détails au clic
+
+### Historique Client Amélioré
+- [x] Onglet historique sur la fiche client
+- [x] Liste des devis du client
+- [x] Liste des factures du client
+- [x] Liste des interventions du client
+- [x] Statistiques client (total facturé, nombre d'interventions)
