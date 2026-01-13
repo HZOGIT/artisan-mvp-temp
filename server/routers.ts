@@ -3780,6 +3780,324 @@ const previsionsRouter = router({
 });
 
 // ============================================================================
+// VEHICULES ROUTER
+// ============================================================================
+const vehiculesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      artisan = await db.createArtisan({ userId: ctx.user.id });
+    }
+    return await db.getVehiculesByArtisan(artisan.id);
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getVehiculeById(input.id);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      immatriculation: z.string(),
+      marque: z.string().optional(),
+      modele: z.string().optional(),
+      annee: z.number().optional(),
+      typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
+      kilometrageActuel: z.number().optional(),
+      dateAchat: z.string().optional(),
+      prixAchat: z.string().optional(),
+      technicienId: z.number().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createVehicule({
+        artisanId: artisan.id,
+        ...input,
+        dateAchat: input.dateAchat ? new Date(input.dateAchat) : undefined,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      immatriculation: z.string().optional(),
+      marque: z.string().optional(),
+      modele: z.string().optional(),
+      annee: z.number().optional(),
+      typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
+      kilometrageActuel: z.number().optional(),
+      technicienId: z.number().nullable().optional(),
+      statut: z.enum(["actif", "en_maintenance", "hors_service", "vendu"]).optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      return await db.updateVehicule(id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.deleteVehicule(input.id);
+    }),
+
+  addKilometrage: protectedProcedure
+    .input(z.object({
+      vehiculeId: z.number(),
+      kilometrage: z.number(),
+      dateReleve: z.string(),
+      motif: z.string().optional(),
+      technicienId: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.addHistoriqueKilometrage({
+        ...input,
+        dateReleve: new Date(input.dateReleve),
+      });
+    }),
+
+  getHistoriqueKilometrage: protectedProcedure
+    .input(z.object({ vehiculeId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getHistoriqueKilometrageByVehicule(input.vehiculeId);
+    }),
+
+  addEntretien: protectedProcedure
+    .input(z.object({
+      vehiculeId: z.number(),
+      type: z.enum(["vidange", "pneus", "freins", "controle_technique", "revision", "reparation", "autre"]),
+      dateEntretien: z.string(),
+      kilometrageEntretien: z.number().optional(),
+      cout: z.string().optional(),
+      prestataire: z.string().optional(),
+      description: z.string().optional(),
+      prochainEntretienKm: z.number().optional(),
+      prochainEntretienDate: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createEntretienVehicule({
+        ...input,
+        dateEntretien: new Date(input.dateEntretien),
+        prochainEntretienDate: input.prochainEntretienDate ? new Date(input.prochainEntretienDate) : undefined,
+      });
+    }),
+
+  getEntretiens: protectedProcedure
+    .input(z.object({ vehiculeId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getEntretiensByVehicule(input.vehiculeId);
+    }),
+
+  getEntretiensAVenir: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getEntretiensAVenir(artisan.id);
+  }),
+
+  addAssurance: protectedProcedure
+    .input(z.object({
+      vehiculeId: z.number(),
+      compagnie: z.string(),
+      numeroContrat: z.string().optional(),
+      typeAssurance: z.enum(["tiers", "tiers_plus", "tous_risques"]).optional(),
+      dateDebut: z.string(),
+      dateFin: z.string(),
+      primeAnnuelle: z.string().optional(),
+      franchise: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createAssuranceVehicule({
+        ...input,
+        dateDebut: new Date(input.dateDebut),
+        dateFin: new Date(input.dateFin),
+      });
+    }),
+
+  getAssurances: protectedProcedure
+    .input(z.object({ vehiculeId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getAssurancesByVehicule(input.vehiculeId);
+    }),
+
+  getAssurancesExpirant: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getAssurancesExpirant(artisan.id, 30);
+  }),
+
+  getStatistiquesFlotte: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return null;
+    return await db.getStatistiquesFlotte(artisan.id);
+  }),
+});
+
+// ============================================================================
+// BADGES ET GAMIFICATION ROUTER
+// ============================================================================
+const badgesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      artisan = await db.createArtisan({ userId: ctx.user.id });
+    }
+    return await db.getBadgesByArtisan(artisan.id);
+  }),
+
+  create: protectedProcedure
+    .input(z.object({
+      code: z.string(),
+      nom: z.string(),
+      description: z.string().optional(),
+      icone: z.string().optional(),
+      couleur: z.string().optional(),
+      categorie: z.enum(["interventions", "avis", "ca", "anciennete", "special"]).optional(),
+      condition: z.string().optional(),
+      seuil: z.number().optional(),
+      points: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createBadge({ artisanId: artisan.id, ...input });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      description: z.string().optional(),
+      icone: z.string().optional(),
+      couleur: z.string().optional(),
+      seuil: z.number().optional(),
+      points: z.number().optional(),
+      actif: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      return await db.updateBadge(id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.deleteBadge(input.id);
+    }),
+
+  getBadgesTechnicien: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getBadgesTechnicien(input.technicienId);
+    }),
+
+  attribuerBadge: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      badgeId: z.number(),
+      valeurAtteinte: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.attribuerBadge(input.technicienId, input.badgeId, input.valeurAtteinte);
+    }),
+
+  verifierBadges: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.verifierEtAttribuerBadges(input.technicienId, artisan.id);
+    }),
+
+  getClassement: protectedProcedure
+    .input(z.object({ periode: z.enum(["semaine", "mois", "trimestre", "annee"]) }))
+    .query(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getClassementTechniciens(artisan.id, input.periode);
+    }),
+
+  calculerClassement: protectedProcedure
+    .input(z.object({ periode: z.enum(["semaine", "mois", "trimestre", "annee"]) }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.calculerClassement(artisan.id, input.periode);
+    }),
+
+  getObjectifsTechnicien: protectedProcedure
+    .input(z.object({ technicienId: z.number(), annee: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getObjectifsTechnicien(input.technicienId, input.annee);
+    }),
+
+  createObjectif: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      mois: z.number(),
+      annee: z.number(),
+      objectifInterventions: z.number().optional(),
+      objectifCA: z.string().optional(),
+      objectifAvisPositifs: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createObjectifTechnicien({ artisanId: artisan.id, ...input });
+    }),
+});
+
+// ============================================================================
+// ALERTES PREVISIONS CA ROUTER
+// ============================================================================
+const alertesPrevisionsRouter = router({
+  getConfig: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return null;
+    return await db.getConfigAlertePrevision(artisan.id);
+  }),
+
+  saveConfig: protectedProcedure
+    .input(z.object({
+      seuilAlertePositif: z.string().optional(),
+      seuilAlerteNegatif: z.string().optional(),
+      alerteEmail: z.boolean().optional(),
+      alerteSms: z.boolean().optional(),
+      emailDestination: z.string().optional(),
+      telephoneDestination: z.string().optional(),
+      frequenceVerification: z.enum(["quotidien", "hebdomadaire", "mensuel"]).optional(),
+      actif: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.saveConfigAlertePrevision({ artisanId: artisan.id, ...input });
+    }),
+
+  getHistorique: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getHistoriqueAlertesPrevisions(artisan.id);
+  }),
+
+  verifierEtEnvoyer: protectedProcedure.mutation(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.verifierEcartsEtEnvoyerAlertes(artisan.id);
+  }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({system: systemRouter,
@@ -3818,6 +4136,9 @@ export const appRouter = router({system: systemRouter,
   notificationsPush: notificationsPushRouter,
   conges: congesRouter,
   previsions: previsionsRouter,
+  vehicules: vehiculesRouter,
+  badges: badgesRouter,
+  alertesPrevisions: alertesPrevisionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -1003,3 +1003,196 @@ export const historiqueCA = mysqlTable("historique_ca", {
 
 export type HistoriqueCA = typeof historiqueCA.$inferSelect;
 export type InsertHistoriqueCA = typeof historiqueCA.$inferInsert;
+
+
+// ============================================================================
+// GESTION DES VEHICULES
+// ============================================================================
+export const vehicules = mysqlTable("vehicules", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  immatriculation: varchar("immatriculation", { length: 20 }).notNull(),
+  marque: varchar("marque", { length: 100 }),
+  modele: varchar("modele", { length: 100 }),
+  annee: int("annee"),
+  typeCarburant: mysqlEnum("typeCarburant", ["essence", "diesel", "electrique", "hybride", "gpl"]).default("diesel"),
+  kilometrageActuel: int("kilometrageActuel").default(0),
+  dateAchat: date("dateAchat"),
+  prixAchat: decimal("prixAchat", { precision: 10, scale: 2 }),
+  technicienId: int("technicienId"), // Technicien assigné
+  statut: mysqlEnum("statut", ["actif", "en_maintenance", "hors_service", "vendu"]).default("actif"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Vehicule = typeof vehicules.$inferSelect;
+export type InsertVehicule = typeof vehicules.$inferInsert;
+
+// Historique kilométrique
+export const historiqueKilometrage = mysqlTable("historique_kilometrage", {
+  id: int("id").autoincrement().primaryKey(),
+  vehiculeId: int("vehiculeId").notNull(),
+  technicienId: int("technicienId"),
+  kilometrage: int("kilometrage").notNull(),
+  dateReleve: date("dateReleve").notNull(),
+  motif: varchar("motif", { length: 255 }), // Ex: "Intervention client", "Déplacement personnel"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type HistoriqueKilometrage = typeof historiqueKilometrage.$inferSelect;
+export type InsertHistoriqueKilometrage = typeof historiqueKilometrage.$inferInsert;
+
+// Entretiens véhicules
+export const entretiensVehicules = mysqlTable("entretiens_vehicules", {
+  id: int("id").autoincrement().primaryKey(),
+  vehiculeId: int("vehiculeId").notNull(),
+  type: mysqlEnum("type", ["vidange", "pneus", "freins", "controle_technique", "revision", "reparation", "autre"]).notNull(),
+  dateEntretien: date("dateEntretien").notNull(),
+  kilometrageEntretien: int("kilometrageEntretien"),
+  cout: decimal("cout", { precision: 10, scale: 2 }),
+  prestataire: varchar("prestataire", { length: 255 }),
+  description: text("description"),
+  prochainEntretienKm: int("prochainEntretienKm"),
+  prochainEntretienDate: date("prochainEntretienDate"),
+  facture: text("facture"), // URL du document
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EntretienVehicule = typeof entretiensVehicules.$inferSelect;
+export type InsertEntretienVehicule = typeof entretiensVehicules.$inferInsert;
+
+// Assurances véhicules
+export const assurancesVehicules = mysqlTable("assurances_vehicules", {
+  id: int("id").autoincrement().primaryKey(),
+  vehiculeId: int("vehiculeId").notNull(),
+  compagnie: varchar("compagnie", { length: 255 }).notNull(),
+  numeroContrat: varchar("numeroContrat", { length: 100 }),
+  typeAssurance: mysqlEnum("typeAssurance", ["tiers", "tiers_plus", "tous_risques"]).default("tiers"),
+  dateDebut: date("dateDebut").notNull(),
+  dateFin: date("dateFin").notNull(),
+  primeAnnuelle: decimal("primeAnnuelle", { precision: 10, scale: 2 }),
+  franchise: decimal("franchise", { precision: 10, scale: 2 }),
+  document: text("document"), // URL du contrat
+  alerteEnvoyee: boolean("alerteEnvoyee").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AssuranceVehicule = typeof assurancesVehicules.$inferSelect;
+export type InsertAssuranceVehicule = typeof assurancesVehicules.$inferInsert;
+
+// ============================================================================
+// BADGES ET GAMIFICATION
+// ============================================================================
+export const badges = mysqlTable("badges", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  code: varchar("code", { length: 50 }).notNull(), // Ex: "first_intervention", "100_interventions"
+  nom: varchar("nom", { length: 100 }).notNull(),
+  description: text("description"),
+  icone: varchar("icone", { length: 50 }), // Nom de l'icône
+  couleur: varchar("couleur", { length: 20 }), // Couleur du badge
+  categorie: mysqlEnum("categorie", ["interventions", "avis", "ca", "anciennete", "special"]).default("interventions"),
+  condition: text("condition"), // Description de la condition
+  seuil: int("seuil"), // Valeur à atteindre
+  points: int("points").default(10), // Points attribués
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Badge = typeof badges.$inferSelect;
+export type InsertBadge = typeof badges.$inferInsert;
+
+// Badges obtenus par les techniciens
+export const badgesTechniciens = mysqlTable("badges_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  badgeId: int("badgeId").notNull(),
+  dateObtention: timestamp("dateObtention").defaultNow().notNull(),
+  valeurAtteinte: int("valeurAtteinte"), // Valeur au moment de l'obtention
+  notifie: boolean("notifie").default(false),
+});
+
+export type BadgeTechnicien = typeof badgesTechniciens.$inferSelect;
+export type InsertBadgeTechnicien = typeof badgesTechniciens.$inferInsert;
+
+// Objectifs mensuels
+export const objectifsTechniciens = mysqlTable("objectifs_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  mois: int("mois").notNull(),
+  annee: int("annee").notNull(),
+  objectifInterventions: int("objectifInterventions").default(0),
+  objectifCA: decimal("objectifCA", { precision: 10, scale: 2 }).default("0.00"),
+  objectifAvisPositifs: int("objectifAvisPositifs").default(0),
+  interventionsRealisees: int("interventionsRealisees").default(0),
+  caRealise: decimal("caRealise", { precision: 10, scale: 2 }).default("0.00"),
+  avisPositifsObtenus: int("avisPositifsObtenus").default(0),
+  pointsGagnes: int("pointsGagnes").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ObjectifTechnicien = typeof objectifsTechniciens.$inferSelect;
+export type InsertObjectifTechnicien = typeof objectifsTechniciens.$inferInsert;
+
+// Classement des techniciens
+export const classementTechniciens = mysqlTable("classement_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  periode: mysqlEnum("periode", ["semaine", "mois", "trimestre", "annee"]).notNull(),
+  dateDebut: date("dateDebut").notNull(),
+  dateFin: date("dateFin").notNull(),
+  rang: int("rang").notNull(),
+  pointsTotal: int("pointsTotal").default(0),
+  interventions: int("interventions").default(0),
+  ca: decimal("ca", { precision: 10, scale: 2 }).default("0.00"),
+  noteMoyenne: decimal("noteMoyenne", { precision: 3, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ClassementTechnicien = typeof classementTechniciens.$inferSelect;
+export type InsertClassementTechnicien = typeof classementTechniciens.$inferInsert;
+
+// ============================================================================
+// ALERTES ECARTS PREVISIONS CA
+// ============================================================================
+export const configAlertesPrevisions = mysqlTable("config_alertes_previsions", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull().unique(),
+  seuilAlertePositif: decimal("seuilAlertePositif", { precision: 5, scale: 2 }).default("10.00"), // +10%
+  seuilAlerteNegatif: decimal("seuilAlerteNegatif", { precision: 5, scale: 2 }).default("10.00"), // -10%
+  alerteEmail: boolean("alerteEmail").default(true),
+  alerteSms: boolean("alerteSms").default(false),
+  emailDestination: varchar("emailDestination", { length: 320 }),
+  telephoneDestination: varchar("telephoneDestination", { length: 20 }),
+  frequenceVerification: mysqlEnum("frequenceVerification", ["quotidien", "hebdomadaire", "mensuel"]).default("hebdomadaire"),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ConfigAlertePrevision = typeof configAlertesPrevisions.$inferSelect;
+export type InsertConfigAlertePrevision = typeof configAlertesPrevisions.$inferInsert;
+
+// Historique des alertes envoyées
+export const historiqueAlertesPrevisions = mysqlTable("historique_alertes_previsions", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  mois: int("mois").notNull(),
+  annee: int("annee").notNull(),
+  typeAlerte: mysqlEnum("typeAlerte", ["depassement_positif", "depassement_negatif"]).notNull(),
+  caPrevisionnel: decimal("caPrevisionnel", { precision: 12, scale: 2 }),
+  caRealise: decimal("caRealise", { precision: 12, scale: 2 }),
+  ecartPourcentage: decimal("ecartPourcentage", { precision: 5, scale: 2 }),
+  canalEnvoi: mysqlEnum("canalEnvoi", ["email", "sms", "les_deux"]).notNull(),
+  dateEnvoi: timestamp("dateEnvoi").defaultNow().notNull(),
+  statut: mysqlEnum("statut", ["envoye", "echec", "lu"]).default("envoye"),
+  message: text("message"),
+});
+
+export type HistoriqueAlertePrevision = typeof historiqueAlertesPrevisions.$inferSelect;
+export type InsertHistoriqueAlertePrevision = typeof historiqueAlertesPrevisions.$inferInsert;

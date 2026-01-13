@@ -50,7 +50,17 @@ import {
   conges, InsertConge, Conge,
   soldesConges, InsertSoldeConge, SoldeConge,
   previsionsCA, InsertPrevisionCA, PrevisionCA,
-  historiqueCA, InsertHistoriqueCA, HistoriqueCA
+  historiqueCA, InsertHistoriqueCA, HistoriqueCA,
+  vehicules, InsertVehicule, Vehicule,
+  historiqueKilometrage, InsertHistoriqueKilometrage, HistoriqueKilometrage,
+  entretiensVehicules, InsertEntretienVehicule, EntretienVehicule,
+  assurancesVehicules, InsertAssuranceVehicule, AssuranceVehicule,
+  badges, InsertBadge, Badge,
+  badgesTechniciens, InsertBadgeTechnicien, BadgeTechnicien,
+  objectifsTechniciens, InsertObjectifTechnicien, ObjectifTechnicien,
+  classementTechniciens, InsertClassementTechnicien, ClassementTechnicien,
+  configAlertesPrevisions, InsertConfigAlertePrevision, ConfigAlertePrevision,
+  historiqueAlertesPrevisions, InsertHistoriqueAlertePrevision, HistoriqueAlertePrevision
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -4011,4 +4021,533 @@ export async function getTechniciensDisponiblesAvecConges(artisanId: number, dat
   }
   
   return disponibles;
+}
+
+
+// ============================================================================
+// GESTION DES VEHICULES
+// ============================================================================
+
+export async function createVehicule(data: InsertVehicule): Promise<Vehicule | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(vehicules).values(data);
+  const [vehicule] = await db.select().from(vehicules).where(eq(vehicules.id, result.insertId));
+  return vehicule || null;
+}
+
+export async function getVehiculesByArtisan(artisanId: number): Promise<Vehicule[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(vehicules).where(eq(vehicules.artisanId, artisanId)).orderBy(desc(vehicules.createdAt));
+}
+
+export async function getVehiculeById(id: number): Promise<Vehicule | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [vehicule] = await db.select().from(vehicules).where(eq(vehicules.id, id));
+  return vehicule || null;
+}
+
+export async function updateVehicule(id: number, data: Partial<InsertVehicule>): Promise<Vehicule | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(vehicules).set(data).where(eq(vehicules.id, id));
+  return getVehiculeById(id);
+}
+
+export async function deleteVehicule(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(vehicules).where(eq(vehicules.id, id));
+  return true;
+}
+
+// Historique kilométrique
+export async function addHistoriqueKilometrage(data: InsertHistoriqueKilometrage): Promise<HistoriqueKilometrage | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(historiqueKilometrage).values(data);
+  // Mettre à jour le kilométrage actuel du véhicule
+  await db.update(vehicules).set({ kilometrageActuel: data.kilometrage }).where(eq(vehicules.id, data.vehiculeId));
+  const [hist] = await db.select().from(historiqueKilometrage).where(eq(historiqueKilometrage.id, result.insertId));
+  return hist || null;
+}
+
+export async function getHistoriqueKilometrageByVehicule(vehiculeId: number): Promise<HistoriqueKilometrage[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(historiqueKilometrage).where(eq(historiqueKilometrage.vehiculeId, vehiculeId)).orderBy(desc(historiqueKilometrage.dateReleve));
+}
+
+// Entretiens véhicules
+export async function createEntretienVehicule(data: InsertEntretienVehicule): Promise<EntretienVehicule | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(entretiensVehicules).values(data);
+  const [entretien] = await db.select().from(entretiensVehicules).where(eq(entretiensVehicules.id, result.insertId));
+  return entretien || null;
+}
+
+export async function getEntretiensByVehicule(vehiculeId: number): Promise<EntretienVehicule[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(entretiensVehicules).where(eq(entretiensVehicules.vehiculeId, vehiculeId)).orderBy(desc(entretiensVehicules.dateEntretien));
+}
+
+export async function getEntretiensAVenir(artisanId: number): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const vehiculesArtisan = await db.select().from(vehicules).where(eq(vehicules.artisanId, artisanId));
+  const vehiculeIds = vehiculesArtisan.map(v => v.id);
+  if (vehiculeIds.length === 0) return [];
+  
+  const entretiens = await db.select().from(entretiensVehicules)
+    .where(inArray(entretiensVehicules.vehiculeId, vehiculeIds));
+  
+  const aujourdhui = new Date();
+  return entretiens.filter(e => {
+    if (e.prochainEntretienDate) {
+      return new Date(e.prochainEntretienDate) <= new Date(aujourdhui.getTime() + 30 * 24 * 60 * 60 * 1000);
+    }
+    return false;
+  }).map(e => {
+    const vehicule = vehiculesArtisan.find(v => v.id === e.vehiculeId);
+    return { ...e, vehicule };
+  });
+}
+
+// Assurances véhicules
+export async function createAssuranceVehicule(data: InsertAssuranceVehicule): Promise<AssuranceVehicule | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(assurancesVehicules).values(data);
+  const [assurance] = await db.select().from(assurancesVehicules).where(eq(assurancesVehicules.id, result.insertId));
+  return assurance || null;
+}
+
+export async function getAssurancesByVehicule(vehiculeId: number): Promise<AssuranceVehicule[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(assurancesVehicules).where(eq(assurancesVehicules.vehiculeId, vehiculeId)).orderBy(desc(assurancesVehicules.dateDebut));
+}
+
+export async function getAssurancesExpirant(artisanId: number, joursAvant: number = 30): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const vehiculesArtisan = await db.select().from(vehicules).where(eq(vehicules.artisanId, artisanId));
+  const vehiculeIds = vehiculesArtisan.map(v => v.id);
+  if (vehiculeIds.length === 0) return [];
+  
+  const assurances = await db.select().from(assurancesVehicules)
+    .where(inArray(assurancesVehicules.vehiculeId, vehiculeIds));
+  
+  const aujourdhui = new Date();
+  const dateLimite = new Date(aujourdhui.getTime() + joursAvant * 24 * 60 * 60 * 1000);
+  
+  return assurances.filter(a => {
+    const dateFin = new Date(a.dateFin);
+    return dateFin <= dateLimite && dateFin >= aujourdhui;
+  }).map(a => {
+    const vehicule = vehiculesArtisan.find(v => v.id === a.vehiculeId);
+    return { ...a, vehicule };
+  });
+}
+
+export async function updateAssuranceVehicule(id: number, data: Partial<InsertAssuranceVehicule>): Promise<AssuranceVehicule | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(assurancesVehicules).set(data).where(eq(assurancesVehicules.id, id));
+  const [assurance] = await db.select().from(assurancesVehicules).where(eq(assurancesVehicules.id, id));
+  return assurance || null;
+}
+
+// ============================================================================
+// BADGES ET GAMIFICATION
+// ============================================================================
+
+export async function createBadge(data: InsertBadge): Promise<Badge | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(badges).values(data);
+  const [badge] = await db.select().from(badges).where(eq(badges.id, result.insertId));
+  return badge || null;
+}
+
+export async function getBadgesByArtisan(artisanId: number): Promise<Badge[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(badges).where(eq(badges.artisanId, artisanId)).orderBy(badges.categorie);
+}
+
+export async function getBadgeById(id: number): Promise<Badge | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [badge] = await db.select().from(badges).where(eq(badges.id, id));
+  return badge || null;
+}
+
+export async function updateBadge(id: number, data: Partial<InsertBadge>): Promise<Badge | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(badges).set(data).where(eq(badges.id, id));
+  return getBadgeById(id);
+}
+
+export async function deleteBadge(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(badges).where(eq(badges.id, id));
+  return true;
+}
+
+// Badges des techniciens
+export async function attribuerBadge(technicienId: number, badgeId: number, valeurAtteinte?: number): Promise<BadgeTechnicien | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  // Vérifier si le badge n'est pas déjà attribué
+  const [existing] = await db.select().from(badgesTechniciens)
+    .where(and(eq(badgesTechniciens.technicienId, technicienId), eq(badgesTechniciens.badgeId, badgeId)));
+  if (existing) return existing;
+  
+  const [result] = await db.insert(badgesTechniciens).values({
+    technicienId,
+    badgeId,
+    valeurAtteinte,
+  });
+  const [badge] = await db.select().from(badgesTechniciens).where(eq(badgesTechniciens.id, result.insertId));
+  return badge || null;
+}
+
+export async function getBadgesTechnicien(technicienId: number): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const badgesTech = await db.select().from(badgesTechniciens).where(eq(badgesTechniciens.technicienId, technicienId));
+  const badgesDetails = await db.select().from(badges).where(inArray(badges.id, badgesTech.map(b => b.badgeId)));
+  return badgesTech.map(bt => ({
+    ...bt,
+    badge: badgesDetails.find(b => b.id === bt.badgeId),
+  }));
+}
+
+export async function getNouveauxBadgesNonNotifies(technicienId: number): Promise<BadgeTechnicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(badgesTechniciens)
+    .where(and(eq(badgesTechniciens.technicienId, technicienId), eq(badgesTechniciens.notifie, false)));
+}
+
+export async function marquerBadgeNotifie(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(badgesTechniciens).set({ notifie: true }).where(eq(badgesTechniciens.id, id));
+}
+
+// Objectifs techniciens
+export async function createObjectifTechnicien(data: InsertObjectifTechnicien): Promise<ObjectifTechnicien | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(objectifsTechniciens).values(data);
+  const [objectif] = await db.select().from(objectifsTechniciens).where(eq(objectifsTechniciens.id, result.insertId));
+  return objectif || null;
+}
+
+export async function getObjectifsTechnicien(technicienId: number, annee: number): Promise<ObjectifTechnicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(objectifsTechniciens)
+    .where(and(eq(objectifsTechniciens.technicienId, technicienId), eq(objectifsTechniciens.annee, annee)))
+    .orderBy(objectifsTechniciens.mois);
+}
+
+export async function updateObjectifTechnicien(id: number, data: Partial<InsertObjectifTechnicien>): Promise<ObjectifTechnicien | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(objectifsTechniciens).set(data).where(eq(objectifsTechniciens.id, id));
+  const [objectif] = await db.select().from(objectifsTechniciens).where(eq(objectifsTechniciens.id, id));
+  return objectif || null;
+}
+
+// Classement techniciens
+export async function getClassementTechniciens(artisanId: number, periode: "semaine" | "mois" | "trimestre" | "annee"): Promise<ClassementTechnicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(classementTechniciens)
+    .where(and(eq(classementTechniciens.artisanId, artisanId), eq(classementTechniciens.periode, periode)))
+    .orderBy(asc(classementTechniciens.rang));
+}
+
+export async function calculerClassement(artisanId: number, periode: "semaine" | "mois" | "trimestre" | "annee"): Promise<ClassementTechnicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const techniciensList = await db.select().from(techniciens)
+    .where(and(eq(techniciens.artisanId, artisanId), eq(techniciens.statut, 'actif')));
+  
+  const aujourdhui = new Date();
+  let dateDebut: Date;
+  let dateFin = aujourdhui;
+  
+  switch (periode) {
+    case 'semaine':
+      dateDebut = new Date(aujourdhui.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'mois':
+      dateDebut = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), 1);
+      break;
+    case 'trimestre':
+      const trimestre = Math.floor(aujourdhui.getMonth() / 3);
+      dateDebut = new Date(aujourdhui.getFullYear(), trimestre * 3, 1);
+      break;
+    case 'annee':
+      dateDebut = new Date(aujourdhui.getFullYear(), 0, 1);
+      break;
+  }
+  
+  const classements: any[] = [];
+  
+  for (const tech of techniciensList) {
+    // Compter les interventions terminées
+    const interventionsList = await db.select().from(interventions)
+      .where(and(
+        eq(interventions.technicienId, tech.id),
+        eq(interventions.statut, 'terminee')
+      ));
+    
+    // Calculer le CA (factures payées liées aux interventions)
+    const facturesList = await db.select().from(factures)
+      .where(eq(factures.statut, 'payee'));
+    
+    // Calculer la note moyenne des avis
+    const avisList = await db.select().from(avisClients)
+      .where(eq(avisClients.statut, 'publie'));
+    
+    const noteMoyenne = avisList.length > 0 
+      ? avisList.reduce((sum, a) => sum + a.note, 0) / avisList.length 
+      : 0;
+    
+    const points = interventionsList.length * 10 + Math.round(noteMoyenne * 20);
+    
+    classements.push({
+      technicienId: tech.id,
+      artisanId,
+      periode,
+      dateDebut: dateDebut.toISOString().split('T')[0],
+      dateFin: dateFin.toISOString().split('T')[0],
+      pointsTotal: points,
+      interventions: interventionsList.length,
+      ca: "0.00",
+      noteMoyenne: noteMoyenne.toFixed(2),
+    });
+  }
+  
+  // Trier par points et attribuer les rangs
+  classements.sort((a, b) => b.pointsTotal - a.pointsTotal);
+  classements.forEach((c, index) => {
+    c.rang = index + 1;
+  });
+  
+  // Sauvegarder le classement
+  for (const c of classements) {
+    await db.insert(classementTechniciens).values(c);
+  }
+  
+  return classements;
+}
+
+// Vérifier et attribuer les badges automatiquement
+export async function verifierEtAttribuerBadges(technicienId: number, artisanId: number): Promise<Badge[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const badgesArtisan = await db.select().from(badges)
+    .where(and(eq(badges.artisanId, artisanId), eq(badges.actif, true)));
+  
+  const badgesObtenus = await db.select().from(badgesTechniciens)
+    .where(eq(badgesTechniciens.technicienId, technicienId));
+  
+  const badgesDejaObtenus = badgesObtenus.map(b => b.badgeId);
+  const nouveauxBadges: Badge[] = [];
+  
+  // Compter les interventions
+  const interventionsList = await db.select().from(interventions)
+    .where(and(eq(interventions.technicienId, technicienId), eq(interventions.statut, 'terminee')));
+  const nbInterventions = interventionsList.length;
+  
+  // Compter les avis positifs (note >= 4)
+  const avisList = await db.select().from(avisClients)
+    .where(eq(avisClients.statut, 'publie'));
+  const nbAvisPositifs = avisList.filter(a => a.note >= 4).length;
+  
+  for (const badge of badgesArtisan) {
+    if (badgesDejaObtenus.includes(badge.id)) continue;
+    
+    let valeurActuelle = 0;
+    
+    switch (badge.categorie) {
+      case 'interventions':
+        valeurActuelle = nbInterventions;
+        break;
+      case 'avis':
+        valeurActuelle = nbAvisPositifs;
+        break;
+    }
+    
+    if (badge.seuil && valeurActuelle >= badge.seuil) {
+      await attribuerBadge(technicienId, badge.id, valeurActuelle);
+      nouveauxBadges.push(badge);
+    }
+  }
+  
+  return nouveauxBadges;
+}
+
+// ============================================================================
+// ALERTES ECARTS PREVISIONS CA
+// ============================================================================
+
+export async function getConfigAlertePrevision(artisanId: number): Promise<ConfigAlertePrevision | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [config] = await db.select().from(configAlertesPrevisions).where(eq(configAlertesPrevisions.artisanId, artisanId));
+  return config || null;
+}
+
+export async function saveConfigAlertePrevision(data: InsertConfigAlertePrevision): Promise<ConfigAlertePrevision | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const existing = await getConfigAlertePrevision(data.artisanId);
+  if (existing) {
+    await db.update(configAlertesPrevisions).set(data).where(eq(configAlertesPrevisions.artisanId, data.artisanId));
+    return getConfigAlertePrevision(data.artisanId);
+  }
+  
+  const [result] = await db.insert(configAlertesPrevisions).values(data);
+  const [config] = await db.select().from(configAlertesPrevisions).where(eq(configAlertesPrevisions.id, result.insertId));
+  return config || null;
+}
+
+export async function getHistoriqueAlertesPrevisions(artisanId: number): Promise<HistoriqueAlertePrevision[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(historiqueAlertesPrevisions)
+    .where(eq(historiqueAlertesPrevisions.artisanId, artisanId))
+    .orderBy(desc(historiqueAlertesPrevisions.dateEnvoi));
+}
+
+export async function createHistoriqueAlertePrevision(data: InsertHistoriqueAlertePrevision): Promise<HistoriqueAlertePrevision | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(historiqueAlertesPrevisions).values(data);
+  const [alerte] = await db.select().from(historiqueAlertesPrevisions).where(eq(historiqueAlertesPrevisions.id, result.insertId));
+  return alerte || null;
+}
+
+export async function verifierEcartsEtEnvoyerAlertes(artisanId: number): Promise<HistoriqueAlertePrevision[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const config = await getConfigAlertePrevision(artisanId);
+  if (!config || !config.actif) return [];
+  
+  const aujourdhui = new Date();
+  const moisActuel = aujourdhui.getMonth() + 1;
+  const anneeActuelle = aujourdhui.getFullYear();
+  
+  // Récupérer les prévisions du mois actuel
+  const [prevision] = await db.select().from(previsionsCA)
+    .where(and(
+      eq(previsionsCA.artisanId, artisanId),
+      eq(previsionsCA.mois, moisActuel),
+      eq(previsionsCA.annee, anneeActuelle)
+    ));
+  
+  if (!prevision) return [];
+  
+  const caPrevisionnel = parseFloat(prevision.caPrevisionnel?.toString() || '0');
+  const caRealise = parseFloat(prevision.caRealise?.toString() || '0');
+  
+  if (caPrevisionnel === 0) return [];
+  
+  const ecartPct = ((caRealise - caPrevisionnel) / caPrevisionnel) * 100;
+  const seuilPositif = parseFloat(config.seuilAlertePositif?.toString() || '10');
+  const seuilNegatif = parseFloat(config.seuilAlerteNegatif?.toString() || '10');
+  
+  const alertesEnvoyees: HistoriqueAlertePrevision[] = [];
+  
+  // Vérifier si une alerte a déjà été envoyée ce mois
+  const alertesExistantes = await db.select().from(historiqueAlertesPrevisions)
+    .where(and(
+      eq(historiqueAlertesPrevisions.artisanId, artisanId),
+      eq(historiqueAlertesPrevisions.mois, moisActuel),
+      eq(historiqueAlertesPrevisions.annee, anneeActuelle)
+    ));
+  
+  if (alertesExistantes.length > 0) return [];
+  
+  let typeAlerte: "depassement_positif" | "depassement_negatif" | null = null;
+  let message = "";
+  
+  if (ecartPct >= seuilPositif) {
+    typeAlerte = "depassement_positif";
+    message = `Bonne nouvelle ! Votre CA réalisé (${caRealise.toLocaleString('fr-FR')} €) dépasse vos prévisions de ${ecartPct.toFixed(1)}%.`;
+  } else if (ecartPct <= -seuilNegatif) {
+    typeAlerte = "depassement_negatif";
+    message = `Attention : Votre CA réalisé (${caRealise.toLocaleString('fr-FR')} €) est inférieur à vos prévisions de ${Math.abs(ecartPct).toFixed(1)}%.`;
+  }
+  
+  if (typeAlerte) {
+    let canalEnvoi: "email" | "sms" | "les_deux" = "email";
+    if (config.alerteEmail && config.alerteSms) {
+      canalEnvoi = "les_deux";
+    } else if (config.alerteSms) {
+      canalEnvoi = "sms";
+    }
+    
+    const alerte = await createHistoriqueAlertePrevision({
+      artisanId,
+      mois: moisActuel,
+      annee: anneeActuelle,
+      typeAlerte,
+      caPrevisionnel: caPrevisionnel.toString(),
+      caRealise: caRealise.toString(),
+      ecartPourcentage: ecartPct.toFixed(2),
+      canalEnvoi,
+      message,
+    });
+    
+    if (alerte) {
+      alertesEnvoyees.push(alerte);
+    }
+  }
+  
+  return alertesEnvoyees;
+}
+
+// Statistiques des véhicules
+export async function getStatistiquesFlotte(artisanId: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const vehiculesArtisan = await db.select().from(vehicules).where(eq(vehicules.artisanId, artisanId));
+  
+  const totalVehicules = vehiculesArtisan.length;
+  const vehiculesActifs = vehiculesArtisan.filter(v => v.statut === 'actif').length;
+  const vehiculesEnMaintenance = vehiculesArtisan.filter(v => v.statut === 'en_maintenance').length;
+  
+  const kilometrageTotal = vehiculesArtisan.reduce((sum, v) => sum + (v.kilometrageActuel || 0), 0);
+  
+  const assurancesExpirant = await getAssurancesExpirant(artisanId, 30);
+  const entretiensAVenir = await getEntretiensAVenir(artisanId);
+  
+  return {
+    totalVehicules,
+    vehiculesActifs,
+    vehiculesEnMaintenance,
+    kilometrageTotal,
+    assurancesExpirant: assurancesExpirant.length,
+    entretiensAVenir: entretiensAVenir.length,
+  };
 }

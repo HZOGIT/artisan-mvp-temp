@@ -329,3 +329,30 @@
 - [x] Graphiques de projection
 - [x] Comparaison prévisions vs réalisé
 - [x] Alertes si écart significatif
+
+
+## Nouvelles Fonctionnalités (Sprint 13)
+### Gestion des Véhicules
+
+- [x] Table des véhicules (immatriculation, marque, modèle, année)
+- [x] Suivi kilométrique avec historique
+- [x] Gestion des entretiens (vidange, pneus, contrôle technique)
+- [x] Suivi des assurances (dates, montants, alertes expiration)
+- [x] Assignation des véhicules aux techniciens
+- [x] Page de gestion de la flotte
+
+### Badges et Gamification
+- [x] Table des badges et récompenses
+- [x] Définition des objectifs (interventions, avis positifs, CA)
+- [x] Attribution automatique des badges
+- [x] Classement des techniciens
+- [x] Page de profil avec badges obtenus
+- [x] Notifications de nouveaux badges
+
+### Alertes Écarts Prévisions CA
+- [x] Calcul automatique des écarts prévisions vs réalisé
+- [x] Configuration des seuils d'alerte (ex: +/- 10%)
+- [x] Envoi d'alertes par email
+- [x] Envoi d'alertes par SMS (optionnel)
+- [x] Historique des alertes envoyées
+- [x] Page de configuration des alertes
