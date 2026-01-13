@@ -29,7 +29,7 @@ interface CommandeLigne {
   montantTotal: number;
 }
 
-interface CommandeFournisseur {
+interface RapportCommandeFournisseur {
   fournisseur: {
     id: number;
     nom: string;
@@ -54,7 +54,7 @@ export default function RapportCommande() {
     return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(value);
   };
 
-  const exportToPDF = (commande: CommandeFournisseur) => {
+  const exportToPDF = (commande: RapportCommandeFournisseur) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     

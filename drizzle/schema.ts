@@ -391,3 +391,82 @@ export const relancesDevis = mysqlTable("relances_devis", {
 
 export type RelanceDevis = typeof relancesDevis.$inferSelect;
 export type InsertRelanceDevis = typeof relancesDevis.$inferInsert;
+
+
+// ============================================================================
+// EMAIL TEMPLATES (Customizable email templates for follow-ups)
+// ============================================================================
+export const modelesEmail = mysqlTable("modeles_email", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  nom: varchar("nom", { length: 100 }).notNull(),
+  type: mysqlEnum("type", ["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]).notNull(),
+  sujet: varchar("sujet", { length: 255 }).notNull(),
+  contenu: text("contenu").notNull(),
+  isDefault: boolean("isDefault").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type ModeleEmail = typeof modelesEmail.$inferSelect;
+export type InsertModeleEmail = typeof modelesEmail.$inferInsert;
+
+// ============================================================================
+// COMMANDES FOURNISSEURS (Supplier orders for performance tracking)
+// ============================================================================
+export const commandesFournisseurs = mysqlTable("commandes_fournisseurs", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  fournisseurId: int("fournisseurId").notNull(),
+  reference: varchar("reference", { length: 50 }),
+  dateCommande: timestamp("dateCommande").defaultNow().notNull(),
+  dateLivraisonPrevue: timestamp("dateLivraisonPrevue"),
+  dateLivraisonReelle: timestamp("dateLivraisonReelle"),
+  statut: mysqlEnum("statut", ["en_attente", "confirmee", "expediee", "livree", "annulee"]).default("en_attente"),
+  montantTotal: decimal("montantTotal", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type CommandeFournisseur = typeof commandesFournisseurs.$inferSelect;
+export type InsertCommandeFournisseur = typeof commandesFournisseurs.$inferInsert;
+
+// ============================================================================
+// LIGNES COMMANDES FOURNISSEURS (Order line items)
+// ============================================================================
+export const lignesCommandesFournisseurs = mysqlTable("lignes_commandes_fournisseurs", {
+  id: int("id").autoincrement().primaryKey(),
+  commandeId: int("commandeId").notNull(),
+  stockId: int("stockId"),
+  designation: varchar("designation", { length: 255 }).notNull(),
+  reference: varchar("reference", { length: 50 }),
+  quantite: decimal("quantite", { precision: 10, scale: 2 }).notNull(),
+  prixUnitaire: decimal("prixUnitaire", { precision: 10, scale: 2 }),
+  montantTotal: decimal("montantTotal", { precision: 10, scale: 2 }),
+});
+
+export type LigneCommandeFournisseur = typeof lignesCommandesFournisseurs.$inferSelect;
+export type InsertLigneCommandeFournisseur = typeof lignesCommandesFournisseurs.$inferInsert;
+
+// ============================================================================
+// PAIEMENTS STRIPE (Online payments for invoices)
+// ============================================================================
+export const paiementsStripe = mysqlTable("paiements_stripe", {
+  id: int("id").autoincrement().primaryKey(),
+  factureId: int("factureId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  stripeSessionId: varchar("stripeSessionId", { length: 255 }),
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
+  montant: decimal("montant", { precision: 10, scale: 2 }).notNull(),
+  devise: varchar("devise", { length: 3 }).default("EUR"),
+  statut: mysqlEnum("statut", ["en_attente", "complete", "echoue", "rembourse"]).default("en_attente"),
+  lienPaiement: varchar("lienPaiement", { length: 500 }),
+  tokenPaiement: varchar("tokenPaiement", { length: 64 }),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type PaiementStripe = typeof paiementsStripe.$inferSelect;
+export type InsertPaiementStripe = typeof paiementsStripe.$inferInsert;

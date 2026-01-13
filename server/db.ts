@@ -19,7 +19,11 @@ import {
   fournisseurs, InsertFournisseur, Fournisseur,
   articlesFournisseurs, InsertArticleFournisseur, ArticleFournisseur,
   smsVerifications, InsertSmsVerification, SmsVerification,
-  relancesDevis, InsertRelanceDevis, RelanceDevis
+  relancesDevis, InsertRelanceDevis, RelanceDevis,
+  modelesEmail, InsertModeleEmail, ModeleEmail,
+  commandesFournisseurs, InsertCommandeFournisseur, CommandeFournisseur,
+  lignesCommandesFournisseurs, InsertLigneCommandeFournisseur, LigneCommandeFournisseur,
+  paiementsStripe, InsertPaiementStripe, PaiementStripe
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1544,7 +1548,7 @@ export async function getStocksEnRupture(artisanId: number): Promise<StockEnRupt
   return result;
 }
 
-export interface CommandeFournisseur {
+export interface RapportCommandeFournisseur {
   fournisseur: Fournisseur | null;
   lignes: {
     stock: Stock;
@@ -1556,11 +1560,11 @@ export interface CommandeFournisseur {
   totalCommande: number;
 }
 
-export async function getRapportCommandeFournisseur(artisanId: number): Promise<CommandeFournisseur[]> {
+export async function getRapportCommandeFournisseur(artisanId: number): Promise<RapportCommandeFournisseur[]> {
   const stocksEnRupture = await getStocksEnRupture(artisanId);
   
   // Regrouper par fournisseur
-  const parFournisseur = new Map<number | null, CommandeFournisseur>();
+  const parFournisseur = new Map<number | null, RapportCommandeFournisseur>();
   
   for (const item of stocksEnRupture) {
     const fournisseurId = item.fournisseur?.id || null;
@@ -1704,4 +1708,284 @@ export async function getLastRelanceDate(devisId: number): Promise<Date | null> 
     .orderBy(desc(relancesDevis.createdAt))
     .limit(1);
   return result.length > 0 ? result[0].createdAt : null;
+}
+
+
+// ============================================================================
+// MODELES EMAIL
+// ============================================================================
+
+export async function getModelesEmailByArtisanId(artisanId: number): Promise<ModeleEmail[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(modelesEmail).where(eq(modelesEmail.artisanId, artisanId)).orderBy(modelesEmail.nom);
+}
+
+export async function getModelesEmailByType(artisanId: number, type: string): Promise<ModeleEmail[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(modelesEmail).where(
+    and(
+      eq(modelesEmail.artisanId, artisanId),
+      eq(modelesEmail.type, type as any)
+    )
+  ).orderBy(modelesEmail.nom);
+}
+
+export async function getModeleEmailById(id: number): Promise<ModeleEmail | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(modelesEmail).where(eq(modelesEmail.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getDefaultModeleEmail(artisanId: number, type: string): Promise<ModeleEmail | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(modelesEmail).where(
+    and(
+      eq(modelesEmail.artisanId, artisanId),
+      eq(modelesEmail.type, type as any),
+      eq(modelesEmail.isDefault, true)
+    )
+  ).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createModeleEmail(data: InsertModeleEmail): Promise<ModeleEmail> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Si c'est le modèle par défaut, retirer le statut par défaut des autres
+  if (data.isDefault) {
+    await db.update(modelesEmail).set({ isDefault: false }).where(
+      and(
+        eq(modelesEmail.artisanId, data.artisanId),
+        eq(modelesEmail.type, data.type)
+      )
+    );
+  }
+  
+  const result = await db.insert(modelesEmail).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(modelesEmail).where(eq(modelesEmail.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to retrieve created email template");
+  return created[0];
+}
+
+export async function updateModeleEmail(id: number, data: Partial<InsertModeleEmail>): Promise<ModeleEmail> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await getModeleEmailById(id);
+  if (!existing) throw new Error("Email template not found");
+  
+  // Si on définit comme modèle par défaut, retirer le statut des autres
+  if (data.isDefault) {
+    await db.update(modelesEmail).set({ isDefault: false }).where(
+      and(
+        eq(modelesEmail.artisanId, existing.artisanId),
+        eq(modelesEmail.type, existing.type)
+      )
+    );
+  }
+  
+  await db.update(modelesEmail).set({ ...data, updatedAt: new Date() }).where(eq(modelesEmail.id, id));
+  const updated = await db.select().from(modelesEmail).where(eq(modelesEmail.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Email template not found");
+  return updated[0];
+}
+
+export async function deleteModeleEmail(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(modelesEmail).where(eq(modelesEmail.id, id));
+}
+
+// ============================================================================
+// COMMANDES FOURNISSEURS
+// ============================================================================
+
+export async function getCommandesFournisseursByArtisanId(artisanId: number): Promise<CommandeFournisseur[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(commandesFournisseurs)
+    .where(eq(commandesFournisseurs.artisanId, artisanId))
+    .orderBy(desc(commandesFournisseurs.dateCommande));
+}
+
+export async function getCommandesFournisseursByFournisseurId(fournisseurId: number): Promise<CommandeFournisseur[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(commandesFournisseurs)
+    .where(eq(commandesFournisseurs.fournisseurId, fournisseurId))
+    .orderBy(desc(commandesFournisseurs.dateCommande));
+}
+
+export async function getCommandeFournisseurById(id: number): Promise<CommandeFournisseur | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(commandesFournisseurs).where(eq(commandesFournisseurs.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createCommandeFournisseur(data: InsertCommandeFournisseur): Promise<CommandeFournisseur> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(commandesFournisseurs).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(commandesFournisseurs).where(eq(commandesFournisseurs.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to retrieve created supplier order");
+  return created[0];
+}
+
+export async function updateCommandeFournisseur(id: number, data: Partial<InsertCommandeFournisseur>): Promise<CommandeFournisseur> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(commandesFournisseurs).set({ ...data, updatedAt: new Date() }).where(eq(commandesFournisseurs.id, id));
+  const updated = await db.select().from(commandesFournisseurs).where(eq(commandesFournisseurs.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Supplier order not found");
+  return updated[0];
+}
+
+export async function deleteCommandeFournisseur(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.commandeId, id));
+  await db.delete(commandesFournisseurs).where(eq(commandesFournisseurs.id, id));
+}
+
+export async function getLignesCommandeFournisseur(commandeId: number): Promise<LigneCommandeFournisseur[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.commandeId, commandeId));
+}
+
+export async function createLigneCommandeFournisseur(data: InsertLigneCommandeFournisseur): Promise<LigneCommandeFournisseur> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(lignesCommandesFournisseurs).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to retrieve created order line");
+  return created[0];
+}
+
+// Statistiques de performance fournisseur
+export interface PerformanceFournisseur {
+  fournisseur: Fournisseur;
+  totalCommandes: number;
+  commandesLivrees: number;
+  commandesEnRetard: number;
+  delaiMoyenLivraison: number | null;
+  tauxFiabilite: number;
+  montantTotal: number;
+}
+
+export async function getPerformancesFournisseurs(artisanId: number): Promise<PerformanceFournisseur[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const fournisseursList = await db.select().from(fournisseurs).where(eq(fournisseurs.artisanId, artisanId));
+  const result: PerformanceFournisseur[] = [];
+  
+  for (const fournisseur of fournisseursList) {
+    const commandes = await db.select().from(commandesFournisseurs)
+      .where(eq(commandesFournisseurs.fournisseurId, fournisseur.id));
+    
+    const totalCommandes = commandes.length;
+    const commandesLivrees = commandes.filter(c => c.statut === 'livree').length;
+    
+    // Calculer les commandes en retard (livrées après la date prévue)
+    let commandesEnRetard = 0;
+    let totalDelai = 0;
+    let commandesAvecDelai = 0;
+    
+    for (const commande of commandes) {
+      if (commande.dateLivraisonReelle && commande.dateLivraisonPrevue) {
+        const delai = Math.floor((commande.dateLivraisonReelle.getTime() - commande.dateCommande.getTime()) / (1000 * 60 * 60 * 24));
+        totalDelai += delai;
+        commandesAvecDelai++;
+        
+        if (commande.dateLivraisonReelle > commande.dateLivraisonPrevue) {
+          commandesEnRetard++;
+        }
+      }
+    }
+    
+    const delaiMoyenLivraison = commandesAvecDelai > 0 ? Math.round(totalDelai / commandesAvecDelai) : null;
+    const tauxFiabilite = totalCommandes > 0 ? Math.round(((commandesLivrees - commandesEnRetard) / totalCommandes) * 100) : 100;
+    const montantTotal = commandes.reduce((sum, c) => sum + (Number(c.montantTotal) || 0), 0);
+    
+    result.push({
+      fournisseur,
+      totalCommandes,
+      commandesLivrees,
+      commandesEnRetard,
+      delaiMoyenLivraison,
+      tauxFiabilite: Math.max(0, tauxFiabilite),
+      montantTotal
+    });
+  }
+  
+  return result.sort((a, b) => b.totalCommandes - a.totalCommandes);
+}
+
+// ============================================================================
+// PAIEMENTS STRIPE
+// ============================================================================
+
+export async function getPaiementsByFactureId(factureId: number): Promise<PaiementStripe[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(paiementsStripe)
+    .where(eq(paiementsStripe.factureId, factureId))
+    .orderBy(desc(paiementsStripe.createdAt));
+}
+
+export async function getPaiementByToken(token: string): Promise<PaiementStripe | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(paiementsStripe).where(eq(paiementsStripe.tokenPaiement, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getPaiementBySessionId(sessionId: string): Promise<PaiementStripe | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(paiementsStripe).where(eq(paiementsStripe.stripeSessionId, sessionId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createPaiementStripe(data: InsertPaiementStripe): Promise<PaiementStripe> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(paiementsStripe).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(paiementsStripe).where(eq(paiementsStripe.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to retrieve created payment");
+  return created[0];
+}
+
+export async function updatePaiementStripe(id: number, data: Partial<InsertPaiementStripe>): Promise<PaiementStripe> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(paiementsStripe).set({ ...data, updatedAt: new Date() }).where(eq(paiementsStripe.id, id));
+  const updated = await db.select().from(paiementsStripe).where(eq(paiementsStripe.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Payment not found");
+  return updated[0];
+}
+
+export async function markPaiementComplete(id: number, paymentIntentId: string): Promise<PaiementStripe> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(paiementsStripe).set({ 
+    statut: 'complete', 
+    stripePaymentIntentId: paymentIntentId,
+    paidAt: new Date(),
+    updatedAt: new Date() 
+  }).where(eq(paiementsStripe.id, id));
+  const updated = await db.select().from(paiementsStripe).where(eq(paiementsStripe.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Payment not found");
+  return updated[0];
 }

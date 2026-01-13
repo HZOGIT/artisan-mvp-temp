@@ -891,6 +891,79 @@ const facturesRouter = router({
 
       return result;
     }),
+
+  // Générer un lien de paiement Stripe
+  generatePaymentLink: protectedProcedure
+    .input(z.object({ factureId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const { createCheckoutSession, isStripeConfigured } = await import('./stripe/stripeService');
+      
+      if (!isStripeConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Stripe n'est pas configuré. Veuillez configurer vos clés Stripe dans les paramètres." });
+      }
+      
+      const facture = await db.getFactureById(input.factureId);
+      if (!facture) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || facture.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const client = await db.getClientById(facture.clientId);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
+      if (!client.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+      
+      // Générer un token unique pour le paiement
+      const tokenPaiement = crypto.randomUUID();
+      
+      // Créer la session Stripe
+      const origin = ctx.req.headers.origin || 'http://localhost:3000';
+      const session = await createCheckoutSession({
+        factureId: facture.id,
+        numeroFacture: facture.numero,
+        montantTTC: Number(facture.totalTTC),
+        clientEmail: client.email,
+        clientName: client.prenom ? `${client.prenom} ${client.nom}` : client.nom,
+        artisanName: artisan.nomEntreprise || 'Artisan',
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        origin,
+        tokenPaiement,
+      });
+      
+      // Enregistrer le paiement en base
+      await db.createPaiementStripe({
+        factureId: facture.id,
+        artisanId: artisan.id,
+        stripeSessionId: session.sessionId,
+        montant: facture.totalTTC || '0',
+        tokenPaiement,
+        lienPaiement: session.url,
+        statut: 'en_attente',
+      });
+      
+      return { url: session.url, token: tokenPaiement };
+    }),
+
+  // Récupérer les paiements d'une facture
+  getPayments: protectedProcedure
+    .input(z.object({ factureId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const facture = await db.getFactureById(input.factureId);
+      if (!facture) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || facture.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return await db.getPaiementsByFactureId(input.factureId);
+    }),
 });
 
 // ============================================================================
@@ -1763,14 +1836,246 @@ const fournisseursRouter = router({
     .mutation(async ({ input }) => {
       await db.deleteArticleFournisseur(input.id);
       return { success: true };
+    })});
+
+// ============================================================================
+// MODELES EMAIL ROUTER
+// ============================================================================
+const modelesEmailRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getModelesEmailByArtisanId(artisan.id);
+  }),
+
+  listByType: protectedProcedure
+    .input(z.object({ type: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getModelesEmailByType(artisan.id, input.type);
     }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const modele = await db.getModeleEmailById(input.id);
+      if (!modele) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Modèle non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || modele.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return modele;
+    }),
+
+  getDefault: protectedProcedure
+    .input(z.object({ type: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      return await db.getDefaultModeleEmail(artisan.id, input.type);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      nom: z.string(),
+      type: z.enum(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]),
+      sujet: z.string(),
+      contenu: z.string(),
+      isDefault: z.boolean().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createModeleEmail({
+        artisanId: artisan.id,
+        ...input
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      sujet: z.string().optional(),
+      contenu: z.string().optional(),
+      isDefault: z.boolean().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+      const modele = await db.getModeleEmailById(id);
+      if (!modele) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Modèle non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || modele.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return await db.updateModeleEmail(id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const modele = await db.getModeleEmailById(input.id);
+      if (!modele) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Modèle non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || modele.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      await db.deleteModeleEmail(input.id);
+      return { success: true };
+    }),
+
+  // Prévisualiser un modèle avec des variables
+  preview: protectedProcedure
+    .input(z.object({
+      contenu: z.string(),
+      variables: z.record(z.string(), z.string())
+    }))
+    .query(({ input }) => {
+      let preview = input.contenu;
+      for (const [key, value] of Object.entries(input.variables)) {
+        preview = preview.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+      }
+      return preview;
+    }),
+});
+
+// ============================================================================
+// COMMANDES FOURNISSEURS ROUTER
+// ============================================================================
+const commandesFournisseursRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getCommandesFournisseursByArtisanId(artisan.id);
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const lignes = await db.getLignesCommandeFournisseur(commande.id);
+      const fournisseur = await db.getFournisseurById(commande.fournisseurId);
+      return { ...commande, lignes, fournisseur };
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      fournisseurId: z.number(),
+      reference: z.string().optional(),
+      dateLivraisonPrevue: z.string().optional(),
+      notes: z.string().optional(),
+      lignes: z.array(z.object({
+        stockId: z.number().optional(),
+        designation: z.string(),
+        reference: z.string().optional(),
+        quantite: z.number(),
+        prixUnitaire: z.number().optional()
+      }))
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      
+      // Calculer le montant total
+      const montantTotal = input.lignes.reduce((sum, l) => {
+        return sum + (l.quantite * (l.prixUnitaire || 0));
+      }, 0);
+      
+      const commande = await db.createCommandeFournisseur({
+        artisanId: artisan.id,
+        fournisseurId: input.fournisseurId,
+        reference: input.reference,
+        dateLivraisonPrevue: input.dateLivraisonPrevue ? new Date(input.dateLivraisonPrevue) : undefined,
+        notes: input.notes,
+        montantTotal: montantTotal.toFixed(2),
+        statut: "en_attente"
+      });
+      
+      // Créer les lignes
+      for (const ligne of input.lignes) {
+        await db.createLigneCommandeFournisseur({
+          commandeId: commande.id,
+          stockId: ligne.stockId,
+          designation: ligne.designation,
+          reference: ligne.reference,
+          quantite: ligne.quantite.toFixed(2),
+          prixUnitaire: ligne.prixUnitaire?.toFixed(2),
+          montantTotal: (ligne.quantite * (ligne.prixUnitaire || 0)).toFixed(2)
+        });
+      }
+      
+      return commande;
+    }),
+
+  updateStatut: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      statut: z.enum(["en_attente", "confirmee", "expediee", "livree", "annulee"]),
+      dateLivraisonReelle: z.string().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      const updateData: any = { statut: input.statut };
+      if (input.dateLivraisonReelle) {
+        updateData.dateLivraisonReelle = new Date(input.dateLivraisonReelle);
+      }
+      
+      return await db.updateCommandeFournisseur(input.id, updateData);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      await db.deleteCommandeFournisseur(input.id);
+      return { success: true };
+    }),
+
+  // Performances fournisseurs
+  getPerformances: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getPerformancesFournisseurs(artisan.id);
+  }),
 });
 
 // ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
-export const appRouter = router({
-  system: systemRouter,
+export const appRouter = router({system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -1791,6 +2096,8 @@ export const appRouter = router({
   signature: signatureRouter,
   stocks: stocksRouter,
   fournisseurs: fournisseursRouter,
+  modelesEmail: modelesEmailRouter,
+  commandesFournisseurs: commandesFournisseursRouter,
 });
 
 export type AppRouter = typeof appRouter;

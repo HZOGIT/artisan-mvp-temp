@@ -171,3 +171,27 @@
 - [x] Génération automatique des notifications de relance
 - [x] Envoi d'email de relance au client
 - [x] Historique des relances effectuées
+
+
+## Nouvelles Fonctionnalités (Sprint 7)
+
+### Modèles d'Emails Personnalisables
+- [x] Table des modèles d'emails (nom, sujet, contenu, variables)
+- [x] Page de gestion des modèles d'emails
+- [x] Variables dynamiques (nom client, numéro devis, montant, etc.)
+- [x] Prévisualisation du modèle avant envoi
+- [x] Intégration avec le module de relance
+
+### Tableau de Bord Performances Fournisseurs
+- [x] Table des commandes fournisseurs
+- [x] Suivi des délais de livraison
+- [x] Calcul du taux de fiabilité
+- [x] Page de tableau de bord avec graphiques
+- [x] Historique des commandes par fournisseur
+
+### Paiement en Ligne Stripe
+- [x] Configuration de l'intégration Stripe
+- [x] Génération de liens de paiement pour les factures
+- [x] Page de paiement publique
+- [x] Webhook pour confirmation de paiement
+- [x] Mise à jour automatique du statut de la facture
