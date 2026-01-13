@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,8 @@ import {
   Plus,
   Palette,
   GripVertical,
-  Move
+  Move,
+  Printer
 } from "lucide-react";
 
 interface Intervention {
@@ -79,6 +80,13 @@ export default function CalendrierChantiers() {
   const { data: techniciens } = trpc.techniciens.getAll.useQuery();
   const { data: interventionsData } = trpc.interventions.list.useQuery();
   const { data: interventionsChantierData } = trpc.chantiers.getAllInterventionsChantier.useQuery();
+  const { data: savedColors } = trpc.interventions.getCouleursCalendrier.useQuery();
+
+  const setCouleurMutation = trpc.interventions.setCouleurIntervention.useMutation({
+    onSuccess: () => {
+      utils.interventions.getCouleursCalendrier.invalidate();
+    },
+  });
 
   const updateInterventionMutation = trpc.interventions.update.useMutation({
     onSuccess: () => {
@@ -217,13 +225,21 @@ export default function CalendrierChantiers() {
     setDragOverDate(null);
   };
 
-  // Changer la couleur d'une intervention
+  // Charger les couleurs sauvegardées au démarrage
+  useEffect(() => {
+    if (savedColors) {
+      setCustomColors(savedColors as Record<number, string>);
+    }
+  }, [savedColors]);
+
+  // Changer la couleur d'une intervention et sauvegarder en BDD
   const setInterventionColor = (interventionId: number, colorClass: string) => {
     setCustomColors(prev => ({
       ...prev,
       [interventionId]: colorClass,
     }));
-    toast.success("Couleur mise à jour");
+    setCouleurMutation.mutate({ interventionId, couleur: colorClass });
+    toast.success("Couleur sauvegardée");
   };
 
   // Navigation
@@ -357,6 +373,219 @@ export default function CalendrierChantiers() {
     toast.success("Calendrier exporté");
   };
 
+  // Impression du calendrier
+  const handlePrint = () => {
+    const printContent = document.getElementById('calendar-print-area');
+    if (!printContent) {
+      toast.error("Impossible d'imprimer le calendrier");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error("Veuillez autoriser les pop-ups pour imprimer");
+      return;
+    }
+
+    const title = viewMode === 'month' 
+      ? `${MOIS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+      : viewMode === 'week'
+      ? `Semaine du ${getDaysInWeek()[0].toLocaleDateString("fr-FR")}`
+      : formatDate(currentDate);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Calendrier des Chantiers - ${title}</title>
+        <style>
+          @page {
+            size: landscape;
+            margin: 1cm;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+          }
+          .print-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+          }
+          .print-header h1 {
+            margin: 0 0 5px 0;
+            font-size: 24px;
+          }
+          .print-header p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+          }
+          .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #ddd;
+            border: 1px solid #ddd;
+          }
+          .day-header {
+            background: #f5f5f5;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+          }
+          .day-cell {
+            background: white;
+            min-height: 80px;
+            padding: 4px;
+            vertical-align: top;
+          }
+          .day-number {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 4px;
+          }
+          .day-cell.other-month {
+            background: #fafafa;
+            color: #999;
+          }
+          .day-cell.today {
+            background: #e3f2fd;
+          }
+          .event {
+            font-size: 10px;
+            padding: 2px 4px;
+            margin-bottom: 2px;
+            border-radius: 2px;
+            color: white;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          .event.blue { background: #3b82f6; }
+          .event.green { background: #22c55e; }
+          .event.purple { background: #a855f7; }
+          .event.orange { background: #f97316; }
+          .event.pink { background: #ec4899; }
+          .event.teal { background: #14b8a6; }
+          .event.indigo { background: #6366f1; }
+          .event.red { background: #ef4444; }
+          .event.yellow { background: #eab308; color: #333; }
+          .event.gray { background: #6b7280; }
+          .legend {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+          }
+          .legend h3 {
+            font-size: 14px;
+            margin: 0 0 10px 0;
+          }
+          .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+          }
+          .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+          }
+          .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+          }
+          .filters-info {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+          }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-header">
+          <h1>Calendrier des Chantiers</h1>
+          <p>${title}</p>
+        </div>
+        ${selectedChantierId || selectedTechnicienId ? `
+          <div class="filters-info">
+            Filtres actifs: 
+            ${selectedChantierId ? `Chantier: ${chantiers?.find(c => c.id === selectedChantierId)?.nom || ''}` : ''}
+            ${selectedTechnicienId ? `Technicien: ${(techniciens as any[])?.find((t: any) => t.id === selectedTechnicienId)?.nom || ''}` : ''}
+          </div>
+        ` : ''}
+        <div class="calendar-grid">
+          ${JOURS.map(j => `<div class="day-header">${j}</div>`).join('')}
+          ${getDaysInMonth().map(({ date, isCurrentMonth }) => {
+            const dayInterventions = getInterventionsForDay(date);
+            const colorClassToName = (cls: string) => {
+              if (cls.includes('blue')) return 'blue';
+              if (cls.includes('green')) return 'green';
+              if (cls.includes('purple')) return 'purple';
+              if (cls.includes('orange')) return 'orange';
+              if (cls.includes('pink')) return 'pink';
+              if (cls.includes('teal')) return 'teal';
+              if (cls.includes('indigo')) return 'indigo';
+              if (cls.includes('red')) return 'red';
+              if (cls.includes('yellow')) return 'yellow';
+              return 'gray';
+            };
+            return `
+              <div class="day-cell ${!isCurrentMonth ? 'other-month' : ''} ${isToday(date) ? 'today' : ''}">
+                <div class="day-number">${date.getDate()}</div>
+                ${dayInterventions.slice(0, 3).map((i: Intervention, idx: number) => `
+                  <div class="event ${colorClassToName(getInterventionColor(i, idx))}">
+                    ${i.chantierNom}
+                  </div>
+                `).join('')}
+                ${dayInterventions.length > 3 ? `<div style="font-size: 10px; color: #666;">+${dayInterventions.length - 3} autres</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="legend">
+          <h3>Légende (${colorMode === 'chantier' ? 'Par chantier' : colorMode === 'technicien' ? 'Par technicien' : 'Par statut'})</h3>
+          <div class="legend-items">
+            ${colorMode === 'statut' ? `
+              <div class="legend-item"><div class="legend-color" style="background: #3b82f6;"></div>Planifiée</div>
+              <div class="legend-item"><div class="legend-color" style="background: #eab308;"></div>En cours</div>
+              <div class="legend-item"><div class="legend-color" style="background: #22c55e;"></div>Terminée</div>
+              <div class="legend-item"><div class="legend-color" style="background: #ef4444;"></div>Annulée</div>
+            ` : colorMode === 'technicien' ? 
+              (techniciens as any[] || []).slice(0, 5).map((t: any, i: number) => `
+                <div class="legend-item">
+                  <div class="legend-color" style="background: ${COLORS[i % COLORS.length].hex};"></div>
+                  ${t.prenom || ''} ${t.nom}
+                </div>
+              `).join('')
+            : 
+              (chantiers || []).slice(0, 5).map((c, i) => `
+                <div class="legend-item">
+                  <div class="legend-color" style="background: ${COLORS[c.id % COLORS.length].hex};"></div>
+                  ${c.nom}
+                </div>
+              `).join('')
+            }
+          </div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); window.close(); }
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const isToday = (date: Date) => {
     const today = new Date();
     return date.toDateString() === today.toDateString();
@@ -410,6 +639,10 @@ export default function CalendrierChantiers() {
           <Button variant="outline" onClick={exportCalendar}>
             <Download className="h-4 w-4 mr-2" />
             Exporter
+          </Button>
+          <Button variant="outline" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimer
           </Button>
         </div>
       </div>

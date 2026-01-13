@@ -428,3 +428,24 @@
 - [x] Couleurs par type d'intervention ou par technicien
 - [x] Sauvegarde des préférences de couleur
 - [x] Légende des couleurs dans le calendrier
+
+
+## Nouvelles Fonctionnalités (Sprint 17)
+
+### Filtres Tableau de Bord Synchronisations
+- [x] Filtre par type (factures, paiements, exports)
+- [x] Filtre par statut de synchronisation
+- [x] Combinaison des filtres
+- [x] Mise à jour des statistiques selon les filtres
+
+### Sauvegarde Couleurs Calendrier
+- [x] Table des préférences de couleurs en BDD
+- [x] API pour sauvegarder les couleurs
+- [x] API pour récupérer les couleurs
+- [x] Chargement automatique des couleurs au démarrage
+
+### Vue Imprimable Calendrier
+- [x] Bouton d'impression dans le calendrier
+- [x] Vue hebdomadaire optimisée pour l'impression
+- [x] Vue mensuelle optimisée pour l'impression
+- [x] Styles CSS d'impression dédiés

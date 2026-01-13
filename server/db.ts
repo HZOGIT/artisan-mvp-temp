@@ -71,7 +71,8 @@ import {
   photosAnalyse, InsertPhotoAnalyse, PhotoAnalyse,
   resultatsAnalyseIA, InsertResultatAnalyseIA, ResultatAnalyseIA,
   suggestionsArticlesIA, InsertSuggestionArticleIA, SuggestionArticleIA,
-  devisGenereIA, InsertDevisGenereIA, DevisGenereIA
+  devisGenereIA, InsertDevisGenereIA, DevisGenereIA,
+  preferencesCouleursCalendrier, InsertPreferenceCouleurCalendrier, PreferenceCouleurCalendrier
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -5242,4 +5243,84 @@ export async function retrySyncItem(artisanId: number, type: string, id: number)
   // Dans une vraie implémentation, on réessaierait de synchroniser l'élément spécifique
   // Pour l'instant, on simule le succès
   return true;
+}
+
+
+// ============================================================================
+// PREFERENCES COULEURS CALENDRIER
+// ============================================================================
+export async function getCouleursCalendrier(artisanId: number): Promise<Record<number, string>> {
+  const db = await getDb();
+  if (!db) return {};
+  
+  const prefs = await db.select()
+    .from(preferencesCouleursCalendrier)
+    .where(eq(preferencesCouleursCalendrier.artisanId, artisanId));
+  
+  const result: Record<number, string> = {};
+  for (const pref of prefs) {
+    result[pref.interventionId] = pref.couleur;
+  }
+  return result;
+}
+
+export async function setCouleurIntervention(
+  artisanId: number, 
+  interventionId: number, 
+  couleur: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  // Vérifier si une préférence existe déjà
+  const existing = await db.select()
+    .from(preferencesCouleursCalendrier)
+    .where(and(
+      eq(preferencesCouleursCalendrier.artisanId, artisanId),
+      eq(preferencesCouleursCalendrier.interventionId, interventionId)
+    ))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    // Mettre à jour
+    await db.update(preferencesCouleursCalendrier)
+      .set({ couleur, updatedAt: new Date() })
+      .where(and(
+        eq(preferencesCouleursCalendrier.artisanId, artisanId),
+        eq(preferencesCouleursCalendrier.interventionId, interventionId)
+      ));
+  } else {
+    // Créer
+    await db.insert(preferencesCouleursCalendrier).values({
+      artisanId,
+      interventionId,
+      couleur,
+    });
+  }
+}
+
+export async function deleteCouleurIntervention(
+  artisanId: number, 
+  interventionId: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  await db.delete(preferencesCouleursCalendrier)
+    .where(and(
+      eq(preferencesCouleursCalendrier.artisanId, artisanId),
+      eq(preferencesCouleursCalendrier.interventionId, interventionId)
+    ));
+}
+
+export async function setCouleursMultiples(
+  artisanId: number, 
+  couleurs: Record<number, string>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  for (const [interventionId, couleur] of Object.entries(couleurs)) {
+    await setCouleurIntervention(artisanId, parseInt(interventionId), couleur);
+  }
 }

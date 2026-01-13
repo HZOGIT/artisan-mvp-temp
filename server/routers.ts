@@ -1125,6 +1125,55 @@ const interventionsRouter = router({
         technicienId: input.technicienId
       });
     }),
+
+  // Gestion des couleurs personnalisées du calendrier
+  getCouleursCalendrier: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return {};
+    return await db.getCouleursCalendrier(artisan.id);
+  }),
+
+  setCouleurIntervention: protectedProcedure
+    .input(z.object({
+      interventionId: z.number(),
+      couleur: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      await db.setCouleurIntervention(artisan.id, input.interventionId, input.couleur);
+      return { success: true };
+    }),
+
+  deleteCouleurIntervention: protectedProcedure
+    .input(z.object({ interventionId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      await db.deleteCouleurIntervention(artisan.id, input.interventionId);
+      return { success: true };
+    }),
+
+  setCouleursMultiples: protectedProcedure
+    .input(z.object({
+      couleurs: z.record(z.string(), z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      const couleursNumeriques: Record<number, string> = {};
+      for (const [key, value] of Object.entries(input.couleurs)) {
+        couleursNumeriques[parseInt(key)] = value;
+      }
+      await db.setCouleursMultiples(artisan.id, couleursNumeriques);
+      return { success: true };
+    }),
 });
 
 // ============================================================================

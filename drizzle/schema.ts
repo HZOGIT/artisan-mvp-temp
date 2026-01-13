@@ -1410,3 +1410,18 @@ export const devisGenereIA = mysqlTable("devis_genere_ia", {
 
 export type DevisGenereIA = typeof devisGenereIA.$inferSelect;
 export type InsertDevisGenereIA = typeof devisGenereIA.$inferInsert;
+
+
+// ============================================================================
+// PREFERENCES COULEURS CALENDRIER
+// ============================================================================
+export const preferencesCouleursCalendrier = mysqlTable("preferences_couleurs_calendrier", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  interventionId: int("interventionId").notNull(),
+  couleur: varchar("couleur", { length: 50 }).notNull(), // ex: "bg-blue-500"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PreferenceCouleurCalendrier = typeof preferencesCouleursCalendrier.$inferSelect;
+export type InsertPreferenceCouleurCalendrier = typeof preferencesCouleursCalendrier.$inferInsert;

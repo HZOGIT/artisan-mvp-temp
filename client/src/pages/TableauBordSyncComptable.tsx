@@ -22,11 +22,19 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Zap,
-  Database
+  Database,
+  Filter,
+  Users,
+  X
 } from "lucide-react";
+
+type StatutFiltre = "tous" | "termine" | "succes" | "erreur" | "en_cours" | "en_attente";
+type TypeFiltre = "tous" | "facture" | "paiement" | "export";
 
 export default function TableauBordSyncComptable() {
   const [periodeFiltree, setPeriodeFiltree] = useState<"7j" | "30j" | "90j" | "365j">("30j");
+  const [statutFiltre, setStatutFiltre] = useState<StatutFiltre>("tous");
+  const [typeFiltre, setTypeFiltre] = useState<TypeFiltre>("tous");
 
   const { data: syncStatus } = trpc.integrationsComptables.getSyncStatus.useQuery();
   const { data: syncLogs } = trpc.integrationsComptables.getSyncLogs.useQuery();
@@ -47,7 +55,15 @@ export default function TableauBordSyncComptable() {
     },
   });
 
-  // Calculer les statistiques
+  // Réinitialiser les filtres
+  const resetFiltres = () => {
+    setStatutFiltre("tous");
+    setTypeFiltre("tous");
+  };
+
+  const hasActiveFilters = statutFiltre !== "tous" || typeFiltre !== "tous";
+
+  // Calculer les statistiques avec filtres
   const stats = useMemo(() => {
     if (!syncLogs || !exports) return null;
 
@@ -56,15 +72,41 @@ export default function TableauBordSyncComptable() {
     const dateDebut = new Date(now.getTime() - periodeJours * 24 * 60 * 60 * 1000);
 
     // Filtrer les logs par période
-    const logsFilters = syncLogs.filter((log: any) => {
+    let logsFilters = syncLogs.filter((log: any) => {
       const logDate = new Date(log.createdAt);
       return logDate >= dateDebut;
     });
 
-    const exportsFilters = exports.filter((exp: any) => {
+    let exportsFilters = exports.filter((exp: any) => {
       const expDate = new Date(exp.createdAt);
       return expDate >= dateDebut;
     });
+
+    // Appliquer le filtre par statut
+    if (statutFiltre !== "tous") {
+      logsFilters = logsFilters.filter((l: any) => {
+        if (statutFiltre === "termine" || statutFiltre === "succes") {
+          return l.statut === "termine" || l.statut === "succes";
+        }
+        return l.statut === statutFiltre;
+      });
+      exportsFilters = exportsFilters.filter((e: any) => {
+        if (statutFiltre === "termine" || statutFiltre === "succes") {
+          return e.statut === "termine" || e.statut === "succes";
+        }
+        return e.statut === statutFiltre;
+      });
+    }
+
+    // Appliquer le filtre par type
+    if (typeFiltre !== "tous") {
+      if (typeFiltre === "export") {
+        logsFilters = [];
+      } else if (typeFiltre === "facture" || typeFiltre === "paiement") {
+        logsFilters = logsFilters.filter((l: any) => l.type === typeFiltre);
+        exportsFilters = [];
+      }
+    }
 
     // Calculer les totaux
     const totalSyncs = logsFilters.length + exportsFilters.length;
@@ -78,7 +120,7 @@ export default function TableauBordSyncComptable() {
     // Calculer les écritures totales
     const totalEcritures = exportsFilters.reduce((sum: number, e: any) => sum + (e.nombreEcritures || 0), 0);
 
-    // Évolution par rapport à la période précédente
+    // Évolution par rapport à la période précédente (sans filtres pour comparaison équitable)
     const datePrecedente = new Date(dateDebut.getTime() - periodeJours * 24 * 60 * 60 * 1000);
     const logsPrecedents = syncLogs.filter((log: any) => {
       const logDate = new Date(log.createdAt);
@@ -98,13 +140,14 @@ export default function TableauBordSyncComptable() {
       tauxReussite,
       totalEcritures,
       evolution,
-      logsRecents: [...logsFilters, ...exportsFilters]
+      logsRecents: [...logsFilters.map((l: any) => ({ ...l, sourceType: 'sync' })), 
+                    ...exportsFilters.map((e: any) => ({ ...e, sourceType: 'export' }))]
         .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 10),
     };
-  }, [syncLogs, exports, periodeFiltree]);
+  }, [syncLogs, exports, periodeFiltree, statutFiltre, typeFiltre]);
 
-  // Données pour le graphique (simulé)
+  // Données pour le graphique
   const chartData = useMemo(() => {
     if (!syncLogs || !exports) return [];
 
@@ -116,15 +159,31 @@ export default function TableauBordSyncComptable() {
       const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
       const dateStr = date.toISOString().split('T')[0];
       
-      const syncsJour = (syncLogs as any[]).filter((l: any) => {
+      let syncsJour = (syncLogs as any[]).filter((l: any) => {
         const logDate = new Date(l.createdAt).toISOString().split('T')[0];
-        return logDate === dateStr;
+        if (logDate !== dateStr) return false;
+        if (statutFiltre !== "tous" && l.statut !== statutFiltre && 
+            !(statutFiltre === "termine" && l.statut === "succes") &&
+            !(statutFiltre === "succes" && l.statut === "termine")) return false;
+        if (typeFiltre !== "tous" && typeFiltre !== "export" && l.type !== typeFiltre) return false;
+        return true;
       }).length;
       
-      const exportsJour = (exports as any[]).filter((e: any) => {
+      let exportsJour = (exports as any[]).filter((e: any) => {
         const expDate = new Date(e.createdAt).toISOString().split('T')[0];
-        return expDate === dateStr;
+        if (expDate !== dateStr) return false;
+        if (statutFiltre !== "tous" && e.statut !== statutFiltre &&
+            !(statutFiltre === "termine" && e.statut === "succes") &&
+            !(statutFiltre === "succes" && e.statut === "termine")) return false;
+        if (typeFiltre !== "tous" && typeFiltre !== "export") return false;
+        return true;
       }).length;
+
+      if (typeFiltre === "export") {
+        syncsJour = 0;
+      } else if (typeFiltre === "facture" || typeFiltre === "paiement") {
+        exportsJour = 0;
+      }
 
       data.push({
         date: dateStr,
@@ -134,7 +193,7 @@ export default function TableauBordSyncComptable() {
     }
 
     return data;
-  }, [syncLogs, exports, periodeFiltree]);
+  }, [syncLogs, exports, periodeFiltree, statutFiltre, typeFiltre]);
 
   const getStatutBadge = (statut: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive"; icon: React.ReactNode; label: string }> = {
@@ -153,6 +212,19 @@ export default function TableauBordSyncComptable() {
     );
   };
 
+  const getTypeBadge = (type: string, sourceType?: string) => {
+    if (sourceType === 'export' || type === 'export') {
+      return <Badge variant="outline" className="bg-purple-50">Export</Badge>;
+    }
+    if (type === 'facture') {
+      return <Badge variant="outline" className="bg-blue-50">Facture</Badge>;
+    }
+    if (type === 'paiement') {
+      return <Badge variant="outline" className="bg-green-50">Paiement</Badge>;
+    }
+    return <Badge variant="outline">Sync</Badge>;
+  };
+
   const maxSyncs = Math.max(...chartData.map(d => d.syncs), 1);
 
   return (
@@ -166,17 +238,6 @@ export default function TableauBordSyncComptable() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <Select value={periodeFiltree} onValueChange={(v: "7j" | "30j" | "90j" | "365j") => setPeriodeFiltree(v)}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7j">7 derniers jours</SelectItem>
-              <SelectItem value="30j">30 derniers jours</SelectItem>
-              <SelectItem value="90j">90 derniers jours</SelectItem>
-              <SelectItem value="365j">12 derniers mois</SelectItem>
-            </SelectContent>
-          </Select>
           <Button
             onClick={() => lancerSyncMutation.mutate()}
             disabled={lancerSyncMutation.isPending}
@@ -195,6 +256,73 @@ export default function TableauBordSyncComptable() {
           </Button>
         </div>
       </div>
+
+      {/* Barre de filtres */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filtres:</span>
+            </div>
+
+            <Select value={periodeFiltree} onValueChange={(v: "7j" | "30j" | "90j" | "365j") => setPeriodeFiltree(v)}>
+              <SelectTrigger className="w-[150px]">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7j">7 derniers jours</SelectItem>
+                <SelectItem value="30j">30 derniers jours</SelectItem>
+                <SelectItem value="90j">90 derniers jours</SelectItem>
+                <SelectItem value="365j">12 derniers mois</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={typeFiltre} onValueChange={(v: TypeFiltre) => setTypeFiltre(v)}>
+              <SelectTrigger className="w-[150px]">
+                <FileText className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous les types</SelectItem>
+                <SelectItem value="facture">Factures</SelectItem>
+                <SelectItem value="paiement">Paiements</SelectItem>
+                <SelectItem value="export">Exports</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={statutFiltre} onValueChange={(v: StatutFiltre) => setStatutFiltre(v)}>
+              <SelectTrigger className="w-[150px]">
+                <Activity className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">Tous les statuts</SelectItem>
+                <SelectItem value="termine">Terminé / Succès</SelectItem>
+                <SelectItem value="en_cours">En cours</SelectItem>
+                <SelectItem value="en_attente">En attente</SelectItem>
+                <SelectItem value="erreur">Erreur</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={resetFiltres}>
+                <X className="h-4 w-4 mr-1" />
+                Réinitialiser
+              </Button>
+            )}
+
+            {hasActiveFilters && (
+              <div className="flex items-center gap-2 ml-auto">
+                <Badge variant="secondary">
+                  {stats?.totalSyncs || 0} résultat(s)
+                </Badge>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Cartes de statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -284,6 +412,9 @@ export default function TableauBordSyncComptable() {
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
             Évolution des Synchronisations
+            {hasActiveFilters && (
+              <Badge variant="outline" className="ml-2">Filtré</Badge>
+            )}
           </CardTitle>
           <CardDescription>
             Nombre de synchronisations par jour sur la période sélectionnée
@@ -421,6 +552,9 @@ export default function TableauBordSyncComptable() {
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             Historique Récent
+            {hasActiveFilters && (
+              <Badge variant="outline" className="ml-2">Filtré</Badge>
+            )}
           </CardTitle>
           <CardDescription>
             Les 10 dernières opérations de synchronisation
@@ -440,14 +574,12 @@ export default function TableauBordSyncComptable() {
             <TableBody>
               {stats?.logsRecents && stats.logsRecents.length > 0 ? (
                 stats.logsRecents.map((log: any, index: number) => (
-                  <TableRow key={`${log.type}-${log.id}-${index}`}>
+                  <TableRow key={`${log.sourceType || log.type}-${log.id}-${index}`}>
                     <TableCell>
                       {log.createdAt ? new Date(log.createdAt).toLocaleString("fr-FR") : "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {log.type === "export" ? "Export" : "Sync"}
-                      </Badge>
+                      {getTypeBadge(log.type, log.sourceType)}
                     </TableCell>
                     <TableCell>{log.logiciel?.toUpperCase() || "-"}</TableCell>
                     <TableCell>
@@ -459,7 +591,7 @@ export default function TableauBordSyncComptable() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    Aucune synchronisation récente
+                    {hasActiveFilters ? "Aucun résultat avec les filtres actuels" : "Aucune synchronisation récente"}
                   </TableCell>
                 </TableRow>
               )}
