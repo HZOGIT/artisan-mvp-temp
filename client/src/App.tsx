@@ -48,6 +48,7 @@ import Chantiers from "./pages/Chantiers";
 import IntegrationsComptables from "./pages/IntegrationsComptables";
 import DevisIA from "./pages/DevisIA";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
+import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -90,6 +91,7 @@ function AuthenticatedRoutes() {
         <Route path="/integrations-comptables" component={IntegrationsComptables} />
         <Route path="/devis-ia" component={DevisIA} />
         <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
+        <Route path="/sync-comptable" component={TableauBordSyncComptable} />
         <Route path="/devis/:id/options" component={DevisOptions} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
@@ -151,6 +153,7 @@ function Router() {
           <Route path="/integrations-comptables" component={() => <AuthenticatedRoutes />} />
           <Route path="/devis-ia" component={() => <AuthenticatedRoutes />} />
           <Route path="/calendrier-chantiers" component={() => <AuthenticatedRoutes />} />
+          <Route path="/sync-comptable" component={() => <AuthenticatedRoutes />} />
         </>
       )}
       <Route path="/404" component={NotFound} />

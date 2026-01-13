@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { 
   Calendar as CalendarIcon, 
@@ -20,7 +21,10 @@ import {
   Building2,
   Download,
   Eye,
-  Plus
+  Plus,
+  Palette,
+  GripVertical,
+  Move
 } from "lucide-react";
 
 interface Intervention {
@@ -40,14 +44,16 @@ interface Intervention {
 type ViewMode = "month" | "week" | "day";
 
 const COLORS = [
-  "bg-blue-500",
-  "bg-green-500",
-  "bg-purple-500",
-  "bg-orange-500",
-  "bg-pink-500",
-  "bg-teal-500",
-  "bg-indigo-500",
-  "bg-red-500",
+  { name: "Bleu", class: "bg-blue-500", hex: "#3b82f6" },
+  { name: "Vert", class: "bg-green-500", hex: "#22c55e" },
+  { name: "Violet", class: "bg-purple-500", hex: "#a855f7" },
+  { name: "Orange", class: "bg-orange-500", hex: "#f97316" },
+  { name: "Rose", class: "bg-pink-500", hex: "#ec4899" },
+  { name: "Cyan", class: "bg-teal-500", hex: "#14b8a6" },
+  { name: "Indigo", class: "bg-indigo-500", hex: "#6366f1" },
+  { name: "Rouge", class: "bg-red-500", hex: "#ef4444" },
+  { name: "Jaune", class: "bg-yellow-500", hex: "#eab308" },
+  { name: "Gris", class: "bg-gray-500", hex: "#6b7280" },
 ];
 
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -63,11 +69,54 @@ export default function CalendrierChantiers() {
   const [selectedTechnicienId, setSelectedTechnicienId] = useState<number | null>(null);
   const [selectedIntervention, setSelectedIntervention] = useState<Intervention | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [draggedIntervention, setDraggedIntervention] = useState<Intervention | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
+  const [customColors, setCustomColors] = useState<Record<number, string>>({});
+  const [colorMode, setColorMode] = useState<"chantier" | "technicien" | "statut">("chantier");
 
+  const utils = trpc.useUtils();
   const { data: chantiers } = trpc.chantiers.list.useQuery();
   const { data: techniciens } = trpc.techniciens.getAll.useQuery();
   const { data: interventionsData } = trpc.interventions.list.useQuery();
   const { data: interventionsChantierData } = trpc.chantiers.getAllInterventionsChantier.useQuery();
+
+  const updateInterventionMutation = trpc.interventions.update.useMutation({
+    onSuccess: () => {
+      toast.success("Intervention déplacée avec succès");
+      utils.interventions.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Erreur lors du déplacement: " + error.message);
+    },
+  });
+
+  // Fonction pour obtenir la couleur d'une intervention
+  const getInterventionColor = useCallback((intervention: Intervention, index: number) => {
+    // Vérifier si une couleur personnalisée existe
+    if (customColors[intervention.id]) {
+      return customColors[intervention.id];
+    }
+    
+    // Couleur basée sur le mode sélectionné
+    switch (colorMode) {
+      case "technicien":
+        if (intervention.technicienId) {
+          return COLORS[intervention.technicienId % COLORS.length].class;
+        }
+        return COLORS[0].class;
+      case "statut":
+        const statutColors: Record<string, string> = {
+          planifiee: "bg-blue-500",
+          en_cours: "bg-yellow-500",
+          terminee: "bg-green-500",
+          annulee: "bg-red-500",
+        };
+        return statutColors[intervention.statut] || COLORS[0].class;
+      case "chantier":
+      default:
+        return COLORS[intervention.chantierId % COLORS.length].class;
+    }
+  }, [customColors, colorMode]);
 
   // Transformer les interventions avec les informations des chantiers
   const interventions = useMemo(() => {
@@ -86,7 +135,7 @@ export default function CalendrierChantiers() {
       const chantierId = interventionChantierMap.get(intervention.id) || 0;
       const chantier = chantierMap.get(chantierId);
       const technicien = technicienMap.get(intervention.technicienId || 0);
-      return {
+      const interventionObj: Intervention = {
         id: intervention.id,
         chantierId: chantierId,
         chantierNom: chantier?.nom || "Sans chantier",
@@ -97,8 +146,8 @@ export default function CalendrierChantiers() {
         statut: intervention.statut || "planifiee",
         description: intervention.description,
         adresse: chantier?.adresse || intervention.adresse,
-        couleur: COLORS[index % COLORS.length],
       };
+      return interventionObj;
     });
   }, [interventionsData, chantiers, techniciens, interventionsChantierData]);
 
@@ -110,6 +159,72 @@ export default function CalendrierChantiers() {
       return true;
     });
   }, [interventions, selectedChantierId, selectedTechnicienId]);
+
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, intervention: Intervention) => {
+    setDraggedIntervention(intervention);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", intervention.id.toString());
+  };
+
+  const handleDragOver = (e: React.DragEvent, date: Date) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverDate(date);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverDate(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetDate: Date) => {
+    e.preventDefault();
+    setDragOverDate(null);
+    
+    if (!draggedIntervention) return;
+    
+    const originalDate = new Date(draggedIntervention.dateDebut);
+    const diffDays = Math.floor((targetDate.getTime() - originalDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) {
+      setDraggedIntervention(null);
+      return;
+    }
+    
+    // Calculer les nouvelles dates
+    const newDateDebut = new Date(originalDate);
+    newDateDebut.setDate(newDateDebut.getDate() + diffDays);
+    
+    let newDateFin = null;
+    if (draggedIntervention.dateFin) {
+      const originalDateFin = new Date(draggedIntervention.dateFin);
+      newDateFin = new Date(originalDateFin);
+      newDateFin.setDate(newDateFin.getDate() + diffDays);
+    }
+    
+    // Mettre à jour l'intervention
+    updateInterventionMutation.mutate({
+      id: draggedIntervention.id,
+      dateDebut: newDateDebut.toISOString(),
+      dateFin: newDateFin?.toISOString() || undefined,
+    });
+    
+    setDraggedIntervention(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIntervention(null);
+    setDragOverDate(null);
+  };
+
+  // Changer la couleur d'une intervention
+  const setInterventionColor = (interventionId: number, colorClass: string) => {
+    setCustomColors(prev => ({
+      ...prev,
+      [interventionId]: colorClass,
+    }));
+    toast.success("Couleur mise à jour");
+  };
 
   // Navigation
   const navigatePrevious = () => {
@@ -147,24 +262,20 @@ export default function CalendrierChantiers() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    // Ajuster pour commencer le lundi
     let startOffset = firstDay.getDay() - 1;
     if (startOffset < 0) startOffset = 6;
     
     const days: { date: Date; isCurrentMonth: boolean }[] = [];
     
-    // Jours du mois précédent
     for (let i = startOffset - 1; i >= 0; i--) {
       const date = new Date(year, month, -i);
       days.push({ date, isCurrentMonth: false });
     }
     
-    // Jours du mois courant
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push({ date: new Date(year, month, i), isCurrentMonth: true });
     }
     
-    // Jours du mois suivant pour compléter la grille
     const remaining = 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
       days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
@@ -251,6 +362,10 @@ export default function CalendrierChantiers() {
     return date.toDateString() === today.toDateString();
   };
 
+  const isDragOver = (date: Date) => {
+    return dragOverDate && date.toDateString() === dragOverDate.toDateString();
+  };
+
   return (
     <div className="space-y-6">
       {/* En-tête */}
@@ -258,13 +373,45 @@ export default function CalendrierChantiers() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Calendrier des Chantiers</h1>
           <p className="text-muted-foreground">
-            Visualisez toutes les interventions planifiées
+            Glissez-déposez les interventions pour les réorganiser
           </p>
         </div>
-        <Button variant="outline" onClick={exportCalendar}>
-          <Download className="h-4 w-4 mr-2" />
-          Exporter
-        </Button>
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline">
+                <Palette className="h-4 w-4 mr-2" />
+                Couleurs
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <div className="space-y-4">
+                <div>
+                  <Label>Mode de coloration</Label>
+                  <Select value={colorMode} onValueChange={(v: "chantier" | "technicien" | "statut") => setColorMode(v)}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="chantier">Par chantier</SelectItem>
+                      <SelectItem value="technicien">Par technicien</SelectItem>
+                      <SelectItem value="statut">Par statut</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground">
+                    Cliquez sur une intervention pour personnaliser sa couleur
+                  </Label>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" onClick={exportCalendar}>
+            <Download className="h-4 w-4 mr-2" />
+            Exporter
+          </Button>
+        </div>
       </div>
 
       {/* Filtres et navigation */}
@@ -356,6 +503,16 @@ export default function CalendrierChantiers() {
         </CardContent>
       </Card>
 
+      {/* Indicateur drag-and-drop */}
+      {draggedIntervention && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
+          <Move className="h-4 w-4 text-blue-600" />
+          <span className="text-sm text-blue-700">
+            Déplacez "{draggedIntervention.chantierNom}" vers une nouvelle date
+          </span>
+        </div>
+      )}
+
       {/* Calendrier */}
       <Card>
         <CardContent className="pt-4">
@@ -376,9 +533,14 @@ export default function CalendrierChantiers() {
                   return (
                     <div
                       key={index}
-                      className={`min-h-[100px] border rounded-lg p-1 ${
+                      className={`min-h-[100px] border rounded-lg p-1 transition-colors ${
                         isCurrentMonth ? "bg-background" : "bg-muted/30"
-                      } ${isToday(date) ? "ring-2 ring-primary" : ""}`}
+                      } ${isToday(date) ? "ring-2 ring-primary" : ""} ${
+                        isDragOver(date) ? "bg-blue-100 border-blue-400" : ""
+                      }`}
+                      onDragOver={(e) => handleDragOver(e, date)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, date)}
                     >
                       <div className={`text-sm font-medium mb-1 ${
                         isCurrentMonth ? "" : "text-muted-foreground"
@@ -386,18 +548,58 @@ export default function CalendrierChantiers() {
                         {date.getDate()}
                       </div>
                       <div className="space-y-1">
-                        {dayInterventions.slice(0, 3).map((intervention) => (
-                          <div
-                            key={intervention.id}
-                            className={`text-xs p-1 rounded cursor-pointer text-white truncate ${intervention.couleur}`}
-                            onClick={() => {
-                              setSelectedIntervention(intervention);
-                              setIsDetailDialogOpen(true);
-                            }}
-                            title={`${intervention.chantierNom} - ${intervention.description || "Intervention"}`}
-                          >
-                            {intervention.chantierNom}
-                          </div>
+                        {dayInterventions.slice(0, 3).map((intervention, idx) => (
+                          <Popover key={intervention.id}>
+                            <PopoverTrigger asChild>
+                              <div
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, intervention)}
+                                onDragEnd={handleDragEnd}
+                                className={`text-xs p-1 rounded cursor-grab active:cursor-grabbing text-white truncate flex items-center gap-1 ${getInterventionColor(intervention, idx)} ${
+                                  draggedIntervention?.id === intervention.id ? "opacity-50" : ""
+                                }`}
+                                title={`${intervention.chantierNom} - ${intervention.description || "Intervention"}`}
+                              >
+                                <GripVertical className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate">{intervention.chantierNom}</span>
+                              </div>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64">
+                              <div className="space-y-3">
+                                <div>
+                                  <h4 className="font-semibold">{intervention.chantierNom}</h4>
+                                  <p className="text-sm text-muted-foreground">{intervention.description || "Intervention"}</p>
+                                </div>
+                                <div>
+                                  <Label className="text-sm">Changer la couleur</Label>
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    {COLORS.map((color) => (
+                                      <button
+                                        key={color.class}
+                                        className={`w-6 h-6 rounded-full ${color.class} hover:ring-2 ring-offset-2 transition-all ${
+                                          (customColors[intervention.id] || getInterventionColor(intervention, idx)) === color.class ? "ring-2" : ""
+                                        }`}
+                                        onClick={() => setInterventionColor(intervention.id, color.class)}
+                                        title={color.name}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => {
+                                    setSelectedIntervention(intervention);
+                                    setIsDetailDialogOpen(true);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Voir les détails
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         ))}
                         {dayInterventions.length > 3 && (
                           <div className="text-xs text-muted-foreground text-center">
@@ -433,28 +635,46 @@ export default function CalendrierChantiers() {
                 {getDaysInWeek().map((date, index) => {
                   const dayInterventions = getInterventionsForDay(date);
                   return (
-                    <div key={index} className="min-h-[300px] border rounded-lg p-2 space-y-2">
-                      {dayInterventions.map((intervention) => (
+                    <div
+                      key={index}
+                      className={`min-h-[300px] border rounded-lg p-2 space-y-2 transition-colors ${
+                        isDragOver(date) ? "bg-blue-100 border-blue-400" : ""
+                      }`}
+                      onDragOver={(e) => handleDragOver(e, date)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, date)}
+                    >
+                      {dayInterventions.map((intervention, idx) => (
                         <Card
                           key={intervention.id}
-                          className={`cursor-pointer hover:shadow-md transition-shadow`}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, intervention)}
+                          onDragEnd={handleDragEnd}
+                          className={`cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
+                            draggedIntervention?.id === intervention.id ? "opacity-50" : ""
+                          }`}
                           onClick={() => {
                             setSelectedIntervention(intervention);
                             setIsDetailDialogOpen(true);
                           }}
                         >
                           <CardContent className="p-2">
-                            <div className={`w-full h-1 rounded mb-2 ${intervention.couleur}`} />
-                            <p className="font-medium text-sm truncate">{intervention.chantierNom}</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {intervention.description || "Intervention"}
-                            </p>
-                            {intervention.technicienNom && (
-                              <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                                <Users className="h-3 w-3" />
-                                {intervention.technicienNom}
+                            <div className={`w-full h-1 rounded mb-2 ${getInterventionColor(intervention, idx)}`} />
+                            <div className="flex items-start gap-1">
+                              <GripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{intervention.chantierNom}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {intervention.description || "Intervention"}
+                                </p>
+                                {intervention.technicienNom && (
+                                  <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                                    <Users className="h-3 w-3" />
+                                    {intervention.technicienNom}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </CardContent>
                         </Card>
                       ))}
@@ -475,17 +695,30 @@ export default function CalendrierChantiers() {
               <div className="text-center mb-4">
                 <h2 className="text-xl font-semibold">{formatDate(currentDate)}</h2>
               </div>
-              <div className="space-y-4">
+              <div
+                className={`space-y-4 min-h-[200px] p-4 rounded-lg transition-colors ${
+                  isDragOver(currentDate) ? "bg-blue-100 border-2 border-blue-400 border-dashed" : ""
+                }`}
+                onDragOver={(e) => handleDragOver(e, currentDate)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, currentDate)}
+              >
                 {getInterventionsForDay(currentDate).length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>Aucune intervention planifiée pour cette journée</p>
+                    <p className="text-sm mt-2">Glissez une intervention ici pour la déplacer</p>
                   </div>
                 ) : (
-                  getInterventionsForDay(currentDate).map((intervention) => (
+                  getInterventionsForDay(currentDate).map((intervention, idx) => (
                     <Card
                       key={intervention.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, intervention)}
+                      onDragEnd={handleDragEnd}
+                      className={`cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
+                        draggedIntervention?.id === intervention.id ? "opacity-50" : ""
+                      }`}
                       onClick={() => {
                         setSelectedIntervention(intervention);
                         setIsDetailDialogOpen(true);
@@ -493,7 +726,10 @@ export default function CalendrierChantiers() {
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">
-                          <div className={`w-2 h-full min-h-[80px] rounded ${intervention.couleur}`} />
+                          <div className="flex items-center gap-2">
+                            <GripVertical className="h-5 w-5 text-muted-foreground" />
+                            <div className={`w-2 h-full min-h-[80px] rounded ${getInterventionColor(intervention, idx)}`} />
+                          </div>
                           <div className="flex-1">
                             <div className="flex items-start justify-between">
                               <div>
@@ -535,24 +771,51 @@ export default function CalendrierChantiers() {
         </CardContent>
       </Card>
 
-      {/* Légende des chantiers */}
-      {chantiers && chantiers.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Légende des chantiers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4">
-              {chantiers.slice(0, 8).map((chantier, index) => (
-                <div key={chantier.id} className="flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded ${COLORS[index % COLORS.length]}`} />
-                  <span className="text-sm">{chantier.nom}</span>
+      {/* Légende des couleurs */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            Légende ({colorMode === "chantier" ? "Par chantier" : colorMode === "technicien" ? "Par technicien" : "Par statut"})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            {colorMode === "chantier" && chantiers?.slice(0, 10).map((chantier, index) => (
+              <div key={chantier.id} className="flex items-center gap-2">
+                <div className={`w-4 h-4 rounded ${COLORS[chantier.id % COLORS.length].class}`} />
+                <span className="text-sm">{chantier.nom}</span>
+              </div>
+            ))}
+            {colorMode === "technicien" && techniciens?.slice(0, 10).map((tech: any, index) => (
+              <div key={tech.id} className="flex items-center gap-2">
+                <div className={`w-4 h-4 rounded ${COLORS[tech.id % COLORS.length].class}`} />
+                <span className="text-sm">{tech.prenom} {tech.nom}</span>
+              </div>
+            ))}
+            {colorMode === "statut" && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-blue-500" />
+                  <span className="text-sm">Planifiée</span>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-yellow-500" />
+                  <span className="text-sm">En cours</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-green-500" />
+                  <span className="text-sm">Terminée</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-red-500" />
+                  <span className="text-sm">Annulée</span>
+                </div>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Dialog de détail */}
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
@@ -613,6 +876,22 @@ export default function CalendrierChantiers() {
               <div>
                 <Label className="text-muted-foreground">Statut</Label>
                 <div className="mt-1">{getStatutBadge(selectedIntervention.statut)}</div>
+              </div>
+
+              <div>
+                <Label className="text-muted-foreground">Couleur personnalisée</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {COLORS.map((color) => (
+                    <button
+                      key={color.class}
+                      className={`w-6 h-6 rounded-full ${color.class} hover:ring-2 ring-offset-2 transition-all ${
+                        customColors[selectedIntervention.id] === color.class ? "ring-2" : ""
+                      }`}
+                      onClick={() => setInterventionColor(selectedIntervention.id, color.class)}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           )}

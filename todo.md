@@ -407,3 +407,24 @@
 - [x] Synchronisation des paiements reçus
 - [x] Journal de synchronisation avec statuts
 - [x] Gestion des erreurs et reprises
+
+
+## Nouvelles Fonctionnalités (Sprint 16)
+
+### Drag-and-Drop Calendrier
+- [x] Implémentation du drag-and-drop pour les interventions
+- [x] Mise à jour des dates lors du déplacement
+- [x] Feedback visuel pendant le drag
+- [x] Validation des contraintes (disponibilité technicien)
+
+### Tableau de Bord Synchronisations Comptables
+- [x] Statistiques des synchronisations (succès, erreurs, en attente)
+- [x] Graphique d'évolution des synchronisations
+- [x] Liste des dernières synchronisations
+- [x] Indicateurs de performance
+
+### Personnalisation Couleurs Événements
+- [x] Sélecteur de couleur pour les interventions
+- [x] Couleurs par type d'intervention ou par technicien
+- [x] Sauvegarde des préférences de couleur
+- [x] Légende des couleurs dans le calendrier
