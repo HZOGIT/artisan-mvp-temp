@@ -148,3 +148,26 @@
 - [x] Vérification du code SMS
 - [x] Enregistrement de la validation SMS avec la signature
 - [x] Configuration du numéro de téléphone du client
+
+
+## Nouvelles Fonctionnalités (Sprint 6)
+
+### Intégration Twilio SMS
+- [x] Configuration du service Twilio
+- [x] Création du module d'envoi SMS
+- [x] Intégration avec la validation de signature
+- [x] Gestion des erreurs d'envoi SMS
+- [x] Configuration des secrets Twilio
+
+### Rapport de Commande Fournisseur
+- [x] Endpoint pour récupérer les articles en rupture de stock
+- [x] Association avec les fournisseurs correspondants
+- [x] Page de génération du rapport de commande
+- [x] Export PDF du rapport de commande
+- [x] Regroupement par fournisseur
+### Relance Automatique des Devis
+- [x] Endpoint pour récupérer les devis non signés
+- [x] Configuration du délai de relance (paramètres)
+- [x] Génération automatique des notifications de relance
+- [x] Envoi d'email de relance au client
+- [x] Historique des relances effectuées

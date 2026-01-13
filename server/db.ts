@@ -18,7 +18,8 @@ import {
   mouvementsStock, InsertMouvementStock, MouvementStock,
   fournisseurs, InsertFournisseur, Fournisseur,
   articlesFournisseurs, InsertArticleFournisseur, ArticleFournisseur,
-  smsVerifications, InsertSmsVerification, SmsVerification
+  smsVerifications, InsertSmsVerification, SmsVerification,
+  relancesDevis, InsertRelanceDevis, RelanceDevis
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1478,4 +1479,229 @@ export async function markSmsVerified(id: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(smsVerifications).set({ verified: true }).where(eq(smsVerifications.id, id));
+}
+
+
+// ============================================================================
+// RAPPORT COMMANDE FOURNISSEUR
+// ============================================================================
+
+export interface StockEnRupture {
+  stock: Stock;
+  fournisseur: Fournisseur | null;
+  articleFournisseur: ArticleFournisseur | null;
+  quantiteACommander: number;
+}
+
+export async function getStocksEnRupture(artisanId: number): Promise<StockEnRupture[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Récupérer les stocks en alerte ou en rupture
+  const lowStocks = await db.select().from(stocks).where(
+    and(
+      eq(stocks.artisanId, artisanId),
+      sql`CAST(${stocks.quantiteEnStock} AS DECIMAL(10,2)) <= CAST(${stocks.seuilAlerte} AS DECIMAL(10,2))`
+    )
+  ).orderBy(stocks.designation);
+  
+  const result: StockEnRupture[] = [];
+  
+  for (const stock of lowStocks) {
+    let fournisseur: Fournisseur | null = null;
+    let articleFournisseur: ArticleFournisseur | null = null;
+    
+    // Chercher le fournisseur associé si l'article a un articleId
+    if (stock.articleId) {
+      const associations = await db.select().from(articlesFournisseurs)
+        .where(eq(articlesFournisseurs.articleId, stock.articleId))
+        .limit(1);
+      
+      if (associations.length > 0) {
+        articleFournisseur = associations[0];
+        const fournisseurResult = await db.select().from(fournisseurs)
+          .where(eq(fournisseurs.id, associations[0].fournisseurId))
+          .limit(1);
+        if (fournisseurResult.length > 0) {
+          fournisseur = fournisseurResult[0];
+        }
+      }
+    }
+    
+    // Calculer la quantité à commander (seuil * 2 - stock actuel)
+    const seuilAlerte = Number(stock.seuilAlerte) || 0;
+    const quantiteEnStock = Number(stock.quantiteEnStock) || 0;
+    const quantiteACommander = Math.max(seuilAlerte * 2 - quantiteEnStock, seuilAlerte);
+    
+    result.push({
+      stock,
+      fournisseur,
+      articleFournisseur,
+      quantiteACommander
+    });
+  }
+  
+  return result;
+}
+
+export interface CommandeFournisseur {
+  fournisseur: Fournisseur | null;
+  lignes: {
+    stock: Stock;
+    articleFournisseur: ArticleFournisseur | null;
+    quantiteACommander: number;
+    prixUnitaire: number;
+    montantTotal: number;
+  }[];
+  totalCommande: number;
+}
+
+export async function getRapportCommandeFournisseur(artisanId: number): Promise<CommandeFournisseur[]> {
+  const stocksEnRupture = await getStocksEnRupture(artisanId);
+  
+  // Regrouper par fournisseur
+  const parFournisseur = new Map<number | null, CommandeFournisseur>();
+  
+  for (const item of stocksEnRupture) {
+    const fournisseurId = item.fournisseur?.id || null;
+    
+    if (!parFournisseur.has(fournisseurId)) {
+      parFournisseur.set(fournisseurId, {
+        fournisseur: item.fournisseur,
+        lignes: [],
+        totalCommande: 0
+      });
+    }
+    
+    const commande = parFournisseur.get(fournisseurId)!;
+    const prixUnitaire = item.articleFournisseur 
+      ? Number(item.articleFournisseur.prixAchat) || 0
+      : Number(item.stock.prixAchat) || 0;
+    const montantTotal = prixUnitaire * item.quantiteACommander;
+    
+    commande.lignes.push({
+      stock: item.stock,
+      articleFournisseur: item.articleFournisseur,
+      quantiteACommander: item.quantiteACommander,
+      prixUnitaire,
+      montantTotal
+    });
+    
+    commande.totalCommande += montantTotal;
+  }
+  
+  // Convertir en tableau et trier (fournisseurs connus en premier)
+  const result = Array.from(parFournisseur.values());
+  result.sort((a, b) => {
+    if (a.fournisseur && !b.fournisseur) return -1;
+    if (!a.fournisseur && b.fournisseur) return 1;
+    if (a.fournisseur && b.fournisseur) {
+      return a.fournisseur.nom.localeCompare(b.fournisseur.nom);
+    }
+    return 0;
+  });
+  
+  return result;
+}
+
+// ============================================================================
+// RELANCE DEVIS NON SIGNÉS
+// ============================================================================
+
+export interface DevisNonSigne {
+  devis: Devis;
+  client: Client | null;
+  signature: SignatureDevis | null;
+  joursDepuisCreation: number;
+  joursDepuisEnvoi: number | null;
+}
+
+export async function getDevisNonSignes(artisanId: number, joursMinimum: number = 7): Promise<DevisNonSigne[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const dateLimit = new Date();
+  dateLimit.setDate(dateLimit.getDate() - joursMinimum);
+  
+  // Récupérer les devis envoyés mais non signés
+  const devisEnvoyesResult = await db.select().from(devis).where(
+    and(
+      eq(devis.artisanId, artisanId),
+      eq(devis.statut, "envoye"),
+      sql`${devis.dateDevis} <= ${dateLimit.toISOString().split('T')[0]}`
+    )
+  ).orderBy(devis.dateDevis);
+  
+  const result: DevisNonSigne[] = [];
+  
+  for (const d of devisEnvoyesResult) {
+    // Vérifier s'il y a une signature
+    const signatureResult = await db.select().from(signaturesDevis)
+      .where(eq(signaturesDevis.devisId, d.id))
+      .limit(1);
+    
+    const signature = signatureResult.length > 0 ? signatureResult[0] : null;
+    
+    // Si le devis est déjà signé, on l'ignore
+    if (signature?.signedAt) continue;
+    
+    // Récupérer le client
+    const clientResult = await db.select().from(clients)
+      .where(eq(clients.id, d.clientId))
+      .limit(1);
+    const client = clientResult.length > 0 ? clientResult[0] : null;
+    
+    // Calculer les jours
+    const dateDevis = new Date(d.dateDevis);
+    const joursDepuisCreation = Math.floor((Date.now() - dateDevis.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let joursDepuisEnvoi: number | null = null;
+    if (signature?.createdAt) {
+      const dateEnvoi = new Date(signature.createdAt);
+      joursDepuisEnvoi = Math.floor((Date.now() - dateEnvoi.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    
+    result.push({
+      devis: d,
+      client,
+      signature,
+      joursDepuisCreation,
+      joursDepuisEnvoi
+    });
+  }
+  
+  return result;
+}
+
+export interface HistoriqueRelance {
+  id: number;
+  devisId: number;
+  dateRelance: Date;
+  type: "email" | "notification";
+  destinataire: string;
+}
+
+export async function getRelancesDevis(devisId: number): Promise<RelanceDevis[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(relancesDevis)
+    .where(eq(relancesDevis.devisId, devisId))
+    .orderBy(desc(relancesDevis.createdAt));
+}
+
+export async function createRelanceDevis(data: InsertRelanceDevis): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(relancesDevis).values(data);
+  return Number(result[0].insertId);
+}
+
+export async function getLastRelanceDate(devisId: number): Promise<Date | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(relancesDevis)
+    .where(eq(relancesDevis.devisId, devisId))
+    .orderBy(desc(relancesDevis.createdAt))
+    .limit(1);
+  return result.length > 0 ? result[0].createdAt : null;
 }

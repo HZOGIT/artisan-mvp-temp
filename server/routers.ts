@@ -6,6 +6,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
+import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
 
 // ============================================================================
 // ARTISAN ROUTER
@@ -519,6 +520,159 @@ const devisRouter = router({
       await db.recalculateDevisTotals(newDevis.id);
 
       return newDevis;
+    }),
+  
+  // Récupérer les devis non signés pour relance
+  getDevisNonSignes: protectedProcedure
+    .input(z.object({ joursMinimum: z.number().optional() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getDevisNonSignes(artisan.id, input.joursMinimum || 7);
+    }),
+  
+  // Récupérer l'historique des relances d'un devis
+  getRelances: protectedProcedure
+    .input(z.object({ devisId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const devisData = await db.getDevisById(input.devisId);
+      if (!devisData || devisData.artisanId !== artisan.id) return [];
+      return await db.getRelancesDevis(input.devisId);
+    }),
+  
+  // Envoyer une relance par email
+  envoyerRelance: protectedProcedure
+    .input(z.object({
+      devisId: z.number(),
+      message: z.string().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      
+      const devisData = await db.getDevisById(input.devisId);
+      if (!devisData || devisData.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+      }
+      
+      const client = await db.getClientById(devisData.clientId);
+      if (!client || !client.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+      
+      // Générer le contenu de l'email de relance
+      const messageRelance = input.message || `Bonjour,\n\nNous vous rappelons que le devis n°${devisData.numero} est toujours en attente de votre signature.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n${artisan.nomEntreprise || 'Votre artisan'}`;
+      
+      // Envoyer l'email
+      const emailResult = await sendEmail({
+        to: client.email,
+        subject: `Relance - Devis n°${devisData.numero}`,
+        body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2c3e50;">Relance - Devis n°${devisData.numero}</h2>
+          <p style="white-space: pre-line;">${messageRelance}</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #7f8c8d; font-size: 12px;">
+            ${artisan.nomEntreprise || ''}<br>
+            ${artisan.adresse || ''}<br>
+            ${artisan.codePostal || ''} ${artisan.ville || ''}<br>
+            ${artisan.telephone || ''}
+          </p>
+        </div>`
+      });
+      
+      // Enregistrer la relance
+      await db.createRelanceDevis({
+        devisId: input.devisId,
+        artisanId: artisan.id,
+        type: "email",
+        destinataire: client.email,
+        message: messageRelance,
+        statut: emailResult ? "envoye" : "echec"
+      });
+      
+      // Créer une notification
+      await db.createNotification({
+        artisanId: artisan.id,
+        type: "info",
+        titre: "Relance envoyée",
+        message: `Une relance a été envoyée pour le devis ${devisData.numero} à ${client.email}`,
+        lien: `/devis/${input.devisId}`
+      });
+      
+      return { success: true, message: "Relance envoyée avec succès" };
+    }),
+  
+  // Envoyer des relances automatiques pour tous les devis en attente
+  envoyerRelancesAutomatiques: protectedProcedure
+    .input(z.object({
+      joursMinimum: z.number().optional(),
+      joursEntreRelances: z.number().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      
+      const joursMinimum = input.joursMinimum || 7;
+      const joursEntreRelances = input.joursEntreRelances || 7;
+      
+      const devisNonSignes = await db.getDevisNonSignes(artisan.id, joursMinimum);
+      let relancesEnvoyees = 0;
+      
+      for (const item of devisNonSignes) {
+        // Vérifier si une relance a déjà été envoyée récemment
+        const derniereRelance = await db.getLastRelanceDate(item.devis.id);
+        if (derniereRelance) {
+          const joursDepuisRelance = Math.floor((Date.now() - derniereRelance.getTime()) / (1000 * 60 * 60 * 24));
+          if (joursDepuisRelance < joursEntreRelances) {
+            continue; // Passer au devis suivant
+          }
+        }
+        
+        // Vérifier que le client a un email
+        if (!item.client?.email) continue;
+        
+        // Envoyer la relance
+        const messageRelance = `Bonjour,\n\nNous vous rappelons que le devis n°${item.devis.numero} est toujours en attente de votre signature.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n${artisan.nomEntreprise || 'Votre artisan'}`;
+        
+        const emailResult = await sendEmail({
+          to: item.client.email,
+          subject: `Relance - Devis n°${item.devis.numero}`,
+          body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2c3e50;">Relance - Devis n°${item.devis.numero}</h2>
+            <p style="white-space: pre-line;">${messageRelance}</p>
+          </div>`
+        });
+        
+        await db.createRelanceDevis({
+          devisId: item.devis.id,
+          artisanId: artisan.id,
+          type: "email",
+          destinataire: item.client.email,
+          message: messageRelance,
+          statut: emailResult ? "envoye" : "echec"
+        });
+        
+        if (emailResult) relancesEnvoyees++;
+      }
+      
+      // Créer une notification récapitulatif
+      if (relancesEnvoyees > 0) {
+        await db.createNotification({
+          artisanId: artisan.id,
+          type: "info",
+          titre: "Relances automatiques",
+          message: `${relancesEnvoyees} relance(s) automatique(s) envoyée(s) pour les devis en attente`,
+          lien: "/devis"
+        });
+      }
+      
+      return { success: true, relancesEnvoyees };
     }),
 });
 
@@ -1218,6 +1372,11 @@ const signatureRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été signé" });
       }
       
+      // Valider le numéro de téléphone
+      if (!isValidPhoneNumber(input.telephone)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Numéro de téléphone invalide" });
+      }
+      
       // Générer un code à 6 chiffres
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       
@@ -1233,19 +1392,25 @@ const signatureRouter = router({
         expiresAt
       });
       
-      // En production, ici on enverrait le SMS via un service comme Twilio
-      // Pour le développement, on log le code
-      console.log(`[SMS] Code de vérification pour ${input.telephone}: ${code}`);
+      // Envoyer le SMS via Twilio (ou simulation si non configuré)
+      const smsResult = await sendVerificationCode(input.telephone, code);
       
-      // Simuler l'envoi SMS (en production, utiliser Twilio ou autre)
-      // await sendSms(input.telephone, `Votre code de vérification pour signer le devis: ${code}`);
+      if (!smsResult.success) {
+        console.error(`[SMS] Échec d'envoi: ${smsResult.error}`);
+        // On ne lève pas d'erreur pour permettre le mode développement
+      }
+      
+      // Vérifier si Twilio est configuré
+      const twilioConfigured = isTwilioConfigured();
       
       return { 
         success: true, 
-        message: "Code de vérification envoyé",
-        // En mode développement, on retourne le code pour faciliter les tests
-        // En production, ne JAMAIS retourner le code
-        devCode: process.env.NODE_ENV === 'development' ? code : undefined
+        message: twilioConfigured 
+          ? "Code de vérification envoyé par SMS" 
+          : "Code de vérification généré (mode développement)",
+        // En mode développement (Twilio non configuré), on retourne le code
+        devCode: !twilioConfigured ? code : undefined,
+        twilioConfigured
       };
     }),
   
@@ -1462,6 +1627,20 @@ const stocksRouter = router({
     }
     
     return { alertsCreated };
+  }),
+  
+  // Rapport de commande fournisseur
+  getRapportCommande: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getRapportCommandeFournisseur(artisan.id);
+  }),
+  
+  // Stocks en rupture avec détails fournisseur
+  getStocksEnRupture: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getStocksEnRupture(artisan.id);
   }),
 });
 

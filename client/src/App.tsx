@@ -20,6 +20,8 @@ import Calendrier from "./pages/Calendrier";
 import DashboardAdvanced from "./pages/DashboardAdvanced";
 import Stocks from "./pages/Stocks";
 import Fournisseurs from "./pages/Fournisseurs";
+import RapportCommande from "./pages/RapportCommande";
+import RelancesDevis from "./pages/RelancesDevis";
 import SignatureDevis from "./pages/SignatureDevis";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -41,6 +43,8 @@ function AuthenticatedRoutes() {
         <Route path="/statistiques" component={DashboardAdvanced} />
         <Route path="/stocks" component={Stocks} />
         <Route path="/fournisseurs" component={Fournisseurs} />
+        <Route path="/rapport-commande" component={RapportCommande} />
+        <Route path="/relances" component={RelancesDevis} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />

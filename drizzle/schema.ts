@@ -373,3 +373,21 @@ export const smsVerifications = mysqlTable("sms_verifications", {
 
 export type SmsVerification = typeof smsVerifications.$inferSelect;
 export type InsertSmsVerification = typeof smsVerifications.$inferInsert;
+
+
+// ============================================================================
+// RELANCES DEVIS (Automatic follow-up for unsigned quotes)
+// ============================================================================
+export const relancesDevis = mysqlTable("relances_devis", {
+  id: int("id").autoincrement().primaryKey(),
+  devisId: int("devisId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  type: mysqlEnum("type", ["email", "notification"]).notNull(),
+  destinataire: varchar("destinataire", { length: 320 }),
+  message: text("message"),
+  statut: mysqlEnum("statut", ["envoye", "echec"]).default("envoye"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type RelanceDevis = typeof relancesDevis.$inferSelect;
+export type InsertRelanceDevis = typeof relancesDevis.$inferInsert;
