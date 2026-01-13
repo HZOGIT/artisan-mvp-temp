@@ -5,6 +5,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
+import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 
 // ============================================================================
 // ARTISAN ROUTER
@@ -413,6 +414,112 @@ const devisRouter = router({
       }
       return await db.createFactureFromDevis(input.devisId);
     }),
+
+  // Envoi par email
+  sendByEmail: protectedProcedure
+    .input(z.object({
+      devisId: z.number(),
+      customMessage: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const devis = await db.getDevisById(input.devisId);
+      if (!devis) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || devis.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const client = await db.getClientById(devis.clientId);
+      if (!client || !client.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+
+      const artisanName = artisan.nomEntreprise || "Votre artisan";
+      const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
+      const totalTTC = `${parseFloat(devis.totalTTC || "0").toFixed(2)} €`;
+
+      const { subject, body } = generateDevisEmailContent({
+        artisanName,
+        clientName,
+        devisNumero: devis.numero,
+        devisObjet: devis.objet || undefined,
+        totalTTC,
+      });
+
+      const finalBody = input.customMessage ? `${input.customMessage}\n\n---\n\n${body}` : body;
+
+      const result = await sendEmail({
+        to: client.email,
+        subject,
+        body: finalBody,
+        attachmentName: `Devis_${devis.numero}.pdf`,
+      });
+
+      if (result.success) {
+        // Mettre à jour le statut du devis en "envoyé"
+        await db.updateDevis(devis.id, { statut: "envoye" });
+        // Créer une notification
+        await db.createNotification({
+          artisanId: artisan.id,
+          type: "succes",
+          titre: "Devis envoyé",
+          message: `Le devis ${devis.numero} a été envoyé à ${client.email}`,
+          lien: `/devis/${devis.id}`,
+        });
+      }
+
+      return result;
+    }),
+
+  // Duplication de devis
+  duplicate: protectedProcedure
+    .input(z.object({ devisId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const devis = await db.getDevisById(input.devisId);
+      if (!devis) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || devis.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+
+      // Créer un nouveau devis avec les mêmes informations
+      const numero = await db.getNextDevisNumber(artisan.id);
+      const newDevis = await db.createDevis({
+        artisanId: artisan.id,
+        clientId: devis.clientId,
+        numero,
+        objet: devis.objet ? `${devis.objet} (copie)` : "(copie)",
+        conditionsPaiement: devis.conditionsPaiement || undefined,
+        notes: devis.notes || undefined,
+        statut: "brouillon",
+      });
+
+      // Copier les lignes du devis original
+      const lignes = await db.getLignesDevisByDevisId(devis.id);
+      for (const ligne of lignes) {
+        await db.createLigneDevis({
+          devisId: newDevis.id,
+          reference: ligne.reference || undefined,
+          designation: ligne.designation,
+          description: ligne.description || undefined,
+          quantite: ligne.quantite,
+          unite: ligne.unite || undefined,
+          prixUnitaireHT: ligne.prixUnitaireHT,
+          tauxTVA: ligne.tauxTVA,
+          montantHT: ligne.montantHT,
+          montantTVA: ligne.montantTVA,
+          montantTTC: ligne.montantTTC,
+        });
+      }
+
+      // Recalculer les totaux
+      await db.recalculateDevisTotals(newDevis.id);
+
+      return newDevis;
+    }),
 });
 
 // ============================================================================
@@ -569,6 +676,67 @@ const facturesRouter = router({
         statut: "payee",
       });
     }),
+
+  // Envoi par email
+  sendByEmail: protectedProcedure
+    .input(z.object({
+      factureId: z.number(),
+      customMessage: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const facture = await db.getFactureById(input.factureId);
+      if (!facture) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || facture.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const client = await db.getClientById(facture.clientId);
+      if (!client || !client.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+
+      const artisanName = artisan.nomEntreprise || "Votre artisan";
+      const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
+      const totalTTC = `${parseFloat(facture.totalTTC || "0").toFixed(2)} €`;
+      const dateEcheance = facture.dateEcheance 
+        ? new Date(facture.dateEcheance).toLocaleDateString('fr-FR')
+        : undefined;
+
+      const { subject, body } = generateFactureEmailContent({
+        artisanName,
+        clientName,
+        factureNumero: facture.numero,
+        factureObjet: facture.objet || undefined,
+        totalTTC,
+        dateEcheance,
+      });
+
+      const finalBody = input.customMessage ? `${input.customMessage}\n\n---\n\n${body}` : body;
+
+      const result = await sendEmail({
+        to: client.email,
+        subject,
+        body: finalBody,
+        attachmentName: `Facture_${facture.numero}.pdf`,
+      });
+
+      if (result.success) {
+        // Mettre à jour le statut de la facture en "envoyée"
+        await db.updateFacture(facture.id, { statut: "envoyee" });
+        // Créer une notification
+        await db.createNotification({
+          artisanId: artisan.id,
+          type: "succes",
+          titre: "Facture envoyée",
+          message: `La facture ${facture.numero} a été envoyée à ${client.email}`,
+          lien: `/factures/${facture.id}`,
+        });
+      }
+
+      return result;
+    }),
 });
 
 // ============================================================================
@@ -716,6 +884,158 @@ const notificationsRouter = router({
       await db.archiveNotification(input.id);
       return { success: true };
     }),
+
+  // Générer les rappels automatiques pour factures impayées
+  generateOverdueReminders: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+    }
+
+    // Récupérer les factures en retard
+    const factures = await db.getFacturesByArtisanId(artisan.id);
+    const facturesEnRetard = factures.filter(f => {
+      if (f.statut === 'payee' || f.statut === 'annulee') return false;
+      if (!f.dateEcheance) return false;
+      const echeance = new Date(f.dateEcheance);
+      return echeance < new Date();
+    });
+
+    let rappelsCreated = 0;
+    for (const facture of facturesEnRetard) {
+      const client = await db.getClientById(facture.clientId);
+      const clientName = client ? (client.prenom ? `${client.prenom} ${client.nom}` : client.nom) : "Client";
+      const joursRetard = Math.floor((new Date().getTime() - new Date(facture.dateEcheance!).getTime()) / (1000 * 60 * 60 * 24));
+
+      await db.createNotification({
+        artisanId: artisan.id,
+        type: "rappel",
+        titre: `Facture ${facture.numero} en retard`,
+        message: `La facture ${facture.numero} de ${clientName} est en retard de ${joursRetard} jour(s). Montant: ${parseFloat(facture.totalTTC || "0").toFixed(2)} €`,
+        lien: `/factures/${facture.id}`,
+      });
+      rappelsCreated++;
+    }
+
+    return { success: true, rappelsCreated };
+  }),
+
+  // Générer les rappels pour interventions à venir (J-1)
+  generateUpcomingReminders: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+    }
+
+    // Récupérer les interventions de demain
+    const interventions = await db.getInterventionsByArtisanId(artisan.id);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const dayAfterTomorrow = new Date(tomorrow);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+
+    const interventionsDemain = interventions.filter(i => {
+      if (i.statut !== 'planifiee') return false;
+      const dateDebut = new Date(i.dateDebut);
+      return dateDebut >= tomorrow && dateDebut < dayAfterTomorrow;
+    });
+
+    let rappelsCreated = 0;
+    for (const intervention of interventionsDemain) {
+      const client = await db.getClientById(intervention.clientId);
+      const clientName = client ? (client.prenom ? `${client.prenom} ${client.nom}` : client.nom) : "Client";
+      const dateFormatted = new Date(intervention.dateDebut).toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      await db.createNotification({
+        artisanId: artisan.id,
+        type: "rappel",
+        titre: `Intervention demain: ${intervention.titre}`,
+        message: `Rappel: Intervention "${intervention.titre}" chez ${clientName} prévue ${dateFormatted}${intervention.adresse ? ` à ${intervention.adresse}` : ''}`,
+        lien: `/interventions`,
+      });
+      rappelsCreated++;
+    }
+
+    return { success: true, rappelsCreated };
+  }),
+
+  // Générer tous les rappels automatiques
+  generateAllReminders: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+    }
+
+    let totalRappels = 0;
+
+    // Factures en retard
+    const factures = await db.getFacturesByArtisanId(artisan.id);
+    const facturesEnRetard = factures.filter(f => {
+      if (f.statut === 'payee' || f.statut === 'annulee') return false;
+      if (!f.dateEcheance) return false;
+      const echeance = new Date(f.dateEcheance);
+      return echeance < new Date();
+    });
+
+    for (const facture of facturesEnRetard) {
+      const client = await db.getClientById(facture.clientId);
+      const clientName = client ? (client.prenom ? `${client.prenom} ${client.nom}` : client.nom) : "Client";
+      const joursRetard = Math.floor((new Date().getTime() - new Date(facture.dateEcheance!).getTime()) / (1000 * 60 * 60 * 24));
+
+      await db.createNotification({
+        artisanId: artisan.id,
+        type: "rappel",
+        titre: `Facture ${facture.numero} en retard`,
+        message: `La facture ${facture.numero} de ${clientName} est en retard de ${joursRetard} jour(s). Montant: ${parseFloat(facture.totalTTC || "0").toFixed(2)} €`,
+        lien: `/factures/${facture.id}`,
+      });
+      totalRappels++;
+    }
+
+    // Interventions de demain
+    const interventions = await db.getInterventionsByArtisanId(artisan.id);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const dayAfterTomorrow = new Date(tomorrow);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+
+    const interventionsDemain = interventions.filter(i => {
+      if (i.statut !== 'planifiee') return false;
+      const dateDebut = new Date(i.dateDebut);
+      return dateDebut >= tomorrow && dateDebut < dayAfterTomorrow;
+    });
+
+    for (const intervention of interventionsDemain) {
+      const client = await db.getClientById(intervention.clientId);
+      const clientName = client ? (client.prenom ? `${client.prenom} ${client.nom}` : client.nom) : "Client";
+      const dateFormatted = new Date(intervention.dateDebut).toLocaleDateString('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      await db.createNotification({
+        artisanId: artisan.id,
+        type: "rappel",
+        titre: `Intervention demain: ${intervention.titre}`,
+        message: `Rappel: Intervention "${intervention.titre}" chez ${clientName} prévue ${dateFormatted}${intervention.adresse ? ` à ${intervention.adresse}` : ''}`,
+        lien: `/interventions`,
+      });
+      totalRappels++;
+    }
+
+    return { success: true, totalRappels };
+  }),
 });
 
 // ============================================================================

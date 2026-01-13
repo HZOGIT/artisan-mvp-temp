@@ -78,3 +78,24 @@
 - [x] Liste des factures du client
 - [x] Liste des interventions du client
 - [x] Statistiques client (total facturé, nombre d'interventions)
+
+
+## Nouvelles Fonctionnalités (Sprint 3)
+
+### Envoi par Email
+- [x] Bouton d'envoi par email sur la page de détail du devis
+- [x] Bouton d'envoi par email sur la page de détail de la facture
+- [x] Génération du PDF et envoi en pièce jointe
+- [x] Personnalisation du message d'accompagnement
+
+### Rappels Automatiques
+- [x] Notifications pour factures impayées (échéance dépassée)
+- [x] Notifications pour interventions à venir (J-1)
+- [x] Affichage des rappels dans le système de notifications
+- [x] Configuration des rappels dans les paramètres
+
+### Duplication de Devis
+- [x] Bouton de duplication sur la page de détail du devis
+- [x] Copie de toutes les lignes d'articles
+- [x] Génération d'un nouveau numéro de devis
+- [x] Redirection vers le nouveau devis pour modification

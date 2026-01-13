@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { generateDevisPDF } from "@/lib/pdfGenerator";
@@ -85,6 +86,35 @@ export default function DevisDetail() {
     },
   });
 
+  const sendByEmailMutation = trpc.devis.sendByEmail.useMutation({
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success(result.message);
+        utils.devis.getById.invalidate({ id: parseInt(id || "0") });
+        setIsEmailDialogOpen(false);
+        setEmailMessage("");
+      } else {
+        toast.error(result.message);
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erreur lors de l'envoi de l'email");
+    },
+  });
+
+  const duplicateMutation = trpc.devis.duplicate.useMutation({
+    onSuccess: (newDevis) => {
+      toast.success("Devis dupliqué avec succès");
+      setLocation(`/devis/${newDevis.id}`);
+    },
+    onError: () => {
+      toast.error("Erreur lors de la duplication du devis");
+    },
+  });
+
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [emailMessage, setEmailMessage] = useState("");
+
   const resetLineForm = () => {
     setLineFormData({
       reference: "",
@@ -122,6 +152,23 @@ export default function DevisDetail() {
   const handleConvertToFacture = () => {
     if (confirm("Convertir ce devis en facture ?")) {
       convertToFactureMutation.mutate({ devisId: parseInt(id || "0") });
+    }
+  };
+
+  const handleSendByEmail = () => {
+    if (!devis?.client?.email) {
+      toast.error("Ce client n'a pas d'adresse email");
+      return;
+    }
+    sendByEmailMutation.mutate({
+      devisId: parseInt(id || "0"),
+      customMessage: emailMessage || undefined,
+    });
+  };
+
+  const handleDuplicate = () => {
+    if (confirm("Dupliquer ce devis ?")) {
+      duplicateMutation.mutate({ devisId: parseInt(id || "0") });
     }
   };
 
@@ -229,6 +276,45 @@ export default function DevisDetail() {
           <Button variant="outline" onClick={handleExportPDF}>
             <Download className="h-4 w-4 mr-2" />
             Export PDF
+          </Button>
+          <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={!devis.client?.email}>
+                <Mail className="h-4 w-4 mr-2" />
+                Envoyer par email
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Envoyer le devis par email</DialogTitle>
+                <DialogDescription>
+                  Le devis sera envoyé à {devis.client?.email}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Message personnalisé (optionnel)</Label>
+                  <Textarea
+                    placeholder="Ajoutez un message personnalisé qui sera inclus dans l'email..."
+                    value={emailMessage}
+                    onChange={(e) => setEmailMessage(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button onClick={handleSendByEmail} disabled={sendByEmailMutation.isPending}>
+                  {sendByEmailMutation.isPending ? "Envoi en cours..." : "Envoyer"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" onClick={handleDuplicate} disabled={duplicateMutation.isPending}>
+            <Copy className="h-4 w-4 mr-2" />
+            Dupliquer
           </Button>
           {devis.statut === "accepte" && (
             <Button onClick={handleConvertToFacture} disabled={convertToFactureMutation.isPending}>
