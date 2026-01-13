@@ -34,6 +34,9 @@ import Chat from "./pages/Chat";
 import Techniciens from "./pages/Techniciens";
 import Avis from "./pages/Avis";
 import SoumettreAvis from "./pages/SoumettreAvis";
+import Geolocalisation from "./pages/Geolocalisation";
+import Comptabilite from "./pages/Comptabilite";
+import DevisOptions from "./pages/DevisOptions";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -63,6 +66,9 @@ function AuthenticatedRoutes() {
         <Route path="/chat" component={Chat} />
         <Route path="/techniciens" component={Techniciens} />
         <Route path="/avis" component={Avis} />
+        <Route path="/geolocalisation" component={Geolocalisation} />
+        <Route path="/comptabilite" component={Comptabilite} />
+        <Route path="/devis/:id/options" component={DevisOptions} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />

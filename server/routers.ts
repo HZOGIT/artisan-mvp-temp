@@ -3048,6 +3048,320 @@ const avisRouter = router({
 // ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
+// ============================================================================
+// GEOLOCALISATION ROUTER
+// ============================================================================
+const geolocalisationRouter = router({
+  updatePosition: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      latitude: z.string(),
+      longitude: z.string(),
+      precision: z.number().optional(),
+      vitesse: z.string().optional(),
+      cap: z.number().optional(),
+      batterie: z.number().optional(),
+      enDeplacement: z.boolean().optional(),
+      interventionEnCoursId: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.updatePositionTechnicien(input);
+    }),
+
+  getPositions: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getAllTechniciensPositions(artisan.id);
+  }),
+
+  getLastPosition: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getLastPositionByTechnicienId(input.technicienId);
+    }),
+
+  getHistorique: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      dateDebut: z.date(),
+      dateFin: z.date(),
+    }))
+    .query(async ({ input }) => {
+      return await db.getPositionsHistorique(input.technicienId, input.dateDebut, input.dateFin);
+    }),
+
+  getStatistiquesDeplacements: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date(),
+      dateFin: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { totalKm: 0, totalMinutes: 0, nombreDeplacements: 0 };
+      return await db.getStatistiquesDeplacements(artisan.id, input.dateDebut, input.dateFin);
+    }),
+
+  createHistoriqueDeplacement: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      interventionId: z.number().optional(),
+      dateDebut: z.date(),
+      dateFin: z.date().optional(),
+      distanceKm: z.string().optional(),
+      dureeMinutes: z.number().optional(),
+      latitudeDepart: z.string().optional(),
+      longitudeDepart: z.string().optional(),
+      latitudeArrivee: z.string().optional(),
+      longitudeArrivee: z.string().optional(),
+      adresseDepart: z.string().optional(),
+      adresseArrivee: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createHistoriqueDeplacement(input);
+    }),
+
+  getHistoriqueDeplacements: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getHistoriqueDeplacementsByTechnicienId(input.technicienId);
+    }),
+});
+
+// ============================================================================
+// COMPTABILITE ROUTER
+// ============================================================================
+const comptabiliteRouter = router({
+  getEcritures: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date().optional(),
+      dateFin: z.date().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getEcrituresComptables(artisan.id, input?.dateDebut, input?.dateFin);
+    }),
+
+  getGrandLivre: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date(),
+      dateFin: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getGrandLivre(artisan.id, input.dateDebut, input.dateFin);
+    }),
+
+  getBalance: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date(),
+      dateFin: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getBalance(artisan.id, input.dateDebut, input.dateFin);
+    }),
+
+  getJournalVentes: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date(),
+      dateFin: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getJournalVentes(artisan.id, input.dateDebut, input.dateFin);
+    }),
+
+  getRapportTVA: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date(),
+      dateFin: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
+      return await db.getRapportTVA(artisan.id, input.dateDebut, input.dateFin);
+    }),
+
+  genererEcrituresFacture: protectedProcedure
+    .input(z.object({ factureId: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.genererEcrituresFacture(input.factureId);
+    }),
+
+  getPlanComptable: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getPlanComptable(artisan.id);
+  }),
+
+  initPlanComptable: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+    await db.initPlanComptable(artisan.id);
+    return { success: true };
+  }),
+});
+
+// ============================================================================
+// DEVIS OPTIONS ROUTER
+// ============================================================================
+const devisOptionsRouter = router({
+  getByDevisId: protectedProcedure
+    .input(z.object({ devisId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getDevisOptionsByDevisId(input.devisId);
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getDevisOptionById(input.id);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      devisId: z.number(),
+      nom: z.string(),
+      description: z.string().optional(),
+      ordre: z.number().optional(),
+      recommandee: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createDevisOption(input);
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      description: z.string().optional(),
+      ordre: z.number().optional(),
+      recommandee: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      return await db.updateDevisOption(id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.deleteDevisOption(input.id);
+      return { success: true };
+    }),
+
+  select: protectedProcedure
+    .input(z.object({ optionId: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.selectDevisOption(input.optionId);
+    }),
+
+  convertirEnDevis: protectedProcedure
+    .input(z.object({ optionId: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.convertirOptionEnDevis(input.optionId);
+      return { success: true };
+    }),
+
+  // Lignes d'option
+  getLignes: protectedProcedure
+    .input(z.object({ optionId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getDevisOptionLignesByOptionId(input.optionId);
+    }),
+
+  createLigne: protectedProcedure
+    .input(z.object({
+      optionId: z.number(),
+      articleId: z.number().optional(),
+      designation: z.string(),
+      description: z.string().optional(),
+      quantite: z.string().optional(),
+      unite: z.string().optional(),
+      prixUnitaireHT: z.string().optional(),
+      tauxTVA: z.string().optional(),
+      remise: z.string().optional(),
+      ordre: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const quantite = parseFloat(input.quantite || '1');
+      const prixUnitaireHT = parseFloat(input.prixUnitaireHT || '0');
+      const tauxTVA = parseFloat(input.tauxTVA || '20');
+      const remise = parseFloat(input.remise || '0');
+      
+      const montantHTBrut = quantite * prixUnitaireHT;
+      const montantRemise = montantHTBrut * (remise / 100);
+      const montantHT = montantHTBrut - montantRemise;
+      const montantTVA = montantHT * (tauxTVA / 100);
+      const montantTTC = montantHT + montantTVA;
+      
+      const ligne = await db.createDevisOptionLigne({
+        ...input,
+        montantHT: montantHT.toFixed(2),
+        montantTVA: montantTVA.toFixed(2),
+        montantTTC: montantTTC.toFixed(2),
+      });
+      
+      await db.recalculerTotauxOption(input.optionId);
+      return ligne;
+    }),
+
+  updateLigne: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      optionId: z.number(),
+      designation: z.string().optional(),
+      description: z.string().optional(),
+      quantite: z.string().optional(),
+      unite: z.string().optional(),
+      prixUnitaireHT: z.string().optional(),
+      tauxTVA: z.string().optional(),
+      remise: z.string().optional(),
+      ordre: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, optionId, ...data } = input;
+      
+      if (data.quantite || data.prixUnitaireHT || data.tauxTVA || data.remise) {
+        const quantite = parseFloat(data.quantite || '1');
+        const prixUnitaireHT = parseFloat(data.prixUnitaireHT || '0');
+        const tauxTVA = parseFloat(data.tauxTVA || '20');
+        const remise = parseFloat(data.remise || '0');
+        
+        const montantHTBrut = quantite * prixUnitaireHT;
+        const montantRemise = montantHTBrut * (remise / 100);
+        const montantHT = montantHTBrut - montantRemise;
+        const montantTVA = montantHT * (tauxTVA / 100);
+        const montantTTC = montantHT + montantTVA;
+        
+        Object.assign(data, {
+          montantHT: montantHT.toFixed(2),
+          montantTVA: montantTVA.toFixed(2),
+          montantTTC: montantTTC.toFixed(2),
+        });
+      }
+      
+      const ligne = await db.updateDevisOptionLigne(id, data);
+      await db.recalculerTotauxOption(optionId);
+      return ligne;
+    }),
+
+  deleteLigne: protectedProcedure
+    .input(z.object({ id: z.number(), optionId: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.deleteDevisOptionLigne(input.id);
+      await db.recalculerTotauxOption(input.optionId);
+      return { success: true };
+    }),
+});
+
+// ============================================================================
+// MAIN APP ROUTER
+// ============================================================================
 export const appRouter = router({system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -3077,6 +3391,9 @@ export const appRouter = router({system: systemRouter,
   chat: chatRouter,
   techniciens: techniciensRouter,
   avis: avisRouter,
+  geolocalisation: geolocalisationRouter,
+  comptabilite: comptabiliteRouter,
+  devisOptions: devisOptionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

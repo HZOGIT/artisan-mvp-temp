@@ -251,3 +251,30 @@
 - [x] Affichage des avis sur la fiche client
 - [x] Statistiques de satisfaction globale
 - [x] Modération des avis par l'artisan
+
+
+## Nouvelles Fonctionnalités (Sprint 10)
+
+### Géolocalisation Temps Réel des Techniciens
+- [x] Table des positions GPS des techniciens
+- [x] Mise à jour de la position depuis l'app mobile
+- [x] Carte interactive avec positions des techniciens
+- [x] Calcul des distances et temps de trajet
+- [x] Optimisation des affectations d'interventions
+- [x] Historique des déplacements
+
+### Module de Comptabilité
+- [x] Export du grand livre comptable
+- [x] Export de la balance comptable
+- [x] Journaux de ventes et achats
+- [x] Rapports TVA
+- [x] Export au format compatible comptable
+- [x] Page de tableau de bord comptable
+
+### Devis Multi-Options
+- [x] Table des options de devis
+- [x] Création de plusieurs options par devis
+- [x] Comparatif des options pour le client
+- [x] Sélection d'option par le client
+- [x] Page de visualisation multi-options
+- [x] Conversion de l'option choisie en facture

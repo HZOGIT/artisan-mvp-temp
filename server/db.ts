@@ -1,4 +1,4 @@
-import { eq, and, desc, like, or, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, like, or, sql, gte, lte, asc, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users, 
@@ -35,7 +35,13 @@ import {
   techniciens, InsertTechnicien, Technicien,
   disponibilitesTechniciens, InsertDisponibiliteTechnicien, DisponibiliteTechnicien,
   avisClients, InsertAvisClient, AvisClient,
-  demandesAvis, InsertDemandeAvis, DemandeAvis
+  demandesAvis, InsertDemandeAvis, DemandeAvis,
+  positionsTechniciens, InsertPositionTechnicien, PositionTechnicien,
+  historiqueDeplacements, InsertHistoriqueDeplacement, HistoriqueDeplacement,
+  ecrituresComptables, InsertEcritureComptable, EcritureComptable,
+  planComptable, InsertCompteComptable, CompteComptable,
+  devisOptions, InsertDevisOption, DevisOption,
+  devisOptionsLignes, InsertDevisOptionLigne, DevisOptionLigne
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -2586,4 +2592,494 @@ export async function getDemandesAvisByArtisanId(artisanId: number): Promise<Dem
   return await db.select().from(demandesAvis)
     .where(eq(demandesAvis.artisanId, artisanId))
     .orderBy(desc(demandesAvis.createdAt));
+}
+
+
+// ============================================================================
+// POSITIONS GPS TECHNICIENS
+// ============================================================================
+export async function updatePositionTechnicien(data: InsertPositionTechnicien): Promise<PositionTechnicien> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(positionsTechniciens).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(positionsTechniciens).where(eq(positionsTechniciens.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create position");
+  return created[0];
+}
+
+export async function getLastPositionByTechnicienId(technicienId: number): Promise<PositionTechnicien | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(positionsTechniciens)
+    .where(eq(positionsTechniciens.technicienId, technicienId))
+    .orderBy(desc(positionsTechniciens.timestamp))
+    .limit(1);
+  return result[0] || null;
+}
+
+export async function getAllTechniciensPositions(artisanId: number): Promise<(PositionTechnicien & { technicien: Technicien })[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Récupérer tous les techniciens de l'artisan
+  const techs = await db.select().from(techniciens).where(eq(techniciens.artisanId, artisanId));
+  
+  const result: (PositionTechnicien & { technicien: Technicien })[] = [];
+  for (const tech of techs) {
+    const lastPos = await getLastPositionByTechnicienId(tech.id);
+    if (lastPos) {
+      result.push({ ...lastPos, technicien: tech });
+    }
+  }
+  
+  return result;
+}
+
+export async function getPositionsHistorique(technicienId: number, dateDebut: Date, dateFin: Date): Promise<PositionTechnicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(positionsTechniciens)
+    .where(and(
+      eq(positionsTechniciens.technicienId, technicienId),
+      gte(positionsTechniciens.timestamp, dateDebut),
+      lte(positionsTechniciens.timestamp, dateFin)
+    ))
+    .orderBy(asc(positionsTechniciens.timestamp));
+}
+
+// ============================================================================
+// HISTORIQUE DEPLACEMENTS
+// ============================================================================
+export async function createHistoriqueDeplacement(data: InsertHistoriqueDeplacement): Promise<HistoriqueDeplacement> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(historiqueDeplacements).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(historiqueDeplacements).where(eq(historiqueDeplacements.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create historique deplacement");
+  return created[0];
+}
+
+export async function getHistoriqueDeplacementsByTechnicienId(technicienId: number): Promise<HistoriqueDeplacement[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(historiqueDeplacements)
+    .where(eq(historiqueDeplacements.technicienId, technicienId))
+    .orderBy(desc(historiqueDeplacements.dateDebut));
+}
+
+export async function getStatistiquesDeplacements(artisanId: number, dateDebut: Date, dateFin: Date) {
+  const db = await getDb();
+  if (!db) return { totalKm: 0, totalMinutes: 0, nombreDeplacements: 0 };
+  
+  const techs = await db.select().from(techniciens).where(eq(techniciens.artisanId, artisanId));
+  const techIds = techs.map(t => t.id);
+  
+  if (techIds.length === 0) return { totalKm: 0, totalMinutes: 0, nombreDeplacements: 0 };
+  
+  const deplacements = await db.select().from(historiqueDeplacements)
+    .where(and(
+      inArray(historiqueDeplacements.technicienId, techIds),
+      gte(historiqueDeplacements.dateDebut, dateDebut),
+      lte(historiqueDeplacements.dateDebut, dateFin)
+    ));
+  
+  const totalKm = deplacements.reduce((sum, d) => sum + (parseFloat(d.distanceKm?.toString() || '0')), 0);
+  const totalMinutes = deplacements.reduce((sum, d) => sum + (d.dureeMinutes || 0), 0);
+  
+  return {
+    totalKm: Math.round(totalKm * 100) / 100,
+    totalMinutes,
+    nombreDeplacements: deplacements.length
+  };
+}
+
+// ============================================================================
+// ECRITURES COMPTABLES
+// ============================================================================
+export async function createEcritureComptable(data: InsertEcritureComptable): Promise<EcritureComptable> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(ecrituresComptables).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(ecrituresComptables).where(eq(ecrituresComptables.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create ecriture comptable");
+  return created[0];
+}
+
+export async function getEcrituresComptables(artisanId: number, dateDebut?: Date, dateFin?: Date): Promise<EcritureComptable[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  let query = db.select().from(ecrituresComptables)
+    .where(eq(ecrituresComptables.artisanId, artisanId));
+  
+  if (dateDebut && dateFin) {
+    query = db.select().from(ecrituresComptables)
+      .where(and(
+        eq(ecrituresComptables.artisanId, artisanId),
+        gte(ecrituresComptables.dateEcriture, dateDebut),
+        lte(ecrituresComptables.dateEcriture, dateFin)
+      ));
+  }
+  
+  return await query.orderBy(asc(ecrituresComptables.dateEcriture));
+}
+
+export async function getGrandLivre(artisanId: number, dateDebut: Date, dateFin: Date): Promise<{
+  compte: string;
+  libelle: string;
+  ecritures: EcritureComptable[];
+  soldeDebit: number;
+  soldeCredit: number;
+}[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const ecritures = await getEcrituresComptables(artisanId, dateDebut, dateFin);
+  
+  // Grouper par compte
+  const parCompte = new Map<string, EcritureComptable[]>();
+  for (const e of ecritures) {
+    const key = e.numeroCompte;
+    if (!parCompte.has(key)) {
+      parCompte.set(key, []);
+    }
+    parCompte.get(key)!.push(e);
+  }
+  
+  const result = [];
+  for (const [compte, ecrs] of Array.from(parCompte)) {
+    const soldeDebit = ecrs.reduce((sum: number, e: EcritureComptable) => sum + parseFloat(e.debit?.toString() || '0'), 0);
+    const soldeCredit = ecrs.reduce((sum: number, e: EcritureComptable) => sum + parseFloat(e.credit?.toString() || '0'), 0);
+    result.push({
+      compte,
+      libelle: ecrs[0]?.libelleCompte || '',
+      ecritures: ecrs,
+      soldeDebit: Math.round(soldeDebit * 100) / 100,
+      soldeCredit: Math.round(soldeCredit * 100) / 100
+    });
+  }
+  
+  return result.sort((a, b) => a.compte.localeCompare(b.compte));
+}
+
+export async function getBalance(artisanId: number, dateDebut: Date, dateFin: Date): Promise<{
+  compte: string;
+  libelle: string;
+  debit: number;
+  credit: number;
+  solde: number;
+}[]> {
+  const grandLivre = await getGrandLivre(artisanId, dateDebut, dateFin);
+  
+  return grandLivre.map(gl => ({
+    compte: gl.compte,
+    libelle: gl.libelle,
+    debit: gl.soldeDebit,
+    credit: gl.soldeCredit,
+    solde: Math.round((gl.soldeDebit - gl.soldeCredit) * 100) / 100
+  }));
+}
+
+export async function getJournalVentes(artisanId: number, dateDebut: Date, dateFin: Date): Promise<EcritureComptable[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(ecrituresComptables)
+    .where(and(
+      eq(ecrituresComptables.artisanId, artisanId),
+      eq(ecrituresComptables.journal, 'VE'),
+      gte(ecrituresComptables.dateEcriture, dateDebut),
+      lte(ecrituresComptables.dateEcriture, dateFin)
+    ))
+    .orderBy(asc(ecrituresComptables.dateEcriture));
+}
+
+export async function getRapportTVA(artisanId: number, dateDebut: Date, dateFin: Date): Promise<{
+  tvaCollectee: number;
+  tvaDeductible: number;
+  tvaNette: number;
+}> {
+  const db = await getDb();
+  if (!db) return { tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
+  
+  const ecritures = await getEcrituresComptables(artisanId, dateDebut, dateFin);
+  
+  // Comptes TVA collectée (445710, 445711, etc.)
+  const tvaCollectee = ecritures
+    .filter(e => e.numeroCompte.startsWith('44571'))
+    .reduce((sum, e) => sum + parseFloat(e.credit?.toString() || '0'), 0);
+  
+  // Comptes TVA déductible (445660, 445661, etc.)
+  const tvaDeductible = ecritures
+    .filter(e => e.numeroCompte.startsWith('44566'))
+    .reduce((sum, e) => sum + parseFloat(e.debit?.toString() || '0'), 0);
+  
+  return {
+    tvaCollectee: Math.round(tvaCollectee * 100) / 100,
+    tvaDeductible: Math.round(tvaDeductible * 100) / 100,
+    tvaNette: Math.round((tvaCollectee - tvaDeductible) * 100) / 100
+  };
+}
+
+// Générer les écritures comptables pour une facture
+export async function genererEcrituresFacture(factureId: number): Promise<EcritureComptable[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const facture = await getFactureById(factureId);
+  if (!facture) return [];
+  
+  const artisan = await getArtisanById(facture.artisanId);
+  if (!artisan) return [];
+  
+  const client = await getClientById(facture.clientId);
+  const dateEcriture = facture.dateFacture;
+  const pieceRef = facture.numero;
+  const libelle = `Facture ${facture.numero} - ${client?.nom || 'Client'}`;
+  
+  const ecritures: InsertEcritureComptable[] = [
+    // Débit compte client (411)
+    {
+      artisanId: facture.artisanId,
+      dateEcriture,
+      journal: 'VE',
+      numeroCompte: '411000',
+      libelleCompte: 'Clients',
+      libelle,
+      pieceRef,
+      debit: facture.totalTTC?.toString() || '0',
+      credit: '0',
+      factureId
+    },
+    // Crédit compte produits (706)
+    {
+      artisanId: facture.artisanId,
+      dateEcriture,
+      journal: 'VE',
+      numeroCompte: '706000',
+      libelleCompte: 'Prestations de services',
+      libelle,
+      pieceRef,
+      debit: '0',
+      credit: facture.totalHT?.toString() || '0',
+      factureId
+    },
+    // Crédit TVA collectée (44571)
+    {
+      artisanId: facture.artisanId,
+      dateEcriture,
+      journal: 'VE',
+      numeroCompte: '445710',
+      libelleCompte: 'TVA collectée',
+      libelle,
+      pieceRef,
+      debit: '0',
+      credit: facture.totalTVA?.toString() || '0',
+      factureId
+    }
+  ];
+  
+  const created: EcritureComptable[] = [];
+  for (const e of ecritures) {
+    const result = await createEcritureComptable(e);
+    created.push(result);
+  }
+  
+  return created;
+}
+
+// ============================================================================
+// PLAN COMPTABLE
+// ============================================================================
+export async function initPlanComptable(artisanId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  const comptesBase: InsertCompteComptable[] = [
+    { artisanId, numeroCompte: '411000', libelle: 'Clients', classe: 4, type: 'actif' },
+    { artisanId, numeroCompte: '401000', libelle: 'Fournisseurs', classe: 4, type: 'passif' },
+    { artisanId, numeroCompte: '512000', libelle: 'Banque', classe: 5, type: 'actif' },
+    { artisanId, numeroCompte: '530000', libelle: 'Caisse', classe: 5, type: 'actif' },
+    { artisanId, numeroCompte: '706000', libelle: 'Prestations de services', classe: 7, type: 'produit' },
+    { artisanId, numeroCompte: '707000', libelle: 'Ventes de marchandises', classe: 7, type: 'produit' },
+    { artisanId, numeroCompte: '601000', libelle: 'Achats de matières premières', classe: 6, type: 'charge' },
+    { artisanId, numeroCompte: '606000', libelle: 'Achats non stockés', classe: 6, type: 'charge' },
+    { artisanId, numeroCompte: '445710', libelle: 'TVA collectée', classe: 4, type: 'passif' },
+    { artisanId, numeroCompte: '445660', libelle: 'TVA déductible', classe: 4, type: 'actif' },
+  ];
+  
+  for (const compte of comptesBase) {
+    await db.insert(planComptable).values(compte);
+  }
+}
+
+export async function getPlanComptable(artisanId: number): Promise<CompteComptable[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(planComptable)
+    .where(eq(planComptable.artisanId, artisanId))
+    .orderBy(asc(planComptable.numeroCompte));
+}
+
+// ============================================================================
+// DEVIS OPTIONS
+// ============================================================================
+export async function createDevisOption(data: InsertDevisOption): Promise<DevisOption> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(devisOptions).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(devisOptions).where(eq(devisOptions.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create devis option");
+  return created[0];
+}
+
+export async function getDevisOptionsByDevisId(devisId: number): Promise<DevisOption[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(devisOptions)
+    .where(eq(devisOptions.devisId, devisId))
+    .orderBy(asc(devisOptions.ordre));
+}
+
+export async function getDevisOptionById(id: number): Promise<DevisOption | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(devisOptions).where(eq(devisOptions.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function updateDevisOption(id: number, data: Partial<InsertDevisOption>): Promise<DevisOption | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(devisOptions).set(data).where(eq(devisOptions.id, id));
+  const result = await db.select().from(devisOptions).where(eq(devisOptions.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function deleteDevisOption(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Supprimer d'abord les lignes
+  await db.delete(devisOptionsLignes).where(eq(devisOptionsLignes.optionId, id));
+  // Puis l'option
+  await db.delete(devisOptions).where(eq(devisOptions.id, id));
+}
+
+export async function selectDevisOption(optionId: number): Promise<DevisOption | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const option = await getDevisOptionById(optionId);
+  if (!option) return null;
+  
+  // Désélectionner toutes les autres options du même devis
+  await db.update(devisOptions)
+    .set({ selectionnee: false, dateSelection: null })
+    .where(eq(devisOptions.devisId, option.devisId));
+  
+  // Sélectionner cette option
+  await db.update(devisOptions)
+    .set({ selectionnee: true, dateSelection: new Date() })
+    .where(eq(devisOptions.id, optionId));
+  
+  return await getDevisOptionById(optionId);
+}
+
+// ============================================================================
+// DEVIS OPTIONS LIGNES
+// ============================================================================
+export async function createDevisOptionLigne(data: InsertDevisOptionLigne): Promise<DevisOptionLigne> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(devisOptionsLignes).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(devisOptionsLignes).where(eq(devisOptionsLignes.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create devis option ligne");
+  return created[0];
+}
+
+export async function getDevisOptionLignesByOptionId(optionId: number): Promise<DevisOptionLigne[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(devisOptionsLignes)
+    .where(eq(devisOptionsLignes.optionId, optionId))
+    .orderBy(asc(devisOptionsLignes.ordre));
+}
+
+export async function updateDevisOptionLigne(id: number, data: Partial<InsertDevisOptionLigne>): Promise<DevisOptionLigne | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(devisOptionsLignes).set(data).where(eq(devisOptionsLignes.id, id));
+  const result = await db.select().from(devisOptionsLignes).where(eq(devisOptionsLignes.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function deleteDevisOptionLigne(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(devisOptionsLignes).where(eq(devisOptionsLignes.id, id));
+}
+
+export async function recalculerTotauxOption(optionId: number): Promise<DevisOption | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const lignes = await getDevisOptionLignesByOptionId(optionId);
+  
+  let totalHT = 0;
+  let totalTVA = 0;
+  
+  for (const ligne of lignes) {
+    totalHT += parseFloat(ligne.montantHT?.toString() || '0');
+    totalTVA += parseFloat(ligne.montantTVA?.toString() || '0');
+  }
+  
+  const totalTTC = totalHT + totalTVA;
+  
+  return await updateDevisOption(optionId, {
+    totalHT: totalHT.toFixed(2),
+    totalTVA: totalTVA.toFixed(2),
+    totalTTC: totalTTC.toFixed(2)
+  });
+}
+
+// Convertir l'option sélectionnée en lignes de devis standard
+export async function convertirOptionEnDevis(optionId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  const option = await getDevisOptionById(optionId);
+  if (!option) return;
+  
+  const lignesOption = await getDevisOptionLignesByOptionId(optionId);
+  
+  // Supprimer les lignes existantes du devis
+  await db.delete(devisLignes).where(eq(devisLignes.devisId, option.devisId));
+  
+  // Créer les nouvelles lignes à partir de l'option
+  for (const ligne of lignesOption) {
+    await db.insert(devisLignes).values({
+      devisId: option.devisId,
+      designation: ligne.designation,
+      description: ligne.description || undefined,
+      quantite: ligne.quantite || '1',
+      unite: ligne.unite || 'unité',
+      prixUnitaireHT: ligne.prixUnitaireHT || '0',
+      tauxTVA: ligne.tauxTVA || '20',
+      montantHT: ligne.montantHT || '0',
+      montantTVA: ligne.montantTVA || '0',
+      montantTTC: ligne.montantTTC || '0',
+      ordre: ligne.ordre || 1
+    });
+  }
+  
+  // Mettre à jour les totaux du devis
+  await db.update(devis).set({
+    totalHT: option.totalHT,
+    totalTVA: option.totalTVA,
+    totalTTC: option.totalTTC
+  }).where(eq(devis.id, option.devisId));
 }

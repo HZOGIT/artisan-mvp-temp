@@ -697,3 +697,133 @@ export const demandesAvis = mysqlTable("demandes_avis", {
 
 export type DemandeAvis = typeof demandesAvis.$inferSelect;
 export type InsertDemandeAvis = typeof demandesAvis.$inferInsert;
+
+
+// ============================================================================
+// POSITIONS GPS TECHNICIENS (Real-time GPS tracking)
+// ============================================================================
+export const positionsTechniciens = mysqlTable("positions_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }).notNull(),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }).notNull(),
+  precision: int("precision"), // Précision en mètres
+  vitesse: decimal("vitesse", { precision: 5, scale: 2 }), // km/h
+  cap: int("cap"), // Direction en degrés (0-360)
+  batterie: int("batterie"), // Niveau de batterie en %
+  enDeplacement: boolean("enDeplacement").default(false),
+  interventionEnCoursId: int("interventionEnCoursId"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PositionTechnicien = typeof positionsTechniciens.$inferSelect;
+export type InsertPositionTechnicien = typeof positionsTechniciens.$inferInsert;
+
+// ============================================================================
+// HISTORIQUE DEPLACEMENTS (Movement history for reporting)
+// ============================================================================
+export const historiqueDeplacements = mysqlTable("historique_deplacements", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  interventionId: int("interventionId"),
+  dateDebut: timestamp("dateDebut").notNull(),
+  dateFin: timestamp("dateFin"),
+  distanceKm: decimal("distanceKm", { precision: 8, scale: 2 }),
+  dureeMinutes: int("dureeMinutes"),
+  latitudeDepart: decimal("latitudeDepart", { precision: 10, scale: 8 }),
+  longitudeDepart: decimal("longitudeDepart", { precision: 11, scale: 8 }),
+  latitudeArrivee: decimal("latitudeArrivee", { precision: 10, scale: 8 }),
+  longitudeArrivee: decimal("longitudeArrivee", { precision: 11, scale: 8 }),
+  adresseDepart: text("adresseDepart"),
+  adresseArrivee: text("adresseArrivee"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type HistoriqueDeplacement = typeof historiqueDeplacements.$inferSelect;
+export type InsertHistoriqueDeplacement = typeof historiqueDeplacements.$inferInsert;
+
+// ============================================================================
+// ECRITURES COMPTABLES (Accounting entries)
+// ============================================================================
+export const ecrituresComptables = mysqlTable("ecritures_comptables", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  dateEcriture: timestamp("dateEcriture").notNull(),
+  journal: mysqlEnum("journal", ["VE", "AC", "BQ", "OD"]).notNull(), // Ventes, Achats, Banque, Opérations Diverses
+  numeroCompte: varchar("numeroCompte", { length: 10 }).notNull(),
+  libelleCompte: varchar("libelleCompte", { length: 100 }),
+  libelle: varchar("libelle", { length: 255 }).notNull(),
+  pieceRef: varchar("pieceRef", { length: 50 }), // Référence facture/devis
+  debit: decimal("debit", { precision: 12, scale: 2 }).default("0.00"),
+  credit: decimal("credit", { precision: 12, scale: 2 }).default("0.00"),
+  factureId: int("factureId"),
+  lettrage: varchar("lettrage", { length: 10 }),
+  pointage: boolean("pointage").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EcritureComptable = typeof ecrituresComptables.$inferSelect;
+export type InsertEcritureComptable = typeof ecrituresComptables.$inferInsert;
+
+// ============================================================================
+// PLAN COMPTABLE (Chart of accounts)
+// ============================================================================
+export const planComptable = mysqlTable("plan_comptable", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  numeroCompte: varchar("numeroCompte", { length: 10 }).notNull(),
+  libelle: varchar("libelle", { length: 100 }).notNull(),
+  classe: int("classe").notNull(), // 1-7
+  type: mysqlEnum("type", ["actif", "passif", "charge", "produit"]).notNull(),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CompteComptable = typeof planComptable.$inferSelect;
+export type InsertCompteComptable = typeof planComptable.$inferInsert;
+
+// ============================================================================
+// DEVIS OPTIONS (Multi-option quotes)
+// ============================================================================
+export const devisOptions = mysqlTable("devis_options", {
+  id: int("id").autoincrement().primaryKey(),
+  devisId: int("devisId").notNull(),
+  nom: varchar("nom", { length: 100 }).notNull(), // Ex: "Option Standard", "Option Premium"
+  description: text("description"),
+  ordre: int("ordre").default(1),
+  totalHT: decimal("totalHT", { precision: 10, scale: 2 }).default("0.00"),
+  totalTVA: decimal("totalTVA", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: decimal("totalTTC", { precision: 10, scale: 2 }).default("0.00"),
+  recommandee: boolean("recommandee").default(false), // Option recommandée par l'artisan
+  selectionnee: boolean("selectionnee").default(false), // Option choisie par le client
+  dateSelection: timestamp("dateSelection"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DevisOption = typeof devisOptions.$inferSelect;
+export type InsertDevisOption = typeof devisOptions.$inferInsert;
+
+// ============================================================================
+// DEVIS OPTIONS LIGNES (Line items for each option)
+// ============================================================================
+export const devisOptionsLignes = mysqlTable("devis_options_lignes", {
+  id: int("id").autoincrement().primaryKey(),
+  optionId: int("optionId").notNull(),
+  articleId: int("articleId"),
+  designation: varchar("designation", { length: 255 }).notNull(),
+  description: text("description"),
+  quantite: decimal("quantite", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaireHT: decimal("prixUnitaireHT", { precision: 10, scale: 2 }).default("0.00"),
+  tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  remise: decimal("remise", { precision: 5, scale: 2 }).default("0.00"),
+  montantHT: decimal("montantHT", { precision: 10, scale: 2 }).default("0.00"),
+  montantTVA: decimal("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
+  montantTTC: decimal("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  ordre: int("ordre").default(1),
+});
+
+export type DevisOptionLigne = typeof devisOptionsLignes.$inferSelect;
+export type InsertDevisOptionLigne = typeof devisOptionsLignes.$inferInsert;
