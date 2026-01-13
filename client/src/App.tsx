@@ -17,6 +17,9 @@ import Articles from "./pages/Articles";
 import Profil from "./pages/Profil";
 import Parametres from "./pages/Parametres";
 import Calendrier from "./pages/Calendrier";
+import DashboardAdvanced from "./pages/DashboardAdvanced";
+import Stocks from "./pages/Stocks";
+import SignatureDevis from "./pages/SignatureDevis";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -34,6 +37,8 @@ function AuthenticatedRoutes() {
         <Route path="/interventions" component={Interventions} />
         <Route path="/articles" component={Articles} />
         <Route path="/calendrier" component={Calendrier} />
+        <Route path="/statistiques" component={DashboardAdvanced} />
+        <Route path="/stocks" component={Stocks} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />
@@ -56,6 +61,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/signature/:token" component={SignatureDevis} />
       {isAuthenticated && (
         <>
           <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
@@ -68,6 +74,8 @@ function Router() {
           <Route path="/interventions" component={() => <AuthenticatedRoutes />} />
           <Route path="/articles" component={() => <AuthenticatedRoutes />} />
           <Route path="/calendrier" component={() => <AuthenticatedRoutes />} />
+          <Route path="/statistiques" component={() => <AuthenticatedRoutes />} />
+          <Route path="/stocks" component={() => <AuthenticatedRoutes />} />
           <Route path="/profil" component={() => <AuthenticatedRoutes />} />
           <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
         </>

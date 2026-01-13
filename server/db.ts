@@ -12,7 +12,10 @@ import {
   facturesLignes, InsertFactureLigne, FactureLigne,
   interventions, InsertIntervention, Intervention,
   notifications, InsertNotification, Notification,
-  parametresArtisan, InsertParametresArtisan, ParametresArtisan
+  parametresArtisan, InsertParametresArtisan, ParametresArtisan,
+  signaturesDevis, InsertSignatureDevis, SignatureDevis,
+  stocks, InsertStock, Stock,
+  mouvementsStock, InsertMouvementStock, MouvementStock
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1028,4 +1031,325 @@ export async function seedBibliothequeArticles(): Promise<void> {
   await db.insert(bibliothequeArticles).values([...articlesPlomberie, ...articlesElectricite]);
   
   console.log(`[Seed] Inserted ${articlesPlomberie.length + articlesElectricite.length} articles into bibliotheque`);
+}
+
+
+// ============================================================================
+// SIGNATURES DEVIS QUERIES
+// ============================================================================
+
+export async function createSignatureDevis(data: InsertSignatureDevis): Promise<SignatureDevis> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(signaturesDevis).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(signaturesDevis).where(eq(signaturesDevis.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to retrieve created signature");
+  return created[0];
+}
+
+export async function getSignatureByToken(token: string): Promise<SignatureDevis | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(signaturesDevis).where(eq(signaturesDevis.token, token)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getSignatureByDevisId(devisId: number): Promise<SignatureDevis | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(signaturesDevis).where(eq(signaturesDevis.devisId, devisId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateSignatureDevis(id: number, data: Partial<InsertSignatureDevis>): Promise<SignatureDevis> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(signaturesDevis).set(data).where(eq(signaturesDevis.id, id));
+  const updated = await db.select().from(signaturesDevis).where(eq(signaturesDevis.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Signature not found");
+  return updated[0];
+}
+
+export async function signDevis(token: string, signatureData: string, signataireName: string, signataireEmail: string, ipAddress: string, userAgent: string): Promise<SignatureDevis> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const signature = await getSignatureByToken(token);
+  if (!signature) throw new Error("Signature token not found");
+  if (signature.signedAt) throw new Error("Devis already signed");
+  if (new Date() > signature.expiresAt) throw new Error("Signature link expired");
+  
+  await db.update(signaturesDevis).set({
+    signatureData,
+    signataireName,
+    signataireEmail,
+    ipAddress,
+    userAgent,
+    signedAt: new Date()
+  }).where(eq(signaturesDevis.token, token));
+  
+  // Update devis status to accepted
+  await db.update(devis).set({ statut: "accepte" }).where(eq(devis.id, signature.devisId));
+  
+  const updated = await db.select().from(signaturesDevis).where(eq(signaturesDevis.token, token)).limit(1);
+  return updated[0];
+}
+
+// ============================================================================
+// STOCKS QUERIES
+// ============================================================================
+
+export async function getStocksByArtisanId(artisanId: number): Promise<Stock[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(stocks).where(eq(stocks.artisanId, artisanId)).orderBy(stocks.designation);
+}
+
+export async function getStockById(id: number): Promise<Stock | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(stocks).where(eq(stocks.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createStock(data: InsertStock): Promise<Stock> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(stocks).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(stocks).where(eq(stocks.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to retrieve created stock");
+  return created[0];
+}
+
+export async function updateStock(id: number, data: Partial<InsertStock>): Promise<Stock> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(stocks).set(data).where(eq(stocks.id, id));
+  const updated = await db.select().from(stocks).where(eq(stocks.id, id)).limit(1);
+  if (updated.length === 0) throw new Error("Stock not found");
+  return updated[0];
+}
+
+export async function deleteStock(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(mouvementsStock).where(eq(mouvementsStock.stockId, id));
+  await db.delete(stocks).where(eq(stocks.id, id));
+}
+
+export async function getLowStockItems(artisanId: number): Promise<Stock[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(stocks).where(
+    and(
+      eq(stocks.artisanId, artisanId),
+      sql`${stocks.quantiteEnStock} <= ${stocks.seuilAlerte}`
+    )
+  ).orderBy(stocks.designation);
+}
+
+export async function adjustStock(stockId: number, quantite: number, type: "entree" | "sortie" | "ajustement", motif?: string, reference?: string): Promise<MouvementStock> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const stock = await getStockById(stockId);
+  if (!stock) throw new Error("Stock not found");
+  
+  const quantiteAvant = Number(stock.quantiteEnStock) || 0;
+  let quantiteApres = quantiteAvant;
+  
+  if (type === "entree") {
+    quantiteApres = quantiteAvant + quantite;
+  } else if (type === "sortie") {
+    quantiteApres = quantiteAvant - quantite;
+    if (quantiteApres < 0) quantiteApres = 0;
+  } else {
+    quantiteApres = quantite;
+  }
+  
+  // Create movement record
+  const result = await db.insert(mouvementsStock).values({
+    stockId,
+    type,
+    quantite: quantite.toFixed(2),
+    quantiteAvant: quantiteAvant.toFixed(2),
+    quantiteApres: quantiteApres.toFixed(2),
+    motif,
+    reference
+  });
+  
+  // Update stock quantity
+  await db.update(stocks).set({ quantiteEnStock: quantiteApres.toFixed(2) }).where(eq(stocks.id, stockId));
+  
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(mouvementsStock).where(eq(mouvementsStock.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to retrieve created movement");
+  return created[0];
+}
+
+export async function getMouvementsStock(stockId: number): Promise<MouvementStock[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(mouvementsStock).where(eq(mouvementsStock.stockId, stockId)).orderBy(desc(mouvementsStock.createdAt));
+}
+
+// ============================================================================
+// ADVANCED DASHBOARD STATISTICS
+// ============================================================================
+
+export async function getMonthlyCAStats(artisanId: number, months: number = 12) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const results = [];
+  const now = new Date();
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const startDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+    
+    const ca = await db.select({ total: sql<number>`COALESCE(SUM(totalTTC), 0)` }).from(factures).where(
+      and(
+        eq(factures.artisanId, artisanId),
+        eq(factures.statut, "payee"),
+        gte(factures.datePaiement, startDate),
+        lte(factures.datePaiement, endDate)
+      )
+    );
+    
+    results.push({
+      month: startDate.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
+      monthNum: startDate.getMonth() + 1,
+      year: startDate.getFullYear(),
+      ca: Number(ca[0]?.total) || 0
+    });
+  }
+  
+  return results;
+}
+
+export async function getYearlyComparison(artisanId: number) {
+  const db = await getDb();
+  if (!db) return { currentYear: 0, previousYear: 0, growth: 0 };
+  
+  const now = new Date();
+  const currentYearStart = new Date(now.getFullYear(), 0, 1);
+  const previousYearStart = new Date(now.getFullYear() - 1, 0, 1);
+  const previousYearEnd = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
+  
+  const currentYearCA = await db.select({ total: sql<number>`COALESCE(SUM(totalTTC), 0)` }).from(factures).where(
+    and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, "payee"),
+      gte(factures.datePaiement, currentYearStart)
+    )
+  );
+  
+  const previousYearCA = await db.select({ total: sql<number>`COALESCE(SUM(totalTTC), 0)` }).from(factures).where(
+    and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, "payee"),
+      gte(factures.datePaiement, previousYearStart),
+      lte(factures.datePaiement, previousYearEnd)
+    )
+  );
+  
+  const currentYear = Number(currentYearCA[0]?.total) || 0;
+  const previousYear = Number(previousYearCA[0]?.total) || 0;
+  const growth = previousYear > 0 ? ((currentYear - previousYear) / previousYear) * 100 : 0;
+  
+  return { currentYear, previousYear, growth };
+}
+
+export async function getConversionRate(artisanId: number) {
+  const db = await getDb();
+  if (!db) return { totalDevis: 0, devisAcceptes: 0, rate: 0 };
+  
+  const totalDevis = await db.select({ count: sql<number>`count(*)` }).from(devis).where(
+    and(
+      eq(devis.artisanId, artisanId),
+      or(eq(devis.statut, "accepte"), eq(devis.statut, "refuse"), eq(devis.statut, "expire"))
+    )
+  );
+  
+  const devisAcceptes = await db.select({ count: sql<number>`count(*)` }).from(devis).where(
+    and(
+      eq(devis.artisanId, artisanId),
+      eq(devis.statut, "accepte")
+    )
+  );
+  
+  const total = totalDevis[0]?.count || 0;
+  const accepted = devisAcceptes[0]?.count || 0;
+  const rate = total > 0 ? (accepted / total) * 100 : 0;
+  
+  return { totalDevis: total, devisAcceptes: accepted, rate };
+}
+
+export async function getTopClients(artisanId: number, limit: number = 5) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db.select({
+    clientId: factures.clientId,
+    totalCA: sql<number>`COALESCE(SUM(totalTTC), 0)`
+  }).from(factures).where(
+    and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, "payee")
+    )
+  ).groupBy(factures.clientId).orderBy(desc(sql`SUM(totalTTC)`)).limit(limit);
+  
+  const topClients = [];
+  for (const row of result) {
+    const client = await getClientById(row.clientId);
+    if (client) {
+      topClients.push({
+        client,
+        totalCA: Number(row.totalCA) || 0
+      });
+    }
+  }
+  
+  return topClients;
+}
+
+export async function getClientEvolution(artisanId: number, months: number = 12) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const results = [];
+  const now = new Date();
+  
+  for (let i = months - 1; i >= 0; i--) {
+    const endDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+    
+    const count = await db.select({ count: sql<number>`count(*)` }).from(clients).where(
+      and(
+        eq(clients.artisanId, artisanId),
+        lte(clients.createdAt, endDate)
+      )
+    );
+    
+    results.push({
+      month: endDate.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }),
+      count: count[0]?.count || 0
+    });
+  }
+  
+  return results;
+}
+
+
+// ============================================================================
+// ADDITIONAL ARTISAN QUERY
+// ============================================================================
+
+export async function getArtisanById(id: number): Promise<Artisan | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(artisans).where(eq(artisans.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }

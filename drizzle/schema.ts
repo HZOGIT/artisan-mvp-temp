@@ -257,3 +257,65 @@ export const parametresArtisan = mysqlTable("parametres_artisan", {
 
 export type ParametresArtisan = typeof parametresArtisan.$inferSelect;
 export type InsertParametresArtisan = typeof parametresArtisan.$inferInsert;
+
+
+// ============================================================================
+// SIGNATURES DEVIS (Electronic signatures for quotes)
+// ============================================================================
+export const signaturesDevis = mysqlTable("signatures_devis", {
+  id: int("id").autoincrement().primaryKey(),
+  devisId: int("devisId").notNull().unique(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  signatureData: text("signatureData"), // Base64 encoded signature image
+  signataireName: varchar("signataireName", { length: 255 }),
+  signataireEmail: varchar("signataireEmail", { length: 320 }),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  userAgent: text("userAgent"),
+  signedAt: timestamp("signedAt"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SignatureDevis = typeof signaturesDevis.$inferSelect;
+export type InsertSignatureDevis = typeof signaturesDevis.$inferInsert;
+
+// ============================================================================
+// STOCKS (Inventory management)
+// ============================================================================
+export const stocks = mysqlTable("stocks", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  articleId: int("articleId"), // Reference to bibliothequeArticles or articlesArtisan
+  articleType: mysqlEnum("articleType", ["bibliotheque", "artisan"]).default("bibliotheque"),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  designation: varchar("designation", { length: 500 }).notNull(),
+  quantiteEnStock: decimal("quantiteEnStock", { precision: 10, scale: 2 }).default("0.00"),
+  seuilAlerte: decimal("seuilAlerte", { precision: 10, scale: 2 }).default("5.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixAchat: decimal("prixAchat", { precision: 10, scale: 2 }),
+  emplacement: varchar("emplacement", { length: 100 }),
+  fournisseur: varchar("fournisseur", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Stock = typeof stocks.$inferSelect;
+export type InsertStock = typeof stocks.$inferInsert;
+
+// ============================================================================
+// MOUVEMENTS STOCK (Stock movements history)
+// ============================================================================
+export const mouvementsStock = mysqlTable("mouvements_stock", {
+  id: int("id").autoincrement().primaryKey(),
+  stockId: int("stockId").notNull(),
+  type: mysqlEnum("type", ["entree", "sortie", "ajustement"]).notNull(),
+  quantite: decimal("quantite", { precision: 10, scale: 2 }).notNull(),
+  quantiteAvant: decimal("quantiteAvant", { precision: 10, scale: 2 }).notNull(),
+  quantiteApres: decimal("quantiteApres", { precision: 10, scale: 2 }).notNull(),
+  motif: text("motif"),
+  reference: varchar("reference", { length: 100 }), // Reference to devis/facture/intervention
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MouvementStock = typeof mouvementsStock.$inferSelect;
+export type InsertMouvementStock = typeof mouvementsStock.$inferInsert;

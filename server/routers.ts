@@ -1068,6 +1068,310 @@ const dashboardRouter = router({
     }
     return result;
   }),
+  
+  getMonthlyCA: protectedProcedure
+    .input(z.object({ months: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getMonthlyCAStats(artisan.id, input?.months || 12);
+    }),
+  
+  getYearlyComparison: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { currentYear: 0, previousYear: 0, growth: 0 };
+    return await db.getYearlyComparison(artisan.id);
+  }),
+  
+  getConversionRate: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { totalDevis: 0, devisAcceptes: 0, rate: 0 };
+    return await db.getConversionRate(artisan.id);
+  }),
+  
+  getTopClients: protectedProcedure
+    .input(z.object({ limit: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getTopClients(artisan.id, input?.limit || 5);
+    }),
+  
+  getClientEvolution: protectedProcedure
+    .input(z.object({ months: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getClientEvolution(artisan.id, input?.months || 12);
+    }),
+});
+
+// ============================================================================
+// SIGNATURE ROUTER
+// ============================================================================
+const signatureRouter = router({
+  createSignatureLink: protectedProcedure
+    .input(z.object({ devisId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      
+      const devisData = await db.getDevisById(input.devisId);
+      if (!devisData || devisData.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+      }
+      
+      // Check if signature already exists
+      const existingSignature = await db.getSignatureByDevisId(input.devisId);
+      if (existingSignature) {
+        return existingSignature;
+      }
+      
+      // Generate unique token
+      const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 32);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days validity
+      
+      const signature = await db.createSignatureDevis({
+        devisId: input.devisId,
+        token,
+        expiresAt
+      });
+      
+      // Create notification
+      await db.createNotification({
+        artisanId: artisan.id,
+        type: "info",
+        titre: "Lien de signature créé",
+        message: `Un lien de signature a été créé pour le devis ${devisData.numero}`,
+        lien: `/devis/${input.devisId}`
+      });
+      
+      return signature;
+    }),
+  
+  getSignatureByDevis: protectedProcedure
+    .input(z.object({ devisId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      
+      const devisData = await db.getDevisById(input.devisId);
+      if (!devisData || devisData.artisanId !== artisan.id) return null;
+      
+      return await db.getSignatureByDevisId(input.devisId);
+    }),
+  
+  getDevisForSignature: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const signature = await db.getSignatureByToken(input.token);
+      if (!signature) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+      }
+      
+      if (new Date() > signature.expiresAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Lien de signature expiré" });
+      }
+      
+      if (signature.signedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été signé" });
+      }
+      
+      const devisData = await db.getDevisById(signature.devisId);
+      if (!devisData) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+      }
+      
+      const artisan = await db.getArtisanById(devisData.artisanId);
+      const client = await db.getClientById(devisData.clientId);
+      const lignes = await db.getLignesDevisByDevisId(devisData.id);
+      
+      return {
+        devis: devisData,
+        artisan,
+        client,
+        lignes,
+        signature
+      };
+    }),
+  
+  signDevis: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      signatureData: z.string(),
+      signataireName: z.string(),
+      signataireEmail: z.string().email()
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
+      const userAgent = ctx.req.headers['user-agent'] || 'unknown';
+      
+      const signature = await db.signDevis(
+        input.token,
+        input.signatureData,
+        input.signataireName,
+        input.signataireEmail,
+        ipAddress,
+        userAgent
+      );
+      
+      // Get devis and artisan to create notification
+      const devisData = await db.getDevisById(signature.devisId);
+      if (devisData) {
+        await db.createNotification({
+          artisanId: devisData.artisanId,
+          type: "succes",
+          titre: "Devis signé !",
+          message: `Le devis ${devisData.numero} a été signé par ${input.signataireName}`,
+          lien: `/devis/${signature.devisId}`
+        });
+      }
+      
+      return { success: true, signature };
+    }),
+});
+
+// ============================================================================
+// STOCKS ROUTER
+// ============================================================================
+const stocksRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getStocksByArtisanId(artisan.id);
+  }),
+  
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      const stock = await db.getStockById(input.id);
+      if (!stock || stock.artisanId !== artisan.id) return null;
+      return stock;
+    }),
+  
+  create: protectedProcedure
+    .input(z.object({
+      reference: z.string(),
+      designation: z.string(),
+      quantiteEnStock: z.string().optional(),
+      seuilAlerte: z.string().optional(),
+      unite: z.string().optional(),
+      prixAchat: z.string().optional(),
+      emplacement: z.string().optional(),
+      fournisseur: z.string().optional(),
+      articleId: z.number().optional(),
+      articleType: z.enum(["bibliotheque", "artisan"]).optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      return await db.createStock({ artisanId: artisan.id, ...input });
+    }),
+  
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      reference: z.string().optional(),
+      designation: z.string().optional(),
+      seuilAlerte: z.string().optional(),
+      unite: z.string().optional(),
+      prixAchat: z.string().optional(),
+      emplacement: z.string().optional(),
+      fournisseur: z.string().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      const stock = await db.getStockById(input.id);
+      if (!stock || stock.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Stock non trouvé" });
+      }
+      const { id, ...data } = input;
+      return await db.updateStock(id, data);
+    }),
+  
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      const stock = await db.getStockById(input.id);
+      if (!stock || stock.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Stock non trouvé" });
+      }
+      await db.deleteStock(input.id);
+      return { success: true };
+    }),
+  
+  adjustQuantity: protectedProcedure
+    .input(z.object({
+      stockId: z.number(),
+      quantite: z.number(),
+      type: z.enum(["entree", "sortie", "ajustement"]),
+      motif: z.string().optional(),
+      reference: z.string().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      const stock = await db.getStockById(input.stockId);
+      if (!stock || stock.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Stock non trouvé" });
+      }
+      return await db.adjustStock(input.stockId, input.quantite, input.type, input.motif, input.reference);
+    }),
+  
+  getMouvements: protectedProcedure
+    .input(z.object({ stockId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const stock = await db.getStockById(input.stockId);
+      if (!stock || stock.artisanId !== artisan.id) return [];
+      return await db.getMouvementsStock(input.stockId);
+    }),
+  
+  getLowStock: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getLowStockItems(artisan.id);
+  }),
+  
+  generateAlerts: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+    }
+    
+    const lowStockItems = await db.getLowStockItems(artisan.id);
+    let alertsCreated = 0;
+    
+    for (const item of lowStockItems) {
+      await db.createNotification({
+        artisanId: artisan.id,
+        type: "alerte",
+        titre: "Stock bas",
+        message: `L'article "${item.designation}" (${item.reference}) est en stock bas: ${item.quantiteEnStock} ${item.unite} (seuil: ${item.seuilAlerte})`,
+        lien: "/stocks"
+      });
+      alertsCreated++;
+    }
+    
+    return { alertsCreated };
+  }),
 });
 
 // ============================================================================
@@ -1121,6 +1425,8 @@ export const appRouter = router({
   notifications: notificationsRouter,
   dashboard: dashboardRouter,
   parametres: parametresRouter,
+  signature: signatureRouter,
+  stocks: stocksRouter,
 });
 
 export type AppRouter = typeof appRouter;

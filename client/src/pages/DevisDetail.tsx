@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -114,6 +114,18 @@ export default function DevisDetail() {
 
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState("");
+  const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
+
+  const requestSignatureMutation = trpc.signature.createSignatureLink.useMutation({
+    onSuccess: () => {
+      toast.success("Lien de signature créé et envoyé au client");
+      setIsSignatureDialogOpen(false);
+      utils.devis.getById.invalidate({ id: parseInt(id || "0") });
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erreur lors de la création du lien de signature");
+    },
+  });
 
   const resetLineForm = () => {
     setLineFormData({
@@ -316,6 +328,40 @@ export default function DevisDetail() {
             <Copy className="h-4 w-4 mr-2" />
             Dupliquer
           </Button>
+          {(devis.statut === "brouillon" || devis.statut === "envoye") && devis.client?.email && (
+            <Dialog open={isSignatureDialogOpen} onOpenChange={setIsSignatureDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Pen className="h-4 w-4 mr-2" />
+                  Signature électronique
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Demander une signature électronique</DialogTitle>
+                  <DialogDescription>
+                    Un lien de signature sera envoyé à {devis.client?.email}. Le client pourra signer le devis en ligne.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <p className="text-sm text-muted-foreground">
+                    Une fois signé, le devis passera automatiquement au statut "Accepté".
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsSignatureDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button 
+                    onClick={() => requestSignatureMutation.mutate({ devisId: parseInt(id || "0") })} 
+                    disabled={requestSignatureMutation.isPending}
+                  >
+                    {requestSignatureMutation.isPending ? "Envoi en cours..." : "Envoyer la demande"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
           {devis.statut === "accepte" && (
             <Button onClick={handleConvertToFacture} disabled={convertToFactureMutation.isPending}>
               <Receipt className="h-4 w-4 mr-2" />

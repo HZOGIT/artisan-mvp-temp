@@ -99,3 +99,30 @@
 - [x] Copie de toutes les lignes d'articles
 - [x] Génération d'un nouveau numéro de devis
 - [x] Redirection vers le nouveau devis pour modification
+
+
+## Nouvelles Fonctionnalités (Sprint 4)
+
+### Signature Électronique
+- [x] Génération de lien de signature unique pour chaque devis
+- [x] Page publique de visualisation et signature du devis
+- [x] Canvas de signature tactile/souris
+- [x] Enregistrement de la signature avec horodatage
+- [x] Mise à jour automatique du statut du devis après signature
+- [x] Notification à l'artisan lors de la signature
+
+### Tableau de Bord Avancé
+- [x] Graphique d'évolution du CA sur 12 mois
+- [x] Comparatif année N vs N-1
+- [x] Répartition du CA par type de prestation
+- [x] Taux de conversion devis/factures
+- [x] Évolution du nombre de clients
+- [x] Top 5 des clients par CA
+
+### Gestion des Stocks
+- [x] Table de stock pour les articles
+- [x] Suivi des quantités en stock
+- [x] Seuil d'alerte de réapprovisionnement
+- [x] Notifications d'alerte stock bas
+- [x] Historique des mouvements de stock
+- [x] Page de gestion des stocks
