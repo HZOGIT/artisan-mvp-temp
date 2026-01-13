@@ -4056,6 +4056,525 @@ const badgesRouter = router({
 });
 
 // ============================================================================
+// CHANTIERS MULTI-INTERVENTIONS ROUTER
+// ============================================================================
+const chantiersRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getChantiersByArtisan(artisan.id);
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getChantierById(input.id);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      clientId: z.number(),
+      reference: z.string(),
+      nom: z.string(),
+      description: z.string().optional(),
+      adresse: z.string().optional(),
+      codePostal: z.string().optional(),
+      ville: z.string().optional(),
+      dateDebut: z.string().optional(),
+      dateFinPrevue: z.string().optional(),
+      budgetPrevisionnel: z.string().optional(),
+      priorite: z.enum(["basse", "normale", "haute", "urgente"]).optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createChantier({
+        artisanId: artisan.id,
+        ...input,
+        dateDebut: input.dateDebut ? new Date(input.dateDebut) : undefined,
+        dateFinPrevue: input.dateFinPrevue ? new Date(input.dateFinPrevue) : undefined,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      description: z.string().optional(),
+      statut: z.enum(["planifie", "en_cours", "en_pause", "termine", "annule"]).optional(),
+      avancement: z.number().optional(),
+      dateFinReelle: z.string().optional(),
+      budgetRealise: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, dateFinReelle, ...rest } = input;
+      return await db.updateChantier(id, {
+        ...rest,
+        dateFinReelle: dateFinReelle ? new Date(dateFinReelle) : undefined,
+      });
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.deleteChantier(input.id);
+    }),
+
+  // Phases
+  getPhases: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getPhasesByChantier(input.chantierId);
+    }),
+
+  createPhase: protectedProcedure
+    .input(z.object({
+      chantierId: z.number(),
+      nom: z.string(),
+      description: z.string().optional(),
+      ordre: z.number().optional(),
+      dateDebutPrevue: z.string().optional(),
+      dateFinPrevue: z.string().optional(),
+      budgetPhase: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createPhaseChantier({
+        ...input,
+        dateDebutPrevue: input.dateDebutPrevue ? new Date(input.dateDebutPrevue) : undefined,
+        dateFinPrevue: input.dateFinPrevue ? new Date(input.dateFinPrevue) : undefined,
+      });
+    }),
+
+  updatePhase: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      statut: z.enum(["a_faire", "en_cours", "termine", "annule"]).optional(),
+      avancement: z.number().optional(),
+      dateDebutReelle: z.string().optional(),
+      dateFinReelle: z.string().optional(),
+      coutReel: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, dateDebutReelle, dateFinReelle, ...rest } = input;
+      return await db.updatePhaseChantier(id, {
+        ...rest,
+        dateDebutReelle: dateDebutReelle ? new Date(dateDebutReelle) : undefined,
+        dateFinReelle: dateFinReelle ? new Date(dateFinReelle) : undefined,
+      });
+    }),
+
+  deletePhase: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.deletePhaseChantier(input.id);
+    }),
+
+  // Interventions
+  getInterventions: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getInterventionsByChantier(input.chantierId);
+    }),
+
+  associerIntervention: protectedProcedure
+    .input(z.object({
+      chantierId: z.number(),
+      interventionId: z.number(),
+      phaseId: z.number().optional(),
+      ordre: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.associerInterventionChantier(input);
+    }),
+
+  dissocierIntervention: protectedProcedure
+    .input(z.object({
+      chantierId: z.number(),
+      interventionId: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.dissocierInterventionChantier(input.chantierId, input.interventionId);
+    }),
+
+  // Documents
+  getDocuments: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getDocumentsByChantier(input.chantierId);
+    }),
+
+  addDocument: protectedProcedure
+    .input(z.object({
+      chantierId: z.number(),
+      nom: z.string(),
+      type: z.enum(["plan", "photo", "permis", "contrat", "facture", "autre"]).optional(),
+      url: z.string(),
+      taille: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.addDocumentChantier(input);
+    }),
+
+  deleteDocument: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.deleteDocumentChantier(input.id);
+    }),
+
+  // Statistiques
+  getStatistiques: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getStatistiquesChantier(input.chantierId);
+    }),
+
+  calculerAvancement: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.calculerAvancementChantier(input.chantierId);
+    }),
+});
+
+// ============================================================================
+// INTEGRATIONS COMPTABLES ROUTER
+// ============================================================================
+const integrationsComptablesRouter = router({
+  getConfig: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return null;
+    return await db.getConfigurationComptable(artisan.id);
+  }),
+
+  saveConfig: protectedProcedure
+    .input(z.object({
+      logiciel: z.enum(["sage", "quickbooks", "ciel", "ebp", "autre"]).optional(),
+      formatExport: z.enum(["fec", "iif", "qbo", "csv"]).optional(),
+      compteVentes: z.string().optional(),
+      compteTVACollectee: z.string().optional(),
+      compteClients: z.string().optional(),
+      compteAchats: z.string().optional(),
+      compteTVADeductible: z.string().optional(),
+      compteFournisseurs: z.string().optional(),
+      compteBanque: z.string().optional(),
+      compteCaisse: z.string().optional(),
+      journalVentes: z.string().optional(),
+      journalAchats: z.string().optional(),
+      journalBanque: z.string().optional(),
+      prefixeFacture: z.string().optional(),
+      prefixeAvoir: z.string().optional(),
+      exerciceDebut: z.number().optional(),
+      actif: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.saveConfigurationComptable({ artisanId: artisan.id, ...input });
+    }),
+
+  getExports: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getExportsComptables(artisan.id);
+  }),
+
+  genererExport: protectedProcedure
+    .input(z.object({
+      logiciel: z.enum(["sage", "quickbooks", "ciel", "ebp", "autre"]),
+      formatExport: z.enum(["fec", "iif", "qbo", "csv"]),
+      dateDebut: z.string(),
+      dateFin: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+
+      const dateDebut = new Date(input.dateDebut);
+      const dateFin = new Date(input.dateFin);
+
+      // Créer l'enregistrement d'export
+      const exportRecord = await db.createExportComptable({
+        artisanId: artisan.id,
+        logiciel: input.logiciel,
+        formatExport: input.formatExport,
+        periodeDebut: dateDebut,
+        periodeFin: dateFin,
+      });
+
+      if (!exportRecord) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erreur lors de la création de l'export" });
+      }
+
+      // Générer le contenu selon le format
+      let contenu = '';
+      if (input.formatExport === 'fec') {
+        contenu = await db.genererExportFEC(artisan.id, dateDebut, dateFin);
+      } else if (input.formatExport === 'iif') {
+        contenu = await db.genererExportIIF(artisan.id, dateDebut, dateFin);
+      }
+
+      // Mettre à jour l'export avec le statut
+      await db.updateExportComptable(exportRecord.id, {
+        statut: 'termine',
+        nombreEcritures: contenu.split('\n').length - 1,
+      });
+
+      return { id: exportRecord.id, contenu };
+    }),
+});
+
+// ============================================================================
+// DEVIS IA ROUTER
+// ============================================================================
+const devisIARouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getAnalysesPhotosByArtisan(artisan.id);
+  }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const analyse = await db.getAnalysePhotoById(input.id);
+      if (!analyse) return null;
+
+      const photos = await db.getPhotosByAnalyse(input.id);
+      const resultats = await db.getResultatsAnalyse(input.id);
+      
+      const resultatsAvecSuggestions = [];
+      for (const resultat of resultats) {
+        const suggestions = await db.getSuggestionsByResultat(resultat.id);
+        resultatsAvecSuggestions.push({ ...resultat, suggestions });
+      }
+
+      const devisGenere = await db.getDevisGenereByAnalyse(input.id);
+
+      return { ...analyse, photos, resultats: resultatsAvecSuggestions, devisGenere };
+    }),
+
+  createAnalyse: protectedProcedure
+    .input(z.object({
+      clientId: z.number().optional(),
+      titre: z.string().optional(),
+      description: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createAnalysePhoto({ artisanId: artisan.id, ...input });
+    }),
+
+  addPhoto: protectedProcedure
+    .input(z.object({
+      analyseId: z.number(),
+      url: z.string(),
+      description: z.string().optional(),
+      ordre: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.addPhotoToAnalyse(input);
+    }),
+
+  analyserPhotos: protectedProcedure
+    .input(z.object({ analyseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+
+      // Mettre à jour le statut
+      await db.updateAnalysePhoto(input.analyseId, { statut: 'en_cours' });
+
+      const photos = await db.getPhotosByAnalyse(input.analyseId);
+      if (photos.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune photo à analyser" });
+      }
+
+      // Importer le LLM pour l'analyse
+      const { invokeLLM } = await import("./_core/llm");
+
+      // Préparer les images pour l'analyse
+      const imageContents = photos.map(p => ({
+        type: "image_url" as const,
+        image_url: { url: p.url, detail: "high" as const }
+      }));
+
+      // Appeler l'IA pour analyser les photos
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `Tu es un expert en bâtiment et travaux. Analyse les photos fournies et identifie les travaux nécessaires.
+            Pour chaque type de travaux détecté, fournis:
+            - Le type de travaux (ex: plomberie, électricité, peinture, etc.)
+            - Une description détaillée des travaux à réaliser
+            - Le niveau d'urgence (faible, moyenne, haute, critique)
+            - Une liste d'articles/matériaux nécessaires avec quantités estimées et prix approximatifs
+            
+            Réponds en JSON avec le format:
+            {
+              "travaux": [
+                {
+                  "type": "string",
+                  "description": "string",
+                  "urgence": "faible|moyenne|haute|critique",
+                  "confiance": 0-100,
+                  "articles": [
+                    {
+                      "nom": "string",
+                      "description": "string",
+                      "quantite": number,
+                      "unite": "string",
+                      "prixEstime": number
+                    }
+                  ]
+                }
+              ]
+            }`
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Analyse ces photos de chantier et identifie les travaux nécessaires:" },
+              ...imageContents
+            ]
+          }
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "analyse_chantier",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                travaux: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      type: { type: "string" },
+                      description: { type: "string" },
+                      urgence: { type: "string", enum: ["faible", "moyenne", "haute", "critique"] },
+                      confiance: { type: "number" },
+                      articles: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            nom: { type: "string" },
+                            description: { type: "string" },
+                            quantite: { type: "number" },
+                            unite: { type: "string" },
+                            prixEstime: { type: "number" }
+                          },
+                          required: ["nom", "quantite", "unite", "prixEstime"],
+                          additionalProperties: false
+                        }
+                      }
+                    },
+                    required: ["type", "description", "urgence", "confiance", "articles"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              required: ["travaux"],
+              additionalProperties: false
+            }
+          }
+        }
+      });
+
+      // Parser la réponse
+      const rawContent = response.choices[0]?.message?.content;
+      const content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
+      if (!content) {
+        await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erreur lors de l'analyse IA" });
+      }
+
+      const analyseResult = JSON.parse(content);
+
+      // Sauvegarder les résultats
+      for (const travail of analyseResult.travaux) {
+        const resultat = await db.saveResultatAnalyseIA({
+          analyseId: input.analyseId,
+          typeTravauxDetecte: travail.type,
+          descriptionTravaux: travail.description,
+          urgence: travail.urgence,
+          confiance: travail.confiance.toString(),
+          rawResponse: travail,
+        });
+
+        if (resultat) {
+          // Sauvegarder les suggestions d'articles
+          for (const article of travail.articles) {
+            // Chercher si l'article existe dans la bibliothèque
+            const articlesExistants = await db.getBibliothequeArticles();
+            const articleMatch = articlesExistants.find(a => 
+              a.designation.toLowerCase().includes(article.nom.toLowerCase()) ||
+              article.nom.toLowerCase().includes(a.designation.toLowerCase())
+            );
+
+            await db.saveSuggestionArticleIA({
+              resultatId: resultat.id,
+              articleId: articleMatch?.id,
+              nomArticle: article.nom,
+              description: article.description || '',
+              quantiteSuggeree: article.quantite.toString(),
+              unite: article.unite,
+              prixEstime: article.prixEstime.toString(),
+              confiance: travail.confiance.toString(),
+            });
+          }
+        }
+      }
+
+      // Mettre à jour le statut
+      await db.updateAnalysePhoto(input.analyseId, { statut: 'termine' });
+
+      return { success: true, nombreTravaux: analyseResult.travaux.length };
+    }),
+
+  updateSuggestion: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      selectionne: z.boolean().optional(),
+      quantiteSuggeree: z.string().optional(),
+      prixEstime: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      return await db.updateSuggestionArticle(id, data);
+    }),
+
+  genererDevis: protectedProcedure
+    .input(z.object({
+      analyseId: z.number(),
+      clientId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      return await db.creerDevisDepuisAnalyseIA(input.analyseId, input.clientId, artisan.id);
+    }),
+});
+
+// ============================================================================
 // ALERTES PREVISIONS CA ROUTER
 // ============================================================================
 const alertesPrevisionsRouter = router({
@@ -4139,6 +4658,9 @@ export const appRouter = router({system: systemRouter,
   vehicules: vehiculesRouter,
   badges: badgesRouter,
   alertesPrevisions: alertesPrevisionsRouter,
+  chantiers: chantiersRouter,
+  integrationsComptables: integrationsComptablesRouter,
+  devisIA: devisIARouter,
 });
 
 export type AppRouter = typeof appRouter;

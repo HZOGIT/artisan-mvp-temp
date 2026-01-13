@@ -1196,3 +1196,208 @@ export const historiqueAlertesPrevisions = mysqlTable("historique_alertes_previs
 
 export type HistoriqueAlertePrevision = typeof historiqueAlertesPrevisions.$inferSelect;
 export type InsertHistoriqueAlertePrevision = typeof historiqueAlertesPrevisions.$inferInsert;
+
+
+// ============================================================================
+// CHANTIERS MULTI-INTERVENTIONS
+// ============================================================================
+export const chantiers = mysqlTable("chantiers", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  clientId: int("clientId").notNull(),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  description: text("description"),
+  adresse: text("adresse"),
+  codePostal: varchar("codePostal", { length: 10 }),
+  ville: varchar("ville", { length: 100 }),
+  dateDebut: date("dateDebut"),
+  dateFinPrevue: date("dateFinPrevue"),
+  dateFinReelle: date("dateFinReelle"),
+  budgetPrevisionnel: decimal("budgetPrevisionnel", { precision: 12, scale: 2 }),
+  budgetRealise: decimal("budgetRealise", { precision: 12, scale: 2 }).default("0.00"),
+  statut: mysqlEnum("statut", ["planifie", "en_cours", "en_pause", "termine", "annule"]).default("planifie"),
+  avancement: int("avancement").default(0), // Pourcentage 0-100
+  priorite: mysqlEnum("priorite", ["basse", "normale", "haute", "urgente"]).default("normale"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Chantier = typeof chantiers.$inferSelect;
+export type InsertChantier = typeof chantiers.$inferInsert;
+
+// Phases d'un chantier
+export const phasesChantier = mysqlTable("phases_chantier", {
+  id: int("id").autoincrement().primaryKey(),
+  chantierId: int("chantierId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  description: text("description"),
+  ordre: int("ordre").default(1),
+  dateDebutPrevue: date("dateDebutPrevue"),
+  dateFinPrevue: date("dateFinPrevue"),
+  dateDebutReelle: date("dateDebutReelle"),
+  dateFinReelle: date("dateFinReelle"),
+  statut: mysqlEnum("statut", ["a_faire", "en_cours", "termine", "annule"]).default("a_faire"),
+  avancement: int("avancement").default(0),
+  budgetPhase: decimal("budgetPhase", { precision: 10, scale: 2 }),
+  coutReel: decimal("coutReel", { precision: 10, scale: 2 }).default("0.00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PhaseChantier = typeof phasesChantier.$inferSelect;
+export type InsertPhaseChantier = typeof phasesChantier.$inferInsert;
+
+// Association interventions-chantiers
+export const interventionsChantier = mysqlTable("interventions_chantier", {
+  id: int("id").autoincrement().primaryKey(),
+  chantierId: int("chantierId").notNull(),
+  interventionId: int("interventionId").notNull(),
+  phaseId: int("phaseId"), // Optionnel: lié à une phase spécifique
+  ordre: int("ordre").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InterventionChantier = typeof interventionsChantier.$inferSelect;
+export type InsertInterventionChantier = typeof interventionsChantier.$inferInsert;
+
+// Documents du chantier
+export const documentsChantier = mysqlTable("documents_chantier", {
+  id: int("id").autoincrement().primaryKey(),
+  chantierId: int("chantierId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  type: mysqlEnum("type", ["plan", "photo", "permis", "contrat", "facture", "autre"]).default("autre"),
+  url: text("url").notNull(),
+  taille: int("taille"), // En octets
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+});
+
+export type DocumentChantier = typeof documentsChantier.$inferSelect;
+export type InsertDocumentChantier = typeof documentsChantier.$inferInsert;
+
+// ============================================================================
+// INTEGRATIONS COMPTABLES
+// ============================================================================
+export const configurationsComptables = mysqlTable("configurations_comptables", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull().unique(),
+  logiciel: mysqlEnum("logiciel", ["sage", "quickbooks", "ciel", "ebp", "autre"]).default("sage"),
+  formatExport: mysqlEnum("formatExport", ["fec", "iif", "qbo", "csv"]).default("fec"),
+  // Comptes comptables
+  compteVentes: varchar("compteVentes", { length: 20 }).default("706000"),
+  compteTVACollectee: varchar("compteTVACollectee", { length: 20 }).default("445710"),
+  compteClients: varchar("compteClients", { length: 20 }).default("411000"),
+  compteAchats: varchar("compteAchats", { length: 20 }).default("607000"),
+  compteTVADeductible: varchar("compteTVADeductible", { length: 20 }).default("445660"),
+  compteFournisseurs: varchar("compteFournisseurs", { length: 20 }).default("401000"),
+  compteBanque: varchar("compteBanque", { length: 20 }).default("512000"),
+  compteCaisse: varchar("compteCaisse", { length: 20 }).default("530000"),
+  // Journaux
+  journalVentes: varchar("journalVentes", { length: 10 }).default("VE"),
+  journalAchats: varchar("journalAchats", { length: 10 }).default("AC"),
+  journalBanque: varchar("journalBanque", { length: 10 }).default("BQ"),
+  // Paramètres
+  prefixeFacture: varchar("prefixeFacture", { length: 10 }).default("FA"),
+  prefixeAvoir: varchar("prefixeAvoir", { length: 10 }).default("AV"),
+  exerciceDebut: int("exerciceDebut").default(1), // Mois de début d'exercice
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ConfigurationComptable = typeof configurationsComptables.$inferSelect;
+export type InsertConfigurationComptable = typeof configurationsComptables.$inferInsert;
+
+// Historique des exports comptables
+export const exportsComptables = mysqlTable("exports_comptables", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  logiciel: mysqlEnum("logiciel", ["sage", "quickbooks", "ciel", "ebp", "autre"]).notNull(),
+  formatExport: mysqlEnum("formatExport", ["fec", "iif", "qbo", "csv"]).notNull(),
+  periodeDebut: date("periodeDebut").notNull(),
+  periodeFin: date("periodeFin").notNull(),
+  nombreEcritures: int("nombreEcritures").default(0),
+  montantTotal: decimal("montantTotal", { precision: 12, scale: 2 }),
+  fichierUrl: text("fichierUrl"),
+  statut: mysqlEnum("statut", ["en_cours", "termine", "erreur"]).default("en_cours"),
+  erreur: text("erreur"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ExportComptable = typeof exportsComptables.$inferSelect;
+export type InsertExportComptable = typeof exportsComptables.$inferInsert;
+
+// ============================================================================
+// DEVIS AUTOMATIQUE PAR IA
+// ============================================================================
+export const analysesPhotosChantier = mysqlTable("analyses_photos_chantier", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  clientId: int("clientId"),
+  titre: varchar("titre", { length: 255 }),
+  description: text("description"),
+  statut: mysqlEnum("statut", ["en_attente", "en_cours", "termine", "erreur"]).default("en_attente"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AnalysePhotoChantier = typeof analysesPhotosChantier.$inferSelect;
+export type InsertAnalysePhotoChantier = typeof analysesPhotosChantier.$inferInsert;
+
+// Photos uploadées pour analyse
+export const photosAnalyse = mysqlTable("photos_analyse", {
+  id: int("id").autoincrement().primaryKey(),
+  analyseId: int("analyseId").notNull(),
+  url: text("url").notNull(),
+  description: text("description"),
+  ordre: int("ordre").default(1),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+});
+
+export type PhotoAnalyse = typeof photosAnalyse.$inferSelect;
+export type InsertPhotoAnalyse = typeof photosAnalyse.$inferInsert;
+
+// Résultats de l'analyse IA
+export const resultatsAnalyseIA = mysqlTable("resultats_analyse_ia", {
+  id: int("id").autoincrement().primaryKey(),
+  analyseId: int("analyseId").notNull(),
+  typeTravauxDetecte: varchar("typeTravauxDetecte", { length: 255 }),
+  descriptionTravaux: text("descriptionTravaux"),
+  urgence: mysqlEnum("urgence", ["faible", "moyenne", "haute", "critique"]).default("moyenne"),
+  confiance: decimal("confiance", { precision: 5, scale: 2 }), // Score de confiance 0-100
+  rawResponse: json("rawResponse"), // Réponse brute de l'IA
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ResultatAnalyseIA = typeof resultatsAnalyseIA.$inferSelect;
+export type InsertResultatAnalyseIA = typeof resultatsAnalyseIA.$inferInsert;
+
+// Suggestions d'articles par l'IA
+export const suggestionsArticlesIA = mysqlTable("suggestions_articles_ia", {
+  id: int("id").autoincrement().primaryKey(),
+  resultatId: int("resultatId").notNull(),
+  articleId: int("articleId"), // Si correspondance trouvée dans la bibliothèque
+  nomArticle: varchar("nomArticle", { length: 255 }).notNull(),
+  description: text("description"),
+  quantiteSuggeree: decimal("quantiteSuggeree", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixEstime: decimal("prixEstime", { precision: 10, scale: 2 }),
+  confiance: decimal("confiance", { precision: 5, scale: 2 }),
+  selectionne: boolean("selectionne").default(true), // Pour permettre à l'utilisateur de désélectionner
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SuggestionArticleIA = typeof suggestionsArticlesIA.$inferSelect;
+export type InsertSuggestionArticleIA = typeof suggestionsArticlesIA.$inferInsert;
+
+// Devis générés à partir de l'analyse IA
+export const devisGenereIA = mysqlTable("devis_genere_ia", {
+  id: int("id").autoincrement().primaryKey(),
+  analyseId: int("analyseId").notNull(),
+  devisId: int("devisId"), // Lien vers le devis créé
+  montantEstime: decimal("montantEstime", { precision: 12, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DevisGenereIA = typeof devisGenereIA.$inferSelect;
+export type InsertDevisGenereIA = typeof devisGenereIA.$inferInsert;

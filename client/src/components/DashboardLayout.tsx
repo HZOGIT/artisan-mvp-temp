@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route, Palmtree, LineChart, Car, Trophy, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route, Palmtree, LineChart, Car, Trophy, AlertTriangle, HardHat, Link2, Sparkles } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -56,6 +56,9 @@ const menuItems = [
   { icon: AlertTriangle, label: "Alertes Prévisions", path: "/alertes-previsions" },
   { icon: Car, label: "Véhicules", path: "/vehicules" },
   { icon: Trophy, label: "Badges", path: "/badges" },
+  { icon: HardHat, label: "Chantiers", path: "/chantiers" },
+  { icon: Link2, label: "Intégrations Compta", path: "/integrations-comptables" },
+  { icon: Sparkles, label: "Devis IA", path: "/devis-ia" },
   { icon: User, label: "Mon profil", path: "/profil" },
   { icon: Settings, label: "Paramètres", path: "/parametres" },
 ];

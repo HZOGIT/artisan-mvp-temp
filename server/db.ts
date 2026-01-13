@@ -60,7 +60,18 @@ import {
   objectifsTechniciens, InsertObjectifTechnicien, ObjectifTechnicien,
   classementTechniciens, InsertClassementTechnicien, ClassementTechnicien,
   configAlertesPrevisions, InsertConfigAlertePrevision, ConfigAlertePrevision,
-  historiqueAlertesPrevisions, InsertHistoriqueAlertePrevision, HistoriqueAlertePrevision
+  historiqueAlertesPrevisions, InsertHistoriqueAlertePrevision, HistoriqueAlertePrevision,
+  chantiers, InsertChantier, Chantier,
+  phasesChantier, InsertPhaseChantier, PhaseChantier,
+  interventionsChantier, InsertInterventionChantier, InterventionChantier,
+  documentsChantier, InsertDocumentChantier, DocumentChantier,
+  configurationsComptables, InsertConfigurationComptable, ConfigurationComptable,
+  exportsComptables, InsertExportComptable, ExportComptable,
+  analysesPhotosChantier, InsertAnalysePhotoChantier, AnalysePhotoChantier,
+  photosAnalyse, InsertPhotoAnalyse, PhotoAnalyse,
+  resultatsAnalyseIA, InsertResultatAnalyseIA, ResultatAnalyseIA,
+  suggestionsArticlesIA, InsertSuggestionArticleIA, SuggestionArticleIA,
+  devisGenereIA, InsertDevisGenereIA, DevisGenereIA
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -4550,4 +4561,494 @@ export async function getStatistiquesFlotte(artisanId: number): Promise<any> {
     assurancesExpirant: assurancesExpirant.length,
     entretiensAVenir: entretiensAVenir.length,
   };
+}
+
+
+// ============================================================================
+// CHANTIERS MULTI-INTERVENTIONS
+// ============================================================================
+
+export async function createChantier(data: InsertChantier): Promise<Chantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(chantiers).values(data);
+  const [result] = await db.select().from(chantiers).where(eq(chantiers.reference, data.reference)).limit(1);
+  return result || null;
+}
+
+export async function getChantiersByArtisan(artisanId: number): Promise<Chantier[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(chantiers).where(eq(chantiers.artisanId, artisanId)).orderBy(desc(chantiers.createdAt));
+}
+
+export async function getChantierById(id: number): Promise<Chantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.select().from(chantiers).where(eq(chantiers.id, id)).limit(1);
+  return result || null;
+}
+
+export async function updateChantier(id: number, data: Partial<InsertChantier>): Promise<Chantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(chantiers).set(data).where(eq(chantiers.id, id));
+  return getChantierById(id);
+}
+
+export async function deleteChantier(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(chantiers).where(eq(chantiers.id, id));
+  return true;
+}
+
+// Phases de chantier
+export async function createPhaseChantier(data: InsertPhaseChantier): Promise<PhaseChantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(phasesChantier).values(data);
+  const [result] = await db.select().from(phasesChantier).where(eq(phasesChantier.chantierId, data.chantierId)).orderBy(desc(phasesChantier.id)).limit(1);
+  return result || null;
+}
+
+export async function getPhasesByChantier(chantierId: number): Promise<PhaseChantier[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(phasesChantier).where(eq(phasesChantier.chantierId, chantierId)).orderBy(asc(phasesChantier.ordre));
+}
+
+export async function updatePhaseChantier(id: number, data: Partial<InsertPhaseChantier>): Promise<PhaseChantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(phasesChantier).set(data).where(eq(phasesChantier.id, id));
+  const [result] = await db.select().from(phasesChantier).where(eq(phasesChantier.id, id)).limit(1);
+  return result || null;
+}
+
+export async function deletePhaseChantier(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(phasesChantier).where(eq(phasesChantier.id, id));
+  return true;
+}
+
+// Interventions du chantier
+export async function associerInterventionChantier(data: InsertInterventionChantier): Promise<InterventionChantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(interventionsChantier).values(data);
+  const [result] = await db.select().from(interventionsChantier).where(eq(interventionsChantier.interventionId, data.interventionId)).limit(1);
+  return result || null;
+}
+
+export async function getInterventionsByChantier(chantierId: number): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const assocs = await db.select().from(interventionsChantier).where(eq(interventionsChantier.chantierId, chantierId)).orderBy(asc(interventionsChantier.ordre));
+  
+  const result = [];
+  for (const assoc of assocs) {
+    const [intervention] = await db.select().from(interventions).where(eq(interventions.id, assoc.interventionId)).limit(1);
+    if (intervention) {
+      result.push({ ...intervention, phaseId: assoc.phaseId, ordre: assoc.ordre });
+    }
+  }
+  return result;
+}
+
+export async function dissocierInterventionChantier(chantierId: number, interventionId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(interventionsChantier).where(
+    and(
+      eq(interventionsChantier.chantierId, chantierId),
+      eq(interventionsChantier.interventionId, interventionId)
+    )
+  );
+  return true;
+}
+
+// Documents du chantier
+export async function addDocumentChantier(data: InsertDocumentChantier): Promise<DocumentChantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(documentsChantier).values(data);
+  const [result] = await db.select().from(documentsChantier).where(eq(documentsChantier.chantierId, data.chantierId)).orderBy(desc(documentsChantier.id)).limit(1);
+  return result || null;
+}
+
+export async function getDocumentsByChantier(chantierId: number): Promise<DocumentChantier[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(documentsChantier).where(eq(documentsChantier.chantierId, chantierId)).orderBy(desc(documentsChantier.uploadedAt));
+}
+
+export async function deleteDocumentChantier(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(documentsChantier).where(eq(documentsChantier.id, id));
+  return true;
+}
+
+// Statistiques du chantier
+export async function getStatistiquesChantier(chantierId: number): Promise<any> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const chantier = await getChantierById(chantierId);
+  if (!chantier) return null;
+  
+  const phases = await getPhasesByChantier(chantierId);
+  const interventionsAssociees = await getInterventionsByChantier(chantierId);
+  const documents = await getDocumentsByChantier(chantierId);
+  
+  const phasesTerminees = phases.filter(p => p.statut === 'termine').length;
+  const interventionsTerminees = interventionsAssociees.filter((i: any) => i.statut === 'terminee').length;
+  
+  // Calculer le coût réel
+  let coutReel = 0;
+  for (const intervention of interventionsAssociees) {
+    // Récupérer les factures liées aux interventions
+    const facturesIntervention = await db.select().from(factures).where(eq(factures.clientId, chantier.clientId));
+    coutReel += facturesIntervention.reduce((sum, f) => sum + parseFloat(f.totalTTC || '0'), 0);
+  }
+  
+  return {
+    totalPhases: phases.length,
+    phasesTerminees,
+    totalInterventions: interventionsAssociees.length,
+    interventionsTerminees,
+    totalDocuments: documents.length,
+    budgetPrevisionnel: parseFloat(chantier.budgetPrevisionnel || '0'),
+    budgetRealise: coutReel,
+    ecartBudget: parseFloat(chantier.budgetPrevisionnel || '0') - coutReel,
+    avancement: chantier.avancement || 0,
+  };
+}
+
+// Calculer et mettre à jour l'avancement du chantier
+export async function calculerAvancementChantier(chantierId: number): Promise<number> {
+  const phases = await getPhasesByChantier(chantierId);
+  if (phases.length === 0) return 0;
+  
+  const avancementTotal = phases.reduce((sum, p) => sum + (p.avancement || 0), 0);
+  const avancementMoyen = Math.round(avancementTotal / phases.length);
+  
+  await updateChantier(chantierId, { avancement: avancementMoyen });
+  return avancementMoyen;
+}
+
+// ============================================================================
+// INTEGRATIONS COMPTABLES
+// ============================================================================
+
+export async function getConfigurationComptable(artisanId: number): Promise<ConfigurationComptable | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.select().from(configurationsComptables).where(eq(configurationsComptables.artisanId, artisanId)).limit(1);
+  return result || null;
+}
+
+export async function saveConfigurationComptable(data: InsertConfigurationComptable): Promise<ConfigurationComptable | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const existing = await getConfigurationComptable(data.artisanId);
+  if (existing) {
+    await db.update(configurationsComptables).set(data).where(eq(configurationsComptables.artisanId, data.artisanId));
+  } else {
+    await db.insert(configurationsComptables).values(data);
+  }
+  return getConfigurationComptable(data.artisanId);
+}
+
+export async function createExportComptable(data: InsertExportComptable): Promise<ExportComptable | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(exportsComptables).values(data);
+  const [result] = await db.select().from(exportsComptables).where(eq(exportsComptables.artisanId, data.artisanId)).orderBy(desc(exportsComptables.id)).limit(1);
+  return result || null;
+}
+
+export async function getExportsComptables(artisanId: number): Promise<ExportComptable[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(exportsComptables).where(eq(exportsComptables.artisanId, artisanId)).orderBy(desc(exportsComptables.createdAt));
+}
+
+export async function updateExportComptable(id: number, data: Partial<InsertExportComptable>): Promise<ExportComptable | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(exportsComptables).set(data).where(eq(exportsComptables.id, id));
+  const [result] = await db.select().from(exportsComptables).where(eq(exportsComptables.id, id)).limit(1);
+  return result || null;
+}
+
+// Générer l'export FEC (Fichier des Écritures Comptables) pour Sage
+export async function genererExportFEC(artisanId: number, dateDebut: Date, dateFin: Date): Promise<string> {
+  const db = await getDb();
+  if (!db) return '';
+  
+  const config = await getConfigurationComptable(artisanId);
+  const ecritures = await db.select().from(ecrituresComptables)
+    .where(
+      and(
+        eq(ecrituresComptables.artisanId, artisanId),
+        gte(ecrituresComptables.dateEcriture, dateDebut),
+        lte(ecrituresComptables.dateEcriture, dateFin)
+      )
+    )
+    .orderBy(asc(ecrituresComptables.dateEcriture));
+  
+  // Format FEC: JournalCode|JournalLib|EcritureNum|EcritureDate|CompteNum|CompteLib|CompAuxNum|CompAuxLib|PieceRef|PieceDate|EcritureLib|Debit|Credit|EcritureLet|DateLet|ValidDate|Montantdevise|Idevise
+  const lignes = ['JournalCode|JournalLib|EcritureNum|EcritureDate|CompteNum|CompteLib|CompAuxNum|CompAuxLib|PieceRef|PieceDate|EcritureLib|Debit|Credit|EcritureLet|DateLet|ValidDate|Montantdevise|Idevise'];
+  
+  for (const e of ecritures) {
+    const dateStr = e.dateEcriture ? new Date(e.dateEcriture).toISOString().split('T')[0].replace(/-/g, '') : '';
+    const debit = e.debit || '0.00';
+    const credit = e.credit || '0.00';
+    
+    lignes.push([
+      e.journal || config?.journalVentes || 'VE',
+      'Journal des ventes',
+      e.id.toString() || '',
+      dateStr,
+      e.numeroCompte || '',
+      e.libelle || '',
+      '',  // compteAuxiliaire non disponible
+      '',
+      e.pieceRef || '',
+      dateStr,
+      e.libelle || '',
+      debit,
+      credit,
+      '',
+      '',
+      dateStr,
+      '',
+      'EUR'
+    ].join('|'));
+  }
+  
+  return lignes.join('\n');
+}
+
+// Générer l'export IIF pour QuickBooks
+export async function genererExportIIF(artisanId: number, dateDebut: Date, dateFin: Date): Promise<string> {
+  const db = await getDb();
+  if (!db) return '';
+  
+  const facturesData = await db.select().from(factures)
+    .where(
+      and(
+        eq(factures.artisanId, artisanId),
+        gte(factures.dateFacture, dateDebut),
+        lte(factures.dateFacture, dateFin)
+      )
+    )
+    .orderBy(asc(factures.dateFacture));
+  
+  const lignes = [
+    '!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO',
+    '!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO',
+    '!ENDTRNS'
+  ];
+  
+  for (const f of facturesData) {
+    const dateStr = f.dateFacture ? new Date(f.dateFacture).toLocaleDateString('en-US') : '';
+    const client = await getClientById(f.clientId);
+    const clientNom = client?.nom || 'Client';
+    
+    // Transaction principale
+    lignes.push(`TRNS\tINVOICE\t${dateStr}\tAccounts Receivable\t${clientNom}\t${f.totalTTC}\t${f.numero}\tFacture ${f.numero}`);
+    // Split pour le revenu
+    lignes.push(`SPL\tINVOICE\t${dateStr}\tSales\t${clientNom}\t-${f.totalHT}\t${f.numero}\t`);
+    // Split pour la TVA
+    const tva = parseFloat(f.totalTTC || '0') - parseFloat(f.totalHT || '0');
+    if (tva > 0) {
+      lignes.push(`SPL\tINVOICE\t${dateStr}\tSales Tax Payable\t${clientNom}\t-${tva.toFixed(2)}\t${f.numero}\t`);
+    }
+    lignes.push('ENDTRNS');
+  }
+  
+  return lignes.join('\n');
+}
+
+// ============================================================================
+// DEVIS AUTOMATIQUE PAR IA
+// ============================================================================
+
+export async function createAnalysePhoto(data: InsertAnalysePhotoChantier): Promise<AnalysePhotoChantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(analysesPhotosChantier).values(data);
+  const [result] = await db.select().from(analysesPhotosChantier).where(eq(analysesPhotosChantier.artisanId, data.artisanId)).orderBy(desc(analysesPhotosChantier.id)).limit(1);
+  return result || null;
+}
+
+export async function getAnalysesPhotosByArtisan(artisanId: number): Promise<AnalysePhotoChantier[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(analysesPhotosChantier).where(eq(analysesPhotosChantier.artisanId, artisanId)).orderBy(desc(analysesPhotosChantier.createdAt));
+}
+
+export async function getAnalysePhotoById(id: number): Promise<AnalysePhotoChantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.select().from(analysesPhotosChantier).where(eq(analysesPhotosChantier.id, id)).limit(1);
+  return result || null;
+}
+
+export async function updateAnalysePhoto(id: number, data: Partial<InsertAnalysePhotoChantier>): Promise<AnalysePhotoChantier | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(analysesPhotosChantier).set(data).where(eq(analysesPhotosChantier.id, id));
+  return getAnalysePhotoById(id);
+}
+
+export async function addPhotoToAnalyse(data: InsertPhotoAnalyse): Promise<PhotoAnalyse | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(photosAnalyse).values(data);
+  const [result] = await db.select().from(photosAnalyse).where(eq(photosAnalyse.analyseId, data.analyseId)).orderBy(desc(photosAnalyse.id)).limit(1);
+  return result || null;
+}
+
+export async function getPhotosByAnalyse(analyseId: number): Promise<PhotoAnalyse[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(photosAnalyse).where(eq(photosAnalyse.analyseId, analyseId)).orderBy(asc(photosAnalyse.ordre));
+}
+
+export async function saveResultatAnalyseIA(data: InsertResultatAnalyseIA): Promise<ResultatAnalyseIA | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(resultatsAnalyseIA).values(data);
+  const [result] = await db.select().from(resultatsAnalyseIA).where(eq(resultatsAnalyseIA.analyseId, data.analyseId)).orderBy(desc(resultatsAnalyseIA.id)).limit(1);
+  return result || null;
+}
+
+export async function getResultatsAnalyse(analyseId: number): Promise<ResultatAnalyseIA[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(resultatsAnalyseIA).where(eq(resultatsAnalyseIA.analyseId, analyseId));
+}
+
+export async function saveSuggestionArticleIA(data: InsertSuggestionArticleIA): Promise<SuggestionArticleIA | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(suggestionsArticlesIA).values(data);
+  const [result] = await db.select().from(suggestionsArticlesIA).where(eq(suggestionsArticlesIA.resultatId, data.resultatId)).orderBy(desc(suggestionsArticlesIA.id)).limit(1);
+  return result || null;
+}
+
+export async function getSuggestionsByResultat(resultatId: number): Promise<SuggestionArticleIA[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(suggestionsArticlesIA).where(eq(suggestionsArticlesIA.resultatId, resultatId));
+}
+
+export async function updateSuggestionArticle(id: number, data: Partial<InsertSuggestionArticleIA>): Promise<SuggestionArticleIA | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(suggestionsArticlesIA).set(data).where(eq(suggestionsArticlesIA.id, id));
+  const [result] = await db.select().from(suggestionsArticlesIA).where(eq(suggestionsArticlesIA.id, id)).limit(1);
+  return result || null;
+}
+
+export async function saveDevisGenereIA(data: InsertDevisGenereIA): Promise<DevisGenereIA | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.insert(devisGenereIA).values(data);
+  const [result] = await db.select().from(devisGenereIA).where(eq(devisGenereIA.analyseId, data.analyseId)).limit(1);
+  return result || null;
+}
+
+export async function getDevisGenereByAnalyse(analyseId: number): Promise<DevisGenereIA | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.select().from(devisGenereIA).where(eq(devisGenereIA.analyseId, analyseId)).limit(1);
+  return result || null;
+}
+
+// Fonction pour créer un devis à partir des suggestions IA
+export async function creerDevisDepuisAnalyseIA(analyseId: number, clientId: number, artisanId: number): Promise<Devis | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const analyse = await getAnalysePhotoById(analyseId);
+  if (!analyse) return null;
+  
+  const resultats = await getResultatsAnalyse(analyseId);
+  if (resultats.length === 0) return null;
+  
+  // Récupérer toutes les suggestions sélectionnées
+  const toutesLesSuggestions: SuggestionArticleIA[] = [];
+  for (const resultat of resultats) {
+    const suggestions = await getSuggestionsByResultat(resultat.id);
+    toutesLesSuggestions.push(...suggestions.filter(s => s.selectionne));
+  }
+  
+  if (toutesLesSuggestions.length === 0) return null;
+  
+  // Calculer les totaux
+  let totalHT = 0;
+  for (const s of toutesLesSuggestions) {
+    totalHT += parseFloat(s.prixEstime || '0') * parseFloat(s.quantiteSuggeree || '1');
+  }
+  const tauxTVA = 20;
+  const totalTVA = totalHT * (tauxTVA / 100);
+  const totalTTC = totalHT + totalTVA;
+  
+  // Générer le numéro de devis
+  const numero = `DEV-IA-${Date.now()}`;
+  
+  // Créer le devis
+  const devisData: InsertDevis = {
+    artisanId,
+    clientId,
+    numero,
+    dateDevis: new Date(),
+    dateValidite: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 jours
+    statut: 'brouillon',
+    totalHT: totalHT.toFixed(2),
+    totalTVA: totalTVA.toFixed(2),
+    totalTTC: totalTTC.toFixed(2),
+    notes: `Devis généré automatiquement par IA à partir de l'analyse #${analyseId}`,
+  };
+  
+  const devis = await createDevis(devisData);
+  if (!devis) return null;
+  
+  // Créer les lignes du devis
+  for (const suggestion of toutesLesSuggestions) {
+    const prixUnitaire = parseFloat(suggestion.prixEstime || '0');
+    const quantite = parseFloat(suggestion.quantiteSuggeree || '1');
+    const montantHT = prixUnitaire * quantite;
+    const montantTVA = montantHT * (tauxTVA / 100);
+    const montantTTC = montantHT + montantTVA;
+    
+    await createLigneDevis({
+      devisId: devis.id,
+      designation: suggestion.nomArticle,
+      description: suggestion.description,
+      quantite: suggestion.quantiteSuggeree || '1',
+      unite: suggestion.unite || 'unité',
+      prixUnitaireHT: prixUnitaire.toFixed(2),
+      tauxTVA: tauxTVA.toString(),
+      montantHT: montantHT.toFixed(2),
+      montantTVA: montantTVA.toFixed(2),
+      montantTTC: montantTTC.toFixed(2),
+    });
+  }
+  
+  // Enregistrer le lien analyse-devis
+  await saveDevisGenereIA({
+    analyseId,
+    devisId: devis.id,
+    montantEstime: totalTTC.toFixed(2),
+  });
+  
+  return devis;
 }

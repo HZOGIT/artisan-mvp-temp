@@ -356,3 +356,30 @@
 - [x] Envoi d'alertes par SMS (optionnel)
 - [x] Historique des alertes envoyées
 - [x] Page de configuration des alertes
+
+
+## Nouvelles Fonctionnalités (Sprint 14)
+
+### Gestion des Chantiers Multi-Interventions
+- [x] Table des chantiers (nom, client, adresse, dates, budget)
+- [x] Association de plusieurs interventions à un chantier
+- [x] Suivi de l'avancement global du chantier
+- [x] Budget et coûts par chantier
+- [x] Timeline des interventions du chantier
+- [x] Page de gestion des chantiers
+
+### Intégration Logiciels Comptables
+- [x] Export au format Sage (FEC)
+- [x] Export au format QuickBooks (IIF/QBO)
+- [x] Mapping des comptes comptables
+- [x] Configuration des paramètres d'export
+- [x] Historique des exports
+- [x] Page de configuration des intégrations
+
+### Devis Automatique par IA
+- [x] Upload de photos du chantier
+- [x] Analyse des photos par IA (vision)
+- [x] Détection des travaux nécessaires
+- [x] Suggestion d'articles et quantités
+- [x] Génération automatique du devis
+- [x] Page de création de devis assisté par IA

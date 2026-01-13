@@ -44,6 +44,9 @@ import Previsions from "./pages/Previsions";
 import Vehicules from "./pages/Vehicules";
 import Badges from "./pages/Badges";
 import AlertesPrevisions from "./pages/AlertesPrevisions";
+import Chantiers from "./pages/Chantiers";
+import IntegrationsComptables from "./pages/IntegrationsComptables";
+import DevisIA from "./pages/DevisIA";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -82,6 +85,9 @@ function AuthenticatedRoutes() {
         <Route path="/vehicules" component={Vehicules} />
         <Route path="/badges" component={Badges} />
         <Route path="/alertes-previsions" component={AlertesPrevisions} />
+        <Route path="/chantiers" component={Chantiers} />
+        <Route path="/integrations-comptables" component={IntegrationsComptables} />
+        <Route path="/devis-ia" component={DevisIA} />
         <Route path="/devis/:id/options" component={DevisOptions} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
@@ -139,6 +145,9 @@ function Router() {
           <Route path="/vehicules" component={() => <AuthenticatedRoutes />} />
           <Route path="/badges" component={() => <AuthenticatedRoutes />} />
           <Route path="/alertes-previsions" component={() => <AuthenticatedRoutes />} />
+          <Route path="/chantiers" component={() => <AuthenticatedRoutes />} />
+          <Route path="/integrations-comptables" component={() => <AuthenticatedRoutes />} />
+          <Route path="/devis-ia" component={() => <AuthenticatedRoutes />} />
         </>
       )}
       <Route path="/404" component={NotFound} />
