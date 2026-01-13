@@ -29,7 +29,13 @@ import {
   contratsMaintenance, InsertContratMaintenance, ContratMaintenance,
   facturesRecurrentes, InsertFactureRecurrente, FactureRecurrente,
   interventionsMobile, InsertInterventionMobile, InterventionMobile,
-  photosInterventions, InsertPhotoIntervention, PhotoIntervention
+  photosInterventions, InsertPhotoIntervention, PhotoIntervention,
+  conversations, InsertConversation, Conversation,
+  messages, InsertMessage, Message,
+  techniciens, InsertTechnicien, Technicien,
+  disponibilitesTechniciens, InsertDisponibiliteTechnicien, DisponibiliteTechnicien,
+  avisClients, InsertAvisClient, AvisClient,
+  demandesAvis, InsertDemandeAvis, DemandeAvis
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -2261,4 +2267,323 @@ export async function getInterventionsByClientId(clientId: number): Promise<Inte
   return await db.select().from(interventions)
     .where(eq(interventions.clientId, clientId))
     .orderBy(desc(interventions.dateDebut));
+}
+
+
+// ============================================================================
+// CONVERSATIONS (Chat)
+// ============================================================================
+
+export async function getConversationsByArtisanId(artisanId: number): Promise<Conversation[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(conversations)
+    .where(eq(conversations.artisanId, artisanId))
+    .orderBy(desc(conversations.dernierMessageAt));
+}
+
+export async function getConversationsByClientId(clientId: number): Promise<Conversation[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(conversations)
+    .where(eq(conversations.clientId, clientId))
+    .orderBy(desc(conversations.dernierMessageAt));
+}
+
+export async function getConversationById(id: number): Promise<Conversation | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function getOrCreateConversation(artisanId: number, clientId: number, sujet?: string): Promise<Conversation> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Chercher une conversation existante
+  const existing = await db.select().from(conversations)
+    .where(and(
+      eq(conversations.artisanId, artisanId),
+      eq(conversations.clientId, clientId),
+      eq(conversations.statut, "active")
+    ))
+    .limit(1);
+  
+  if (existing.length > 0) return existing[0];
+  
+  // Créer une nouvelle conversation
+  const result = await db.insert(conversations).values({
+    artisanId,
+    clientId,
+    sujet: sujet || "Nouvelle conversation",
+    dernierMessageAt: new Date(),
+  });
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(conversations).where(eq(conversations.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create conversation");
+  return created[0];
+}
+
+export async function updateConversation(id: number, data: Partial<InsertConversation>): Promise<Conversation | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(conversations).set({ ...data, updatedAt: new Date() }).where(eq(conversations.id, id));
+  return await getConversationById(id);
+}
+
+// ============================================================================
+// MESSAGES
+// ============================================================================
+
+export async function getMessagesByConversationId(conversationId: number): Promise<Message[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(messages.createdAt);
+}
+
+export async function createMessage(data: InsertMessage): Promise<Message> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(messages).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(messages).where(eq(messages.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create message");
+  
+  // Mettre à jour la date du dernier message dans la conversation
+  await db.update(conversations)
+    .set({ dernierMessageAt: new Date(), updatedAt: new Date() })
+    .where(eq(conversations.id, data.conversationId));
+  
+  return created[0];
+}
+
+export async function markMessagesAsRead(conversationId: number, expediteur: "artisan" | "client"): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Marquer comme lus les messages de l'autre partie
+  const otherParty = expediteur === "artisan" ? "client" : "artisan";
+  await db.update(messages)
+    .set({ lu: true, luAt: new Date() })
+    .where(and(
+      eq(messages.conversationId, conversationId),
+      eq(messages.expediteur, otherParty),
+      eq(messages.lu, false)
+    ));
+}
+
+export async function getUnreadMessagesCount(artisanId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(and(
+      eq(conversations.artisanId, artisanId),
+      eq(messages.expediteur, "client"),
+      eq(messages.lu, false)
+    ));
+  
+  return result[0]?.count || 0;
+}
+
+// ============================================================================
+// TECHNICIENS (Team members)
+// ============================================================================
+
+export async function getTechniciensByArtisanId(artisanId: number): Promise<Technicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(techniciens)
+    .where(eq(techniciens.artisanId, artisanId))
+    .orderBy(techniciens.nom);
+}
+
+export async function getTechnicienById(id: number): Promise<Technicien | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(techniciens).where(eq(techniciens.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function createTechnicien(data: InsertTechnicien): Promise<Technicien> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(techniciens).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(techniciens).where(eq(techniciens.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create technicien");
+  return created[0];
+}
+
+export async function updateTechnicien(id: number, data: Partial<InsertTechnicien>): Promise<Technicien | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(techniciens).set({ ...data, updatedAt: new Date() }).where(eq(techniciens.id, id));
+  return await getTechnicienById(id);
+}
+
+export async function deleteTechnicien(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(techniciens).where(eq(techniciens.id, id));
+}
+
+export async function getTechniciensDisponibles(artisanId: number, date: Date): Promise<Technicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Récupérer tous les techniciens actifs
+  const allTechniciens = await db.select().from(techniciens)
+    .where(and(
+      eq(techniciens.artisanId, artisanId),
+      eq(techniciens.statut, "actif")
+    ));
+  
+  return allTechniciens;
+}
+
+// ============================================================================
+// DISPONIBILITES TECHNICIENS
+// ============================================================================
+
+export async function getDisponibilitesByTechnicienId(technicienId: number): Promise<DisponibiliteTechnicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(disponibilitesTechniciens)
+    .where(eq(disponibilitesTechniciens.technicienId, technicienId))
+    .orderBy(disponibilitesTechniciens.jourSemaine);
+}
+
+export async function setDisponibilite(data: InsertDisponibiliteTechnicien): Promise<DisponibiliteTechnicien> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Supprimer l'ancienne disponibilité pour ce jour
+  await db.delete(disponibilitesTechniciens)
+    .where(and(
+      eq(disponibilitesTechniciens.technicienId, data.technicienId),
+      eq(disponibilitesTechniciens.jourSemaine, data.jourSemaine)
+    ));
+  
+  const result = await db.insert(disponibilitesTechniciens).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(disponibilitesTechniciens).where(eq(disponibilitesTechniciens.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to set disponibilite");
+  return created[0];
+}
+
+// ============================================================================
+// AVIS CLIENTS
+// ============================================================================
+
+export async function getAvisByArtisanId(artisanId: number): Promise<AvisClient[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(avisClients)
+    .where(eq(avisClients.artisanId, artisanId))
+    .orderBy(desc(avisClients.createdAt));
+}
+
+export async function getAvisByClientId(clientId: number): Promise<AvisClient[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(avisClients)
+    .where(eq(avisClients.clientId, clientId))
+    .orderBy(desc(avisClients.createdAt));
+}
+
+export async function getAvisById(id: number): Promise<AvisClient | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(avisClients).where(eq(avisClients.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function getAvisByToken(token: string): Promise<AvisClient | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(avisClients).where(eq(avisClients.tokenAvis, token)).limit(1);
+  return result[0] || null;
+}
+
+export async function createAvis(data: InsertAvisClient): Promise<AvisClient> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(avisClients).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(avisClients).where(eq(avisClients.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create avis");
+  return created[0];
+}
+
+export async function updateAvis(id: number, data: Partial<InsertAvisClient>): Promise<AvisClient | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(avisClients).set({ ...data, updatedAt: new Date() }).where(eq(avisClients.id, id));
+  return await getAvisById(id);
+}
+
+export async function getAvisStats(artisanId: number): Promise<{ moyenne: number; total: number; distribution: Record<number, number> }> {
+  const db = await getDb();
+  if (!db) return { moyenne: 0, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+  
+  const allAvis = await db.select().from(avisClients)
+    .where(and(
+      eq(avisClients.artisanId, artisanId),
+      eq(avisClients.statut, "publie")
+    ));
+  
+  const total = allAvis.length;
+  const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let somme = 0;
+  
+  for (const avis of allAvis) {
+    somme += avis.note;
+    distribution[avis.note] = (distribution[avis.note] || 0) + 1;
+  }
+  
+  const moyenne = total > 0 ? somme / total : 0;
+  
+  return { moyenne, total, distribution };
+}
+
+// ============================================================================
+// DEMANDES AVIS
+// ============================================================================
+
+export async function getDemandeAvisByToken(token: string): Promise<DemandeAvis | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(demandesAvis).where(eq(demandesAvis.tokenDemande, token)).limit(1);
+  return result[0] || null;
+}
+
+export async function createDemandeAvis(data: InsertDemandeAvis): Promise<DemandeAvis> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(demandesAvis).values(data);
+  const insertId = Number(result[0].insertId);
+  const created = await db.select().from(demandesAvis).where(eq(demandesAvis.id, insertId)).limit(1);
+  if (created.length === 0) throw new Error("Failed to create demande avis");
+  return created[0];
+}
+
+export async function updateDemandeAvis(id: number, data: Partial<InsertDemandeAvis>): Promise<DemandeAvis | null> {
+  const db = await getDb();
+  if (!db) return null;
+  await db.update(demandesAvis).set(data).where(eq(demandesAvis.id, id));
+  const result = await db.select().from(demandesAvis).where(eq(demandesAvis.id, id)).limit(1);
+  return result[0] || null;
+}
+
+export async function getDemandesAvisByArtisanId(artisanId: number): Promise<DemandeAvis[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(demandesAvis)
+    .where(eq(demandesAvis.artisanId, artisanId))
+    .orderBy(desc(demandesAvis.createdAt));
 }

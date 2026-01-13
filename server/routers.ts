@@ -2550,6 +2550,502 @@ const interventionsMobileRouter = router({
 });
 
 // ============================================================================
+// CHAT ROUTER
+// ============================================================================
+const chatRouter = router({
+  // Récupérer les conversations de l'artisan
+  getConversations: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const convs = await db.getConversationsByArtisanId(artisan.id);
+    
+    // Enrichir avec les infos client
+    const enriched = await Promise.all(convs.map(async (conv) => {
+      const client = await db.getClientById(conv.clientId);
+      const msgs = await db.getMessagesByConversationId(conv.id);
+      const unreadCount = msgs.filter(m => m.expediteur === 'client' && !m.lu).length;
+      return { ...conv, client, unreadCount };
+    }));
+    
+    return enriched;
+  }),
+
+  // Récupérer les messages d'une conversation
+  getMessages: protectedProcedure
+    .input(z.object({ conversationId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      // Marquer les messages comme lus
+      await db.markMessagesAsRead(input.conversationId, 'artisan');
+      
+      return await db.getMessagesByConversationId(input.conversationId);
+    }),
+
+  // Envoyer un message
+  sendMessage: protectedProcedure
+    .input(z.object({
+      conversationId: z.number(),
+      contenu: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      return await db.createMessage({
+        conversationId: input.conversationId,
+        expediteur: 'artisan',
+        contenu: input.contenu,
+      });
+    }),
+
+  // Démarrer une conversation avec un client
+  startConversation: protectedProcedure
+    .input(z.object({
+      clientId: z.number(),
+      sujet: z.string().optional(),
+      premierMessage: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const client = await db.getClientById(input.clientId);
+      if (!client || client.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Client non trouvé" });
+      }
+      
+      const conv = await db.getOrCreateConversation(artisan.id, input.clientId, input.sujet);
+      
+      if (input.premierMessage) {
+        await db.createMessage({
+          conversationId: conv.id,
+          expediteur: 'artisan',
+          contenu: input.premierMessage,
+        });
+      }
+      
+      return conv;
+    }),
+
+  // Compter les messages non lus
+  getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return 0;
+    return await db.getUnreadMessagesCount(artisan.id);
+  }),
+
+  // Archiver une conversation
+  archiveConversation: protectedProcedure
+    .input(z.object({ conversationId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      
+      return await db.updateConversation(input.conversationId, { statut: 'archivee' });
+    }),
+});
+
+// ============================================================================
+// TECHNICIENS ROUTER
+// ============================================================================
+const techniciensRouter = router({
+  // Récupérer tous les techniciens
+  getAll: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getTechniciensByArtisanId(artisan.id);
+  }),
+
+  // Récupérer un technicien par ID
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const technicien = await db.getTechnicienById(input.id);
+      if (!technicien || technicien.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
+      }
+      
+      return technicien;
+    }),
+
+  // Créer un technicien
+  create: protectedProcedure
+    .input(z.object({
+      nom: z.string().min(1),
+      prenom: z.string().optional(),
+      email: z.string().email().optional(),
+      telephone: z.string().optional(),
+      specialite: z.string().optional(),
+      couleur: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      return await db.createTechnicien({
+        artisanId: artisan.id,
+        ...input,
+      });
+    }),
+
+  // Mettre à jour un technicien
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().min(1).optional(),
+      prenom: z.string().optional(),
+      email: z.string().email().optional(),
+      telephone: z.string().optional(),
+      specialite: z.string().optional(),
+      couleur: z.string().optional(),
+      statut: z.enum(["actif", "inactif", "conge"]).optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const technicien = await db.getTechnicienById(input.id);
+      if (!technicien || technicien.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
+      }
+      
+      const { id, ...data } = input;
+      return await db.updateTechnicien(id, data);
+    }),
+
+  // Supprimer un technicien
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const technicien = await db.getTechnicienById(input.id);
+      if (!technicien || technicien.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
+      }
+      
+      await db.deleteTechnicien(input.id);
+      return { success: true };
+    }),
+
+  // Récupérer les techniciens disponibles pour une date
+  getDisponibles: protectedProcedure
+    .input(z.object({ date: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getTechniciensDisponibles(artisan.id, new Date(input.date));
+    }),
+
+  // Récupérer les disponibilités d'un technicien
+  getDisponibilites: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const technicien = await db.getTechnicienById(input.technicienId);
+      if (!technicien || technicien.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
+      }
+      
+      return await db.getDisponibilitesByTechnicienId(input.technicienId);
+    }),
+
+  // Définir les disponibilités d'un technicien
+  setDisponibilite: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      jourSemaine: z.number().min(0).max(6),
+      heureDebut: z.string(),
+      heureFin: z.string(),
+      disponible: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const technicien = await db.getTechnicienById(input.technicienId);
+      if (!technicien || technicien.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
+      }
+      
+      return await db.setDisponibilite(input);
+    }),
+
+  // Statistiques par technicien
+  getStats: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const technicien = await db.getTechnicienById(input.technicienId);
+      if (!technicien || technicien.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
+      }
+      
+      // Récupérer les interventions assignées à ce technicien
+      const allInterventions = await db.getInterventionsByArtisanId(artisan.id);
+      const interventionsTech = allInterventions.filter(i => i.technicienId === input.technicienId);
+      
+      const total = interventionsTech.length;
+      const terminees = interventionsTech.filter(i => i.statut === 'terminee').length;
+      const enCours = interventionsTech.filter(i => i.statut === 'en_cours').length;
+      const planifiees = interventionsTech.filter(i => i.statut === 'planifiee').length;
+      
+      return { total, terminees, enCours, planifiees };
+    }),
+});
+
+// ============================================================================
+// AVIS CLIENTS ROUTER
+// ============================================================================
+const avisRouter = router({
+  // Récupérer tous les avis
+  getAll: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const avis = await db.getAvisByArtisanId(artisan.id);
+    
+    // Enrichir avec les infos client et intervention
+    const enriched = await Promise.all(avis.map(async (a) => {
+      const client = await db.getClientById(a.clientId);
+      const intervention = a.interventionId ? await db.getInterventionById(a.interventionId) : null;
+      return { ...a, client, intervention };
+    }));
+    
+    return enriched;
+  }),
+
+  // Statistiques des avis
+  getStats: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { moyenne: 0, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+    return await db.getAvisStats(artisan.id);
+  }),
+
+  // Envoyer une demande d'avis après intervention
+  envoyerDemande: protectedProcedure
+    .input(z.object({ interventionId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
+      
+      const client = await db.getClientById(intervention.clientId);
+      if (!client || !client.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'email" });
+      }
+      
+      // Générer un token unique
+      const token = crypto.randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 14); // Expire dans 14 jours
+      
+      // Créer la demande d'avis
+      const demande = await db.createDemandeAvis({
+        artisanId: artisan.id,
+        clientId: client.id,
+        interventionId: input.interventionId,
+        tokenDemande: token,
+        emailEnvoyeAt: new Date(),
+        expiresAt,
+      });
+      
+      // Envoyer l'email
+      const baseUrl = ctx.req.headers.origin || 'http://localhost:3000';
+      const lienAvis = `${baseUrl}/avis/${token}`;
+      
+      await sendEmail({
+        to: client.email,
+        subject: `Votre avis sur notre intervention - ${artisan.nomEntreprise || 'Artisan'}`,
+        body: `
+          <h2>Bonjour ${client.nom},</h2>
+          <p>Suite à notre intervention du ${new Date(intervention.dateDebut).toLocaleDateString('fr-FR')}, nous aimerions connaître votre avis.</p>
+          <p>Votre retour est précieux et nous aide à améliorer nos services.</p>
+          <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
+          <p>Ce lien est valable pendant 14 jours.</p>
+          <p>Merci de votre confiance,<br>${artisan.nomEntreprise || 'Votre artisan'}</p>
+        `,
+      });
+      
+      return demande;
+    }),
+
+  // Répondre à un avis
+  repondre: protectedProcedure
+    .input(z.object({
+      avisId: z.number(),
+      reponse: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const avis = await db.getAvisById(input.avisId);
+      if (!avis || avis.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Avis non trouvé" });
+      }
+      
+      return await db.updateAvis(input.avisId, {
+        reponseArtisan: input.reponse,
+        reponseAt: new Date(),
+      });
+    }),
+
+  // Modérer un avis (masquer/publier)
+  moderer: protectedProcedure
+    .input(z.object({
+      avisId: z.number(),
+      statut: z.enum(["publie", "masque"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      
+      const avis = await db.getAvisById(input.avisId);
+      if (!avis || avis.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Avis non trouvé" });
+      }
+      
+      return await db.updateAvis(input.avisId, { statut: input.statut });
+    }),
+
+  // Page publique - soumettre un avis
+  submitAvis: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      note: z.number().min(1).max(5),
+      commentaire: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const demande = await db.getDemandeAvisByToken(input.token);
+      if (!demande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Demande d'avis non trouvée" });
+      }
+      
+      if (demande.statut === 'completee') {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Vous avez déjà donné votre avis" });
+      }
+      
+      if (new Date() > new Date(demande.expiresAt)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce lien a expiré" });
+      }
+      
+      // Créer l'avis
+      const avis = await db.createAvis({
+        artisanId: demande.artisanId,
+        clientId: demande.clientId,
+        interventionId: demande.interventionId,
+        note: input.note,
+        commentaire: input.commentaire,
+        tokenAvis: crypto.randomUUID(),
+        statut: 'publie',
+      });
+      
+      // Mettre à jour la demande
+      await db.updateDemandeAvis(demande.id, {
+        statut: 'completee',
+        avisRecuAt: new Date(),
+      });
+      
+      // Notifier l'artisan
+      const artisan = await db.getArtisanById(demande.artisanId);
+      if (artisan) {
+        await db.createNotification({
+          artisanId: artisan.id,
+          type: 'info',
+          titre: 'Nouvel avis client',
+          message: `Un client a laissé un avis ${input.note}/5`,
+        });
+      }
+      
+      return { success: true };
+    }),
+
+  // Page publique - récupérer les infos de la demande d'avis
+  getDemandeInfo: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const demande = await db.getDemandeAvisByToken(input.token);
+      if (!demande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Demande d'avis non trouvée" });
+      }
+      
+      const artisan = await db.getArtisanById(demande.artisanId);
+      const client = await db.getClientById(demande.clientId);
+      const intervention = await db.getInterventionById(demande.interventionId);
+      
+      return {
+        demande,
+        artisan: artisan ? { nomEntreprise: artisan.nomEntreprise } : null,
+        client: client ? { nom: client.nom } : null,
+        intervention: intervention ? { 
+          titre: intervention.titre,
+          dateDebut: intervention.dateDebut,
+        } : null,
+        isExpired: new Date() > new Date(demande.expiresAt),
+        isCompleted: demande.statut === 'completee',
+      };
+    }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({system: systemRouter,
@@ -2578,6 +3074,9 @@ export const appRouter = router({system: systemRouter,
   clientPortal: clientPortalRouter,
   contrats: contratsRouter,
   interventionsMobile: interventionsMobileRouter,
+  chat: chatRouter,
+  techniciens: techniciensRouter,
+  avis: avisRouter,
 });
 
 export type AppRouter = typeof appRouter;

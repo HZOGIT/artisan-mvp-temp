@@ -224,3 +224,30 @@
 - [x] Notifications de renouvellement
 - [x] Page de gestion des contrats
 - [x] Historique des factures générées par contrat
+
+
+## Nouvelles Fonctionnalités (Sprint 9)
+
+### Chat en Temps Réel
+- [x] Table des conversations et messages
+- [x] Interface de chat sur le portail client
+- [x] Interface de chat côté artisan
+- [x] Notifications de nouveaux messages
+- [x] Historique des conversations
+- [x] Indicateur de messages non lus
+
+### Gestion des Équipes
+- [x] Table des techniciens/membres d'équipe
+- [x] Assignation des interventions aux techniciens
+- [x] Calendrier de disponibilité des techniciens
+- [x] Page de gestion de l'équipe
+- [x] Filtrage des interventions par technicien
+- [x] Statistiques par technicien
+
+### Notation et Avis Clients
+- [x] Table des avis et notations
+- [x] Email de demande d'avis après intervention
+- [x] Page publique de notation (1-5 étoiles + commentaire)
+- [x] Affichage des avis sur la fiche client
+- [x] Statistiques de satisfaction globale
+- [x] Modération des avis par l'artisan

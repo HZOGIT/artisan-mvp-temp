@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -38,12 +38,15 @@ const menuItems = [
   { icon: FileSignature, label: "Contrats", path: "/contrats" },
   { icon: Calendar, label: "Interventions", path: "/interventions" },
   { icon: Smartphone, label: "Mode Mobile", path: "/mobile" },
+  { icon: UsersRound, label: "Techniciens", path: "/techniciens" },
   { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
   { icon: Package, label: "Articles", path: "/articles" },
   { icon: Boxes, label: "Stocks", path: "/stocks" },
   { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
   { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
   { icon: TrendingUp, label: "Perf. Fournisseurs", path: "/performances-fournisseurs" },
+  { icon: MessageCircle, label: "Chat", path: "/chat" },
+  { icon: Star, label: "Avis Clients", path: "/avis" },
   { icon: User, label: "Mon profil", path: "/profil" },
   { icon: Settings, label: "Paramètres", path: "/parametres" },
 ];

@@ -211,6 +211,7 @@ export const interventions = mysqlTable("interventions", {
   notes: text("notes"),
   devisId: int("devisId"),
   factureId: int("factureId"),
+  technicienId: int("technicienId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -585,3 +586,114 @@ export const photosInterventions = mysqlTable("photos_interventions", {
 
 export type PhotoIntervention = typeof photosInterventions.$inferSelect;
 export type InsertPhotoIntervention = typeof photosInterventions.$inferInsert;
+
+
+// ============================================================================
+// CONVERSATIONS (Chat between artisan and clients)
+// ============================================================================
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  clientId: int("clientId").notNull(),
+  sujet: varchar("sujet", { length: 255 }),
+  statut: mysqlEnum("statut", ["active", "archivee"]).default("active"),
+  dernierMessageAt: timestamp("dernierMessageAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+// ============================================================================
+// MESSAGES (Chat messages)
+// ============================================================================
+export const messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull(),
+  expediteur: mysqlEnum("expediteur", ["artisan", "client"]).notNull(),
+  contenu: text("contenu").notNull(),
+  lu: boolean("lu").default(false),
+  luAt: timestamp("luAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+
+// ============================================================================
+// TECHNICIENS (Team members)
+// ============================================================================
+export const techniciens = mysqlTable("techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  prenom: varchar("prenom", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  telephone: varchar("telephone", { length: 20 }),
+  specialite: varchar("specialite", { length: 100 }),
+  couleur: varchar("couleur", { length: 7 }).default("#3b82f6"),
+  statut: mysqlEnum("statut", ["actif", "inactif", "conge"]).default("actif"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type Technicien = typeof techniciens.$inferSelect;
+export type InsertTechnicien = typeof techniciens.$inferInsert;
+
+// ============================================================================
+// DISPONIBILITES TECHNICIENS (Availability schedule)
+// ============================================================================
+export const disponibilitesTechniciens = mysqlTable("disponibilites_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  jourSemaine: int("jourSemaine").notNull(), // 0=Dimanche, 1=Lundi, etc.
+  heureDebut: varchar("heureDebut", { length: 5 }).notNull(), // Format HH:MM
+  heureFin: varchar("heureFin", { length: 5 }).notNull(),
+  disponible: boolean("disponible").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DisponibiliteTechnicien = typeof disponibilitesTechniciens.$inferSelect;
+export type InsertDisponibiliteTechnicien = typeof disponibilitesTechniciens.$inferInsert;
+
+// ============================================================================
+// AVIS CLIENTS (Customer reviews)
+// ============================================================================
+export const avisClients = mysqlTable("avis_clients", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  clientId: int("clientId").notNull(),
+  interventionId: int("interventionId"),
+  note: int("note").notNull(), // 1-5 étoiles
+  commentaire: text("commentaire"),
+  tokenAvis: varchar("tokenAvis", { length: 64 }).unique(),
+  reponseArtisan: text("reponseArtisan"),
+  reponseAt: timestamp("reponseAt"),
+  statut: mysqlEnum("statut", ["en_attente", "publie", "masque"]).default("en_attente"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type AvisClient = typeof avisClients.$inferSelect;
+export type InsertAvisClient = typeof avisClients.$inferInsert;
+
+// ============================================================================
+// DEMANDES AVIS (Review requests sent to clients)
+// ============================================================================
+export const demandesAvis = mysqlTable("demandes_avis", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  clientId: int("clientId").notNull(),
+  interventionId: int("interventionId").notNull(),
+  tokenDemande: varchar("tokenDemande", { length: 64 }).notNull().unique(),
+  emailEnvoyeAt: timestamp("emailEnvoyeAt"),
+  avisRecuAt: timestamp("avisRecuAt"),
+  statut: mysqlEnum("statut", ["envoyee", "ouverte", "completee", "expiree"]).default("envoyee"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DemandeAvis = typeof demandesAvis.$inferSelect;
+export type InsertDemandeAvis = typeof demandesAvis.$inferInsert;

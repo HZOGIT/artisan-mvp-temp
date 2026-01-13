@@ -30,6 +30,10 @@ import PaiementAnnule from "./pages/PaiementAnnule";
 import PortailClient from "./pages/PortailClient";
 import Contrats from "./pages/Contrats";
 import InterventionsMobile from "./pages/InterventionsMobile";
+import Chat from "./pages/Chat";
+import Techniciens from "./pages/Techniciens";
+import Avis from "./pages/Avis";
+import SoumettreAvis from "./pages/SoumettreAvis";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -56,6 +60,9 @@ function AuthenticatedRoutes() {
         <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
         <Route path="/contrats" component={Contrats} />
         <Route path="/mobile" component={InterventionsMobile} />
+        <Route path="/chat" component={Chat} />
+        <Route path="/techniciens" component={Techniciens} />
+        <Route path="/avis" component={Avis} />
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />
@@ -82,6 +89,7 @@ function Router() {
       <Route path="/paiement/succes" component={PaiementSucces} />
       <Route path="/paiement/annule" component={PaiementAnnule} />
       <Route path="/portail/:token" component={PortailClient} />
+      <Route path="/avis/:token" component={SoumettreAvis} />
       {isAuthenticated && (
         <>
           <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
@@ -101,6 +109,13 @@ function Router() {
           <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
           <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
           <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
+          <Route path="/chat" component={() => <AuthenticatedRoutes />} />
+          <Route path="/techniciens" component={() => <AuthenticatedRoutes />} />
+          <Route path="/avis" component={() => <AuthenticatedRoutes />} />
+          <Route path="/rapport-commande" component={() => <AuthenticatedRoutes />} />
+          <Route path="/relances" component={() => <AuthenticatedRoutes />} />
+          <Route path="/modeles-email" component={() => <AuthenticatedRoutes />} />
+          <Route path="/performances-fournisseurs" component={() => <AuthenticatedRoutes />} />
         </>
       )}
       <Route path="/404" component={NotFound} />

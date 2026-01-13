@@ -50,6 +50,20 @@
       "when": 1768337135362,
       "tag": "0006_safe_chameleon",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1768338136256,
+      "tag": "0007_nappy_newton_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1768338351131,
+      "tag": "0008_ordinary_falcon",
+      "breakpoints": true
     }
   ]
 }
