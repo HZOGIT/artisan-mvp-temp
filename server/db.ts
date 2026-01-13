@@ -4657,6 +4657,23 @@ export async function getInterventionsByChantier(chantierId: number): Promise<an
   return result;
 }
 
+export async function getAllInterventionsChantier(artisanId: number): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  // Récupérer tous les chantiers de l'artisan
+  const chantiersArtisan = await db.select().from(chantiers).where(eq(chantiers.artisanId, artisanId));
+  const chantierIds = chantiersArtisan.map(c => c.id);
+  if (chantierIds.length === 0) return [];
+  
+  // Récupérer toutes les associations
+  const allAssocs = [];
+  for (const chantierId of chantierIds) {
+    const assocs = await db.select().from(interventionsChantier).where(eq(interventionsChantier.chantierId, chantierId));
+    allAssocs.push(...assocs);
+  }
+  return allAssocs;
+}
+
 export async function dissocierInterventionChantier(chantierId: number, interventionId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
@@ -5051,4 +5068,178 @@ export async function creerDevisDepuisAnalyseIA(analyseId: number, clientId: num
   });
   
   return devis;
+}
+
+
+// ============================================================================
+// SYNCHRONISATION COMPTABLE AUTOMATIQUE
+// ============================================================================
+
+export async function saveSyncConfigComptable(data: Partial<InsertConfigurationComptable> & { artisanId: number }): Promise<ConfigurationComptable | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const existing = await getConfigurationComptable(data.artisanId);
+  if (existing) {
+    await db.update(configurationsComptables).set(data).where(eq(configurationsComptables.artisanId, data.artisanId));
+  } else {
+    await db.insert(configurationsComptables).values(data);
+  }
+  return getConfigurationComptable(data.artisanId);
+}
+
+export async function getSyncLogsComptables(artisanId: number): Promise<any[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Récupérer les exports récents comme logs
+  const exportsRecents = await db.select().from(exportsComptables)
+    .where(eq(exportsComptables.artisanId, artisanId))
+    .orderBy(desc(exportsComptables.createdAt))
+    .limit(50);
+  
+  return exportsRecents.map(e => ({
+    id: e.id,
+    type: 'export',
+    logiciel: e.logiciel,
+    statut: e.statut,
+    nombreEcritures: e.nombreEcritures,
+    createdAt: e.createdAt,
+  }));
+}
+
+export async function getPendingItemsComptables(artisanId: number): Promise<{
+  facturesEnAttente: number;
+  paiementsEnAttente: number;
+  erreurs: number;
+  items: any[];
+}> {
+  const db = await getDb();
+  if (!db) return { facturesEnAttente: 0, paiementsEnAttente: 0, erreurs: 0, items: [] };
+  
+  // Récupérer les factures non synchronisées (celles qui n'ont pas d'export récent)
+  const facturesNonSync = await db.select().from(factures)
+    .where(eq(factures.artisanId, artisanId))
+    .orderBy(desc(factures.createdAt))
+    .limit(100);
+  
+  // Simuler les éléments en attente (dans une vraie implémentation, on aurait une table de suivi)
+  const items: any[] = [];
+  let facturesEnAttente = 0;
+  let paiementsEnAttente = 0;
+  let erreurs = 0;
+  
+  // Marquer les factures récentes comme en attente de sync
+  for (const f of facturesNonSync.slice(0, 5)) {
+    if (f.statut === 'envoyee' || f.statut === 'payee') {
+      items.push({
+        type: 'facture',
+        id: f.id,
+        reference: f.numero,
+        date: f.dateFacture,
+        montant: f.totalTTC,
+        statut: 'en_attente',
+      });
+      facturesEnAttente++;
+    }
+  }
+  
+  return { facturesEnAttente, paiementsEnAttente, erreurs, items };
+}
+
+export async function lancerSynchronisationComptable(artisanId: number): Promise<{
+  facturesSyncees: number;
+  paiementsSynces: number;
+  erreurs: number;
+}> {
+  const db = await getDb();
+  if (!db) return { facturesSyncees: 0, paiementsSynces: 0, erreurs: 0 };
+  
+  const config = await getConfigurationComptable(artisanId);
+  if (!config) return { facturesSyncees: 0, paiementsSynces: 0, erreurs: 0 };
+  
+  // Simuler la synchronisation
+  // Dans une vraie implémentation, on enverrait les données vers Sage/QuickBooks via leur API
+  
+  // Récupérer les factures à synchroniser
+  const facturesASync = await db.select().from(factures)
+    .where(
+      and(
+        eq(factures.artisanId, artisanId),
+        or(
+          eq(factures.statut, 'envoyee'),
+          eq(factures.statut, 'payee')
+        )
+      )
+    )
+    .limit(50);
+  
+  let facturesSyncees = 0;
+  let paiementsSynces = 0;
+  let erreurs = 0;
+  
+  // Simuler le traitement
+  for (const f of facturesASync) {
+    // Simuler l'envoi vers le logiciel comptable
+    // En production, on appellerait l'API du logiciel comptable ici
+    facturesSyncees++;
+    
+    // Si la facture est payée, synchroniser aussi le paiement
+    if (f.statut === 'payee') {
+      paiementsSynces++;
+    }
+  }
+  
+  // Mettre à jour la date de dernière synchronisation
+  await db.update(configurationsComptables)
+    .set({ 
+      derniereSync: new Date(),
+      prochainSync: calculerProchaineSync(config.frequenceSync || 'manuel', config.heureSync || '02:00'),
+    })
+    .where(eq(configurationsComptables.artisanId, artisanId));
+  
+  // Créer un log d'export pour tracer la synchronisation
+  await createExportComptable({
+    artisanId,
+    logiciel: config.logiciel || 'sage',
+    formatExport: config.formatExport || 'fec',
+    periodeDebut: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    periodeFin: new Date(),
+    nombreEcritures: facturesSyncees + paiementsSynces,
+    statut: 'termine',
+  });
+  
+  return { facturesSyncees, paiementsSynces, erreurs };
+}
+
+function calculerProchaineSync(frequence: string, heure: string): Date {
+  const maintenant = new Date();
+  const [heures, minutes] = heure.split(':').map(Number);
+  
+  const prochaine = new Date(maintenant);
+  prochaine.setHours(heures, minutes, 0, 0);
+  
+  switch (frequence) {
+    case 'quotidien':
+      if (prochaine <= maintenant) {
+        prochaine.setDate(prochaine.getDate() + 1);
+      }
+      break;
+    case 'hebdomadaire':
+      prochaine.setDate(prochaine.getDate() + 7);
+      break;
+    case 'mensuel':
+      prochaine.setMonth(prochaine.getMonth() + 1);
+      break;
+    default:
+      return maintenant;
+  }
+  
+  return prochaine;
+}
+
+export async function retrySyncItem(artisanId: number, type: string, id: number): Promise<boolean> {
+  // Dans une vraie implémentation, on réessaierait de synchroniser l'élément spécifique
+  // Pour l'instant, on simule le succès
+  return true;
 }

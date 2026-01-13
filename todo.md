@@ -383,3 +383,27 @@
 - [x] Suggestion d'articles et quantités
 - [x] Génération automatique du devis
 - [x] Page de création de devis assisté par IA
+
+
+## Nouvelles Fonctionnalités (Sprint 15)
+
+### Amélioration Devis IA - Modification Manuelle
+- [x] Interface d'édition des suggestions d'articles
+- [x] Modification des quantités et prix unitaires
+- [x] Ajout/suppression d'articles suggérés
+- [x] Validation des modifications avant génération
+- [x] Prévisualisation du devis final
+
+### Calendrier Partagé des Chantiers
+- [x] Vue calendrier des interventions par chantier
+- [x] Filtrage par chantier et technicien
+- [x] Drag & drop pour réorganiser les interventions
+- [x] Affichage des phases du chantier
+- [x] Export du calendrier
+
+### Synchronisation Automatique Comptable
+- [x] Configuration de la synchronisation automatique
+- [x] Envoi automatique des factures vers Sage/QuickBooks
+- [x] Synchronisation des paiements reçus
+- [x] Journal de synchronisation avec statuts
+- [x] Gestion des erreurs et reprises

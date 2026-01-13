@@ -1301,6 +1301,15 @@ export const configurationsComptables = mysqlTable("configurations_comptables", 
   prefixeAvoir: varchar("prefixeAvoir", { length: 10 }).default("AV"),
   exerciceDebut: int("exerciceDebut").default(1), // Mois de début d'exercice
   actif: boolean("actif").default(true),
+  // Synchronisation automatique
+  syncAutoFactures: boolean("syncAutoFactures").default(false),
+  syncAutoPaiements: boolean("syncAutoPaiements").default(false),
+  frequenceSync: mysqlEnum("frequenceSync", ["quotidien", "hebdomadaire", "mensuel", "manuel"]).default("manuel"),
+  heureSync: varchar("heureSync", { length: 5 }).default("02:00"),
+  notifierErreurs: boolean("notifierErreurs").default(true),
+  notifierSucces: boolean("notifierSucces").default(false),
+  derniereSync: timestamp("derniereSync"),
+  prochainSync: timestamp("prochainSync"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -4181,6 +4181,12 @@ const chantiersRouter = router({
       return await db.getInterventionsByChantier(input.chantierId);
     }),
 
+  getAllInterventionsChantier: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getAllInterventionsChantier(artisan.id);
+  }),
+
   associerIntervention: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
@@ -4328,6 +4334,68 @@ const integrationsComptablesRouter = router({
       });
 
       return { id: exportRecord.id, contenu };
+    }),
+
+  // Synchronisation automatique
+  saveSyncConfig: protectedProcedure
+    .input(z.object({
+      syncAutoFactures: z.boolean().optional(),
+      syncAutoPaiements: z.boolean().optional(),
+      frequenceSync: z.enum(["quotidien", "hebdomadaire", "mensuel", "manuel"]).optional(),
+      heureSync: z.string().optional(),
+      notifierErreurs: z.boolean().optional(),
+      notifierSucces: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.saveSyncConfigComptable({ artisanId: artisan.id, ...input });
+    }),
+
+  getSyncStatus: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { actif: false };
+    const config = await db.getConfigurationComptable(artisan.id);
+    return { 
+      actif: config?.syncAutoFactures || config?.syncAutoPaiements || false,
+      derniereSync: config?.derniereSync,
+      prochainSync: config?.prochainSync,
+    };
+  }),
+
+  getSyncLogs: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getSyncLogsComptables(artisan.id);
+  }),
+
+  getPendingItems: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { facturesEnAttente: 0, paiementsEnAttente: 0, erreurs: 0, items: [] };
+    return await db.getPendingItemsComptables(artisan.id);
+  }),
+
+  lancerSync: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+    }
+    return await db.lancerSynchronisationComptable(artisan.id);
+  }),
+
+  retrySync: protectedProcedure
+    .input(z.object({
+      type: z.enum(["facture", "paiement"]),
+      id: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      return await db.retrySyncItem(artisan.id, input.type, input.id);
     }),
 });
 

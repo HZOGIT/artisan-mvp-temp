@@ -10,8 +10,21 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Camera, Upload, Sparkles, FileText, Trash2, Eye, CheckCircle2, Clock, AlertCircle, RefreshCw, Image as ImageIcon, ChevronRight } from "lucide-react";
+import { Camera, Upload, Sparkles, FileText, Trash2, Eye, CheckCircle2, Clock, AlertCircle, RefreshCw, Image as ImageIcon, ChevronRight, Edit2, Plus, Save, X } from "lucide-react";
+
+interface SuggestionEditable {
+  id: number;
+  nomArticle: string;
+  quantiteSuggeree: number;
+  unite: string;
+  prixEstime: string;
+  selectionne: boolean;
+  confiance: number;
+  isEditing?: boolean;
+  isNew?: boolean;
+}
 
 export default function DevisIA() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -22,6 +35,10 @@ export default function DevisIA() {
     clientId: 0,
   });
   const [uploadedPhotos, setUploadedPhotos] = useState<{ url: string; description: string }[]>([]);
+  const [editedSuggestions, setEditedSuggestions] = useState<Record<number, SuggestionEditable>>({});
+  const [newSuggestions, setNewSuggestions] = useState<SuggestionEditable[]>([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
@@ -75,6 +92,9 @@ export default function DevisIA() {
     onSuccess: () => {
       toast.success("Devis généré avec succès");
       utils.devisIA.getById.invalidate();
+      setIsEditMode(false);
+      setEditedSuggestions({});
+      setNewSuggestions([]);
     },
     onError: (error) => {
       toast.error(error.message);
@@ -86,7 +106,6 @@ export default function DevisIA() {
     if (!files || !selectedAnalyse) return;
 
     for (const file of Array.from(files)) {
-      // Simuler l'upload - en production, utiliser storagePut
       const reader = new FileReader();
       reader.onload = async (event) => {
         const url = event.target?.result as string;
@@ -106,6 +125,98 @@ export default function DevisIA() {
       return;
     }
     createAnalyseMutation.mutate(formData);
+  };
+
+  // Fonctions pour l'édition des suggestions
+  const startEditMode = () => {
+    setIsEditMode(true);
+    // Initialiser les suggestions éditées avec les valeurs actuelles
+    const initialEdits: Record<number, SuggestionEditable> = {};
+    analyseDetails?.resultats?.forEach((resultat: any) => {
+      resultat.suggestions?.forEach((suggestion: any) => {
+        initialEdits[suggestion.id] = {
+          id: suggestion.id,
+          nomArticle: suggestion.nomArticle,
+          quantiteSuggeree: suggestion.quantiteSuggeree,
+          unite: suggestion.unite || "unité",
+          prixEstime: suggestion.prixEstime,
+          selectionne: suggestion.selectionne,
+          confiance: suggestion.confiance,
+        };
+      });
+    });
+    setEditedSuggestions(initialEdits);
+  };
+
+  const cancelEditMode = () => {
+    setIsEditMode(false);
+    setEditedSuggestions({});
+    setNewSuggestions([]);
+  };
+
+  const updateEditedSuggestion = (id: number, field: keyof SuggestionEditable, value: any) => {
+    setEditedSuggestions(prev => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value,
+      },
+    }));
+  };
+
+  const addNewSuggestion = () => {
+    const newId = Date.now();
+    setNewSuggestions(prev => [...prev, {
+      id: newId,
+      nomArticle: "",
+      quantiteSuggeree: 1,
+      unite: "unité",
+      prixEstime: "0",
+      selectionne: true,
+      confiance: 100,
+      isNew: true,
+    }]);
+  };
+
+  const updateNewSuggestion = (id: number, field: keyof SuggestionEditable, value: any) => {
+    setNewSuggestions(prev => prev.map(s => 
+      s.id === id ? { ...s, [field]: value } : s
+    ));
+  };
+
+  const removeNewSuggestion = (id: number) => {
+    setNewSuggestions(prev => prev.filter(s => s.id !== id));
+  };
+
+  const saveAllChanges = async () => {
+    // Sauvegarder les modifications des suggestions existantes
+    for (const [id, suggestion] of Object.entries(editedSuggestions)) {
+      await updateSuggestionMutation.mutateAsync({
+        id: parseInt(id),
+        selectionne: suggestion.selectionne,
+        quantiteSuggeree: suggestion.quantiteSuggeree.toString(),
+        prixEstime: suggestion.prixEstime,
+      });
+    }
+    toast.success("Modifications sauvegardées");
+    setIsEditMode(false);
+  };
+
+  const calculateTotal = () => {
+    let total = 0;
+    // Ajouter les suggestions existantes sélectionnées
+    Object.values(editedSuggestions).forEach(s => {
+      if (s.selectionne) {
+        total += s.quantiteSuggeree * parseFloat(s.prixEstime || "0");
+      }
+    });
+    // Ajouter les nouvelles suggestions sélectionnées
+    newSuggestions.forEach(s => {
+      if (s.selectionne) {
+        total += s.quantiteSuggeree * parseFloat(s.prixEstime || "0");
+      }
+    });
+    return total;
   };
 
   const getStatutBadge = (statut: string) => {
@@ -277,144 +388,378 @@ export default function DevisIA() {
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold">Photos du chantier</h3>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Ajouter des photos
-                      </Button>
-                    </div>
-
-                    {analyseDetails.photos?.length === 0 ? (
-                      <div
-                        className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">
-                          Cliquez pour ajouter des photos du chantier
-                        </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          className="hidden"
+                          accept="image/*"
+                          multiple
+                          onChange={handleFileUpload}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Ajouter des photos
+                        </Button>
                       </div>
-                    ) : (
+                    </div>
+                    {analyseDetails.photos && analyseDetails.photos.length > 0 ? (
                       <div className="grid grid-cols-3 gap-4">
-                        {analyseDetails.photos?.map((photo: any) => (
+                        {analyseDetails.photos.map((photo: any) => (
                           <div key={photo.id} className="relative group">
                             <img
                               src={photo.url}
-                              alt={photo.description || "Photo"}
+                              alt={photo.description}
                               className="w-full h-32 object-cover rounded-lg"
                             />
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                              <Button variant="secondary" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="destructive" size="sm">
-                                <Trash2 className="h-4 w-4" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                              <Button variant="ghost" size="icon" className="text-white">
+                                <Eye className="h-5 w-5" />
                               </Button>
                             </div>
                           </div>
                         ))}
                       </div>
-                    )}
-
-                    {analyseDetails.photos && analyseDetails.photos.length > 0 && analyseDetails.statut === "en_attente" && (
-                      <Button
-                        className="w-full mt-4"
-                        onClick={() => analyserPhotosMutation.mutate({ analyseId: selectedAnalyse })}
-                        disabled={analyserPhotosMutation.isPending}
-                      >
-                        {analyserPhotosMutation.isPending ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                            Analyse en cours...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Lancer l'analyse IA
-                          </>
-                        )}
-                      </Button>
+                    ) : (
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                        <Camera className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">
+                          Ajoutez des photos pour commencer l'analyse
+                        </p>
+                      </div>
                     )}
                   </div>
 
-                  {/* Résultats de l'analyse */}
+                  {/* Bouton Analyser */}
+                  {analyseDetails.photos && analyseDetails.photos.length > 0 && analyseDetails.statut === "en_attente" && (
+                    <Button
+                      className="w-full"
+                      onClick={() => analyserPhotosMutation.mutate({ analyseId: selectedAnalyse })}
+                      disabled={analyserPhotosMutation.isPending}
+                    >
+                      {analyserPhotosMutation.isPending ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          Analyse en cours...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Analyser les photos avec l'IA
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Résultats de l'analyse avec édition */}
                   {analyseDetails.resultats && analyseDetails.resultats.length > 0 && (
                     <div>
-                      <h3 className="font-semibold mb-4">Travaux détectés</h3>
-                      <div className="space-y-4">
-                        {analyseDetails.resultats.map((resultat: any) => (
-                          <Card key={resultat.id}>
-                            <CardHeader className="pb-2">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <CardTitle className="text-base">
-                                    {resultat.typeTravauxDetecte}
-                                  </CardTitle>
-                                  <CardDescription>
-                                    {resultat.descriptionTravaux}
-                                  </CardDescription>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {getUrgenceBadge(resultat.urgence || "moyenne")}
-                                  <Badge variant="outline">
-                                    {resultat.confiance}% confiance
-                                  </Badge>
-                                </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <h4 className="text-sm font-semibold mb-2">
-                                Articles suggérés
-                              </h4>
-                              <div className="space-y-2">
-                                {resultat.suggestions?.map((suggestion: any) => (
-                                  <div
-                                    key={suggestion.id}
-                                    className="flex items-center justify-between p-2 border rounded"
-                                  >
-                                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold">Travaux détectés et articles suggérés</h3>
+                        {!isEditMode && !analyseDetails.devisGenere && (
+                          <Button variant="outline" size="sm" onClick={startEditMode}>
+                            <Edit2 className="h-4 w-4 mr-2" />
+                            Modifier les suggestions
+                          </Button>
+                        )}
+                        {isEditMode && (
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={cancelEditMode}>
+                              <X className="h-4 w-4 mr-2" />
+                              Annuler
+                            </Button>
+                            <Button size="sm" onClick={saveAllChanges}>
+                              <Save className="h-4 w-4 mr-2" />
+                              Sauvegarder
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      {isEditMode ? (
+                        /* Mode édition avec tableau */
+                        <Card>
+                          <CardContent className="pt-4">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-12">Sel.</TableHead>
+                                  <TableHead>Article</TableHead>
+                                  <TableHead className="w-24">Qté</TableHead>
+                                  <TableHead className="w-24">Unité</TableHead>
+                                  <TableHead className="w-32">Prix unit. €</TableHead>
+                                  <TableHead className="w-32 text-right">Total €</TableHead>
+                                  <TableHead className="w-12"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {Object.values(editedSuggestions).map((suggestion) => (
+                                  <TableRow key={suggestion.id}>
+                                    <TableCell>
                                       <Checkbox
                                         checked={suggestion.selectionne}
                                         onCheckedChange={(checked) =>
-                                          updateSuggestionMutation.mutate({
-                                            id: suggestion.id,
-                                            selectionne: !!checked,
-                                          })
+                                          updateEditedSuggestion(suggestion.id, "selectionne", !!checked)
                                         }
                                       />
-                                      <div>
-                                        <p className="font-medium">{suggestion.nomArticle}</p>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        value={suggestion.nomArticle}
+                                        onChange={(e) =>
+                                          updateEditedSuggestion(suggestion.id, "nomArticle", e.target.value)
+                                        }
+                                        className="h-8"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={suggestion.quantiteSuggeree}
+                                        onChange={(e) =>
+                                          updateEditedSuggestion(suggestion.id, "quantiteSuggeree", parseFloat(e.target.value) || 0)
+                                        }
+                                        className="h-8"
+                                        min="0"
+                                        step="0.1"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        value={suggestion.unite}
+                                        onChange={(e) =>
+                                          updateEditedSuggestion(suggestion.id, "unite", e.target.value)
+                                        }
+                                        className="h-8"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={suggestion.prixEstime}
+                                        onChange={(e) =>
+                                          updateEditedSuggestion(suggestion.id, "prixEstime", e.target.value)
+                                        }
+                                        className="h-8"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium">
+                                      {(suggestion.quantiteSuggeree * parseFloat(suggestion.prixEstime || "0")).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="text-xs">
+                                        {suggestion.confiance}%
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                {/* Nouvelles suggestions ajoutées manuellement */}
+                                {newSuggestions.map((suggestion) => (
+                                  <TableRow key={suggestion.id} className="bg-green-50">
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={suggestion.selectionne}
+                                        onCheckedChange={(checked) =>
+                                          updateNewSuggestion(suggestion.id, "selectionne", !!checked)
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        value={suggestion.nomArticle}
+                                        onChange={(e) =>
+                                          updateNewSuggestion(suggestion.id, "nomArticle", e.target.value)
+                                        }
+                                        className="h-8"
+                                        placeholder="Nom de l'article"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={suggestion.quantiteSuggeree}
+                                        onChange={(e) =>
+                                          updateNewSuggestion(suggestion.id, "quantiteSuggeree", parseFloat(e.target.value) || 0)
+                                        }
+                                        className="h-8"
+                                        min="0"
+                                        step="0.1"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        value={suggestion.unite}
+                                        onChange={(e) =>
+                                          updateNewSuggestion(suggestion.id, "unite", e.target.value)
+                                        }
+                                        className="h-8"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Input
+                                        type="number"
+                                        value={suggestion.prixEstime}
+                                        onChange={(e) =>
+                                          updateNewSuggestion(suggestion.id, "prixEstime", e.target.value)
+                                        }
+                                        className="h-8"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium">
+                                      {(suggestion.quantiteSuggeree * parseFloat(suggestion.prixEstime || "0")).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-500"
+                                        onClick={() => removeNewSuggestion(suggestion.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                            
+                            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                              <Button variant="outline" size="sm" onClick={addNewSuggestion}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Ajouter un article
+                              </Button>
+                              <div className="text-right">
+                                <p className="text-sm text-muted-foreground">Total estimé HT</p>
+                                <p className="text-2xl font-bold">{calculateTotal().toFixed(2)} €</p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        /* Mode affichage normal */
+                        <div className="space-y-4">
+                          {analyseDetails.resultats.map((resultat: any) => (
+                            <Card key={resultat.id}>
+                              <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle className="text-base">
+                                      {resultat.typeTravauxDetecte}
+                                    </CardTitle>
+                                    <CardDescription>
+                                      {resultat.descriptionTravaux}
+                                    </CardDescription>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {getUrgenceBadge(resultat.urgence || "moyenne")}
+                                    <Badge variant="outline">
+                                      {resultat.confiance}% confiance
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <h4 className="text-sm font-semibold mb-2">
+                                  Articles suggérés
+                                </h4>
+                                <div className="space-y-2">
+                                  {resultat.suggestions?.map((suggestion: any) => (
+                                    <div
+                                      key={suggestion.id}
+                                      className="flex items-center justify-between p-2 border rounded"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <Checkbox
+                                          checked={suggestion.selectionne}
+                                          onCheckedChange={(checked) =>
+                                            updateSuggestionMutation.mutate({
+                                              id: suggestion.id,
+                                              selectionne: !!checked,
+                                            })
+                                          }
+                                        />
+                                        <div>
+                                          <p className="font-medium">{suggestion.nomArticle}</p>
+                                          <p className="text-sm text-muted-foreground">
+                                            {suggestion.quantiteSuggeree} {suggestion.unite}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="font-semibold">
+                                          {parseFloat(suggestion.prixEstime || "0").toFixed(2)} €
+                                        </p>
                                         <p className="text-sm text-muted-foreground">
-                                          {suggestion.quantiteSuggeree} {suggestion.unite}
+                                          {suggestion.confiance}% confiance
                                         </p>
                                       </div>
                                     </div>
-                                    <div className="text-right">
-                                      <p className="font-semibold">
-                                        {parseFloat(suggestion.prixEstime || "0").toFixed(2)} €
-                                      </p>
-                                      <p className="text-sm text-muted-foreground">
-                                        {suggestion.confiance}% confiance
-                                      </p>
-                                    </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Prévisualisation du devis */}
+                      {isEditMode && (
+                        <Card className="mt-4 border-blue-200 bg-blue-50">
+                          <CardContent className="pt-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-semibold text-blue-800">Prévisualisation</h4>
+                                <p className="text-sm text-blue-700">
+                                  {Object.values(editedSuggestions).filter(s => s.selectionne).length + newSuggestions.filter(s => s.selectionne).length} articles sélectionnés
+                                </p>
                               </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
+                              <Button variant="outline" onClick={() => setShowPreview(!showPreview)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                {showPreview ? "Masquer" : "Voir"} le détail
+                              </Button>
+                            </div>
+                            {showPreview && (
+                              <div className="mt-4 p-4 bg-white rounded-lg">
+                                <h5 className="font-semibold mb-2">Récapitulatif du devis</h5>
+                                <div className="space-y-1 text-sm">
+                                  {Object.values(editedSuggestions).filter(s => s.selectionne).map(s => (
+                                    <div key={s.id} className="flex justify-between">
+                                      <span>{s.nomArticle} x {s.quantiteSuggeree}</span>
+                                      <span>{(s.quantiteSuggeree * parseFloat(s.prixEstime || "0")).toFixed(2)} €</span>
+                                    </div>
+                                  ))}
+                                  {newSuggestions.filter(s => s.selectionne).map(s => (
+                                    <div key={s.id} className="flex justify-between text-green-700">
+                                      <span>{s.nomArticle} x {s.quantiteSuggeree} (ajouté)</span>
+                                      <span>{(s.quantiteSuggeree * parseFloat(s.prixEstime || "0")).toFixed(2)} €</span>
+                                    </div>
+                                  ))}
+                                  <div className="border-t pt-2 mt-2 font-semibold flex justify-between">
+                                    <span>Total HT</span>
+                                    <span>{calculateTotal().toFixed(2)} €</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>TVA (20%)</span>
+                                    <span>{(calculateTotal() * 0.2).toFixed(2)} €</span>
+                                  </div>
+                                  <div className="flex justify-between text-lg font-bold">
+                                    <span>Total TTC</span>
+                                    <span>{(calculateTotal() * 1.2).toFixed(2)} €</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
 
                       {/* Générer le devis */}
                       {!analyseDetails.devisGenere && (
@@ -424,7 +769,10 @@ export default function DevisIA() {
                               <div>
                                 <h4 className="font-semibold">Générer le devis</h4>
                                 <p className="text-sm text-muted-foreground">
-                                  Créez un devis à partir des articles sélectionnés
+                                  {isEditMode 
+                                    ? "Sauvegardez vos modifications puis générez le devis"
+                                    : "Créez un devis à partir des articles sélectionnés"
+                                  }
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
@@ -453,7 +801,7 @@ export default function DevisIA() {
                                     })
                                   }
                                   disabled={
-                                    genererDevisMutation.isPending || !formData.clientId
+                                    genererDevisMutation.isPending || !formData.clientId || isEditMode
                                   }
                                 >
                                   {genererDevisMutation.isPending ? (
