@@ -43,7 +43,14 @@ import {
   devisOptions, InsertDevisOption, DevisOption,
   devisOptionsLignes, InsertDevisOptionLigne, DevisOptionLigne,
   rapportsPersonnalises, InsertRapportPersonnalise, RapportPersonnalise,
-  executionsRapports, InsertExecutionRapport, ExecutionRapport
+  executionsRapports, InsertExecutionRapport, ExecutionRapport,
+  pushSubscriptions, InsertPushSubscription, PushSubscription,
+  preferencesNotifications, InsertPreferenceNotification, PreferenceNotification,
+  historiqueNotificationsPush, InsertHistoriqueNotificationPush, HistoriqueNotificationPush,
+  conges, InsertConge, Conge,
+  soldesConges, InsertSoldeConge, SoldeConge,
+  previsionsCA, InsertPrevisionCA, PrevisionCA,
+  historiqueCA, InsertHistoriqueCA, HistoriqueCA
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -3495,4 +3502,513 @@ export async function getHistoriqueExecutions(rapportId: number, limit: number =
     .where(eq(executionsRapports.rapportId, rapportId))
     .orderBy(desc(executionsRapports.dateExecution))
     .limit(limit);
+}
+
+
+// ============================================================================
+// NOTIFICATIONS PUSH
+// ============================================================================
+
+export async function savePushSubscription(data: InsertPushSubscription): Promise<PushSubscription | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(pushSubscriptions).values(data).$returningId();
+  if (!result) return null;
+  const [subscription] = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.id, result.id));
+  return subscription || null;
+}
+
+export async function getPushSubscriptionsByTechnicien(technicienId: number): Promise<PushSubscription[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(pushSubscriptions)
+    .where(and(eq(pushSubscriptions.technicienId, technicienId), eq(pushSubscriptions.actif, true)));
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  return true;
+}
+
+export async function getPreferencesNotifications(technicienId: number): Promise<PreferenceNotification | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [prefs] = await db.select().from(preferencesNotifications)
+    .where(eq(preferencesNotifications.technicienId, technicienId));
+  return prefs || null;
+}
+
+export async function savePreferencesNotifications(data: InsertPreferenceNotification): Promise<PreferenceNotification | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const existing = await getPreferencesNotifications(data.technicienId);
+  if (existing) {
+    await db.update(preferencesNotifications)
+      .set(data)
+      .where(eq(preferencesNotifications.technicienId, data.technicienId));
+    return await getPreferencesNotifications(data.technicienId);
+  }
+  
+  const [result] = await db.insert(preferencesNotifications).values(data).$returningId();
+  if (!result) return null;
+  const [prefs] = await db.select().from(preferencesNotifications).where(eq(preferencesNotifications.id, result.id));
+  return prefs || null;
+}
+
+export async function createHistoriqueNotificationPush(data: InsertHistoriqueNotificationPush): Promise<HistoriqueNotificationPush | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(historiqueNotificationsPush).values(data).$returningId();
+  if (!result) return null;
+  const [notif] = await db.select().from(historiqueNotificationsPush).where(eq(historiqueNotificationsPush.id, result.id));
+  return notif || null;
+}
+
+export async function getHistoriqueNotificationsPush(technicienId: number, limit: number = 50): Promise<HistoriqueNotificationPush[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(historiqueNotificationsPush)
+    .where(eq(historiqueNotificationsPush.technicienId, technicienId))
+    .orderBy(desc(historiqueNotificationsPush.dateEnvoi))
+    .limit(limit);
+}
+
+export async function markNotificationPushAsRead(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.update(historiqueNotificationsPush)
+    .set({ statut: 'lu', dateLecture: new Date() })
+    .where(eq(historiqueNotificationsPush.id, id));
+  return true;
+}
+
+// ============================================================================
+// CONGES ET ABSENCES
+// ============================================================================
+
+export async function createConge(data: InsertConge): Promise<Conge | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(conges).values(data).$returningId();
+  if (!result) return null;
+  const [conge] = await db.select().from(conges).where(eq(conges.id, result.id));
+  return conge || null;
+}
+
+export async function getCongesByTechnicien(technicienId: number): Promise<Conge[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(conges)
+    .where(eq(conges.technicienId, technicienId))
+    .orderBy(desc(conges.dateDebut));
+}
+
+export async function getCongesByArtisan(artisanId: number, statut?: string): Promise<Conge[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  if (statut) {
+    return await db.select().from(conges)
+      .where(and(eq(conges.artisanId, artisanId), eq(conges.statut, statut as any)))
+      .orderBy(desc(conges.dateDebut));
+  }
+  
+  return await db.select().from(conges)
+    .where(eq(conges.artisanId, artisanId))
+    .orderBy(desc(conges.dateDebut));
+}
+
+export async function getCongesEnAttente(artisanId: number): Promise<Conge[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(conges)
+    .where(and(eq(conges.artisanId, artisanId), eq(conges.statut, 'en_attente')))
+    .orderBy(asc(conges.dateDebut));
+}
+
+export async function updateCongeStatut(id: number, statut: string, validePar: number, commentaire?: string): Promise<Conge | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  await db.update(conges)
+    .set({ 
+      statut: statut as any, 
+      validePar, 
+      commentaireValidation: commentaire,
+      dateValidation: new Date()
+    })
+    .where(eq(conges.id, id));
+  
+  const [conge] = await db.select().from(conges).where(eq(conges.id, id));
+  return conge || null;
+}
+
+export async function getCongeById(id: number): Promise<Conge | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [conge] = await db.select().from(conges).where(eq(conges.id, id));
+  return conge || null;
+}
+
+export async function deleteConge(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  await db.delete(conges).where(eq(conges.id, id));
+  return true;
+}
+
+export async function getCongesParPeriode(artisanId: number, dateDebut: string, dateFin: string): Promise<Conge[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const allConges = await db.select().from(conges)
+    .where(eq(conges.artisanId, artisanId));
+  
+  return allConges.filter(c => {
+    const debut = new Date(c.dateDebut);
+    const fin = new Date(c.dateFin);
+    const periodeDebut = new Date(dateDebut);
+    const periodeFin = new Date(dateFin);
+    return (debut <= periodeFin && fin >= periodeDebut);
+  });
+}
+
+export async function getSoldesConges(technicienId: number, annee: number): Promise<SoldeConge[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(soldesConges)
+    .where(and(eq(soldesConges.technicienId, technicienId), eq(soldesConges.annee, annee)));
+}
+
+export async function updateSoldeConges(technicienId: number, type: string, annee: number, joursPris: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  
+  const [solde] = await db.select().from(soldesConges)
+    .where(and(
+      eq(soldesConges.technicienId, technicienId),
+      eq(soldesConges.type, type as any),
+      eq(soldesConges.annee, annee)
+    ));
+  
+  if (solde) {
+    const nouveauJoursPris = parseFloat(solde.joursPris?.toString() || '0') + joursPris;
+    const nouveauSoldeRestant = parseFloat(solde.soldeInitial?.toString() || '0') + parseFloat(solde.joursAcquis?.toString() || '0') - nouveauJoursPris;
+    
+    await db.update(soldesConges)
+      .set({ 
+        joursPris: nouveauJoursPris.toFixed(2),
+        soldeRestant: nouveauSoldeRestant.toFixed(2)
+      })
+      .where(eq(soldesConges.id, solde.id));
+  }
+  
+  return true;
+}
+
+export async function initSoldeConges(data: InsertSoldeConge): Promise<SoldeConge | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [result] = await db.insert(soldesConges).values(data).$returningId();
+  if (!result) return null;
+  const [solde] = await db.select().from(soldesConges).where(eq(soldesConges.id, result.id));
+  return solde || null;
+}
+
+// ============================================================================
+// PREVISIONS DE CA
+// ============================================================================
+
+export async function getHistoriqueCA(artisanId: number, nombreMois: number = 24): Promise<HistoriqueCA[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(historiqueCA)
+    .where(eq(historiqueCA.artisanId, artisanId))
+    .orderBy(desc(historiqueCA.annee), desc(historiqueCA.mois))
+    .limit(nombreMois);
+}
+
+export async function saveHistoriqueCA(data: InsertHistoriqueCA): Promise<HistoriqueCA | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  // Vérifier si l'entrée existe déjà
+  const existing = await db.select().from(historiqueCA)
+    .where(and(
+      eq(historiqueCA.artisanId, data.artisanId),
+      eq(historiqueCA.mois, data.mois),
+      eq(historiqueCA.annee, data.annee)
+    ));
+  
+  if (existing.length > 0) {
+    await db.update(historiqueCA)
+      .set(data)
+      .where(eq(historiqueCA.id, existing[0].id));
+    return existing[0];
+  }
+  
+  const [result] = await db.insert(historiqueCA).values(data).$returningId();
+  if (!result) return null;
+  const [hist] = await db.select().from(historiqueCA).where(eq(historiqueCA.id, result.id));
+  return hist || null;
+}
+
+export async function calculerHistoriqueCAMensuel(artisanId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  // Récupérer toutes les factures payées
+  const facturesPayees = await db.select().from(factures)
+    .where(and(eq(factures.artisanId, artisanId), eq(factures.statut, 'payee')));
+  
+  // Récupérer tous les devis
+  const tousDevis = await db.select().from(devis)
+    .where(eq(devis.artisanId, artisanId));
+  
+  // Grouper par mois/année
+  const parMois: Record<string, { ca: number, nbFactures: number, clients: Set<number>, devisEnvoyes: number, devisAcceptes: number }> = {};
+  
+  facturesPayees.forEach(f => {
+    const date = new Date(f.dateFacture);
+    const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    if (!parMois[key]) {
+      parMois[key] = { ca: 0, nbFactures: 0, clients: new Set(), devisEnvoyes: 0, devisAcceptes: 0 };
+    }
+    parMois[key].ca += parseFloat(f.totalTTC?.toString() || '0');
+    parMois[key].nbFactures++;
+    parMois[key].clients.add(f.clientId);
+  });
+  
+  tousDevis.forEach(d => {
+    const date = new Date(d.dateDevis);
+    const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    if (!parMois[key]) {
+      parMois[key] = { ca: 0, nbFactures: 0, clients: new Set(), devisEnvoyes: 0, devisAcceptes: 0 };
+    }
+    if (d.statut === 'envoye' || d.statut === 'accepte' || d.statut === 'refuse') {
+      parMois[key].devisEnvoyes++;
+    }
+    if (d.statut === 'accepte') {
+      parMois[key].devisAcceptes++;
+    }
+  });
+  
+  // Sauvegarder l'historique
+  for (const [key, data] of Object.entries(parMois)) {
+    const [annee, mois] = key.split('-').map(Number);
+    const panierMoyen = data.nbFactures > 0 ? data.ca / data.nbFactures : 0;
+    const tauxConversion = data.devisEnvoyes > 0 ? (data.devisAcceptes / data.devisEnvoyes) * 100 : 0;
+    
+    await saveHistoriqueCA({
+      artisanId,
+      mois,
+      annee,
+      caTotal: data.ca.toFixed(2),
+      nombreFactures: data.nbFactures,
+      nombreClients: data.clients.size,
+      panierMoyen: panierMoyen.toFixed(2),
+      tauxConversion: tauxConversion.toFixed(2),
+    });
+  }
+}
+
+export async function getPrevisionsCA(artisanId: number, annee: number): Promise<PrevisionCA[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(previsionsCA)
+    .where(and(eq(previsionsCA.artisanId, artisanId), eq(previsionsCA.annee, annee)))
+    .orderBy(asc(previsionsCA.mois));
+}
+
+export async function savePrevisionCA(data: InsertPrevisionCA): Promise<PrevisionCA | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  // Vérifier si l'entrée existe déjà
+  const existing = await db.select().from(previsionsCA)
+    .where(and(
+      eq(previsionsCA.artisanId, data.artisanId),
+      eq(previsionsCA.mois, data.mois),
+      eq(previsionsCA.annee, data.annee)
+    ));
+  
+  if (existing.length > 0) {
+    await db.update(previsionsCA)
+      .set(data)
+      .where(eq(previsionsCA.id, existing[0].id));
+    const [updated] = await db.select().from(previsionsCA).where(eq(previsionsCA.id, existing[0].id));
+    return updated || null;
+  }
+  
+  const [result] = await db.insert(previsionsCA).values(data).$returningId();
+  if (!result) return null;
+  const [prev] = await db.select().from(previsionsCA).where(eq(previsionsCA.id, result.id));
+  return prev || null;
+}
+
+export async function calculerPrevisionsCA(artisanId: number, methode: string = 'moyenne_mobile'): Promise<PrevisionCA[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Récupérer l'historique des 24 derniers mois
+  const historique = await getHistoriqueCA(artisanId, 24);
+  
+  if (historique.length < 3) {
+    return []; // Pas assez de données pour faire des prévisions
+  }
+  
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  
+  const previsions: PrevisionCA[] = [];
+  
+  // Calculer les prévisions pour les 12 prochains mois
+  for (let i = 0; i < 12; i++) {
+    let targetMonth = currentMonth + i;
+    let targetYear = currentYear;
+    
+    if (targetMonth > 12) {
+      targetMonth -= 12;
+      targetYear++;
+    }
+    
+    let caPrevisionnel = 0;
+    let confiance = 0;
+    
+    if (methode === 'moyenne_mobile') {
+      // Moyenne mobile sur les 3 derniers mois
+      const derniersMois = historique.slice(0, Math.min(3, historique.length));
+      const moyenne = derniersMois.reduce((sum, h) => sum + parseFloat(h.caTotal?.toString() || '0'), 0) / derniersMois.length;
+      caPrevisionnel = moyenne;
+      confiance = Math.min(90, 60 + (historique.length * 2));
+    } else if (methode === 'regression_lineaire') {
+      // Régression linéaire simple
+      const n = historique.length;
+      const x = historique.map((_, idx) => idx);
+      const y = historique.map(h => parseFloat(h.caTotal?.toString() || '0'));
+      
+      const sumX = x.reduce((a, b) => a + b, 0);
+      const sumY = y.reduce((a, b) => a + b, 0);
+      const sumXY = x.reduce((sum, xi, idx) => sum + xi * y[idx], 0);
+      const sumX2 = x.reduce((sum, xi) => sum + xi * xi, 0);
+      
+      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+      const intercept = (sumY - slope * sumX) / n;
+      
+      caPrevisionnel = intercept + slope * (n + i);
+      confiance = Math.min(85, 50 + (historique.length * 1.5));
+    } else if (methode === 'saisonnalite') {
+      // Prendre la valeur du même mois l'année précédente avec ajustement
+      const memesMois = historique.filter(h => h.mois === targetMonth);
+      if (memesMois.length > 0) {
+        const moyenne = memesMois.reduce((sum, h) => sum + parseFloat(h.caTotal?.toString() || '0'), 0) / memesMois.length;
+        // Ajuster avec la tendance générale
+        const tendance = historique.length >= 2 
+          ? (parseFloat(historique[0].caTotal?.toString() || '0') - parseFloat(historique[historique.length - 1].caTotal?.toString() || '0')) / historique.length
+          : 0;
+        caPrevisionnel = moyenne + (tendance * i);
+        confiance = Math.min(80, 55 + (memesMois.length * 10));
+      } else {
+        // Fallback sur moyenne mobile
+        const derniersMois = historique.slice(0, 3);
+        caPrevisionnel = derniersMois.reduce((sum, h) => sum + parseFloat(h.caTotal?.toString() || '0'), 0) / derniersMois.length;
+        confiance = 50;
+      }
+    }
+    
+    // S'assurer que la prévision est positive
+    caPrevisionnel = Math.max(0, caPrevisionnel);
+    
+    // Récupérer le CA réalisé si le mois est passé
+    const historiqueMatch = historique.find(h => h.mois === targetMonth && h.annee === targetYear);
+    const caRealise = historiqueMatch ? parseFloat(historiqueMatch.caTotal?.toString() || '0') : 0;
+    const ecart = caRealise - caPrevisionnel;
+    const ecartPourcentage = caPrevisionnel > 0 ? (ecart / caPrevisionnel) * 100 : 0;
+    
+    const prevision = await savePrevisionCA({
+      artisanId,
+      mois: targetMonth,
+      annee: targetYear,
+      caPrevisionnel: caPrevisionnel.toFixed(2),
+      caRealise: caRealise.toFixed(2),
+      ecart: ecart.toFixed(2),
+      ecartPourcentage: ecartPourcentage.toFixed(2),
+      methodeCalcul: methode as any,
+      confiance: confiance.toFixed(2),
+    });
+    
+    if (prevision) {
+      previsions.push(prevision);
+    }
+  }
+  
+  return previsions;
+}
+
+export async function getComparaisonPrevisionsRealise(artisanId: number, annee: number): Promise<{ mois: number, previsionnel: number, realise: number, ecart: number, ecartPct: number }[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const previsions = await getPrevisionsCA(artisanId, annee);
+  const historique = await getHistoriqueCA(artisanId, 12);
+  
+  return previsions.map(p => {
+    const hist = historique.find(h => h.mois === p.mois && h.annee === p.annee);
+    const realise = hist ? parseFloat(hist.caTotal?.toString() || '0') : 0;
+    const previsionnel = parseFloat(p.caPrevisionnel?.toString() || '0');
+    const ecart = realise - previsionnel;
+    const ecartPct = previsionnel > 0 ? (ecart / previsionnel) * 100 : 0;
+    
+    return {
+      mois: p.mois,
+      previsionnel,
+      realise,
+      ecart,
+      ecartPct,
+    };
+  });
+}
+
+// Fonction pour vérifier si un technicien est en congé à une date donnée
+export async function isTechnicienEnConge(technicienId: number, date: Date): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  
+  const congesApprouves = await db.select().from(conges)
+    .where(and(
+      eq(conges.technicienId, technicienId),
+      eq(conges.statut, 'approuve')
+    ));
+  
+  const dateStr = date.toISOString().split('T')[0];
+  
+  return congesApprouves.some(c => {
+    const debut = new Date(c.dateDebut).toISOString().split('T')[0];
+    const fin = new Date(c.dateFin).toISOString().split('T')[0];
+    return dateStr >= debut && dateStr <= fin;
+  });
+}
+
+// Fonction pour obtenir les techniciens disponibles à une date donnée (avec vérification des congés)
+export async function getTechniciensDisponiblesAvecConges(artisanId: number, date: Date): Promise<Technicien[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const allTechniciens = await db.select().from(techniciens)
+    .where(and(eq(techniciens.artisanId, artisanId), eq(techniciens.statut, 'actif')));
+  
+  const disponibles: Technicien[] = [];
+  
+  for (const tech of allTechniciens) {
+    const enConge = await isTechnicienEnConge(tech.id, date);
+    if (!enConge) {
+      disponibles.push(tech);
+    }
+  }
+  
+  return disponibles;
 }

@@ -78,6 +78,13 @@
       "when": 1768340058692,
       "tag": "0010_curious_emma_frost",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1768340686426,
+      "tag": "0011_lumpy_shockwave",
+      "breakpoints": true
     }
   ]
 }

@@ -303,3 +303,29 @@
 - [x] Génération de graphiques dynamiques
 - [x] Export PDF et CSV des rapports
 - [x] Sauvegarde des modèles de rapports
+
+
+## Nouvelles Fonctionnalités (Sprint 12)
+
+### Notifications Push
+- [x] Configuration du service de notifications push
+- [x] Enregistrement des tokens de notification des techniciens
+- [x] Envoi de notifications lors de nouvelles assignations
+- [x] Notifications pour les modifications d'interventions
+- [x] Page de gestion des préférences de notification
+
+### Gestion des Congés et Absences
+- [x] Table des congés et absences
+- [x] Création de demandes de congés
+- [x] Validation des congés par l'artisan
+- [x] Calendrier des absences
+- [x] Prise en compte dans la planification
+- [x] Historique des congés par technicien
+
+### Prévisions de CA
+- [x] Analyse de l'historique des ventes
+- [x] Calcul des tendances mensuelles
+- [x] Prévisions sur 3, 6 et 12 mois
+- [x] Graphiques de projection
+- [x] Comparaison prévisions vs réalisé
+- [x] Alertes si écart significatif

@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route, Palmtree, LineChart } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -51,6 +51,8 @@ const menuItems = [
   { icon: Route, label: "Planification", path: "/planification" },
   { icon: FileText, label: "Rapports", path: "/rapports" },
   { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
+  { icon: Palmtree, label: "Congés", path: "/conges" },
+  { icon: LineChart, label: "Prévisions CA", path: "/previsions" },
   { icon: User, label: "Mon profil", path: "/profil" },
   { icon: Settings, label: "Paramètres", path: "/parametres" },
 ];

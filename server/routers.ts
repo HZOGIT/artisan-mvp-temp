@@ -3502,6 +3502,284 @@ const rapportsRouter = router({
 });
 
 // ============================================================================
+// NOTIFICATIONS PUSH ROUTER
+// ============================================================================
+const notificationsPushRouter = router({
+  subscribe: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      endpoint: z.string(),
+      p256dh: z.string(),
+      auth: z.string(),
+      userAgent: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.savePushSubscription(input);
+    }),
+
+  unsubscribe: protectedProcedure
+    .input(z.object({ endpoint: z.string() }))
+    .mutation(async ({ input }) => {
+      await db.deletePushSubscription(input.endpoint);
+      return { success: true };
+    }),
+
+  getPreferences: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getPreferencesNotifications(input.technicienId);
+    }),
+
+  savePreferences: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      nouvelleAssignation: z.boolean().optional(),
+      modificationIntervention: z.boolean().optional(),
+      annulationIntervention: z.boolean().optional(),
+      rappelIntervention: z.boolean().optional(),
+      nouveauMessage: z.boolean().optional(),
+      demandeAvis: z.boolean().optional(),
+      heureDebutNotif: z.string().optional(),
+      heureFinNotif: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.savePreferencesNotifications(input);
+    }),
+
+  getHistorique: protectedProcedure
+    .input(z.object({ technicienId: z.number(), limit: z.number().default(50) }))
+    .query(async ({ input }) => {
+      return await db.getHistoriqueNotificationsPush(input.technicienId, input.limit);
+    }),
+
+  markAsRead: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.markNotificationPushAsRead(input.id);
+      return { success: true };
+    }),
+
+  // Envoyer une notification (pour tests ou envoi manuel)
+  send: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      type: z.enum(["assignation", "modification", "annulation", "rappel", "message", "avis"]),
+      titre: z.string(),
+      corps: z.string().optional(),
+      referenceId: z.number().optional(),
+      referenceType: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      // Enregistrer dans l'historique
+      return await db.createHistoriqueNotificationPush(input);
+    }),
+});
+
+// ============================================================================
+// CONGES ROUTER
+// ============================================================================
+const congesRouter = router({
+  list: protectedProcedure
+    .input(z.object({ statut: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.getCongesByArtisan(artisan.id, input.statut);
+    }),
+
+  enAttente: protectedProcedure.query(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      artisan = await db.createArtisan({ userId: ctx.user.id });
+    }
+    return await db.getCongesEnAttente(artisan.id);
+  }),
+
+  byTechnicien: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getCongesByTechnicien(input.technicienId);
+    }),
+
+  byPeriode: protectedProcedure
+    .input(z.object({ dateDebut: z.string(), dateFin: z.string() }))
+    .query(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.getCongesParPeriode(artisan.id, input.dateDebut, input.dateFin);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      type: z.enum(["conge_paye", "rtt", "maladie", "sans_solde", "formation", "autre"]),
+      dateDebut: z.string(),
+      dateFin: z.string(),
+      demiJourneeDebut: z.boolean().optional(),
+      demiJourneeFin: z.boolean().optional(),
+      motif: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.createConge({
+        ...input,
+        artisanId: artisan.id,
+        dateDebut: new Date(input.dateDebut),
+        dateFin: new Date(input.dateFin),
+      });
+    }),
+
+  approuver: protectedProcedure
+    .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const conge = await db.getCongeById(input.id);
+      if (conge) {
+        // Calculer le nombre de jours
+        const debut = new Date(conge.dateDebut);
+        const fin = new Date(conge.dateFin);
+        const diffTime = Math.abs(fin.getTime() - debut.getTime());
+        let jours = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        if (conge.demiJourneeDebut) jours -= 0.5;
+        if (conge.demiJourneeFin) jours -= 0.5;
+        
+        // Mettre à jour le solde si c'est un congé payé ou RTT
+        if (conge.type === 'conge_paye' || conge.type === 'rtt') {
+          await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), jours);
+        }
+      }
+      return await db.updateCongeStatut(input.id, 'approuve', ctx.user.id, input.commentaire);
+    }),
+
+  refuser: protectedProcedure
+    .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      return await db.updateCongeStatut(input.id, 'refuse', ctx.user.id, input.commentaire);
+    }),
+
+  annuler: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      return await db.updateCongeStatut(input.id, 'annule', ctx.user.id);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.deleteConge(input.id);
+      return { success: true };
+    }),
+
+  getSoldes: protectedProcedure
+    .input(z.object({ technicienId: z.number(), annee: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getSoldesConges(input.technicienId, input.annee);
+    }),
+
+  initSolde: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      type: z.enum(["conge_paye", "rtt"]),
+      annee: z.number(),
+      soldeInitial: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.initSoldeConges({
+        ...input,
+        artisanId: artisan.id,
+        soldeRestant: input.soldeInitial,
+      });
+    }),
+});
+
+// ============================================================================
+// PREVISIONS CA ROUTER
+// ============================================================================
+const previsionsRouter = router({
+  getHistorique: protectedProcedure
+    .input(z.object({ nombreMois: z.number().default(24) }))
+    .query(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.getHistoriqueCA(artisan.id, input.nombreMois);
+    }),
+
+  calculerHistorique: protectedProcedure.mutation(async ({ ctx }) => {
+    let artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) {
+      artisan = await db.createArtisan({ userId: ctx.user.id });
+    }
+    await db.calculerHistoriqueCAMensuel(artisan.id);
+    return { success: true };
+  }),
+
+  getPrevisions: protectedProcedure
+    .input(z.object({ annee: z.number() }))
+    .query(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.getPrevisionsCA(artisan.id, input.annee);
+    }),
+
+  calculer: protectedProcedure
+    .input(z.object({ methode: z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite"]).default("moyenne_mobile") }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      // D'abord mettre à jour l'historique
+      await db.calculerHistoriqueCAMensuel(artisan.id);
+      // Puis calculer les prévisions
+      return await db.calculerPrevisionsCA(artisan.id, input.methode);
+    }),
+
+  getComparaison: protectedProcedure
+    .input(z.object({ annee: z.number() }))
+    .query(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.getComparaisonPrevisionsRealise(artisan.id, input.annee);
+    }),
+
+  savePrevisionManuelle: protectedProcedure
+    .input(z.object({
+      mois: z.number(),
+      annee: z.number(),
+      caPrevisionnel: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.savePrevisionCA({
+        artisanId: artisan.id,
+        mois: input.mois,
+        annee: input.annee,
+        caPrevisionnel: input.caPrevisionnel,
+        methodeCalcul: 'manuel',
+      });
+    }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({system: systemRouter,
@@ -3537,6 +3815,9 @@ export const appRouter = router({system: systemRouter,
   comptabilite: comptabiliteRouter,
   devisOptions: devisOptionsRouter,
   rapports: rapportsRouter,
+  notificationsPush: notificationsPushRouter,
+  conges: congesRouter,
+  previsions: previsionsRouter,
 });
 
 export type AppRouter = typeof appRouter;

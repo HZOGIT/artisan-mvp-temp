@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date } from "drizzle-orm/mysql-core";
 
 // ============================================================================
 // USERS TABLE (Core authentication)
@@ -868,3 +868,138 @@ export const executionsRapports = mysqlTable("executions_rapports", {
 
 export type ExecutionRapport = typeof executionsRapports.$inferSelect;
 export type InsertExecutionRapport = typeof executionsRapports.$inferInsert;
+
+
+// ============================================================================
+// NOTIFICATIONS PUSH (Tokens et préférences)
+// ============================================================================
+export const pushSubscriptions = mysqlTable("push_subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: varchar("userAgent", { length: 255 }),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+// Préférences de notification par technicien
+export const preferencesNotifications = mysqlTable("preferences_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  nouvelleAssignation: boolean("nouvelleAssignation").default(true),
+  modificationIntervention: boolean("modificationIntervention").default(true),
+  annulationIntervention: boolean("annulationIntervention").default(true),
+  rappelIntervention: boolean("rappelIntervention").default(true),
+  nouveauMessage: boolean("nouveauMessage").default(true),
+  demandeAvis: boolean("demandeAvis").default(false),
+  heureDebutNotif: varchar("heureDebutNotif", { length: 5 }).default("08:00"),
+  heureFinNotif: varchar("heureFinNotif", { length: 5 }).default("20:00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PreferenceNotification = typeof preferencesNotifications.$inferSelect;
+export type InsertPreferenceNotification = typeof preferencesNotifications.$inferInsert;
+
+// Historique des notifications envoyées
+export const historiqueNotificationsPush = mysqlTable("historique_notifications_push", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  type: mysqlEnum("type", ["assignation", "modification", "annulation", "rappel", "message", "avis"]).notNull(),
+  titre: varchar("titre", { length: 100 }).notNull(),
+  corps: text("corps"),
+  referenceId: int("referenceId"), // ID de l'intervention, message, etc.
+  referenceType: varchar("referenceType", { length: 50 }),
+  statut: mysqlEnum("statut", ["envoye", "echec", "lu"]).default("envoye"),
+  dateEnvoi: timestamp("dateEnvoi").defaultNow().notNull(),
+  dateLecture: timestamp("dateLecture"),
+});
+
+export type HistoriqueNotificationPush = typeof historiqueNotificationsPush.$inferSelect;
+export type InsertHistoriqueNotificationPush = typeof historiqueNotificationsPush.$inferInsert;
+
+// ============================================================================
+// CONGES ET ABSENCES
+// ============================================================================
+export const conges = mysqlTable("conges", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  type: mysqlEnum("type", ["conge_paye", "rtt", "maladie", "sans_solde", "formation", "autre"]).notNull(),
+  dateDebut: date("dateDebut").notNull(),
+  dateFin: date("dateFin").notNull(),
+  demiJourneeDebut: boolean("demiJourneeDebut").default(false), // Matin ou après-midi
+  demiJourneeFin: boolean("demiJourneeFin").default(false),
+  motif: text("motif"),
+  statut: mysqlEnum("statut", ["en_attente", "approuve", "refuse", "annule"]).default("en_attente"),
+  commentaireValidation: text("commentaireValidation"),
+  dateValidation: timestamp("dateValidation"),
+  validePar: int("validePar"), // userId de l'artisan qui a validé
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Conge = typeof conges.$inferSelect;
+export type InsertConge = typeof conges.$inferInsert;
+
+// Solde de congés par technicien et type
+export const soldesConges = mysqlTable("soldes_conges", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  type: mysqlEnum("type", ["conge_paye", "rtt"]).notNull(),
+  annee: int("annee").notNull(),
+  soldeInitial: decimal("soldeInitial", { precision: 5, scale: 2 }).default("0.00"),
+  soldeRestant: decimal("soldeRestant", { precision: 5, scale: 2 }).default("0.00"),
+  joursAcquis: decimal("joursAcquis", { precision: 5, scale: 2 }).default("0.00"),
+  joursPris: decimal("joursPris", { precision: 5, scale: 2 }).default("0.00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SoldeConge = typeof soldesConges.$inferSelect;
+export type InsertSoldeConge = typeof soldesConges.$inferInsert;
+
+// ============================================================================
+// PREVISIONS DE CA
+// ============================================================================
+export const previsionsCA = mysqlTable("previsions_ca", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  mois: int("mois").notNull(), // 1-12
+  annee: int("annee").notNull(),
+  caPrevisionnel: decimal("caPrevisionnel", { precision: 12, scale: 2 }).default("0.00"),
+  caRealise: decimal("caRealise", { precision: 12, scale: 2 }).default("0.00"),
+  ecart: decimal("ecart", { precision: 12, scale: 2 }).default("0.00"),
+  ecartPourcentage: decimal("ecartPourcentage", { precision: 5, scale: 2 }).default("0.00"),
+  methodeCalcul: mysqlEnum("methodeCalcul", ["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"]).default("moyenne_mobile"),
+  confiance: decimal("confiance", { precision: 5, scale: 2 }), // Niveau de confiance 0-100
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PrevisionCA = typeof previsionsCA.$inferSelect;
+export type InsertPrevisionCA = typeof previsionsCA.$inferInsert;
+
+// Historique mensuel du CA (pour les calculs de prévision)
+export const historiqueCA = mysqlTable("historique_ca", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  mois: int("mois").notNull(),
+  annee: int("annee").notNull(),
+  caTotal: decimal("caTotal", { precision: 12, scale: 2 }).default("0.00"),
+  nombreFactures: int("nombreFactures").default(0),
+  nombreClients: int("nombreClients").default(0),
+  panierMoyen: decimal("panierMoyen", { precision: 10, scale: 2 }).default("0.00"),
+  tauxConversion: decimal("tauxConversion", { precision: 5, scale: 2 }), // Devis signés / Devis envoyés
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type HistoriqueCA = typeof historiqueCA.$inferSelect;
+export type InsertHistoriqueCA = typeof historiqueCA.$inferInsert;
