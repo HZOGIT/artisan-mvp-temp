@@ -517,3 +517,10 @@
 ## Bugs à corriger
 
 - [x] RangeError: Invalid time value dans la page Devis (Devis.tsx ligne 218) - Corrigé: dateCreation -> dateDevis
+
+
+## Améliorations Page Devis
+
+- [x] Filtrage des devis par statut (brouillon, envoyé, accepté, refusé, expiré)
+- [x] Conversion d'un devis accepté en facture en un clic
+- [x] Recherche avancée par nom de client ou numéro de devis
