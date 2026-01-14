@@ -532,3 +532,8 @@
 - [x] Export Excel de la liste des devis filtrés
 - [x] Tableau de bord statistiques de conversion des devis (/devis/statistiques)
 - [x] Système de relance automatique pour devis en attente (configuration complète)
+
+
+## Bugs à corriger
+
+- [x] NotFoundError: Failed to execute 'removeChild' dans la page Articles - Corrigé: ajouté {} comme paramètre à getBibliotheque et gestion null-safe

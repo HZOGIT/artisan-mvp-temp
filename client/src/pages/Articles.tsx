@@ -27,7 +27,7 @@ export default function Articles() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  const { data: articles, isLoading } = trpc.articles.getBibliotheque.useQuery();
+  const { data: articles, isLoading } = trpc.articles.getBibliotheque.useQuery({});
 
   const formatCurrency = (amount: string | number | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount || 0;
@@ -108,21 +108,21 @@ export default function Articles() {
             <tbody>
               {filteredArticles.map((article: any) => (
                 <tr key={article.id}>
-                  <td className="font-mono text-sm">{article.reference || "-"}</td>
+                  <td className="font-mono text-sm">{article.reference ?? "-"}</td>
                   <td>
                     <div>
-                      <p className="font-medium">{article.designation}</p>
-                      {article.description && (
+                      <p className="font-medium">{article.designation ?? "Sans nom"}</p>
+                      {article.description ? (
                         <p className="text-sm text-muted-foreground line-clamp-1">{article.description}</p>
-                      )}
+                      ) : null}
                     </div>
                   </td>
                   <td>
-                    <Badge className={categorieColors[article.categorie || 'autre'] || "bg-gray-100"}>
-                      {categorieLabels[article.categorie || 'autre'] || article.categorie}
+                    <Badge className={categorieColors[article.categorie ?? 'autre'] ?? "bg-gray-100"}>
+                      {categorieLabels[article.categorie ?? 'autre'] ?? article.categorie ?? "Autre"}
                     </Badge>
                   </td>
-                  <td>{article.unite || "unité"}</td>
+                  <td>{article.unite ?? "unité"}</td>
                   <td className="text-right font-medium">{formatCurrency(article.prixUnitaireHT)}</td>
                 </tr>
               ))}
