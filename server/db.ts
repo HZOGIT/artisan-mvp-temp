@@ -295,6 +295,29 @@ export async function searchArticles(query: string, metier?: string): Promise<Bi
   ).orderBy(bibliothequeArticles.designation).limit(50);
 }
 
+export async function createBibliothequeArticle(data: InsertBibliothequeArticle): Promise<BibliothequeArticle> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(bibliothequeArticles).values(data);
+  const id = Number(result[0].insertId);
+  const [article] = await db.select().from(bibliothequeArticles).where(eq(bibliothequeArticles.id, id));
+  return article;
+}
+
+export async function updateBibliothequeArticle(id: number, data: Partial<InsertBibliothequeArticle>): Promise<BibliothequeArticle | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(bibliothequeArticles).set(data).where(eq(bibliothequeArticles.id, id));
+  const [article] = await db.select().from(bibliothequeArticles).where(eq(bibliothequeArticles.id, id));
+  return article || null;
+}
+
+export async function deleteBibliothequeArticle(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(bibliothequeArticles).where(eq(bibliothequeArticles.id, id));
+}
+
 // ============================================================================
 // ARTICLES ARTISAN QUERIES
 // ============================================================================

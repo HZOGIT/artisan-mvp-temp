@@ -537,3 +537,13 @@
 ## Bugs à corriger
 
 - [x] NotFoundError: Failed to execute 'removeChild' dans la page Articles - Corrigé: ajouté {} comme paramètre à getBibliotheque et gestion null-safe
+
+
+## Améliorations Bibliothèque d'Articles
+
+- [x] Création d'articles depuis la page bibliothèque
+- [x] Modification d'articles existants
+- [x] Suppression d'articles
+- [x] Import CSV d'articles en masse
+- [x] Export CSV de la bibliothèque
+- [x] Indicateurs de niveau de stock pour chaque article

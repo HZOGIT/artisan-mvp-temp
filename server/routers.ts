@@ -218,6 +218,66 @@ const articlesRouter = router({
       return { success: true };
     }),
   
+  // CRUD Bibliothèque d'articles
+  createBibliothequeArticle: protectedProcedure
+    .input(z.object({
+      reference: z.string().min(1),
+      designation: z.string().min(1),
+      description: z.string().optional(),
+      unite: z.string().optional(),
+      prixUnitaireHT: z.string(),
+      categorie: z.string().optional(),
+      sousCategorie: z.string().optional(),
+      metier: z.enum(["plomberie", "electricite", "chauffage", "general"]).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createBibliothequeArticle(input);
+    }),
+  
+  updateBibliothequeArticle: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      reference: z.string().optional(),
+      designation: z.string().optional(),
+      description: z.string().optional(),
+      unite: z.string().optional(),
+      prixUnitaireHT: z.string().optional(),
+      categorie: z.string().optional(),
+      sousCategorie: z.string().optional(),
+      metier: z.enum(["plomberie", "electricite", "chauffage", "general"]).optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      return await db.updateBibliothequeArticle(id, data);
+    }),
+  
+  deleteBibliothequeArticle: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.deleteBibliothequeArticle(input.id);
+      return { success: true };
+    }),
+  
+  importBibliothequeArticles: protectedProcedure
+    .input(z.array(z.object({
+      reference: z.string(),
+      designation: z.string(),
+      description: z.string().optional(),
+      unite: z.string().optional(),
+      prixUnitaireHT: z.string(),
+      categorie: z.string().optional(),
+      sousCategorie: z.string().optional(),
+      metier: z.enum(["plomberie", "electricite", "chauffage", "general"]).optional(),
+    })))
+    .mutation(async ({ input }) => {
+      let imported = 0;
+      for (const article of input) {
+        await db.createBibliothequeArticle(article);
+        imported++;
+      }
+      return { imported };
+    }),
+  
   seed: protectedProcedure.mutation(async () => {
     await db.seedBibliothequeArticles();
     return { success: true };
