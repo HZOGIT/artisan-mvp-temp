@@ -470,3 +470,24 @@
 - [x] Reprogrammation par glisser-déposer
 - [x] Feedback visuel amélioré
 - [x] Confirmation avant modification
+
+
+## Nouvelles Fonctionnalités (Sprint 19)
+
+### Prévisualisation PDF
+- [x] Dialogue de prévisualisation du PDF
+- [x] Affichage du PDF dans un iframe
+- [x] Boutons télécharger et fermer
+- [x] Génération du PDF en mémoire
+
+### Personnalisation Widget Calendrier
+- [x] Menu de configuration du widget
+- [x] Choix des informations affichées
+- [x] Sauvegarde des préférences
+- [x] Options d'affichage (jour/semaine/statistiques)
+
+### Amélioration Confirmation Drag-and-Drop
+- [x] Bouton d'annulation explicite
+- [x] Historique des actions récentes
+- [x] Option "Ne plus demander"
+- [x] Feedback visuel amélioré

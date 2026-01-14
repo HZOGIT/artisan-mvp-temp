@@ -87,6 +87,9 @@ export default function CalendrierChantiers() {
     newTechnicienNom?: string;
   } | null>(null);
   const [dragOverTechnicien, setDragOverTechnicien] = useState<number | null>(null);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
+  const [skipConfirmation, setSkipConfirmation] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: chantiers } = trpc.chantiers.list.useQuery();
@@ -230,6 +233,16 @@ export default function CalendrierChantiers() {
     const newDateDebut = new Date(originalDate);
     newDateDebut.setDate(newDateDebut.getDate() + diffDays);
     
+    // Vérifier si on doit sauter la confirmation
+    if (skipConfirmation) {
+      updateInterventionMutation.mutate({
+        id: draggedIntervention.id,
+        dateDebut: newDateDebut.toISOString(),
+      });
+      setDraggedIntervention(null);
+      return;
+    }
+    
     // Afficher la confirmation
     setPendingChange({
       type: 'date',
@@ -248,6 +261,16 @@ export default function CalendrierChantiers() {
     
     if (!draggedIntervention) return;
     if (draggedIntervention.technicienId === technicienId) {
+      setDraggedIntervention(null);
+      return;
+    }
+    
+    // Vérifier si on doit sauter la confirmation
+    if (skipConfirmation) {
+      assignerTechnicienMutation.mutate({
+        interventionId: draggedIntervention.id,
+        technicienId: technicienId,
+      });
       setDraggedIntervention(null);
       return;
     }
@@ -440,8 +463,8 @@ export default function CalendrierChantiers() {
     toast.success("Calendrier exporté");
   };
 
-  // Export PDF du calendrier
-  const exportToPDF = () => {
+  // Générer le document PDF
+  const generatePdfDocument = () => {
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
@@ -536,9 +559,37 @@ export default function CalendrierChantiers() {
       );
     }
 
-    // Télécharger le PDF
+    return doc;
+  };
+
+  // Prévisualiser le PDF
+  const previewPDF = () => {
+    const doc = generatePdfDocument();
+    const dataUrl = doc.output('datauristring');
+    setPdfDataUrl(dataUrl);
+    setShowPdfPreview(true);
+  };
+
+  // Télécharger le PDF directement
+  const downloadPDF = () => {
+    const doc = generatePdfDocument();
     doc.save(`calendrier-chantiers-${currentDate.toISOString().split('T')[0]}.pdf`);
-    toast.success('PDF généré avec succès');
+    toast.success('PDF téléchargé avec succès');
+  };
+
+  // Télécharger depuis la prévisualisation
+  const downloadFromPreview = () => {
+    const doc = generatePdfDocument();
+    doc.save(`calendrier-chantiers-${currentDate.toISOString().split('T')[0]}.pdf`);
+    setShowPdfPreview(false);
+    setPdfDataUrl(null);
+    toast.success('PDF téléchargé avec succès');
+  };
+
+  // Fermer la prévisualisation
+  const closePdfPreview = () => {
+    setShowPdfPreview(false);
+    setPdfDataUrl(null);
   };
 
   // Impression du calendrier
@@ -812,7 +863,7 @@ export default function CalendrierChantiers() {
             <Printer className="h-4 w-4 mr-2" />
             Imprimer
           </Button>
-          <Button variant="outline" onClick={exportToPDF}>
+          <Button variant="outline" onClick={previewPDF}>
             <FileDown className="h-4 w-4 mr-2" />
             PDF
           </Button>
@@ -1312,26 +1363,56 @@ export default function CalendrierChantiers() {
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Move className="h-5 w-5 text-primary" />
               {pendingChange?.type === 'date' ? 'Confirmer le changement de date' : 'Confirmer la réassignation'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="pt-2">
               {pendingChange?.type === 'date' ? (
-                <>
-                  Voulez-vous déplacer l'intervention <strong>"{pendingChange?.interventionTitre}"</strong> au{' '}
-                  <strong>{pendingChange?.newDate?.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> ?
-                </>
+                <div className="space-y-2">
+                  <p>Voulez-vous déplacer l'intervention :</p>
+                  <div className="bg-muted p-3 rounded-lg">
+                    <p className="font-medium">"{pendingChange?.interventionTitre}"</p>
+                    <p className="text-sm mt-1">
+                      <span className="text-muted-foreground">Nouvelle date :</span>{' '}
+                      <strong className="text-primary">
+                        {pendingChange?.newDate?.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </strong>
+                    </p>
+                  </div>
+                </div>
               ) : (
-                <>
-                  Voulez-vous réassigner l'intervention <strong>"{pendingChange?.interventionTitre}"</strong> à{' '}
-                  <strong>{pendingChange?.newTechnicienNom}</strong> ?
-                </>
+                <div className="space-y-2">
+                  <p>Voulez-vous réassigner l'intervention :</p>
+                  <div className="bg-muted p-3 rounded-lg">
+                    <p className="font-medium">"{pendingChange?.interventionTitre}"</p>
+                    <p className="text-sm mt-1">
+                      <span className="text-muted-foreground">Nouveau technicien :</span>{' '}
+                      <strong className="text-primary">{pendingChange?.newTechnicienNom}</strong>
+                    </p>
+                  </div>
+                </div>
               )}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
+          <div className="flex items-center space-x-2 py-2">
+            <input
+              type="checkbox"
+              id="skipConfirmation"
+              checked={skipConfirmation}
+              onChange={(e) => setSkipConfirmation(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="skipConfirmation" className="text-sm text-muted-foreground cursor-pointer">
+              Ne plus demander de confirmation pour cette session
+            </Label>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={cancelChange} className="text-muted-foreground">
+              Annuler l'action
+            </Button>
             <Button variant="outline" onClick={cancelChange}>
-              Annuler
+              Non, annuler
             </Button>
             <Button onClick={confirmChange} disabled={updateInterventionMutation.isPending || assignerTechnicienMutation.isPending}>
               {(updateInterventionMutation.isPending || assignerTechnicienMutation.isPending) ? (
@@ -1340,8 +1421,38 @@ export default function CalendrierChantiers() {
                   Confirmation...
                 </>
               ) : (
-                'Confirmer'
+                'Oui, confirmer'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogue de prévisualisation PDF */}
+      <Dialog open={showPdfPreview} onOpenChange={setShowPdfPreview}>
+        <DialogContent className="max-w-5xl h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Prévisualisation du PDF</DialogTitle>
+            <DialogDescription>
+              Vérifiez le contenu avant de télécharger
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 h-[calc(90vh-180px)]">
+            {pdfDataUrl && (
+              <iframe
+                src={pdfDataUrl}
+                className="w-full h-full border rounded-lg"
+                title="Prévisualisation PDF"
+              />
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closePdfPreview}>
+              Fermer
+            </Button>
+            <Button onClick={downloadFromPreview}>
+              <FileDown className="h-4 w-4 mr-2" />
+              Télécharger
             </Button>
           </DialogFooter>
         </DialogContent>
