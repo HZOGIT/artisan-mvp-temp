@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, reference, designation, prixUnitaireHT FROM articles_artisan LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SELECT id, reference, designation, prixUnitaireHT FROM articles_artisan LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "reference": "PLB-001",
+      "designation": "Remplacement robinet mitigeur",
+      "prixUnitaireHT": "85.00"
+    },
+    {
+      "id": "2",
+      "reference": "PLB-002",
+      "designation": "Débouchage canalisation",
+      "prixUnitaireHT": "120.00"
+    },
+    {
+      "id": "3",
+      "reference": "PLB-003",
+      "designation": "Installation WC complet",
+      "prixUnitaireHT": "350.00"
+    },
+    {
+      "id": "4",
+      "reference": "PLB-004",
+      "designation": "Réparation fuite eau",
+      "prixUnitaireHT": "95.00"
+    },
+    {
+      "id": "5",
+      "reference": "PLB-005",
+      "designation": "Remplacement chauffe-eau 200L",
+      "prixUnitaireHT": "890.00"
+    },
+    {
+      "id": "6",
+      "reference": "PLB-006",
+      "designation": "Installation douche italienne",
+      "prixUnitaireHT": "2500.00"
+    },
+    {
+      "id": "7",
+      "reference": "PLB-007",
+      "designation": "Remplacement siphon",
+      "prixUnitaireHT": "45.00"
+    },
+    {
+      "id": "8",
+      "reference": "PLB-008",
+      "designation": "Détartrage chauffe-eau",
+      "prixUnitaireHT": "150.00"
+    },
+    {
+      "id": "9",
+      "reference": "PLB-009",
+      "designation": "Installation lave-vaisselle",
+      "prixUnitaireHT": "75.00"
+    },
+    {
+      "id": "10",
+      "reference": "PLB-010",
+      "designation": "Remplacement joint robinet",
+      "prixUnitaireHT": "35.00"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\treference\tdesignation\tprixUnitaireHT\n1\tPLB-001\tRemplacement robinet mitigeur\t85.00\n2\tPLB-002\tDébouchage canalisation\t120.00\n3\tPLB-003\tInstallation WC complet\t350.00\n4\tPLB-004\tRéparation fuite eau\t95.00\n5\tPLB-005\tRemplacement chauffe-eau 200L\t890.00\n6\tPLB-006\tInstallation douche italienne\t2500.00\n7\tPLB-007\tRemplacement siphon\t45.00\n8\tPLB-008\tDétartrage chauffe-eau\t150.00\n9\tPLB-009\tInstallation lave-vaisselle\t75.00\n10\tPLB-010\tRemplacement joint robinet\t35.00\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

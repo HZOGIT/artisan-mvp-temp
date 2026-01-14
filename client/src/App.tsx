@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -47,6 +47,7 @@ import AlertesPrevisions from "./pages/AlertesPrevisions";
 import Chantiers from "./pages/Chantiers";
 import IntegrationsComptables from "./pages/IntegrationsComptables";
 import DevisIA from "./pages/DevisIA";
+import DevisLigneEdit from "./pages/DevisLigneEdit";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import StatistiquesDevis from "./pages/StatistiquesDevis";
@@ -54,14 +55,18 @@ import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
 function AuthenticatedRoutes() {
+  const [location] = useLocation();
+  
   return (
     <DashboardLayout>
-      <Switch>
+      <Switch location={location}>
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/clients" component={Clients} />
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/devis" component={Devis} />
         <Route path="/devis/statistiques" component={StatistiquesDevis} />
+        <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
+        <Route path="/devis/:id/options" component={DevisOptions} />
         <Route path="/devis/:id" component={DevisDetail} />
         <Route path="/factures" component={Factures} />
         <Route path="/factures/:id" component={FactureDetail} />
@@ -94,7 +99,7 @@ function AuthenticatedRoutes() {
         <Route path="/devis-ia" component={DevisIA} />
         <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
         <Route path="/sync-comptable" component={TableauBordSyncComptable} />
-        <Route path="/devis/:id/options" component={DevisOptions} />
+        
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />
@@ -127,6 +132,7 @@ function Router() {
           <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
           <Route path="/clients/:rest*" component={() => <AuthenticatedRoutes />} />
           <Route path="/clients" component={() => <AuthenticatedRoutes />} />
+          <Route path="/devis/:id/ligne/nouvelle" component={() => <AuthenticatedRoutes />} />
           <Route path="/devis/:rest*" component={() => <AuthenticatedRoutes />} />
           <Route path="/devis" component={() => <AuthenticatedRoutes />} />
           <Route path="/factures/:rest*" component={() => <AuthenticatedRoutes />} />

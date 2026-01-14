@@ -1,0 +1,22 @@
+{
+  "query": "SHOW TABLES LIKE '%ligne%';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SHOW TABLES LIKE '%ligne%';",
+  "rows": [
+    {
+      "Tables_in_J25kfT9jDPLP68WkWNhvrq (%ligne%)": "devis_lignes"
+    },
+    {
+      "Tables_in_J25kfT9jDPLP68WkWNhvrq (%ligne%)": "devis_options_lignes"
+    },
+    {
+      "Tables_in_J25kfT9jDPLP68WkWNhvrq (%ligne%)": "factures_lignes"
+    },
+    {
+      "Tables_in_J25kfT9jDPLP68WkWNhvrq (%ligne%)": "lignes_commandes_fournisseurs"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_J25kfT9jDPLP68WkWNhvrq (%ligne%)\ndevis_lignes\ndevis_options_lignes\nfactures_lignes\nlignes_commandes_fournisseurs\n",
+  "stderr": "",
+  "execution_time_ms": 63
+}

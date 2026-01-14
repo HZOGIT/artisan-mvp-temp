@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, reference, designation, prixUnitaireHT FROM bibliotheque_articles LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SELECT id, reference, designation, prixUnitaireHT FROM bibliotheque_articles LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "reference": "PLB-001",
+      "designation": "Tube cuivre 12mm - 1m",
+      "prixUnitaireHT": "8.50"
+    },
+    {
+      "id": "2",
+      "reference": "PLB-002",
+      "designation": "Tube cuivre 14mm - 1m",
+      "prixUnitaireHT": "10.20"
+    },
+    {
+      "id": "3",
+      "reference": "PLB-003",
+      "designation": "Tube cuivre 16mm - 1m",
+      "prixUnitaireHT": "12.80"
+    },
+    {
+      "id": "4",
+      "reference": "PLB-004",
+      "designation": "Tube cuivre 18mm - 1m",
+      "prixUnitaireHT": "14.50"
+    },
+    {
+      "id": "5",
+      "reference": "PLB-005",
+      "designation": "Tube cuivre 22mm - 1m",
+      "prixUnitaireHT": "18.90"
+    },
+    {
+      "id": "6",
+      "reference": "PLB-006",
+      "designation": "Tube PER 12mm - 1m",
+      "prixUnitaireHT": "2.80"
+    },
+    {
+      "id": "7",
+      "reference": "PLB-007",
+      "designation": "Tube PER 16mm - 1m",
+      "prixUnitaireHT": "3.50"
+    },
+    {
+      "id": "8",
+      "reference": "PLB-008",
+      "designation": "Tube PER 20mm - 1m",
+      "prixUnitaireHT": "4.80"
+    },
+    {
+      "id": "9",
+      "reference": "PLB-009",
+      "designation": "Tube multicouche 16mm - 1m",
+      "prixUnitaireHT": "4.20"
+    },
+    {
+      "id": "10",
+      "reference": "PLB-010",
+      "designation": "Tube multicouche 20mm - 1m",
+      "prixUnitaireHT": "5.80"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\treference\tdesignation\tprixUnitaireHT\n1\tPLB-001\tTube cuivre 12mm - 1m\t8.50\n2\tPLB-002\tTube cuivre 14mm - 1m\t10.20\n3\tPLB-003\tTube cuivre 16mm - 1m\t12.80\n4\tPLB-004\tTube cuivre 18mm - 1m\t14.50\n5\tPLB-005\tTube cuivre 22mm - 1m\t18.90\n6\tPLB-006\tTube PER 12mm - 1m\t2.80\n7\tPLB-007\tTube PER 16mm - 1m\t3.50\n8\tPLB-008\tTube PER 20mm - 1m\t4.80\n9\tPLB-009\tTube multicouche 16mm - 1m\t4.20\n10\tPLB-010\tTube multicouche 20mm - 1m\t5.80\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

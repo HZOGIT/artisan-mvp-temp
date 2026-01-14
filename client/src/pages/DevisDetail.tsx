@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -417,109 +417,10 @@ export default function DevisDetail() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Lignes du devis</CardTitle>
-            <Dialog open={isAddLineDialogOpen} onOpenChange={setIsAddLineDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" onClick={resetLineForm}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter une ligne
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Ajouter une ligne</DialogTitle>
-                  <DialogDescription>
-                    Sélectionnez un article ou saisissez manuellement
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleAddLine}>
-                  <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Article de la bibliothèque</Label>
-                      <Select onValueChange={handleSelectArticle}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un article..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {articles?.slice(0, 50).map((article: any) => (
-                            <SelectItem key={article.id} value={String(article.id)}>
-                              {article.designation} - {formatCurrency(article.prixUnitaireHT)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reference">Référence</Label>
-                        <Input
-                          id="reference"
-                          value={lineFormData.reference}
-                          onChange={(e) => setLineFormData({ ...lineFormData, reference: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="designation">Désignation *</Label>
-                        <Input
-                          id="designation"
-                          value={lineFormData.designation}
-                          onChange={(e) => setLineFormData({ ...lineFormData, designation: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="quantite">Quantité</Label>
-                        <Input
-                          id="quantite"
-                          type="number"
-                          step="0.01"
-                          value={lineFormData.quantite}
-                          onChange={(e) => setLineFormData({ ...lineFormData, quantite: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="unite">Unité</Label>
-                        <Input
-                          id="unite"
-                          value={lineFormData.unite}
-                          onChange={(e) => setLineFormData({ ...lineFormData, unite: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="prixUnitaireHT">Prix HT *</Label>
-                        <Input
-                          id="prixUnitaireHT"
-                          type="number"
-                          step="0.01"
-                          value={lineFormData.prixUnitaireHT}
-                          onChange={(e) => setLineFormData({ ...lineFormData, prixUnitaireHT: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="tauxTVA">TVA %</Label>
-                        <Input
-                          id="tauxTVA"
-                          type="number"
-                          step="0.01"
-                          value={lineFormData.tauxTVA}
-                          onChange={(e) => setLineFormData({ ...lineFormData, tauxTVA: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setIsAddLineDialogOpen(false)}>
-                      Annuler
-                    </Button>
-                    <Button type="submit" disabled={addLineMutation.isPending}>
-                      {addLineMutation.isPending ? "Ajout..." : "Ajouter"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" onClick={() => setLocation(`/devis/${id}/ligne/nouvelle`)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter une ligne
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -582,13 +483,134 @@ export default function DevisDetail() {
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>Aucune ligne dans ce devis</p>
-              <Button variant="link" onClick={() => setIsAddLineDialogOpen(true)}>
+              <Button variant="link" onClick={() => setLocation(`/devis/${id}/ligne/nouvelle`)}>
                 Ajouter une ligne
               </Button>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog pour ajouter une ligne */}
+      <Dialog open={isAddLineDialogOpen} onOpenChange={setIsAddLineDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Ajouter une ligne</DialogTitle>
+            <DialogDescription>
+              Sélectionnez un article ou saisissez manuellement
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddLine}>
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label>Article de la bibliothèque</Label>
+                <Select onValueChange={(val) => {
+                  const article = articles?.find((a: any) => a.id === parseInt(val));
+                  if (article) {
+                    setLineFormData({
+                      reference: article.reference || "",
+                      designation: article.designation || "",
+                      description: article.description || "",
+                      quantite: "1",
+                      unite: article.unite || "unité",
+                      prixUnitaireHT: String(article.prixUnitaireHT || ""),
+                      tauxTVA: "20.00",
+                    });
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un article..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {articles?.slice(0, 50).map((article: any) => (
+                      <SelectItem key={article.id} value={String(article.id)}>
+                        {article.designation} - {formatCurrency(article.prixUnitaireHT)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reference">Référence</Label>
+                  <Input
+                    id="reference"
+                    value={lineFormData.reference}
+                    onChange={(e) => setLineFormData({ ...lineFormData, reference: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="designation">Désignation *</Label>
+                  <Input
+                    id="designation"
+                    value={lineFormData.designation}
+                    onChange={(e) => setLineFormData({ ...lineFormData, designation: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={lineFormData.description}
+                  onChange={(e) => setLineFormData({ ...lineFormData, description: e.target.value })}
+                  rows={2}
+                />
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quantite">Quantité</Label>
+                  <Input
+                    id="quantite"
+                    type="number"
+                    step="0.01"
+                    value={lineFormData.quantite}
+                    onChange={(e) => setLineFormData({ ...lineFormData, quantite: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unite">Unité</Label>
+                  <Input
+                    id="unite"
+                    value={lineFormData.unite}
+                    onChange={(e) => setLineFormData({ ...lineFormData, unite: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prixUnitaireHT">Prix HT *</Label>
+                  <Input
+                    id="prixUnitaireHT"
+                    type="number"
+                    step="0.01"
+                    value={lineFormData.prixUnitaireHT}
+                    onChange={(e) => setLineFormData({ ...lineFormData, prixUnitaireHT: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tauxTVA">TVA %</Label>
+                  <Input
+                    id="tauxTVA"
+                    type="number"
+                    step="0.01"
+                    value={lineFormData.tauxTVA}
+                    onChange={(e) => setLineFormData({ ...lineFormData, tauxTVA: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddLineDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={addLineMutation.isPending}>
+                {addLineMutation.isPending ? "Ajout..." : "Ajouter"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

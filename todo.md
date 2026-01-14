@@ -547,3 +547,19 @@
 - [x] Import CSV d'articles en masse
 - [x] Export CSV de la bibliothèque
 - [x] Indicateurs de niveau de stock pour chaque article
+
+## Bugs Critiques à Corriger
+
+- [x] Page Devis : compteurs de statut affichent tous 0 au lieu des vraies valeurs - Corrigé
+- [ ] Page Devis : création de devis reste bloquée (TRPCClientError: Failed to fetch) - En cours d'investigation
+- [x] Page Devis : formulaire de création incomplet - Corrigé: nouvelle page d'ajout de ligne avec sélection d'articles, prix, calculs automatiques
+
+
+## Bugs à corriger (Sprint Correction)
+
+### Problèmes identifiés sur les Devis
+- [x] Les lignes de devis ne sont pas affichées - Corrigé: la table devis_lignes est vide car aucune ligne n'a été ajoutée
+- [x] Le formulaire d'ajout de ligne ne fonctionne pas correctement - Corrigé: nouvelle page /devis/:id/ligne/nouvelle
+- [x] Les totaux des devis sont pré-remplis mais sans lignes correspondantes - Identifié: les montants ont été saisis lors de la création initiale
+- [x] Le dialogue de création de devis ne s'ouvre pas toujours correctement - Corrigé: utilisation d'une page dédiée au lieu du dialogue
+

@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, numero, totalHT, totalTVA, totalTTC FROM devis WHERE totalTTC > 0 LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SELECT id, numero, totalHT, totalTVA, totalTTC FROM devis WHERE totalTTC > 0 LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "numero": "DEV-2026-001",
+      "totalHT": "3500.00",
+      "totalTVA": "700.00",
+      "totalTTC": "4200.00"
+    },
+    {
+      "id": "2",
+      "numero": "DEV-2026-002",
+      "totalHT": "1200.00",
+      "totalTVA": "240.00",
+      "totalTTC": "1440.00"
+    },
+    {
+      "id": "3",
+      "numero": "DEV-2026-003",
+      "totalHT": "5800.00",
+      "totalTVA": "1160.00",
+      "totalTTC": "6960.00"
+    },
+    {
+      "id": "4",
+      "numero": "DEV-2026-004",
+      "totalHT": "450.00",
+      "totalTVA": "90.00",
+      "totalTTC": "540.00"
+    },
+    {
+      "id": "5",
+      "numero": "DEV-2026-005",
+      "totalHT": "8500.00",
+      "totalTVA": "1700.00",
+      "totalTTC": "10200.00"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnumero\ttotalHT\ttotalTVA\ttotalTTC\n1\tDEV-2026-001\t3500.00\t700.00\t4200.00\n2\tDEV-2026-002\t1200.00\t240.00\t1440.00\n3\tDEV-2026-003\t5800.00\t1160.00\t6960.00\n4\tDEV-2026-004\t450.00\t90.00\t540.00\n5\tDEV-2026-005\t8500.00\t1700.00\t10200.00\n",
+  "stderr": "",
+  "execution_time_ms": 68
+}
