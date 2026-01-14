@@ -1,4 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +27,8 @@ import {
   Palette,
   GripVertical,
   Move,
-  Printer
+  Printer,
+  FileDown
 } from "lucide-react";
 
 interface Intervention {
@@ -74,6 +77,16 @@ export default function CalendrierChantiers() {
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
   const [customColors, setCustomColors] = useState<Record<number, string>>({});
   const [colorMode, setColorMode] = useState<"chantier" | "technicien" | "statut">("chantier");
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingChange, setPendingChange] = useState<{
+    type: 'date' | 'technicien';
+    interventionId: number;
+    interventionTitre: string;
+    newDate?: Date;
+    newTechnicienId?: number;
+    newTechnicienNom?: string;
+  } | null>(null);
+  const [dragOverTechnicien, setDragOverTechnicien] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
   const { data: chantiers } = trpc.chantiers.list.useQuery();
@@ -90,11 +103,25 @@ export default function CalendrierChantiers() {
 
   const updateInterventionMutation = trpc.interventions.update.useMutation({
     onSuccess: () => {
-      toast.success("Intervention déplacée avec succès");
+      toast.success("Intervention mise à jour avec succès");
       utils.interventions.list.invalidate();
+      setShowConfirmDialog(false);
+      setPendingChange(null);
     },
     onError: (error) => {
-      toast.error("Erreur lors du déplacement: " + error.message);
+      toast.error("Erreur lors de la mise à jour: " + error.message);
+    },
+  });
+
+  const assignerTechnicienMutation = trpc.interventions.assignerTechnicien.useMutation({
+    onSuccess: () => {
+      toast.success("Technicien réassigné avec succès");
+      utils.interventions.list.invalidate();
+      setShowConfirmDialog(false);
+      setPendingChange(null);
+    },
+    onError: (error) => {
+      toast.error("Erreur lors de la réassignation: " + error.message);
     },
   });
 
@@ -203,21 +230,61 @@ export default function CalendrierChantiers() {
     const newDateDebut = new Date(originalDate);
     newDateDebut.setDate(newDateDebut.getDate() + diffDays);
     
-    let newDateFin = null;
-    if (draggedIntervention.dateFin) {
-      const originalDateFin = new Date(draggedIntervention.dateFin);
-      newDateFin = new Date(originalDateFin);
-      newDateFin.setDate(newDateFin.getDate() + diffDays);
+    // Afficher la confirmation
+    setPendingChange({
+      type: 'date',
+      interventionId: draggedIntervention.id,
+      interventionTitre: draggedIntervention.description || `Intervention #${draggedIntervention.id}`,
+      newDate: newDateDebut,
+    });
+    setShowConfirmDialog(true);
+    setDraggedIntervention(null);
+  };
+
+  // Handler pour le drop sur un technicien
+  const handleDropOnTechnicien = (e: React.DragEvent, technicienId: number, technicienNom: string) => {
+    e.preventDefault();
+    setDragOverTechnicien(null);
+    
+    if (!draggedIntervention) return;
+    if (draggedIntervention.technicienId === technicienId) {
+      setDraggedIntervention(null);
+      return;
     }
     
-    // Mettre à jour l'intervention
-    updateInterventionMutation.mutate({
-      id: draggedIntervention.id,
-      dateDebut: newDateDebut.toISOString(),
-      dateFin: newDateFin?.toISOString() || undefined,
+    // Afficher la confirmation
+    setPendingChange({
+      type: 'technicien',
+      interventionId: draggedIntervention.id,
+      interventionTitre: draggedIntervention.description || `Intervention #${draggedIntervention.id}`,
+      newTechnicienId: technicienId,
+      newTechnicienNom: technicienNom,
     });
-    
+    setShowConfirmDialog(true);
     setDraggedIntervention(null);
+  };
+
+  // Confirmer le changement
+  const confirmChange = () => {
+    if (!pendingChange) return;
+    
+    if (pendingChange.type === 'date' && pendingChange.newDate) {
+      updateInterventionMutation.mutate({
+        id: pendingChange.interventionId,
+        dateDebut: pendingChange.newDate.toISOString(),
+      });
+    } else if (pendingChange.type === 'technicien' && pendingChange.newTechnicienId !== undefined) {
+      assignerTechnicienMutation.mutate({
+        interventionId: pendingChange.interventionId,
+        technicienId: pendingChange.newTechnicienId,
+      });
+    }
+  };
+
+  // Annuler le changement
+  const cancelChange = () => {
+    setShowConfirmDialog(false);
+    setPendingChange(null);
   };
 
   const handleDragEnd = () => {
@@ -371,6 +438,107 @@ export default function CalendrierChantiers() {
     link.download = `calendrier-chantiers-${currentDate.toISOString().split("T")[0]}.csv`;
     link.click();
     toast.success("Calendrier exporté");
+  };
+
+  // Export PDF du calendrier
+  const exportToPDF = () => {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const title = viewMode === 'month' 
+      ? `${MOIS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
+      : viewMode === 'week'
+      ? `Semaine du ${getDaysInWeek()[0].toLocaleDateString("fr-FR")}`
+      : formatDate(currentDate);
+
+    // En-tête
+    doc.setFontSize(20);
+    doc.setTextColor(51, 51, 51);
+    doc.text('Calendrier des Chantiers', 148.5, 15, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.setTextColor(102, 102, 102);
+    doc.text(title, 148.5, 23, { align: 'center' });
+
+    // Filtres actifs
+    let yPos = 30;
+    if (selectedChantierId || selectedTechnicienId) {
+      doc.setFontSize(10);
+      let filterText = 'Filtres: ';
+      if (selectedChantierId) {
+        filterText += `Chantier: ${chantiers?.find(c => c.id === selectedChantierId)?.nom || ''} `;
+      }
+      if (selectedTechnicienId) {
+        filterText += `Technicien: ${(techniciens as any[])?.find((t: any) => t.id === selectedTechnicienId)?.nom || ''}`;
+      }
+      doc.text(filterText, 14, yPos);
+      yPos += 7;
+    }
+
+    // Tableau des interventions
+    const tableData = filteredInterventions.map(i => [
+      i.chantierNom,
+      i.description || 'Intervention',
+      new Date(i.dateDebut).toLocaleDateString('fr-FR'),
+      i.dateFin ? new Date(i.dateFin).toLocaleDateString('fr-FR') : '-',
+      i.technicienNom || 'Non assigné',
+      i.adresse || '-',
+      i.statut === 'planifiee' ? 'Planifiée' :
+        i.statut === 'en_cours' ? 'En cours' :
+        i.statut === 'terminee' ? 'Terminée' : 'Annulée'
+    ]);
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['Chantier', 'Description', 'Début', 'Fin', 'Technicien', 'Adresse', 'Statut']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: {
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 3
+      },
+      columnStyles: {
+        0: { cellWidth: 35 },
+        1: { cellWidth: 45 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 35 },
+        5: { cellWidth: 50 },
+        6: { cellWidth: 25 }
+      }
+    });
+
+    // Légende
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.setTextColor(51, 51, 51);
+    doc.text(`Légende (${colorMode === 'chantier' ? 'Par chantier' : colorMode === 'technicien' ? 'Par technicien' : 'Par statut'})`, 14, finalY);
+
+    // Pied de page
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Généré le ${new Date().toLocaleDateString('fr-FR')} - Page ${i}/${pageCount}`,
+        148.5,
+        200,
+        { align: 'center' }
+      );
+    }
+
+    // Télécharger le PDF
+    doc.save(`calendrier-chantiers-${currentDate.toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF généré avec succès');
   };
 
   // Impression du calendrier
@@ -643,6 +811,10 @@ export default function CalendrierChantiers() {
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
             Imprimer
+          </Button>
+          <Button variant="outline" onClick={exportToPDF}>
+            <FileDown className="h-4 w-4 mr-2" />
+            PDF
           </Button>
         </div>
       </div>
@@ -1131,6 +1303,45 @@ export default function CalendrierChantiers() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
               Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogue de confirmation pour les changements */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingChange?.type === 'date' ? 'Confirmer le changement de date' : 'Confirmer la réassignation'}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingChange?.type === 'date' ? (
+                <>
+                  Voulez-vous déplacer l'intervention <strong>"{pendingChange?.interventionTitre}"</strong> au{' '}
+                  <strong>{pendingChange?.newDate?.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> ?
+                </>
+              ) : (
+                <>
+                  Voulez-vous réassigner l'intervention <strong>"{pendingChange?.interventionTitre}"</strong> à{' '}
+                  <strong>{pendingChange?.newTechnicienNom}</strong> ?
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={cancelChange}>
+              Annuler
+            </Button>
+            <Button onClick={confirmChange} disabled={updateInterventionMutation.isPending || assignerTechnicienMutation.isPending}>
+              {(updateInterventionMutation.isPending || assignerTechnicienMutation.isPending) ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Confirmation...
+                </>
+              ) : (
+                'Confirmer'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

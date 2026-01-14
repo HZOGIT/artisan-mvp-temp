@@ -449,3 +449,24 @@
 - [x] Vue hebdomadaire optimisée pour l'impression
 - [x] Vue mensuelle optimisée pour l'impression
 - [x] Styles CSS d'impression dédiés
+
+
+## Nouvelles Fonctionnalités (Sprint 18)
+
+### Export PDF Calendrier
+- [x] Bouton d'export PDF dans le calendrier
+- [x] Génération du PDF avec jsPDF
+- [x] Mise en page optimisée pour le PDF
+- [x] Inclusion de la légende et des filtres
+
+### Widget Calendrier Compact
+- [x] Composant CalendarWidget réutilisable
+- [x] Intégration sur le tableau de bord
+- [x] Affichage des interventions du jour/semaine
+- [x] Navigation rapide vers le calendrier complet
+
+### Amélioration Drag-and-Drop
+- [x] Réassignation de technicien par drag-and-drop
+- [x] Reprogrammation par glisser-déposer
+- [x] Feedback visuel amélioré
+- [x] Confirmation avant modification

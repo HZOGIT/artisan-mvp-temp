@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import CalendarWidget from "@/components/CalendarWidget";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
@@ -191,6 +192,9 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Widget Calendrier Compact */}
+        <CalendarWidget />
 
         {/* Quick Actions */}
         <Card>
