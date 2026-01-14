@@ -1425,3 +1425,24 @@ export const preferencesCouleursCalendrier = mysqlTable("preferences_couleurs_ca
 });
 export type PreferenceCouleurCalendrier = typeof preferencesCouleursCalendrier.$inferSelect;
 export type InsertPreferenceCouleurCalendrier = typeof preferencesCouleursCalendrier.$inferInsert;
+
+
+// ============================================================================
+// CONFIGURATION RELANCES AUTOMATIQUES
+// ============================================================================
+export const configRelancesAuto = mysqlTable("config_relances_auto", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull().unique(),
+  actif: boolean("actif").default(false),
+  joursApresEnvoi: int("joursApresEnvoi").default(7),
+  joursEntreRelances: int("joursEntreRelances").default(7),
+  nombreMaxRelances: int("nombreMaxRelances").default(3),
+  heureEnvoi: varchar("heureEnvoi", { length: 5 }).default("09:00"),
+  joursEnvoi: varchar("joursEnvoi", { length: 50 }).default("1,2,3,4,5"), // jours de la semaine (1=lundi, 7=dimanche)
+  modeleEmailId: int("modeleEmailId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ConfigRelancesAuto = typeof configRelancesAuto.$inferSelect;
+export type InsertConfigRelancesAuto = typeof configRelancesAuto.$inferInsert;

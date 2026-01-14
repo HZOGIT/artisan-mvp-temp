@@ -524,3 +524,11 @@
 - [x] Filtrage des devis par statut (brouillon, envoyé, accepté, refusé, expiré)
 - [x] Conversion d'un devis accepté en facture en un clic
 - [x] Recherche avancée par nom de client ou numéro de devis
+
+
+## Améliorations Devis - Sprint 21
+
+- [x] Export PDF de la liste des devis filtrés
+- [x] Export Excel de la liste des devis filtrés
+- [x] Tableau de bord statistiques de conversion des devis (/devis/statistiques)
+- [x] Système de relance automatique pour devis en attente (configuration complète)

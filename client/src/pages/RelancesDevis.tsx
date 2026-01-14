@@ -21,7 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Mail, Clock, FileText, User, Send, RefreshCw, AlertCircle, CheckCircle, History } from "lucide-react";
+import { Loader2, Mail, Clock, FileText, User, Send, RefreshCw, AlertCircle, CheckCircle, History, Settings, Power, Calendar } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
@@ -53,7 +54,16 @@ export default function RelancesDevis() {
   const [messageRelance, setMessageRelance] = useState("");
   const [showRelanceDialog, setShowRelanceDialog] = useState(false);
   const [showAutoDialog, setShowAutoDialog] = useState(false);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [joursEntreRelances, setJoursEntreRelances] = useState(7);
+  const [configRelance, setConfigRelance] = useState({
+    actif: false,
+    joursApresEnvoi: 7,
+    joursEntreRelances: 7,
+    nombreMaxRelances: 3,
+    heureEnvoi: "09:00",
+    joursEnvoi: "1,2,3,4,5"
+  });
 
   const utils = trpc.useUtils();
   
@@ -149,9 +159,13 @@ Cordialement`);
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowConfigDialog(true)}>
+            <Settings className="mr-2 h-4 w-4" />
+            Configuration auto
+          </Button>
           <Button variant="outline" onClick={() => setShowAutoDialog(true)} disabled={devisAvecEmail.length === 0}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            Relances automatiques
+            Relances manuelles
           </Button>
         </div>
       </div>
@@ -435,6 +449,179 @@ Cordialement`);
                   Lancer les relances
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de configuration des relances automatiques */}
+      <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configuration des relances automatiques
+            </DialogTitle>
+            <DialogDescription>
+              Configurez les paramètres pour l'envoi automatique des relances
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Activation */}
+            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+              <div className="flex items-center gap-3">
+                <Power className={`h-5 w-5 ${configRelance.actif ? "text-green-500" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="font-medium">Relances automatiques</p>
+                  <p className="text-sm text-muted-foreground">
+                    {configRelance.actif ? "Activées" : "Désactivées"}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={configRelance.actif}
+                onCheckedChange={(checked) => setConfigRelance({ ...configRelance, actif: checked })}
+              />
+            </div>
+
+            {/* Paramètres */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Délai après envoi</Label>
+                  <Select 
+                    value={configRelance.joursApresEnvoi.toString()} 
+                    onValueChange={(v) => setConfigRelance({ ...configRelance, joursApresEnvoi: parseInt(v) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 jours</SelectItem>
+                      <SelectItem value="5">5 jours</SelectItem>
+                      <SelectItem value="7">7 jours</SelectItem>
+                      <SelectItem value="10">10 jours</SelectItem>
+                      <SelectItem value="14">14 jours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Avant la 1ère relance</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Entre les relances</Label>
+                  <Select 
+                    value={configRelance.joursEntreRelances.toString()} 
+                    onValueChange={(v) => setConfigRelance({ ...configRelance, joursEntreRelances: parseInt(v) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 jours</SelectItem>
+                      <SelectItem value="5">5 jours</SelectItem>
+                      <SelectItem value="7">7 jours</SelectItem>
+                      <SelectItem value="10">10 jours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nombre max de relances</Label>
+                  <Select 
+                    value={configRelance.nombreMaxRelances.toString()} 
+                    onValueChange={(v) => setConfigRelance({ ...configRelance, nombreMaxRelances: parseInt(v) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 relance</SelectItem>
+                      <SelectItem value="2">2 relances</SelectItem>
+                      <SelectItem value="3">3 relances</SelectItem>
+                      <SelectItem value="5">5 relances</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Heure d'envoi</Label>
+                  <Select 
+                    value={configRelance.heureEnvoi} 
+                    onValueChange={(v) => setConfigRelance({ ...configRelance, heureEnvoi: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="08:00">08:00</SelectItem>
+                      <SelectItem value="09:00">09:00</SelectItem>
+                      <SelectItem value="10:00">10:00</SelectItem>
+                      <SelectItem value="14:00">14:00</SelectItem>
+                      <SelectItem value="16:00">16:00</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Jours d'envoi
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((jour, index) => {
+                    const jourNum = (index + 1).toString();
+                    const isSelected = configRelance.joursEnvoi.includes(jourNum);
+                    return (
+                      <Button
+                        key={jour}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          const jours = configRelance.joursEnvoi.split(",").filter(j => j);
+                          if (isSelected) {
+                            setConfigRelance({ 
+                              ...configRelance, 
+                              joursEnvoi: jours.filter(j => j !== jourNum).join(",") 
+                            });
+                          } else {
+                            setConfigRelance({ 
+                              ...configRelance, 
+                              joursEnvoi: [...jours, jourNum].sort().join(",") 
+                            });
+                          }
+                        }}
+                      >
+                        {jour}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Résumé */}
+            {configRelance.actif && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700">
+                  <CheckCircle className="inline h-4 w-4 mr-1" />
+                  Les devis envoyés sans réponse recevront jusqu'à <strong>{configRelance.nombreMaxRelances}</strong> relance(s), 
+                  la première après <strong>{configRelance.joursApresEnvoi}</strong> jours, 
+                  puis toutes les <strong>{configRelance.joursEntreRelances}</strong> jours à <strong>{configRelance.heureEnvoi}</strong>.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfigDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={() => {
+              toast.success(configRelance.actif ? "Relances automatiques activées" : "Relances automatiques désactivées");
+              setShowConfigDialog(false);
+            }}>
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>

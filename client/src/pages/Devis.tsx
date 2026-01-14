@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
-import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, ArrowRight, Filter, Receipt } from "lucide-react";
+import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, ArrowRight, Filter, Receipt, Download, FileSpreadsheet } from "lucide-react";
+import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -110,6 +112,107 @@ export default function Devis() {
   const formatCurrency = (amount: string | number | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount || 0;
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
+  };
+
+  // Export PDF
+  const exportToPDF = () => {
+    if (!filteredDevis || filteredDevis.length === 0) {
+      toast.error("Aucun devis à exporter");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Titre
+    doc.setFontSize(18);
+    doc.text("Liste des Devis", pageWidth / 2, 20, { align: "center" });
+    
+    // Filtre actif
+    doc.setFontSize(10);
+    const filterText = statusFilter === "all" ? "Tous les statuts" : statusLabels[statusFilter];
+    doc.text(`Filtre: ${filterText} | ${filteredDevis.length} devis`, pageWidth / 2, 28, { align: "center" });
+    doc.text(`Exporté le ${format(new Date(), "dd/MM/yyyy à HH:mm", { locale: fr })}`, pageWidth / 2, 34, { align: "center" });
+
+    // En-têtes du tableau
+    let y = 45;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("Numéro", 14, y);
+    doc.text("Client", 45, y);
+    doc.text("Date", 90, y);
+    doc.text("Objet", 115, y);
+    doc.text("Montant TTC", 160, y);
+    doc.text("Statut", 185, y);
+    
+    // Ligne de séparation
+    y += 3;
+    doc.line(14, y, 200, y);
+    y += 5;
+
+    // Données
+    doc.setFont("helvetica", "normal");
+    filteredDevis.forEach((devis: any) => {
+      if (y > 280) {
+        doc.addPage();
+        y = 20;
+      }
+      const client = clientsMap.get(devis.clientId);
+      const clientName = client ? `${client.nom} ${client.prenom}`.substring(0, 20) : "-";
+      const objet = (devis.objet || "-").substring(0, 25);
+      
+      doc.text(devis.numero || "-", 14, y);
+      doc.text(clientName, 45, y);
+      doc.text(devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-", 90, y);
+      doc.text(objet, 115, y);
+      doc.text(formatCurrency(devis.totalTTC).replace("\u00a0", " "), 160, y);
+      doc.text(statusLabels[devis.statut] || devis.statut, 185, y);
+      y += 7;
+    });
+
+    doc.save(`devis_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    toast.success("Export PDF téléchargé");
+  };
+
+  // Export Excel
+  const exportToExcel = () => {
+    if (!filteredDevis || filteredDevis.length === 0) {
+      toast.error("Aucun devis à exporter");
+      return;
+    }
+
+    const data = filteredDevis.map((devis: any) => {
+      const client = clientsMap.get(devis.clientId);
+      return {
+        "Numéro": devis.numero || "-",
+        "Client": client ? `${client.nom} ${client.prenom}` : "-",
+        "Date": devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-",
+        "Objet": devis.objet || "-",
+        "Montant HT": parseFloat(devis.totalHT || "0"),
+        "TVA": parseFloat(devis.totalTVA || "0"),
+        "Montant TTC": parseFloat(devis.totalTTC || "0"),
+        "Statut": statusLabels[devis.statut] || devis.statut,
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Devis");
+    
+    // Ajuster la largeur des colonnes
+    ws["!cols"] = [
+      { wch: 15 }, // Numéro
+      { wch: 25 }, // Client
+      { wch: 12 }, // Date
+      { wch: 35 }, // Objet
+      { wch: 12 }, // Montant HT
+      { wch: 10 }, // TVA
+      { wch: 12 }, // Montant TTC
+      { wch: 12 }, // Statut
+    ];
+
+    XLSX.writeFile(wb, `devis_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    toast.success("Export Excel téléchargé");
   };
 
   // Créer un mapping client pour la recherche par nom
@@ -228,26 +331,38 @@ export default function Devis() {
         </Dialog>
       </div>
 
-      {/* Filtres par statut */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={statusFilter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setStatusFilter("all")}
-        >
-          Tous ({devisList?.length || 0})
-        </Button>
-        {Object.entries(statusLabels).map(([key, label]) => (
+      {/* Filtres par statut et exports */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
           <Button
-            key={key}
-            variant={statusFilter === key ? "default" : "outline"}
+            variant={statusFilter === "all" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter(key)}
-            className={statusFilter === key ? "" : statusColors[key]}
+            onClick={() => setStatusFilter("all")}
           >
-            {label} ({statusCounts[key] || 0})
+            Tous ({devisList?.length || 0})
           </Button>
-        ))}
+          {Object.entries(statusLabels).map(([key, label]) => (
+            <Button
+              key={key}
+              variant={statusFilter === key ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(key)}
+              className={statusFilter === key ? "" : statusColors[key]}
+            >
+              {label} ({statusCounts[key] || 0})
+            </Button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportToPDF}>
+            <Download className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportToExcel}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+        </div>
       </div>
 
       {/* Search */}

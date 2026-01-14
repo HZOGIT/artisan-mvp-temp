@@ -49,6 +49,7 @@ import IntegrationsComptables from "./pages/IntegrationsComptables";
 import DevisIA from "./pages/DevisIA";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
+import StatistiquesDevis from "./pages/StatistiquesDevis";
 import DashboardLayout from "./components/DashboardLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 
@@ -60,6 +61,7 @@ function AuthenticatedRoutes() {
         <Route path="/clients" component={Clients} />
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/devis" component={Devis} />
+        <Route path="/devis/statistiques" component={StatistiquesDevis} />
         <Route path="/devis/:id" component={DevisDetail} />
         <Route path="/factures" component={Factures} />
         <Route path="/factures/:id" component={FactureDetail} />
