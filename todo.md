@@ -491,3 +491,24 @@
 - [x] Historique des actions récentes
 - [x] Option "Ne plus demander"
 - [x] Feedback visuel amélioré
+
+
+## Nouvelles Fonctionnalités (Sprint 20)
+
+### Recherche et Filtrage PDF
+- [x] Champ de recherche dans la prévisualisation PDF
+- [x] Filtres par chantier, technicien et statut
+- [x] Mise à jour dynamique du PDF selon les filtres
+- [x] Indicateur du nombre de résultats
+
+### Partage Configuration Widget
+- [x] Bouton de partage de configuration
+- [x] Génération d'un code de partage
+- [x] Import de configuration partagée
+- [x] Réinitialisation de la configuration
+
+### Animation Drag-and-Drop
+- [x] Animation de transition fluide
+- [x] Indicateur visuel de la nouvelle position
+- [x] Effet de survol amélioré
+- [x] Feedback visuel du déplacement

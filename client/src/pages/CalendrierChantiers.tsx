@@ -28,7 +28,8 @@ import {
   GripVertical,
   Move,
   Printer,
-  FileDown
+  FileDown,
+  Search
 } from "lucide-react";
 
 interface Intervention {
@@ -90,6 +91,11 @@ export default function CalendrierChantiers() {
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
   const [skipConfirmation, setSkipConfirmation] = useState(false);
+  const [pdfSearchTerm, setPdfSearchTerm] = useState("");
+  const [pdfFilterChantier, setPdfFilterChantier] = useState<number | null>(null);
+  const [pdfFilterTechnicien, setPdfFilterTechnicien] = useState<number | null>(null);
+  const [pdfFilterStatut, setPdfFilterStatut] = useState<string | null>(null);
+  const [animatingIntervention, setAnimatingIntervention] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
   const { data: chantiers } = trpc.chantiers.list.useQuery();
@@ -287,21 +293,32 @@ export default function CalendrierChantiers() {
     setDraggedIntervention(null);
   };
 
-  // Confirmer le changement
+  // Confirmer le changement avec animation
   const confirmChange = () => {
     if (!pendingChange) return;
     
-    if (pendingChange.type === 'date' && pendingChange.newDate) {
-      updateInterventionMutation.mutate({
-        id: pendingChange.interventionId,
-        dateDebut: pendingChange.newDate.toISOString(),
-      });
-    } else if (pendingChange.type === 'technicien' && pendingChange.newTechnicienId !== undefined) {
-      assignerTechnicienMutation.mutate({
-        interventionId: pendingChange.interventionId,
-        technicienId: pendingChange.newTechnicienId,
-      });
-    }
+    // Déclencher l'animation
+    setAnimatingIntervention(pendingChange.interventionId);
+    
+    // Effectuer le changement après un court délai pour l'animation
+    setTimeout(() => {
+      if (pendingChange.type === 'date' && pendingChange.newDate) {
+        updateInterventionMutation.mutate({
+          id: pendingChange.interventionId,
+          dateDebut: pendingChange.newDate.toISOString(),
+        });
+      } else if (pendingChange.type === 'technicien' && pendingChange.newTechnicienId !== undefined) {
+        assignerTechnicienMutation.mutate({
+          interventionId: pendingChange.interventionId,
+          technicienId: pendingChange.newTechnicienId,
+        });
+      }
+      
+      // Arrêter l'animation après la mise à jour
+      setTimeout(() => {
+        setAnimatingIntervention(null);
+      }, 500);
+    }, 100);
   };
 
   // Annuler le changement
@@ -463,6 +480,29 @@ export default function CalendrierChantiers() {
     toast.success("Calendrier exporté");
   };
 
+  // Filtrer les interventions pour le PDF
+  const pdfFilteredInterventions = useMemo(() => {
+    return filteredInterventions.filter(i => {
+      // Filtre par recherche
+      if (pdfSearchTerm) {
+        const searchLower = pdfSearchTerm.toLowerCase();
+        const matchesSearch = 
+          i.chantierNom?.toLowerCase().includes(searchLower) ||
+          i.description?.toLowerCase().includes(searchLower) ||
+          i.technicienNom?.toLowerCase().includes(searchLower) ||
+          i.adresse?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+      // Filtre par chantier
+      if (pdfFilterChantier && i.chantierId !== pdfFilterChantier) return false;
+      // Filtre par technicien
+      if (pdfFilterTechnicien && i.technicienId !== pdfFilterTechnicien) return false;
+      // Filtre par statut
+      if (pdfFilterStatut && i.statut !== pdfFilterStatut) return false;
+      return true;
+    });
+  }, [filteredInterventions, pdfSearchTerm, pdfFilterChantier, pdfFilterTechnicien, pdfFilterStatut]);
+
   // Générer le document PDF
   const generatePdfDocument = () => {
     const doc = new jsPDF({
@@ -488,21 +528,33 @@ export default function CalendrierChantiers() {
 
     // Filtres actifs
     let yPos = 30;
-    if (selectedChantierId || selectedTechnicienId) {
+    const activeFilters: string[] = [];
+    if (pdfFilterChantier) {
+      activeFilters.push(`Chantier: ${chantiers?.find(c => c.id === pdfFilterChantier)?.nom || ''}`);
+    }
+    if (pdfFilterTechnicien) {
+      activeFilters.push(`Technicien: ${(techniciens as any[])?.find((t: any) => t.id === pdfFilterTechnicien)?.nom || ''}`);
+    }
+    if (pdfFilterStatut) {
+      const statutLabels: Record<string, string> = {
+        planifiee: 'Planifiée',
+        en_cours: 'En cours',
+        terminee: 'Terminée',
+        annulee: 'Annulée'
+      };
+      activeFilters.push(`Statut: ${statutLabels[pdfFilterStatut] || pdfFilterStatut}`);
+    }
+    if (pdfSearchTerm) {
+      activeFilters.push(`Recherche: "${pdfSearchTerm}"`);
+    }
+    if (activeFilters.length > 0) {
       doc.setFontSize(10);
-      let filterText = 'Filtres: ';
-      if (selectedChantierId) {
-        filterText += `Chantier: ${chantiers?.find(c => c.id === selectedChantierId)?.nom || ''} `;
-      }
-      if (selectedTechnicienId) {
-        filterText += `Technicien: ${(techniciens as any[])?.find((t: any) => t.id === selectedTechnicienId)?.nom || ''}`;
-      }
-      doc.text(filterText, 14, yPos);
+      doc.text(`Filtres: ${activeFilters.join(' | ')}`, 14, yPos);
       yPos += 7;
     }
 
     // Tableau des interventions
-    const tableData = filteredInterventions.map(i => [
+    const tableData = pdfFilteredInterventions.map(i => [
       i.chantierNom,
       i.description || 'Intervention',
       new Date(i.dateDebut).toLocaleDateString('fr-FR'),
@@ -1012,7 +1064,9 @@ export default function CalendrierChantiers() {
                                 onDragStart={(e) => handleDragStart(e, intervention)}
                                 onDragEnd={handleDragEnd}
                                 className={`text-xs p-1 rounded cursor-grab active:cursor-grabbing text-white truncate flex items-center gap-1 ${getInterventionColor(intervention, idx)} ${
-                                  draggedIntervention?.id === intervention.id ? "opacity-50" : ""
+                                  draggedIntervention?.id === intervention.id ? "opacity-50 scale-105" : ""
+                                } ${
+                                  animatingIntervention === intervention.id ? "animate-pulse ring-2 ring-primary ring-offset-2 scale-110 transition-all duration-300" : "transition-all duration-200"
                                 }`}
                                 title={`${intervention.chantierNom} - ${intervention.description || "Intervention"}`}
                               >
@@ -1106,8 +1160,10 @@ export default function CalendrierChantiers() {
                           draggable
                           onDragStart={(e) => handleDragStart(e, intervention)}
                           onDragEnd={handleDragEnd}
-                          className={`cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
-                            draggedIntervention?.id === intervention.id ? "opacity-50" : ""
+                          className={`cursor-grab active:cursor-grabbing hover:shadow-md ${
+                            draggedIntervention?.id === intervention.id ? "opacity-50 scale-105" : ""
+                          } ${
+                            animatingIntervention === intervention.id ? "animate-pulse ring-2 ring-primary ring-offset-2 scale-105 transition-all duration-300" : "transition-all duration-200"
                           }`}
                           onClick={() => {
                             setSelectedIntervention(intervention);
@@ -1172,8 +1228,10 @@ export default function CalendrierChantiers() {
                       draggable
                       onDragStart={(e) => handleDragStart(e, intervention)}
                       onDragEnd={handleDragEnd}
-                      className={`cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
-                        draggedIntervention?.id === intervention.id ? "opacity-50" : ""
+                      className={`cursor-grab active:cursor-grabbing hover:shadow-md ${
+                        draggedIntervention?.id === intervention.id ? "opacity-50 scale-105" : ""
+                      } ${
+                        animatingIntervention === intervention.id ? "animate-pulse ring-2 ring-primary ring-offset-2 scale-105 transition-all duration-300" : "transition-all duration-200"
                       }`}
                       onClick={() => {
                         setSelectedIntervention(intervention);
@@ -1429,15 +1487,112 @@ export default function CalendrierChantiers() {
       </Dialog>
 
       {/* Dialogue de prévisualisation PDF */}
-      <Dialog open={showPdfPreview} onOpenChange={setShowPdfPreview}>
-        <DialogContent className="max-w-5xl h-[90vh]">
+      <Dialog open={showPdfPreview} onOpenChange={(open) => {
+        setShowPdfPreview(open);
+        if (!open) {
+          setPdfSearchTerm("");
+          setPdfFilterChantier(null);
+          setPdfFilterTechnicien(null);
+          setPdfFilterStatut(null);
+        }
+      }}>
+        <DialogContent className="max-w-6xl h-[95vh]">
           <DialogHeader>
             <DialogTitle>Prévisualisation du PDF</DialogTitle>
             <DialogDescription>
-              Vérifiez le contenu avant de télécharger
+              Filtrez et vérifiez le contenu avant de télécharger
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0 h-[calc(90vh-180px)]">
+          
+          {/* Barre de filtres */}
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted rounded-lg">
+            <div className="flex-1 min-w-[200px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher..."
+                  value={pdfSearchTerm}
+                  onChange={(e) => {
+                    setPdfSearchTerm(e.target.value);
+                    // Regénérer le PDF après un délai
+                    setTimeout(() => {
+                      const doc = generatePdfDocument();
+                      setPdfDataUrl(doc.output('datauristring'));
+                    }, 300);
+                  }}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <Select
+              value={pdfFilterChantier?.toString() || "all"}
+              onValueChange={(value) => {
+                setPdfFilterChantier(value === "all" ? null : parseInt(value));
+                setTimeout(() => {
+                  const doc = generatePdfDocument();
+                  setPdfDataUrl(doc.output('datauristring'));
+                }, 100);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Chantier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les chantiers</SelectItem>
+                {chantiers?.map(c => (
+                  <SelectItem key={c.id} value={c.id.toString()}>{c.nom}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={pdfFilterTechnicien?.toString() || "all"}
+              onValueChange={(value) => {
+                setPdfFilterTechnicien(value === "all" ? null : parseInt(value));
+                setTimeout(() => {
+                  const doc = generatePdfDocument();
+                  setPdfDataUrl(doc.output('datauristring'));
+                }, 100);
+              }}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Technicien" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les techniciens</SelectItem>
+                {(techniciens as any[])?.map((t: any) => (
+                  <SelectItem key={t.id} value={t.id.toString()}>
+                    {t.prenom} {t.nom}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={pdfFilterStatut || "all"}
+              onValueChange={(value) => {
+                setPdfFilterStatut(value === "all" ? null : value);
+                setTimeout(() => {
+                  const doc = generatePdfDocument();
+                  setPdfDataUrl(doc.output('datauristring'));
+                }, 100);
+              }}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="planifiee">Planifiée</SelectItem>
+                <SelectItem value="en_cours">En cours</SelectItem>
+                <SelectItem value="terminee">Terminée</SelectItem>
+                <SelectItem value="annulee">Annulée</SelectItem>
+              </SelectContent>
+            </Select>
+            <Badge variant="secondary" className="ml-auto">
+              {pdfFilteredInterventions.length} intervention(s)
+            </Badge>
+          </div>
+          
+          <div className="flex-1 min-h-0 h-[calc(95vh-280px)]">
             {pdfDataUrl && (
               <iframe
                 src={pdfDataUrl}
@@ -1452,7 +1607,7 @@ export default function CalendrierChantiers() {
             </Button>
             <Button onClick={downloadFromPreview}>
               <FileDown className="h-4 w-4 mr-2" />
-              Télécharger
+              Télécharger ({pdfFilteredInterventions.length} interventions)
             </Button>
           </DialogFooter>
         </DialogContent>

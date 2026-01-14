@@ -7,13 +7,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Link } from "wouter";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import { 
   Calendar as CalendarIcon, 
   Clock,
   MapPin,
   User,
   ArrowRight,
-  Settings2
+  Settings2,
+  Share2,
+  Copy,
+  Download,
+  Upload
 } from "lucide-react";
 
 const JOURS_COURTS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -49,6 +56,9 @@ export default function CalendarWidget({ className }: CalendarWidgetProps) {
     const saved = localStorage.getItem('calendarWidgetSettings');
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareCode, setShareCode] = useState("");
+  const [importCode, setImportCode] = useState("");
 
   const { data: interventionsData } = trpc.interventions.list.useQuery();
   const { data: chantiers } = trpc.chantiers.list.useQuery();
@@ -65,6 +75,42 @@ export default function CalendarWidget({ className }: CalendarWidgetProps) {
 
   const updateSetting = (key: keyof WidgetSettings, value: boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Générer un code de partage
+  const generateShareCode = () => {
+    const code = btoa(JSON.stringify(settings));
+    setShareCode(code);
+    setShowShareDialog(true);
+  };
+
+  // Copier le code de partage
+  const copyShareCode = () => {
+    navigator.clipboard.writeText(shareCode);
+    toast.success("Code copié dans le presse-papiers");
+  };
+
+  // Importer une configuration
+  const importConfiguration = () => {
+    try {
+      const decoded = JSON.parse(atob(importCode));
+      if (typeof decoded === 'object' && 'showMiniCalendar' in decoded) {
+        setSettings(decoded);
+        toast.success("Configuration importée avec succès");
+        setImportCode("");
+        setShowShareDialog(false);
+      } else {
+        toast.error("Code de configuration invalide");
+      }
+    } catch (e) {
+      toast.error("Code de configuration invalide");
+    }
+  };
+
+  // Réinitialiser la configuration
+  const resetConfiguration = () => {
+    setSettings(DEFAULT_SETTINGS);
+    toast.success("Configuration réinitialisée");
   };
 
   // Transformer les interventions avec les informations des chantiers
@@ -238,6 +284,12 @@ export default function CalendarWidget({ className }: CalendarWidgetProps) {
                       </div>
                     </div>
                   </div>
+                  <div className="border-t pt-3 mt-3">
+                    <Button variant="outline" size="sm" className="w-full" onClick={generateShareCode}>
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Partager cette configuration
+                    </Button>
+                  </div>
                 </div>
               </PopoverContent>
             </Popover>
@@ -371,6 +423,66 @@ export default function CalendarWidget({ className }: CalendarWidgetProps) {
           </div>
         )}
       </CardContent>
+
+      {/* Dialogue de partage */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="h-5 w-5" />
+              Partager la configuration
+            </DialogTitle>
+            <DialogDescription>
+              Partagez votre configuration de widget avec d'autres membres de l'équipe
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Code de partage */}
+            <div>
+              <Label className="text-sm font-medium">Votre code de configuration</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  value={shareCode}
+                  readOnly
+                  className="font-mono text-xs"
+                />
+                <Button variant="outline" size="icon" onClick={copyShareCode}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Envoyez ce code à un collègue pour qu'il puisse importer votre configuration
+              </p>
+            </div>
+
+            <div className="border-t pt-4">
+              <Label className="text-sm font-medium">Importer une configuration</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  placeholder="Collez le code ici..."
+                  value={importCode}
+                  onChange={(e) => setImportCode(e.target.value)}
+                  className="font-mono text-xs"
+                />
+                <Button variant="outline" onClick={importConfiguration} disabled={!importCode}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importer
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={resetConfiguration}>
+              Réinitialiser
+            </Button>
+            <Button variant="outline" onClick={() => setShowShareDialog(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
