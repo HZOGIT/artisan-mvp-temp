@@ -215,7 +215,7 @@ export default function Devis() {
               {filteredDevis.map((devis: any) => (
                 <tr key={devis.id} className="cursor-pointer" onClick={() => setLocation(`/devis/${devis.id}`)}>
                   <td className="font-medium">{devis.numero}</td>
-                  <td>{format(new Date(devis.dateCreation), "dd/MM/yyyy", { locale: fr })}</td>
+                  <td>{devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy", { locale: fr }) : "-"}</td>
                   <td>{devis.objet || "-"}</td>
                   <td className="font-medium">{formatCurrency(devis.totalTTC)}</td>
                   <td>

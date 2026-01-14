@@ -512,3 +512,8 @@
 - [x] Indicateur visuel de la nouvelle position
 - [x] Effet de survol amélioré
 - [x] Feedback visuel du déplacement
+
+
+## Bugs à corriger
+
+- [x] RangeError: Invalid time value dans la page Devis (Devis.tsx ligne 218) - Corrigé: dateCreation -> dateDevis
