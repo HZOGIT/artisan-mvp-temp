@@ -563,3 +563,17 @@
 - [x] Les totaux des devis sont pré-remplis mais sans lignes correspondantes - Identifié: les montants ont été saisis lors de la création initiale
 - [x] Le dialogue de création de devis ne s'ouvre pas toujours correctement - Corrigé: utilisation d'une page dédiée au lieu du dialogue
 
+
+
+## Sprint Correction Sélecteur d'Articles
+
+- [ ] Corriger le sélecteur d'articles pour qu'il s'ouvre correctement
+- [ ] Ajouter une fonctionnalité de recherche et filtrage à la liste d'articles
+- [ ] Pré-remplir automatiquement les champs du formulaire lors de la sélection d'un article
+
+
+## Corrections Sélecteur d'Articles (Sprint Correction)
+
+- [x] Corriger le sélecteur d'articles pour qu'il s'ouvre correctement - Corrigé: utilisation d'un Dialog au lieu d'un Popover
+- [x] Ajouter une fonctionnalité de recherche et de filtrage à la liste de sélection des articles - Corrigé: champ de recherche avec filtrage par nom, référence et catégorie
+- [x] Pré-remplir automatiquement les champs du formulaire lors de la sélection d'un article - Corrigé: les champs sont pré-remplis avec les données de l'article sélectionné
