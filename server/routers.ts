@@ -8,7 +8,7 @@ import * as db from "./db";
 import * as dbSecure from "./db-secure";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
-import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema } from "../shared/validation";
+import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
 
 // ============================================================================
 // ARTISAN ROUTER
@@ -285,22 +285,24 @@ const devisRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    return await db.getDevisByArtisanId(artisan.id);
+    // Utiliser la version sécurisée
+    return await dbSecure.getDevisByArtisanIdSecure(artisan.id);
   }),
   
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const devis = await db.getDevisById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Utiliser la version sécurisée avec vérification d'ownership
+      const devis = await dbSecure.getDevisByIdSecure(input.id, artisan.id);
       if (!devis) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
       }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || devis.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
       const lignes = await db.getLignesDevisByDevisId(devis.id);
-      const client = await db.getClientById(devis.clientId);
+      const client = await dbSecure.getClientByIdSecure(devis.clientId, artisan.id);
       return { ...devis, lignes, client };
     }),
   
@@ -317,16 +319,24 @@ const devisRouter = router({
       if (!artisan) {
         artisan = await db.createArtisan({ userId: ctx.user.id });
       }
+      // Vérifier que le client appartient à l'artisan
+      const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
       const numero = await db.getNextDevisNumber(artisan.id);
-      return await db.createDevis({
-        artisanId: artisan.id,
-        clientId: input.clientId,
+      // Utiliser la version sécurisée
+      return await dbSecure.createDevisSecure(artisan.id, input.clientId, {
         numero,
         objet: input.objet,
         conditionsPaiement: input.conditionsPaiement,
         notes: input.notes,
         dateValidite: input.dateValidite ? new Date(input.dateValidite) : undefined,
         statut: "brouillon",
+        dateDevis: new Date(),
+        totalHT: "0.00",
+        totalTVA: "0.00",
+        totalTTC: "0.00",
       });
     }),
   
@@ -341,31 +351,36 @@ const devisRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, dateValidite, ...data } = input;
-      const devis = await db.getDevisById(id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que le devis appartient à l'artisan
+      const devis = await dbSecure.getDevisByIdSecure(id, artisan.id);
       if (!devis) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
       }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || devis.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
-      return await db.updateDevis(id, {
+      // Utiliser la version sécurisée
+      return await dbSecure.updateDevisSecure(id, artisan.id, {
         ...data,
         dateValidite: dateValidite ? new Date(dateValidite) : undefined,
+        // Ne pas modifier les totaux ici - ils sont recalculés automatiquement
       });
     }),
   
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const devis = await db.getDevisById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que le devis appartient à l'artisan
+      const devis = await dbSecure.getDevisByIdSecure(input.id, artisan.id);
       if (!devis) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
       }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || devis.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
+      // Supprimer avec vérification d'ownership
       await db.deleteDevis(input.id);
       return { success: true };
     }),
@@ -737,22 +752,24 @@ const facturesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    return await db.getFacturesByArtisanId(artisan.id);
+    // Utiliser la version sécurisée
+    return await dbSecure.getFacturesByArtisanIdSecure(artisan.id);
   }),
   
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const facture = await db.getFactureById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Utiliser la version sécurisée avec vérification d'ownership
+      const facture = await dbSecure.getFactureByIdSecure(input.id, artisan.id);
       if (!facture) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
       }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || facture.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
       const lignes = await db.getLignesFacturesByFactureId(facture.id);
-      const client = await db.getClientById(facture.clientId);
+      const client = await dbSecure.getClientByIdSecure(facture.clientId, artisan.id);
       return { ...facture, lignes, client };
     }),
   
@@ -769,7 +786,13 @@ const facturesRouter = router({
       if (!artisan) {
         artisan = await db.createArtisan({ userId: ctx.user.id });
       }
+      // Vérifier que le client appartient à l'artisan
+      const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
       const numero = await db.getNextFactureNumber(artisan.id);
+      // Utiliser la version sécurisée (créer une fonction si nécessaire)
       return await db.createFacture({
         artisanId: artisan.id,
         clientId: input.clientId,
@@ -779,6 +802,10 @@ const facturesRouter = router({
         notes: input.notes,
         dateEcheance: input.dateEcheance ? new Date(input.dateEcheance) : undefined,
         statut: "brouillon",
+        dateFacture: new Date(),
+        totalHT: "0.00",
+        totalTVA: "0.00",
+        totalTTC: "0.00",
       });
     }),
   
@@ -795,13 +822,14 @@ const facturesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, dateEcheance, datePaiement, ...data } = input;
-      const facture = await db.getFactureById(id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que la facture appartient à l'artisan
+      const facture = await dbSecure.getFactureByIdSecure(id, artisan.id);
       if (!facture) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
-      }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || facture.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       return await db.updateFacture(id, {
         ...data,
@@ -813,13 +841,14 @@ const facturesRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const facture = await db.getFactureById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que la facture appartient à l'artisan
+      const facture = await dbSecure.getFactureByIdSecure(input.id, artisan.id);
       if (!facture) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
-      }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || facture.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       await db.deleteFacture(input.id);
       return { success: true };
@@ -1027,21 +1056,23 @@ const interventionsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    return await db.getInterventionsByArtisanId(artisan.id);
+    // Utiliser la version sécurisée
+    return await dbSecure.getInterventionsByArtisanIdSecure(artisan.id);
   }),
   
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const intervention = await db.getInterventionById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Utiliser la version sécurisée avec vérification d'ownership
+      const intervention = await dbSecure.getInterventionByIdSecure(input.id, artisan.id);
       if (!intervention) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
       }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || intervention.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
-      const client = await db.getClientById(intervention.clientId);
+      const client = await dbSecure.getClientByIdSecure(intervention.clientId, artisan.id);
       return { ...intervention, client };
     }),
   
@@ -1059,6 +1090,11 @@ const interventionsRouter = router({
       let artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      // Vérifier que le client appartient à l'artisan
+      const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
       }
       return await db.createIntervention({
         artisanId: artisan.id,
@@ -1086,13 +1122,14 @@ const interventionsRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, dateDebut, dateFin, ...data } = input;
-      const intervention = await db.getInterventionById(id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que l'intervention appartient à l'artisan
+      const intervention = await dbSecure.getInterventionByIdSecure(id, artisan.id);
       if (!intervention) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
-      }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || intervention.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       return await db.updateIntervention(id, {
         ...data,
@@ -1104,13 +1141,14 @@ const interventionsRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const intervention = await db.getInterventionById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que l'intervention appartient à l'artisan
+      const intervention = await dbSecure.getInterventionByIdSecure(input.id, artisan.id);
       if (!intervention) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
-      }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || intervention.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       await db.deleteIntervention(input.id);
       return { success: true };
@@ -1729,7 +1767,8 @@ const stocksRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    return await db.getStocksByArtisanId(artisan.id);
+    // Utiliser la version sécurisée
+    return await dbSecure.getStocksByArtisanIdSecure(artisan.id);
   }),
   
   getById: protectedProcedure
@@ -1738,6 +1777,7 @@ const stocksRouter = router({
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return null;
       const stock = await db.getStockById(input.id);
+      // Vérifier que le stock appartient à l'artisan
       if (!stock || stock.artisanId !== artisan.id) return null;
       return stock;
     }),
@@ -1912,13 +1952,19 @@ const fournisseursRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    return await db.getFournisseursByArtisan(artisan.id);
+    // Utiliser la version sécurisée
+    return await dbSecure.getFournisseursByArtisanIdSecure(artisan.id);
   }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
-      return await db.getFournisseurById(input.id);
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      const fournisseur = await db.getFournisseurById(input.id);
+      // Vérifier que le fournisseur appartient à l'artisan
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) return null;
+      return fournisseur;
     }),
 
   create: protectedProcedure
@@ -1952,7 +1998,15 @@ const fournisseursRouter = router({
       ville: z.string().optional(),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      const fournisseur = await db.getFournisseurById(input.id);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur non trouvé" });
+      }
       const { id, ...data } = input;
       await db.updateFournisseur(id, data);
       return { success: true };
@@ -1960,7 +2014,15 @@ const fournisseursRouter = router({
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      const fournisseur = await db.getFournisseurById(input.id);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur non trouvé" });
+      }
       await db.deleteFournisseur(input.id);
       return { success: true };
     }),
