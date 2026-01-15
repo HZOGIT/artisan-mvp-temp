@@ -231,14 +231,21 @@ export async function deleteClient(id: number): Promise<void> {
 export async function searchClients(artisanId: number, query: string): Promise<Client[]> {
   const db = await getDb();
   if (!db) return [];
+  
+  // Échapper les caractères spéciaux SQL LIKE
+  const escapedQuery = query
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+  
   return await db.select().from(clients).where(
     and(
       eq(clients.artisanId, artisanId),
       or(
-        like(clients.nom, `%${query}%`),
-        like(clients.prenom, `%${query}%`),
-        like(clients.email, `%${query}%`),
-        like(clients.telephone, `%${query}%`)
+        like(clients.nom, `%${escapedQuery}%`),
+        like(clients.prenom, `%${escapedQuery}%`),
+        like(clients.email, `%${escapedQuery}%`),
+        like(clients.telephone, `%${escapedQuery}%`)
       )
     )
   ).orderBy(desc(clients.createdAt));
@@ -275,13 +282,19 @@ export async function searchArticles(query: string, metier?: string): Promise<Bi
   const db = await getDb();
   if (!db) return [];
   
+  // Échapper les caractères spéciaux SQL LIKE
+  const escapedQuery = query
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+  
   if (metier) {
     return await db.select().from(bibliothequeArticles).where(
       and(
         eq(bibliothequeArticles.metier, metier as any),
         or(
-          like(bibliothequeArticles.designation, `%${query}%`),
-          like(bibliothequeArticles.reference, `%${query}%`)
+          like(bibliothequeArticles.designation, `%${escapedQuery}%`),
+          like(bibliothequeArticles.reference, `%${escapedQuery}%`)
         )
       )
     ).orderBy(bibliothequeArticles.designation).limit(50);
@@ -289,8 +302,8 @@ export async function searchArticles(query: string, metier?: string): Promise<Bi
   
   return await db.select().from(bibliothequeArticles).where(
     or(
-      like(bibliothequeArticles.designation, `%${query}%`),
-      like(bibliothequeArticles.reference, `%${query}%`)
+      like(bibliothequeArticles.designation, `%${escapedQuery}%`),
+      like(bibliothequeArticles.reference, `%${escapedQuery}%`)
     )
   ).orderBy(bibliothequeArticles.designation).limit(50);
 }
@@ -1225,7 +1238,8 @@ export async function getLowStockItems(artisanId: number): Promise<Stock[]> {
   return await db.select().from(stocks).where(
     and(
       eq(stocks.artisanId, artisanId),
-      sql`${stocks.quantiteEnStock} <= ${stocks.seuilAlerte}`
+      // Utiliser lte() au lieu de sql template literal pour éviter l'injection SQL
+      lte(stocks.quantiteEnStock, stocks.seuilAlerte)
     )
   ).orderBy(stocks.designation);
 }
@@ -1698,13 +1712,16 @@ export async function getDevisNonSignes(artisanId: number, joursMinimum: number 
   
   const dateLimit = new Date();
   dateLimit.setDate(dateLimit.getDate() - joursMinimum);
+  // Convertir en Date pour la comparaison
+  const dateLimitDate = new Date(dateLimit.getFullYear(), dateLimit.getMonth(), dateLimit.getDate());
   
   // Récupérer les devis envoyés mais non signés
+  // Utiliser lte() au lieu de sql template literal pour éviter l'injection SQL
   const devisEnvoyesResult = await db.select().from(devis).where(
     and(
       eq(devis.artisanId, artisanId),
       eq(devis.statut, "envoye"),
-      sql`${devis.dateDevis} <= ${dateLimit.toISOString().split('T')[0]}`
+      lte(devis.dateDevis, dateLimit)
     )
   ).orderBy(devis.dateDevis);
   

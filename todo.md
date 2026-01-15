@@ -577,3 +577,52 @@
 - [x] Corriger le sélecteur d'articles pour qu'il s'ouvre correctement - Corrigé: utilisation d'un Dialog au lieu d'un Popover
 - [x] Ajouter une fonctionnalité de recherche et de filtrage à la liste de sélection des articles - Corrigé: champ de recherche avec filtrage par nom, référence et catégorie
 - [x] Pré-remplir automatiquement les champs du formulaire lors de la sélection d'un article - Corrigé: les champs sont pré-remplis avec les données de l'article sélectionné
+
+
+---
+
+## 🔴 CORRECTIONS AUDIT SÉCURITÉ (PHASE 0 - CRITIQUE)
+
+### Sécurité Multi-Tenant
+- [ ] Créer `server/_core/security.ts` avec wrappers sécurisés
+- [ ] Refactorer `server/db.ts` - Ajouter artisanId à toutes les requêtes (200+ occurrences)
+- [ ] Simplifier `server/routers.ts` - Utiliser les wrappers de sécurité
+- [ ] Tester l'isolation entre artisans
+
+### Prévention SQL Injection  
+- [ ] Corriger `searchClients` et autres recherches texte
+- [ ] Éliminer tous les `sql` templates avec interpolation directe
+- [ ] Utiliser les paramètres Drizzle (like, eq, and, or)
+- [ ] Auditer toutes les fonctions de `server/db.ts`
+
+### Gestion des Secrets
+- [ ] Créer validation stricte des secrets au démarrage
+- [ ] Supprimer les valeurs par défaut dangereuses
+- [ ] Valider les formats (JWT_SECRET min 32 chars, STRIPE_SECRET_KEY commence par sk_)
+- [ ] Ne JAMAIS exposer les secrets au client
+
+## 🟡 CORRECTIONS AUDIT PERFORMANCE (PHASE 1 - IMPORTANT)
+
+### Index Base de Données
+- [ ] Ajouter index sur `clients` (artisanId, email, telephone)
+- [ ] Ajouter index sur `devis` (artisanId, clientId, numero, statut, dateEmission)
+- [ ] Ajouter index sur `factures` (artisanId, clientId, numero, statut, dateEmission)
+- [ ] Ajouter index sur `interventions` (artisanId, clientId, dateDebut, statut)
+- [ ] Ajouter index sur `stocks` (artisanId, reference)
+
+### Validation des Données
+- [ ] Ajouter regex pour téléphone, SIRET, code postal
+- [ ] Ajouter limites de longueur pour email, nom, etc.
+- [ ] Valider les formats strictement
+- [ ] Tester les cas limites
+
+### Gestion d'Erreurs
+- [ ] Créer `server/_core/errorHandler.ts`
+- [ ] Implémenter middleware d'erreur global
+- [ ] Ne pas exposer les détails en production
+- [ ] Logger les erreurs correctement
+
+### Optimisation Requêtes
+- [ ] Éliminer les N+1 queries
+- [ ] Utiliser JOIN au lieu de boucles
+- [ ] Optimiser les requêtes lentes

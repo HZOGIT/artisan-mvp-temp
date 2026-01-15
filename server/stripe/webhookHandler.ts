@@ -20,7 +20,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     event = constructWebhookEvent(
       req.body,
       signature,
-      ENV.STRIPE_WEBHOOK_SECRET
+      ENV.stripeWebhookSecret || ''
     );
   } catch (err: any) {
     console.error('[Stripe Webhook] Signature verification failed:', err.message);

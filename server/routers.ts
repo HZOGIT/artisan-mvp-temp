@@ -5,8 +5,10 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
+import * as dbSecure from "./db-secure";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
+import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema } from "../shared/validation";
 
 // ============================================================================
 // ARTISAN ROUTER
@@ -66,88 +68,80 @@ const clientsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    return await db.getClientsByArtisanId(artisan.id);
+    // Utiliser la version sécurisée
+    return await dbSecure.getClientsByArtisanIdSecure(artisan.id);
   }),
   
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
-      const client = await db.getClientById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Utiliser la version sécurisée avec vérification d'ownership
+      const client = await dbSecure.getClientByIdSecure(input.id, artisan.id);
       if (!client) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
-      }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || client.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       return client;
     }),
   
   create: protectedProcedure
-    .input(z.object({
-      nom: z.string().min(1, "Le nom est requis"),
-      prenom: z.string().optional(),
-      email: z.string().email().optional().or(z.literal("")),
-      telephone: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      notes: z.string().optional(),
-    }))
+    .input(ClientInputSchema)
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         artisan = await db.createArtisan({ userId: ctx.user.id });
       }
-      return await db.createClient({ artisanId: artisan.id, ...input });
+      // Utiliser la version sécurisée
+      return await dbSecure.createClientSecure(artisan.id, input);
     }),
   
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().min(1).optional(),
-      prenom: z.string().optional(),
-      email: z.string().email().optional().or(z.literal("")),
-      telephone: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      notes: z.string().optional(),
+      ...ClientInputSchema.partial().shape,
     }))
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
-      const client = await db.getClientById(id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que le client appartient à l'artisan
+      const client = await dbSecure.getClientByIdSecure(id, artisan.id);
       if (!client) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
       }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || client.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
-      return await db.updateClient(id, data);
+      // Utiliser la version sécurisée
+      return await dbSecure.updateClientSecure(id, artisan.id, data);
     }),
   
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      const client = await db.getClientById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Vérifier que le client appartient à l'artisan
+      const client = await dbSecure.getClientByIdSecure(input.id, artisan.id);
       if (!client) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
       }
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan || client.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
-      await db.deleteClient(input.id);
+      // Utiliser la version sécurisée
+      await dbSecure.deleteClientSecure(input.id, artisan.id);
       return { success: true };
     }),
   
   search: protectedProcedure
-    .input(z.object({ query: z.string() }))
+    .input(ClientSearchSchema)
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      return await db.searchClients(artisan.id, input.query);
+      // Utiliser la version sécurisée
+      return await dbSecure.searchClientsSecure(artisan.id, input.query);
     }),
 });
 

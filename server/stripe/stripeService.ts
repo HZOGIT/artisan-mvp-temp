@@ -3,7 +3,7 @@ import { ENV } from '../_core/env';
 import { STRIPE_CONFIG, getInvoiceProductName, getInvoiceProductDescription } from './products';
 
 // Initialiser Stripe avec la clé secrète
-const stripe = new Stripe(ENV.STRIPE_SECRET_KEY || '', {
+const stripe = new Stripe(ENV.stripeSecretKey || '', {
   apiVersion: '2025-12-15.clover',
 });
 
@@ -111,7 +111,7 @@ export function constructWebhookEvent(
  * Vérifie si Stripe est configuré
  */
 export function isStripeConfigured(): boolean {
-  return !!(ENV.STRIPE_SECRET_KEY && ENV.STRIPE_SECRET_KEY.length > 0);
+  return !!(ENV.stripeSecretKey && ENV.stripeSecretKey.length > 0);
 }
 
 export { stripe };
