@@ -626,3 +626,36 @@
 - [ ] Éliminer les N+1 queries
 - [ ] Utiliser JOIN au lieu de boucles
 - [ ] Optimiser les requêtes lentes
+
+
+## Sprint 3 - Nouvelles Fonctionnalités Prioritaires
+
+### Import de Contacts Clients via Excel
+- [ ] Créer un composant d'upload de fichier Excel
+- [ ] Parser le fichier Excel et valider les données
+- [ ] Afficher une prévisualisation des contacts avant import
+- [ ] Implémenter la logique d'import en base de données
+- [ ] Gérer les doublons (email, téléphone)
+- [ ] Afficher les messages de succès/erreur
+- [ ] Créer une page dédiée pour l'import
+
+### Génération PDF des Devis et Factures
+- [ ] Créer un template PDF pour les devis
+- [ ] Créer un template PDF pour les factures
+- [ ] Ajouter le logo de l'artisan au PDF
+- [ ] Inclure les détails client (nom, adresse, email, téléphone)
+- [ ] Inclure les articles avec prix unitaire et total
+- [ ] Calculer et afficher TVA et total
+- [ ] Ajouter les conditions de paiement
+- [ ] Implémenter le bouton "Télécharger PDF" sur les pages devis/factures
+- [ ] Tester la génération avec différents formats
+
+### Gestion des Modèles d'E-mails Transactionnels
+- [ ] Créer une table pour les modèles d'emails
+- [ ] Créer une page de gestion des modèles
+- [ ] Implémenter l'édition des modèles
+- [ ] Ajouter les variables dynamiques (nom client, numéro devis, etc.)
+- [ ] Créer une prévisualisation du modèle
+- [ ] Intégrer les modèles avec l'envoi d'email
+- [ ] Créer des modèles par défaut (relance, confirmation, etc.)
+- [ ] Tester l'envoi avec les variables remplacées

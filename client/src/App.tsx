@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
+import ImportClients from "./pages/ImportClients";
 import Devis from "./pages/Devis";
 import DevisDetail from "./pages/DevisDetail";
 import Factures from "./pages/Factures";
@@ -24,6 +25,7 @@ import RapportCommande from "./pages/RapportCommande";
 import RelancesDevis from "./pages/RelancesDevis";
 import SignatureDevis from "./pages/SignatureDevis";
 import ModelesEmail from "./pages/ModelesEmail";
+import ModelesEmailTransactionnels from "./pages/ModelesEmailTransactionnels";
 import PerformancesFournisseurs from "./pages/PerformancesFournisseurs";
 import PaiementSucces from "./pages/PaiementSucces";
 import PaiementAnnule from "./pages/PaiementAnnule";
@@ -62,6 +64,7 @@ function AuthenticatedRoutes() {
       <Switch location={location}>
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/clients" component={Clients} />
+        <Route path="/clients/import" component={ImportClients} />
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/devis" component={Devis} />
         <Route path="/devis/statistiques" component={StatistiquesDevis} />
@@ -79,6 +82,7 @@ function AuthenticatedRoutes() {
         <Route path="/rapport-commande" component={RapportCommande} />
         <Route path="/relances" component={RelancesDevis} />
         <Route path="/modeles-email" component={ModelesEmail} />
+        <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
         <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
         <Route path="/contrats" component={Contrats} />
         <Route path="/mobile" component={InterventionsMobile} />

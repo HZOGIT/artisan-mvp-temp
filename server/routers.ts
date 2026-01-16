@@ -140,8 +140,42 @@ const clientsRouter = router({
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      // Utiliser la version sécurisée
       return await dbSecure.searchClientsSecure(artisan.id, input.query);
+    }),
+  
+  importFromExcel: protectedProcedure
+    .input(z.object({
+      clients: z.array(z.object({
+        nom: z.string(),
+        prenom: z.string().optional(),
+        email: z.string().email().optional(),
+        telephone: z.string().optional(),
+        adresse: z.string().optional(),
+        codePostal: z.string().optional(),
+        ville: z.string().optional(),
+        notes: z.string().optional(),
+      }))
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      
+      let imported = 0;
+      let skipped = 0;
+      
+      for (const clientData of input.clients) {
+        try {
+          await dbSecure.createClientSecure(artisan.id, clientData);
+          imported++;
+        } catch (error) {
+          console.error("Erreur lors de l'import:", error);
+          skipped++;
+        }
+      }
+      
+      return { imported, skipped };
     }),
 });
 
@@ -483,6 +517,32 @@ const devisRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       return await db.createFactureFromDevis(input.devisId);
+    }),
+
+  generatePDF: protectedProcedure
+    .input(z.object({ devisId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const devis = await db.getDevisById(input.devisId);
+      if (!devis) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || devis.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acces non autorise" });
+      }
+      const client = await db.getClientById(devis.clientId);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouve" });
+      }
+      const lignes = await db.getLignesDevisByDevisId(devis.id);
+      
+      const { generateDevisPDF } = await import("./_core/pdfGenerator");
+      const pdfBuffer = generateDevisPDF({ devis: { ...devis, lignes }, artisan, client });
+      
+      return {
+        pdf: pdfBuffer.toString("base64"),
+        filename: `Devis_${devis.numero}.pdf`,
+      };
     }),
 
   // Envoi par email
@@ -901,17 +961,43 @@ const facturesRouter = router({
     .mutation(async ({ ctx, input }) => {
       const facture = await db.getFactureById(input.id);
       if (!facture) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvee" });
       }
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan || facture.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acces non autorise" });
       }
       return await db.updateFacture(input.id, {
         montantPaye: input.montantPaye,
         datePaiement: new Date(input.datePaiement),
         statut: "payee",
       });
+    }),
+
+  generatePDF: protectedProcedure
+    .input(z.object({ factureId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const facture = await db.getFactureById(input.factureId);
+      if (!facture) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvee" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || facture.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acces non autorise" });
+      }
+      const client = await db.getClientById(facture.clientId);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouve" });
+      }
+      const lignes = await db.getLignesFacturesByFactureId(facture.id);
+      
+      const { generateFacturePDF } = await import("./_core/pdfGenerator");
+      const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client });
+      
+      return {
+        pdf: pdfBuffer.toString("base64"),
+        filename: `Facture_${facture.numero}.pdf`,
+      };
     }),
 
   // Envoi par email

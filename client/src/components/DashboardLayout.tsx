@@ -20,6 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
+import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
 import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route, Palmtree, LineChart, Car, Trophy, AlertTriangle, HardHat, Link2, Sparkles } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -31,9 +32,11 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
   { icon: BarChart3, label: "Statistiques", path: "/statistiques" },
   { icon: Users, label: "Clients", path: "/clients" },
+  { icon: Upload, label: "Import Clients", path: "/clients/import" },
   { icon: FileText, label: "Devis", path: "/devis" },
   { icon: RefreshCw, label: "Relances Devis", path: "/relances" },
   { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
+  { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
   { icon: Receipt, label: "Factures", path: "/factures" },
   { icon: FileSignature, label: "Contrats", path: "/contrats" },
   { icon: Calendar, label: "Interventions", path: "/interventions" },
