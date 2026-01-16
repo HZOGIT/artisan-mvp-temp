@@ -40,6 +40,13 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  
+  // ENDPOINT TEMPORAIRE - Créer les utilisateurs de test
+  if (process.env.NODE_ENV === "development") {
+    app.get('/api/test/create-users', async (req, res) => {
+      res.json({ message: 'Endpoint de création d\'utilisateurs de test disponible' });
+    });
+  }
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

@@ -117,8 +117,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    overflow-y: scroll; /* Force la barre de défilement pour éviter le saut */
+  }
   body {
     @apply bg-background text-foreground;
+  }
+  /* Prévenir le saut du scrollbar quand une modale s'ouvre */
+  body.overflow-hidden {
+    padding-right: var(--scrollbar-width, 0px);
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),

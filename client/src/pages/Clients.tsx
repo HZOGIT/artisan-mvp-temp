@@ -128,9 +128,15 @@ export default function Clients() {
             Gérez votre base de clients
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (open) {
+            resetForm();
+            setEditingClient(null);
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingClient(null); }}>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Nouveau client
             </Button>

@@ -6,26 +6,24 @@ import { z } from "zod";
  */
 const envSchema = z.object({
   // Database - REQUIS
-  DATABASE_URL: z.string().url("DATABASE_URL doit être une URL valide"),
+  DATABASE_URL: z.string().min(1, "DATABASE_URL requis"),
   
   // Auth - REQUIS
-  JWT_SECRET: z.string()
-    .min(32, "JWT_SECRET doit faire au moins 32 caractères pour la sécurité")
-    .max(256, "JWT_SECRET ne doit pas dépasser 256 caractères"),
-  VITE_APP_ID: z.string().min(1, "VITE_APP_ID requis"),
-  OAUTH_SERVER_URL: z.string().url("OAUTH_SERVER_URL doit être une URL valide"),
-  VITE_OAUTH_PORTAL_URL: z.string().url("VITE_OAUTH_PORTAL_URL doit être une URL valide"),
+  JWT_SECRET: z.string().min(1, "JWT_SECRET requis"),
+  VITE_APP_ID: z.string().optional(),
+  OAUTH_SERVER_URL: z.string().optional(),
+  VITE_OAUTH_PORTAL_URL: z.string().optional(),
   
   // Stripe - REQUIS
-  STRIPE_SECRET_KEY: z.string()
-    .startsWith("sk_", "STRIPE_SECRET_KEY doit commencer par 'sk_'"),
-  VITE_STRIPE_PUBLISHABLE_KEY: z.string()
-    .startsWith("pk_", "VITE_STRIPE_PUBLISHABLE_KEY doit commencer par 'pk_'"),
+  STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY requis"),
+  VITE_STRIPE_PUBLISHABLE_KEY: z.string().min(1, "VITE_STRIPE_PUBLISHABLE_KEY requis"),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   
   // Manus API - OPTIONNEL
-  BUILT_IN_FORGE_API_URL: z.string().url().optional(),
+  BUILT_IN_FORGE_API_URL: z.string().optional(),
   BUILT_IN_FORGE_API_KEY: z.string().optional(),
+  VITE_FRONTEND_FORGE_API_KEY: z.string().optional(),
+  VITE_FRONTEND_FORGE_API_URL: z.string().optional(),
   
   // Owner Info - OPTIONNEL
   OWNER_OPEN_ID: z.string().optional(),
@@ -34,7 +32,7 @@ const envSchema = z.object({
   // Email (optionnel mais recommandé)
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
-  SMTP_USER: z.string().email().optional(),
+  SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   
   // SMS Twilio (optionnel)
@@ -49,11 +47,20 @@ const envSchema = z.object({
   S3_SECRET_KEY: z.string().optional(),
   
   // Monitoring (optionnel)
-  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_DSN: z.string().optional(),
+  
+  // Analytics (optionnel)
+  VITE_ANALYTICS_ENDPOINT: z.string().optional(),
+  VITE_ANALYTICS_WEBSITE_ID: z.string().optional(),
+  
+  // App Info (optionnel)
+  VITE_APP_LOGO: z.string().optional(),
+  VITE_APP_TITLE: z.string().optional(),
   
   // Environment
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-});
+  PORT: z.string().optional(),
+}).passthrough(); // Permettre les variables d'environnement supplémentaires
 
 type EnvType = z.infer<typeof envSchema>;
 
