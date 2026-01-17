@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, ReactNode } from "react";
+import { ReactNode } from "react";
 import { X } from "lucide-react";
 
 interface BulletproofModalProps {
@@ -8,6 +8,7 @@ interface BulletproofModalProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  onPointerDownOutside?: (e: React.PointerEvent) => void;
 }
 
 export function BulletproofModal({
@@ -17,26 +18,10 @@ export function BulletproofModal({
   description,
   children,
   footer,
+  onPointerDownOutside,
 }: BulletproofModalProps) {
-  // 🔑 CLÉS : Utiliser useRef pour persister l'état INDÉPENDAMMENT du prop isOpen
-  const isOpenRef = useRef(false);
-  const [, setForceRender] = useState(0);
-
-  // Synchroniser isOpenRef avec le prop isOpen
-  useEffect(() => {
-    isOpenRef.current = isOpen;
-    setForceRender(prev => prev + 1);
-  }, [isOpen]);
-
-  // Fonction pour fermer la modale (met à jour AUSSI le ref)
-  const handleClose = () => {
-    isOpenRef.current = false;
-    setForceRender(prev => prev + 1);
-    onClose();
-  };
-
   // Si la modale n'est pas ouverte, ne rien afficher
-  if (!isOpenRef.current) {
+  if (!isOpen) {
     return null;
   }
 
@@ -45,7 +30,12 @@ export function BulletproofModal({
       {/* Overlay */}
       <div
         className="fixed inset-0 z-40 bg-black/50"
-        onClick={() => handleClose()}
+        onClick={() => onClose()}
+        onPointerDown={(e) => {
+          if (onPointerDownOutside) {
+            onPointerDownOutside(e);
+          }
+        }}
       />
 
       {/* Modal */}
@@ -53,6 +43,9 @@ export function BulletproofModal({
         <div
           className="bg-background rounded-lg border shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto"
           onClick={(e) => {
+            e.stopPropagation();
+          }}
+          onPointerDown={(e) => {
             e.stopPropagation();
           }}
         >
@@ -67,7 +60,7 @@ export function BulletproofModal({
               )}
             </div>
             <button
-              onClick={() => handleClose()}
+              onClick={() => onClose()}
               className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-5 w-5" />

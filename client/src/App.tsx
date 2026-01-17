@@ -6,7 +6,9 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
-import Clients from "./pages/Clients";
+import { Clients } from "./pages/Clients";
+import { ClientsNouveauPage } from "./pages/ClientsNouveauPage";
+import { DevisNouveauPage } from "./pages/DevisNouveauPage";
 import ClientDetail from "./pages/ClientDetail";
 import ImportClients from "./pages/ImportClients";
 import Devis from "./pages/Devis";
@@ -64,9 +66,11 @@ function AuthenticatedRoutes() {
       <Switch location={location}>
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/clients" component={Clients} />
+        <Route path="/clients/nouveau" component={ClientsNouveauPage} />
         <Route path="/clients/import" component={ImportClients} />
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/devis" component={Devis} />
+        <Route path="/devis/nouveau" component={DevisNouveauPage} />
         <Route path="/devis/statistiques" component={StatistiquesDevis} />
         <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
         <Route path="/devis/:id/options" component={DevisOptions} />

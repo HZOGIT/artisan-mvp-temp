@@ -1,395 +1,189 @@
 import { useState, useCallback } from "react";
+import { useRouter } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useModal } from "@/contexts/ModalContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { BulletproofModal } from "@/components/BulletproofModal";
-import { Plus, Search, User, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
-export default function Clients() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [editingClient, setEditingClient] = useState<any>(null);
-  const { isCreateClientModalOpen, openCreateClientModal, closeCreateClientModal } = useModal();
+interface ClientFormData {
+  nom: string;
+  prenom: string;
+  email: string;
+  telephone: string;
+  adresse: string;
+  codePostal: string;
+  ville: string;
+  notes: string;
+}
 
-  const [formData, setFormData] = useState({
-    nom: "",
-    prenom: "",
-    email: "",
-    telephone: "",
-    adresse: "",
-    codePostal: "",
-    ville: "",
-    notes: "",
-  });
+const initialFormData: ClientFormData = {
+  nom: "",
+  prenom: "",
+  email: "",
+  telephone: "",
+  adresse: "",
+  codePostal: "",
+  ville: "",
+  notes: "",
+};
 
+export function Clients() {
+  const router = useRouter();
+  const navigate = (path: string) => router.push(path);
   const utils = trpc.useUtils();
-  const { data: clients, isLoading } = trpc.clients.list.useQuery();
   
-  const createMutation = trpc.clients.create.useMutation({
-    onSuccess: () => {
-      utils.clients.list.invalidate();
-      resetForm();
-      closeCreateClientModal();
-      toast.success("Client créé avec succès");
-    },
-    onError: () => {
-      toast.error("Erreur lors de la création du client");
-    },
-  });
+  // State pour le formulaire d'édition
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [formData, setFormData] = useState<ClientFormData>(initialFormData);
+  const [editingClientId, setEditingClientId] = useState<number | null>(null);
+  
+  // State pour la recherche
+  const [searchQuery, setSearchQuery] = useState("");
 
+  // Queries
+  const { data: clients = [], isLoading } = trpc.clients.list.useQuery();
+  
+  // Mutations
   const updateMutation = trpc.clients.update.useMutation({
     onSuccess: () => {
+      toast.success("Client mis à jour");
+      setFormData(initialFormData);
+      setEditingClientId(null);
+      setIsEditModalOpen(false);
       utils.clients.list.invalidate();
-      setEditingClient(null);
-      resetForm();
-      toast.success("Client mis à jour avec succès");
     },
-    onError: () => {
-      toast.error("Erreur lors de la mise à jour du client");
+    onError: (error) => {
+      toast.error(error.message || "Erreur lors de la mise à jour");
     },
   });
 
   const deleteMutation = trpc.clients.delete.useMutation({
     onSuccess: () => {
+      toast.success("Client supprimé");
       utils.clients.list.invalidate();
-      toast.success("Client supprimé avec succès");
     },
-    onError: () => {
-      toast.error("Erreur lors de la suppression du client");
+    onError: (error) => {
+      toast.error(error.message || "Erreur lors de la suppression");
     },
   });
 
-  const resetForm = useCallback(() => {
-    setFormData({
-      nom: "",
-      prenom: "",
-      email: "",
-      telephone: "",
-      adresse: "",
-      codePostal: "",
-      ville: "",
-      notes: "",
-    });
+  // Handler pour les changements d'input
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   }, []);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  // Handler pour réinitialiser le formulaire
+  const resetForm = useCallback(() => {
+    setFormData(initialFormData);
+  }, []);
+
+  // Handler pour fermer la modale d'édition
+  const handleCloseEditModal = useCallback(() => {
+    setIsEditModalOpen(false);
+    resetForm();
+    setEditingClientId(null);
+  }, [resetForm]);
+
+  // Handler pour ouvrir la modale d'édition
+  const handleOpenEditModal = useCallback((client: any) => {
+    setFormData({
+      nom: client.nom,
+      prenom: client.prenom || "",
+      email: client.email || "",
+      telephone: client.telephone || "",
+      adresse: client.adresse || "",
+      codePostal: client.codePostal || "",
+      ville: client.ville || "",
+      notes: client.notes || "",
+    });
+    setEditingClientId(client.id);
+    setIsEditModalOpen(true);
+  }, []);
+
+  // Handler pour soumettre le formulaire d'édition
+  const handleSubmitEdit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.nom.trim()) {
       toast.error("Le nom est requis");
       return;
     }
-
-    if (editingClient) {
-      updateMutation.mutate({
-        id: editingClient.id,
+    if (editingClientId) {
+      await updateMutation.mutateAsync({
+        id: editingClientId,
         ...formData,
       });
-    } else {
-      createMutation.mutate(formData);
     }
-  }, [formData, editingClient, createMutation, updateMutation]);
+  }, [formData, editingClientId, updateMutation]);
 
-  const handleEdit = useCallback((client: any) => {
-    setEditingClient(client);
-    setFormData(client);
-  }, []);
-
-  const handleDelete = useCallback((id: number) => {
+  // Handler pour supprimer un client
+  const handleDelete = useCallback((clientId: number) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate({ id: clientId });
     }
   }, [deleteMutation]);
 
-  const filteredClients = clients?.filter((client) =>
+  // Handler pour la recherche
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  // Filtrer les clients
+  const filteredClients = clients.filter(client =>
     client.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+    client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    client.telephone?.includes(searchQuery)
+  );
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Clients</h1>
-          <p className="text-muted-foreground">Gérez votre base de clients</p>
+          <p className="text-gray-600">Gérez votre base de clients</p>
         </div>
-        <Button onClick={() => {
-          resetForm();
-          setEditingClient(null);
-          openCreateClientModal();
-        }}>
-          <Plus className="w-4 h-4 mr-2" />
+        <Button onClick={() => navigate('/clients/nouveau')} className="gap-2">
+          <Plus className="w-4 h-4" />
           Nouveau client
         </Button>
       </div>
 
-      {/* Search */}
+      {/* Barre de recherche */}
       <div className="relative">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         <Input
+          type="text"
           placeholder="Rechercher un client..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={handleSearchChange}
           className="pl-10"
         />
       </div>
 
-      {/* Create Modal */}
-      <BulletproofModal
-        isOpen={isCreateClientModalOpen && !editingClient}
-        onClose={() => {
-          closeCreateClientModal();
-          resetForm();
-        }}
-        title="Nouveau client"
-        description="Remplissez les informations du nouveau client"
-        footer={
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                closeCreateClientModal();
-                resetForm();
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              type="submit"
-              disabled={createMutation.isPending}
-              onClick={handleSubmit}
-            >
-              {createMutation.isPending ? "Création..." : "Créer le client"}
-            </Button>
-          </div>
-        }
-      >
-        <form className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="nom">Nom *</Label>
-              <Input
-                id="nom"
-                value={formData.nom}
-                onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="prenom">Prénom</Label>
-              <Input
-                id="prenom"
-                value={formData.prenom}
-                onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="telephone">Téléphone</Label>
-              <Input
-                id="telephone"
-                value={formData.telephone}
-                onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="adresse">Adresse</Label>
-            <Input
-              id="adresse"
-              value={formData.adresse}
-              onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="codePostal">Code Postal</Label>
-              <Input
-                id="codePostal"
-                value={formData.codePostal}
-                onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ville">Ville</Label>
-              <Input
-                id="ville"
-                value={formData.ville}
-                onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
-          </div>
-        </form>
-      </BulletproofModal>
-
-      {/* Edit Modal */}
-      <BulletproofModal
-        isOpen={!!editingClient}
-        onClose={() => {
-          setEditingClient(null);
-          resetForm();
-        }}
-        title="Modifier le client"
-        description="Modifiez les informations du client"
-        footer={
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setEditingClient(null);
-                resetForm();
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending}
-              onClick={handleSubmit}
-            >
-              {updateMutation.isPending ? "Mise à jour..." : "Mettre à jour"}
-            </Button>
-          </div>
-        }
-      >
-        <form className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-nom">Nom *</Label>
-              <Input
-                id="edit-nom"
-                value={formData.nom}
-                onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-prenom">Prénom</Label>
-              <Input
-                id="edit-prenom"
-                value={formData.prenom}
-                onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-telephone">Téléphone</Label>
-              <Input
-                id="edit-telephone"
-                value={formData.telephone}
-                onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-adresse">Adresse</Label>
-            <Input
-              id="edit-adresse"
-              value={formData.adresse}
-              onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-codePostal">Code Postal</Label>
-              <Input
-                id="edit-codePostal"
-                value={formData.codePostal}
-                onChange={(e) => setFormData({ ...formData, codePostal: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-ville">Ville</Label>
-              <Input
-                id="edit-ville"
-                value={formData.ville}
-                onChange={(e) => setFormData({ ...formData, ville: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-notes">Notes</Label>
-            <Textarea
-              id="edit-notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
-          </div>
-        </form>
-      </BulletproofModal>
-
-      {/* Clients List */}
+      {/* Liste des clients */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Chargement...</p>
-        </div>
+        <div className="text-center py-8">Chargement...</div>
       ) : filteredClients.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <User className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Aucun client</h3>
-            <p className="text-muted-foreground mb-6">
-              Commencez par ajouter votre premier client
-            </p>
-            <Button onClick={() => {
-              resetForm();
-              setEditingClient(null);
-              openCreateClientModal();
-            }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter un client
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="text-center py-8 text-gray-500">
+          {searchQuery ? "Aucun client trouvé" : "Aucun client créé"}
+        </div>
       ) : (
         <div className="grid gap-4">
-          {filteredClients.map((client) => (
+          {filteredClients.map(client => (
             <Card key={client.id}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
+              <CardContent className="pt-6">
+                <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg">
-                      {client.prenom} {client.nom}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 mt-4 text-sm text-muted-foreground">
+                    <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
+                    <div className="space-y-1 text-sm text-gray-600 mt-2">
                       {client.email && (
                         <div className="flex items-center gap-2">
                           <Mail className="w-4 h-4" />
@@ -405,15 +199,10 @@ export default function Clients() {
                       {client.adresse && (
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4" />
-                          {client.adresse}
+                          {client.adresse}, {client.codePostal} {client.ville}
                         </div>
                       )}
                     </div>
-                    {client.notes && (
-                      <p className="mt-4 text-sm text-muted-foreground">
-                        {client.notes}
-                      </p>
-                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -422,14 +211,11 @@ export default function Clients() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEdit(client)}>
+                      <DropdownMenuItem onClick={() => handleOpenEditModal(client)}>
                         <Pencil className="w-4 h-4 mr-2" />
-                        Modifier
+                        Éditer
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(client.id)}
-                        className="text-red-600"
-                      >
+                      <DropdownMenuItem onClick={() => handleDelete(client.id)} className="text-red-600">
                         <Trash2 className="w-4 h-4 mr-2" />
                         Supprimer
                       </DropdownMenuItem>
@@ -439,6 +225,165 @@ export default function Clients() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Modal Édition Client */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-40 bg-black/50" onClick={handleCloseEditModal} />
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto z-50">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold">Éditer le client</h2>
+              <button onClick={handleCloseEditModal} className="text-muted-foreground hover:text-foreground">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6">
+              <form onSubmit={handleSubmitEdit} className="space-y-4">
+                {/* Nom */}
+                <div>
+                  <Label htmlFor="edit-nom" className="block text-sm font-medium mb-1">
+                    Nom *
+                  </Label>
+                  <input
+                    id="edit-nom"
+                    type="text"
+                    name="nom"
+                    value={formData.nom}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Prénom */}
+                <div>
+                  <Label htmlFor="edit-prenom" className="block text-sm font-medium mb-1">
+                    Prénom
+                  </Label>
+                  <input
+                    id="edit-prenom"
+                    type="text"
+                    name="prenom"
+                    value={formData.prenom}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <Label htmlFor="edit-email" className="block text-sm font-medium mb-1">
+                    Email
+                  </Label>
+                  <input
+                    id="edit-email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Téléphone */}
+                <div>
+                  <Label htmlFor="edit-telephone" className="block text-sm font-medium mb-1">
+                    Téléphone
+                  </Label>
+                  <input
+                    id="edit-telephone"
+                    type="tel"
+                    name="telephone"
+                    value={formData.telephone}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Adresse */}
+                <div>
+                  <Label htmlFor="edit-adresse" className="block text-sm font-medium mb-1">
+                    Adresse
+                  </Label>
+                  <input
+                    id="edit-adresse"
+                    type="text"
+                    name="adresse"
+                    value={formData.adresse}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Code Postal et Ville */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-codePostal" className="block text-sm font-medium mb-1">
+                      Code Postal
+                    </Label>
+                    <input
+                      id="edit-codePostal"
+                      type="text"
+                      name="codePostal"
+                      value={formData.codePostal}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      maxLength={5}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-ville" className="block text-sm font-medium mb-1">
+                      Ville
+                    </Label>
+                    <input
+                      id="edit-ville"
+                      type="text"
+                      name="ville"
+                      value={formData.ville}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <Label htmlFor="edit-notes" className="block text-sm font-medium mb-1">
+                    Notes
+                  </Label>
+                  <textarea
+                    id="edit-notes"
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Boutons */}
+                <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+                  <button
+                    type="button"
+                    onClick={handleCloseEditModal}
+                    className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateMutation.isPending}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
+                  >
+                    {updateMutation.isPending ? "Mise à jour..." : "Mettre à jour"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       )}
     </div>

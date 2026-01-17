@@ -96,6 +96,17 @@ export default function Devis() {
     });
   };
 
+  const handleOpenCreateDialog = () => {
+    setSelectedClientId("");
+    setFormData({
+      objet: "",
+      conditionsPaiement: "Paiement à réception de facture",
+      notes: "",
+      dateValidite: "",
+    });
+    setIsCreateDialogOpen(true);
+  };
+
   const handleDelete = (id: number) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce devis ?")) {
       deleteMutation.mutate({ id });
@@ -261,7 +272,7 @@ export default function Devis() {
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={handleOpenCreateDialog}>
               <Plus className="h-4 w-4 mr-2" />
               Nouveau devis
             </Button>
