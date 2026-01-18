@@ -1,0 +1,9 @@
+{
+  "query": "-- Supprimer les utilisateurs orphelins (sans artisan) parmi les doublons\nDELETE u1 FROM users u1\nLEFT JOIN artisans a ON a.userId = u1.id\nWHERE a.id IS NULL\nAND u1.email IN (\n  SELECT email FROM (\n    SELECT email FROM users GROUP BY email HAVING COUNT(*) > 1\n  ) AS duplicates\n);\n\n-- Vérifier que les doublons sont supprimés\nSELECT email, COUNT(*) as count\nFROM users\nGROUP BY email\nHAVING COUNT(*) > 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute -- Supprimer les utilisateurs orphelins (sans artisan) parmi les doublons\nDELETE u1 FROM users u1\nLEFT JOIN artisans a ON a.userId = u1.id\nWHERE a.id IS NULL\nAND u1.email IN (\n  SELECT email FROM (\n    SELECT email FROM users GROUP BY email HAVING COUNT(*) > 1\n  ) AS duplicates\n);\n\n-- Vérifier que les doublons sont supprimés\nSELECT email, COUNT(*) as count\nFROM users\nGROUP BY email\nHAVING COUNT(*) > 1;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 59
+}

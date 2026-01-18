@@ -41,10 +41,53 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   
-  // ENDPOINT TEMPORAIRE - Créer les utilisateurs de test
+  // ENDPOINTS DE TEST - Forcer la connexion avec les utilisateurs de test
   if (process.env.NODE_ENV === "development") {
-    app.get('/api/test/create-users', async (req, res) => {
-      res.json({ message: 'Endpoint de création d\'utilisateurs de test disponible' });
+    // Helper pour créer une session de test
+    const createTestSession = async (req: any, res: any, email: string) => {
+      try {
+        const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
+        const { sdk } = await import('./sdk');
+        const { getSessionCookieOptions } = await import('./cookies');
+        const dbModule = await import('../db');
+        const schemaModule = await import('../../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        
+        const db = await dbModule.getDb();
+        
+        const users = await db.select().from(schemaModule.users).where(
+          eq(schemaModule.users.email, email)
+        );
+        
+        if (users.length === 0) {
+          return res.status(404).json({ error: `User ${email} not found` });
+        }
+        
+        const user = users[0];
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || '',
+          expiresInMs: ONE_YEAR_MS,
+        });
+        
+        const cookieOptions = getSessionCookieOptions(req);
+        res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        res.redirect('/');
+      } catch (error) {
+        console.error('Error creating test session:', error);
+        res.status(500).json({ error: error.message });
+      }
+    };
+    
+    app.get('/api/test/login-biopp2003', async (req, res) => {
+      await createTestSession(req, res, 'biopp2003@yahoo.fr');
+    });
+    
+    app.get('/api/test/login-doudihab', async (req, res) => {
+      await createTestSession(req, res, 'doudihab@gmail.com');
+    });
+    
+    app.get('/api/test/login-zouiten', async (req, res) => {
+      await createTestSession(req, res, 'zouiten@biopp.fr');
     });
   }
   // OAuth callback under /api/oauth/callback
