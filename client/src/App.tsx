@@ -8,7 +8,7 @@ import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import { Clients } from "./pages/Clients";
 import { ClientsNouveauPage } from "./pages/ClientsNouveauPage";
-import { DevisNouveauPage } from "./pages/DevisNouveauPage";
+import DevisNouveauPage from "./pages/DevisNouveauPage";
 import ClientDetail from "./pages/ClientDetail";
 import ImportClients from "./pages/ImportClients";
 import Devis from "./pages/Devis";
