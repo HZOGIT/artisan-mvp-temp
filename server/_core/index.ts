@@ -54,6 +54,9 @@ async function startServer() {
         const { eq } = await import('drizzle-orm');
         
         const db = await dbModule.getDb();
+        if (!db) {
+          return res.status(500).json({ error: 'Database connection failed' });
+        }
         
         const users = await db.select().from(schemaModule.users).where(
           eq(schemaModule.users.email, email)
@@ -74,7 +77,8 @@ async function startServer() {
         res.redirect('/');
       } catch (error) {
         console.error('Error creating test session:', error);
-        res.status(500).json({ error: error.message });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: errorMessage });
       }
     };
     

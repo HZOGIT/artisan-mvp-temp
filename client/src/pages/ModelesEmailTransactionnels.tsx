@@ -14,8 +14,8 @@ interface ModeleEmail {
   nom: string;
   sujet: string;
   contenu: string;
-  variables: string;
-  type: "relance" | "confirmation" | "rappel" | "autre";
+  variables?: string;
+  type: "relance_devis" | "envoi_devis" | "envoi_facture" | "rappel_paiement" | "autre";
   createdAt: Date;
 }
 
@@ -34,7 +34,7 @@ const VARIABLES_DISPONIBLES = [
 const MODELES_PAR_DEFAUT = [
   {
     nom: "Relance Devis",
-    type: "relance" as const,
+    type: "relance_devis" as const,
     sujet: "Relance - Devis {{numeroDevis}}",
     contenu: `Bonjour {{prenomClient}},
 
@@ -47,7 +47,7 @@ Cordialement,
   },
   {
     nom: "Confirmation Facture",
-    type: "confirmation" as const,
+    type: "envoi_facture" as const,
     sujet: "Facture {{numeroFacture}} - {{nomEntreprise}}",
     contenu: `Bonjour {{prenomClient}},
 
@@ -63,7 +63,7 @@ Cordialement,
   },
   {
     nom: "Rappel Paiement",
-    type: "rappel" as const,
+    type: "rappel_paiement" as const,
     sujet: "Rappel - Facture {{numeroFacture}} impayée",
     contenu: `Bonjour {{prenomClient}},
 
