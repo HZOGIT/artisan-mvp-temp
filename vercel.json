@@ -1,7 +1,7 @@
 {
-  "buildCommand": "pnpm install && pnpm build",
+  "buildCommand": "pnpm install --frozen-lockfile && cd client && pnpm build",
   "outputDirectory": "client/dist",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --frozen-lockfile",
   "framework": "vite",
   "env": {
     "VITE_API_URL": "@vite_api_url",
