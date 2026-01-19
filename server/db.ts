@@ -42,6 +42,8 @@ import {
   planComptable, InsertCompteComptable, CompteComptable,
   devisOptions, InsertDevisOption, DevisOption,
   devisOptionsLignes, InsertDevisOptionLigne, DevisOptionLigne,
+  modelesDevis, InsertModeleDevis, ModeleDevis,
+  modelesDevisLignes, InsertModeleDevisLigne, ModeleDevisLigne,
   rapportsPersonnalises, InsertRapportPersonnalise, RapportPersonnalise,
   executionsRapports, InsertExecutionRapport, ExecutionRapport,
   pushSubscriptions, InsertPushSubscription, PushSubscription,
@@ -5363,4 +5365,156 @@ export async function setCouleursMultiples(
   for (const [interventionId, couleur] of Object.entries(couleurs)) {
     await setCouleurIntervention(artisanId, parseInt(interventionId), couleur);
   }
+}
+
+
+// ============================================================================
+// MODELES DEVIS FUNCTIONS
+// ============================================================================
+
+export async function getModelesDevisByArtisanId(artisanId: number): Promise<ModeleDevis[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db
+    .select()
+    .from(modelesDevis)
+    .where(eq(modelesDevis.artisanId, artisanId))
+    .orderBy(desc(modelesDevis.createdAt));
+}
+
+export async function getModeleDevisById(modeleId: number): Promise<ModeleDevis | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db
+    .select()
+    .from(modelesDevis)
+    .where(eq(modelesDevis.id, modeleId))
+    .limit(1);
+  
+  return result[0] || null;
+}
+
+export async function createModeleDevis(
+  artisanId: number,
+  data: {
+    nom: string;
+    description?: string;
+    notes?: string;
+    isDefault?: boolean;
+  }
+): Promise<ModeleDevis> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(modelesDevis).values({
+    artisanId,
+    nom: data.nom,
+    description: data.description,
+    notes: data.notes,
+    isDefault: data.isDefault || false,
+  });
+  
+  const id = result[0].insertId as number;
+  const created = await getModeleDevisById(id);
+  if (!created) throw new Error("Failed to create modele devis");
+  
+  return created;
+}
+
+export async function updateModeleDevis(
+  modeleId: number,
+  data: Partial<{
+    nom: string;
+    description: string;
+    notes: string;
+    isDefault: boolean;
+  }>
+): Promise<ModeleDevis | null> {
+  const db = await getDb();
+  if (!db) return null;
+  
+  await db
+    .update(modelesDevis)
+    .set(data)
+    .where(eq(modelesDevis.id, modeleId));
+  
+  return await getModeleDevisById(modeleId);
+}
+
+export async function deleteModeleDevis(modeleId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  // Supprimer les lignes d'abord
+  await db
+    .delete(modelesDevisLignes)
+    .where(eq(modelesDevisLignes.modeleId, modeleId));
+  
+  // Puis le modèle
+  await db
+    .delete(modelesDevis)
+    .where(eq(modelesDevis.id, modeleId));
+}
+
+export async function getModeleDevisLignes(modeleId: number): Promise<ModeleDevisLigne[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db
+    .select()
+    .from(modelesDevisLignes)
+    .where(eq(modelesDevisLignes.modeleId, modeleId))
+    .orderBy(asc(modelesDevisLignes.ordre));
+}
+
+export async function addLigneToModeleDevis(
+  modeleId: number,
+  data: {
+    articleId?: number;
+    designation: string;
+    description?: string;
+    quantite: number;
+    unite: string;
+    prixUnitaireHT: number;
+    tauxTVA: number;
+    remise?: number;
+    ordre?: number;
+  }
+): Promise<ModeleDevisLigne> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(modelesDevisLignes).values({
+    modeleId,
+    articleId: data.articleId,
+    designation: data.designation,
+    description: data.description,
+    quantite: data.quantite.toString(),
+    unite: data.unite,
+    prixUnitaireHT: data.prixUnitaireHT.toString(),
+    tauxTVA: data.tauxTVA.toString(),
+    remise: data.remise?.toString() || "0",
+    ordre: data.ordre || 1,
+  });
+  
+  const id = result[0].insertId as number;
+  const lignes = await db
+    .select()
+    .from(modelesDevisLignes)
+    .where(eq(modelesDevisLignes.id, id))
+    .limit(1);
+  
+  if (!lignes[0]) throw new Error("Failed to create ligne");
+  return lignes[0];
+}
+
+export async function deleteLigneFromModeleDevis(ligneId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  await db
+    .delete(modelesDevisLignes)
+    .where(eq(modelesDevisLignes.id, ligneId));
 }

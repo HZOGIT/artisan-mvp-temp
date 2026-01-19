@@ -1446,3 +1446,42 @@ export const configRelancesAuto = mysqlTable("config_relances_auto", {
 
 export type ConfigRelancesAuto = typeof configRelancesAuto.$inferSelect;
 export type InsertConfigRelancesAuto = typeof configRelancesAuto.$inferInsert;
+
+
+// ============================================================================
+// MODELES DEVIS (Reusable quote templates)
+// ============================================================================
+export const modelesDevis = mysqlTable("modeles_devis", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  description: text("description"),
+  notes: text("notes"),
+  isDefault: boolean("isDefault").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ModeleDevis = typeof modelesDevis.$inferSelect;
+export type InsertModeleDevis = typeof modelesDevis.$inferInsert;
+
+// ============================================================================
+// MODELES DEVIS LIGNES (Line items for quote templates)
+// ============================================================================
+export const modelesDevisLignes = mysqlTable("modeles_devis_lignes", {
+  id: int("id").autoincrement().primaryKey(),
+  modeleId: int("modeleId").notNull(),
+  articleId: int("articleId"),
+  designation: varchar("designation", { length: 255 }).notNull(),
+  description: text("description"),
+  quantite: decimal("quantite", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaireHT: decimal("prixUnitaireHT", { precision: 10, scale: 2 }).default("0.00"),
+  tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  remise: decimal("remise", { precision: 5, scale: 2 }).default("0.00"),
+  ordre: int("ordre").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ModeleDevisLigne = typeof modelesDevisLignes.$inferSelect;
+export type InsertModeleDevisLigne = typeof modelesDevisLignes.$inferInsert;

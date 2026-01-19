@@ -803,6 +803,88 @@ const devisRouter = router({
       
       return { success: true, relancesEnvoyees };
     }),
+
+  // Modèles de devis
+  getModeles: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getModelesDevisByArtisanId(artisan.id);
+  }),
+
+  createModele: protectedProcedure
+    .input(z.object({
+      nom: z.string().min(1),
+      description: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      return await db.createModeleDevis(artisan.id, input);
+    }),
+
+  getModeleWithLignes: protectedProcedure
+    .input(z.object({ modeleId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const modele = await db.getModeleDevisById(input.modeleId);
+      if (!modele) throw new TRPCError({ code: "NOT_FOUND", message: "Modèle non trouvé" });
+      
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || modele.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès refusé" });
+      }
+      
+      const lignes = await db.getModeleDevisLignes(input.modeleId);
+      return { modele, lignes };
+    }),
+
+  addLigneToModele: protectedProcedure
+    .input(z.object({
+      modeleId: z.number(),
+      articleId: z.number().optional(),
+      designation: z.string().min(1),
+      description: z.string().optional(),
+      quantite: z.number().default(1),
+      unite: z.string().default("unité"),
+      prixUnitaireHT: z.number().default(0),
+      tauxTVA: z.number().default(20),
+      remise: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      
+      const modele = await db.getModeleDevisById(input.modeleId);
+      if (!modele || modele.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès refusé" });
+      }
+      
+      return await db.addLigneToModeleDevis(input.modeleId, {
+        articleId: input.articleId,
+        designation: input.designation,
+        description: input.description,
+        quantite: input.quantite,
+        unite: input.unite,
+        prixUnitaireHT: input.prixUnitaireHT,
+        tauxTVA: input.tauxTVA,
+        remise: input.remise,
+      });
+    }),
+
+  deleteModele: protectedProcedure
+    .input(z.object({ modeleId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      
+      const modele = await db.getModeleDevisById(input.modeleId);
+      if (!modele || modele.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès refusé" });
+      }
+      
+      await db.deleteModeleDevis(input.modeleId);
+      return { success: true };
+    }),
 });
 
 // ============================================================================

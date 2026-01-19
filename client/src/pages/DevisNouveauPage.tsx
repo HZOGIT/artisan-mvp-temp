@@ -49,15 +49,21 @@ export default function DevisNouveauPage() {
   const [lignes, setLignes] = useState<LigneDevis[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // États de la recherche d'articles
+  // Etats de la recherche d'articles
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [selectedModeleId, setSelectedModeleId] = useState<number | null>(null);
 
-  // Requêtes tRPC
+  // Requetes tRPC
   const { data: clients = [] } = trpc.clients.list.useQuery();
   const { data: articles = [] } = trpc.articles.getArtisanArticles.useQuery();
+  const { data: modeles = [] } = trpc.devis.getModeles.useQuery();
   const createMutation = trpc.devis.create.useMutation();
   const addLigneMutation = trpc.devis.addLigne.useMutation();
+  const getModeleQuery = trpc.devis.getModeleWithLignes.useQuery(
+    { modeleId: selectedModeleId || 0 },
+    { enabled: selectedModeleId !== null }
+  );
 
   // Filtrer les articles
   const articlesFiltrés = useMemo(() => {
@@ -134,6 +140,26 @@ export default function DevisNouveauPage() {
       const newLignes = [...lignes];
       [newLignes[index], newLignes[index + 1]] = [newLignes[index + 1], newLignes[index]];
       setLignes(newLignes);
+    }
+  };
+
+  const handleLoadModele = async (modeleId: number) => {
+    try {
+      const data = await getModeleQuery.refetch();
+      if (data.data?.lignes) {
+        const newLignes: LigneDevis[] = data.data.lignes.map((ligne: any) => ({
+          id: Date.now().toString() + Math.random(),
+          description: ligne.designation,
+          quantite: parseFloat(ligne.quantite as any),
+          prixUnitaireHT: parseFloat(ligne.prixUnitaireHT as any),
+          tauxTVA: parseFloat(ligne.tauxTVA as any),
+        }));
+        setLignes([...lignes, ...newLignes]);
+        setSelectedModeleId(null);
+        toast.success("Modele charge");
+      }
+    } catch (error) {
+      toast.error("Erreur lors du chargement du modele");
     }
   };
 
@@ -261,6 +287,33 @@ export default function DevisNouveauPage() {
             />
           </div>
         </div>
+
+        {/* Modeles de devis */}
+        {modeles.length > 0 && (
+          <div>
+            <Label className="block text-sm font-medium mb-2">
+              Charger un modele
+            </Label>
+            <select
+              value={selectedModeleId || ""}
+              onChange={(e) => {
+                const id = parseInt(e.target.value);
+                if (id) {
+                  setSelectedModeleId(id);
+                  handleLoadModele(id);
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Selectionner un modele...</option>
+              {modeles.map(modele => (
+                <option key={modele.id} value={modele.id}>
+                  {modele.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Recherche d'articles */}
         <div>
