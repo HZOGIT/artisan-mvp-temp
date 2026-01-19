@@ -246,14 +246,14 @@ export default function DevisNouveauPage() {
           </Label>
           <select
             id="clientId"
-            value={clientId}
+            value={clientId.toString()}
             onChange={(e) => setClientId(parseInt(e.target.value))}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="0">Sélectionner un client...</option>
             {clients.map(client => (
-              <option key={client.id} value={client.id}>
+              <option key={client.id} value={client.id.toString()}>
                 {client.nom} {client.prenom}
               </option>
             ))}
