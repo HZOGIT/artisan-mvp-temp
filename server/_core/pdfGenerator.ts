@@ -19,9 +19,9 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   const doc = new jsPDF();
 
   // Couleurs
-  const primaryColor: [number, number, number] = [41, 128, 185]; // Bleu
-  const lightGray: [number, number, number] = [245, 245, 245];
-  const darkGray: [number, number, number] = [80, 80, 80];
+  const primaryColor = [41, 128, 185]; // Bleu
+  const lightGray = [245, 245, 245];
+  const darkGray = [80, 80, 80];
 
   // En-tête
   doc.setFillColor(...primaryColor);
@@ -37,12 +37,12 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   doc.setFontSize(10);
   doc.text(`N° ${devis.numero}`, 150, 15);
   doc.text(
-    `Date: ${new Date(devis.dateDevis || new Date()).toLocaleDateString("fr-FR")}`,
+    `Date: ${new Date(devis.dateCreation).toLocaleDateString("fr-FR")}`,
     150,
     22
   );
   doc.text(
-    `Validité: ${new Date(devis.dateValidite || new Date()).toLocaleDateString("fr-FR")}`,
+    `Validité: ${new Date(devis.dateValidite).toLocaleDateString("fr-FR")}`,
     150,
     29
   );
@@ -50,11 +50,11 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   // Informations artisan
   doc.setTextColor(...darkGray);
   doc.setFontSize(12);
-  doc.setFont("", "bold");
+  doc.setFont(undefined, "bold");
   doc.text(artisan.nomEntreprise || "Artisan", 20, 55);
 
   doc.setFontSize(10);
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.text(artisan.adresse || "", 20, 62);
   doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`, 20, 68);
   if (artisan.siret) {
@@ -68,11 +68,11 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   }
 
   // Informations client
-  doc.setFont("", "bold");
+  doc.setFont(undefined, "bold");
   doc.setFontSize(11);
   doc.text("CLIENT", 120, 55);
 
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.setFontSize(10);
   doc.text(`${client.prenom || ""} ${client.nom}`, 120, 62);
   if (client.adresse) {
@@ -89,16 +89,12 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   }
 
   // Tableau des articles
-  const tableData = devis.lignes.map((ligne: typeof devis.lignes[0]) => {
-    const quantite = Number(ligne.quantite || 0);
-    const prixUnitaire = Number(ligne.prixUnitaireHT || 0);
-    return [
-      ligne.designation,
-      quantite.toString(),
-      `${prixUnitaire.toFixed(2)} €`,
-      `${(prixUnitaire * quantite).toFixed(2)} €`,
-    ];
-  });
+  const tableData = devis.lignes.map((ligne) => [
+    ligne.designation,
+    ligne.quantite.toString(),
+    `${ligne.prixUnitaireHT.toFixed(2)} €`,
+    `${(ligne.prixUnitaireHT * ligne.quantite).toFixed(2)} €`,
+  ]);
 
   autoTable(doc, {
     head: [["Désignation", "Quantité", "P.U. HT", "Total HT"]],
@@ -127,11 +123,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
 
   // Calculs
   const sousTotal = devis.lignes.reduce(
-    (sum: number, ligne: typeof devis.lignes[0]) => {
-      const quantite = Number(ligne.quantite || 0);
-      const prixUnitaire = Number(ligne.prixUnitaireHT || 0);
-      return sum + prixUnitaire * quantite;
-    },
+    (sum, ligne) => sum + ligne.prixUnitaireHT * ligne.quantite,
     0
   );
   const tva = sousTotal * (Number(artisan.tauxTVA) / 100);
@@ -140,7 +132,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   // Totaux
   let yPosition = (doc as any).lastAutoTable.finalY + 10;
 
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.setFontSize(10);
   doc.text(`Sous-total: ${sousTotal.toFixed(2)} €`, 140, yPosition);
   yPosition += 7;
@@ -152,13 +144,13 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   yPosition += 7;
 
   // Total en gras
-  doc.setFont("", "bold");
+  doc.setFont(undefined, "bold");
   doc.setFontSize(12);
   doc.setTextColor(...primaryColor);
   doc.text(`TOTAL TTC: ${total.toFixed(2)} €`, 140, yPosition);
 
   // Pied de page
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
   doc.text(
@@ -176,10 +168,10 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const doc = new jsPDF();
 
   // Couleurs
-  const primaryColor: [number, number, number] = [41, 128, 185]; // Bleu
-  const lightGray: [number, number, number] = [245, 245, 245];
-  const darkGray: [number, number, number] = [80, 80, 80];
-  const successColor: [number, number, number] = [16, 185, 129]; // Vert
+  const primaryColor = [41, 128, 185]; // Bleu
+  const lightGray = [245, 245, 245];
+  const darkGray = [80, 80, 80];
+  const successColor = [16, 185, 129]; // Vert
 
   // En-tête
   doc.setFillColor(...primaryColor);
@@ -195,12 +187,12 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFontSize(10);
   doc.text(`N° ${facture.numero}`, 150, 15);
   doc.text(
-    `Date: ${new Date(facture.dateFacture || new Date()).toLocaleDateString("fr-FR")}`,
+    `Date: ${new Date(facture.dateFacture).toLocaleDateString("fr-FR")}`,
     150,
     22
   );
   doc.text(
-    `Échéance: ${new Date(facture.dateEcheance || new Date()).toLocaleDateString("fr-FR")}`,
+    `Échéance: ${new Date(facture.dateEcheance).toLocaleDateString("fr-FR")}`,
     150,
     29
   );
@@ -208,11 +200,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   // Informations artisan
   doc.setTextColor(...darkGray);
   doc.setFontSize(12);
-  doc.setFont("", "bold");
+  doc.setFont(undefined, "bold");
   doc.text(artisan.nomEntreprise || "Artisan", 20, 55);
 
   doc.setFontSize(10);
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.text(artisan.adresse || "", 20, 62);
   doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`, 20, 68);
   if (artisan.siret) {
@@ -226,11 +218,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   }
 
   // Informations client
-  doc.setFont("", "bold");
+  doc.setFont(undefined, "bold");
   doc.setFontSize(11);
   doc.text("CLIENT", 120, 55);
 
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.setFontSize(10);
   doc.text(`${client.prenom || ""} ${client.nom}`, 120, 62);
   if (client.adresse) {
@@ -247,16 +239,12 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   }
 
   // Tableau des articles
-  const tableData = facture.lignes.map((ligne: typeof facture.lignes[0]) => {
-    const quantite = Number(ligne.quantite || 0);
-    const prixUnitaire = Number(ligne.prixUnitaireHT || 0);
-    return [
-      ligne.designation,
-      quantite.toString(),
-      `${prixUnitaire.toFixed(2)} €`,
-      `${(prixUnitaire * quantite).toFixed(2)} €`,
-    ];
-  });
+  const tableData = facture.lignes.map((ligne) => [
+    ligne.designation,
+    ligne.quantite.toString(),
+    `${ligne.prixUnitaireHT.toFixed(2)} €`,
+    `${(ligne.prixUnitaireHT * ligne.quantite).toFixed(2)} €`,
+  ]);
 
   autoTable(doc, {
     head: [["Désignation", "Quantité", "P.U. HT", "Total HT"]],
@@ -285,11 +273,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
 
   // Calculs
   const sousTotal = facture.lignes.reduce(
-    (sum: number, ligne: typeof facture.lignes[0]) => {
-      const quantite = Number(ligne.quantite || 0);
-      const prixUnitaire = Number(ligne.prixUnitaireHT || 0);
-      return sum + prixUnitaire * quantite;
-    },
+    (sum, ligne) => sum + ligne.prixUnitaireHT * ligne.quantite,
     0
   );
   const tva = sousTotal * (Number(artisan.tauxTVA) / 100);
@@ -298,7 +282,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   // Totaux
   let yPosition = (doc as any).lastAutoTable.finalY + 10;
 
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.setFontSize(10);
   doc.text(`Sous-total: ${sousTotal.toFixed(2)} €`, 140, yPosition);
   yPosition += 7;
@@ -310,14 +294,14 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   yPosition += 7;
 
   // Total en gras
-  doc.setFont("", "bold");
+  doc.setFont(undefined, "bold");
   doc.setFontSize(12);
   doc.setTextColor(...primaryColor);
   doc.text(`TOTAL TTC: ${total.toFixed(2)} €`, 140, yPosition);
 
   // Statut de paiement
   yPosition += 15;
-  doc.setFont("", "bold");
+  doc.setFont(undefined, "bold");
   doc.setFontSize(10);
   if (facture.statut === "payee") {
     doc.setTextColor(...successColor);
@@ -328,7 +312,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   }
 
   // Pied de page
-  doc.setFont("", "normal");
+  doc.setFont(undefined, "normal");
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
   doc.text(

@@ -1,8 +1,5 @@
 import { eq, and, desc, like, or, sql, gte, lte, asc, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-
-// Exporter les types pour utilisation dans d'autres modules
-export type { Facture, FactureLigne, Artisan, Client, Devis, DevisLigne };
 import { 
   InsertUser, users, 
   artisans, InsertArtisan, Artisan,
