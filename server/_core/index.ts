@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
@@ -77,87 +78,8 @@ async function startServer() {
   
   // DEMO LOGIN ROUTE - Works in all environments for testing
   app.get('/demo-login', async (req, res) => {
-    try {
-      console.log('[DEMO] Demo login route accessed');
-      
-      const dbModule = await import('../db');
-      const schemaModule = await import('../../drizzle/schema');
-      const { eq } = await import('drizzle-orm');
-      const { COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
-      const { sdk } = await import('./sdk');
-      const { getSessionCookieOptions } = await import('./cookies');
-      
-      const db = await dbModule.getDb();
-      
-      // 1. Chercher ou créer un utilisateur demo
-      const demoEmail = 'zouiten@biopp.fr';
-      let demoUsers = await db.select()
-        .from(schemaModule.users)
-        .where(eq(schemaModule.users.email, demoEmail))
-        .limit(1);
-      
-      let demoUser = demoUsers[0];
-      
-      if (!demoUser) {
-        console.log('[DEMO] Creating new demo user');
-        // Créer l'utilisateur demo
-        await db.insert(schemaModule.users).values({
-          email: demoEmail,
-          name: 'Zouiten Demo',
-          openId: 'demo-zouiten-' + Date.now(),
-          loginMethod: 'demo',
-          role: 'user',
-        });
-        
-        // Récupérer l'utilisateur créé
-        const createdUsers = await db.select()
-          .from(schemaModule.users)
-          .where(eq(schemaModule.users.email, demoEmail))
-          .limit(1);
-        
-        demoUser = createdUsers[0];
-        
-        // Créer aussi un artisan associé
-        if (demoUser) {
-          console.log('[DEMO] Creating demo artisan');
-          await db.insert(schemaModule.artisans).values({
-            userId: demoUser.id,
-            nomEntreprise: 'Demo Électricité',
-            siret: '12345678901234',
-            adresse: '123 Rue Demo',
-            codePostal: '75001',
-            ville: 'Paris',
-            telephone: '0123456789',
-            email: demoEmail,
-            specialite: 'electricite',
-          });
-        }
-      }
-      
-      if (!demoUser) {
-        throw new Error('Failed to create or find demo user');
-      }
-      
-      // 2. Créer la session
-      console.log('[DEMO] Creating session for user:', demoUser.id);
-      const sessionToken = await sdk.createSessionToken(demoUser.openId, {
-        name: demoUser.name || 'Demo User',
-        expiresInMs: ONE_YEAR_MS,
-      });
-      
-      const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      
-      console.log('[DEMO] Session created, redirecting to dashboard');
-      res.redirect('/');
-      
-    } catch (error) {
-      console.error('[DEMO] Demo login error:', error);
-      res.status(500).json({ 
-        error: 'Demo login failed', 
-        details: error.message 
-      });
-    }
+    console.log('[DEMO] Demo login route accessed');
+    await createTestSession(req, res, 'zouiten@biopp.fr');
   });
   
   // ENDPOINTS DE TEST - Forcer la connexion avec les utilisateurs de test (development only)
@@ -203,4 +125,4 @@ async function startServer() {
   });
 }
 
-export { startServer };
+startServer().catch(console.error);
