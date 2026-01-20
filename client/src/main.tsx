@@ -9,6 +9,19 @@ import { getLoginUrl } from "./const";
 import { ModalProvider } from "./contexts/ModalContext";
 import "./index.css";
 
+// Inject analytics if environment variables are available
+if (typeof window !== 'undefined') {
+  const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT;
+  const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
+  if (endpoint && websiteId) {
+    const script = document.createElement('script');
+    script.defer = true;
+    script.src = endpoint + '/umami';
+    script.setAttribute('data-website-id', websiteId);
+    document.head.appendChild(script);
+  }
+}
+
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
