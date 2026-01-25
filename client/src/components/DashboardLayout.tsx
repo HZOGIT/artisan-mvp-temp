@@ -65,6 +65,7 @@ const menuItems = [
   { icon: Link2, label: "Intégrations Compta", path: "/integrations-comptables" },
   { icon: Sparkles, label: "Devis IA", path: "/devis-ia" },
   { icon: User, label: "Mon profil", path: "/profil" },
+  { icon: User, label: "Profil Utilisateur", path: "/profile" },
   { icon: Settings, label: "Paramètres", path: "/parametres" },
 ];
 

@@ -18,6 +18,7 @@ import FactureDetail from "./pages/FactureDetail";
 import Interventions from "./pages/Interventions";
 import Articles from "./pages/Articles";
 import Profil from "./pages/Profil";
+import Profile from "./pages/Profile";
 import Parametres from "./pages/Parametres";
 import Calendrier from "./pages/Calendrier";
 import DashboardAdvanced from "./pages/DashboardAdvanced";
@@ -109,6 +110,7 @@ function AuthenticatedRoutes() {
         <Route path="/sync-comptable" component={TableauBordSyncComptable} />
         
         <Route path="/profil" component={Profil} />
+        <Route path="/profile" component={Profile} />
         <Route path="/parametres" component={Parametres} />
         <Route component={NotFound} />
       </Switch>
