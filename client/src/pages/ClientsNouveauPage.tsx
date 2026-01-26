@@ -215,19 +215,18 @@ export function ClientsNouveauPage() {
               name="notes"
               value={formData.notes}
               onChange={handleInputChange}
-              rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Informations complémentaires..."
+              placeholder="Notes supplémentaires..."
+              rows={4}
             />
           </div>
 
           {/* Boutons */}
-          <div className="flex justify-end gap-3 pt-6 border-t">
+          <div className="flex gap-4 justify-end pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={handleCancel}
-              disabled={createMutation.isPending}
             >
               Annuler
             </Button>
