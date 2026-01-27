@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useRouter } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,8 +32,7 @@ const initialFormData: ClientFormData = {
 };
 
 export function Clients() {
-  const router = useRouter();
-  const navigate = (path: string) => router.push(path);
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   
   // State pour le formulaire d'édition

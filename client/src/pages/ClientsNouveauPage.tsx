@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useRouter } from "wouter";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -29,8 +29,7 @@ const initialFormData: ClientFormData = {
 };
 
 export function ClientsNouveauPage() {
-  const router = useRouter();
-  const navigate = (path: string) => router.push(path);
+  const [, navigate] = useLocation();
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
   const utils = trpc.useUtils();
 
