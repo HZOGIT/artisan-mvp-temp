@@ -86,19 +86,11 @@ declare global {
   }
 }
 
-// Get environment variables with fallbacks
-const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY || "";
+const API_KEY = import.meta.env.VITE_FRONTEND_FORGE_API_KEY;
 const FORGE_BASE_URL =
   import.meta.env.VITE_FRONTEND_FORGE_API_URL ||
-  "https://forge.manus.ai";
+  "https://forge.butterfly-effect.dev";
 const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
-
-// Validate that API_KEY is available
-if (!API_KEY) {
-  console.warn(
-    "⚠️ VITE_FRONTEND_FORGE_API_KEY is not defined. Google Maps will not work."
-  );
-}
 
 function loadMapScript() {
   return new Promise(resolve => {

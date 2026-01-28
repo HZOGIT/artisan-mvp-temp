@@ -1,1 +1,0 @@
-ALTER TABLE `interventions` ADD `technicienId` int;

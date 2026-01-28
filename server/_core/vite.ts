@@ -48,28 +48,19 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  // Use process.cwd() instead of import.meta.dirname because esbuild bundles
-  // the code and import.meta.dirname becomes unreliable in production
-  const distPath = path.resolve(process.cwd(), "dist", "public");
+  const distPath =
+    process.env.NODE_ENV === "development"
+      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
+      : path.resolve(import.meta.dirname, "public");
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
 
-  // Serve static files from dist/public with aggressive caching
-  app.use(express.static(distPath, {
-    maxAge: '1d',
-    etag: false,
-  }));
+  app.use(express.static(distPath));
 
-  // Serve assets explicitly with long cache
-  app.use('/assets', express.static(path.resolve(distPath, 'assets'), {
-    maxAge: '1y',
-    etag: false,
-  }));
-
-  // Fall through to index.html for SPA routing
+  // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });

@@ -48,7 +48,7 @@ class OAuthService {
     state: string
   ): Promise<ExchangeTokenResponse> {
     const payload: ExchangeTokenRequest = {
-      clientId: ENV.appId || "",
+      clientId: ENV.appId,
       grantType: "authorization_code",
       code,
       redirectUri: this.decodeState(state),
@@ -171,7 +171,7 @@ class SDKServer {
     return this.signSession(
       {
         openId,
-        appId: ENV.appId || "",
+        appId: ENV.appId,
         name: options.name || "",
       },
       options
@@ -237,7 +237,7 @@ class SDKServer {
   ): Promise<GetUserInfoWithJwtResponse> {
     const payload: GetUserInfoWithJwtRequest = {
       jwtToken,
-      projectId: ENV.appId || "",
+      projectId: ENV.appId,
     };
 
     const { data } = await this.client.post<GetUserInfoWithJwtResponse>(
@@ -257,75 +257,47 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // Parse cookies
+    // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
+    const session = await this.verifySession(sessionCookie);
 
-    if (!sessionCookie) {
-      throw ForbiddenError("Missing session cookie");
+    if (!session) {
+      throw ForbiddenError("Invalid session cookie");
     }
 
-    try {
-      // Try to verify as personal JWT first (email/password auth)
-      const secretKey = this.getSessionSecret();
-      const { payload } = await jwtVerify(sessionCookie, secretKey, {
-        algorithms: ["HS256"],
-      });
-      
-      const userId = payload.userId as number | undefined;
-      if (!userId) {
-        throw new Error("Invalid JWT payload");
-      }
-      
-      // Get user from database
-      const user = await db.getUserById(userId);
-      if (!user) {
-        throw new Error("User not found");
-      }
-      
-      return user;
-    } catch (jwtError) {
-      // If personal JWT verification fails, try Manus OAuth flow
-      console.warn("[Auth] Personal JWT verification failed, trying OAuth");
-      
-      const session = await this.verifySession(sessionCookie);
-      if (!session) {
-        throw ForbiddenError("Invalid session cookie");
-      }
+    const sessionUserId = session.openId;
+    const signedInAt = new Date();
+    let user = await db.getUserByOpenId(sessionUserId);
 
-      const sessionUserId = session.openId;
-      const signedInAt = new Date();
-      let user = await db.getUserByOpenId(sessionUserId);
-
-      // If user not in DB, sync from OAuth server automatically
-      if (!user) {
-        try {
-          const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-          await db.upsertUser({
-            openId: userInfo.openId,
-            name: userInfo.name || null,
-            email: userInfo.email ?? null,
-            loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-            lastSignedIn: signedInAt,
-          });
-          user = await db.getUserByOpenId(userInfo.openId);
-        } catch (error) {
-          console.error("[Auth] Failed to sync user from OAuth:", error);
-          throw ForbiddenError("Failed to sync user info");
-        }
+    // If user not in DB, sync from OAuth server automatically
+    if (!user) {
+      try {
+        const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
+        await db.upsertUser({
+          openId: userInfo.openId,
+          name: userInfo.name || null,
+          email: userInfo.email ?? null,
+          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+          lastSignedIn: signedInAt,
+        });
+        user = await db.getUserByOpenId(userInfo.openId);
+      } catch (error) {
+        console.error("[Auth] Failed to sync user from OAuth:", error);
+        throw ForbiddenError("Failed to sync user info");
       }
-
-      if (!user) {
-        throw ForbiddenError("User not found");
-      }
-
-      await db.upsertUser({
-        openId: user.openId,
-        lastSignedIn: signedInAt,
-      });
-
-      return user;
     }
+
+    if (!user) {
+      throw ForbiddenError("User not found");
+    }
+
+    await db.upsertUser({
+      openId: user.openId,
+      lastSignedIn: signedInAt,
+    });
+
+    return user;
   }
 }
 

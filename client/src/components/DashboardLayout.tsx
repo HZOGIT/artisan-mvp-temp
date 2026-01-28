@@ -20,53 +20,16 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
-import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route, Palmtree, LineChart, Car, Trophy, AlertTriangle, HardHat, Link2, Sparkles } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
-  { icon: BarChart3, label: "Statistiques", path: "/statistiques" },
-  { icon: Users, label: "Clients", path: "/clients" },
-  { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
-  { icon: Upload, label: "Import Clients", path: "/clients/import" },
-  { icon: FileText, label: "Devis", path: "/devis" },
-  { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
-  { icon: RefreshCw, label: "Relances Devis", path: "/relances" },
-  { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
-  { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
-  { icon: Receipt, label: "Factures", path: "/factures" },
-  { icon: FileSignature, label: "Contrats", path: "/contrats" },
-  { icon: Calendar, label: "Interventions", path: "/interventions" },
-  { icon: Smartphone, label: "Mode Mobile", path: "/mobile" },
-  { icon: UsersRound, label: "Techniciens", path: "/techniciens" },
-  { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
-  { icon: Package, label: "Articles", path: "/articles" },
-  { icon: Boxes, label: "Stocks", path: "/stocks" },
-  { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
-  { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
-  { icon: TrendingUp, label: "Perf. Fournisseurs", path: "/performances-fournisseurs" },
-  { icon: MessageCircle, label: "Chat", path: "/chat" },
-  { icon: Star, label: "Avis Clients", path: "/avis" },
-  { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
-  { icon: Route, label: "Planification", path: "/planification" },
-  { icon: FileText, label: "Rapports", path: "/rapports" },
-  { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
-  { icon: Palmtree, label: "Congés", path: "/conges" },
-  { icon: LineChart, label: "Prévisions CA", path: "/previsions" },
-  { icon: AlertTriangle, label: "Alertes Prévisions", path: "/alertes-previsions" },
-  { icon: Car, label: "Véhicules", path: "/vehicules" },
-  { icon: Trophy, label: "Badges", path: "/badges" },
-  { icon: HardHat, label: "Chantiers", path: "/chantiers" },
-  { icon: Link2, label: "Intégrations Compta", path: "/integrations-comptables" },
-  { icon: Sparkles, label: "Devis IA", path: "/devis-ia" },
-  { icon: User, label: "Mon profil", path: "/profil" },
-  { icon: User, label: "Profil Utilisateur", path: "/profile" },
-  { icon: Settings, label: "Paramètres", path: "/parametres" },
+  { icon: LayoutDashboard, label: "Page 1", path: "/" },
+  { icon: Users, label: "Page 2", path: "/some-path" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -208,7 +171,7 @@ function DashboardLayoutContent({
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-semibold tracking-tight truncate">
-                    Artisan MVP
+                    Navigation
                   </span>
                 </div>
               ) : null}
