@@ -81,8 +81,8 @@ import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: mysql.Pool | null = null;
-let _connectionAttempts = 0;
-const MAX_RETRY_ATTEMPTS = 3;
+let _lastConnectionError: Error | null = null;
+let _connectionInProgress = false;
 
 export async function getDb() {
   // Si la connexion est déjà établie, la retourner
@@ -96,37 +96,42 @@ export async function getDb() {
     return null;
   }
   
-  // Réessayer la connexion jusqu'à MAX_RETRY_ATTEMPTS fois
-  if (_connectionAttempts < MAX_RETRY_ATTEMPTS) {
-    _connectionAttempts++;
-    try {
-      console.log(`[Database] Attempting connection (attempt ${_connectionAttempts}/${MAX_RETRY_ATTEMPTS})...`);
-      
-      _pool = mysql.createPool(process.env.DATABASE_URL);
-      console.log('[Database] MySQL pool created');
-      
-      _db = drizzle(_pool) as any;
-      console.log('[Database] Drizzle ORM initialized');
-      
-      const connection = await _pool.getConnection();
-      const result = await connection.execute('SELECT 1 as test');
-      console.log('[Database] Connection test successful');
-      connection.release();
-      
-      return _db;
-    } catch (error) {
-      console.error(`[Database] Connection attempt ${_connectionAttempts} failed:`, error instanceof Error ? error.message : error);
-      _db = null;
-      _pool = null;
-      
-      // Attendre un peu avant de réessayer
-      if (_connectionAttempts < MAX_RETRY_ATTEMPTS) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
+  // Éviter les tentatives de connexion simultanées
+  if (_connectionInProgress) {
+    console.log('[Database] Connection already in progress, waiting...');
+    // Attendre un peu et réessayer
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return getDb();
   }
   
-  return _db;
+  _connectionInProgress = true;
+  
+  try {
+    console.log('[Database] Attempting to connect to MySQL...');
+    
+    _pool = mysql.createPool(process.env.DATABASE_URL);
+    console.log('[Database] MySQL pool created');
+    
+    _db = drizzle(_pool) as any;
+    console.log('[Database] Drizzle ORM initialized');
+    
+    const connection = await _pool.getConnection();
+    const result = await connection.execute('SELECT 1 as test');
+    console.log('[Database] Connection test successful');
+    connection.release();
+    
+    _lastConnectionError = null;
+    return _db;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('[Database] Connection failed:', errorMsg);
+    _lastConnectionError = error instanceof Error ? error : new Error(errorMsg);
+    _db = null;
+    _pool = null;
+    return null;
+  } finally {
+    _connectionInProgress = false;
+  }
 }
 
 // ============================================================================
