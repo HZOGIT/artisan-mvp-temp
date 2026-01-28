@@ -80,7 +80,9 @@ const trpcClient = trpc.createClient({
 });
 console.log('✅ tRPC client created');
 
-const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+// Hardcode Clerk production key
+const clerkPublishableKey = "pk_live_Y2xlcmsuY2hlbWlub3YuY29tJA";
+console.log('🔑 Using hardcoded Clerk production key:', clerkPublishableKey);
 
 if (!clerkPublishableKey) {
   console.error('❌ Missing Clerk publishable key');
