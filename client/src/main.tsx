@@ -10,20 +10,31 @@ import { getLoginUrl } from "./const";
 import { ModalProvider } from "./contexts/ModalContext";
 import "./index.css";
 
+// Debug: Log startup
+console.log('🚀 main.tsx: App starting...');
+console.log('🔑 VITE_CLERK_PUBLISHABLE_KEY:', import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ? '✅ defined' : '❌ undefined');
+
 // Inject analytics if environment variables are available
 if (typeof window !== 'undefined') {
   const endpoint = import.meta.env.VITE_ANALYTICS_ENDPOINT;
   const websiteId = import.meta.env.VITE_ANALYTICS_WEBSITE_ID;
+  console.log('📊 Analytics endpoint:', endpoint);
+  console.log('📊 Analytics website ID:', websiteId);
   if (endpoint && websiteId) {
+    console.log('📊 Loading analytics script...');
     const script = document.createElement('script');
     script.defer = true;
     script.src = endpoint + '/umami';
     script.setAttribute('data-website-id', websiteId);
     document.head.appendChild(script);
+  } else {
+    console.log('📊 Analytics disabled (missing endpoint or websiteId)');
   }
 }
 
+console.log('⚙️ Creating QueryClient...');
 const queryClient = new QueryClient();
+console.log('✅ QueryClient created');
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -52,6 +63,7 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+console.log('⚙️ Creating tRPC client...');
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
@@ -66,14 +78,28 @@ const trpcClient = trpc.createClient({
     }),
   ],
 });
+console.log('✅ tRPC client created');
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!clerkPublishableKey) {
+  console.error('❌ Missing Clerk publishable key');
   throw new Error("Missing Clerk publishable key");
 }
 
-createRoot(document.getElementById("root")!).render(
+console.log('✅ Clerk publishable key found');
+console.log('🔐 Creating root element...');
+
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  console.error('❌ Root element not found!');
+  throw new Error('Root element not found');
+}
+
+console.log('✅ Root element found');
+console.log('🔐 Initializing ClerkProvider...');
+
+createRoot(rootElement).render(
   <ClerkProvider publishableKey={clerkPublishableKey}>
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
@@ -84,3 +110,5 @@ createRoot(document.getElementById("root")!).render(
     </trpc.Provider>
   </ClerkProvider>
 );
+
+console.log('✅ App rendered successfully');
