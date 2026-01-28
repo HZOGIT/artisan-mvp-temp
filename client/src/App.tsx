@@ -48,6 +48,7 @@ import Conges from "./pages/Conges";
 import Previsions from "./pages/Previsions";
 import Vehicules from "./pages/Vehicules";
 import Badges from "./pages/Badges";
+import SignInPage from "./pages/SignIn";
 import AlertesPrevisions from "./pages/AlertesPrevisions";
 import Chantiers from "./pages/Chantiers";
 import IntegrationsComptables from "./pages/IntegrationsComptables";
@@ -72,32 +73,28 @@ function AuthenticatedRoutes() {
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/devis" component={Devis} />
         <Route path="/devis/nouveau" component={DevisNouveauPage} />
-        <Route path="/devis/statistiques" component={StatistiquesDevis} />
-        <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
-        <Route path="/devis/:id/options" component={DevisOptions} />
         <Route path="/devis/:id" component={DevisDetail} />
+        <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
         <Route path="/factures" component={Factures} />
         <Route path="/factures/:id" component={FactureDetail} />
         <Route path="/interventions" component={Interventions} />
         <Route path="/articles" component={Articles} />
         <Route path="/calendrier" component={Calendrier} />
-        <Route path="/statistiques" component={DashboardAdvanced} />
+        <Route path="/statistiques" component={StatistiquesDevis} />
         <Route path="/stocks" component={Stocks} />
         <Route path="/fournisseurs" component={Fournisseurs} />
-        <Route path="/rapport-commande" component={RapportCommande} />
-        <Route path="/relances" component={RelancesDevis} />
-        <Route path="/modeles-email" component={ModelesEmail} />
-        <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
-        <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
+        <Route path="/profil" component={Profil} />
+        <Route path="/profile" component={Profile} />
+        <Route path="/parametres" component={Parametres} />
         <Route path="/contrats" component={Contrats} />
         <Route path="/mobile" component={InterventionsMobile} />
         <Route path="/chat" component={Chat} />
         <Route path="/techniciens" component={Techniciens} />
         <Route path="/avis" component={Avis} />
         <Route path="/geolocalisation" component={Geolocalisation} />
+        <Route path="/comptabilite" component={Comptabilite} />
         <Route path="/planification" component={Planification} />
         <Route path="/rapports" component={Rapports} />
-        <Route path="/comptabilite" component={Comptabilite} />
         <Route path="/conges" component={Conges} />
         <Route path="/previsions" component={Previsions} />
         <Route path="/vehicules" component={Vehicules} />
@@ -107,11 +104,7 @@ function AuthenticatedRoutes() {
         <Route path="/integrations-comptables" component={IntegrationsComptables} />
         <Route path="/devis-ia" component={DevisIA} />
         <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
-        <Route path="/sync-comptable" component={TableauBordSyncComptable} />
-        
-        <Route path="/profil" component={Profil} />
-        <Route path="/profile" component={Profile} />
-        <Route path="/parametres" component={Parametres} />
+        <Route path="/tableau-bord-sync-comptable" component={TableauBordSyncComptable} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -132,6 +125,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/sign-in" component={SignInPage} />
       <Route path="/signature/:token" component={SignatureDevis} />
       <Route path="/paiement/succes" component={PaiementSucces} />
       <Route path="/paiement/annule" component={PaiementAnnule} />
@@ -154,16 +148,19 @@ function Router() {
           <Route path="/stocks" component={() => <AuthenticatedRoutes />} />
           <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
           <Route path="/profil" component={() => <AuthenticatedRoutes />} />
+          <Route path="/profile" component={() => <AuthenticatedRoutes />} />
           <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
           <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
           <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
           <Route path="/chat" component={() => <AuthenticatedRoutes />} />
           <Route path="/techniciens" component={() => <AuthenticatedRoutes />} />
           <Route path="/avis" component={() => <AuthenticatedRoutes />} />
-          <Route path="/rapport-commande" component={() => <AuthenticatedRoutes />} />
-          <Route path="/relances" component={() => <AuthenticatedRoutes />} />
-          <Route path="/modeles-email" component={() => <AuthenticatedRoutes />} />
-          <Route path="/performances-fournisseurs" component={() => <AuthenticatedRoutes />} />
+          <Route path="/geolocalisation" component={() => <AuthenticatedRoutes />} />
+          <Route path="/comptabilite" component={() => <AuthenticatedRoutes />} />
+          <Route path="/planification" component={() => <AuthenticatedRoutes />} />
+          <Route path="/rapports" component={() => <AuthenticatedRoutes />} />
+          <Route path="/conges" component={() => <AuthenticatedRoutes />} />
+          <Route path="/previsions" component={() => <AuthenticatedRoutes />} />
           <Route path="/vehicules" component={() => <AuthenticatedRoutes />} />
           <Route path="/badges" component={() => <AuthenticatedRoutes />} />
           <Route path="/alertes-previsions" component={() => <AuthenticatedRoutes />} />
@@ -171,26 +168,26 @@ function Router() {
           <Route path="/integrations-comptables" component={() => <AuthenticatedRoutes />} />
           <Route path="/devis-ia" component={() => <AuthenticatedRoutes />} />
           <Route path="/calendrier-chantiers" component={() => <AuthenticatedRoutes />} />
-          <Route path="/sync-comptable" component={() => <AuthenticatedRoutes />} />
+          <Route path="/tableau-bord-sync-comptable" component={() => <AuthenticatedRoutes />} />
         </>
       )}
-      <Route path="/404" component={NotFound} />
+      {!isAuthenticated && (
+        <Route path="/sign-in" component={SignInPage} />
+      )}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider>
         <TooltipProvider>
-          <Toaster />
           <Router />
+          <Toaster />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
 }
-
-export default App;

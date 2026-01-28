@@ -5518,3 +5518,13 @@ export async function deleteLigneFromModeleDevis(ligneId: number): Promise<void>
     .delete(modelesDevisLignes)
     .where(eq(modelesDevisLignes.id, ligneId));
 }
+
+// Export types for use in other modules
+export type {
+  Devis,
+  DevisLigne,
+  Facture,
+  FactureLigne,
+  Artisan,
+  Client,
+};
