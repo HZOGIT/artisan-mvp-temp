@@ -31,14 +31,15 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   
-  // Content Security Policy middleware to allow Clerk
-  app.use((req, res, next) => {
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.cheminov.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src 'self' https://clerk.cheminov.com;"
-    );
-    next();
-  });
+  // TODO: Re-enable CSP with proper Clerk directives
+  // Temporarily disabled to allow Clerk to load
+  // app.use((req, res, next) => {
+  //   res.setHeader(
+  //     'Content-Security-Policy',
+  //     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.cheminov.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src 'self' https://clerk.cheminov.com;"
+  //   );
+  //   next();
+  // });}
   
   // Stripe webhook - MUST be before express.json() for signature verification
   app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
