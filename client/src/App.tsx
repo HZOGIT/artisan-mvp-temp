@@ -49,6 +49,7 @@ import Previsions from "./pages/Previsions";
 import Vehicules from "./pages/Vehicules";
 import Badges from "./pages/Badges";
 import SignInPage from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
 import AlertesPrevisions from "./pages/AlertesPrevisions";
 import Chantiers from "./pages/Chantiers";
 import IntegrationsComptables from "./pages/IntegrationsComptables";
@@ -117,7 +118,9 @@ function Router() {
   return (
     <Switch location={location}>
       <Route path="/" component={Home} />
+      <Route path="/signin" component={SignInPage} />
       <Route path="/sign-in" component={SignInPage} />
+      <Route path="/signup" component={SignUp} />
       <Route path="/signature/:token" component={SignatureDevis} />
       <Route path="/paiement/succes" component={PaiementSucces} />
       <Route path="/paiement/annule" component={PaiementAnnule} />

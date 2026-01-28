@@ -1,4 +1,3 @@
-import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -6,6 +5,8 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import * as dbSecure from "./db-secure";
+import { createUserWithPassword, authenticateUser } from "./_core/auth";
+import { COOKIE_NAME } from "../shared/const";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
 import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
@@ -5023,6 +5024,48 @@ const alertesPrevisionsRouter = router({
 export const appRouter = router({system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    
+    signup: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+        name: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          const user = await createUserWithPassword(input.email, input.password, input.name);
+          
+          // Set session cookie
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, JSON.stringify({ userId: user.id }), cookieOptions);
+          
+          return { success: true, user };
+        } catch (error) {
+          if (error instanceof Error && error.message === 'User already exists') {
+            throw new TRPCError({ code: 'CONFLICT', message: 'Email already in use' });
+          }
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Signup failed' });
+        }
+      }),
+    
+    signin: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const user = await authenticateUser(input.email, input.password);
+        if (!user) {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid email or password' });
+        }
+        
+        // Set session cookie
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, JSON.stringify({ userId: user.id }), cookieOptions);
+        
+        return { success: true, user };
+      }),
+    
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
