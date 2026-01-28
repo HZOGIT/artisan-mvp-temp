@@ -108,6 +108,7 @@ export async function getDb() {
   
   try {
     console.log('[Database] Attempting to connect to MySQL...');
+    console.log('[Database] DATABASE_URL length:', process.env.DATABASE_URL?.length);
     
     _pool = mysql.createPool(process.env.DATABASE_URL);
     console.log('[Database] MySQL pool created');
@@ -116,15 +117,21 @@ export async function getDb() {
     console.log('[Database] Drizzle ORM initialized');
     
     const connection = await _pool.getConnection();
+    console.log('[Database] Got connection from pool');
+    
     const result = await connection.execute('SELECT 1 as test');
     console.log('[Database] Connection test successful');
+    
     connection.release();
     
     _lastConnectionError = null;
+    console.log('[Database] SUCCESS: MySQL connected!');
     return _db;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('[Database] Connection failed:', errorMsg);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error('[Database] FAILED: Connection error:', errorMsg);
+    console.error('[Database] Stack:', errorStack);
     _lastConnectionError = error instanceof Error ? error : new Error(errorMsg);
     _db = null;
     _pool = null;
