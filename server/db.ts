@@ -81,11 +81,26 @@ import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: mysql.Pool | null = null;
+let _connectionAttempts = 0;
+const MAX_RETRY_ATTEMPTS = 3;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  // Si la connexion est déjà établie, la retourner
+  if (_db) {
+    return _db;
+  }
+  
+  // Si DATABASE_URL n'est pas définie, impossible de se connecter
+  if (!process.env.DATABASE_URL) {
+    console.error('[Database] DATABASE_URL not set');
+    return null;
+  }
+  
+  // Réessayer la connexion jusqu'à MAX_RETRY_ATTEMPTS fois
+  if (_connectionAttempts < MAX_RETRY_ATTEMPTS) {
+    _connectionAttempts++;
     try {
-      console.log('[Database] Initializing MySQL connection...');
+      console.log(`[Database] Attempting connection (attempt ${_connectionAttempts}/${MAX_RETRY_ATTEMPTS})...`);
       
       _pool = mysql.createPool(process.env.DATABASE_URL);
       console.log('[Database] MySQL pool created');
@@ -97,12 +112,20 @@ export async function getDb() {
       const result = await connection.execute('SELECT 1 as test');
       console.log('[Database] Connection test successful');
       connection.release();
+      
+      return _db;
     } catch (error) {
-      console.error('[Database] Failed to connect:', error);
+      console.error(`[Database] Connection attempt ${_connectionAttempts} failed:`, error instanceof Error ? error.message : error);
       _db = null;
       _pool = null;
+      
+      // Attendre un peu avant de réessayer
+      if (_connectionAttempts < MAX_RETRY_ATTEMPTS) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
   }
+  
   return _db;
 }
 
