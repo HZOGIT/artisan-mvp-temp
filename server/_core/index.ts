@@ -28,6 +28,22 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  console.log('[Server] Starting...');
+  console.log('[Database] Checking MySQL connection...');
+  console.log('[Database] DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Missing');
+  
+  try {
+    const { getDb } = await import('../db');
+    const db = await getDb();
+    if (db) {
+      console.log('[Database] MySQL connected successfully');
+    } else {
+      console.error('[Database] MySQL connection failed: getDb returned null');
+    }
+  } catch (error) {
+    console.error('[Database] MySQL connection failed:', error);
+  }
+  
   const app = express();
   const server = createServer(app);
   
