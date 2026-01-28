@@ -58,8 +58,8 @@ import CalendrierChantiers from "./pages/CalendrierChantiers";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import StatistiquesDevis from "./pages/StatistiquesDevis";
 import DashboardLayout from "./components/DashboardLayout";
-import { useAuth } from "./_core/hooks/useAuth";
 
+// BYPASS CLERK TEMPORARILY - Redirect all authenticated routes directly to dashboard
 function AuthenticatedRoutes() {
   const [location] = useLocation();
   
@@ -112,18 +112,10 @@ function AuthenticatedRoutes() {
 }
 
 function Router() {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const [location] = useLocation();
 
   return (
-    <Switch>
+    <Switch location={location}>
       <Route path="/" component={Home} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/signature/:token" component={SignatureDevis} />
@@ -131,49 +123,43 @@ function Router() {
       <Route path="/paiement/annule" component={PaiementAnnule} />
       <Route path="/portail/:token" component={PortailClient} />
       <Route path="/avis/:token" component={SoumettreAvis} />
-      {isAuthenticated && (
-        <>
-          <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
-          <Route path="/clients/:rest*" component={() => <AuthenticatedRoutes />} />
-          <Route path="/clients" component={() => <AuthenticatedRoutes />} />
-          <Route path="/devis/:id/ligne/nouvelle" component={() => <AuthenticatedRoutes />} />
-          <Route path="/devis/:rest*" component={() => <AuthenticatedRoutes />} />
-          <Route path="/devis" component={() => <AuthenticatedRoutes />} />
-          <Route path="/factures/:rest*" component={() => <AuthenticatedRoutes />} />
-          <Route path="/factures" component={() => <AuthenticatedRoutes />} />
-          <Route path="/interventions" component={() => <AuthenticatedRoutes />} />
-          <Route path="/articles" component={() => <AuthenticatedRoutes />} />
-          <Route path="/calendrier" component={() => <AuthenticatedRoutes />} />
-          <Route path="/statistiques" component={() => <AuthenticatedRoutes />} />
-          <Route path="/stocks" component={() => <AuthenticatedRoutes />} />
-          <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
-          <Route path="/profil" component={() => <AuthenticatedRoutes />} />
-          <Route path="/profile" component={() => <AuthenticatedRoutes />} />
-          <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
-          <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
-          <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
-          <Route path="/chat" component={() => <AuthenticatedRoutes />} />
-          <Route path="/techniciens" component={() => <AuthenticatedRoutes />} />
-          <Route path="/avis" component={() => <AuthenticatedRoutes />} />
-          <Route path="/geolocalisation" component={() => <AuthenticatedRoutes />} />
-          <Route path="/comptabilite" component={() => <AuthenticatedRoutes />} />
-          <Route path="/planification" component={() => <AuthenticatedRoutes />} />
-          <Route path="/rapports" component={() => <AuthenticatedRoutes />} />
-          <Route path="/conges" component={() => <AuthenticatedRoutes />} />
-          <Route path="/previsions" component={() => <AuthenticatedRoutes />} />
-          <Route path="/vehicules" component={() => <AuthenticatedRoutes />} />
-          <Route path="/badges" component={() => <AuthenticatedRoutes />} />
-          <Route path="/alertes-previsions" component={() => <AuthenticatedRoutes />} />
-          <Route path="/chantiers" component={() => <AuthenticatedRoutes />} />
-          <Route path="/integrations-comptables" component={() => <AuthenticatedRoutes />} />
-          <Route path="/devis-ia" component={() => <AuthenticatedRoutes />} />
-          <Route path="/calendrier-chantiers" component={() => <AuthenticatedRoutes />} />
-          <Route path="/tableau-bord-sync-comptable" component={() => <AuthenticatedRoutes />} />
-        </>
-      )}
-      {!isAuthenticated && (
-        <Route path="/sign-in" component={SignInPage} />
-      )}
+      {/* BYPASS CLERK - All routes go to authenticated routes */}
+      <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
+      <Route path="/clients/:rest*" component={() => <AuthenticatedRoutes />} />
+      <Route path="/clients" component={() => <AuthenticatedRoutes />} />
+      <Route path="/devis/:id/ligne/nouvelle" component={() => <AuthenticatedRoutes />} />
+      <Route path="/devis/:rest*" component={() => <AuthenticatedRoutes />} />
+      <Route path="/devis" component={() => <AuthenticatedRoutes />} />
+      <Route path="/factures/:rest*" component={() => <AuthenticatedRoutes />} />
+      <Route path="/factures" component={() => <AuthenticatedRoutes />} />
+      <Route path="/interventions" component={() => <AuthenticatedRoutes />} />
+      <Route path="/articles" component={() => <AuthenticatedRoutes />} />
+      <Route path="/calendrier" component={() => <AuthenticatedRoutes />} />
+      <Route path="/statistiques" component={() => <AuthenticatedRoutes />} />
+      <Route path="/stocks" component={() => <AuthenticatedRoutes />} />
+      <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
+      <Route path="/profil" component={() => <AuthenticatedRoutes />} />
+      <Route path="/profile" component={() => <AuthenticatedRoutes />} />
+      <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
+      <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
+      <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
+      <Route path="/chat" component={() => <AuthenticatedRoutes />} />
+      <Route path="/techniciens" component={() => <AuthenticatedRoutes />} />
+      <Route path="/avis" component={() => <AuthenticatedRoutes />} />
+      <Route path="/geolocalisation" component={() => <AuthenticatedRoutes />} />
+      <Route path="/comptabilite" component={() => <AuthenticatedRoutes />} />
+      <Route path="/planification" component={() => <AuthenticatedRoutes />} />
+      <Route path="/rapports" component={() => <AuthenticatedRoutes />} />
+      <Route path="/conges" component={() => <AuthenticatedRoutes />} />
+      <Route path="/previsions" component={() => <AuthenticatedRoutes />} />
+      <Route path="/vehicules" component={() => <AuthenticatedRoutes />} />
+      <Route path="/badges" component={() => <AuthenticatedRoutes />} />
+      <Route path="/alertes-previsions" component={() => <AuthenticatedRoutes />} />
+      <Route path="/chantiers" component={() => <AuthenticatedRoutes />} />
+      <Route path="/integrations-comptables" component={() => <AuthenticatedRoutes />} />
+      <Route path="/devis-ia" component={() => <AuthenticatedRoutes />} />
+      <Route path="/calendrier-chantiers" component={() => <AuthenticatedRoutes />} />
+      <Route path="/tableau-bord-sync-comptable" component={() => <AuthenticatedRoutes />} />
       <Route component={NotFound} />
     </Switch>
   );
