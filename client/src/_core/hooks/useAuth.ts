@@ -1,7 +1,6 @@
-import { getLoginUrl } from "@/const";
+import { useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo } from "react";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -9,76 +8,36 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
-    options ?? {};
-  const utils = trpc.useUtils();
-
-  const meQuery = trpc.auth.me.useQuery(undefined, {
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
+  const [location, setLocation] = useLocation();
+  
+  // Query current user
+  const { data: user, isLoading: loading } = trpc.auth.me.useQuery();
+  
+  // Logout mutation
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
+      setLocation("/");
     },
   });
 
-  const logout = useCallback(async () => {
-    try {
-      await logoutMutation.mutateAsync();
-    } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      ) {
-        return;
-      }
-      throw error;
-    } finally {
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
-    }
-  }, [logoutMutation, utils]);
-
-  const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
-    return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
-    };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
-
+  // Redirect to signin if not authenticated and option is set
   useEffect(() => {
-    if (!redirectOnUnauthenticated) return;
-    if (meQuery.isLoading || logoutMutation.isPending) return;
-    if (state.user) return;
-    if (typeof window === "undefined") return;
-    if (window.location.pathname === redirectPath) return;
+    if (options?.redirectOnUnauthenticated && !loading && !user) {
+      setLocation(options.redirectPath || "/signin");
+    }
+  }, [user, loading, options, setLocation]);
 
-    window.location.href = redirectPath
-  }, [
-    redirectOnUnauthenticated,
-    redirectPath,
-    logoutMutation.isPending,
-    meQuery.isLoading,
-    state.user,
-  ]);
+  const isAuthenticated = !!user;
 
-  return {
-    ...state,
-    refresh: () => meQuery.refetch(),
-    logout,
-  };
+  return useMemo(() => ({
+    user,
+    loading,
+    error: null,
+    isAuthenticated,
+    logout: () => logoutMutation.mutate(),
+    refresh: () => {
+      // Invalidate the query to refetch
+      return Promise.resolve();
+    },
+  }), [user, loading, logoutMutation]);
 }

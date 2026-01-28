@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, numero, statut, objet FROM devis LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SELECT id, numero, statut, objet FROM devis LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "numero": "DEV-2026-001",
+      "statut": "accepte",
+      "objet": "Rénovation salle de bain complète"
+    },
+    {
+      "id": "2",
+      "numero": "DEV-2026-002",
+      "statut": "envoye",
+      "objet": "Remplacement chauffe-eau"
+    },
+    {
+      "id": "3",
+      "numero": "DEV-2026-003",
+      "statut": "accepte",
+      "objet": "Installation cuisine professionnelle"
+    },
+    {
+      "id": "4",
+      "numero": "DEV-2026-004",
+      "statut": "brouillon",
+      "objet": "Réparation fuite toiture"
+    },
+    {
+      "id": "5",
+      "numero": "DEV-2026-005",
+      "statut": "envoye",
+      "objet": "Mise aux normes colonnes montantes"
+    },
+    {
+      "id": "6",
+      "numero": "DEV-2026-006",
+      "statut": "refuse",
+      "objet": "Installation climatisation"
+    },
+    {
+      "id": "7",
+      "numero": "DEV-2026-007",
+      "statut": "accepte",
+      "objet": "Rénovation sanitaires boutique"
+    },
+    {
+      "id": "8",
+      "numero": "DEV-2026-008",
+      "statut": "envoye",
+      "objet": "Détartrage et entretien annuel"
+    },
+    {
+      "id": "9",
+      "numero": "EL-DEV-2026-001",
+      "statut": "accepte",
+      "objet": "Rénovation électrique complète appartement"
+    },
+    {
+      "id": "10",
+      "numero": "EL-DEV-2026-002",
+      "statut": "envoye",
+      "objet": "Installation domotique maison"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnumero\tstatut\tobjet\n1\tDEV-2026-001\taccepte\tRénovation salle de bain complète\n2\tDEV-2026-002\tenvoye\tRemplacement chauffe-eau\n3\tDEV-2026-003\taccepte\tInstallation cuisine professionnelle\n4\tDEV-2026-004\tbrouillon\tRéparation fuite toiture\n5\tDEV-2026-005\tenvoye\tMise aux normes colonnes montantes\n6\tDEV-2026-006\trefuse\tInstallation climatisation\n7\tDEV-2026-007\taccepte\tRénovation sanitaires boutique\n8\tDEV-2026-008\tenvoye\tDétartrage et entretien annuel\n9\tEL-DEV-2026-001\taccepte\tRénovation électrique complète appartement\n10\tEL-DEV-2026-002\tenvoye\tInstallation domotique maison\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

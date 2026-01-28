@@ -1,0 +1,100 @@
+{
+  "query": "SELECT id, artisanId, clientId, numero, objet, statut, totalTTC FROM devis LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SELECT id, artisanId, clientId, numero, objet, statut, totalTTC FROM devis LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "artisanId": "1",
+      "clientId": "1",
+      "numero": "DEV-2026-001",
+      "objet": "Rénovation salle de bain complète",
+      "statut": "accepte",
+      "totalTTC": "4200.00"
+    },
+    {
+      "id": "2",
+      "artisanId": "1",
+      "clientId": "2",
+      "numero": "DEV-2026-002",
+      "objet": "Remplacement chauffe-eau",
+      "statut": "envoye",
+      "totalTTC": "1440.00"
+    },
+    {
+      "id": "3",
+      "artisanId": "1",
+      "clientId": "3",
+      "numero": "DEV-2026-003",
+      "objet": "Installation cuisine professionnelle",
+      "statut": "accepte",
+      "totalTTC": "6960.00"
+    },
+    {
+      "id": "4",
+      "artisanId": "1",
+      "clientId": "4",
+      "numero": "DEV-2026-004",
+      "objet": "Réparation fuite toiture",
+      "statut": "brouillon",
+      "totalTTC": "540.00"
+    },
+    {
+      "id": "5",
+      "artisanId": "1",
+      "clientId": "5",
+      "numero": "DEV-2026-005",
+      "objet": "Mise aux normes colonnes montantes",
+      "statut": "envoye",
+      "totalTTC": "10200.00"
+    },
+    {
+      "id": "6",
+      "artisanId": "1",
+      "clientId": "6",
+      "numero": "DEV-2026-006",
+      "objet": "Installation climatisation",
+      "statut": "refuse",
+      "totalTTC": "3840.00"
+    },
+    {
+      "id": "7",
+      "artisanId": "1",
+      "clientId": "7",
+      "numero": "DEV-2026-007",
+      "objet": "Rénovation sanitaires boutique",
+      "statut": "accepte",
+      "totalTTC": "2520.00"
+    },
+    {
+      "id": "8",
+      "artisanId": "1",
+      "clientId": "8",
+      "numero": "DEV-2026-008",
+      "objet": "Détartrage et entretien annuel",
+      "statut": "envoye",
+      "totalTTC": "336.00"
+    },
+    {
+      "id": "9",
+      "artisanId": "2",
+      "clientId": "11",
+      "numero": "EL-DEV-2026-001",
+      "objet": "Rénovation électrique complète appartement",
+      "statut": "accepte",
+      "totalTTC": "5400.00"
+    },
+    {
+      "id": "10",
+      "artisanId": "2",
+      "clientId": "12",
+      "numero": "EL-DEV-2026-002",
+      "objet": "Installation domotique maison",
+      "statut": "envoye",
+      "totalTTC": "3840.00"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tartisanId\tclientId\tnumero\tobjet\tstatut\ttotalTTC\n1\t1\t1\tDEV-2026-001\tRénovation salle de bain complète\taccepte\t4200.00\n2\t1\t2\tDEV-2026-002\tRemplacement chauffe-eau\tenvoye\t1440.00\n3\t1\t3\tDEV-2026-003\tInstallation cuisine professionnelle\taccepte\t6960.00\n4\t1\t4\tDEV-2026-004\tRéparation fuite toiture\tbrouillon\t540.00\n5\t1\t5\tDEV-2026-005\tMise aux normes colonnes montantes\tenvoye\t10200.00\n6\t1\t6\tDEV-2026-006\tInstallation climatisation\trefuse\t3840.00\n7\t1\t7\tDEV-2026-007\tRénovation sanitaires boutique\taccepte\t2520.00\n8\t1\t8\tDEV-2026-008\tDétartrage et entretien annuel\tenvoye\t336.00\n9\t2\t11\tEL-DEV-2026-001\tRénovation électrique complète appartement\taccepte\t5400.00\n10\t2\t12\tEL-DEV-2026-002\tInstallation domotique maison\tenvoye\t3840.00\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

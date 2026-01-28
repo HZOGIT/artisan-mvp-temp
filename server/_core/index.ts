@@ -28,11 +28,46 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  console.log('[Server] Starting...');
+  console.log('[Database] Checking MySQL connection...');
+  console.log('[Database] DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Missing');
+  
+  try {
+    const { getDb } = await import('../db');
+    const db = await getDb();
+    if (db) {
+      console.log('[Database] MySQL connected successfully');
+    } else {
+      console.error('[Database] MySQL connection failed: getDb returned null');
+    }
+  } catch (error) {
+    console.error('[Database] MySQL connection failed:', error);
+  }
+  
   const app = express();
   const server = createServer(app);
+  
+  // TODO: Re-enable CSP with proper Clerk directives
+  // Temporarily disabled to allow Clerk to load
+  // app.use((req, res, next) => {
+  //   res.setHeader(
+  //     'Content-Security-Policy',
+  //     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.cheminov.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src 'self' https://clerk.cheminov.com;"
+  //   );
+  //   next();
+  // });}
+  
+  // Stripe webhook - MUST be before express.json() for signature verification
+  app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const { handleStripeWebhook } = await import('../stripe/webhookHandler');
+    return handleStripeWebhook(req, res);
+  });
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API

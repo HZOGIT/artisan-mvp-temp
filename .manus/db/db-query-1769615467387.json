@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO users (email, password, name, loginMethod, lastSignedIn) VALUES ('test@example.com', '$2b$10$BbyMpR1Qr0soqu9XRBUF..lZH0THUA/p1u/HVrq9MmLbtf0Ihyk8W', 'Test User', 'email', NOW());",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute INSERT INTO users (email, password, name, loginMethod, lastSignedIn) VALUES ('test@example.com', '$2b$10$BbyMpR1Qr0soqu9XRBUF..lZH0THUA/p1u/HVrq9MmLbtf0Ihyk8W', 'Test User', 'email', NOW());",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 62
+}
