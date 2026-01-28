@@ -5,6 +5,7 @@ import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { trpc } from './lib/trpc'
 import { httpBatchLink } from '@trpc/client'
+import superjson from 'superjson'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,6 +20,7 @@ const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: '/api/trpc',
+      transformer: superjson,
     }),
   ],
 })

@@ -2274,6 +2274,7 @@ const modelesEmailRouter = router({
       type: z.enum(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]),
       sujet: z.string(),
       contenu: z.string(),
+      variables: z.string().optional(),
       isDefault: z.boolean().optional()
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2291,8 +2292,10 @@ const modelesEmailRouter = router({
     .input(z.object({
       id: z.number(),
       nom: z.string().optional(),
+      type: z.enum(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]).optional(),
       sujet: z.string().optional(),
       contenu: z.string().optional(),
+      variables: z.string().optional(),
       isDefault: z.boolean().optional()
     }))
     .mutation(async ({ ctx, input }) => {

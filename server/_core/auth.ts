@@ -44,7 +44,7 @@ export async function createUserWithPassword(
   const hashedPassword = await hashPassword(password);
 
   // Create user
-    const result = await db.insert(users).values({
+  const result = await db.insert(users).values({
     email,
     password: hashedPassword,
     name: name || null,
@@ -52,15 +52,11 @@ export async function createUserWithPassword(
     lastSignedIn: new Date(),
   });
 
-  // Get the ID from the result
-  const userId = result.insertId ? Number(result.insertId) : result[0]?.id;
-  if (!userId) throw new Error('Failed to get inserted user ID');
-
-  // Retrieve the created user
+  // Retrieve the created user by email (since we just inserted it)
   const created = await db
     .select()
     .from(users)
-    .where(eq(users.id, userId))
+    .where(eq(users.email, email))
     .limit(1);
 
   if (created.length === 0) throw new Error('Failed to retrieve created user');

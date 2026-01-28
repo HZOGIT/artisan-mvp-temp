@@ -37,12 +37,12 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   doc.setFontSize(10);
   doc.text(`N° ${devis.numero}`, 150, 15);
   doc.text(
-    `Date: ${new Date(devis.dateCreation).toLocaleDateString("fr-FR")}`,
+    `Date: ${new Date(devis.dateDevis).toLocaleDateString("fr-FR")}`,
     150,
     22
   );
   doc.text(
-    `Validité: ${new Date(devis.dateValidite).toLocaleDateString("fr-FR")}`,
+    `Validité: ${devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : "Non définie"}`,
     150,
     29
   );
@@ -89,12 +89,16 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   }
 
   // Tableau des articles
-  const tableData = devis.lignes.map((ligne) => [
-    ligne.designation,
-    ligne.quantite.toString(),
-    `${ligne.prixUnitaireHT.toFixed(2)} €`,
-    `${(ligne.prixUnitaireHT * ligne.quantite).toFixed(2)} €`,
-  ]);
+  const tableData = devis.lignes.map((ligne) => {
+    const quantite = Number(ligne.quantite) || 0;
+    const prixUnitaire = typeof ligne.prixUnitaireHT === 'string' ? parseFloat(ligne.prixUnitaireHT) : Number(ligne.prixUnitaireHT);
+    return [
+      ligne.designation,
+      quantite.toString(),
+      `${prixUnitaire.toFixed(2)} €`,
+      `${(prixUnitaire * quantite).toFixed(2)} €`,
+    ];
+  });
 
   autoTable(doc, {
     head: [["Désignation", "Quantité", "P.U. HT", "Total HT"]],
@@ -122,10 +126,11 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   });
 
   // Calculs
-  const sousTotal = devis.lignes.reduce(
-    (sum, ligne) => sum + ligne.prixUnitaireHT * ligne.quantite,
-    0
-  );
+  const sousTotal = devis.lignes.reduce((sum, ligne) => {
+    const quantite = Number(ligne.quantite) || 0;
+    const prixUnitaire = typeof ligne.prixUnitaireHT === 'string' ? parseFloat(ligne.prixUnitaireHT) : Number(ligne.prixUnitaireHT);
+    return sum + (prixUnitaire * quantite);
+  }, 0);
   const tva = sousTotal * (Number(artisan.tauxTVA) / 100);
   const total = sousTotal + tva;
 
@@ -192,7 +197,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     22
   );
   doc.text(
-    `Échéance: ${new Date(facture.dateEcheance).toLocaleDateString("fr-FR")}`,
+    `Échéance: ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`,
     150,
     29
   );
