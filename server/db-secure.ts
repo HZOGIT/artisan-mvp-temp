@@ -114,14 +114,15 @@ export async function createClientSecure(
     };
 
     const result = await db.insert(clients).values(clientData);
-    const insertId = Number(result[0].insertId);
-
+    
+    // Récupérer le client créé par email ou par nom+artisanId (plus fiable que insertId)
     const created = await db.select()
       .from(clients)
       .where(and(
-        eq(clients.id, insertId),
+        eq(clients.nom, data.nom),
         eq(clients.artisanId, artisanId) // ✅ CRITICAL: Vérifier l'appartenance
       ))
+      .orderBy(desc(clients.createdAt))
       .limit(1);
 
     if (created.length === 0) {
