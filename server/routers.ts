@@ -5062,9 +5062,17 @@ export const appRouter = router({system: systemRouter,
           throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid email or password' });
         }
         
-        // Set session cookie
+        // Create a JWT token
+        const { SignJWT } = await import('jose');
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret-key');
+        const token = await new SignJWT({ userId: user.id, email: user.email })
+          .setProtectedHeader({ alg: 'HS256' })
+          .setExpirationTime('7d')
+          .sign(secret);
+        
+        // Set session cookie with JWT
         const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, JSON.stringify({ userId: user.id }), cookieOptions);
+        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
         
         return { success: true, user };
       }),
