@@ -1,4 +1,3 @@
-import { useAuth as useClerkAuth, useClerk } from "@clerk/clerk-react";
 import { useCallback, useMemo } from "react";
 
 type UseAuthOptions = {
@@ -7,39 +6,26 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false } = options ?? {};
-  const { userId, user, isLoaded, isSignedIn } = useClerkAuth();
-  const { signOut } = useClerk();
-
+  // BYPASS CLERK - Return mock authenticated user
   const logout = useCallback(async () => {
-    await signOut({ redirectUrl: "/" });
-  }, [signOut]);
+    // Mock logout
+    console.log("Logout called (mock)");
+  }, []);
 
   const state = useMemo(() => {
-    if (!isLoaded) {
-      return {
-        user: null,
-        loading: true,
-        error: null,
-        isAuthenticated: false,
-      };
-    }
-
     return {
-      user: user
-        ? {
-            id: userId || "",
-            name: user.fullName || "",
-            email: user.primaryEmailAddress?.emailAddress || "",
-            createdAt: new Date(user.createdAt || Date.now()),
-            updatedAt: new Date(user.updatedAt || Date.now()),
-          }
-        : null,
-      loading: !isLoaded,
+      user: {
+        id: "user-1",
+        name: "Utilisateur",
+        email: "user@example.com",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      loading: false,
       error: null,
-      isAuthenticated: isSignedIn || false,
+      isAuthenticated: true,
     };
-  }, [isLoaded, isSignedIn, user, userId]);
+  }, []);
 
   return {
     ...state,
