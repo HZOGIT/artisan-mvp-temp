@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, email, password, name, createdAt FROM users WHERE email = 'zoubej@gmail.com';",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SELECT id, email, password, name, createdAt FROM users WHERE email = 'zoubej@gmail.com';",
+  "rows": [
+    {
+      "id": "1980001",
+      "email": "zoubej@gmail.com",
+      "password": "$2b$10$fuw4zTQqBnpJJGVGC/gSlupW40pTVKjJ2OG5NM1aaQWeyLodjiepO",
+      "name": "Test User",
+      "createdAt": "2026-01-29 04:36:39"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\temail\tpassword\tname\tcreatedAt\n1980001\tzoubej@gmail.com\t$2b$10$fuw4zTQqBnpJJGVGC/gSlupW40pTVKjJ2OG5NM1aaQWeyLodjiepO\tTest User\t2026-01-29 04:36:39\n",
+  "stderr": "",
+  "execution_time_ms": 421
+}

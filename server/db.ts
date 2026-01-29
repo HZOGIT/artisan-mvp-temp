@@ -32,6 +32,24 @@ let _pool: mysql.Pool | null = null;
 let _lastConnectionError: Error | null = null;
 let _connectionInProgress = false;
 
+// Parser la DATABASE_URL pour extraire les composants
+function parseDatabaseUrl(url: string) {
+  try {
+    const dbUrl = new URL(url);
+    return {
+      host: dbUrl.hostname,
+      port: parseInt(dbUrl.port) || 3306,
+      user: decodeURIComponent(dbUrl.username),
+      password: decodeURIComponent(dbUrl.password),
+      database: dbUrl.pathname.substring(1),
+      ssl: dbUrl.searchParams.get('ssl') ? JSON.parse(dbUrl.searchParams.get('ssl')!) : undefined,
+    };
+  } catch (error) {
+    console.error('[Database] Failed to parse DATABASE_URL:', error);
+    throw new Error('Invalid DATABASE_URL format');
+  }
+}
+
 export async function getDb() {
   // Si la connexion est déjà établie, la retourner
   if (_db) {
@@ -51,12 +69,21 @@ export async function getDb() {
   _connectionInProgress = true;
 
   try {
+    // Parser la DATABASE_URL
+    if (!ENV.databaseUrl) {
+      throw new Error('DATABASE_URL is not defined');
+    }
+    
+    const dbConfig = parseDatabaseUrl(ENV.databaseUrl);
+    
     // Créer le pool de connexion
     _pool = mysql.createPool({
-      host: ENV.DATABASE_HOST,
-      user: ENV.DATABASE_USER,
-      password: ENV.DATABASE_PASSWORD,
-      database: ENV.DATABASE_NAME,
+      host: dbConfig.host,
+      port: dbConfig.port,
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: dbConfig.database,
+      ssl: dbConfig.ssl,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
