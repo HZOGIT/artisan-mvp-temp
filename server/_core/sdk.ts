@@ -274,65 +274,34 @@ class SDKServer {
     }
 
     try {
-      // Try to verify as personal JWT first (email/password auth)
+      // Verify JWT token (email/password auth)
+      console.log('[Auth] Verifying JWT token...');
       const secretKey = this.getSessionSecret();
       const { payload } = await jwtVerify(sessionCookie, secretKey, {
         algorithms: ["HS256"],
       });
       
+      console.log('[Auth] JWT verified successfully, payload:', payload);
       const userId = payload.userId as number | undefined;
       if (!userId) {
+        console.error('[Auth] JWT payload missing userId');
         throw new Error("Invalid JWT payload");
       }
       
       // Get user from database
+      console.log('[Auth] Fetching user from database, userId:', userId);
       const user = await db.getUserById(userId);
       if (!user) {
+        console.error('[Auth] User not found in database, userId:', userId);
         throw new Error("User not found");
       }
       
+      console.log('[Auth] User authenticated successfully:', user.email);
       return user;
     } catch (jwtError) {
-      // If personal JWT verification fails, try Manus OAuth flow
-      console.warn("[Auth] Personal JWT verification failed, trying OAuth");
-      
-      const session = await this.verifySession(sessionCookie);
-      if (!session) {
-        throw ForbiddenError("Invalid session cookie");
-      }
-
-      const sessionUserId = session.openId;
-      const signedInAt = new Date();
-      let user = await db.getUserByOpenId(sessionUserId);
-
-      // If user not in DB, sync from OAuth server automatically
-      if (!user) {
-        try {
-          const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-          await db.upsertUser({
-            openId: userInfo.openId,
-            name: userInfo.name || null,
-            email: userInfo.email ?? null,
-            loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-            lastSignedIn: signedInAt,
-          });
-          user = await db.getUserByOpenId(userInfo.openId);
-        } catch (error) {
-          console.error("[Auth] Failed to sync user from OAuth:", error);
-          throw ForbiddenError("Failed to sync user info");
-        }
-      }
-
-      if (!user) {
-        throw ForbiddenError("User not found");
-      }
-
-      await db.upsertUser({
-        openId: user.openId,
-        lastSignedIn: signedInAt,
-      });
-
-      return user;
+      // If JWT verification fails, throw error (no OAuth fallback)
+      console.error("[Auth] JWT verification failed:", jwtError);
+      throw ForbiddenError("Invalid or expired token");
     }
   }
 }
