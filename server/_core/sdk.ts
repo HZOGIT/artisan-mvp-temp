@@ -258,10 +258,18 @@ class SDKServer {
 
   async authenticateRequest(req: Request): Promise<User> {
     // Parse cookies
+    console.log('[Auth] Authenticating request...');
+    console.log('[Auth] Cookie header:', req.headers.cookie ? 'Present' : 'Missing');
+    
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
+    
+    console.log('[Auth] Parsed cookies:', Array.from(cookies.keys()));
+    console.log('[Auth] Looking for cookie:', COOKIE_NAME);
+    console.log('[Auth] Session cookie found:', sessionCookie ? 'Yes' : 'No');
 
     if (!sessionCookie) {
+      console.warn('[Auth] No session cookie found, throwing error');
       throw ForbiddenError("Missing session cookie");
     }
 
