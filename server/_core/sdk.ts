@@ -265,10 +265,10 @@ class SDKServer {
     console.log('5. req.headers.cookie:', req.headers.cookie);
     console.log('6. req.cookies.token:', req.cookies?.token);
     
-    const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
+    // Use req.cookies directly (parsed by cookie-parser middleware)
+    const sessionCookie = (req.cookies as any)?.[COOKIE_NAME];
     
-    console.log('7. Parsed cookies:', Array.from(cookies.keys()));
+    console.log('7. Parsed cookies:', Object.keys(req.cookies || {}));
     console.log('8. Looking for cookie:', COOKIE_NAME);
     console.log('9. Session cookie found:', sessionCookie ? 'Yes' : 'No');
 
