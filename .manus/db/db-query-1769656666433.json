@@ -1,0 +1,55 @@
+{
+  "query": "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() ORDER BY TABLE_NAME;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() ORDER BY TABLE_NAME;",
+  "rows": [
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    },
+    {
+      "TABLE_NAME": "analyses_photos_chantier"
+    },
+    {
+      "TABLE_NAME": "articles_artisan"
+    },
+    {
+      "TABLE_NAME": "articles_fournisseurs"
+    },
+    {
+      "TABLE_NAME": "artisans"
+    },
+    {
+      "TABLE_NAME": "assurances_vehicules"
+    },
+    {
+      "TABLE_NAME": "avis_clients"
+    },
+    {
+      "TABLE_NAME": "badges"
+    },
+    {
+      "TABLE_NAME": "badges_techniciens"
+    },
+    {
+      "TABLE_NAME": "bibliotheque_articles"
+    },
+    {
+      "TABLE_NAME": "chantiers"
+    },
+    {
+      "TABLE_NAME": "classement_techniciens"
+    },
+    {
+      "TABLE_NAME": "client_portal_access"
+    },
+    {
+      "TABLE_NAME": "client_portal_sessions"
+    },
+    {
+      "TABLE_NAME": "users"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\n__drizzle_migrations\nanalyses_photos_chantier\narticles_artisan\narticles_fournisseurs\nartisans\nassurances_vehicules\navis_clients\nbadges\nbadges_techniciens\nbibliotheque_articles\nchantiers\nclassement_techniciens\nclient_portal_access\nclient_portal_sessions\nusers\n",
+  "stderr": "",
+  "execution_time_ms": 1118
+}
