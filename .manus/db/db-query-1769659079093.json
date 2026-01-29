@@ -1,0 +1,17 @@
+{
+  "query": "INSERT INTO clients (artisanId, nom, email, telephone, adresse, codePostal, ville) \nVALUES (1, 'Client Test', 'test@client.com', '0612345678', '123 Rue Test', '75001', 'Paris');\n\nSELECT id, nom, email, telephone, ville FROM clients LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute INSERT INTO clients (artisanId, nom, email, telephone, adresse, codePostal, ville) \nVALUES (1, 'Client Test', 'test@client.com', '0612345678', '123 Rue Test', '75001', 'Paris');\n\nSELECT id, nom, email, telephone, ville FROM clients LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "nom": "Client Test",
+      "email": "test@client.com",
+      "telephone": "0612345678",
+      "ville": "Paris"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnom\temail\ttelephone\tville\n1\tClient Test\ttest@client.com\t0612345678\tParis\n",
+  "stderr": "",
+  "execution_time_ms": 413
+}

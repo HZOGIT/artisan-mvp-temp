@@ -1,0 +1,114 @@
+{
+  "query": "DESCRIBE devis_lignes;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute DESCRIBE devis_lignes;",
+  "rows": [
+    {
+      "Field": "id",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "PRI",
+      "Default": "NULL",
+      "Extra": "auto_increment"
+    },
+    {
+      "Field": "devisId",
+      "Type": "int(11)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "ordre",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "0",
+      "Extra": ""
+    },
+    {
+      "Field": "reference",
+      "Type": "varchar(50)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "designation",
+      "Type": "varchar(500)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "description",
+      "Type": "text",
+      "Null": "YES",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "quantite",
+      "Type": "decimal(10,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "1.00",
+      "Extra": ""
+    },
+    {
+      "Field": "unite",
+      "Type": "varchar(20)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "unité",
+      "Extra": ""
+    },
+    {
+      "Field": "prixUnitaireHT",
+      "Type": "decimal(10,2)",
+      "Null": "NO",
+      "Key": "",
+      "Default": "NULL",
+      "Extra": ""
+    },
+    {
+      "Field": "tauxTVA",
+      "Type": "decimal(5,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "20.00",
+      "Extra": ""
+    },
+    {
+      "Field": "montantHT",
+      "Type": "decimal(10,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "0.00",
+      "Extra": ""
+    },
+    {
+      "Field": "montantTVA",
+      "Type": "decimal(10,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "0.00",
+      "Extra": ""
+    },
+    {
+      "Field": "montantTTC",
+      "Type": "decimal(10,2)",
+      "Null": "YES",
+      "Key": "",
+      "Default": "0.00",
+      "Extra": ""
+    }
+  ],
+  "messages": [],
+  "stdout": "Field\tType\tNull\tKey\tDefault\tExtra\nid\tint(11)\tNO\tPRI\tNULL\tauto_increment\ndevisId\tint(11)\tNO\t\tNULL\t\nordre\tint(11)\tYES\t\t0\t\nreference\tvarchar(50)\tYES\t\tNULL\t\ndesignation\tvarchar(500)\tNO\t\tNULL\t\ndescription\ttext\tYES\t\tNULL\t\nquantite\tdecimal(10,2)\tYES\t\t1.00\t\nunite\tvarchar(20)\tYES\t\tunité\t\nprixUnitaireHT\tdecimal(10,2)\tNO\t\tNULL\t\ntauxTVA\tdecimal(5,2)\tYES\t\t20.00\t\nmontantHT\tdecimal(10,2)\tYES\t\t0.00\t\nmontantTVA\tdecimal(10,2)\tYES\t\t0.00\t\nmontantTTC\tdecimal(10,2)\tYES\t\t0.00\t\n",
+  "stderr": "",
+  "execution_time_ms": 362
+}

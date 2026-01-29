@@ -1,0 +1,16 @@
+{
+  "query": "INSERT INTO devis_lignes (devisId, designation, quantite, prixUnitaireHT) \nVALUES (1, 'Prestation Test', 1, 1000.00);\n\nSELECT id, designation, quantite, prixUnitaireHT FROM devis_lignes LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3Df5Vmfjhp6Bzkk.79acb552eee2 --database J25kfT9jDPLP68WkWNhvrq --execute INSERT INTO devis_lignes (devisId, designation, quantite, prixUnitaireHT) \nVALUES (1, 'Prestation Test', 1, 1000.00);\n\nSELECT id, designation, quantite, prixUnitaireHT FROM devis_lignes LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "designation": "Prestation Test",
+      "quantite": "1.00",
+      "prixUnitaireHT": "1000.00"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tdesignation\tquantite\tprixUnitaireHT\n1\tPrestation Test\t1.00\t1000.00\n",
+  "stderr": "",
+  "execution_time_ms": 406
+}
