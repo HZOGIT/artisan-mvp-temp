@@ -48,6 +48,8 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   
+  console.log('=== SERVER SETUP ===');
+  
   // TODO: Re-enable CSP with proper Clerk directives
   // Temporarily disabled to allow Clerk to load
   // app.use((req, res, next) => {
@@ -66,10 +68,12 @@ async function startServer() {
   
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
+  console.log('OK express.json() charge');
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   
   // IMPORTANT: cookie-parser MUST be before routes to parse cookies
   app.use(cookieParser());
+  console.log('OK cookieParser() charge');
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);

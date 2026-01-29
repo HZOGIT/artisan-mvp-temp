@@ -257,50 +257,55 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // Parse cookies
-    console.log('[Auth] Authenticating request...');
-    console.log('[Auth] Cookie header:', req.headers.cookie ? 'Present' : 'Missing');
+    console.log('=== MIDDLEWARE AUTH DEBUG ===');
+    console.log('1. URL demandee:', req.url);
+    console.log('2. Methode:', req.method);
+    console.log('3. req.cookies existe:', !!req.cookies);
+    console.log('4. req.cookies contenu:', JSON.stringify(req.cookies));
+    console.log('5. req.headers.cookie:', req.headers.cookie);
+    console.log('6. req.cookies.token:', req.cookies?.token);
     
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     
-    console.log('[Auth] Parsed cookies:', Array.from(cookies.keys()));
-    console.log('[Auth] Looking for cookie:', COOKIE_NAME);
-    console.log('[Auth] Session cookie found:', sessionCookie ? 'Yes' : 'No');
+    console.log('7. Parsed cookies:', Array.from(cookies.keys()));
+    console.log('8. Looking for cookie:', COOKIE_NAME);
+    console.log('9. Session cookie found:', sessionCookie ? 'Yes' : 'No');
 
     if (!sessionCookie) {
-      console.warn('[Auth] No session cookie found, throwing error');
+      console.warn('10. PAS DE TOKEN - REJET');
+      console.log('=== FIN MIDDLEWARE AUTH DEBUG ===');
       throw ForbiddenError("Missing session cookie");
     }
 
     try {
-      // Verify JWT token (email/password auth)
-      console.log('[Auth] Verifying JWT token...');
+      console.log('11. TOKEN TROUVE');
+      console.log('12. JWT_SECRET existe:', !!process.env.JWT_SECRET);
+      
       const secretKey = this.getSessionSecret();
       const { payload } = await jwtVerify(sessionCookie, secretKey, {
         algorithms: ["HS256"],
       });
       
-      console.log('[Auth] JWT verified successfully, payload:', payload);
+      console.log('13. JWT VALIDE:', payload);
       const userId = payload.userId as number | undefined;
       if (!userId) {
-        console.error('[Auth] JWT payload missing userId');
+        console.error('14. JWT payload missing userId');
         throw new Error("Invalid JWT payload");
       }
       
-      // Get user from database
-      console.log('[Auth] Fetching user from database, userId:', userId);
       const user = await db.getUserById(userId);
       if (!user) {
-        console.error('[Auth] User not found in database, userId:', userId);
+        console.error('15. User not found in database, userId:', userId);
         throw new Error("User not found");
       }
       
-      console.log('[Auth] User authenticated successfully:', user.email);
+      console.log('16. USER ATTACHE A REQ');
+      console.log('=== FIN MIDDLEWARE AUTH DEBUG ===');
       return user;
     } catch (jwtError) {
-      // If JWT verification fails, throw error (no OAuth fallback)
-      console.error("[Auth] JWT verification failed:", jwtError);
+      console.log('13. JWT INVALIDE:', jwtError);
+      console.log('=== FIN MIDDLEWARE AUTH DEBUG ===');
       throw ForbiddenError("Invalid or expired token");
     }
   }
