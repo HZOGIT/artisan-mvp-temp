@@ -5038,9 +5038,17 @@ export const appRouter = router({system: systemRouter,
         try {
           const user = await createUserWithPassword(input.email, input.password, input.name);
           
-          // Set session cookie
+          // FIX: Creer un JWT comme dans signin (au lieu de JSON.stringify)
+          const { SignJWT } = await import('jose');
+          const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret-key');
+          const token = await new SignJWT({ userId: user.id, email: user.email })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setExpirationTime('7d')
+            .sign(secret);
+          
+          // Set session cookie with JWT
           const cookieOptions = getSessionCookieOptions(ctx.req);
-          ctx.res.cookie(COOKIE_NAME, JSON.stringify({ userId: user.id }), cookieOptions);
+          ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
           
           return { success: true, user };
         } catch (error) {

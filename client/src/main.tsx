@@ -21,6 +21,13 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: '/api/trpc',
       transformer: superjson,
+      // FIX: Envoyer les cookies avec chaque requete
+      fetch(url, options) {
+        return fetch(url, {
+          ...options,
+          credentials: 'include',
+        });
+      },
     }),
   ],
 })
