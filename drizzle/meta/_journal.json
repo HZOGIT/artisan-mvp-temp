@@ -148,6 +148,13 @@
       "when": 1769652006528,
       "tag": "0020_simple_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1769811138424,
+      "tag": "0021_add_lucia_sessions",
+      "breakpoints": true
     }
   ]
 }

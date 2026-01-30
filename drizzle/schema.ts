@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint } from "drizzle-orm/mysql-core";
 
 // ============================================================================
 // USERS TABLE (Core authentication)
@@ -1486,3 +1486,16 @@ export const modelesDevisLignes = mysqlTable("modeles_devis_lignes", {
 
 export type ModeleDevisLigne = typeof modelesDevisLignes.$inferSelect;
 export type InsertModeleDevisLigne = typeof modelesDevisLignes.$inferInsert;
+
+
+// ============================================================================
+// LUCIA AUTH SESSIONS TABLE
+// ============================================================================
+export const sessions = mysqlTable("sessions", {
+  id: varchar("id", { length: 128 }).primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: bigint("expiresAt", { mode: "number" }).notNull(),
+});
+
+export type Session = typeof sessions.$inferSelect;
+export type InsertSession = typeof sessions.$inferInsert;
