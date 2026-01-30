@@ -1,4 +1,4 @@
-import { getSessionCookieOptions } from "./_core/cookies";
+
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
@@ -6,6 +6,7 @@ import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import * as dbSecure from "./db-secure";
 import { createUserWithPassword, authenticateUser } from "./_core/auth";
+import { createToken, setAuthCookie, clearAuthCookie } from "./_core/auth-simple";
 import { COOKIE_NAME } from "../shared/const";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
@@ -5026,7 +5027,9 @@ const alertesPrevisionsRouter = router({
 // ============================================================================
 export const appRouter = router({system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(({ ctx }) => {
+      return ctx.user;
+    }),
     
     signup: publicProcedure
       .input(z.object({
@@ -5037,19 +5040,8 @@ export const appRouter = router({system: systemRouter,
       .mutation(async ({ input, ctx }) => {
         try {
           const user = await createUserWithPassword(input.email, input.password, input.name);
-          
-          // FIX: Creer un JWT comme dans signin (au lieu de JSON.stringify)
-          const { SignJWT } = await import('jose');
-          const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret-key');
-          const token = await new SignJWT({ userId: user.id, email: user.email })
-            .setProtectedHeader({ alg: 'HS256' })
-            .setExpirationTime('7d')
-            .sign(secret);
-          
-          // Set session cookie with JWT
-          const cookieOptions = getSessionCookieOptions(ctx.req);
-          ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
-          
+          const token = await createToken({ id: user.id, email: user.email });
+          setAuthCookie(ctx.res, token, ctx.req);
           return { success: true, user };
         } catch (error) {
           if (error instanceof Error && error.message === 'User already exists') {
@@ -5069,38 +5061,14 @@ export const appRouter = router({system: systemRouter,
         if (!user) {
           throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid email or password' });
         }
-        
-        console.log('=== SIGNIN DEBUG ===');
-        console.log('1. User trouve:', { id: user.id, email: user.email });
-        
-        // Create a JWT token
-        const { SignJWT } = await import('jose');
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret-key');
-        const token = await new SignJWT({ userId: user.id, email: user.email })
-          .setProtectedHeader({ alg: 'HS256' })
-          .setExpirationTime('7d')
-          .sign(secret);
-        
-        console.log('2. JWT cree:', token.substring(0, 50) + '...');
-        console.log('3. JWT_SECRET existe:', !!process.env.JWT_SECRET);
-        
-        // Set session cookie with JWT
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        console.log('4. Avant res.cookie - ctx.res existe:', !!ctx.res);
-        console.log('5. Configuration du cookie:', { name: COOKIE_NAME, ...cookieOptions });
-        
-        ctx.res.cookie(COOKIE_NAME, token, cookieOptions);
-        
-        console.log('6. Apres res.cookie - Cookie defini');
-        console.log('=== FIN SIGNIN DEBUG ===');
-        
+        const token = await createToken({ id: user.id, email: user.email });
+        setAuthCookie(ctx.res, token, ctx.req);
         return { success: true, user };
       }),
     
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
+      clearAuthCookie(ctx.res);
+      return { success: true };
     }),
   }),
   artisan: artisanRouter,
