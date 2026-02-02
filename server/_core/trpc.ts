@@ -13,10 +13,14 @@ export const publicProcedure = t.procedure;
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
 
+  console.log('[DEBUG] protectedProcedure ctx.user:', ctx.user);
+
   if (!ctx.user) {
+    console.error('[DEBUG] User is null - throwing UNAUTHORIZED');
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
+  console.log('[DEBUG] User authenticated:', ctx.user.email);
   return next({
     ctx: {
       ...ctx,
