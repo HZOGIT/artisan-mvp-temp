@@ -12,27 +12,9 @@ function getEnvVar(key: string, fallback: string = ""): string {
 }
 
 /**
- * Get Manus OAuth login URL
- * Constructs the OAuth authorization URL with proper parameters
+ * Get login URL - redirects to local sign-in page
+ * Using email/password authentication instead of OAuth
  */
 export const getLoginUrl = () => {
-  const oauthPortalUrl = getEnvVar("VITE_OAUTH_PORTAL_URL", "https://oauth.manus.im");
-  const appId = getEnvVar("VITE_APP_ID", "");
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
-  
-  if (!appId) {
-    console.error("❌ VITE_APP_ID is not configured");
-    return "/sign-in"; // Fallback to local sign-in page
-  }
-  
-  const params = new URLSearchParams({
-    client_id: appId,
-    redirect_uri: redirectUri,
-    response_type: "code",
-    scope: "openid profile email",
-  });
-  
-  const loginUrl = `${oauthPortalUrl}/authorize?${params.toString()}`;
-  console.log("🔐 OAuth Login URL:", loginUrl);
-  return loginUrl;
+  return "/sign-in";
 };

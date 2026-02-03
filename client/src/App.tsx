@@ -12,6 +12,7 @@ import Factures from "./pages/Factures";
 import Interventions from "./pages/Interventions";
 import PaiementSucces from "./pages/PaiementSucces";
 import PaiementAnnule from "./pages/PaiementAnnule";
+import SignIn from "./pages/SignIn";
 import DashboardLayout from "./components/DashboardLayout";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 
@@ -44,6 +45,7 @@ export default function App() {
         <TooltipProvider>
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/sign-in" component={SignIn} />
             <Route component={AuthenticatedRoutes} />
           </Switch>
         </TooltipProvider>
