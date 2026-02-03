@@ -29,15 +29,18 @@ export default function SignIn() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("🔐 Bouton cliqué - handleSubmit appelé");
     setError("");
     setLoading(true);
 
     if (!email || !password) {
+      console.log("❌ Email ou password vide");
       setError("Veuillez remplir tous les champs");
       setLoading(false);
       return;
     }
 
+    console.log("📧 Tentative de connexion avec:", { email });
     signinMutation.mutate({ email, password });
   };
 

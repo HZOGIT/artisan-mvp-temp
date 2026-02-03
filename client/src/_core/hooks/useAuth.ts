@@ -13,9 +13,8 @@ export function useAuth(options?: UseAuthOptions) {
   const queryClient = useQueryClient();
   
   // Query current user
-  const { data: user, isLoading: loading } = trpc.auth.me.useQuery();
+  const { data: user, isLoading: loading, refetch } = trpc.auth.me.useQuery();
   
-  // Logout mutation
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
       // Invalider le cache pour forcer un refresh de auth.me
@@ -40,9 +39,6 @@ export function useAuth(options?: UseAuthOptions) {
     error: null,
     isAuthenticated,
     logout: () => logoutMutation.mutate(),
-    refresh: () => {
-      // Invalidate the query to refetch
-      return Promise.resolve();
-    },
-  }), [user, loading, logoutMutation]);
+    refetch: () => refetch(),
+  }), [user, loading, logoutMutation, refetch]);
 }
