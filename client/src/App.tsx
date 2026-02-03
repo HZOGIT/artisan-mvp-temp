@@ -17,6 +17,11 @@ import DashboardLayout from "./components/DashboardLayout";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import PlaceholderPage from "./pages/PlaceholderPage";
 
+// Placeholder wrapper components
+const DashboardPlaceholder = () => <PlaceholderPage title="Tableau de bord" />;
+const ArticlesPlaceholder = () => <PlaceholderPage title="Articles" />;
+const ProfilePlaceholder = () => <PlaceholderPage title="Mon profil" />;
+
 // MVP Routes Only
 function AuthenticatedRoutes() {
   const [location] = useLocation();
@@ -29,16 +34,21 @@ function AuthenticatedRoutes() {
         <Route path="/clients/nouveau" component={ClientsNouveauPage} />
         <Route path="/clients/:id" component={ClientDetail} />
         <Route path="/devis" component={Devis} />
+        <Route path="/devis/nouveau" component={DevisLigneEdit} />
         <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
         <Route path="/factures" component={Factures} />
         <Route path="/interventions" component={Interventions} />
-        <Route path="/articles" element={<PlaceholderPage title="Articles" />} />
-        <Route path="/profil" element={<PlaceholderPage title="Mon profil" />} />
         
         {/* Placeholder Routes - Coming Soon */}
-        <Route path="/dashboard" element={<PlaceholderPage title="Tableau de bord" />} />
+        <Route path="/dashboard" component={DashboardPlaceholder} />
+        <Route path="/articles" component={ArticlesPlaceholder} />
+        <Route path="/profil" component={ProfilePlaceholder} />
+        
+        {/* Payment Routes */}
         <Route path="/paiement/succes" component={PaiementSucces} />
         <Route path="/paiement/annule" component={PaiementAnnule} />
+        
+        {/* 404 Fallback */}
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
