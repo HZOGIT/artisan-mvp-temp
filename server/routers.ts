@@ -92,12 +92,22 @@ const clientsRouter = router({
   create: protectedProcedure
     .input(ClientInputSchema)
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
+      try {
+        console.log("[DEBUG] clients.create input:", input);
+        let artisan = await db.getArtisanByUserId(ctx.user.id);
+        console.log("[DEBUG] artisan:", artisan);
+        if (!artisan) {
+          artisan = await db.createArtisan({ userId: ctx.user.id });
+          console.log("[DEBUG] artisan created:", artisan);
+        }
+        // Utiliser la version sécurisée
+        const result = await dbSecure.createClientSecure(artisan.id, input);
+        console.log("[DEBUG] client created:", result);
+        return result;
+      } catch (error) {
+        console.error("[ERROR] clients.create failed:", error);
+        throw error;
       }
-      // Utiliser la version sécurisée
-      return await dbSecure.createClientSecure(artisan.id, input);
     }),
   
   update: protectedProcedure
