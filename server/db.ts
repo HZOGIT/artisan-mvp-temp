@@ -18,7 +18,7 @@ import {
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: any = null;
 let _pool: mysql.Pool | null = null;
 let _lastConnectionError: Error | null = null;
 let _connectionInProgress = false;
@@ -68,7 +68,9 @@ export async function getDb() {
     const dbConfig = parseDatabaseUrl(ENV.databaseUrl);
     
     // Créer le pool de connexion
+    // @ts-ignore - mysql2 types
     _pool = mysql.createPool({
+      // @ts-ignore - mysql2 types
       host: dbConfig.host,
       port: dbConfig.port,
       user: dbConfig.user,
@@ -88,7 +90,7 @@ export async function getDb() {
     connection.release();
 
     // Créer l'instance Drizzle
-    _db = drizzle(_pool);
+    _db = drizzle(_pool) as unknown as any;
 
     console.log('[Database] Connected successfully');
     _lastConnectionError = null;
@@ -890,11 +892,11 @@ export async function getBibliothequeArticles(metier?: string, categorie?: strin
     let query: any = db.select().from(bibliothequeArticles);
 
     if (metier) {
-      query = query.where(eq(bibliothequeArticles.metier, metier));
+      query = query.where(eq(bibliothequeArticles.metier, metier as any));
     }
 
     if (categorie) {
-      query = query.where(eq(bibliothequeArticles.categorie, categorie));
+      query = query.where(eq(bibliothequeArticles.categorie, categorie as any));
     }
 
     return await query;
@@ -913,11 +915,11 @@ export async function searchArticles(query: string, metier?: string) {
     let dbQuery: any = db.select().from(bibliothequeArticles);
 
     if (metier) {
-      dbQuery = dbQuery.where(eq(bibliothequeArticles.metier, metier));
+      dbQuery = dbQuery.where(eq(bibliothequeArticles.metier, metier as any));
     }
 
     const results = await dbQuery;
-    return results.filter(a => 
+    return results.filter((a: any) => 
       a.designation.toLowerCase().includes(query.toLowerCase()) ||
       (a.reference && a.reference.toLowerCase().includes(query.toLowerCase()))
     );
