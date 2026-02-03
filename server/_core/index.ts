@@ -60,10 +60,7 @@ async function startServer() {
   // });}
   
   // Stripe webhook - MUST be before express.json() for signature verification
-  app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    const { handleStripeWebhook } = await import('../stripe/webhookHandler');
-    return handleStripeWebhook(req, res);
-  });
+  // TODO: Implémenter le webhook Stripe pour le MVP
   
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
