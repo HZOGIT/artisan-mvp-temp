@@ -15,6 +15,7 @@ import PaiementAnnule from "./pages/PaiementAnnule";
 import SignIn from "./pages/SignIn";
 import DashboardLayout from "./components/DashboardLayout";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
+import PlaceholderPage from "./pages/PlaceholderPage";
 
 // MVP Routes Only
 function AuthenticatedRoutes() {
@@ -23,6 +24,7 @@ function AuthenticatedRoutes() {
   return (
     <DashboardLayout>
       <Switch location={location}>
+        {/* MVP Routes - Fully Functional */}
         <Route path="/clients" component={Clients} />
         <Route path="/clients/nouveau" component={ClientsNouveauPage} />
         <Route path="/clients/:id" component={ClientDetail} />
@@ -30,6 +32,11 @@ function AuthenticatedRoutes() {
         <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
         <Route path="/factures" component={Factures} />
         <Route path="/interventions" component={Interventions} />
+        <Route path="/articles" element={<PlaceholderPage title="Articles" />} />
+        <Route path="/profil" element={<PlaceholderPage title="Mon profil" />} />
+        
+        {/* Placeholder Routes - Coming Soon */}
+        <Route path="/dashboard" element={<PlaceholderPage title="Tableau de bord" />} />
         <Route path="/paiement/succes" component={PaiementSucces} />
         <Route path="/paiement/annule" component={PaiementAnnule} />
         <Route component={NotFound} />
