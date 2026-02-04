@@ -11,10 +11,7 @@ function getEnvVar(key: string, fallback: string = ""): string {
   return value || fallback;
 }
 
-/**
- * Get login URL - redirects to local sign-in page
- * Using email/password authentication instead of OAuth
- */
+// Clerk sign-in URL
 export const getLoginUrl = () => {
   return "/sign-in";
 };

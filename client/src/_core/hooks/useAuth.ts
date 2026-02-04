@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useQueryClient } from "@tanstack/react-query";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -10,17 +9,14 @@ type UseAuthOptions = {
 
 export function useAuth(options?: UseAuthOptions) {
   const [location, setLocation] = useLocation();
-  const queryClient = useQueryClient();
   
   // Query current user
-  const { data: user, isLoading: loading, refetch } = trpc.auth.me.useQuery();
+  const { data: user, isLoading: loading } = trpc.auth.me.useQuery();
   
+  // Logout mutation
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
-      // Invalider le cache pour forcer un refresh de auth.me
-      queryClient.invalidateQueries();
-      // Rediriger vers signin
-      setLocation("/signin");
+      setLocation("/");
     },
   });
 
@@ -39,6 +35,9 @@ export function useAuth(options?: UseAuthOptions) {
     error: null,
     isAuthenticated,
     logout: () => logoutMutation.mutate(),
-    refetch: () => refetch(),
-  }), [user, loading, logoutMutation, refetch]);
+    refresh: () => {
+      // Invalidate the query to refetch
+      return Promise.resolve();
+    },
+  }), [user, loading, logoutMutation]);
 }

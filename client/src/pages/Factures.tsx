@@ -48,11 +48,11 @@ export default function Factures() {
   const { data: clients } = trpc.clients.list.useQuery();
 
   const createMutation = trpc.factures.create.useMutation({
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       utils.factures.list.invalidate();
       setIsCreateDialogOpen(false);
       toast.success("Facture créée avec succès");
-      setLocation(`/factures/${data?.id}`);
+      setLocation(`/factures/${data.id}`);
     },
     onError: () => {
       toast.error("Erreur lors de la création de la facture");

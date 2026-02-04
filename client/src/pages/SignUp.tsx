@@ -9,30 +9,42 @@ import { trpc } from "@/lib/trpc";
 import { Wrench, ArrowRight, Loader2 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
-export default function SignIn() {
+export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [name, setName] = useState("");
   const [, setLocation] = useLocation();
   
-  const signinMutation = trpc.auth.signin.useMutation({
+  const signupMutation = trpc.auth.signup.useMutation({
     onSuccess: () => {
-      toast.success("Connexion réussie");
+      toast.success("Inscription réussie");
       setLocation("/dashboard");
     },
     onError: (error) => {
-      toast.error(error.message || "Email ou mot de passe incorrect.");
+      toast.error(error.message || "Une erreur s'est produite.");
     },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password) {
+    if (!email || !password || !confirmPassword) {
       toast.error("Veuillez remplir tous les champs.");
       return;
     }
 
-    signinMutation.mutate({ email, password });
+    if (password !== confirmPassword) {
+      toast.error("Les mots de passe ne correspondent pas.");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+
+    signupMutation.mutate({ email, password, name: name || undefined });
   };
 
   return (
@@ -57,13 +69,25 @@ export default function SignIn() {
       <div className="flex-1 flex items-center justify-center py-12 px-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Connexion</CardTitle>
+            <CardTitle>Créer un compte</CardTitle>
             <CardDescription>
-              Entrez vos identifiants pour accéder à votre compte
+              Inscrivez-vous pour accéder à Artisan MVP
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nom (optionnel)</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Votre nom"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={signupMutation.isPending}
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -72,7 +96,7 @@ export default function SignIn() {
                   placeholder="votre@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={signinMutation.isPending}
+                  disabled={signupMutation.isPending}
                   required
                 />
               </div>
@@ -85,7 +109,20 @@ export default function SignIn() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={signinMutation.isPending}
+                  disabled={signupMutation.isPending}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={signupMutation.isPending}
                   required
                 />
               </div>
@@ -93,27 +130,27 @@ export default function SignIn() {
               <Button 
                 type="submit" 
                 className="w-full"
-                disabled={signinMutation.isPending}
+                disabled={signupMutation.isPending}
               >
-                {signinMutation.isPending ? (
+                {signupMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connexion en cours...
+                    Inscription en cours...
                   </>
                 ) : (
-                  "Se connecter"
+                  "S'inscrire"
                 )}
               </Button>
             </form>
 
             <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">Pas encore de compte ? </span>
+              <span className="text-muted-foreground">Vous avez déjà un compte ? </span>
               <Button 
                 variant="link" 
                 className="p-0 h-auto"
-                onClick={() => setLocation("/signup")}
+                onClick={() => setLocation("/signin")}
               >
-                S'inscrire
+                Se connecter
               </Button>
             </div>
           </CardContent>
