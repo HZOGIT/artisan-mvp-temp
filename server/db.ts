@@ -1,30 +1,5 @@
-import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { 
-  InsertUser, users, 
-  artisans, InsertArtisan, Artisan,
-  clients, InsertClient, Client,
-  bibliothequeArticles, InsertBibliothequeArticle, BibliothequeArticle,
-  articlesArtisan, InsertArticleArtisan, ArticleArtisan,
-  devis, InsertDevis, Devis,
-  devisLignes, InsertDevisLigne, DevisLigne,
-  factures, InsertFacture, Facture,
-  facturesLignes, InsertFactureLigne, FactureLigne,
-  interventions, InsertIntervention, Intervention,
-  notifications, InsertNotification, Notification,
-  parametresArtisan, InsertParametresArtisan, ParametresArtisan,
-  signaturesDevis, InsertSignatureDevis, SignatureDevis,
-  stocks, InsertStock, Stock,
-  mouvementsStock, InsertMouvementStock, MouvementStock,
-  fournisseurs, InsertFournisseur, Fournisseur,
-  articlesFournisseurs, InsertArticleFournisseur, ArticleFournisseur,
-  smsVerifications, InsertSmsVerification, SmsVerification,
-  relancesDevis, InsertRelanceDevis, RelanceDevis,
-  modelesEmail, InsertModeleEmail, ModeleEmail,
-  commandesFournisseurs, InsertCommandeFournisseur, CommandeFournisseur,
-  lignesCommandesFournisseurs, InsertLigneCommandeFournisseur, LigneCommandeFournisseur,
-  paiementsStripe, InsertPaiementStripe, PaiementStripe
-} from "../drizzle/schema";
+import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -112,26 +87,5 @@ export async function getDb() {
   }
 }
 
-export { User, InsertUser } from "../drizzle/schema";
-export { Artisan, InsertArtisan } from "../drizzle/schema";
-export { Client, InsertClient } from "../drizzle/schema";
-export { BibliothequeArticle, InsertBibliothequeArticle } from "../drizzle/schema";
-export { ArticleArtisan, InsertArticleArtisan } from "../drizzle/schema";
-export { Devis, InsertDevis } from "../drizzle/schema";
-export { DevisLigne, InsertDevisLigne } from "../drizzle/schema";
-export { Facture, InsertFacture } from "../drizzle/schema";
-export { FactureLigne, InsertFactureLigne } from "../drizzle/schema";
-export { Intervention, InsertIntervention } from "../drizzle/schema";
-export { Notification, InsertNotification } from "../drizzle/schema";
-export { ParametresArtisan, InsertParametresArtisan } from "../drizzle/schema";
-export { SignatureDevis, InsertSignatureDevis } from "../drizzle/schema";
-export { Stock, InsertStock } from "../drizzle/schema";
-export { MouvementStock, InsertMouvementStock } from "../drizzle/schema";
-export { Fournisseur, InsertFournisseur } from "../drizzle/schema";
-export { ArticleFournisseur, InsertArticleFournisseur } from "../drizzle/schema";
-export { SmsVerification, InsertSmsVerification } from "../drizzle/schema";
-export { RelanceDevis, InsertRelanceDevis } from "../drizzle/schema";
-export { ModeleEmail, InsertModeleEmail } from "../drizzle/schema";
-export { CommandeFournisseur, InsertCommandeFournisseur } from "../drizzle/schema";
-export { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../drizzle/schema";
-export { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
+// Types are imported directly from schema in the routers
+// No re-exports needed here to avoid module loading issues

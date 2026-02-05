@@ -69,65 +69,70 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
 /**
  * Traite une session de paiement complétée
+ * TODO: Implémenter les fonctions DB manquantes
  */
 async function handleCheckoutSessionCompleted(session: any) {
   console.log(`[Stripe Webhook] Checkout session completed: ${session.id}`);
+  console.log('[Stripe Webhook] TODO: Implement payment completion logic');
   
-  const tokenPaiement = session.metadata?.token_paiement;
-  const factureId = session.metadata?.facture_id;
-  
-  if (!tokenPaiement || !factureId) {
-    console.error('[Stripe Webhook] Missing metadata in session');
-    return;
-  }
-
-  // Récupérer le paiement par token
-  const paiement = await db.getPaiementByToken(tokenPaiement);
-  
-  if (!paiement) {
-    console.error(`[Stripe Webhook] Payment not found for token: ${tokenPaiement}`);
-    return;
-  }
-
-  // Mettre à jour le paiement comme complété
-  await db.markPaiementComplete(paiement.id, session.payment_intent || '');
-  
-  // Mettre à jour le statut de la facture
-  await db.updateFacture(parseInt(factureId), {
-    statut: 'payee',
-    datePaiement: new Date(),
-  });
-
-  // Créer une notification pour l'artisan
-  const facture = await db.getFactureById(parseInt(factureId));
-  if (facture) {
-    await db.createNotification({
-      artisanId: facture.artisanId,
-      type: 'succes',
-      titre: 'Paiement reçu',
-      message: `Le paiement de la facture ${facture.numero} a été reçu (${Number(facture.totalTTC).toFixed(2)} €)`,
-      lien: `/factures/${facture.id}`,
-    });
-  }
-
-  console.log(`[Stripe Webhook] Payment completed for invoice ${factureId}`);
+  // const tokenPaiement = session.metadata?.token_paiement;
+  // const factureId = session.metadata?.facture_id;
+  // 
+  // if (!tokenPaiement || !factureId) {
+  //   console.error('[Stripe Webhook] Missing metadata in session');
+  //   return;
+  // }
+  //
+  // // Récupérer le paiement par token
+  // const paiement = await db.getPaiementByToken(tokenPaiement);
+  // 
+  // if (!paiement) {
+  //   console.error(`[Stripe Webhook] Payment not found for token: ${tokenPaiement}`);
+  //   return;
+  // }
+  //
+  // // Mettre à jour le paiement comme complété
+  // await db.markPaiementComplete(paiement.id, session.payment_intent || '');
+  // 
+  // // Mettre à jour le statut de la facture
+  // await db.updateFacture(parseInt(factureId), {
+  //   statut: 'payee',
+  //   datePaiement: new Date(),
+  // });
+  //
+  // // Créer une notification pour l'artisan
+  // const facture = await db.getFactureById(parseInt(factureId));
+  // if (facture) {
+  //   await db.createNotification({
+  //     artisanId: facture.artisanId,
+  //     type: 'succes',
+  //     titre: 'Paiement reçu',
+  //     message: `Le paiement de la facture ${facture.numero} a été reçu (${Number(facture.totalTTC).toFixed(2)} €)`,
+  //     lien: `/factures/${facture.id}`,
+  //   });
+  // }
+  //
+  // console.log(`[Stripe Webhook] Payment completed for invoice ${factureId}`);
 }
 
 /**
  * Traite un paiement échoué
+ * TODO: Implémenter les fonctions DB manquantes
  */
 async function handlePaymentFailed(paymentIntent: any) {
-  const tokenPaiement = paymentIntent.metadata?.token_paiement;
+  console.log('[Stripe Webhook] TODO: Implement payment failure logic');
   
-  if (!tokenPaiement) {
-    return;
-  }
-
-  const paiement = await db.getPaiementByToken(tokenPaiement);
-  
-  if (paiement) {
-    await db.updatePaiementStripe(paiement.id, {
-      statut: 'echoue',
-    });
-  }
+  // const tokenPaiement = paymentIntent.metadata?.token_paiement;
+  // 
+  // if (!tokenPaiement) {
+  //   return;
+  // }
+  //
+  // const paiement = await db.getPaiementByToken(tokenPaiement);
+  // 
+  // if (paiement) {
+  //   await db.updatePaiementStripe(paiement.id, {
+  //     statut: 'echoue',
+  //   });
+  // }
 }
