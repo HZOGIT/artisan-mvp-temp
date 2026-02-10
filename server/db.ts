@@ -1266,4 +1266,3 @@ export { ModeleEmail, InsertModeleEmail } from "../drizzle/schema";
 export { CommandeFournisseur, InsertCommandeFournisseur } from "../drizzle/schema";
 export { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../drizzle/schema";
 export { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
-Allô Impasse oui **** Oui c'est bon Alexandra Oui oui je t'entends Hamdri Lamar Khlaoufik Al Hamilda dimanche j'ai vu ton appel C'est facile ouais franchement enfin L'équipe moi je suis un petit peu absent face ces derniers jours L'équipe galère pas mal Ouais donc ils ont voulu voir avec toi qu'est ce qu'il y a à faire comment faire Parce que Ils ont l'air d'être bloqué complètement oui
