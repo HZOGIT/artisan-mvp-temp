@@ -54,11 +54,16 @@ const artisanRouter = router({
       tauxTVA: z.string().optional(),
       logo: z.string().optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      const artisan = await db.getArtisanByUserId(ctx.user.id);
+   .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      
+      // Si le profil n'existe pas, le créer
       if (!artisan) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+        artisan = await db.createArtisan({ userId: ctx.user.id, ...input });
+        return artisan;
       }
+      
+      // Sinon, le mettre à jour
       return await db.updateArtisan(artisan.id, input);
     }),
 });
