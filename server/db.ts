@@ -1123,23 +1123,45 @@ export async function getDashboardStats(artisanId: number): Promise<any> {
   
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
   
-  const facturesThisMonth = facturesList.filter(f => new Date(f.createdAt) >= startOfMonth);
-  const caThisMonth = facturesThisMonth.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0);
+  const facturesPayees = facturesList.filter(f => f.statut === 'payee');
+  const facturesThisMonth = facturesPayees.filter(f => {
+    const date = f.datePaiement ? new Date(f.datePaiement) : new Date(f.createdAt);
+    return date >= startOfMonth;
+  });
+  const caMonth = facturesThisMonth.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0);
   
-  const devisEnAttente = devisList.filter(d => d.statut === 'envoye' || d.statut === 'brouillon');
-  const facturesImpayees = facturesList.filter(f => f.statut !== 'payee' && f.statut !== 'annulee');
+  const facturesThisYear = facturesPayees.filter(f => {
+    const date = f.datePaiement ? new Date(f.datePaiement) : new Date(f.createdAt);
+    return date >= startOfYear;
+  });
+  const caYear = facturesThisYear.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0);
+  
+  const devisEnCours = devisList.filter(d => d.statut === 'brouillon' || d.statut === 'envoye').length;
+  
+  const facturesImpayeesList = facturesList.filter(f => f.statut !== 'payee' && f.statut !== 'annulee');
+  const facturesImpayees = {
+    count: facturesImpayeesList.length,
+    total: facturesImpayeesList.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0)
+  };
+  
+  const interventionsAVenir = interventionsList.filter(i => {
+    if (i.statut !== 'planifiee') return false;
+    const dateDebut = new Date(i.dateDebut);
+    return dateDebut >= now;
+  }).length;
   
   return {
+    caMonth,
+    caYear,
+    devisEnCours,
+    facturesImpayees,
     totalClients: clientsList.length,
+    interventionsAVenir,
     totalDevis: devisList.length,
     totalFactures: facturesList.length,
     totalInterventions: interventionsList.length,
-    caThisMonth,
-    devisEnAttente: devisEnAttente.length,
-    facturesImpayees: facturesImpayees.length,
-    montantDevisEnAttente: devisEnAttente.reduce((sum, d) => sum + parseFloat(d.totalTTC?.toString() || '0'), 0),
-    montantFacturesImpayees: facturesImpayees.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0),
   };
 }
 
