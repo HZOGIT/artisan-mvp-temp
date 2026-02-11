@@ -117,8 +117,8 @@ export default function CalendarWidget({ className }: CalendarWidgetProps) {
   const interventions = useMemo(() => {
     if (!interventionsData) return [];
     
-    const chantierMap = new Map(chantiers.map(c => [c.id, c]));
-    const technicienMap = new Map<number, any>(techniciens?.map((t) => [t.id, t]) || []);
+    const chantierMap = new Map((chantiers || []).map(c => [c.id, c]));
+    const technicienMap = new Map<number, any>((techniciens || []).map((t) => [t.id, t]));
     
     return interventionsData.map((intervention) => {
       const technicien = technicienMap.get(intervention.technicienId || 0);
@@ -134,7 +134,7 @@ export default function CalendarWidget({ className }: CalendarWidgetProps) {
       };
     });
   }, [interventionsData, chantiers, techniciens]);
-
+  
   // Interventions du jour
   const todayInterventions = useMemo(() => {
     const todayStr = today.toISOString().split('T')[0];
