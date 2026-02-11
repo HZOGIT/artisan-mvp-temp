@@ -621,12 +621,12 @@ export async function getUpcomingInterventions(artisanId: number, days: number =
     .orderBy(asc(interventions.dateDebut));
 }
 
-export async function createIntervention(artisanId: number, data: Omit<InsertIntervention, 'artisanId'>): Promise<Intervention> {
+export async function createIntervention(data: InsertIntervention): Promise<Intervention> {
   const db = await getDb();
-  await db.insert(interventions).values({ ...data, artisanId });
+  await db.insert(interventions).values(data);
   const result = await db.select().from(interventions)
     .where(and(
-      eq(interventions.artisanId, artisanId),
+      eq(interventions.artisanId, data.artisanId),
       eq(interventions.clientId, data.clientId),
       eq(interventions.titre, data.titre)
     ))
