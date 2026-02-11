@@ -362,7 +362,7 @@ export default function DevisDetail() {
               </DialogContent>
             </Dialog>
           )}
-          {devis.statut === "accepte" && (
+          {(devis.statut === "accepte" || devis.statut === "envoye") && (
             <Button onClick={handleConvertToFacture} disabled={convertToFactureMutation.isPending}>
               <Receipt className="h-4 w-4 mr-2" />
               Convertir en facture
