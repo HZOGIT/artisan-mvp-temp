@@ -115,7 +115,7 @@ export default function CalendarWidget({ className }: CalendarWidgetProps) {
 
   // Transformer les interventions avec les informations des chantiers
   const interventions = useMemo(() => {
-    if (!interventionsData || !chantiers) return [];
+    if (!interventionsData) return [];
     
     const chantierMap = new Map(chantiers.map(c => [c.id, c]));
     const technicienMap = new Map<number, any>(techniciens?.map((t) => [t.id, t]) || []);
