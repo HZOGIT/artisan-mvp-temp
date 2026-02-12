@@ -29,12 +29,9 @@ const envSchema = z.object({
   OWNER_OPEN_ID: z.string().optional(),
   OWNER_NAME: z.string().optional(),
   
-  // Email (optionnel mais recommandé)
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.string().optional(),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().optional(),
+  // Email (Resend)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
   
   // SMS Twilio (optionnel)
   TWILIO_ACCOUNT_SID: z.string().optional(),
@@ -133,12 +130,9 @@ export const ENV = {
   isDevelopment: getEnv().NODE_ENV === "development",
   isTest: getEnv().NODE_ENV === "test",
   
-  // Email
-  smtpHost: getEnv().SMTP_HOST,
-  smtpPort: getEnv().SMTP_PORT,
-  smtpUser: getEnv().SMTP_USER,
-  smtpPass: getEnv().SMTP_PASS,
-  smtpFrom: getEnv().SMTP_FROM,
+  // Email (Resend)
+  resendApiKey: getEnv().RESEND_API_KEY,
+  emailFrom: getEnv().EMAIL_FROM,
   
   // SMS
   twilioAccountSid: getEnv().TWILIO_ACCOUNT_SID,

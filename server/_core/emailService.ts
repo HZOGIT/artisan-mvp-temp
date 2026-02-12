@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { ENV } from "./env";
 
 export interface EmailPayload {
@@ -9,27 +9,17 @@ export interface EmailPayload {
   attachmentContent?: string; // Base64 encoded
 }
 
-const smtpConfigured = !!(ENV.smtpHost && ENV.smtpUser && ENV.smtpPass);
+const resendConfigured = !!ENV.resendApiKey;
 
-const transporter = smtpConfigured
-  ? nodemailer.createTransport({
-      host: ENV.smtpHost,
-      port: Number(ENV.smtpPort) || 465,
-      secure: true,
-      auth: {
-        user: ENV.smtpUser,
-        pass: ENV.smtpPass,
-      },
-    })
-  : null;
+const resend = resendConfigured ? new Resend(ENV.resendApiKey) : null;
 
-if (!smtpConfigured) {
-  console.warn("[Email] SMTP non configuré — les emails seront simulés (console.log)");
+if (!resendConfigured) {
+  console.warn("[Email] RESEND_API_KEY non configuré — les emails seront simulés (console.log)");
 }
 
 /**
- * Envoie un email via SMTP (nodemailer).
- * Fallback en mode simulation si SMTP non configuré.
+ * Envoie un email via Resend API.
+ * Fallback en mode simulation si Resend non configuré.
  */
 export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; message: string }> {
   const { to, subject, body } = payload;
@@ -43,22 +33,22 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
     return { success: false, message: "Adresse email invalide" };
   }
 
-  // Mode simulation si SMTP non configuré
-  if (!transporter) {
+  // Mode simulation si Resend non configuré
+  if (!resend) {
     console.log(`[Email][SIM] → ${to} | ${subject}`);
     return { success: true, message: `Email simulé avec succès à ${to}` };
   }
 
   try {
-    const mailOptions: nodemailer.SendMailOptions = {
-      from: ENV.smtpFrom || ENV.smtpUser,
+    const emailOptions: Parameters<typeof resend.emails.send>[0] = {
+      from: ENV.emailFrom || "Artisan MVP <onboarding@resend.dev>",
       to,
       subject,
       html: body,
     };
 
     if (payload.attachmentName && payload.attachmentContent) {
-      mailOptions.attachments = [
+      emailOptions.attachments = [
         {
           filename: payload.attachmentName,
           content: Buffer.from(payload.attachmentContent, "base64"),
@@ -66,7 +56,13 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
       ];
     }
 
-    await transporter.sendMail(mailOptions);
+    const { error } = await resend.emails.send(emailOptions);
+
+    if (error) {
+      console.error("[Email] Erreur Resend:", error);
+      return { success: false, message: `Erreur lors de l'envoi: ${error.message}` };
+    }
+
     console.log(`[Email] Envoyé à ${to} — ${subject}`);
     return { success: true, message: `Email envoyé avec succès à ${to}` };
   } catch (error) {
