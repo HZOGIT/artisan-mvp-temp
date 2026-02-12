@@ -14,8 +14,8 @@ const smtpConfigured = !!(ENV.smtpHost && ENV.smtpUser && ENV.smtpPass);
 const transporter = smtpConfigured
   ? nodemailer.createTransport({
       host: ENV.smtpHost,
-      port: Number(ENV.smtpPort) || 587,
-      secure: Number(ENV.smtpPort) === 465,
+      port: Number(ENV.smtpPort) || 465,
+      secure: true,
       auth: {
         user: ENV.smtpUser,
         pass: ENV.smtpPass,
