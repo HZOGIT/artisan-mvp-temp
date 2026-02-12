@@ -67,16 +67,18 @@ export type InsertClient = typeof clients.$inferInsert;
 // BIBLIOTHEQUE ARTICLES (Global article library)
 // ============================================================================
 export const bibliothequeArticles = mysqlTable("bibliotheque_articles", {
-  id: int("id").autoincrement().primaryKey(),
-  reference: varchar("reference", { length: 50 }).notNull(),
-  designation: varchar("designation", { length: 500 }).notNull(),
+  id: int("id").primaryKey().autoincrement(),
+  metier: varchar("metier", { length: 50 }).notNull(),
+  categorie: varchar("categorie", { length: 50 }).notNull(),
+  sous_categorie: varchar("sous_categorie", { length: 100 }).notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
   description: text("description"),
-  unite: varchar("unite", { length: 20 }).default("unité"),
-  prixUnitaireHT: decimal("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
-  categorie: varchar("categorie", { length: 100 }),
-  sousCategorie: varchar("sousCategorie", { length: 100 }),
-  metier: mysqlEnum("metier", ["plomberie", "electricite", "chauffage", "general"]).default("general"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  prix_base: decimal("prix_base", { precision: 10, scale: 2 }).notNull(),
+  unite: varchar("unite", { length: 50 }).notNull(),
+  duree_moyenne_minutes: int("duree_moyenne_minutes"),
+  visible: boolean("visible").default(true),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 export type BibliothequeArticle = typeof bibliothequeArticles.$inferSelect;

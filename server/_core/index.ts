@@ -74,6 +74,78 @@ async function startServer() {
   app.use(cookieParser());
   console.log('OK cookieParser() charge');
 
+  // ============================================================
+  // API Articles - recherche bibliothèque
+  // ============================================================
+  app.get('/api/articles/search', async (req, res) => {
+    try {
+      const q = (req.query.q as string || '').trim();
+      if (q.length < 2) {
+        return res.json([]);
+      }
+      const metier = req.query.metier as string | undefined;
+      const categorie = req.query.categorie as string | undefined;
+      const sous_categorie = req.query.sous_categorie as string | undefined;
+
+      const { getDb, getPool } = await import('../db');
+      await getDb(); // ensure connection is initialized
+      const pool = getPool();
+      if (!pool) return res.status(500).json({ error: 'Database unavailable' });
+
+      let query = `
+        SELECT id, nom, description, prix_base, unite, metier, categorie, sous_categorie, duree_moyenne_minutes
+        FROM bibliotheque_articles
+        WHERE visible = 1 AND nom LIKE ?
+      `;
+      const params: any[] = [`%${q}%`];
+
+      if (metier) { query += ' AND metier = ?'; params.push(metier); }
+      if (categorie) { query += ' AND categorie = ?'; params.push(categorie); }
+      if (sous_categorie) { query += ' AND sous_categorie = ?'; params.push(sous_categorie); }
+
+      query += ' ORDER BY nom LIMIT 10';
+
+      const [rows] = await pool.execute(query, params);
+      res.json(rows);
+    } catch (error) {
+      console.error('[API] /api/articles/search error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/articles/categories', async (req, res) => {
+    try {
+      const metier = req.query.metier as string;
+      if (!metier) {
+        return res.status(400).json({ error: 'Parameter metier is required' });
+      }
+
+      const { getDb, getPool } = await import('../db');
+      await getDb();
+      const pool = getPool();
+      if (!pool) return res.status(500).json({ error: 'Database unavailable' });
+
+      const [rows] = await pool.execute(
+        `SELECT DISTINCT categorie, sous_categorie FROM bibliotheque_articles WHERE visible = 1 AND metier = ? ORDER BY categorie, sous_categorie`,
+        [metier]
+      );
+
+      // Group by categorie
+      const grouped: Record<string, string[]> = {};
+      for (const row of rows as any[]) {
+        if (!grouped[row.categorie]) grouped[row.categorie] = [];
+        if (!grouped[row.categorie].includes(row.sous_categorie)) {
+          grouped[row.categorie].push(row.sous_categorie);
+        }
+      }
+
+      res.json(grouped);
+    } catch (error) {
+      console.error('[API] /api/articles/categories error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
