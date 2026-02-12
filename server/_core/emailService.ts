@@ -1,3 +1,4 @@
+import nodemailer from "nodemailer";
 import { ENV } from "./env";
 
 export interface EmailPayload {
@@ -8,49 +9,69 @@ export interface EmailPayload {
   attachmentContent?: string; // Base64 encoded
 }
 
+const smtpConfigured = !!(ENV.smtpHost && ENV.smtpUser && ENV.smtpPass);
+
+const transporter = smtpConfigured
+  ? nodemailer.createTransport({
+      host: ENV.smtpHost,
+      port: Number(ENV.smtpPort) || 587,
+      secure: Number(ENV.smtpPort) === 465,
+      auth: {
+        user: ENV.smtpUser,
+        pass: ENV.smtpPass,
+      },
+    })
+  : null;
+
+if (!smtpConfigured) {
+  console.warn("[Email] SMTP non configuré — les emails seront simulés (console.log)");
+}
+
 /**
- * Envoie un email via le service Manus.
- * Cette fonction simule l'envoi d'email et crée une notification de succès.
- * Dans un environnement de production, elle serait connectée à un service SMTP réel.
+ * Envoie un email via SMTP (nodemailer).
+ * Fallback en mode simulation si SMTP non configuré.
  */
 export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; message: string }> {
   const { to, subject, body } = payload;
 
-  // Validation basique
   if (!to || !subject || !body) {
     return { success: false, message: "Paramètres d'email manquants" };
   }
 
-  // Validation de l'email
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(to)) {
     return { success: false, message: "Adresse email invalide" };
   }
 
+  // Mode simulation si SMTP non configuré
+  if (!transporter) {
+    console.log(`[Email][SIM] → ${to} | ${subject}`);
+    return { success: true, message: `Email simulé avec succès à ${to}` };
+  }
+
   try {
-    // Dans un environnement de production, ici on utiliserait un service SMTP
-    // Pour l'instant, on simule l'envoi et on log les informations
-    console.log(`[Email] Envoi d'email à ${to}`);
-    console.log(`[Email] Sujet: ${subject}`);
-    console.log(`[Email] Corps: ${body.substring(0, 100)}...`);
-    
-    if (payload.attachmentName) {
-      console.log(`[Email] Pièce jointe: ${payload.attachmentName}`);
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: ENV.smtpFrom || ENV.smtpUser,
+      to,
+      subject,
+      html: body,
+    };
+
+    if (payload.attachmentName && payload.attachmentContent) {
+      mailOptions.attachments = [
+        {
+          filename: payload.attachmentName,
+          content: Buffer.from(payload.attachmentContent, "base64"),
+        },
+      ];
     }
 
-    // Simuler un délai d'envoi
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    return { 
-      success: true, 
-      message: `Email envoyé avec succès à ${to}` 
-    };
+    await transporter.sendMail(mailOptions);
+    console.log(`[Email] Envoyé à ${to} — ${subject}`);
+    return { success: true, message: `Email envoyé avec succès à ${to}` };
   } catch (error) {
-    console.error("[Email] Erreur lors de l'envoi:", error);
-    return { 
-      success: false, 
-      message: "Erreur lors de l'envoi de l'email" 
-    };
+    console.error("[Email] Erreur:", error);
+    return { success: false, message: "Erreur lors de l'envoi de l'email" };
   }
 }
 
@@ -65,9 +86,9 @@ export function generateDevisEmailContent(params: {
   totalTTC: string;
 }): { subject: string; body: string } {
   const { artisanName, clientName, devisNumero, devisObjet, totalTTC } = params;
-  
+
   const subject = `Devis ${devisNumero}${devisObjet ? ` - ${devisObjet}` : ''} de ${artisanName}`;
-  
+
   const body = `
 Bonjour ${clientName},
 
@@ -101,9 +122,9 @@ export function generateFactureEmailContent(params: {
   dateEcheance?: string;
 }): { subject: string; body: string } {
   const { artisanName, clientName, factureNumero, factureObjet, totalTTC, dateEcheance } = params;
-  
+
   const subject = `Facture ${factureNumero}${factureObjet ? ` - ${factureObjet}` : ''} de ${artisanName}`;
-  
+
   const body = `
 Bonjour ${clientName},
 
@@ -135,9 +156,9 @@ export function generateRappelFactureContent(params: {
   joursRetard: number;
 }): { subject: string; body: string } {
   const { artisanName, clientName, factureNumero, totalTTC, joursRetard } = params;
-  
+
   const subject = `Rappel: Facture ${factureNumero} en attente de règlement`;
-  
+
   const body = `
 Bonjour ${clientName},
 
@@ -168,9 +189,9 @@ export function generateRappelInterventionContent(params: {
   interventionAdresse?: string;
 }): { subject: string; body: string } {
   const { artisanName, clientName, interventionTitre, interventionDate, interventionAdresse } = params;
-  
+
   const subject = `Rappel: Intervention prévue demain - ${interventionTitre}`;
-  
+
   const body = `
 Bonjour ${clientName},
 

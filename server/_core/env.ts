@@ -34,6 +34,7 @@ const envSchema = z.object({
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
   
   // SMS Twilio (optionnel)
   TWILIO_ACCOUNT_SID: z.string().optional(),
@@ -137,6 +138,7 @@ export const ENV = {
   smtpPort: getEnv().SMTP_PORT,
   smtpUser: getEnv().SMTP_USER,
   smtpPass: getEnv().SMTP_PASS,
+  smtpFrom: getEnv().SMTP_FROM,
   
   // SMS
   twilioAccountSid: getEnv().TWILIO_ACCOUNT_SID,
