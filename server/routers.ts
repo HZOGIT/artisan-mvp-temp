@@ -557,6 +557,7 @@ const devisRouter = router({
     .input(z.object({
       devisId: z.number(),
       customMessage: z.string().optional(),
+      attachPdf: z.boolean().optional().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       const devis = await db.getDevisById(input.devisId);
@@ -593,11 +594,21 @@ const devisRouter = router({
         ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${input.customMessage.replace(/\n/g, '<br>')}</div></body>`)
         : body;
 
+      // Générer le PDF si demandé
+      let attachmentContent: string | undefined;
+      if (input.attachPdf) {
+        const lignes = await db.getLignesDevisByDevisId(devis.id);
+        const { generateDevisPDF } = await import("./_core/pdfGenerator");
+        const pdfBuffer = generateDevisPDF({ devis: { ...devis, lignes }, artisan, client });
+        attachmentContent = pdfBuffer.toString("base64");
+      }
+
       const result = await sendEmail({
         to: client.email,
         subject,
         body: finalBody,
-        attachmentName: `Devis_${devis.numero}.pdf`,
+        attachmentName: input.attachPdf ? `Devis_${devis.numero}.pdf` : undefined,
+        attachmentContent,
       });
 
       if (result.success) {

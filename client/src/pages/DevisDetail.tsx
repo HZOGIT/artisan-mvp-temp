@@ -114,6 +114,7 @@ export default function DevisDetail() {
 
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState("");
+  const [attachPdf, setAttachPdf] = useState(true);
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
 
   const requestSignatureMutation = trpc.signature.createSignatureLink.useMutation({
@@ -175,6 +176,7 @@ export default function DevisDetail() {
     sendByEmailMutation.mutate({
       devisId: parseInt(id || "0"),
       customMessage: emailMessage || undefined,
+      attachPdf,
     });
   };
 
@@ -313,6 +315,15 @@ export default function DevisDetail() {
                     rows={4}
                   />
                 </div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={attachPdf}
+                    onChange={(e) => setAttachPdf(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Joindre le devis en PDF</span>
+                </label>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
