@@ -1,14 +1,12 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Search, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Search, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface LigneDevis {
   id: string;
@@ -16,16 +14,19 @@ interface LigneDevis {
   quantite: number;
   prixUnitaireHT: number;
   tauxTVA: number;
+  unite: string;
 }
 
-interface Article {
+interface ArticleBibliotheque {
   id: number;
-  nom?: string;
-  designation?: string;
-  categorie?: string;
-  prix?: number;
-  prixUnitaireHT?: number;
-  unite?: string;
+  nom: string;
+  description: string | null;
+  prix_base: string;
+  unite: string;
+  metier: string;
+  categorie: string;
+  sous_categorie: string;
+  duree_moyenne_minutes: number | null;
 }
 
 const formatCurrency = (value: number | string | null | undefined) => {
@@ -49,14 +50,18 @@ export default function DevisNouveauPage() {
   const [lignes, setLignes] = useState<LigneDevis[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Etats de la recherche d'articles
+  // Etats de la recherche d'articles (API /api/articles/search)
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<ArticleBibliotheque[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [activeSearchLigneId, setActiveSearchLigneId] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [selectedModeleId, setSelectedModeleId] = useState<number | null>(null);
 
   // Requetes tRPC
   const { data: clients = [] } = trpc.clients.list.useQuery();
-  const { data: articles = [] } = trpc.articles.getArtisanArticles.useQuery();
   const { data: modeles = [] } = trpc.devis.getModeles.useQuery();
   const createMutation = trpc.devis.create.useMutation();
   const addLigneMutation = trpc.devis.addLigne.useMutation();
@@ -65,27 +70,40 @@ export default function DevisNouveauPage() {
     { enabled: selectedModeleId !== null }
   );
 
-  // Filtrer les articles
-  const articlesFiltrés = useMemo(() => {
-    if (searchQuery.length < 2) return [];
-    return articles.filter((article: any) => {
-      const nom = article.nom || article.designation || "";
-      const categorie = article.categorie || "";
-      return nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-             categorie.toLowerCase().includes(searchQuery.toLowerCase());
-    });
-  }, [searchQuery, articles]);
+  // Recherche d'articles avec debounce 300ms
+  const searchArticles = useCallback((query: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/articles/search?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+        }
+      } catch (err) {
+        console.error("[ArticleSearch]", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
 
-  // Grouper par catégorie
-  const articlesGroupes = useMemo(() => {
-    const groups: Record<string, Article[]> = {};
-    articlesFiltrés.forEach((article: any) => {
-      const categorie = article.categorie || "Autres";
-      if (!groups[categorie]) groups[categorie] = [];
-      groups[categorie].push(article);
-    });
-    return groups;
-  }, [articlesFiltrés]);
+  // Fermer le dropdown si on clique en dehors
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setActiveSearchLigneId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Ajouter une ligne vide
   const handleAjouterLigne = () => {
@@ -95,23 +113,27 @@ export default function DevisNouveauPage() {
       quantite: 1,
       prixUnitaireHT: 0,
       tauxTVA: 20,
+      unite: "unité",
     };
     setLignes([...lignes, nouvelleLigne]);
   };
 
-  // Sélectionner un article
-  const handleSelectArticle = (article: any) => {
-    const nouvelleLigne: LigneDevis = {
-      id: Date.now().toString(),
-      description: article.nom || article.designation || "",
-      quantite: 1,
-      prixUnitaireHT: article.prix || article.prixUnitaireHT || 0,
-      tauxTVA: 20,
-    };
-    setLignes([...lignes, nouvelleLigne]);
+  // Sélectionner un article depuis la bibliothèque → pré-remplit la ligne existante
+  const handleSelectArticle = (ligneId: string, article: ArticleBibliotheque) => {
+    setLignes(lignes.map(ligne =>
+      ligne.id === ligneId
+        ? {
+            ...ligne,
+            description: article.nom,
+            prixUnitaireHT: parseFloat(article.prix_base) || 0,
+            unite: article.unite || "unité",
+          }
+        : ligne
+    ));
+    setActiveSearchLigneId(null);
     setSearchQuery("");
-    setIsSearchDialogOpen(false);
-    toast.success(`${article.nom || article.designation} ajouté`);
+    setSearchResults([]);
+    toast.success(`${article.nom} sélectionné`);
   };
 
   // Modifier une ligne
@@ -153,6 +175,7 @@ export default function DevisNouveauPage() {
           quantite: parseFloat(ligne.quantite as any),
           prixUnitaireHT: parseFloat(ligne.prixUnitaireHT as any),
           tauxTVA: parseFloat(ligne.tauxTVA as any),
+          unite: ligne.unite || "unité",
         }));
         setLignes([...lignes, ...newLignes]);
         setSelectedModeleId(null);
@@ -315,93 +338,6 @@ export default function DevisNouveauPage() {
           </div>
         )}
 
-        {/* Recherche d'articles */}
-        <div>
-          <Label className="block text-sm font-medium mb-2">
-            Rechercher un article
-          </Label>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-start text-left"
-            onClick={() => setIsSearchDialogOpen(true)}
-          >
-            <Search className="w-4 h-4 mr-2" />
-            Cliquez pour rechercher un article...
-          </Button>
-
-          {/* Dialog de recherche */}
-          <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
-            <DialogContent className="max-w-2xl max-h-[80vh]">
-              <DialogHeader>
-                <DialogTitle>Sélectionner un article</DialogTitle>
-                <DialogDescription>
-                  Recherchez par nom ou catégorie (min 2 caractères)
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Rechercher..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                  autoFocus
-                />
-                {searchQuery && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
-                    onClick={() => setSearchQuery("")}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-
-              <ScrollArea className="h-[400px] pr-4">
-                {searchQuery.length < 2 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    Tapez au moins 2 caractères pour rechercher
-                  </div>
-                ) : articlesFiltrés.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    Aucun article trouvé
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {Object.entries(articlesGroupes).map(([categorie, articlesInCategory]) => (
-                      <div key={categorie}>
-                        <h4 className="text-sm font-semibold text-gray-700 mb-2 sticky top-0 bg-white py-1">
-                          {categorie} ({articlesInCategory.length})
-                        </h4>
-                        <div className="space-y-1">
-                          {articlesInCategory.map(article => (
-                            <button
-                              key={article.id}
-                              type="button"
-                              onClick={() => handleSelectArticle(article)}
-                              className="w-full text-left px-4 py-3 hover:bg-blue-50 rounded border-b last:border-b-0 transition-colors"
-                            >
-                              <div className="font-medium text-sm">{article.nom || article.designation}</div>
-                              <div className="text-xs text-gray-600">
-                                {formatCurrency(article.prix || article.prixUnitaireHT)} • {article.unite || "unité"}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </DialogContent>
-          </Dialog>
-        </div>
-
         {/* Lignes de devis */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -459,16 +395,62 @@ export default function DevisNouveauPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-xs font-medium mb-1 block">Description</Label>
-                    <Input
-                      value={ligne.description}
-                      onChange={(e) => handleModifierLigne(ligne.id, 'description', e.target.value)}
-                      placeholder="Description de l'article"
-                    />
+                  {/* Désignation avec autocomplete inline */}
+                  <div className="relative" ref={activeSearchLigneId === ligne.id ? dropdownRef : undefined}>
+                    <Label className="text-xs font-medium mb-1 block">Désignation *</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        value={activeSearchLigneId === ligne.id ? searchQuery : ligne.description}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (activeSearchLigneId !== ligne.id) {
+                            setActiveSearchLigneId(ligne.id);
+                            setSearchQuery(val);
+                          } else {
+                            setSearchQuery(val);
+                          }
+                          // Mise à jour simultanée de la description (saisie libre)
+                          handleModifierLigne(ligne.id, 'description', val);
+                          searchArticles(val);
+                        }}
+                        onFocus={() => {
+                          setActiveSearchLigneId(ligne.id);
+                          setSearchQuery(ligne.description);
+                          if (ligne.description.length >= 2) {
+                            searchArticles(ligne.description);
+                          }
+                        }}
+                        placeholder="Tapez pour rechercher un article ou saisir librement..."
+                        className="pl-10"
+                      />
+                      {isSearching && activeSearchLigneId === ligne.id && (
+                        <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                      )}
+                    </div>
+
+                    {/* Dropdown résultats */}
+                    {activeSearchLigneId === ligne.id && searchQuery.length >= 2 && searchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {searchResults.map((article) => (
+                          <button
+                            key={article.id}
+                            type="button"
+                            onClick={() => handleSelectArticle(ligne.id, article)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors"
+                          >
+                            <div className="font-medium text-sm">{article.nom}</div>
+                            <div className="text-xs text-gray-500">
+                              {formatCurrency(article.prix_base)} / {article.unite}
+                              <span className="ml-2 text-gray-400">{article.categorie}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-5 gap-3">
                     <div>
                       <Label className="text-xs font-medium mb-1 block">Quantité</Label>
                       <Input
@@ -480,7 +462,15 @@ export default function DevisNouveauPage() {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs font-medium mb-1 block">Prix HT</Label>
+                      <Label className="text-xs font-medium mb-1 block">Unité</Label>
+                      <Input
+                        value={ligne.unite}
+                        onChange={(e) => handleModifierLigne(ligne.id, 'unite', e.target.value)}
+                        placeholder="unité"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium mb-1 block">Prix HT (€)</Label>
                       <Input
                         type="number"
                         value={ligne.prixUnitaireHT}
