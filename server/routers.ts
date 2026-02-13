@@ -576,15 +576,22 @@ const devisRouter = router({
       const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
       const totalTTC = `${parseFloat(devis.totalTTC || "0").toFixed(2)} €`;
 
+      const dateValidite = devis.dateValidite
+        ? new Date(devis.dateValidite).toLocaleDateString("fr-FR")
+        : undefined;
+
       const { subject, body } = generateDevisEmailContent({
         artisanName,
         clientName,
         devisNumero: devis.numero,
         devisObjet: devis.objet || undefined,
         totalTTC,
+        dateValidite,
       });
 
-      const finalBody = input.customMessage ? `${input.customMessage}\n\n---\n\n${body}` : body;
+      const finalBody = input.customMessage
+        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${input.customMessage.replace(/\n/g, '<br>')}</div></body>`)
+        : body;
 
       const result = await sendEmail({
         to: client.email,
