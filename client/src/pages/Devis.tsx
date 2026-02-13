@@ -1,14 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
-import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, ArrowRight, Filter, Receipt, Download, FileSpreadsheet } from "lucide-react";
+import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, Receipt, Download, FileSpreadsheet } from "lucide-react";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -37,30 +33,9 @@ export default function Devis() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
-  const [formData, setFormData] = useState({
-    objet: "",
-    conditionsPaiement: "Paiement à réception de facture",
-    notes: "",
-    dateValidite: "",
-  });
-
   const utils = trpc.useUtils();
   const { data: devisList, isLoading } = trpc.devis.list.useQuery();
   const { data: clients } = trpc.clients.list.useQuery();
-
-  const createMutation = trpc.devis.create.useMutation({
-    onSuccess: (data) => {
-      utils.devis.list.invalidate();
-      setIsCreateDialogOpen(false);
-      toast.success("Devis créé avec succès");
-      setLocation(`/devis/${data.id}`);
-    },
-    onError: () => {
-      toast.error("Erreur lors de la création du devis");
-    },
-  });
 
   const deleteMutation = trpc.devis.delete.useMutation({
     onSuccess: () => {
@@ -83,29 +58,6 @@ export default function Devis() {
       toast.error(error.message || "Erreur lors de la conversion en facture");
     },
   });
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedClientId) {
-      toast.error("Veuillez sélectionner un client");
-      return;
-    }
-    createMutation.mutate({
-      clientId: parseInt(selectedClientId),
-      ...formData,
-    });
-  };
-
-  const handleOpenCreateDialog = () => {
-    setSelectedClientId("");
-    setFormData({
-      objet: "",
-      conditionsPaiement: "Paiement à réception de facture",
-      notes: "",
-      dateValidite: "",
-    });
-    setIsCreateDialogOpen(true);
-  };
 
   const handleDelete = (id: number) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce devis ?")) {
@@ -270,76 +222,10 @@ export default function Devis() {
             Gérez vos devis clients
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleOpenCreateDialog}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nouveau devis
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nouveau devis</DialogTitle>
-              <DialogDescription>
-                Créez un nouveau devis pour un client
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreate}>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label>Client *</Label>
-                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients?.map((client: any) => (
-                        <SelectItem key={client.id} value={String(client.id)}>
-                          {client.nom} {client.prenom}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="objet">Objet</Label>
-                  <Input
-                    id="objet"
-                    value={formData.objet}
-                    onChange={(e) => setFormData({ ...formData, objet: e.target.value })}
-                    placeholder="Ex: Rénovation salle de bain"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dateValidite">Date de validité</Label>
-                  <Input
-                    id="dateValidite"
-                    type="date"
-                    value={formData.dateValidite}
-                    onChange={(e) => setFormData({ ...formData, dateValidite: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Création..." : "Créer le devis"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => setLocation("/devis/nouveau")}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nouveau devis
+        </Button>
       </div>
 
       {/* Filtres par statut et exports */}
@@ -479,7 +365,7 @@ export default function Devis() {
                 : "Commencez par créer votre premier devis"}
             </p>
             {!searchQuery && statusFilter === "all" && (
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
+              <Button onClick={() => setLocation("/devis/nouveau")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Créer un devis
               </Button>
