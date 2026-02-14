@@ -352,13 +352,13 @@ export default function Articles() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Référence</th>
+                <th className="w-[100px]">Référence</th>
                 <th>Désignation</th>
-                <th>Catégorie</th>
-                <th>Stock</th>
-                <th>Unité</th>
-                <th className="text-right">Prix HT</th>
-                <th className="w-12"></th>
+                <th className="w-[100px] hidden lg:table-cell">Catégorie</th>
+                <th className="w-[70px] hidden lg:table-cell">Stock</th>
+                <th className="w-[70px]">Unité</th>
+                <th className="w-[90px] text-right">Prix HT</th>
+                <th className="w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -373,12 +373,12 @@ export default function Articles() {
                       ) : null}
                     </div>
                   </td>
-                  <td>
+                  <td className="hidden lg:table-cell">
                     <Badge className={categorieColors[article.categorie ?? 'autre'] ?? "bg-gray-100"}>
                       {categorieLabels[article.categorie ?? 'autre'] ?? article.categorie ?? "Autre"}
                     </Badge>
                   </td>
-                  <td>{getStockIndicator(article.id) || <span className="text-muted-foreground text-sm">Non suivi</span>}</td>
+                  <td className="hidden lg:table-cell">{getStockIndicator(article.id) || <span className="text-muted-foreground text-sm">Non suivi</span>}</td>
                   <td>{article.unite ?? "unité"}</td>
                   <td className="text-right font-medium">{formatCurrency(article.prixUnitaireHT)}</td>
                   <td>

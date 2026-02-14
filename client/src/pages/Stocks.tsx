@@ -419,42 +419,42 @@ export default function Stocks() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : filteredStocks && filteredStocks.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
+              <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full table-fixed">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left p-3">Référence</th>
-                      <th className="text-left p-3">Désignation</th>
-                      <th className="text-right p-3">Quantité</th>
-                      <th className="text-right p-3">Seuil</th>
-                      <th className="text-right p-3">Prix achat</th>
-                      <th className="text-left p-3">Emplacement</th>
-                      <th className="text-left p-3">Fournisseur</th>
-                      <th className="text-right p-3">Actions</th>
+                      <th className="text-left p-2 w-[100px]">Référence</th>
+                      <th className="text-left p-2">Désignation</th>
+                      <th className="text-right p-2 w-[80px]">Quantité</th>
+                      <th className="text-right p-2 w-[60px]">Seuil</th>
+                      <th className="text-right p-2 w-[90px] hidden lg:table-cell">Prix achat</th>
+                      <th className="text-left p-2 hidden lg:table-cell">Emplacement</th>
+                      <th className="text-left p-2 hidden lg:table-cell">Fournisseur</th>
+                      <th className="text-right p-2 w-[140px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredStocks.map((stock) => (
                       <tr key={stock.id} className={`border-t ${isLowStock(stock) ? 'bg-orange-50' : ''}`}>
-                        <td className="p-3 font-mono text-sm">{stock.reference}</td>
-                        <td className="p-3">
+                        <td className="p-2 font-mono text-sm truncate">{stock.reference}</td>
+                        <td className="p-2 truncate">
                           <div className="flex items-center gap-2">
-                            {stock.designation}
+                            <span className="truncate">{stock.designation}</span>
                             {isLowStock(stock) && (
-                              <AlertTriangle className="h-4 w-4 text-orange-500" />
+                              <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
                             )}
                           </div>
                         </td>
-                        <td className="text-right p-3">
+                        <td className="text-right p-2">
                           <span className={isLowStock(stock) ? 'text-orange-600 font-bold' : ''}>
                             {stock.quantiteEnStock} {stock.unite}
                           </span>
                         </td>
-                        <td className="text-right p-3 text-muted-foreground">{stock.seuilAlerte}</td>
-                        <td className="text-right p-3">{formatCurrency(stock.prixAchat)}</td>
-                        <td className="p-3 text-muted-foreground">{stock.emplacement || "-"}</td>
-                        <td className="p-3 text-muted-foreground">{stock.fournisseur || "-"}</td>
-                        <td className="text-right p-3">
+                        <td className="text-right p-2 text-muted-foreground">{stock.seuilAlerte}</td>
+                        <td className="text-right p-2 hidden lg:table-cell">{formatCurrency(stock.prixAchat)}</td>
+                        <td className="p-2 text-muted-foreground hidden lg:table-cell truncate">{stock.emplacement || "-"}</td>
+                        <td className="p-2 text-muted-foreground hidden lg:table-cell truncate">{stock.fournisseur || "-"}</td>
+                        <td className="text-right p-2">
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="icon" onClick={() => openMouvementDialog(stock)} title="Mouvement">
                               <ArrowUpCircle className="h-4 w-4" />
@@ -491,36 +491,36 @@ export default function Stocks() {
 
           <TabsContent value="low">
             {lowStockItems && lowStockItems.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full">
+              <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full table-fixed">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left p-3">Référence</th>
-                      <th className="text-left p-3">Désignation</th>
-                      <th className="text-right p-3">Quantité</th>
-                      <th className="text-right p-3">Seuil</th>
-                      <th className="text-left p-3">Fournisseur</th>
-                      <th className="text-right p-3">Actions</th>
+                      <th className="text-left p-2 w-[100px]">Référence</th>
+                      <th className="text-left p-2">Désignation</th>
+                      <th className="text-right p-2 w-[80px]">Quantité</th>
+                      <th className="text-right p-2 w-[60px]">Seuil</th>
+                      <th className="text-left p-2 hidden lg:table-cell">Fournisseur</th>
+                      <th className="text-right p-2 w-[140px]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {lowStockItems.map((stock) => (
                       <tr key={stock.id} className="border-t bg-orange-50">
-                        <td className="p-3 font-mono text-sm">{stock.reference}</td>
-                        <td className="p-3">
+                        <td className="p-2 font-mono text-sm truncate">{stock.reference}</td>
+                        <td className="p-2 truncate">
                           <div className="flex items-center gap-2">
-                            {stock.designation}
-                            <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            <span className="truncate">{stock.designation}</span>
+                            <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
                           </div>
                         </td>
-                        <td className="text-right p-3">
+                        <td className="text-right p-2">
                           <span className="text-orange-600 font-bold">
                             {stock.quantiteEnStock} {stock.unite}
                           </span>
                         </td>
-                        <td className="text-right p-3 text-muted-foreground">{stock.seuilAlerte}</td>
-                        <td className="p-3 text-muted-foreground">{stock.fournisseur || "-"}</td>
-                        <td className="text-right p-3">
+                        <td className="text-right p-2 text-muted-foreground">{stock.seuilAlerte}</td>
+                        <td className="p-2 text-muted-foreground hidden lg:table-cell truncate">{stock.fournisseur || "-"}</td>
+                        <td className="text-right p-2">
                           <Button variant="outline" size="sm" onClick={() => openMouvementDialog(stock)}>
                             <ArrowUpCircle className="mr-2 h-4 w-4" />
                             Réapprovisionner

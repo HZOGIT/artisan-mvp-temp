@@ -354,10 +354,10 @@ export default function Interventions() {
             <thead>
               <tr>
                 <th>Titre</th>
-                <th>Date</th>
-                <th>Adresse</th>
-                <th>Statut</th>
-                <th className="w-12"></th>
+                <th className="w-[130px]">Date</th>
+                <th className="hidden lg:table-cell">Adresse</th>
+                <th className="w-[100px]">Statut</th>
+                <th className="w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -369,7 +369,7 @@ export default function Interventions() {
                       ? format(new Date(intervention.dateDebut), "dd/MM/yyyy HH:mm", { locale: fr })
                       : "-"}
                   </td>
-                  <td>{intervention.adresse || "-"}</td>
+                  <td className="hidden lg:table-cell truncate">{intervention.adresse || "-"}</td>
                   <td>
                     <Badge className={statusColors[intervention.statut || 'planifiee'] || "bg-gray-100"}>
                       {statusLabels[intervention.statut || 'planifiee'] || intervention.statut}

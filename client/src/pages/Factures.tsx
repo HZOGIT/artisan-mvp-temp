@@ -203,12 +203,12 @@ export default function Factures() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Numéro</th>
-                <th>Date</th>
+                <th className="w-[110px]">Numéro</th>
+                <th className="w-[100px]">Date</th>
                 <th>Objet</th>
-                <th>Montant TTC</th>
-                <th>Statut</th>
-                <th className="w-12"></th>
+                <th className="w-[110px] text-right">Montant TTC</th>
+                <th className="w-[100px]">Statut</th>
+                <th className="w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -216,8 +216,8 @@ export default function Factures() {
                 <tr key={facture.id} className="cursor-pointer" onClick={() => setLocation(`/factures/${facture.id}`)}>
                   <td className="font-medium">{facture.numero}</td>
                   <td>{format(new Date(facture.createdAt), "dd/MM/yyyy", { locale: fr })}</td>
-                  <td>{facture.objet || "-"}</td>
-                  <td className="font-medium">{formatCurrency(facture.totalTTC)}</td>
+                  <td className="truncate max-w-0">{facture.objet || "-"}</td>
+                  <td className="font-medium text-right">{formatCurrency(facture.totalTTC)}</td>
                   <td>
                     <Badge className={statusColors[facture.statut || 'brouillon'] || "bg-gray-100"}>
                       {statusLabels[facture.statut || 'brouillon'] || facture.statut}

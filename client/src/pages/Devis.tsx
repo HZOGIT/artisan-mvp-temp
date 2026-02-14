@@ -283,13 +283,13 @@ export default function Devis() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Numéro</th>
+                <th className="w-[110px]">Numéro</th>
                 <th>Client</th>
-                <th>Date</th>
+                <th className="w-[100px] hidden lg:table-cell">Date</th>
                 <th>Objet</th>
-                <th>Montant TTC</th>
-                <th>Statut</th>
-                <th className="w-12"></th>
+                <th className="w-[110px] text-right">Montant TTC</th>
+                <th className="w-[100px]">Statut</th>
+                <th className="w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -298,10 +298,10 @@ export default function Devis() {
                 return (
                   <tr key={devis.id} className="cursor-pointer" onClick={() => setLocation(`/devis/${devis.id}`)}>
                     <td className="font-medium">{devis.numero}</td>
-                    <td>{client ? `${client.nom} ${client.prenom}` : "-"}</td>
-                    <td>{devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy", { locale: fr }) : "-"}</td>
-                    <td>{devis.objet || "-"}</td>
-                    <td className="font-medium">{formatCurrency(devis.totalTTC)}</td>
+                    <td className="truncate">{client ? `${client.nom} ${client.prenom}` : "-"}</td>
+                    <td className="hidden lg:table-cell">{devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy", { locale: fr }) : "-"}</td>
+                    <td className="truncate max-w-0">{devis.objet || "-"}</td>
+                    <td className="font-medium text-right">{formatCurrency(devis.totalTTC)}</td>
                     <td>
                       <Badge className={statusColors[devis.statut] || "bg-gray-100"}>
                         {statusLabels[devis.statut] || devis.statut}
