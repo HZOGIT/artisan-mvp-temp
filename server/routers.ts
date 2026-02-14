@@ -52,6 +52,9 @@ const artisanRouter = router({
       email: z.string().email().optional(),
       specialite: z.enum(["plomberie", "electricite", "chauffage", "multi-services"]).optional(),
       tauxTVA: z.string().optional(),
+      numeroTVA: z.string().optional(),
+      iban: z.string().optional(),
+      codeAPE: z.string().optional(),
       logo: z.string().optional(),
     }))
    .mutation(async ({ ctx, input }) => {

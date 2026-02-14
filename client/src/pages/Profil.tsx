@@ -1,28 +1,27 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { User, Building, Phone, Mail, MapPin, Save } from "lucide-react";
+import { Building, Phone, Mail, MapPin, Save, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Profil() {
-  const { user } = useAuth();
   const [formData, setFormData] = useState({
-    raisonSociale: "",
+    nomEntreprise: "",
     siret: "",
-    specialite: "plomberie" as const,
+    numeroTVA: "",
+    codeAPE: "",
+    specialite: "plomberie" as string,
     telephone: "",
     email: "",
     adresse: "",
     codePostal: "",
     ville: "",
-    description: "",
     tauxTVA: "20.00",
+    iban: "",
   });
 
   const { data: artisan, isLoading } = trpc.artisan.getProfile.useQuery();
@@ -39,16 +38,18 @@ export default function Profil() {
   useEffect(() => {
     if (artisan) {
       setFormData({
-        raisonSociale: artisan.nomEntreprise || "",
+        nomEntreprise: artisan.nomEntreprise || "",
         siret: artisan.siret || "",
-        specialite: (artisan.specialite as any) || "plomberie",
+        numeroTVA: (artisan as any).numeroTVA || "",
+        codeAPE: (artisan as any).codeAPE || "",
+        specialite: artisan.specialite || "plomberie",
         telephone: artisan.telephone || "",
         email: artisan.email || "",
         adresse: artisan.adresse || "",
         codePostal: artisan.codePostal || "",
         ville: artisan.ville || "",
-        description: "",
         tauxTVA: artisan.tauxTVA || "20.00",
+        iban: (artisan as any).iban || "",
       });
     }
   }, [artisan]);
@@ -91,11 +92,11 @@ export default function Profil() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="raisonSociale">Raison sociale</Label>
+                <Label htmlFor="nomEntreprise">Raison sociale</Label>
                 <Input
-                  id="raisonSociale"
-                  value={formData.raisonSociale}
-                  onChange={(e) => setFormData({ ...formData, raisonSociale: e.target.value })}
+                  id="nomEntreprise"
+                  value={formData.nomEntreprise}
+                  onChange={(e) => setFormData({ ...formData, nomEntreprise: e.target.value })}
                   placeholder="Nom de votre entreprise"
                 />
               </div>
@@ -109,12 +110,30 @@ export default function Profil() {
                 />
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="numeroTVA">N° TVA intracommunautaire</Label>
+                <Input
+                  id="numeroTVA"
+                  value={formData.numeroTVA}
+                  onChange={(e) => setFormData({ ...formData, numeroTVA: e.target.value })}
+                  placeholder="FR 12 345678901"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="codeAPE">Code APE / NAF</Label>
+                <Input
+                  id="codeAPE"
+                  value={formData.codeAPE}
+                  onChange={(e) => setFormData({ ...formData, codeAPE: e.target.value })}
+                  placeholder="4322A"
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Spécialité</Label>
-                <Select 
-                  value={formData.specialite} 
-                  onValueChange={(v) => setFormData({ ...formData, specialite: v as any })}
+                <Select
+                  value={formData.specialite}
+                  onValueChange={(v) => setFormData({ ...formData, specialite: v })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -123,29 +142,20 @@ export default function Profil() {
                     <SelectItem value="plomberie">Plomberie</SelectItem>
                     <SelectItem value="electricite">Électricité</SelectItem>
                     <SelectItem value="chauffage">Chauffage</SelectItem>
-                    <SelectItem value="multi_services">Multi-services</SelectItem>
+                    <SelectItem value="multi-services">Multi-services</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="tauxTVA">Taux de TVA par défaut (%)</Label>
-                <Input
-                  id="tauxTVA"
-                  type="number"
-                  step="0.01"
-                  value={formData.tauxTVA}
-                  onChange={(e) => setFormData({ ...formData, tauxTVA: e.target.value })}
-                />
-              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description de l'activité</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Décrivez votre activité..."
-                rows={3}
+              <Label htmlFor="tauxTVA">Taux de TVA par défaut (%)</Label>
+              <Input
+                id="tauxTVA"
+                type="number"
+                step="0.01"
+                className="max-w-[200px]"
+                value={formData.tauxTVA}
+                onChange={(e) => setFormData({ ...formData, tauxTVA: e.target.value })}
               />
             </div>
           </CardContent>
@@ -222,6 +232,30 @@ export default function Profil() {
                   placeholder="Paris"
                 />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Informations bancaires */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Informations bancaires
+            </CardTitle>
+            <CardDescription>
+              L'IBAN sera affiché sur vos factures pour faciliter le paiement
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label htmlFor="iban">IBAN</Label>
+              <Input
+                id="iban"
+                value={formData.iban}
+                onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
+                placeholder="FR76 1234 5678 9012 3456 7890 123"
+              />
             </div>
           </CardContent>
         </Card>

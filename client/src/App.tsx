@@ -18,7 +18,6 @@ import FactureDetail from "./pages/FactureDetail";
 import Interventions from "./pages/Interventions";
 import Articles from "./pages/Articles";
 import Profil from "./pages/Profil";
-import Profile from "./pages/Profile";
 import Parametres from "./pages/Parametres";
 import Calendrier from "./pages/Calendrier";
 import DashboardAdvanced from "./pages/DashboardAdvanced";
@@ -85,7 +84,6 @@ function AuthenticatedRoutes() {
         <Route path="/stocks" component={Stocks} />
         <Route path="/fournisseurs" component={Fournisseurs} />
         <Route path="/profil" component={Profil} />
-        <Route path="/profile" component={Profile} />
         <Route path="/parametres" component={Parametres} />
         <Route path="/contrats" component={Contrats} />
         <Route path="/mobile" component={InterventionsMobile} />
@@ -147,7 +145,6 @@ function Router() {
       <Route path="/stocks" component={() => <AuthenticatedRoutes />} />
       <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
       <Route path="/profil" component={() => <AuthenticatedRoutes />} />
-      <Route path="/profile" component={() => <AuthenticatedRoutes />} />
       <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
       <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
       <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
