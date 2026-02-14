@@ -349,33 +349,31 @@ export default function Interventions() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : filteredInterventions && filteredInterventions.length > 0 ? (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
                 <th>Titre</th>
-                <th className="w-[130px]">Date</th>
-                <th className="hidden lg:table-cell">Adresse</th>
-                <th className="w-[100px]">Statut</th>
-                <th className="w-10"></th>
+                <th className="whitespace-nowrap">Date</th>
+                <th className="whitespace-nowrap">Statut</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {filteredInterventions.map((intervention: any) => (
                 <tr key={intervention.id}>
                   <td className="font-medium">{intervention.titre}</td>
-                  <td>
-                    {intervention.dateDebut 
+                  <td className="whitespace-nowrap">
+                    {intervention.dateDebut
                       ? format(new Date(intervention.dateDebut), "dd/MM/yyyy HH:mm", { locale: fr })
                       : "-"}
                   </td>
-                  <td className="hidden lg:table-cell truncate">{intervention.adresse || "-"}</td>
-                  <td>
+                  <td className="whitespace-nowrap">
                     <Badge className={statusColors[intervention.statut || 'planifiee'] || "bg-gray-100"}>
                       {statusLabels[intervention.statut || 'planifiee'] || intervention.statut}
                     </Badge>
                   </td>
-                  <td>
+                  <td className="whitespace-nowrap">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -387,7 +385,7 @@ export default function Interventions() {
                           <Pencil className="h-4 w-4 mr-2" />
                           Modifier
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           onClick={() => handleDelete(intervention.id)}
                           className="text-destructive"
                         >

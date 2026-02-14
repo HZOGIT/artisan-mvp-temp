@@ -348,40 +348,31 @@ export default function Articles() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : filteredArticles && filteredArticles.length > 0 ? (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th className="w-[100px]">Référence</th>
                 <th>Désignation</th>
-                <th className="w-[100px] hidden lg:table-cell">Catégorie</th>
-                <th className="w-[70px] hidden lg:table-cell">Stock</th>
-                <th className="w-[70px]">Unité</th>
-                <th className="w-[90px] text-right">Prix HT</th>
-                <th className="w-10"></th>
+                <th className="whitespace-nowrap">Catégorie</th>
+                <th className="whitespace-nowrap">Unité</th>
+                <th className="whitespace-nowrap text-right">Prix HT</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {filteredArticles.map((article: any) => (
                 <tr key={article.id}>
-                  <td className="font-mono text-sm">{article.reference ?? "-"}</td>
                   <td>
-                    <div>
-                      <p className="font-medium">{article.designation ?? "Sans nom"}</p>
-                      {article.description ? (
-                        <p className="text-sm text-muted-foreground line-clamp-1">{article.description}</p>
-                      ) : null}
-                    </div>
+                    <p className="font-medium">{article.designation ?? "Sans nom"}</p>
                   </td>
-                  <td className="hidden lg:table-cell">
+                  <td className="whitespace-nowrap">
                     <Badge className={categorieColors[article.categorie ?? 'autre'] ?? "bg-gray-100"}>
                       {categorieLabels[article.categorie ?? 'autre'] ?? article.categorie ?? "Autre"}
                     </Badge>
                   </td>
-                  <td className="hidden lg:table-cell">{getStockIndicator(article.id) || <span className="text-muted-foreground text-sm">Non suivi</span>}</td>
-                  <td>{article.unite ?? "unité"}</td>
-                  <td className="text-right font-medium">{formatCurrency(article.prixUnitaireHT)}</td>
-                  <td>
+                  <td className="whitespace-nowrap">{article.unite ?? "unité"}</td>
+                  <td className="text-right font-medium whitespace-nowrap">{formatCurrency(article.prixUnitaireHT)}</td>
+                  <td className="whitespace-nowrap">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">

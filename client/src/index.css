@@ -205,13 +205,13 @@
 
   /* Styles pour les tableaux */
   .data-table {
-    @apply w-full text-sm table-fixed;
+    @apply w-full text-sm;
   }
   .data-table th {
-    @apply px-3 py-2.5 text-left font-medium text-muted-foreground bg-muted/50 text-xs uppercase tracking-wider;
+    @apply px-3 py-2.5 text-left font-medium text-muted-foreground bg-muted/50;
   }
   .data-table td {
-    @apply px-3 py-2.5 border-t border-border overflow-hidden text-ellipsis whitespace-nowrap;
+    @apply px-3 py-2.5 border-t border-border;
   }
   .data-table tr:hover td {
     @apply bg-muted/30;

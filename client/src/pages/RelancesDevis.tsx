@@ -256,43 +256,31 @@ Cordialement`);
           </CardHeader>
           <CardContent>
             <div className="border rounded-lg overflow-x-auto">
-              <table className="w-full table-fixed">
+              <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="text-left p-2 text-sm font-medium w-[110px]">Devis</th>
-                    <th className="text-left p-2 text-sm font-medium">Client</th>
-                    <th className="text-right p-2 text-sm font-medium w-[90px]">Montant</th>
-                    <th className="text-center p-2 text-sm font-medium w-[90px] hidden lg:table-cell">Ancienneté</th>
-                    <th className="text-center p-2 text-sm font-medium w-[80px]">Statut</th>
-                    <th className="text-right p-2 text-sm font-medium w-[90px]">Actions</th>
+                    <th className="text-left p-2 font-medium whitespace-nowrap">Devis</th>
+                    <th className="text-left p-2 font-medium">Client</th>
+                    <th className="text-right p-2 font-medium whitespace-nowrap">Montant</th>
+                    <th className="text-center p-2 font-medium whitespace-nowrap">Statut</th>
+                    <th className="text-right p-2 font-medium whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {devisNonSignes.map((item) => (
                     <tr key={item.devis.id} className="border-t">
-                      <td className="p-2">
+                      <td className="p-2 whitespace-nowrap">
                         <Link href={`/devis/${item.devis.id}`} className="hover:underline">
-                          <span className="font-medium text-sm">{item.devis.numero}</span>
+                          <span className="font-medium">{item.devis.numero}</span>
                         </Link>
                       </td>
-                      <td className="p-2 truncate">
-                        <div className="truncate font-medium text-sm">{item.client?.nom || 'Client inconnu'}</div>
-                        {item.client?.email ? (
-                          <div className="text-xs text-muted-foreground truncate">{item.client.email}</div>
-                        ) : (
-                          <div className="text-xs text-orange-500">Pas d'email</div>
-                        )}
+                      <td className="p-2">
+                        <div className="font-medium">{item.client?.nom || 'Client inconnu'}</div>
                       </td>
-                      <td className="p-2 text-right font-medium">
+                      <td className="p-2 text-right font-medium whitespace-nowrap">
                         {formatCurrency(item.devis.totalTTC)}
                       </td>
-                      <td className="p-2 text-center hidden lg:table-cell">
-                        <Badge variant={item.joursDepuisCreation > 14 ? "destructive" : "secondary"}>
-                          <Clock className="mr-1 h-3 w-3" />
-                          {item.joursDepuisCreation} jours
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-center">
+                      <td className="p-2 text-center whitespace-nowrap">
                         {item.signature ? (
                           <Badge variant="outline">
                             Lien envoyé
@@ -303,7 +291,7 @@ Cordialement`);
                           </Badge>
                         )}
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-2 text-right whitespace-nowrap">
                         <div className="flex justify-end gap-2">
                           {item.client?.email ? (
                             <Button

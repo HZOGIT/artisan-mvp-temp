@@ -420,41 +420,33 @@ export default function Stocks() {
               </div>
             ) : filteredStocks && filteredStocks.length > 0 ? (
               <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full table-fixed">
+                <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left p-2 w-[100px]">Référence</th>
                       <th className="text-left p-2">Désignation</th>
-                      <th className="text-right p-2 w-[80px]">Quantité</th>
-                      <th className="text-right p-2 w-[60px]">Seuil</th>
-                      <th className="text-right p-2 w-[90px] hidden lg:table-cell">Prix achat</th>
-                      <th className="text-left p-2 hidden lg:table-cell">Emplacement</th>
-                      <th className="text-left p-2 hidden lg:table-cell">Fournisseur</th>
-                      <th className="text-right p-2 w-[140px]">Actions</th>
+                      <th className="text-right p-2 whitespace-nowrap">Quantité</th>
+                      <th className="text-right p-2 whitespace-nowrap">Seuil</th>
+                      <th className="text-right p-2 whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredStocks.map((stock) => (
                       <tr key={stock.id} className={`border-t ${isLowStock(stock) ? 'bg-orange-50' : ''}`}>
-                        <td className="p-2 font-mono text-sm truncate">{stock.reference}</td>
-                        <td className="p-2 truncate">
+                        <td className="p-2">
                           <div className="flex items-center gap-2">
-                            <span className="truncate">{stock.designation}</span>
+                            <span>{stock.designation}</span>
                             {isLowStock(stock) && (
                               <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
                             )}
                           </div>
                         </td>
-                        <td className="text-right p-2">
+                        <td className="text-right p-2 whitespace-nowrap">
                           <span className={isLowStock(stock) ? 'text-orange-600 font-bold' : ''}>
                             {stock.quantiteEnStock} {stock.unite}
                           </span>
                         </td>
-                        <td className="text-right p-2 text-muted-foreground">{stock.seuilAlerte}</td>
-                        <td className="text-right p-2 hidden lg:table-cell">{formatCurrency(stock.prixAchat)}</td>
-                        <td className="p-2 text-muted-foreground hidden lg:table-cell truncate">{stock.emplacement || "-"}</td>
-                        <td className="p-2 text-muted-foreground hidden lg:table-cell truncate">{stock.fournisseur || "-"}</td>
-                        <td className="text-right p-2">
+                        <td className="text-right p-2 text-muted-foreground whitespace-nowrap">{stock.seuilAlerte}</td>
+                        <td className="text-right p-2 whitespace-nowrap">
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="icon" onClick={() => openMouvementDialog(stock)} title="Mouvement">
                               <ArrowUpCircle className="h-4 w-4" />
@@ -492,35 +484,31 @@ export default function Stocks() {
           <TabsContent value="low">
             {lowStockItems && lowStockItems.length > 0 ? (
               <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full table-fixed">
+                <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left p-2 w-[100px]">Référence</th>
                       <th className="text-left p-2">Désignation</th>
-                      <th className="text-right p-2 w-[80px]">Quantité</th>
-                      <th className="text-right p-2 w-[60px]">Seuil</th>
-                      <th className="text-left p-2 hidden lg:table-cell">Fournisseur</th>
-                      <th className="text-right p-2 w-[140px]">Actions</th>
+                      <th className="text-right p-2 whitespace-nowrap">Quantité</th>
+                      <th className="text-right p-2 whitespace-nowrap">Seuil</th>
+                      <th className="text-right p-2 whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {lowStockItems.map((stock) => (
                       <tr key={stock.id} className="border-t bg-orange-50">
-                        <td className="p-2 font-mono text-sm truncate">{stock.reference}</td>
-                        <td className="p-2 truncate">
+                        <td className="p-2">
                           <div className="flex items-center gap-2">
-                            <span className="truncate">{stock.designation}</span>
+                            <span>{stock.designation}</span>
                             <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
                           </div>
                         </td>
-                        <td className="text-right p-2">
+                        <td className="text-right p-2 whitespace-nowrap">
                           <span className="text-orange-600 font-bold">
                             {stock.quantiteEnStock} {stock.unite}
                           </span>
                         </td>
-                        <td className="text-right p-2 text-muted-foreground">{stock.seuilAlerte}</td>
-                        <td className="p-2 text-muted-foreground hidden lg:table-cell truncate">{stock.fournisseur || "-"}</td>
-                        <td className="text-right p-2">
+                        <td className="text-right p-2 text-muted-foreground whitespace-nowrap">{stock.seuilAlerte}</td>
+                        <td className="text-right p-2 whitespace-nowrap">
                           <Button variant="outline" size="sm" onClick={() => openMouvementDialog(stock)}>
                             <ArrowUpCircle className="mr-2 h-4 w-4" />
                             Réapprovisionner

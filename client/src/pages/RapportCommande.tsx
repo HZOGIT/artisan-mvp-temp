@@ -360,40 +360,28 @@ export default function RapportCommande() {
               </CardHeader>
               <CardContent>
                 <div className="border rounded-lg overflow-x-auto">
-                  <table className="w-full table-fixed">
+                  <table className="w-full text-sm">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="text-left p-2 text-sm font-medium w-[100px]">Référence</th>
-                        <th className="text-left p-2 text-sm font-medium">Désignation</th>
-                        <th className="text-right p-2 text-sm font-medium w-[80px]">Stock</th>
-                        <th className="text-right p-2 text-sm font-medium w-[60px] hidden lg:table-cell">Seuil</th>
-                        <th className="text-right p-2 text-sm font-medium w-[80px]">Qté cmd</th>
-                        <th className="text-right p-2 text-sm font-medium w-[80px] hidden lg:table-cell">Prix unit.</th>
-                        <th className="text-right p-2 text-sm font-medium w-[80px]">Total</th>
+                        <th className="text-left p-2 font-medium">Désignation</th>
+                        <th className="text-right p-2 font-medium whitespace-nowrap">Stock</th>
+                        <th className="text-right p-2 font-medium whitespace-nowrap">À commander</th>
+                        <th className="text-right p-2 font-medium whitespace-nowrap">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {commande.lignes.map((ligne, ligneIndex) => (
                         <tr key={ligneIndex} className="border-t">
-                          <td className="p-2 text-sm truncate">
-                            <span className="font-mono">{ligne.stock.reference}</span>
-                          </td>
-                          <td className="p-2 text-sm truncate">{ligne.stock.designation}</td>
-                          <td className="p-2 text-sm text-right">
+                          <td className="p-2">{ligne.stock.designation}</td>
+                          <td className="p-2 text-right whitespace-nowrap">
                             <Badge variant={Number(ligne.stock.quantiteEnStock) <= 0 ? "destructive" : "outline"}>
-                              {ligne.stock.quantiteEnStock}
+                              {ligne.stock.quantiteEnStock} {ligne.stock.unite}
                             </Badge>
                           </td>
-                          <td className="p-2 text-sm text-right text-muted-foreground hidden lg:table-cell">
-                            {ligne.stock.seuilAlerte}
-                          </td>
-                          <td className="p-2 text-sm text-right font-medium">
+                          <td className="p-2 text-right font-medium whitespace-nowrap">
                             {ligne.quantiteACommander} {ligne.stock.unite}
                           </td>
-                          <td className="p-2 text-sm text-right hidden lg:table-cell">
-                            {formatCurrency(ligne.prixUnitaire)}
-                          </td>
-                          <td className="p-2 text-sm text-right font-medium">
+                          <td className="p-2 text-right font-medium whitespace-nowrap">
                             {formatCurrency(ligne.montantTotal)}
                           </td>
                         </tr>
@@ -401,7 +389,7 @@ export default function RapportCommande() {
                     </tbody>
                     <tfoot className="bg-muted/50">
                       <tr>
-                        <td colSpan={6} className="p-2 text-right font-medium">
+                        <td colSpan={3} className="p-2 text-right font-medium">
                           Total commande:
                         </td>
                         <td className="p-2 text-right font-bold text-lg">

@@ -279,17 +279,16 @@ export default function Devis() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : filteredDevis && filteredDevis.length > 0 ? (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th className="w-[110px]">Numéro</th>
+                <th className="whitespace-nowrap">Numéro</th>
                 <th>Client</th>
-                <th className="w-[100px] hidden lg:table-cell">Date</th>
                 <th>Objet</th>
-                <th className="w-[110px] text-right">Montant TTC</th>
-                <th className="w-[100px]">Statut</th>
-                <th className="w-10"></th>
+                <th className="whitespace-nowrap text-right">Montant TTC</th>
+                <th className="whitespace-nowrap">Statut</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -297,17 +296,16 @@ export default function Devis() {
                 const client = clientsMap.get(devis.clientId);
                 return (
                   <tr key={devis.id} className="cursor-pointer" onClick={() => setLocation(`/devis/${devis.id}`)}>
-                    <td className="font-medium">{devis.numero}</td>
-                    <td className="truncate">{client ? `${client.nom} ${client.prenom}` : "-"}</td>
-                    <td className="hidden lg:table-cell">{devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy", { locale: fr }) : "-"}</td>
-                    <td className="truncate max-w-0">{devis.objet || "-"}</td>
-                    <td className="font-medium text-right">{formatCurrency(devis.totalTTC)}</td>
-                    <td>
+                    <td className="font-medium whitespace-nowrap">{devis.numero}</td>
+                    <td className="whitespace-nowrap">{client ? `${client.nom} ${client.prenom}` : "-"}</td>
+                    <td className="max-w-[200px] truncate">{devis.objet || "-"}</td>
+                    <td className="font-medium text-right whitespace-nowrap">{formatCurrency(devis.totalTTC)}</td>
+                    <td className="whitespace-nowrap">
                       <Badge className={statusColors[devis.statut] || "bg-gray-100"}>
                         {statusLabels[devis.statut] || devis.statut}
                       </Badge>
                     </td>
-                    <td onClick={(e) => e.stopPropagation()}>
+                    <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -326,7 +324,7 @@ export default function Devis() {
                           {devis.statut === "accepte" && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={(e) => handleConvertToFacture(devis.id, e)}
                                 className="text-green-600"
                               >
@@ -336,7 +334,7 @@ export default function Devis() {
                             </>
                           )}
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => handleDelete(devis.id)}
                             className="text-destructive"
                           >

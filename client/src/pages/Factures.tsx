@@ -92,6 +92,8 @@ export default function Factures() {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
   };
 
+  const clientsMap = new Map((clients || []).map((c: any) => [c.id, c]));
+
   const filteredFactures = facturesList?.filter((facture: any) => {
     const searchLower = searchQuery.toLowerCase();
     return (
@@ -199,58 +201,59 @@ export default function Factures() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : filteredFactures && filteredFactures.length > 0 ? (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th className="w-[110px]">Numéro</th>
-                <th className="w-[100px]">Date</th>
-                <th>Objet</th>
-                <th className="w-[110px] text-right">Montant TTC</th>
-                <th className="w-[100px]">Statut</th>
-                <th className="w-10"></th>
+                <th className="whitespace-nowrap">Numéro</th>
+                <th>Client</th>
+                <th className="whitespace-nowrap text-right">Montant TTC</th>
+                <th className="whitespace-nowrap">Statut</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {filteredFactures.map((facture: any) => (
-                <tr key={facture.id} className="cursor-pointer" onClick={() => setLocation(`/factures/${facture.id}`)}>
-                  <td className="font-medium">{facture.numero}</td>
-                  <td>{format(new Date(facture.createdAt), "dd/MM/yyyy", { locale: fr })}</td>
-                  <td className="truncate max-w-0">{facture.objet || "-"}</td>
-                  <td className="font-medium text-right">{formatCurrency(facture.totalTTC)}</td>
-                  <td>
-                    <Badge className={statusColors[facture.statut || 'brouillon'] || "bg-gray-100"}>
-                      {statusLabels[facture.statut || 'brouillon'] || facture.statut}
-                    </Badge>
-                  </td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setLocation(`/factures/${facture.id}`)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          Voir
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setLocation(`/factures/${facture.id}`)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(facture.id)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
+              {filteredFactures.map((facture: any) => {
+                const client = clientsMap.get(facture.clientId);
+                return (
+                  <tr key={facture.id} className="cursor-pointer" onClick={() => setLocation(`/factures/${facture.id}`)}>
+                    <td className="font-medium whitespace-nowrap">{facture.numero}</td>
+                    <td className="whitespace-nowrap">{client ? `${client.nom} ${client.prenom || ''}`.trim() : "-"}</td>
+                    <td className="font-medium text-right whitespace-nowrap">{formatCurrency(facture.totalTTC)}</td>
+                    <td className="whitespace-nowrap">
+                      <Badge className={statusColors[facture.statut || 'brouillon'] || "bg-gray-100"}>
+                        {statusLabels[facture.statut || 'brouillon'] || facture.statut}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setLocation(`/factures/${facture.id}`)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Voir
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setLocation(`/factures/${facture.id}`)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDelete(facture.id)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
