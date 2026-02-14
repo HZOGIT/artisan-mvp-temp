@@ -966,8 +966,7 @@ const facturesRouter = router({
       }
       const numero = await db.getNextFactureNumber(artisan.id);
       // Utiliser la version sécurisée (créer une fonction si nécessaire)
-      return await db.createFacture({
-        artisanId: artisan.id,
+      return await db.createFacture(artisan.id, {
         clientId: input.clientId,
         numero,
         objet: input.objet,
