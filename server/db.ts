@@ -1040,9 +1040,9 @@ export async function getLastRelanceDate(devisId: number): Promise<Date | null> 
   const db = await getDb();
   const result = await db.select().from(relancesDevis)
     .where(eq(relancesDevis.devisId, devisId))
-    .orderBy(desc(relancesDevis.dateRelance))
+    .orderBy(desc(relancesDevis.createdAt))
     .limit(1);
-  return result[0]?.dateRelance || null;
+  return result[0]?.createdAt || null;
 }
 
 // ============================================================================

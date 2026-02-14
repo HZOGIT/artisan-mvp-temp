@@ -685,7 +685,32 @@ const devisRouter = router({
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      return await db.getDevisNonSignes(artisan.id, input.joursMinimum || 7);
+      const joursMinimum = input.joursMinimum || 7;
+      const allDevis = await db.getDevisNonSignes(artisan.id);
+
+      const results = [];
+      for (const d of allDevis) {
+        const joursDepuisCreation = Math.floor((Date.now() - new Date(d.dateDevis).getTime()) / (1000 * 60 * 60 * 24));
+        if (joursDepuisCreation < joursMinimum) continue;
+
+        const client = await db.getClientById(d.clientId);
+        const signature = await db.getSignatureByDevisId(d.id);
+
+        results.push({
+          devis: {
+            id: d.id,
+            numero: d.numero,
+            dateDevis: d.dateDevis,
+            totalTTC: d.totalTTC,
+            statut: d.statut,
+          },
+          client: client ? { id: client.id, nom: `${client.prenom || ''} ${client.nom}`.trim(), email: client.email } : null,
+          signature: signature ? { id: signature.id, token: signature.token, createdAt: signature.createdAt } : null,
+          joursDepuisCreation,
+          joursDepuisEnvoi: signature ? Math.floor((Date.now() - new Date(signature.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : null,
+        });
+      }
+      return results;
     }),
   
   // Récupérer l'historique des relances d'un devis
@@ -748,7 +773,7 @@ const devisRouter = router({
         type: "email",
         destinataire: client.email,
         message: messageRelance,
-        statut: emailResult ? "envoye" : "echec"
+        statut: emailResult.success ? "envoye" : "echec"
       });
       
       // Créer une notification

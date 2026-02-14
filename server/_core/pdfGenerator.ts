@@ -14,6 +14,56 @@ export interface PDFFactureData {
   client: Client;
 }
 
+/**
+ * Renders the artisan info block (shared between devis and facture).
+ * Returns the Y position after the last line.
+ */
+function renderArtisanInfo(doc: jsPDF, artisan: Artisan, darkGray: [number, number, number]): number {
+  doc.setTextColor(...darkGray);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(artisan.nomEntreprise || "Artisan", 20, 55);
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+
+  let y = 62;
+  if (artisan.adresse) {
+    doc.text(artisan.adresse, 20, y);
+    y += 5;
+  }
+  const cpVille = `${artisan.codePostal || ""} ${artisan.ville || ""}`.trim();
+  if (cpVille) {
+    doc.text(cpVille, 20, y);
+    y += 5;
+  }
+  if (artisan.telephone) {
+    doc.text(`Tél: ${artisan.telephone}`, 20, y);
+    y += 5;
+  }
+  if (artisan.email) {
+    doc.text(`Email: ${artisan.email}`, 20, y);
+    y += 5;
+  }
+  // Ligne vide de séparation
+  y += 2;
+  if (artisan.siret) {
+    doc.text(`SIRET: ${artisan.siret}`, 20, y);
+    y += 5;
+  }
+  const a = artisan as any;
+  if (a.numeroTVA) {
+    doc.text(`TVA Intracom: ${a.numeroTVA}`, 20, y);
+    y += 5;
+  }
+  if (a.codeAPE) {
+    doc.text(`Code APE: ${a.codeAPE}`, 20, y);
+    y += 5;
+  }
+
+  return y;
+}
+
 export function generateDevisPDF(data: PDFDevisData): Buffer {
   const { devis, artisan, client } = data;
   const doc = new jsPDF();
@@ -48,24 +98,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   );
 
   // Informations artisan
-  doc.setTextColor(...darkGray);
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(artisan.nomEntreprise || "Artisan", 20, 55);
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(artisan.adresse || "", 20, 62);
-  doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`, 20, 68);
-  if (artisan.siret) {
-    doc.text(`SIRET: ${artisan.siret}`, 20, 74);
-  }
-  if (artisan.telephone) {
-    doc.text(`Tél: ${artisan.telephone}`, 20, 80);
-  }
-  if (artisan.email) {
-    doc.text(`Email: ${artisan.email}`, 20, 86);
-  }
+  renderArtisanInfo(doc, artisan, darkGray);
 
   // Informations client
   doc.setFont("helvetica", "bold");
@@ -203,24 +236,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   );
 
   // Informations artisan
-  doc.setTextColor(...darkGray);
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(artisan.nomEntreprise || "Artisan", 20, 55);
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(artisan.adresse || "", 20, 62);
-  doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`, 20, 68);
-  if (artisan.siret) {
-    doc.text(`SIRET: ${artisan.siret}`, 20, 74);
-  }
-  if (artisan.telephone) {
-    doc.text(`Tél: ${artisan.telephone}`, 20, 80);
-  }
-  if (artisan.email) {
-    doc.text(`Email: ${artisan.email}`, 20, 86);
-  }
+  renderArtisanInfo(doc, artisan, darkGray);
 
   // Informations client
   doc.setFont("helvetica", "bold");
@@ -310,22 +326,40 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFontSize(10);
   if (facture.statut === "payee") {
     doc.setTextColor(...successColor);
-    doc.text("✓ FACTURE PAYÉE", 20, yPosition);
+    doc.text("FACTURE PAYEE", 20, yPosition);
   } else {
     doc.setTextColor(239, 68, 68); // Rouge
     doc.text("EN ATTENTE DE PAIEMENT", 20, yPosition);
   }
 
-  // Pied de page
+  // Pied de page — mentions légales obligatoires facture
+  const footerY = 260;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+
+  const a = artisan as any;
+  if (a.iban) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Reglement par virement bancaire :", 20, footerY);
+    doc.setFont("helvetica", "normal");
+    doc.text(`IBAN: ${a.iban}`, 20, footerY + 4);
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
+  doc.text("Paiement a 30 jours.", 20, footerY + 12);
   doc.text(
-    "Conditions de paiement: À réception de la facture",
+    "En cas de retard de paiement, une penalite de 3 fois le taux d'interet legal sera appliquee,",
     20,
-    280
+    footerY + 16
   );
-  doc.text("Délai de paiement: 30 jours", 20, 285);
+  doc.text(
+    "ainsi qu'une indemnite forfaitaire de 40 EUR pour frais de recouvrement (Art. L441-10 C.com).",
+    20,
+    footerY + 20
+  );
 
   return Buffer.from(doc.output("arraybuffer"));
 }
