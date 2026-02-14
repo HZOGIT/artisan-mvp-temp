@@ -40,9 +40,13 @@ const menuItems = [
   { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
   { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
   { icon: Receipt, label: "Factures", path: "/factures" },
-  { icon: FileSignature, label: "Contrats", path: "/contrats" },
+  // TODO PHASE 2 : Réactiver Contrats de maintenance
+  // Fonctions manquantes : getContratsByArtisanId, createContrat, updateContrat, deleteContrat, getNextContratNumber, createFactureRecurrente
+  // { icon: FileSignature, label: "Contrats", path: "/contrats" },
   { icon: Calendar, label: "Interventions", path: "/interventions" },
-  { icon: Smartphone, label: "Mode Mobile", path: "/mobile" },
+  // TODO PHASE 2 : Réactiver Mode Mobile interventions
+  // Fonctions manquantes : getInterventionMobileByInterventionId, createInterventionMobile, updateInterventionMobile, createPhotoIntervention, getPhotosByInterventionMobileId
+  // { icon: Smartphone, label: "Mode Mobile", path: "/mobile" },
   { icon: UsersRound, label: "Techniciens", path: "/techniciens" },
   { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
   { icon: Package, label: "Articles", path: "/articles" },
@@ -50,7 +54,9 @@ const menuItems = [
   { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
   { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
   { icon: TrendingUp, label: "Perf. Fournisseurs", path: "/performances-fournisseurs" },
-  { icon: MessageCircle, label: "Chat", path: "/chat" },
+  // TODO PHASE 2 : Réactiver Chat
+  // Fonctions manquantes : getConversationsByArtisanId, getMessagesByConversationId, getOrCreateConversation, createMessage, markMessagesAsRead, getUnreadMessagesCount
+  // { icon: MessageCircle, label: "Chat", path: "/chat" },
   { icon: Star, label: "Avis Clients", path: "/avis" },
   { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
   { icon: Route, label: "Planification", path: "/planification" },

@@ -775,44 +775,50 @@ const devisRouter = router({
       const joursMinimum = input.joursMinimum || 7;
       const joursEntreRelances = input.joursEntreRelances || 7;
       
-      const devisNonSignes = await db.getDevisNonSignes(artisan.id, joursMinimum);
+      const devisNonSignes = await db.getDevisNonSignes(artisan.id);
       let relancesEnvoyees = 0;
-      
-      for (const item of devisNonSignes) {
+
+      for (const d of devisNonSignes) {
+        // Filtrer par ancienneté minimum
+        const joursDepuisCreation = Math.floor((Date.now() - new Date(d.dateDevis).getTime()) / (1000 * 60 * 60 * 24));
+        if (joursDepuisCreation < joursMinimum) continue;
+
         // Vérifier si une relance a déjà été envoyée récemment
-        const derniereRelance = await db.getLastRelanceDate(item.devis.id);
+        const derniereRelance = await db.getLastRelanceDate(d.id);
         if (derniereRelance) {
           const joursDepuisRelance = Math.floor((Date.now() - derniereRelance.getTime()) / (1000 * 60 * 60 * 24));
           if (joursDepuisRelance < joursEntreRelances) {
-            continue; // Passer au devis suivant
+            continue;
           }
         }
-        
-        // Vérifier que le client a un email
-        if (!item.client?.email) continue;
-        
-        // Envoyer la relance
-        const messageRelance = `Bonjour,\n\nNous vous rappelons que le devis n°${item.devis.numero} est toujours en attente de votre signature.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n${artisan.nomEntreprise || 'Votre artisan'}`;
-        
+
+        // Récupérer le client et vérifier qu'il a un email
+        const client = await db.getClientById(d.clientId);
+        if (!client?.email) continue;
+
+        const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
+        const artisanName = artisan.nomEntreprise || 'Votre artisan';
+        const messageRelance = `Bonjour ${clientName},\n\nNous vous rappelons que le devis n°${d.numero} est toujours en attente de votre signature.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n${artisanName}`;
+
         const emailResult = await sendEmail({
-          to: item.client.email,
-          subject: `Relance - Devis n°${item.devis.numero}`,
+          to: client.email,
+          subject: `Relance - Devis n°${d.numero}`,
           body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #2c3e50;">Relance - Devis n°${item.devis.numero}</h2>
+            <h2 style="color: #2c3e50;">Relance - Devis n°${d.numero}</h2>
             <p style="white-space: pre-line;">${messageRelance}</p>
           </div>`
         });
-        
+
         await db.createRelanceDevis({
-          devisId: item.devis.id,
+          devisId: d.id,
           artisanId: artisan.id,
           type: "email",
-          destinataire: item.client.email,
+          destinataire: client.email,
           message: messageRelance,
-          statut: emailResult ? "envoye" : "echec"
+          statut: emailResult.success ? "envoye" : "echec"
         });
-        
-        if (emailResult) relancesEnvoyees++;
+
+        if (emailResult.success) relancesEnvoyees++;
       }
       
       // Créer une notification récapitulatif
@@ -1112,6 +1118,7 @@ const facturesRouter = router({
     .input(z.object({
       factureId: z.number(),
       customMessage: z.string().optional(),
+      attachPdf: z.boolean().optional().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
       const facture = await db.getFactureById(input.factureId);
@@ -1130,7 +1137,7 @@ const facturesRouter = router({
       const artisanName = artisan.nomEntreprise || "Votre artisan";
       const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
       const totalTTC = `${parseFloat(facture.totalTTC || "0").toFixed(2)} €`;
-      const dateEcheance = facture.dateEcheance 
+      const dateEcheance = facture.dateEcheance
         ? new Date(facture.dateEcheance).toLocaleDateString('fr-FR')
         : undefined;
 
@@ -1143,13 +1150,25 @@ const facturesRouter = router({
         dateEcheance,
       });
 
-      const finalBody = input.customMessage ? `${input.customMessage}\n\n---\n\n${body}` : body;
+      const finalBody = input.customMessage
+        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${input.customMessage.replace(/\n/g, '<br>')}</div></body>`)
+        : body;
+
+      // Générer le PDF si demandé
+      let attachmentContent: string | undefined;
+      if (input.attachPdf) {
+        const lignes = await db.getLignesFacturesByFactureId(facture.id);
+        const { generateFacturePDF } = await import("./_core/pdfGenerator");
+        const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client });
+        attachmentContent = pdfBuffer.toString("base64");
+      }
 
       const result = await sendEmail({
         to: client.email,
         subject,
         body: finalBody,
-        attachmentName: `Facture_${facture.numero}.pdf`,
+        attachmentName: input.attachPdf ? `Facture_${facture.numero}.pdf` : undefined,
+        attachmentContent,
       });
 
       if (result.success) {

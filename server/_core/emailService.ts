@@ -175,22 +175,76 @@ export function generateFactureEmailContent(params: {
 
   const subject = `Facture ${factureNumero}${factureObjet ? ` - ${factureObjet}` : ''} de ${artisanName}`;
 
-  const body = `
-Bonjour ${clientName},
+  const body = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
-Veuillez trouver ci-joint la facture ${factureNumero}${factureObjet ? ` concernant "${factureObjet}"` : ''}.
+        <!-- Header -->
+        <tr>
+          <td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${artisanName}</h1>
+          </td>
+        </tr>
 
-Montant total TTC: ${totalTTC}
-${dateEcheance ? `Date d'échéance: ${dateEcheance}` : ''}
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 40px 16px 40px;">
+            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
+            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint la facture <strong>${factureNumero}</strong>${factureObjet ? ` concernant <em>&laquo;&nbsp;${factureObjet}&nbsp;&raquo;</em>` : ''}.</p>
+          </td>
+        </tr>
 
-Nous vous remercions de procéder au règlement dans les meilleurs délais.
+        <!-- Recap box -->
+        <tr>
+          <td style="padding:0 40px 28px 40px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+              <tr>
+                <td style="padding:20px 24px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro de facture</td>
+                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${factureNumero}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Montant TTC</td>
+                      <td style="padding:6px 0;font-size:16px;color:#1e40af;font-weight:700;text-align:right;border-top:1px solid #dbeafe;">${totalTTC}</td>
+                    </tr>
+                    ${dateEcheance ? `<tr>
+                      <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Date d'échéance</td>
+                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;border-top:1px solid #dbeafe;">${dateEcheance}</td>
+                    </tr>` : ''}
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-Cordialement,
-${artisanName}
+        <!-- CTA text -->
+        <tr>
+          <td style="padding:0 40px 36px 40px;">
+            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Nous vous remercions de procéder au règlement dans les meilleurs délais.</p>
+            <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
+            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
+          </td>
+        </tr>
 
----
-Ce message a été envoyé automatiquement depuis Artisan MVP.
-  `.trim();
+        <!-- Footer -->
+        <tr>
+          <td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis MonArtisan Pro</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
 
   return { subject, body };
 }

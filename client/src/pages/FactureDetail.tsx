@@ -100,6 +100,7 @@ export default function FactureDetail() {
 
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [emailMessage, setEmailMessage] = useState("");
+  const [attachPdf, setAttachPdf] = useState(true);
 
   const handleSendByEmail = () => {
     if (!facture?.client?.email) {
@@ -109,6 +110,7 @@ export default function FactureDetail() {
     sendByEmailMutation.mutate({
       factureId: parseInt(id || "0"),
       customMessage: emailMessage || undefined,
+      attachPdf,
     });
   };
 
@@ -271,6 +273,15 @@ export default function FactureDetail() {
                     rows={4}
                   />
                 </div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={attachPdf}
+                    onChange={(e) => setAttachPdf(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Joindre la facture en PDF</span>
+                </label>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>

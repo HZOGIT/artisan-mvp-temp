@@ -106,6 +106,11 @@ function AuthenticatedRoutes() {
         <Route path="/devis-ia" component={DevisIA} />
         <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
         <Route path="/tableau-bord-sync-comptable" component={TableauBordSyncComptable} />
+        <Route path="/relances" component={RelancesDevis} />
+        <Route path="/modeles-email" component={ModelesEmail} />
+        <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
+        <Route path="/rapport-commande" component={RapportCommande} />
+        <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>

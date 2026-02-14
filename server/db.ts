@@ -24,7 +24,9 @@ import {
   modelesEmail, ModeleEmail, InsertModeleEmail,
   commandesFournisseurs, CommandeFournisseur, InsertCommandeFournisseur,
   lignesCommandesFournisseurs, LigneCommandeFournisseur, InsertLigneCommandeFournisseur,
-  paiementsStripe, PaiementStripe, InsertPaiementStripe
+  paiementsStripe, PaiementStripe, InsertPaiementStripe,
+  modelesDevis, ModeleDevis, InsertModeleDevis,
+  modelesDevisLignes, ModeleDevisLigne, InsertModeleDevisLigne
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -769,24 +771,25 @@ export async function deleteStock(id: number): Promise<void> {
   await db.delete(stocks).where(eq(stocks.id, id));
 }
 
-export async function adjustStock(id: number, quantity: number, type: 'add' | 'remove'): Promise<Stock | undefined> {
+export async function adjustStock(id: number, quantity: number, type: 'entree' | 'sortie' | 'ajustement', motif?: string, reference?: string): Promise<Stock | undefined> {
   const db = await getDb();
   const stock = await getStockById(id);
   if (!stock) return undefined;
-  
+
   const currentQty = parseFloat(stock.quantiteEnStock?.toString() || '0');
-  const newQty = type === 'add' ? currentQty + quantity : currentQty - quantity;
-  
+  const newQty = type === 'sortie' ? currentQty - quantity : currentQty + quantity;
+
   await db.update(stocks).set({ quantiteEnStock: newQty.toString() }).where(eq(stocks.id, id));
-  
+
   // Log movement
   await db.insert(mouvementsStock).values({
     stockId: id,
-    type: type === 'add' ? 'entree' : 'sortie',
+    type,
     quantite: quantity.toString(),
-    motif: type === 'add' ? 'Ajout manuel' : 'Retrait manuel',
+    motif: motif || (type === 'entree' ? 'Ajout manuel' : type === 'sortie' ? 'Retrait manuel' : 'Ajustement'),
+    reference: reference || undefined,
   });
-  
+
   return getStockById(id);
 }
 
@@ -1266,6 +1269,48 @@ export async function getYearlyComparison(artisanId: number): Promise<any> {
 }
 
 // ============================================================================
+// MODELES DEVIS (Quote templates)
+// ============================================================================
+
+export async function getModelesDevisByArtisanId(artisanId: number): Promise<ModeleDevis[]> {
+  const db = await getDb();
+  return await db.select().from(modelesDevis).where(eq(modelesDevis.artisanId, artisanId)).orderBy(desc(modelesDevis.createdAt));
+}
+
+export async function getModeleDevisById(id: number): Promise<ModeleDevis | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(modelesDevis).where(eq(modelesDevis.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createModeleDevis(artisanId: number, data: { nom: string; description?: string; notes?: string }): Promise<ModeleDevis> {
+  const db = await getDb();
+  await db.insert(modelesDevis).values({ artisanId, ...data });
+  const result = await db.select().from(modelesDevis).where(eq(modelesDevis.artisanId, artisanId)).orderBy(desc(modelesDevis.id)).limit(1);
+  return result[0];
+}
+
+export async function getModeleDevisLignes(modeleId: number): Promise<ModeleDevisLigne[]> {
+  const db = await getDb();
+  return await db.select().from(modelesDevisLignes).where(eq(modelesDevisLignes.modeleId, modeleId)).orderBy(asc(modelesDevisLignes.ordre));
+}
+
+export async function addLigneToModeleDevis(modeleId: number, data: Omit<InsertModeleDevisLigne, 'modeleId'>): Promise<ModeleDevisLigne> {
+  const db = await getDb();
+  const existingLignes = await getModeleDevisLignes(modeleId);
+  const ordre = existingLignes.length + 1;
+  await db.insert(modelesDevisLignes).values({ ...data, modeleId, ordre });
+  const result = await db.select().from(modelesDevisLignes).where(eq(modelesDevisLignes.modeleId, modeleId)).orderBy(desc(modelesDevisLignes.id)).limit(1);
+  return result[0];
+}
+
+export async function deleteModeleDevis(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(modelesDevisLignes).where(eq(modelesDevisLignes.modeleId, id));
+  await db.delete(modelesDevis).where(eq(modelesDevis.id, id));
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1292,3 +1337,5 @@ export { ModeleEmail, InsertModeleEmail } from "../drizzle/schema";
 export { CommandeFournisseur, InsertCommandeFournisseur } from "../drizzle/schema";
 export { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../drizzle/schema";
 export { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
+export { ModeleDevis, InsertModeleDevis } from "../drizzle/schema";
+export { ModeleDevisLigne, InsertModeleDevisLigne } from "../drizzle/schema";
