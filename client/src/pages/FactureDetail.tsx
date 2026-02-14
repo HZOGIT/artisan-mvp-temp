@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,24 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { generateFacturePDF } from "@/lib/pdfGenerator";
 import { fr } from "date-fns/locale";
+
+interface ArticleBibliotheque {
+  id: number;
+  nom: string;
+  description: string | null;
+  prix_base: string;
+  unite: string;
+  metier: string;
+  categorie: string;
+  sous_categorie: string;
+  duree_moyenne_minutes: number | null;
+}
 
 const statusLabels: Record<string, string> = {
   brouillon: "Brouillon",
@@ -49,6 +61,48 @@ export default function FactureDetail() {
     prixUnitaireHT: "",
     tauxTVA: "20.00",
   });
+
+  // Autocomplete article search
+  const [searchResults, setSearchResults] = useState<ArticleBibliotheque[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const searchArticles = useCallback((query: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setShowDropdown(false);
+      return;
+    }
+    setIsSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/articles/search?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+          setShowDropdown(data.length > 0);
+        }
+      } catch (err) {
+        console.error("[ArticleSearch]", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const utils = trpc.useUtils();
   const { data: facture, isLoading } = trpc.factures.getById.useQuery(
@@ -421,39 +475,65 @@ export default function FactureDetail() {
                 </DialogHeader>
                 <form onSubmit={handleAddLine}>
                   <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Article de la bibliothèque</Label>
-                      <Select onValueChange={handleSelectArticle}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un article..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {articles?.slice(0, 50).map((article: any) => (
-                            <SelectItem key={article.id} value={String(article.id)}>
-                              {article.designation} - {formatCurrency(article.prixUnitaireHT)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reference">Référence</Label>
-                        <Input
-                          id="reference"
-                          value={lineFormData.reference}
-                          onChange={(e) => setLineFormData({ ...lineFormData, reference: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="designation">Désignation *</Label>
+                    {/* Désignation avec autocomplete */}
+                    <div className="relative" ref={dropdownRef}>
+                      <Label htmlFor="designation">Désignation *</Label>
+                      <div className="relative mt-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
                           id="designation"
                           value={lineFormData.designation}
-                          onChange={(e) => setLineFormData({ ...lineFormData, designation: e.target.value })}
+                          onChange={(e) => {
+                            setLineFormData({ ...lineFormData, designation: e.target.value });
+                            searchArticles(e.target.value);
+                          }}
+                          onFocus={() => {
+                            if (lineFormData.designation.length >= 2) searchArticles(lineFormData.designation);
+                          }}
+                          placeholder="Tapez pour rechercher un article ou saisir librement..."
+                          className="pl-10"
                           required
                         />
+                        {isSearching && (
+                          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                        )}
                       </div>
+                      {showDropdown && searchResults.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {searchResults.map((article) => (
+                            <button
+                              key={article.id}
+                              type="button"
+                              onClick={() => {
+                                setLineFormData({
+                                  ...lineFormData,
+                                  designation: article.nom,
+                                  description: article.description || "",
+                                  prixUnitaireHT: article.prix_base,
+                                  unite: article.unite || "unité",
+                                });
+                                setShowDropdown(false);
+                                toast.success(`${article.nom} sélectionné`);
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors"
+                            >
+                              <div className="font-medium text-sm">{article.nom}</div>
+                              <div className="text-xs text-gray-500">
+                                {formatCurrency(article.prix_base)} / {article.unite}
+                                <span className="ml-2 text-gray-400">{article.categorie}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reference">Référence</Label>
+                      <Input
+                        id="reference"
+                        value={lineFormData.reference}
+                        onChange={(e) => setLineFormData({ ...lineFormData, reference: e.target.value })}
+                      />
                     </div>
                     <div className="grid grid-cols-4 gap-4">
                       <div className="space-y-2">
