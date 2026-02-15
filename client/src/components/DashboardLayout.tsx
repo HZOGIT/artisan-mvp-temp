@@ -38,7 +38,6 @@ type MenuItem = { icon: any; label: string; path: string };
 interface MenuGroup {
   title: string;
   icon: any;
-  defaultOpen?: boolean;
   items: MenuItem[];
 }
 
@@ -46,7 +45,6 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Tableau de bord",
     icon: LayoutDashboard,
-    defaultOpen: true,
     items: [
       { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
       { icon: BarChart3, label: "Statistiques", path: "/statistiques" },
@@ -55,7 +53,6 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Commercial",
     icon: FileText,
-    defaultOpen: true,
     items: [
       { icon: FileText, label: "Devis", path: "/devis" },
       { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
@@ -66,7 +63,6 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Clients",
     icon: Users,
-    defaultOpen: true,
     items: [
       { icon: Users, label: "Clients", path: "/clients" },
       { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
@@ -194,6 +190,15 @@ function DashboardLayoutContent({
   const activeMenuItem = allMenuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
+  // Controlled collapsible state: only the group containing the active page is initially open
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    menuGroups.forEach((group) => {
+      initial[group.title] = group.items.some((item) => location === item.path);
+    });
+    return initial;
+  });
+
   useEffect(() => {
     if (isCollapsed) {
       setIsResizing(false);
@@ -260,11 +265,13 @@ function DashboardLayoutContent({
           <SidebarContent className="gap-0 overflow-y-auto">
             <SidebarMenu className="px-2 py-1">
               {menuGroups.map((group) => {
-                const groupHasActive = group.items.some((item) => location === item.path);
                 return (
                   <Collapsible
                     key={group.title}
-                    defaultOpen={group.defaultOpen || groupHasActive}
+                    open={openGroups[group.title] ?? false}
+                    onOpenChange={(open) =>
+                      setOpenGroups((prev) => ({ ...prev, [group.title]: open }))
+                    }
                     className="group/collapsible"
                   >
                     <SidebarMenuItem>
