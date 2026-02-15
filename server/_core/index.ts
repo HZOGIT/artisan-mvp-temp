@@ -33,10 +33,12 @@ async function startServer() {
   console.log('[Database] DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Missing');
   
   try {
-    const { getDb } = await import('../db');
+    const { getDb, seedTestData } = await import('../db');
     const db = await getDb();
     if (db) {
       console.log('[Database] MySQL connected successfully');
+      // Seed test data (one-time, skips if data already exists)
+      try { await seedTestData(); } catch (e) { console.error('[Seed] Error:', e); }
     } else {
       console.error('[Database] MySQL connection failed: getDb returned null');
     }

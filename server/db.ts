@@ -26,7 +26,11 @@ import {
   lignesCommandesFournisseurs, LigneCommandeFournisseur, InsertLigneCommandeFournisseur,
   paiementsStripe, PaiementStripe, InsertPaiementStripe,
   modelesDevis, ModeleDevis, InsertModeleDevis,
-  modelesDevisLignes, ModeleDevisLigne, InsertModeleDevisLigne
+  modelesDevisLignes, ModeleDevisLigne, InsertModeleDevisLigne,
+  avisClients, AvisClient, InsertAvisClient,
+  demandesAvis, DemandeAvis, InsertDemandeAvis,
+  techniciens, Technicien,
+  positionsTechniciens, PositionTechnicien
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -785,6 +789,8 @@ export async function adjustStock(id: number, quantity: number, type: 'entree' |
     stockId: id,
     type,
     quantite: quantity.toString(),
+    quantiteAvant: currentQty.toString(),
+    quantiteApres: newQty.toString(),
     motif: motif || (type === 'entree' ? 'Ajout manuel' : type === 'sortie' ? 'Retrait manuel' : 'Ajustement'),
     reference: reference || undefined,
   });
@@ -1382,3 +1388,249 @@ export { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../dri
 export { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
 export { ModeleDevis, InsertModeleDevis } from "../drizzle/schema";
 export { ModeleDevisLigne, InsertModeleDevisLigne } from "../drizzle/schema";
+export { AvisClient, InsertAvisClient } from "../drizzle/schema";
+export { DemandeAvis, InsertDemandeAvis } from "../drizzle/schema";
+export { Technicien } from "../drizzle/schema";
+export { PositionTechnicien } from "../drizzle/schema";
+
+// ============================================================================
+// AVIS CLIENTS
+// ============================================================================
+
+export async function getAvisByArtisanId(artisanId: number): Promise<AvisClient[]> {
+  const db = await getDb();
+  return await db.select().from(avisClients)
+    .where(eq(avisClients.artisanId, artisanId))
+    .orderBy(desc(avisClients.createdAt));
+}
+
+export async function getAvisById(id: number): Promise<AvisClient | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(avisClients).where(eq(avisClients.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getAvisStats(artisanId: number): Promise<{ moyenne: number; total: number; distribution: Record<number, number> }> {
+  const db = await getDb();
+  const allAvis = await db.select().from(avisClients)
+    .where(eq(avisClients.artisanId, artisanId));
+
+  const total = allAvis.length;
+  const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let sum = 0;
+  allAvis.forEach(a => {
+    sum += a.note;
+    distribution[a.note] = (distribution[a.note] || 0) + 1;
+  });
+
+  return { moyenne: total > 0 ? sum / total : 0, total, distribution };
+}
+
+export async function createAvis(data: InsertAvisClient): Promise<AvisClient> {
+  const db = await getDb();
+  await db.insert(avisClients).values(data);
+  const result = await db.select().from(avisClients)
+    .where(eq(avisClients.artisanId, data.artisanId))
+    .orderBy(desc(avisClients.id))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateAvis(id: number, data: Partial<InsertAvisClient>): Promise<AvisClient | undefined> {
+  const db = await getDb();
+  await db.update(avisClients).set(data).where(eq(avisClients.id, id));
+  return getAvisById(id);
+}
+
+// ============================================================================
+// DEMANDES AVIS
+// ============================================================================
+
+export async function getDemandeAvisByToken(token: string): Promise<DemandeAvis | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(demandesAvis)
+    .where(eq(demandesAvis.tokenDemande, token))
+    .limit(1);
+  return result[0];
+}
+
+export async function createDemandeAvis(data: InsertDemandeAvis): Promise<DemandeAvis> {
+  const db = await getDb();
+  await db.insert(demandesAvis).values(data);
+  const result = await db.select().from(demandesAvis)
+    .where(eq(demandesAvis.tokenDemande, data.tokenDemande))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateDemandeAvis(id: number, data: Partial<InsertDemandeAvis>): Promise<DemandeAvis | undefined> {
+  const db = await getDb();
+  await db.update(demandesAvis).set(data).where(eq(demandesAvis.id, id));
+  const result = await db.select().from(demandesAvis).where(eq(demandesAvis.id, id)).limit(1);
+  return result[0];
+}
+
+// ============================================================================
+// TECHNICIENS — SUGGESTIONS PLANIFICATION
+// ============================================================================
+
+export async function getSuggestionsTechniciens(
+  artisanId: number,
+  latitude: number,
+  longitude: number,
+  dateIntervention: Date
+): Promise<any[]> {
+  const db = await getDb();
+
+  // Get all active technicians for this artisan
+  const allTechniciens = await db.select().from(techniciens)
+    .where(and(eq(techniciens.artisanId, artisanId), eq(techniciens.statut, "actif")));
+
+  if (allTechniciens.length === 0) return [];
+
+  // Get interventions on the same day to check availability
+  const dayStart = new Date(dateIntervention);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dateIntervention);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const dayInterventions = await db.select().from(interventions)
+    .where(and(
+      eq(interventions.artisanId, artisanId),
+      gte(interventions.dateDebut, dayStart),
+      lte(interventions.dateDebut, dayEnd),
+      ne(interventions.statut, "annulee")
+    ));
+
+  // Build suggestions
+  const suggestions = await Promise.all(allTechniciens.map(async (tech) => {
+    // Check if technician has a conflicting intervention (within 2h window)
+    const targetHour = dateIntervention.getHours();
+    const busy = dayInterventions.some(i => {
+      if (i.technicienId !== tech.id) return false;
+      const iHour = new Date(i.dateDebut).getHours();
+      return Math.abs(iHour - targetHour) < 2;
+    });
+
+    // Get last known position
+    const positions = await db.select().from(positionsTechniciens)
+      .where(eq(positionsTechniciens.technicienId, tech.id))
+      .orderBy(desc(positionsTechniciens.timestamp))
+      .limit(1);
+    const position = positions[0] || null;
+
+    // Calculate approximate distance (Haversine simplified)
+    let distance = 0;
+    let tempsTrajet = 0;
+    if (position) {
+      const lat1 = parseFloat(position.latitude.toString());
+      const lon1 = parseFloat(position.longitude.toString());
+      const R = 6371;
+      const dLat = (latitude - lat1) * Math.PI / 180;
+      const dLon = (longitude - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(latitude * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      tempsTrajet = Math.round((distance / 40) * 60); // ~40km/h average in city
+    }
+
+    const score = (busy ? 0 : 50) + Math.max(0, 50 - distance);
+
+    return {
+      technicien: {
+        id: tech.id,
+        nom: `${tech.prenom || ""} ${tech.nom}`.trim(),
+        couleur: tech.couleur,
+        specialite: tech.specialite,
+      },
+      distance: Math.round(distance * 10) / 10,
+      tempsTrajet,
+      disponible: !busy,
+      position: position ? {
+        latitude: position.latitude.toString(),
+        longitude: position.longitude.toString(),
+      } : null,
+      score,
+    };
+  }));
+
+  return suggestions.sort((a, b) => b.score - a.score);
+}
+
+export async function getTechnicienPlusProche(
+  artisanId: number,
+  latitude: number,
+  longitude: number,
+  dateIntervention: Date
+): Promise<any | null> {
+  const suggestions = await getSuggestionsTechniciens(artisanId, latitude, longitude, dateIntervention);
+  const available = suggestions.filter(s => s.disponible);
+  return available.length > 0 ? available[0] : null;
+}
+
+// One-time seed for test data (runs on server startup)
+export async function seedTestData(): Promise<void> {
+  const db = await getDb();
+
+  // Get the first artisan
+  const [artisan] = await db.select().from(artisans).limit(1);
+  if (!artisan) {
+    console.log('[Seed] No artisan found, skipping test data');
+    return;
+  }
+
+  // Check if test data already exists (by checking stocks)
+  const existingStocks = await db.select().from(stocks).where(eq(stocks.artisanId, artisan.id)).limit(1);
+  if (existingStocks.length > 0) {
+    console.log('[Seed] Test data already exists, skipping');
+    return;
+  }
+
+  console.log(`[Seed] Inserting test data for artisan ${artisan.id}...`);
+
+  // Get clients for avis
+  const allClients = await db.select().from(clients).where(eq(clients.artisanId, artisan.id));
+  const clientMartin = allClients.find(c => c.nom === 'Martin');
+  const clientDurand = allClients.find(c => c.nom === 'Durand');
+  const clientBernard = allClients.find(c => c.nom === 'Bernard');
+
+  // 3 Avis clients
+  const avisData = [
+    { client: clientMartin, note: 5, commentaire: 'Excellent travail, très professionnel. Je recommande vivement !' },
+    { client: clientDurand, note: 4, commentaire: 'Bon travail, ponctuel et soigneux. Petit bémol sur le délai initial.' },
+    { client: clientBernard, note: 5, commentaire: 'Parfait ! Intervention rapide et efficace. Artisan de confiance.' },
+  ];
+  for (const avis of avisData) {
+    if (!avis.client) continue;
+    await db.insert(avisClients).values({
+      artisanId: artisan.id,
+      clientId: avis.client.id,
+      note: avis.note,
+      commentaire: avis.commentaire,
+      statut: 'publie',
+    });
+    console.log(`[Seed] Avis: ${avis.client.nom} - ${avis.note}/5`);
+  }
+
+  // 3 Stock items
+  const stockItems = [
+    { reference: 'JNT-TOR-001', designation: 'Joint torique DN20', quantiteEnStock: '50.00', seuilAlerte: '10.00', unite: 'pièce', prixAchat: '0.85', emplacement: 'Étagère A2', fournisseur: 'Cedeo' },
+    { reference: 'TUB-CUI-014', designation: 'Tube cuivre 14mm (barre 2m)', quantiteEnStock: '25.00', seuilAlerte: '5.00', unite: 'barre', prixAchat: '12.50', emplacement: 'Rack B1', fournisseur: 'Cedeo' },
+    { reference: 'DIS-20A-003', designation: 'Disjoncteur 20A', quantiteEnStock: '15.00', seuilAlerte: '3.00', unite: 'pièce', prixAchat: '8.90', emplacement: 'Armoire C3', fournisseur: 'Rexel' },
+  ];
+  for (const item of stockItems) {
+    await db.insert(stocks).values({ artisanId: artisan.id, ...item });
+    console.log(`[Seed] Stock: ${item.designation} (qty: ${item.quantiteEnStock})`);
+  }
+
+  // 2 Fournisseurs
+  const fournisseursData = [
+    { nom: 'Cedeo Lyon', contact: 'Jean-Pierre Moreau', email: 'contact@cedeo-lyon.fr', telephone: '04 72 33 44 55', adresse: '15 rue de l\'Industrie', codePostal: '69003', ville: 'Lyon' },
+    { nom: 'Rexel Villeurbanne', contact: 'Sophie Lambert', email: 'villeurbanne@rexel.fr', telephone: '04 78 85 66 77', adresse: 'ZI des Bruyères, 8 allée des Platanes', codePostal: '69100', ville: 'Villeurbanne' },
+  ];
+  for (const f of fournisseursData) {
+    await db.insert(fournisseurs).values({ artisanId: artisan.id, ...f });
+    console.log(`[Seed] Fournisseur: ${f.nom}`);
+  }
+
+  console.log('[Seed] Test data inserted successfully!');
+}
