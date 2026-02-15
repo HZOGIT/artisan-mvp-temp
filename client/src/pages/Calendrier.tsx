@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import Calendar from "@/components/Calendar";
-import DashboardLayout from "@/components/DashboardLayout";
 
 export default function Calendrier() {
   const [, setLocation] = useLocation();
@@ -40,6 +39,16 @@ export default function Calendrier() {
     },
     onError: () => {
       toast.error("Erreur lors de la création de l'intervention");
+    },
+  });
+
+  const updateMutation = trpc.interventions.update.useMutation({
+    onSuccess: () => {
+      utils.interventions.list.invalidate();
+      toast.success("Intervention déplacée");
+    },
+    onError: () => {
+      toast.error("Erreur lors du déplacement");
     },
   });
 
@@ -94,6 +103,21 @@ export default function Calendrier() {
     });
   };
 
+  const handleInterventionDrop = (interventionId: number, newDate: Date) => {
+    const intervention = interventions?.find((i: any) => i.id === interventionId);
+    if (!intervention) return;
+
+    const oldDate = new Date(intervention.dateDebut);
+    const hours = oldDate.getHours();
+    const minutes = oldDate.getMinutes();
+    newDate.setHours(hours, minutes, 0, 0);
+
+    updateMutation.mutate({
+      id: interventionId,
+      dateDebut: newDate.toISOString(),
+    });
+  };
+
   const handleClientChange = (clientId: string) => {
     setFormData({ ...formData, clientId });
     const client = clients?.find((c: any) => c.id === parseInt(clientId));
@@ -108,11 +132,9 @@ export default function Calendrier() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
     );
   }
 
@@ -126,22 +148,22 @@ export default function Calendrier() {
   }));
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Calendrier</h1>
-            <p className="text-muted-foreground">
-              Visualisez et planifiez vos interventions
-            </p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Calendrier</h1>
+          <p className="text-muted-foreground">
+            Visualisez et planifiez vos interventions — glissez-déposez pour replanifier
+          </p>
         </div>
+      </div>
 
-        <Calendar
-          interventions={formattedInterventions}
-          onAddClick={handleAddClick}
-          onInterventionClick={handleInterventionClick}
-        />
+      <Calendar
+        interventions={formattedInterventions}
+        onAddClick={handleAddClick}
+        onInterventionClick={handleInterventionClick}
+        onInterventionDrop={handleInterventionDrop}
+      />
 
         {/* Dialog pour ajouter une intervention */}
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -258,7 +280,6 @@ export default function Calendrier() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

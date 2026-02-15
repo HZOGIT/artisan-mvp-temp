@@ -99,6 +99,15 @@ export default function Interventions() {
     setSelectedClientId("");
   };
 
+  const handleClientChange = (clientId: string) => {
+    setSelectedClientId(clientId);
+    const client = clients?.find((c: any) => c.id === parseInt(clientId));
+    if (client?.adresse) {
+      const adresse = `${client.adresse}, ${client.codePostal || ""} ${client.ville || ""}`.trim().replace(/,\s*$/, "");
+      setFormData((prev) => ({ ...prev, adresse }));
+    }
+  };
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClientId || !formData.titre) {
@@ -176,7 +185,7 @@ export default function Interventions() {
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Client *</Label>
-                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <Select value={selectedClientId} onValueChange={handleClientChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner un client" />
                     </SelectTrigger>

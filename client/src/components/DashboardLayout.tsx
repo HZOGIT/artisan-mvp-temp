@@ -1,6 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -22,57 +27,89 @@ import {
 import { getLoginUrl } from "@/const";
 import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, Bell, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, TrendingUp, FileSignature, Smartphone, MessageCircle, UsersRound, Star, MapPin, Calculator, Route, Palmtree, LineChart, Car, Trophy, AlertTriangle, HardHat, Link2, Sparkles } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
-  { icon: BarChart3, label: "Statistiques", path: "/statistiques" },
-  { icon: Users, label: "Clients", path: "/clients" },
-  { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
-  { icon: Upload, label: "Import Clients", path: "/clients/import" },
-  { icon: FileText, label: "Devis", path: "/devis" },
-  { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
-  { icon: RefreshCw, label: "Relances Devis", path: "/relances" },
-  { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
-  { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
-  { icon: Receipt, label: "Factures", path: "/factures" },
-  // TODO PHASE 2 : Réactiver Contrats de maintenance
-  // Fonctions manquantes : getContratsByArtisanId, createContrat, updateContrat, deleteContrat, getNextContratNumber, createFactureRecurrente
-  // { icon: FileSignature, label: "Contrats", path: "/contrats" },
-  { icon: Calendar, label: "Interventions", path: "/interventions" },
-  // TODO PHASE 2 : Réactiver Mode Mobile interventions
-  // Fonctions manquantes : getInterventionMobileByInterventionId, createInterventionMobile, updateInterventionMobile, createPhotoIntervention, getPhotosByInterventionMobileId
-  // { icon: Smartphone, label: "Mode Mobile", path: "/mobile" },
-  { icon: UsersRound, label: "Techniciens", path: "/techniciens" },
-  { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
-  { icon: Package, label: "Articles", path: "/articles" },
-  { icon: Boxes, label: "Stocks", path: "/stocks" },
-  { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
-  { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
-  { icon: TrendingUp, label: "Perf. Fournisseurs", path: "/performances-fournisseurs" },
-  // TODO PHASE 2 : Réactiver Chat
-  // Fonctions manquantes : getConversationsByArtisanId, getMessagesByConversationId, getOrCreateConversation, createMessage, markMessagesAsRead, getUnreadMessagesCount
-  // { icon: MessageCircle, label: "Chat", path: "/chat" },
-  { icon: Star, label: "Avis Clients", path: "/avis" },
-  { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
-  { icon: Route, label: "Planification", path: "/planification" },
-  { icon: FileText, label: "Rapports", path: "/rapports" },
-  { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
-  { icon: Palmtree, label: "Congés", path: "/conges" },
-  { icon: LineChart, label: "Prévisions CA", path: "/previsions" },
-  { icon: AlertTriangle, label: "Alertes Prévisions", path: "/alertes-previsions" },
-  { icon: Car, label: "Véhicules", path: "/vehicules" },
-  { icon: Trophy, label: "Badges", path: "/badges" },
-  { icon: HardHat, label: "Chantiers", path: "/chantiers" },
-  { icon: Link2, label: "Intégrations Compta", path: "/integrations-comptables" },
-  { icon: Sparkles, label: "Devis IA", path: "/devis-ia" },
-  { icon: User, label: "Mon profil", path: "/profil" },
-  { icon: Settings, label: "Paramètres", path: "/parametres" },
+type MenuItem = { icon: any; label: string; path: string };
+
+interface MenuGroup {
+  title: string;
+  icon: any;
+  defaultOpen?: boolean;
+  items: MenuItem[];
+}
+
+const menuGroups: MenuGroup[] = [
+  {
+    title: "Tableau de bord",
+    icon: LayoutDashboard,
+    defaultOpen: true,
+    items: [
+      { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+      { icon: BarChart3, label: "Statistiques", path: "/statistiques" },
+    ],
+  },
+  {
+    title: "Commercial",
+    icon: FileText,
+    defaultOpen: true,
+    items: [
+      { icon: FileText, label: "Devis", path: "/devis" },
+      { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
+      { icon: RefreshCw, label: "Relances", path: "/relances" },
+      { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
+      { icon: Mail, label: "Modèles Transac.", path: "/modeles-email-transactionnels" },
+      { icon: Receipt, label: "Factures", path: "/factures" },
+    ],
+  },
+  {
+    title: "Clients",
+    icon: Users,
+    defaultOpen: true,
+    items: [
+      { icon: Users, label: "Clients", path: "/clients" },
+      { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
+      { icon: Upload, label: "Import Clients", path: "/clients/import" },
+      { icon: Star, label: "Avis Clients", path: "/avis" },
+    ],
+  },
+  {
+    title: "Terrain",
+    icon: Calendar,
+    items: [
+      { icon: Calendar, label: "Interventions", path: "/interventions" },
+      { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
+      { icon: HardHat, label: "Chantiers", path: "/chantiers" },
+      { icon: Route, label: "Planification", path: "/planification" },
+    ],
+  },
+  {
+    title: "Gestion",
+    icon: Package,
+    items: [
+      { icon: Package, label: "Articles", path: "/articles" },
+      { icon: Boxes, label: "Stocks", path: "/stocks" },
+      { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
+      { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
+      { icon: FileText, label: "Rapports", path: "/rapports" },
+      { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
+      { icon: LineChart, label: "Prévisions CA", path: "/previsions" },
+    ],
+  },
+  {
+    title: "Paramètres",
+    icon: Settings,
+    items: [
+      { icon: User, label: "Mon profil", path: "/profil" },
+      { icon: Settings, label: "Paramètres", path: "/parametres" },
+    ],
+  },
 ];
+
+const allMenuItems = menuGroups.flatMap((g) => g.items);
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -154,7 +191,7 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  const activeMenuItem = allMenuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -220,24 +257,51 @@ function DashboardLayoutContent({
             </div>
           </SidebarHeader>
 
-          <SidebarContent className="gap-0">
+          <SidebarContent className="gap-0 overflow-y-auto">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
-                const isActive = location === item.path;
+              {menuGroups.map((group) => {
+                const groupHasActive = group.items.some((item) => location === item.path);
                 return (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
-                      className={`h-10 transition-all font-normal`}
-                    >
-                      <item.icon
-                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                      />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  <Collapsible
+                    key={group.title}
+                    defaultOpen={group.defaultOpen || groupHasActive}
+                    className="group/collapsible"
+                  >
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          tooltip={group.title}
+                          className="h-9 font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          <group.icon className="h-4 w-4" />
+                          <span className="text-xs uppercase tracking-wider">{group.title}</span>
+                          <ChevronRight className="ml-auto h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenu className="pl-2">
+                          {group.items.map((item) => {
+                            const isActive = location === item.path;
+                            return (
+                              <SidebarMenuItem key={item.path}>
+                                <SidebarMenuButton
+                                  isActive={isActive}
+                                  onClick={() => setLocation(item.path)}
+                                  tooltip={item.label}
+                                  className="h-9 transition-all font-normal"
+                                >
+                                  <item.icon
+                                    className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
+                                  />
+                                  <span>{item.label}</span>
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            );
+                          })}
+                        </SidebarMenu>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
                 );
               })}
             </SidebarMenu>

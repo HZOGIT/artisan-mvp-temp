@@ -23,6 +23,7 @@ interface CalendarProps {
   onDateClick?: (date: Date) => void;
   onInterventionClick?: (intervention: Intervention) => void;
   onAddClick?: (date: Date) => void;
+  onInterventionDrop?: (interventionId: number, newDate: Date) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -39,9 +40,10 @@ const statusLabels: Record<string, string> = {
   annulee: "Annulée",
 };
 
-export default function Calendar({ interventions, onDateClick, onInterventionClick, onAddClick }: CalendarProps) {
+export default function Calendar({ interventions, onDateClick, onInterventionClick, onAddClick, onInterventionDrop }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -123,14 +125,29 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
               const isSelected = selectedDate && isSameDay(day, selectedDate);
 
               return (
-                <button
+                <div
                   key={dateKey}
                   onClick={() => handleDateClick(day)}
+                  onDragOver={(e) => {
+                    if (!onInterventionDrop) return;
+                    e.preventDefault();
+                    setDragOverDate(dateKey);
+                  }}
+                  onDragLeave={() => setDragOverDate(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverDate(null);
+                    const interventionId = e.dataTransfer.getData("interventionId");
+                    if (interventionId && onInterventionDrop) {
+                      onInterventionDrop(parseInt(interventionId), day);
+                    }
+                  }}
                   className={`
-                    relative min-h-[80px] p-1 text-left border rounded-lg transition-colors
+                    relative min-h-[80px] p-1 text-left border rounded-lg transition-colors cursor-pointer
                     ${isCurrentMonth ? "bg-background" : "bg-muted/30"}
                     ${isToday ? "border-primary" : "border-border"}
                     ${isSelected ? "ring-2 ring-primary" : ""}
+                    ${dragOverDate === dateKey ? "ring-2 ring-primary/50 bg-primary/5" : ""}
                     hover:bg-accent
                   `}
                 >
@@ -147,9 +164,15 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
                     {dayInterventions.slice(0, 2).map((intervention) => (
                       <div
                         key={intervention.id}
+                        draggable={!!onInterventionDrop}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("interventionId", String(intervention.id));
+                          e.stopPropagation();
+                        }}
                         className={`
                           text-xs px-1 py-0.5 rounded truncate text-white
                           ${statusColors[intervention.statut] || "bg-gray-500"}
+                          ${onInterventionDrop ? "cursor-grab active:cursor-grabbing" : ""}
                         `}
                         title={intervention.titre}
                       >
@@ -162,7 +185,7 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
                       </div>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
