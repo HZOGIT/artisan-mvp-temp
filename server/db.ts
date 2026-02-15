@@ -244,8 +244,7 @@ export async function searchArticles(query: string, metier?: string): Promise<Bi
   const searchTerm = `%${query}%`;
   const conditions = [
     or(
-      like(bibliothequeArticles.designation, searchTerm),
-      like(bibliothequeArticles.reference, searchTerm),
+      like(bibliothequeArticles.nom, searchTerm),
       like(bibliothequeArticles.description, searchTerm)
     )
   ];

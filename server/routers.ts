@@ -259,53 +259,50 @@ const articlesRouter = router({
   // CRUD Bibliothèque d'articles
   createBibliothequeArticle: protectedProcedure
     .input(z.object({
-      reference: z.string().min(1),
-      designation: z.string().min(1),
+      nom: z.string().min(1),
       description: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      categorie: z.string().optional(),
-      sousCategorie: z.string().optional(),
-      metier: z.enum(["plomberie", "electricite", "chauffage", "general"]).optional(),
+      unite: z.string(),
+      prix_base: z.string(),
+      categorie: z.string(),
+      sous_categorie: z.string(),
+      metier: z.string(),
     }))
     .mutation(async ({ input }) => {
       return await db.createBibliothequeArticle(input);
     }),
-  
+
   updateBibliothequeArticle: protectedProcedure
     .input(z.object({
       id: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().optional(),
+      nom: z.string().optional(),
       description: z.string().optional(),
       unite: z.string().optional(),
-      prixUnitaireHT: z.string().optional(),
+      prix_base: z.string().optional(),
       categorie: z.string().optional(),
-      sousCategorie: z.string().optional(),
-      metier: z.enum(["plomberie", "electricite", "chauffage", "general"]).optional(),
+      sous_categorie: z.string().optional(),
+      metier: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
       return await db.updateBibliothequeArticle(id, data);
     }),
-  
+
   deleteBibliothequeArticle: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       await db.deleteBibliothequeArticle(input.id);
       return { success: true };
     }),
-  
+
   importBibliothequeArticles: protectedProcedure
     .input(z.array(z.object({
-      reference: z.string(),
-      designation: z.string(),
+      nom: z.string(),
       description: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      categorie: z.string().optional(),
-      sousCategorie: z.string().optional(),
-      metier: z.enum(["plomberie", "electricite", "chauffage", "general"]).optional(),
+      unite: z.string(),
+      prix_base: z.string(),
+      categorie: z.string(),
+      sous_categorie: z.string(),
+      metier: z.string(),
     })))
     .mutation(async ({ input }) => {
       let imported = 0;
