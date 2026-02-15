@@ -933,13 +933,57 @@ export async function createLigneCommandeFournisseur(data: InsertLigneCommandeFo
   return result[0];
 }
 
-export async function getRapportCommandeFournisseur(artisanId: number): Promise<any> {
-  const commandes = await getCommandesFournisseursByArtisanId(artisanId);
-  return {
-    totalCommandes: commandes.length,
-    commandesEnCours: commandes.filter(c => c.statut === 'en_cours').length,
-    commandesLivrees: commandes.filter(c => c.statut === 'livree').length,
-  };
+export async function getRapportCommandeFournisseur(artisanId: number): Promise<any[]> {
+  const lowStockItems = await getLowStockItems(artisanId);
+  if (lowStockItems.length === 0) return [];
+
+  const fournisseursList = await getFournisseursByArtisanId(artisanId);
+  const fournisseursMap = new Map(fournisseursList.map(f => [f.id, f]));
+
+  // For each low-stock item, find linked fournisseur via articlesFournisseurs
+  const grouped = new Map<number | 0, { fournisseur: any; lignes: any[] }>();
+
+  for (const stock of lowStockItems) {
+    const artFournisseurs = stock.articleId ? await getArticleFournisseurs(stock.articleId) : [];
+    const af = artFournisseurs[0] || null;
+    const fournisseurId = af ? af.fournisseurId : 0;
+    const fournisseur = fournisseurId ? fournisseursMap.get(fournisseurId) || null : null;
+
+    if (!grouped.has(fournisseurId)) {
+      grouped.set(fournisseurId, { fournisseur, lignes: [] });
+    }
+
+    const qteEnStock = parseFloat(stock.quantiteEnStock || "0");
+    const seuil = parseFloat(stock.seuilAlerte || "5");
+    const quantiteACommander = Math.max(seuil * 2 - qteEnStock, 1);
+    const prixUnitaire = parseFloat(af?.prixAchat || stock.prixAchat || "0");
+
+    grouped.get(fournisseurId)!.lignes.push({
+      stock: {
+        id: stock.id,
+        reference: stock.reference,
+        designation: stock.designation,
+        quantiteEnStock: stock.quantiteEnStock,
+        seuilAlerte: stock.seuilAlerte,
+        unite: stock.unite,
+        prixAchat: stock.prixAchat,
+      },
+      articleFournisseur: af ? {
+        referenceExterne: af.referenceExterne,
+        prixAchat: af.prixAchat,
+        delaiLivraison: af.delaiLivraison,
+      } : null,
+      quantiteACommander,
+      prixUnitaire,
+      montantTotal: quantiteACommander * prixUnitaire,
+    });
+  }
+
+  return Array.from(grouped.values()).map(g => ({
+    fournisseur: g.fournisseur,
+    lignes: g.lignes,
+    totalCommande: g.lignes.reduce((sum, l) => sum + l.montantTotal, 0),
+  }));
 }
 
 // ============================================================================
