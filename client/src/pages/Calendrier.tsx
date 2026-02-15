@@ -68,10 +68,13 @@ export default function Calendrier() {
   const handleAddClick = (date: Date) => {
     setSelectedDate(date);
     const dateStr = format(date, "yyyy-MM-dd");
+    const heureStr = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
     setFormData({
       ...formData,
       dateDebut: dateStr,
       dateFin: dateStr,
+      heureDebut: heureStr || "09:00",
+      heureFin: `${String(Math.min(date.getHours() + 1, 20)).padStart(2, "0")}:00`,
     });
     setIsAddDialogOpen(true);
   };
@@ -104,14 +107,6 @@ export default function Calendrier() {
   };
 
   const handleInterventionDrop = (interventionId: number, newDate: Date) => {
-    const intervention = interventions?.find((i: any) => i.id === interventionId);
-    if (!intervention) return;
-
-    const oldDate = new Date(intervention.dateDebut);
-    const hours = oldDate.getHours();
-    const minutes = oldDate.getMinutes();
-    newDate.setHours(hours, minutes, 0, 0);
-
     updateMutation.mutate({
       id: interventionId,
       dateDebut: newDate.toISOString(),

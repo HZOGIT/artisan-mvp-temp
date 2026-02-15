@@ -60,8 +60,6 @@ const menuGroups: MenuGroup[] = [
       { icon: FileText, label: "Devis", path: "/devis" },
       { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
       { icon: RefreshCw, label: "Relances", path: "/relances" },
-      { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
-      { icon: Mail, label: "Modèles Transac.", path: "/modeles-email-transactionnels" },
       { icon: Receipt, label: "Factures", path: "/factures" },
     ],
   },
@@ -105,6 +103,8 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: User, label: "Mon profil", path: "/profil" },
       { icon: Settings, label: "Paramètres", path: "/parametres" },
+      { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
+      { icon: Mail, label: "Modèles Transac.", path: "/modeles-email-transactionnels" },
     ],
   },
 ];
