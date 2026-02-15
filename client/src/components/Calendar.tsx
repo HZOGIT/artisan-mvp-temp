@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Columns3 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -12,6 +13,7 @@ interface Intervention {
   dateDebut: Date | string;
   dateFin?: Date | string | null;
   statut: string;
+  adresse?: string | null;
   client?: {
     nom: string;
     prenom?: string | null;
@@ -51,15 +53,17 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const weekGridRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to 8h on mount for week view
+  // Scroll to current hour (or 8h) when week view activates or currentDate changes
   useEffect(() => {
     if (viewMode === "week" && weekGridRef.current) {
-      const row8h = weekGridRef.current.querySelector("[data-hour='8']");
-      if (row8h) {
-        row8h.scrollIntoView({ block: "start" });
+      const now = new Date();
+      const targetHour = now.getHours() >= 7 && now.getHours() <= 20 ? now.getHours() : 8;
+      const row = weekGridRef.current.querySelector(`[data-hour='${targetHour}']`);
+      if (row) {
+        row.scrollIntoView({ block: "start" });
       }
     }
-  }, [viewMode]);
+  }, [viewMode, currentDate]);
 
   // Month view data
   const monthStart = startOfMonth(currentDate);
@@ -93,7 +97,11 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
     if (viewMode === "month") setCurrentDate(addMonths(currentDate, 1));
     else setCurrentDate(addWeeks(currentDate, 1));
   };
-  const handleToday = () => setCurrentDate(new Date());
+  const handleToday = () => {
+    const today = new Date();
+    setCurrentDate(today);
+    setSelectedDate(today);
+  };
 
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
@@ -475,7 +483,7 @@ function WeekView({
                   }
                 }}
                 className={`
-                  border-r last:border-r-0 p-0.5 transition-colors cursor-pointer relative
+                  border-r last:border-r-0 p-0.5 transition-colors cursor-pointer relative overflow-hidden min-w-0
                   ${dragOverSlot === slotKey ? "bg-primary/10 ring-1 ring-inset ring-primary/30" : "hover:bg-muted/30"}
                   ${isNow ? "bg-primary/5" : ""}
                 `}
@@ -485,32 +493,50 @@ function WeekView({
                   <div className="absolute left-0 right-0 border-t-2 border-primary/60" style={{ top: `${(new Date().getMinutes() / 60) * 100}%` }} />
                 )}
 
-                {slotInterventions.map((intervention) => (
-                  <div
-                    key={intervention.id}
-                    draggable={!!onInterventionDrop}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("interventionId", String(intervention.id));
-                      e.stopPropagation();
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onInterventionClick?.(intervention);
-                    }}
-                    className={`
-                      text-xs px-1.5 py-1 rounded mb-0.5 text-white truncate
-                      ${statusColors[intervention.statut] || "bg-gray-500"}
-                      ${onInterventionDrop ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
-                    `}
-                    title={`${intervention.titre} - ${format(new Date(intervention.dateDebut), "HH:mm")}`}
-                  >
-                    <span className="font-medium">{format(new Date(intervention.dateDebut), "HH:mm")}</span>{" "}
-                    {intervention.titre}
-                    {intervention.client && (
-                      <span className="opacity-80"> - {intervention.client.prenom} {intervention.client.nom}</span>
-                    )}
-                  </div>
-                ))}
+                {slotInterventions.map((intervention) => {
+                  const startDate = new Date(intervention.dateDebut);
+                  const clientName = intervention.client
+                    ? `${intervention.client.prenom || ""} ${intervention.client.nom}`.trim()
+                    : null;
+
+                  return (
+                    <Tooltip key={intervention.id}>
+                      <TooltipTrigger asChild>
+                        <div
+                          draggable={!!onInterventionDrop}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("interventionId", String(intervention.id));
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onInterventionClick?.(intervention);
+                          }}
+                          className={`
+                            text-xs px-1.5 py-1 rounded mb-0.5 text-white block w-full truncate
+                            ${statusColors[intervention.statut] || "bg-gray-500"}
+                            ${onInterventionDrop ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
+                          `}
+                        >
+                          <span className="font-medium">{format(startDate, "HH:mm")}</span>{" "}
+                          {intervention.titre}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <div className="space-y-1">
+                          <p className="font-semibold">{intervention.titre}</p>
+                          <p className="text-xs">
+                            {format(startDate, "EEEE d MMMM yyyy", { locale: fr })} à {format(startDate, "HH:mm")}
+                            {intervention.dateFin && <> — {format(new Date(intervention.dateFin), "HH:mm")}</>}
+                          </p>
+                          {clientName && <p className="text-xs">Client : {clientName}</p>}
+                          {intervention.adresse && <p className="text-xs">Adresse : {intervention.adresse}</p>}
+                          <p className="text-xs">Statut : {statusLabels[intervention.statut] || intervention.statut}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
               </div>
             );
           })}

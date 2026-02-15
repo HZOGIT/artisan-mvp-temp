@@ -139,6 +139,7 @@ export default function Calendrier() {
     dateDebut: i.dateDebut,
     dateFin: i.dateFin,
     statut: i.statut,
+    adresse: i.adresse,
     client: i.client,
   }));
 
