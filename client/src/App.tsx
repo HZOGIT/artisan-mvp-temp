@@ -165,6 +165,11 @@ function Router() {
       <Route path="/devis-ia" component={() => <AuthenticatedRoutes />} />
       <Route path="/calendrier-chantiers" component={() => <AuthenticatedRoutes />} />
       <Route path="/tableau-bord-sync-comptable" component={() => <AuthenticatedRoutes />} />
+      <Route path="/relances" component={() => <AuthenticatedRoutes />} />
+      <Route path="/modeles-email" component={() => <AuthenticatedRoutes />} />
+      <Route path="/modeles-email-transactionnels" component={() => <AuthenticatedRoutes />} />
+      <Route path="/rapport-commande" component={() => <AuthenticatedRoutes />} />
+      <Route path="/performances-fournisseurs" component={() => <AuthenticatedRoutes />} />
       <Route component={NotFound} />
     </Switch>
   );
