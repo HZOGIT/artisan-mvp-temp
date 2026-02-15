@@ -96,9 +96,13 @@ export default function Factures() {
 
   const filteredFactures = facturesList?.filter((facture: any) => {
     const searchLower = searchQuery.toLowerCase();
+    if (!searchLower) return true;
+    const client = clientsMap.get(facture.clientId);
+    const clientName = client ? `${client.nom} ${client.prenom}`.toLowerCase() : "";
     return (
       facture.numero?.toLowerCase().includes(searchLower) ||
-      facture.objet?.toLowerCase().includes(searchLower)
+      facture.objet?.toLowerCase().includes(searchLower) ||
+      clientName.includes(searchLower)
     );
   });
 

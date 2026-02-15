@@ -34,9 +34,13 @@ export const EmailSchema = z
  */
 export const PhoneSchema = z
   .string()
-  .regex(
-    /^(\+33|0)[1-9](?:[0-9]{8}|[0-9]{3}[0-9]{5})$/,
-    "Numéro de téléphone invalide"
+  .refine(
+    (val) => {
+      if (!val) return true;
+      const digits = val.replace(/[\s.\-+]/g, "");
+      return /^\d{10,15}$/.test(digits);
+    },
+    { message: "Numéro de téléphone invalide" }
   )
   .optional()
   .or(z.literal(""));
