@@ -170,7 +170,7 @@ export default function Rapports() {
               <DialogTitle>Créer un nouveau rapport</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Nom du rapport</Label>
                   <Input
@@ -211,7 +211,7 @@ export default function Rapports() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Format d'affichage</Label>
                   <Select
@@ -259,7 +259,7 @@ export default function Rapports() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Date de début (optionnel)</Label>
                   <Input

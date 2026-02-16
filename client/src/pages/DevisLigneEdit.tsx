@@ -321,7 +321,7 @@ export default function DevisLigneEdit() {
             <CardTitle>Détails de la ligne</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="reference">Référence</Label>
                 <Input
@@ -354,7 +354,7 @@ export default function DevisLigneEdit() {
               />
             </div>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantite">Quantité</Label>
                 <Input
@@ -425,7 +425,7 @@ export default function DevisLigneEdit() {
             <CardTitle>Récapitulatif</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
               <div className="p-4 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Total HT</p>
                 <p className="text-xl font-bold">{formatCurrency(totalHT)}</p>

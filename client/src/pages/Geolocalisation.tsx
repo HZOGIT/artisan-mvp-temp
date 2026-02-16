@@ -318,7 +318,7 @@ export default function Geolocalisation() {
               <CardTitle className="text-lg">Statistiques</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-muted/50 rounded-lg">
                   <p className="text-2xl font-bold text-green-600">
                     {positions?.filter(p => p.enDeplacement).length || 0}

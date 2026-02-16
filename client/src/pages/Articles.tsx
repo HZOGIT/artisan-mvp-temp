@@ -445,7 +445,7 @@ export default function Articles() {
                 rows={3}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Prix HT *</Label>
                 <Input
@@ -478,7 +478,7 @@ export default function Articles() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label>Métier</Label>
                 <Select value={form.metier} onValueChange={(v) => setForm({ ...form, metier: v })}>

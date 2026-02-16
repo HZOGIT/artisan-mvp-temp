@@ -535,7 +535,7 @@ export default function FactureDetail() {
                         onChange={(e) => setLineFormData({ ...lineFormData, reference: e.target.value })}
                       />
                     </div>
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="quantite">Quantité</Label>
                         <Input

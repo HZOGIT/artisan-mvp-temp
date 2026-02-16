@@ -217,7 +217,7 @@ export default function Interventions() {
                     placeholder="Adresse de l'intervention"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dateDebut">Date de début</Label>
                     <Input
@@ -285,7 +285,7 @@ export default function Interventions() {
                   onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-dateDebut">Date de début</Label>
                   <Input

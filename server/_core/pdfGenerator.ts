@@ -1,6 +1,16 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client } from "../db";
+import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
+
+// Register Roboto font for proper French accent support
+function registerFonts(doc: jsPDF) {
+  doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_REGULAR);
+  doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+  doc.addFileToVFS("Roboto-Bold.ttf", ROBOTO_BOLD);
+  doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+  doc.setFont("Roboto", "normal");
+}
 
 export interface PDFDevisData {
   devis: Devis & { lignes: DevisLigne[] };
@@ -21,11 +31,11 @@ export interface PDFFactureData {
 function renderArtisanInfo(doc: jsPDF, artisan: Artisan, darkGray: [number, number, number]): number {
   doc.setTextColor(...darkGray);
   doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.text(artisan.nomEntreprise || "Artisan", 20, 55);
 
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
 
   let y = 62;
   if (artisan.adresse) {
@@ -67,6 +77,7 @@ function renderArtisanInfo(doc: jsPDF, artisan: Artisan, darkGray: [number, numb
 export function generateDevisPDF(data: PDFDevisData): Buffer {
   const { devis, artisan, client } = data;
   const doc = new jsPDF();
+  registerFonts(doc);
 
   // Couleurs
   const primaryColor: [number, number, number] = [41, 128, 185]; // Bleu
@@ -80,11 +91,13 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   // Titre
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
+  doc.setFont("Roboto", "bold");
   doc.text("DEVIS", 20, 25);
 
   // Numéro et date
   doc.setTextColor(200, 200, 200);
   doc.setFontSize(10);
+  doc.setFont("Roboto", "normal");
   doc.text(`N° ${devis.numero}`, 150, 15);
   doc.text(
     `Date: ${new Date(devis.dateDevis).toLocaleDateString("fr-FR")}`,
@@ -101,11 +114,11 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   renderArtisanInfo(doc, artisan, darkGray);
 
   // Informations client
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setFontSize(11);
   doc.text("CLIENT", 120, 55);
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(10);
   doc.text(`${client.prenom || ""} ${client.nom}`, 120, 62);
   if (client.adresse) {
@@ -142,9 +155,11 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
       textColor: [255, 255, 255],
       fontStyle: "bold",
       halign: "center",
+      font: "Roboto",
     },
     bodyStyles: {
       textColor: darkGray,
+      font: "Roboto",
     },
     alternateRowStyles: {
       fillColor: lightGray,
@@ -170,7 +185,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   // Totaux
   let yPosition = (doc as any).lastAutoTable.finalY + 10;
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(10);
   doc.text(`Sous-total: ${sousTotal.toFixed(2)} €`, 140, yPosition);
   yPosition += 7;
@@ -182,13 +197,13 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   yPosition += 7;
 
   // Total en gras
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...primaryColor);
   doc.text(`TOTAL TTC: ${total.toFixed(2)} €`, 140, yPosition);
 
   // Pied de page
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
   doc.text(
@@ -204,6 +219,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
 export function generateFacturePDF(data: PDFFactureData): Buffer {
   const { facture, artisan, client } = data;
   const doc = new jsPDF();
+  registerFonts(doc);
 
   // Couleurs
   const primaryColor: [number, number, number] = [41, 128, 185]; // Bleu
@@ -218,11 +234,13 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   // Titre
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
+  doc.setFont("Roboto", "bold");
   doc.text("FACTURE", 20, 25);
 
   // Numéro et date
   doc.setTextColor(200, 200, 200);
   doc.setFontSize(10);
+  doc.setFont("Roboto", "normal");
   doc.text(`N° ${facture.numero}`, 150, 15);
   doc.text(
     `Date: ${new Date(facture.dateFacture).toLocaleDateString("fr-FR")}`,
@@ -239,11 +257,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   renderArtisanInfo(doc, artisan, darkGray);
 
   // Informations client
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setFontSize(11);
   doc.text("CLIENT", 120, 55);
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(10);
   doc.text(`${client.prenom || ""} ${client.nom}`, 120, 62);
   if (client.adresse) {
@@ -276,9 +294,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
       textColor: [255, 255, 255],
       fontStyle: "bold",
       halign: "center",
+      font: "Roboto",
     },
     bodyStyles: {
       textColor: darkGray,
+      font: "Roboto",
     },
     alternateRowStyles: {
       fillColor: lightGray,
@@ -303,7 +323,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   // Totaux
   let yPosition = (doc as any).lastAutoTable.finalY + 10;
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(10);
   doc.text(`Sous-total: ${sousTotal.toFixed(2)} €`, 140, yPosition);
   yPosition += 7;
@@ -315,18 +335,18 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   yPosition += 7;
 
   // Total en gras
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setFontSize(12);
   doc.setTextColor(...primaryColor);
   doc.text(`TOTAL TTC: ${total.toFixed(2)} €`, 140, yPosition);
 
   // Statut de paiement
   yPosition += 15;
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setFontSize(10);
   if (facture.statut === "payee") {
     doc.setTextColor(...successColor);
-    doc.text("FACTURE PAYEE", 20, yPosition);
+    doc.text("FACTURE PAYÉE", 20, yPosition);
   } else {
     doc.setTextColor(239, 68, 68); // Rouge
     doc.text("EN ATTENTE DE PAIEMENT", 20, yPosition);
@@ -334,29 +354,29 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
 
   // Pied de page — mentions légales obligatoires facture
   const footerY = 260;
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(8);
   doc.setTextColor(100, 100, 100);
 
   const a = artisan as any;
   if (a.iban) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Reglement par virement bancaire :", 20, footerY);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "bold");
+    doc.text("Règlement par virement bancaire :", 20, footerY);
+    doc.setFont("Roboto", "normal");
     doc.text(`IBAN: ${a.iban}`, 20, footerY + 4);
   }
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text("Paiement a 30 jours.", 20, footerY + 12);
+  doc.text("Paiement à 30 jours.", 20, footerY + 12);
   doc.text(
-    "En cas de retard de paiement, une penalite de 3 fois le taux d'interet legal sera appliquee,",
+    "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée,",
     20,
     footerY + 16
   );
   doc.text(
-    "ainsi qu'une indemnite forfaitaire de 40 EUR pour frais de recouvrement (Art. L441-10 C.com).",
+    "ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C.com).",
     20,
     footerY + 20
   );

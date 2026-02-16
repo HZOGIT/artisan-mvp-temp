@@ -1252,7 +1252,7 @@ export default function CalendrierChantiers() {
                               </div>
                               {getStatutBadge(intervention.statut)}
                             </div>
-                            <div className="grid grid-cols-2 gap-4 mt-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                               {intervention.technicienNom && (
                                 <div className="flex items-center gap-2 text-sm">
                                   <Users className="h-4 w-4 text-muted-foreground" />
@@ -1354,7 +1354,7 @@ export default function CalendrierChantiers() {
                 </div>
               )}
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Date de début</Label>
                   <p>{new Date(selectedIntervention.dateDebut).toLocaleDateString("fr-FR")}</p>

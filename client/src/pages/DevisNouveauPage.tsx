@@ -299,7 +299,7 @@ export default function DevisNouveauPage() {
         </div>
 
         {/* Dates */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="dateDevis" className="block text-sm font-medium mb-2">
               Date du devis

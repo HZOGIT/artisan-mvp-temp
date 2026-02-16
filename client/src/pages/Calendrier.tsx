@@ -201,7 +201,7 @@ export default function Calendrier() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dateDebut">Date début *</Label>
                     <Input
@@ -223,7 +223,7 @@ export default function Calendrier() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dateFin">Date fin</Label>
                     <Input

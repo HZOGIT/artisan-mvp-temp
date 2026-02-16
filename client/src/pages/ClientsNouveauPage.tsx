@@ -88,7 +88,7 @@ export function ClientsNouveauPage() {
       <div className="max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg border">
           {/* Nom et Prénom */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="nom" className="block text-sm font-medium mb-2">
                 Nom *
@@ -122,7 +122,7 @@ export function ClientsNouveauPage() {
           </div>
 
           {/* Email et Téléphone */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="email" className="block text-sm font-medium mb-2">
                 Email
@@ -171,7 +171,7 @@ export function ClientsNouveauPage() {
           </div>
 
           {/* Code Postal et Ville */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="codePostal" className="block text-sm font-medium mb-2">
                 Code Postal

@@ -171,7 +171,7 @@ export default function Techniciens() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="nom">Nom *</Label>
                   <Input
@@ -190,7 +190,7 @@ export default function Techniciens() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -218,7 +218,7 @@ export default function Techniciens() {
                   placeholder="Ex: Plomberie, Électricité..."
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Couleur</Label>
                   <Select
@@ -387,7 +387,7 @@ export default function Techniciens() {
           <CardContent>
             {selectedTechnicien && stats ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-muted rounded-lg">
                     <p className="text-2xl font-bold">{stats.total}</p>
                     <p className="text-sm text-muted-foreground">Total</p>

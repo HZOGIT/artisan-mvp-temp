@@ -291,7 +291,7 @@ export default function DevisOptions() {
                               onChange={(e) => setNewLigne({ ...newLigne, designation: e.target.value })}
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Quantité</Label>
                               <Input
@@ -308,7 +308,7 @@ export default function DevisOptions() {
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Prix unitaire HT</Label>
                               <Input

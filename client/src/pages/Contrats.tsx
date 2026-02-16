@@ -191,7 +191,7 @@ export default function Contrats() {
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="client">Client *</Label>
                     <Select
@@ -247,7 +247,7 @@ export default function Contrats() {
                     placeholder="Description des prestations incluses"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="montantHT">Montant HT *</Label>
                     <Input
@@ -270,7 +270,7 @@ export default function Contrats() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="dateDebut">Date de début *</Label>
                     <Input

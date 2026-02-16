@@ -127,7 +127,7 @@ export default function AlertesPrevisions() {
               </div>
 
               {/* Seuils */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-green-500" />

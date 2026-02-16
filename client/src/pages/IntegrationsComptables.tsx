@@ -470,7 +470,7 @@ export default function IntegrationsComptables() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Logiciel comptable</Label>
                   <Select
@@ -513,7 +513,7 @@ export default function IntegrationsComptables() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Date de début</Label>
                   <Input
@@ -603,7 +603,7 @@ export default function IntegrationsComptables() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Logiciel comptable</Label>
                   <Select
@@ -648,7 +648,7 @@ export default function IntegrationsComptables() {
 
               <div>
                 <h4 className="font-semibold mb-4">Comptes comptables - Ventes</h4>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Ventes</Label>
                     <Input
@@ -681,7 +681,7 @@ export default function IntegrationsComptables() {
 
               <div>
                 <h4 className="font-semibold mb-4">Comptes comptables - Achats</h4>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Achats</Label>
                     <Input
@@ -714,7 +714,7 @@ export default function IntegrationsComptables() {
 
               <div>
                 <h4 className="font-semibold mb-4">Comptes de trésorerie</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Banque</Label>
                     <Input
@@ -738,7 +738,7 @@ export default function IntegrationsComptables() {
 
               <div>
                 <h4 className="font-semibold mb-4">Journaux</h4>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Journal ventes</Label>
                     <Input

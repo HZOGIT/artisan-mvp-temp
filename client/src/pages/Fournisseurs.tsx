@@ -252,7 +252,7 @@ export default function Fournisseurs() {
                     placeholder="Ex: Rexel, Point P..."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Contact</Label>
                     <Input
@@ -287,7 +287,7 @@ export default function Fournisseurs() {
                     placeholder="123 rue du Commerce"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Code postal</Label>
                     <Input
@@ -475,7 +475,7 @@ export default function Fournisseurs() {
                   onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Contact</Label>
                   <Input
@@ -506,7 +506,7 @@ export default function Fournisseurs() {
                   onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Code postal</Label>
                   <Input
@@ -654,7 +654,7 @@ export default function Fournisseurs() {
                       placeholder="REF-FOURNISSEUR-001"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Prix d'achat (€)</Label>
                       <Input

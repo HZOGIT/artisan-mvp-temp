@@ -318,7 +318,7 @@ export function Clients() {
                 </div>
 
                 {/* Code Postal et Ville */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="edit-codePostal" className="block text-sm font-medium mb-1">
                       Code Postal

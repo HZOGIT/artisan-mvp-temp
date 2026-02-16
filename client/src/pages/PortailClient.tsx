@@ -286,7 +286,7 @@ export default function PortailClient() {
                       )}
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500">Périodicité:</span>{" "}
                           <span className="capitalize">{contrat.periodicite}</span>

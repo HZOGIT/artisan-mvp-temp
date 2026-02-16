@@ -1,5 +1,15 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
+
+// Register Roboto font for proper French accent support
+function registerFonts(doc: jsPDF) {
+  doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_REGULAR);
+  doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+  doc.addFileToVFS("Roboto-Bold.ttf", ROBOTO_BOLD);
+  doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+  doc.setFont("Roboto", "normal");
+}
 
 interface Artisan {
   nomEntreprise?: string | null;
@@ -107,28 +117,25 @@ function addHeader(
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPos = 20;
 
-  // Titre du document
   doc.setFontSize(24);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setTextColor(41, 128, 185);
   doc.text(type, pageWidth / 2, yPos, { align: "center" });
 
-  // Numéro du document
   yPos += 10;
   doc.setFontSize(12);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setTextColor(100, 100, 100);
   doc.text(`N° ${numero}`, pageWidth / 2, yPos, { align: "center" });
 
-  // Informations de l'artisan (gauche)
   yPos += 15;
   doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setTextColor(0, 0, 0);
   doc.text(artisan.nomEntreprise || "Mon Entreprise", 20, yPos);
 
   yPos += 6;
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
@@ -160,18 +167,17 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPos = yStart;
 
-  // Encadré client
   doc.setDrawColor(200, 200, 200);
   doc.setFillColor(248, 249, 250);
   doc.roundedRect(pageWidth - 90, yPos - 5, 70, 45, 3, 3, "FD");
 
   doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setTextColor(0, 0, 0);
   doc.text("Client", pageWidth - 85, yPos + 3);
 
   yPos += 10;
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
@@ -206,36 +212,36 @@ function addDocumentInfo(
   doc.setFontSize(10);
   doc.setTextColor(60, 60, 60);
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.text("Date d'émission:", 20, yPos);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.text(formatDate(data.dateCreation), 65, yPos);
 
   yPos += 6;
   if (type === "devis" && data.dateValidite) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Roboto", "bold");
     doc.text("Valide jusqu'au:", 20, yPos);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     doc.text(formatDate(data.dateValidite), 65, yPos);
     yPos += 6;
   } else if (type === "facture" && data.dateEcheance) {
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Roboto", "bold");
     doc.text("Échéance:", 20, yPos);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     doc.text(formatDate(data.dateEcheance), 65, yPos);
     yPos += 6;
   }
 
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.text("Statut:", 20, yPos);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.text(getStatutLabel(data.statut, type), 65, yPos);
 
   if (data.objet) {
     yPos += 10;
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Roboto", "bold");
     doc.text("Objet:", 20, yPos);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     const objetLines = doc.splitTextToSize(data.objet, 150);
     doc.text(objetLines, 45, yPos);
     yPos += objetLines.length * 5;
@@ -264,10 +270,12 @@ function addLignesTable(doc: jsPDF, lignes: LigneDocument[], yStart: number): nu
       textColor: [255, 255, 255],
       fontStyle: "bold",
       fontSize: 9,
+      font: "Roboto",
     },
     bodyStyles: {
       fontSize: 8,
       textColor: [60, 60, 60],
+      font: "Roboto",
     },
     columnStyles: {
       0: { cellWidth: 70 },
@@ -294,7 +302,6 @@ function addTotals(
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPos = yStart;
 
-  // Encadré des totaux
   doc.setDrawColor(200, 200, 200);
   doc.setFillColor(248, 249, 250);
   const boxHeight = montantPaye !== undefined && montantPaye !== null ? 50 : 35;
@@ -304,7 +311,7 @@ function addTotals(
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.text("Total HT:", pageWidth - 85, yPos);
   doc.text(formatCurrency(totalHT), pageWidth - 25, yPos, { align: "right" });
 
@@ -313,7 +320,7 @@ function addTotals(
   doc.text(formatCurrency(totalTVA), pageWidth - 25, yPos, { align: "right" });
 
   yPos += 7;
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.setFontSize(11);
   doc.setTextColor(41, 128, 185);
   doc.text("Total TTC:", pageWidth - 85, yPos);
@@ -323,12 +330,12 @@ function addTotals(
     yPos += 8;
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     doc.text("Déjà payé:", pageWidth - 85, yPos);
     doc.text(formatCurrency(montantPaye), pageWidth - 25, yPos, { align: "right" });
 
     yPos += 7;
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Roboto", "bold");
     if (totalTTC - montantPaye > 0) {
       doc.setTextColor(220, 53, 69);
     } else {
@@ -348,23 +355,22 @@ function addFooter(doc: jsPDF, conditions?: string | null): void {
   if (conditions) {
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.setFont("helvetica", "italic");
+    doc.setFont("Roboto", "normal");
     const conditionsLines = doc.splitTextToSize(conditions, pageWidth - 40);
     doc.text(conditionsLines, 20, pageHeight - 30);
   }
 
-  // Ligne de séparation
   doc.setDrawColor(200, 200, 200);
   doc.line(20, pageHeight - 15, pageWidth - 20, pageHeight - 15);
 
-  // Texte de pied de page
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text("Document généré par Artisan MVP", pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text("Document généré par MonArtisan Pro", pageWidth / 2, pageHeight - 10, { align: "center" });
 }
 
 export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisData): void {
   const doc = new jsPDF();
+  registerFonts(doc);
 
   let yPos = addHeader(doc, artisan, "DEVIS", devis.numero);
   yPos = addClientInfo(doc, client, yPos - 35);
@@ -378,6 +384,7 @@ export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisD
 
 export function generateFacturePDF(artisan: Artisan, client: Client, facture: FactureData): void {
   const doc = new jsPDF();
+  registerFonts(doc);
 
   let yPos = addHeader(doc, artisan, "FACTURE", facture.numero);
   yPos = addClientInfo(doc, client, yPos - 35);

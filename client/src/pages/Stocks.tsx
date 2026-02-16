@@ -279,7 +279,7 @@ export default function Stocks() {
                   <DialogDescription>Ajoutez un nouvel article à votre inventaire</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Référence *</Label>
                       <Input
@@ -313,7 +313,7 @@ export default function Stocks() {
                       placeholder="Nom de l'article"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Quantité initiale</Label>
                       <Input
@@ -331,7 +331,7 @@ export default function Stocks() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Prix d'achat</Label>
                       <Input
@@ -538,7 +538,7 @@ export default function Stocks() {
               <DialogDescription>Modifiez les informations de l'article</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Référence *</Label>
                   <Input
@@ -570,7 +570,7 @@ export default function Stocks() {
                   onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Seuil d'alerte</Label>
                   <Input
@@ -589,7 +589,7 @@ export default function Stocks() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Emplacement</Label>
                   <Input
