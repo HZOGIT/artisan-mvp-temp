@@ -29,8 +29,10 @@ import {
   modelesDevisLignes, ModeleDevisLigne, InsertModeleDevisLigne,
   avisClients, AvisClient, InsertAvisClient,
   demandesAvis, DemandeAvis, InsertDemandeAvis,
-  techniciens, Technicien,
-  positionsTechniciens, PositionTechnicien,
+  techniciens, Technicien, InsertTechnicien,
+  positionsTechniciens, PositionTechnicien, InsertPositionTechnicien,
+  disponibilitesTechniciens, DisponibiliteTechnicien,
+  historiqueDeplacements,
   chantiers, Chantier, InsertChantier,
   phasesChantier, PhaseChantier, InsertPhaseChantier,
   interventionsChantier, InterventionChantier, InsertInterventionChantier,
@@ -1523,6 +1525,220 @@ export async function updateDemandeAvis(id: number, data: Partial<InsertDemandeA
   await db.update(demandesAvis).set(data).where(eq(demandesAvis.id, id));
   const result = await db.select().from(demandesAvis).where(eq(demandesAvis.id, id)).limit(1);
   return result[0];
+}
+
+// ============================================================================
+// TECHNICIENS — CRUD
+// ============================================================================
+
+export async function getTechniciensByArtisanId(artisanId: number): Promise<Technicien[]> {
+  const db = await getDb();
+  return await db.select().from(techniciens)
+    .where(eq(techniciens.artisanId, artisanId))
+    .orderBy(asc(techniciens.nom));
+}
+
+export async function getTechnicienById(id: number): Promise<Technicien | undefined> {
+  const db = await getDb();
+  const [result] = await db.select().from(techniciens).where(eq(techniciens.id, id));
+  return result;
+}
+
+export async function createTechnicien(data: InsertTechnicien): Promise<Technicien> {
+  const db = await getDb();
+  const [result] = await db.insert(techniciens).values(data);
+  const [created] = await db.select().from(techniciens).where(eq(techniciens.id, result.insertId));
+  return created;
+}
+
+export async function updateTechnicien(id: number, data: Partial<InsertTechnicien>): Promise<Technicien> {
+  const db = await getDb();
+  await db.update(techniciens).set({ ...data, updatedAt: new Date() }).where(eq(techniciens.id, id));
+  const [updated] = await db.select().from(techniciens).where(eq(techniciens.id, id));
+  return updated;
+}
+
+export async function deleteTechnicien(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(techniciens).where(eq(techniciens.id, id));
+}
+
+export async function getTechniciensDisponibles(artisanId: number, date: Date): Promise<Technicien[]> {
+  const db = await getDb();
+  // Get active technicians
+  const actifs = await db.select().from(techniciens)
+    .where(and(eq(techniciens.artisanId, artisanId), eq(techniciens.statut, "actif")));
+
+  // Check availability schedule for this day of the week
+  const jourSemaine = date.getDay(); // 0=Sunday, 1=Monday, etc.
+  const disponibles: Technicien[] = [];
+
+  for (const tech of actifs) {
+    const dispos = await db.select().from(disponibilitesTechniciens)
+      .where(and(
+        eq(disponibilitesTechniciens.technicienId, tech.id),
+        eq(disponibilitesTechniciens.jourSemaine, jourSemaine)
+      ));
+    // If no schedule defined, consider available; if schedule exists, check if disponible=true
+    if (dispos.length === 0 || dispos.some(d => d.disponible)) {
+      disponibles.push(tech);
+    }
+  }
+
+  return disponibles;
+}
+
+// ============================================================================
+// TECHNICIENS — DISPONIBILITES
+// ============================================================================
+
+export async function getDisponibilitesByTechnicienId(technicienId: number): Promise<DisponibiliteTechnicien[]> {
+  const db = await getDb();
+  return await db.select().from(disponibilitesTechniciens)
+    .where(eq(disponibilitesTechniciens.technicienId, technicienId))
+    .orderBy(asc(disponibilitesTechniciens.jourSemaine));
+}
+
+export async function setDisponibilite(data: {
+  technicienId: number;
+  jourSemaine: number;
+  heureDebut: string;
+  heureFin: string;
+  disponible: boolean;
+}): Promise<DisponibiliteTechnicien> {
+  const db = await getDb();
+  // Upsert: check if entry exists for this technicien + jourSemaine
+  const [existing] = await db.select().from(disponibilitesTechniciens)
+    .where(and(
+      eq(disponibilitesTechniciens.technicienId, data.technicienId),
+      eq(disponibilitesTechniciens.jourSemaine, data.jourSemaine)
+    ));
+
+  if (existing) {
+    await db.update(disponibilitesTechniciens).set({
+      heureDebut: data.heureDebut,
+      heureFin: data.heureFin,
+      disponible: data.disponible,
+    }).where(eq(disponibilitesTechniciens.id, existing.id));
+    const [updated] = await db.select().from(disponibilitesTechniciens)
+      .where(eq(disponibilitesTechniciens.id, existing.id));
+    return updated;
+  } else {
+    const [result] = await db.insert(disponibilitesTechniciens).values(data);
+    const [created] = await db.select().from(disponibilitesTechniciens)
+      .where(eq(disponibilitesTechniciens.id, result.insertId));
+    return created;
+  }
+}
+
+// ============================================================================
+// TECHNICIENS — POSITIONS / GEOLOCALISATION
+// ============================================================================
+
+export async function updatePositionTechnicien(data: {
+  technicienId: number;
+  latitude: string;
+  longitude: string;
+  precision?: number;
+  vitesse?: string;
+  cap?: number;
+  batterie?: number;
+  enDeplacement?: boolean;
+  interventionEnCoursId?: number;
+}): Promise<PositionTechnicien> {
+  const db = await getDb();
+  const [result] = await db.insert(positionsTechniciens).values({
+    technicienId: data.technicienId,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    precision: data.precision,
+    vitesse: data.vitesse,
+    cap: data.cap,
+    batterie: data.batterie,
+    enDeplacement: data.enDeplacement,
+    interventionEnCoursId: data.interventionEnCoursId,
+  });
+  const [created] = await db.select().from(positionsTechniciens)
+    .where(eq(positionsTechniciens.id, result.insertId));
+  return created;
+}
+
+export async function getAllTechniciensPositions(artisanId: number): Promise<any[]> {
+  const db = await getDb();
+  const allTechs = await db.select().from(techniciens)
+    .where(eq(techniciens.artisanId, artisanId));
+
+  const results = [];
+  for (const tech of allTechs) {
+    const [lastPosition] = await db.select().from(positionsTechniciens)
+      .where(eq(positionsTechniciens.technicienId, tech.id))
+      .orderBy(desc(positionsTechniciens.timestamp))
+      .limit(1);
+    results.push({ ...tech, position: lastPosition || null });
+  }
+  return results;
+}
+
+export async function getLastPositionByTechnicienId(technicienId: number): Promise<PositionTechnicien | null> {
+  const db = await getDb();
+  const [result] = await db.select().from(positionsTechniciens)
+    .where(eq(positionsTechniciens.technicienId, technicienId))
+    .orderBy(desc(positionsTechniciens.timestamp))
+    .limit(1);
+  return result || null;
+}
+
+export async function getPositionsHistorique(
+  technicienId: number,
+  dateDebut: Date,
+  dateFin: Date
+): Promise<PositionTechnicien[]> {
+  const db = await getDb();
+  return await db.select().from(positionsTechniciens)
+    .where(and(
+      eq(positionsTechniciens.technicienId, technicienId),
+      gte(positionsTechniciens.timestamp, dateDebut),
+      lte(positionsTechniciens.timestamp, dateFin)
+    ))
+    .orderBy(asc(positionsTechniciens.timestamp));
+}
+
+export async function getStatistiquesDeplacements(
+  artisanId: number,
+  dateDebut: Date,
+  dateFin: Date
+): Promise<{ totalKm: number; totalMinutes: number; nombreDeplacements: number }> {
+  const db = await getDb();
+  const allTechs = await db.select({ id: techniciens.id }).from(techniciens)
+    .where(eq(techniciens.artisanId, artisanId));
+  const techIds = allTechs.map(t => t.id);
+  if (techIds.length === 0) return { totalKm: 0, totalMinutes: 0, nombreDeplacements: 0 };
+
+  const deplacements = await db.select().from(historiqueDeplacements)
+    .where(and(
+      inArray(historiqueDeplacements.technicienId, techIds),
+      gte(historiqueDeplacements.dateDebut, dateDebut),
+      lte(historiqueDeplacements.dateDebut, dateFin)
+    ));
+
+  const totalKm = deplacements.reduce((sum, d) => sum + Number(d.distanceKm || 0), 0);
+  const totalMinutes = deplacements.reduce((sum, d) => sum + (d.dureeMinutes || 0), 0);
+  return { totalKm: Math.round(totalKm * 100) / 100, totalMinutes, nombreDeplacements: deplacements.length };
+}
+
+export async function createHistoriqueDeplacement(data: any): Promise<any> {
+  const db = await getDb();
+  const [result] = await db.insert(historiqueDeplacements).values(data);
+  const [created] = await db.select().from(historiqueDeplacements)
+    .where(eq(historiqueDeplacements.id, result.insertId));
+  return created;
+}
+
+export async function getHistoriqueDeplacementsByTechnicienId(technicienId: number): Promise<any[]> {
+  const db = await getDb();
+  return await db.select().from(historiqueDeplacements)
+    .where(eq(historiqueDeplacements.technicienId, technicienId))
+    .orderBy(desc(historiqueDeplacements.dateDebut));
 }
 
 // ============================================================================
