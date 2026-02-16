@@ -2004,6 +2004,18 @@ const signatureRouter = router({
       smsVerified: z.boolean().optional()
     }))
     .mutation(async ({ input, ctx }) => {
+      // Validate token
+      const existing = await db.getSignatureByToken(input.token);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+      }
+      if (existing.statut !== 'en_attente') {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été traité" });
+      }
+      if (new Date() > existing.expiresAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce lien de signature a expiré" });
+      }
+
       const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
       const userAgent = ctx.req.headers['user-agent'] || 'unknown';
 
@@ -2047,6 +2059,15 @@ const signatureRouter = router({
       motifRefus: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      // Validate token exists first
+      const existing = await db.getSignatureByToken(input.token);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+      }
+      if (existing.statut !== 'en_attente') {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été traité" });
+      }
+
       const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
       const userAgent = ctx.req.headers['user-agent'] || 'unknown';
 
