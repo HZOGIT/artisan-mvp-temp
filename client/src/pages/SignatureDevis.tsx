@@ -229,10 +229,11 @@ export default function SignatureDevis() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              {actionComplete === "accepte"
-                ? <>Le devis <strong>{data?.devis.numero}</strong> a ete accepte et signe avec succes. L'artisan a ete notifie.</>
-                : <>Le devis <strong>{data?.devis.numero}</strong> a ete refuse. L'artisan a ete notifie.</>
-              }
+              {actionComplete === "accepte" ? (
+                <span>Le devis <strong>{data?.devis.numero}</strong> a ete accepte et signe avec succes. L&apos;artisan a ete notifie.</span>
+              ) : (
+                <span>Le devis <strong>{data?.devis.numero}</strong> a ete refuse. L&apos;artisan a ete notifie.</span>
+              )}
             </p>
             <p className="text-sm text-muted-foreground">Vous pouvez fermer cette page.</p>
           </CardContent>
@@ -256,9 +257,11 @@ export default function SignatureDevis() {
               <div>
                 <CardTitle className="text-2xl">Devis n&deg; {devis.numero}</CardTitle>
                 <CardDescription>
-                  {devis.objet && <>{devis.objet} &mdash; </>}
-                  {formatDate(devis.dateDevis)}
-                  {devis.dateValidite && <> &mdash; Valide jusqu'au {formatDate(devis.dateValidite)}</>}
+                  <span>
+                    {devis.objet ? `${devis.objet} — ` : ""}
+                    {formatDate(devis.dateDevis)}
+                    {devis.dateValidite ? ` — Valide jusqu'au ${formatDate(devis.dateValidite)}` : ""}
+                  </span>
                 </CardDescription>
               </div>
               <div className="flex gap-2">
@@ -300,7 +303,7 @@ export default function SignatureDevis() {
             <CardContent>
               <p className="font-semibold">{artisan?.nomEntreprise}</p>
               {artisan?.adresse && <p className="text-sm text-muted-foreground">{artisan.adresse}</p>}
-              {(artisan?.codePostal || artisan?.ville) && <p className="text-sm text-muted-foreground">{artisan.codePostal} {artisan.ville}</p>}
+              {(artisan?.codePostal || artisan?.ville) && <p className="text-sm text-muted-foreground">{[artisan.codePostal, artisan.ville].filter(Boolean).join(" ")}</p>}
               {artisan?.telephone && <p className="text-sm text-muted-foreground">Tel: {artisan.telephone}</p>}
               {artisan?.siret && <p className="text-sm text-muted-foreground">SIRET: {artisan.siret}</p>}
             </CardContent>
@@ -316,7 +319,7 @@ export default function SignatureDevis() {
             <CardContent>
               <p className="font-semibold">{client?.prenom} {client?.nom}</p>
               {client?.adresse && <p className="text-sm text-muted-foreground">{client.adresse}</p>}
-              {(client?.codePostal || client?.ville) && <p className="text-sm text-muted-foreground">{client.codePostal} {client.ville}</p>}
+              {(client?.codePostal || client?.ville) && <p className="text-sm text-muted-foreground">{[client.codePostal, client.ville].filter(Boolean).join(" ")}</p>}
               {client?.email && <p className="text-sm text-muted-foreground">{client.email}</p>}
             </CardContent>
           </Card>
@@ -345,7 +348,7 @@ export default function SignatureDevis() {
                         <p className="font-medium text-sm">{ligne.designation}</p>
                         {ligne.description && <p className="text-xs text-muted-foreground">{ligne.description}</p>}
                       </td>
-                      <td className="text-right p-3 text-sm">{ligne.quantite} {ligne.unite}</td>
+                      <td className="text-right p-3 text-sm">{`${ligne.quantite} ${ligne.unite || ""}`}</td>
                       <td className="text-right p-3 text-sm">{formatCurrency(ligne.prixUnitaireHT)}</td>
                       <td className="text-right p-3 text-sm">{formatCurrency(ligne.montantHT || 0)}</td>
                     </tr>
@@ -464,9 +467,9 @@ export default function SignatureDevis() {
                   disabled={isSigning || !hasSignature || !signataireName || !signataireEmail || !accepted}
                 >
                   {isSigning ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signature en cours...</>
+                    <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signature en cours...</span>
                   ) : (
-                    <><Check className="mr-2 h-4 w-4" /> Accepter et signer</>
+                    <span className="flex items-center"><Check className="mr-2 h-4 w-4" /> Accepter et signer</span>
                   )}
                 </Button>
                 <Button
@@ -520,9 +523,9 @@ export default function SignatureDevis() {
                   className="flex-1"
                 >
                   {isRefusing ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Envoi...</>
+                    <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Envoi...</span>
                   ) : (
-                    <><XCircle className="mr-2 h-4 w-4" /> Confirmer le refus</>
+                    <span className="flex items-center"><XCircle className="mr-2 h-4 w-4" /> Confirmer le refus</span>
                   )}
                 </Button>
               </div>
