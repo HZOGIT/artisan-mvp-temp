@@ -2272,6 +2272,23 @@ export async function savePrevisionCA(data: { artisanId: number; mois: number; a
   return result[0];
 }
 
+export async function seedHistoriqueCA(artisanId: number, data: { mois: number; annee: number; caTotal: string; nombreFactures?: number; nombreClients?: number; panierMoyen?: string }): Promise<HistoriqueCA> {
+  const db = await getDb();
+  await db.delete(historiqueCA).where(and(
+    eq(historiqueCA.artisanId, artisanId),
+    eq(historiqueCA.mois, data.mois),
+    eq(historiqueCA.annee, data.annee)
+  ));
+  await db.insert(historiqueCA).values({
+    artisanId, mois: data.mois, annee: data.annee, caTotal: data.caTotal,
+    nombreFactures: data.nombreFactures || 0, nombreClients: data.nombreClients || 0, panierMoyen: data.panierMoyen || "0",
+  });
+  const result = await db.select().from(historiqueCA)
+    .where(and(eq(historiqueCA.artisanId, artisanId), eq(historiqueCA.mois, data.mois), eq(historiqueCA.annee, data.annee)))
+    .limit(1);
+  return result[0];
+}
+
 // One-time seed for test data (runs on server startup)
 export async function seedTestData(): Promise<void> {
   const db = await getDb();

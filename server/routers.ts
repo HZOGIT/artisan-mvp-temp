@@ -4251,6 +4251,23 @@ const previsionsRouter = router({
     return { success: true };
   }),
 
+  seedHistorique: protectedProcedure
+    .input(z.object({
+      mois: z.number(),
+      annee: z.number(),
+      caTotal: z.string(),
+      nombreFactures: z.number().default(0),
+      nombreClients: z.number().default(0),
+      panierMoyen: z.string().default("0"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.seedHistoriqueCA(artisan.id, input);
+    }),
+
   getPrevisions: protectedProcedure
     .input(z.object({ annee: z.number() }))
     .query(async ({ ctx, input }) => {
