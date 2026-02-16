@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, Phone, Mail, MapPin, FileText, Receipt, Calendar, TrendingUp, Euro, Clock } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, MapPin, FileText, Receipt, Calendar, TrendingUp, Euro, Clock, Globe, Loader2, Copy, ShieldOff, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 const devisStatusLabels: Record<string, string> = {
   brouillon: "Brouillon",
@@ -66,6 +67,30 @@ export default function ClientDetail() {
   const { data: clientDevis } = trpc.devis.list.useQuery();
   const { data: clientFactures } = trpc.factures.list.useQuery();
   const { data: clientInterventions } = trpc.interventions.list.useQuery();
+
+  // Portal access
+  const { data: portalStatus, refetch: refetchPortal } = trpc.clientPortal.getStatus.useQuery(
+    { clientId: parseInt(id || "0") },
+    { enabled: !!id }
+  );
+
+  const generateAccess = trpc.clientPortal.generateAccess.useMutation({
+    onSuccess: (data) => {
+      toast.success("Accès portail envoyé par email");
+      navigator.clipboard.writeText(data.url).catch(() => {});
+      refetchPortal();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erreur lors de la génération de l'accès");
+    },
+  });
+
+  const deactivateAccess = trpc.clientPortal.deactivate.useMutation({
+    onSuccess: () => {
+      toast.success("Portail désactivé");
+      refetchPortal();
+    },
+  });
 
   const formatCurrency = (amount: string | number | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount || 0;
@@ -239,8 +264,8 @@ export default function ClientDetail() {
                 <Receipt className="h-4 w-4 mr-2" />
                 Créer une facture
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 className="w-full justify-start"
                 onClick={() => setLocation("/interventions")}
@@ -248,6 +273,78 @@ export default function ClientDetail() {
                 <Calendar className="h-4 w-4 mr-2" />
                 Planifier une intervention
               </Button>
+            </div>
+
+            {/* Portail Client */}
+            <div className="pt-4 border-t space-y-2">
+              <p className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                Portail client
+              </p>
+              {portalStatus ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                    <span className="text-sm text-green-700 font-medium">Portail actif</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Expire le {format(new Date(portalStatus.dateExpiration), "dd/MM/yyyy")}
+                    {portalStatus.lastAccessAt && (
+                      <><br />Dernier accès : {format(new Date(portalStatus.lastAccessAt), "dd/MM/yyyy à HH:mm", { locale: fr })}</>
+                    )}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-xs"
+                      onClick={() => {
+                        const url = `${window.location.origin}/portail/${portalStatus.token}`;
+                        navigator.clipboard.writeText(url);
+                        toast.success("Lien copié !");
+                      }}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copier le lien
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => generateAccess.mutate({ clientId: parseInt(id || "0") })}
+                      disabled={generateAccess.isPending}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Renouveler
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => deactivateAccess.mutate({ clientId: parseInt(id || "0") })}
+                    disabled={deactivateAccess.isPending}
+                  >
+                    <ShieldOff className="h-3 w-3 mr-1" />
+                    Désactiver le portail
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => generateAccess.mutate({ clientId: parseInt(id || "0") })}
+                  disabled={generateAccess.isPending || !client?.email}
+                >
+                  {generateAccess.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Globe className="h-4 w-4 mr-2" />
+                  )}
+                  {client?.email ? "Envoyer l'accès portail" : "Email requis pour le portail"}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

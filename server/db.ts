@@ -43,6 +43,7 @@ import {
   planComptable, CompteComptable, InsertCompteComptable,
   previsionsCA, PrevisionCA, InsertPrevisionCA,
   historiqueCA, HistoriqueCA, InsertHistoriqueCA,
+  clientPortalAccess, ClientPortalAccess, InsertClientPortalAccess,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -1525,6 +1526,68 @@ export async function updateDemandeAvis(id: number, data: Partial<InsertDemandeA
   await db.update(demandesAvis).set(data).where(eq(demandesAvis.id, id));
   const result = await db.select().from(demandesAvis).where(eq(demandesAvis.id, id)).limit(1);
   return result[0];
+}
+
+// ============================================================================
+// CLIENT PORTAL ACCESS
+// ============================================================================
+
+export async function createClientPortalAccess(data: InsertClientPortalAccess): Promise<ClientPortalAccess> {
+  const db = await getDb();
+  // Deactivate any existing active portal access for this client
+  await db.update(clientPortalAccess)
+    .set({ isActive: false })
+    .where(and(
+      eq(clientPortalAccess.clientId, data.clientId),
+      eq(clientPortalAccess.artisanId, data.artisanId),
+      eq(clientPortalAccess.isActive, true)
+    ));
+  const [result] = await db.insert(clientPortalAccess).values(data);
+  const [created] = await db.select().from(clientPortalAccess)
+    .where(eq(clientPortalAccess.id, result.insertId));
+  return created;
+}
+
+export async function getClientPortalAccessByToken(token: string): Promise<ClientPortalAccess | null> {
+  const db = await getDb();
+  const [result] = await db.select().from(clientPortalAccess)
+    .where(and(
+      eq(clientPortalAccess.token, token),
+      eq(clientPortalAccess.isActive, true),
+      gte(clientPortalAccess.expiresAt, new Date())
+    ));
+  return result || null;
+}
+
+export async function updateClientPortalAccessLastAccess(id: number): Promise<void> {
+  const db = await getDb();
+  await db.update(clientPortalAccess)
+    .set({ lastAccessAt: new Date() })
+    .where(eq(clientPortalAccess.id, id));
+}
+
+export async function getPortalAccessByClientId(clientId: number, artisanId: number): Promise<ClientPortalAccess | null> {
+  const db = await getDb();
+  const [result] = await db.select().from(clientPortalAccess)
+    .where(and(
+      eq(clientPortalAccess.clientId, clientId),
+      eq(clientPortalAccess.artisanId, artisanId),
+      eq(clientPortalAccess.isActive, true)
+    ))
+    .orderBy(desc(clientPortalAccess.createdAt))
+    .limit(1);
+  return result || null;
+}
+
+export async function deactivatePortalAccess(clientId: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  await db.update(clientPortalAccess)
+    .set({ isActive: false })
+    .where(and(
+      eq(clientPortalAccess.clientId, clientId),
+      eq(clientPortalAccess.artisanId, artisanId),
+      eq(clientPortalAccess.isActive, true)
+    ));
 }
 
 // ============================================================================

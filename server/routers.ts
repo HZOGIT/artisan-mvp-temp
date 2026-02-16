@@ -2677,8 +2677,8 @@ const clientPortalRouter = router({
       // Générer un token unique
       const token = crypto.randomUUID();
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30); // Valide 30 jours
-      
+      expiresAt.setDate(expiresAt.getDate() + 90); // Valide 90 jours
+
       await db.createClientPortalAccess({
         clientId: client.id,
         artisanId: artisan.id,
@@ -2686,9 +2686,48 @@ const clientPortalRouter = router({
         email: client.email,
         expiresAt,
       });
-      
-      const origin = ctx.req.headers.origin || 'http://localhost:3000';
-      return { url: `${origin}/portail/${token}`, token };
+
+      const origin = ctx.req.headers.origin || 'https://artisan.cheminov.com';
+      const portalUrl = `${origin}/portail/${token}`;
+
+      // Envoyer l'email au client
+      const clientName = `${client.prenom || ''} ${client.nom}`.trim();
+      const artisanName = artisan.nomEntreprise || 'Votre artisan';
+      await sendEmail({
+        to: client.email,
+        subject: `${artisanName} — Accès à votre espace client`,
+        body: `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${artisanName}</h1>
+        </td></tr>
+        <tr><td style="padding:36px 40px 16px 40px;">
+          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Vous pouvez désormais consulter vos devis, factures et interventions depuis votre espace client en ligne.</p>
+        </td></tr>
+        <tr><td style="padding:0 40px 28px 40px;text-align:center;">
+          <a href="${portalUrl}" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:600;">Accéder à mon espace client</a>
+        </td></tr>
+        <tr><td style="padding:0 40px 36px 40px;">
+          <p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">Ce lien est valable 90 jours. Si vous ne pouvez pas cliquer sur le bouton, copiez ce lien dans votre navigateur :</p>
+          <p style="margin:0;font-size:13px;color:#2563eb;word-break:break-all;">${portalUrl}</p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">Ce message a été envoyé automatiquement depuis MonArtisan Pro</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+      });
+
+      return { url: portalUrl, token };
     }),
 
   // Vérifier l'accès au portail (public)
@@ -2707,8 +2746,8 @@ const clientPortalRouter = router({
       
       return {
         valid: true,
-        client: client ? { id: client.id, nom: client.nom, prenom: client.prenom, email: client.email } : null,
-        artisan: artisan ? { id: artisan.id, nomEntreprise: artisan.nomEntreprise, telephone: artisan.telephone, email: artisan.email } : null,
+        client: client ? { id: client.id, nom: client.nom, prenom: client.prenom, email: client.email, telephone: client.telephone, adresse: client.adresse, codePostal: client.codePostal, ville: client.ville } : null,
+        artisan: artisan ? { id: artisan.id, nomEntreprise: artisan.nomEntreprise, telephone: artisan.telephone, email: artisan.email, adresse: artisan.adresse, codePostal: artisan.codePostal, ville: artisan.ville, siret: artisan.siret } : null,
       };
     }),
 
@@ -2787,6 +2826,80 @@ const clientPortalRouter = router({
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
       return await db.getContratsByClientId(access.clientId);
+    }),
+
+  // Récupérer les informations du client (public avec token)
+  getClientInfo: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      }
+      const client = await db.getClientById(access.clientId);
+      const artisan = await db.getArtisanById(access.artisanId);
+      if (!client) return null;
+      return {
+        nom: client.nom,
+        prenom: client.prenom,
+        email: client.email,
+        telephone: client.telephone,
+        adresse: client.adresse,
+        codePostal: client.codePostal,
+        ville: client.ville,
+        artisanEmail: artisan?.email || null,
+      };
+    }),
+
+  // Demander une modification d'infos (public avec token)
+  demanderModification: publicProcedure
+    .input(z.object({ token: z.string(), message: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      }
+      const client = await db.getClientById(access.clientId);
+      const artisan = await db.getArtisanById(access.artisanId);
+      if (!client || !artisan?.email) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Données introuvables" });
+      }
+      const clientName = `${client.prenom || ''} ${client.nom}`.trim();
+      await sendEmail({
+        to: artisan.email,
+        subject: `Demande de modification — ${clientName}`,
+        body: `<p>Le client <strong>${clientName}</strong> (${client.email || 'pas d\'email'}) demande une modification de ses informations via le portail client :</p><blockquote style="border-left:3px solid #2563eb;padding:12px;margin:16px 0;background:#f8fafc;">${input.message}</blockquote>`,
+      });
+      return { success: true };
+    }),
+
+  // Statut du portail pour un client (protégé — côté artisan)
+  getStatus: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      const access = await db.getPortalAccessByClientId(input.clientId, artisan.id);
+      if (!access) return null;
+      return {
+        actif: access.isActive,
+        token: access.token,
+        dateExpiration: access.expiresAt,
+        lastAccessAt: access.lastAccessAt,
+        createdAt: access.createdAt,
+      };
+    }),
+
+  // Désactiver le portail (protégé — côté artisan)
+  deactivate: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+      await db.deactivatePortalAccess(input.clientId, artisan.id);
+      return { success: true };
     }),
 });
 

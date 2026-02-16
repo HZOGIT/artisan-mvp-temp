@@ -148,6 +148,61 @@ async function startServer() {
     }
   });
 
+  // ============================================================
+  // Portail Client — Public PDF download routes
+  // ============================================================
+  app.get('/api/portail/:token/devis/:id/pdf', async (req, res) => {
+    try {
+      const { getClientPortalAccessByToken, getDevisById, getLignesDevisByDevisId, getArtisanById, getClientById } = await import('../db');
+      const access = await getClientPortalAccessByToken(req.params.token);
+      if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
+
+      const devisData = await getDevisById(parseInt(req.params.id));
+      if (!devisData || devisData.clientId !== access.clientId) return res.status(404).json({ error: 'Devis non trouvé' });
+
+      const lignes = await getLignesDevisByDevisId(devisData.id);
+      const artisan = await getArtisanById(access.artisanId);
+      const client = await getClientById(access.clientId);
+      if (!artisan || !client) return res.status(404).json({ error: 'Données introuvables' });
+
+      const { generateDevisPDF } = await import('./pdfGenerator');
+      const pdfBuffer = generateDevisPDF({ devis: { ...devisData, lignes }, artisan, client });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="Devis_${devisData.numero}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[Portail] PDF devis error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+    }
+  });
+
+  app.get('/api/portail/:token/factures/:id/pdf', async (req, res) => {
+    try {
+      const { getClientPortalAccessByToken, getFactureById, getLignesFacturesByFactureId, getArtisanById, getClientById } = await import('../db');
+      const access = await getClientPortalAccessByToken(req.params.token);
+      if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
+
+      const facture = await getFactureById(parseInt(req.params.id));
+      if (!facture || facture.clientId !== access.clientId) return res.status(404).json({ error: 'Facture non trouvée' });
+
+      const lignes = await getLignesFacturesByFactureId(facture.id);
+      const artisan = await getArtisanById(access.artisanId);
+      const client = await getClientById(access.clientId);
+      if (!artisan || !client) return res.status(404).json({ error: 'Données introuvables' });
+
+      const { generateFacturePDF } = await import('./pdfGenerator');
+      const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="Facture_${facture.numero}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[Portail] PDF facture error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
