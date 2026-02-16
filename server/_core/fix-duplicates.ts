@@ -98,6 +98,24 @@ async function fixDuplicates() {
       }
     }
 
+    // Add unique indexes if they don't exist (managed via raw SQL to avoid drizzle-kit interactive prompts)
+    try {
+      await pool.execute(`ALTER TABLE devis ADD UNIQUE INDEX unique_devis_artisan_numero (artisanId, numero)`);
+      console.log('[FixDuplicates] Added unique index on devis(artisanId, numero)');
+    } catch (e: any) {
+      if (e.code === 'ER_DUP_KEYNAME' || e.message?.includes('Duplicate key name')) {
+        console.log('[FixDuplicates] Unique index on devis already exists');
+      } else { throw e; }
+    }
+    try {
+      await pool.execute(`ALTER TABLE factures ADD UNIQUE INDEX unique_factures_artisan_numero (artisanId, numero)`);
+      console.log('[FixDuplicates] Added unique index on factures(artisanId, numero)');
+    } catch (e: any) {
+      if (e.code === 'ER_DUP_KEYNAME' || e.message?.includes('Duplicate key name')) {
+        console.log('[FixDuplicates] Unique index on factures already exists');
+      } else { throw e; }
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
