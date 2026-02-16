@@ -31,6 +31,13 @@ export default function SignatureDevis() {
     { enabled: !!token }
   );
 
+  // Pre-fill email from client data when it loads
+  useEffect(() => {
+    if (data?.client?.email && !signataireEmail) {
+      setSignataireEmail(data.client.email);
+    }
+  }, [data]);
+
   const signMutation = trpc.signature.signDevis.useMutation({
     onSuccess: () => {
       setActionComplete("accepte");
@@ -239,9 +246,6 @@ export default function SignatureDevis() {
   const { devis, artisan, client, lignes, signature } = data;
   const isAlreadyProcessed = signature.statut === "accepte" || signature.statut === "refuse";
 
-  // Pre-fill email from client if available
-  const defaultEmail = signataireEmail || client?.email || "";
-
   return (
     <div className="min-h-screen bg-gray-50 py-6 px-4">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -406,7 +410,7 @@ export default function SignatureDevis() {
                   <Input
                     id="email"
                     type="email"
-                    value={signataireEmail || defaultEmail}
+                    value={signataireEmail}
                     onChange={(e) => setSignataireEmail(e.target.value)}
                     placeholder="votre@email.com"
                   />
@@ -457,7 +461,7 @@ export default function SignatureDevis() {
                   className="flex-1 bg-green-600 hover:bg-green-700"
                   size="lg"
                   onClick={handleSign}
-                  disabled={isSigning || !hasSignature || !signataireName || !(signataireEmail || defaultEmail) || !accepted}
+                  disabled={isSigning || !hasSignature || !signataireName || !signataireEmail || !accepted}
                 >
                   {isSigning ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signature en cours...</>
