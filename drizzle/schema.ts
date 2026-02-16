@@ -273,11 +273,13 @@ export const signaturesDevis = mysqlTable("signatures_devis", {
   id: int("id").autoincrement().primaryKey(),
   devisId: int("devisId").notNull().unique(),
   token: varchar("token", { length: 64 }).notNull().unique(),
+  statut: mysqlEnum("statut", ["en_attente", "accepte", "refuse"]).default("en_attente"),
   signatureData: text("signatureData"), // Base64 encoded signature image
   signataireName: varchar("signataireName", { length: 255 }),
   signataireEmail: varchar("signataireEmail", { length: 320 }),
   ipAddress: varchar("ipAddress", { length: 45 }),
   userAgent: text("userAgent"),
+  motifRefus: text("motifRefus"),
   signedAt: timestamp("signedAt"),
   expiresAt: timestamp("expiresAt").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

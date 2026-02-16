@@ -52,6 +52,10 @@ export default function DevisDetail() {
   );
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
   const { data: artisan } = trpc.artisan.getProfile.useQuery();
+  const { data: signatureData } = trpc.signature.getSignatureByDevis.useQuery(
+    { devisId: parseInt(id || "0") },
+    { enabled: !!id }
+  );
 
   const updateMutation = trpc.devis.update.useMutation({
     onSuccess: () => {
@@ -339,35 +343,35 @@ export default function DevisDetail() {
             <Copy className="h-4 w-4 mr-2" />
             Dupliquer
           </Button>
-          {(devis.statut === "brouillon" || devis.statut === "envoye") && devis.client?.email && (
+          {(devis.statut === "brouillon" || devis.statut === "envoye") && devis.client?.email && !signatureData && (
             <Dialog open={isSignatureDialogOpen} onOpenChange={setIsSignatureDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Pen className="h-4 w-4 mr-2" />
-                  Signature électronique
+                  Envoyer au client
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Demander une signature électronique</DialogTitle>
+                  <DialogTitle>Envoyer le devis pour signature</DialogTitle>
                   <DialogDescription>
-                    Un lien de signature sera envoyé à {devis.client?.email}. Le client pourra signer le devis en ligne.
+                    Un email avec un lien de signature sera envoye a {devis.client?.email}. Le client pourra consulter le devis et le signer (ou refuser) en ligne.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                   <p className="text-sm text-muted-foreground">
-                    Une fois signé, le devis passera automatiquement au statut "Accepté".
+                    Le lien est valide 30 jours. Le statut du devis sera mis a jour automatiquement.
                   </p>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsSignatureDialogOpen(false)}>
                     Annuler
                   </Button>
-                  <Button 
-                    onClick={() => requestSignatureMutation.mutate({ devisId: parseInt(id || "0") })} 
+                  <Button
+                    onClick={() => requestSignatureMutation.mutate({ devisId: parseInt(id || "0") })}
                     disabled={requestSignatureMutation.isPending}
                   >
-                    {requestSignatureMutation.isPending ? "Envoi en cours..." : "Envoyer la demande"}
+                    {requestSignatureMutation.isPending ? "Envoi en cours..." : "Envoyer au client"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -422,6 +426,70 @@ export default function DevisDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Signature Status */}
+      {signatureData && (
+        <Card className={
+          signatureData.statut === 'accepte' ? 'border-green-300 bg-green-50' :
+          signatureData.statut === 'refuse' ? 'border-red-300 bg-red-50' :
+          'border-blue-300 bg-blue-50'
+        }>
+          <CardContent className="py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Pen className="h-5 w-5" />
+                <div>
+                  <p className="font-medium">
+                    {signatureData.statut === 'accepte' && `Devis accepte et signe par ${signatureData.signataireName}`}
+                    {signatureData.statut === 'refuse' && `Devis refuse${signatureData.motifRefus ? ` — ${signatureData.motifRefus}` : ''}`}
+                    {signatureData.statut === 'en_attente' && 'Signature en attente du client'}
+                  </p>
+                  {signatureData.signedAt && (
+                    <p className="text-sm text-muted-foreground">
+                      Le {format(new Date(signatureData.signedAt), "dd/MM/yyyy 'a' HH:mm", { locale: fr })}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const url = `${window.location.origin}/devis-public/${signatureData.token}`;
+                    navigator.clipboard.writeText(url);
+                    toast.success("Lien copie dans le presse-papier");
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copier le lien
+                </Button>
+                {signatureData.statut === 'accepte' && signatureData.signatureData && (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Pen className="h-4 w-4 mr-1" />
+                        Voir la signature
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Signature de {signatureData.signataireName}</DialogTitle>
+                      </DialogHeader>
+                      <div className="border rounded-lg p-4 bg-white">
+                        <img src={signatureData.signatureData} alt="Signature" className="w-full" />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        IP: {signatureData.ipAddress} | Signe le {signatureData.signedAt ? format(new Date(signatureData.signedAt), "dd/MM/yyyy HH:mm", { locale: fr }) : ''}
+                      </p>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lines */}
       <Card>

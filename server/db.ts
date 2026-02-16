@@ -1013,21 +1013,44 @@ export async function createSignatureDevis(data: InsertSignatureDevis): Promise<
   return (await getSignatureByToken(data.token))!;
 }
 
-export async function signDevis(token: string, signatureData: string, signataireName: string, ipAddress: string, userAgent: string): Promise<void> {
+export async function signDevis(token: string, signatureData: string, signataireName: string, signataireEmail: string, ipAddress: string, userAgent: string): Promise<SignatureDevis> {
   const db = await getDb();
   const signature = await getSignatureByToken(token);
   if (!signature) throw new Error('Signature not found');
-  
+
   await db.update(signaturesDevis).set({
+    statut: 'accepte',
     signatureData,
     signataireName,
+    signataireEmail,
     ipAddress,
     userAgent,
     signedAt: new Date(),
   }).where(eq(signaturesDevis.token, token));
-  
+
   // Update devis status
   await db.update(devis).set({ statut: 'accepte' }).where(eq(devis.id, signature.devisId));
+
+  return (await getSignatureByToken(token))!;
+}
+
+export async function refuserDevis(token: string, motifRefus: string | undefined, ipAddress: string, userAgent: string): Promise<SignatureDevis> {
+  const db = await getDb();
+  const signature = await getSignatureByToken(token);
+  if (!signature) throw new Error('Signature not found');
+
+  await db.update(signaturesDevis).set({
+    statut: 'refuse',
+    motifRefus: motifRefus || null,
+    ipAddress,
+    userAgent,
+    signedAt: new Date(),
+  }).where(eq(signaturesDevis.token, token));
+
+  // Update devis status
+  await db.update(devis).set({ statut: 'refuse' }).where(eq(devis.id, signature.devisId));
+
+  return (await getSignatureByToken(token))!;
 }
 
 // ============================================================================

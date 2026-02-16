@@ -1800,15 +1800,55 @@ const signatureRouter = router({
         expiresAt
       });
       
+      // Send email to client with signature link
+      const client = await db.getClientById(devisData.clientId);
+      if (client?.email) {
+        const { sendEmail } = await import('./_core/emailService');
+        const signatureUrl = `https://artisan.cheminov.com/devis-public/${token}`;
+        const artisanName = artisan.nomEntreprise || 'Votre artisan';
+        const clientName = `${client.prenom || ''} ${client.nom || ''}`.trim() || 'Client';
+        const totalTTC = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(parseFloat(devisData.totalTTC as any) || 0);
+
+        await sendEmail({
+          to: client.email,
+          subject: `Devis ${devisData.numero} à signer - ${artisanName}`,
+          body: `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
+<h1 style="margin:0;color:#ffffff;font-size:22px;">${artisanName}</h1>
+</td></tr>
+<tr><td style="padding:36px 40px 16px 40px;">
+<p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;">Bonjour ${clientName},</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Vous avez reçu le devis <strong>${devisData.numero}</strong>${devisData.objet ? ` pour <em>${devisData.objet}</em>` : ''} d'un montant de <strong>${totalTTC}</strong>.</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Cliquez sur le bouton ci-dessous pour consulter le devis et le signer électroniquement :</p>
+</td></tr>
+<tr><td style="padding:0 40px 28px 40px;text-align:center;">
+<a href="${signatureUrl}" style="display:inline-block;background-color:#1e40af;color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-size:16px;font-weight:600;">Consulter et signer le devis</a>
+</td></tr>
+<tr><td style="padding:0 40px 36px 40px;">
+<p style="margin:0 0 8px 0;font-size:13px;color:#9ca3af;">Ce lien est valide pendant 30 jours.</p>
+<p style="margin:0;font-size:13px;color:#9ca3af;">Si le bouton ne fonctionne pas, copiez ce lien : ${signatureUrl}</p>
+</td></tr>
+<tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+<p style="margin:0;font-size:12px;color:#9ca3af;">Ce message a été envoyé automatiquement depuis MonArtisan Pro</p>
+</td></tr>
+</table></td></tr></table></body></html>`
+        });
+      }
+
       // Create notification
       await db.createNotification({
         artisanId: artisan.id,
         type: "info",
-        titre: "Lien de signature créé",
-        message: `Un lien de signature a été créé pour le devis ${devisData.numero}`,
+        titre: "Devis envoyé pour signature",
+        message: `Le devis ${devisData.numero} a été envoyé à ${client?.email || 'le client'} pour signature électronique`,
         lien: `/devis/${input.devisId}`
       });
-      
+
       return signature;
     }),
   
@@ -1829,26 +1869,22 @@ const signatureRouter = router({
     .query(async ({ input }) => {
       const signature = await db.getSignatureByToken(input.token);
       if (!signature) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide ou expiré" });
       }
-      
-      if (new Date() > signature.expiresAt) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Lien de signature expiré" });
+
+      if (new Date() > signature.expiresAt && signature.statut === 'en_attente') {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce lien de signature a expiré" });
       }
-      
-      if (signature.signedAt) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été signé" });
-      }
-      
+
       const devisData = await db.getDevisById(signature.devisId);
       if (!devisData) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
       }
-      
+
       const artisan = await db.getArtisanById(devisData.artisanId);
       const client = await db.getClientById(devisData.clientId);
       const lignes = await db.getLignesDevisByDevisId(devisData.id);
-      
+
       return {
         devis: devisData,
         artisan,
@@ -1970,7 +2006,7 @@ const signatureRouter = router({
     .mutation(async ({ input, ctx }) => {
       const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
       const userAgent = ctx.req.headers['user-agent'] || 'unknown';
-      
+
       const signature = await db.signDevis(
         input.token,
         input.signatureData,
@@ -1979,19 +2015,71 @@ const signatureRouter = router({
         ipAddress,
         userAgent
       );
-      
-      // Get devis and artisan to create notification
+
+      // Get devis and artisan to create notification + send email
       const devisData = await db.getDevisById(signature.devisId);
       if (devisData) {
+        const artisan = await db.getArtisanById(devisData.artisanId);
         await db.createNotification({
           artisanId: devisData.artisanId,
           type: "succes",
           titre: "Devis signé !",
-          message: `Le devis ${devisData.numero} a été signé par ${input.signataireName}`,
+          message: `Le devis ${devisData.numero} a été accepté et signé par ${input.signataireName}`,
           lien: `/devis/${signature.devisId}`
         });
+        // Email notification to artisan
+        if (artisan?.email) {
+          const { sendEmail } = await import('./_core/emailService');
+          await sendEmail({
+            to: artisan.email,
+            subject: `Devis ${devisData.numero} accepté et signé`,
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${input.signataireName}</strong> (${input.signataireEmail}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">MonArtisan Pro</p>`
+          });
+        }
       }
-      
+
+      return { success: true, signature };
+    }),
+
+  refuseDevis: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      motifRefus: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
+      const userAgent = ctx.req.headers['user-agent'] || 'unknown';
+
+      const signature = await db.refuserDevis(
+        input.token,
+        input.motifRefus,
+        ipAddress,
+        userAgent
+      );
+
+      const devisData = await db.getDevisById(signature.devisId);
+      if (devisData) {
+        const artisan = await db.getArtisanById(devisData.artisanId);
+        const client = await db.getClientById(devisData.clientId);
+        const clientName = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : 'Le client';
+        await db.createNotification({
+          artisanId: devisData.artisanId,
+          type: "alerte",
+          titre: "Devis refusé",
+          message: `Le devis ${devisData.numero} a été refusé par ${clientName}${input.motifRefus ? ` — Motif : ${input.motifRefus}` : ''}`,
+          lien: `/devis/${signature.devisId}`
+        });
+        // Email notification to artisan
+        if (artisan?.email) {
+          const { sendEmail } = await import('./_core/emailService');
+          await sendEmail({
+            to: artisan.email,
+            subject: `Devis ${devisData.numero} refusé par ${clientName}`,
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${clientName}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${input.motifRefus}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">MonArtisan Pro</p>`
+          });
+        }
+      }
+
       return { success: true, signature };
     }),
 });

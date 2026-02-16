@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { trpc } from "@/lib/trpc";
-import { Loader2, Check, FileText, Building2, User, Pen, AlertCircle, Phone, Shield, MessageSquare } from "lucide-react";
+import { Loader2, Check, FileText, Building2, User, Pen, AlertCircle, Download, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
-
-type SignatureStep = "info" | "sms" | "signature";
+import { generateDevisPDF } from "@/lib/pdfGenerator";
 
 export default function SignatureDevis() {
   const { token } = useParams<{ token: string }>();
@@ -18,47 +19,22 @@ export default function SignatureDevis() {
   const [hasSignature, setHasSignature] = useState(false);
   const [signataireName, setSignataireName] = useState("");
   const [signataireEmail, setSignataireEmail] = useState("");
-  const [telephone, setTelephone] = useState("");
-  const [smsCode, setSmsCode] = useState("");
+  const [accepted, setAccepted] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
-  const [signatureComplete, setSignatureComplete] = useState(false);
-  const [currentStep, setCurrentStep] = useState<SignatureStep>("info");
-  const [smsVerified, setSmsVerified] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
+  const [isRefusing, setIsRefusing] = useState(false);
+  const [showRefuseForm, setShowRefuseForm] = useState(false);
+  const [motifRefus, setMotifRefus] = useState("");
+  const [actionComplete, setActionComplete] = useState<"accepte" | "refuse" | null>(null);
 
   const { data, isLoading, error } = trpc.signature.getDevisForSignature.useQuery(
     { token: token || "" },
     { enabled: !!token }
   );
 
-  const requestSmsMutation = trpc.signature.requestSmsCode.useMutation({
-    onSuccess: (data) => {
-      toast.success("Code de vérification envoyé par SMS");
-      setCurrentStep("sms");
-      if (data.devCode) {
-        setDevCode(data.devCode);
-      }
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    }
-  });
-
-  const verifySmsMutation = trpc.signature.verifySmsCode.useMutation({
-    onSuccess: () => {
-      toast.success("Code vérifié avec succès");
-      setSmsVerified(true);
-      setCurrentStep("signature");
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    }
-  });
-
   const signMutation = trpc.signature.signDevis.useMutation({
     onSuccess: () => {
-      setSignatureComplete(true);
-      toast.success("Devis signé avec succès !");
+      setActionComplete("accepte");
+      toast.success("Devis accepte et signe !");
     },
     onError: (error) => {
       toast.error(error.message);
@@ -66,143 +42,135 @@ export default function SignatureDevis() {
     }
   });
 
+  const refuseMutation = trpc.signature.refuseDevis.useMutation({
+    onSuccess: () => {
+      setActionComplete("refuse");
+      toast.success("Devis refuse");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+      setIsRefusing(false);
+    }
+  });
+
+  // Canvas setup
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    // Set canvas size
     canvas.width = canvas.offsetWidth;
     canvas.height = 200;
-
-    // Set drawing style
     ctx.strokeStyle = "#1e40af";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-  }, [data, currentStep]);
+  }, [data, showRefuseForm]);
+
+  // Canvas resize on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      canvas.width = canvas.offsetWidth;
+      canvas.height = 200;
+      ctx.putImageData(imageData, 0, 0);
+      ctx.strokeStyle = "#1e40af";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    if ("touches" in e) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     setIsDrawing(true);
     setHasSignature(true);
-
-    const rect = canvas.getBoundingClientRect();
-    let x, y;
-
-    if ("touches" in e) {
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
-    }
-
+    const { x, y } = getCanvasPos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    let x, y;
-
-    if ("touches" in e) {
-      e.preventDefault();
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
-    } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
-    }
-
+    if ("touches" in e) e.preventDefault();
+    const { x, y } = getCanvasPos(e);
     ctx.lineTo(x, y);
     ctx.stroke();
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
+  const stopDrawing = () => setIsDrawing(false);
 
   const clearSignature = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasSignature(false);
   };
 
-  const handleRequestSms = () => {
-    if (!signataireName || !signataireEmail || !telephone) {
-      toast.error("Veuillez remplir tous les champs");
+  const handleSign = () => {
+    if (!hasSignature || !signataireName || !signataireEmail || !token || !accepted) {
+      toast.error("Veuillez remplir tous les champs, cocher l'acceptation et signer");
       return;
     }
-    
-    // Validation basique du numéro de téléphone
-    const phoneRegex = /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/;
-    if (!phoneRegex.test(telephone.replace(/\s/g, ''))) {
-      toast.error("Veuillez entrer un numéro de téléphone valide");
-      return;
-    }
-
-    requestSmsMutation.mutate({
-      token: token || "",
-      telephone: telephone.replace(/\s/g, '')
-    });
-  };
-
-  const handleVerifySms = () => {
-    if (!smsCode || smsCode.length !== 6) {
-      toast.error("Veuillez entrer un code à 6 chiffres");
-      return;
-    }
-
-    verifySmsMutation.mutate({
-      token: token || "",
-      code: smsCode
-    });
-  };
-
-  const handleSign = async () => {
-    if (!hasSignature || !signataireName || !signataireEmail || !token) {
-      toast.error("Veuillez remplir tous les champs et signer le document");
-      return;
-    }
-
-    if (!smsVerified) {
-      toast.error("Veuillez d'abord vérifier votre numéro de téléphone");
-      return;
-    }
-
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     setIsSigning(true);
     const signatureData = canvas.toDataURL("image/png");
+    signMutation.mutate({ token, signatureData, signataireName, signataireEmail });
+  };
 
-    signMutation.mutate({
-      token,
-      signatureData,
-      signataireName,
-      signataireEmail,
-      smsVerified: true
+  const handleRefuse = () => {
+    if (!token) return;
+    setIsRefusing(true);
+    refuseMutation.mutate({ token, motifRefus: motifRefus || undefined });
+  };
+
+  const handleDownloadPDF = () => {
+    if (!data) return;
+    const { devis: d, artisan: a, client: c, lignes: l } = data;
+    const lignesPDF = (l || []).map((ligne: any) => ({
+      designation: ligne.designation,
+      description: ligne.description,
+      quantite: parseFloat(ligne.quantite) || 1,
+      unite: ligne.unite,
+      prixUnitaire: parseFloat(ligne.prixUnitaireHT) || 0,
+      tauxTva: parseFloat(ligne.tauxTVA) || 20,
+    }));
+    generateDevisPDF(a || {}, c || {}, {
+      numero: d.numero,
+      dateCreation: d.createdAt,
+      dateValidite: d.dateValidite,
+      statut: d.statut || "brouillon",
+      objet: d.objet,
+      lignes: lignesPDF,
+      totalHT: parseFloat(d.totalHT as any) || 0,
+      totalTVA: parseFloat(d.totalTVA as any) || 0,
+      totalTTC: parseFloat(d.totalTTC as any) || 0,
+      conditions: (d as any).conditionsPaiement || null,
     });
   };
 
@@ -212,11 +180,7 @@ export default function SignatureDevis() {
   };
 
   const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric"
-    });
+    return new Date(date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
   };
 
   if (isLoading) {
@@ -234,7 +198,7 @@ export default function SignatureDevis() {
           <CardHeader>
             <div className="flex items-center gap-2 text-red-500">
               <AlertCircle className="h-6 w-6" />
-              <CardTitle>Erreur</CardTitle>
+              <CardTitle>Lien invalide</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -245,23 +209,25 @@ export default function SignatureDevis() {
     );
   }
 
-  if (signatureComplete) {
+  // Confirmation page after accept/refuse
+  if (actionComplete) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <div className="flex items-center gap-2 text-green-500">
-              <Check className="h-6 w-6" />
-              <CardTitle>Signature confirmée</CardTitle>
+            <div className={`flex items-center gap-2 ${actionComplete === "accepte" ? "text-green-500" : "text-red-500"}`}>
+              {actionComplete === "accepte" ? <Check className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}
+              <CardTitle>{actionComplete === "accepte" ? "Devis accepte et signe" : "Devis refuse"}</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              Le devis <strong>{data?.devis.numero}</strong> a été signé avec succès.
+              {actionComplete === "accepte"
+                ? <>Le devis <strong>{data?.devis.numero}</strong> a ete accepte et signe avec succes. L'artisan a ete notifie.</>
+                : <>Le devis <strong>{data?.devis.numero}</strong> a ete refuse. L'artisan a ete notifie.</>
+              }
             </p>
-            <p className="text-sm text-muted-foreground">
-              Une confirmation a été envoyée à l'artisan. Vous pouvez fermer cette page.
-            </p>
+            <p className="text-sm text-muted-foreground">Vous pouvez fermer cette page.</p>
           </CardContent>
         </Card>
       </div>
@@ -270,127 +236,114 @@ export default function SignatureDevis() {
 
   if (!data) return null;
 
-  const { devis, artisan, client, lignes } = data;
+  const { devis, artisan, client, lignes, signature } = data;
+  const isAlreadyProcessed = signature.statut === "accepte" || signature.statut === "refuse";
+
+  // Pre-fill email from client if available
+  const defaultEmail = signataireEmail || client?.email || "";
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-gray-50 py-6 px-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <CardTitle className="text-2xl">Signature du Devis</CardTitle>
-                <CardDescription>Devis n° {devis.numero}</CardDescription>
+                <CardTitle className="text-2xl">Devis n&deg; {devis.numero}</CardTitle>
+                <CardDescription>
+                  {devis.objet && <>{devis.objet} &mdash; </>}
+                  {formatDate(devis.dateDevis)}
+                  {devis.dateValidite && <> &mdash; Valide jusqu'au {formatDate(devis.dateValidite)}</>}
+                </CardDescription>
               </div>
-              <FileText className="h-12 w-12 text-primary" />
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleDownloadPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Telecharger PDF
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>
 
-        {/* Progress Steps */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className={`flex items-center gap-2 ${currentStep === "info" ? "text-primary" : smsVerified ? "text-green-500" : "text-muted-foreground"}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "info" ? "bg-primary text-white" : smsVerified ? "bg-green-500 text-white" : "bg-muted"}`}>
-                  {smsVerified ? <Check className="h-4 w-4" /> : "1"}
-                </div>
-                <span className="hidden sm:inline font-medium">Informations</span>
+        {/* Already processed banner */}
+        {isAlreadyProcessed && (
+          <Card className={signature.statut === "accepte" ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50"}>
+            <CardContent className="py-4">
+              <div className={`flex items-center gap-2 ${signature.statut === "accepte" ? "text-green-700" : "text-red-700"}`}>
+                {signature.statut === "accepte" ? <Check className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+                <span className="font-medium">
+                  {signature.statut === "accepte"
+                    ? `Ce devis a ete accepte et signe par ${signature.signataireName} le ${signature.signedAt ? formatDate(signature.signedAt) : ''}`
+                    : `Ce devis a ete refuse${signature.motifRefus ? ` — Motif : ${signature.motifRefus}` : ''}`
+                  }
+                </span>
               </div>
-              <div className="flex-1 h-1 mx-4 bg-muted">
-                <div className={`h-full transition-all ${currentStep !== "info" ? "bg-primary" : "bg-muted"}`} style={{ width: currentStep === "info" ? "0%" : "100%" }} />
-              </div>
-              <div className={`flex items-center gap-2 ${currentStep === "sms" ? "text-primary" : smsVerified ? "text-green-500" : "text-muted-foreground"}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "sms" ? "bg-primary text-white" : smsVerified ? "bg-green-500 text-white" : "bg-muted"}`}>
-                  {smsVerified ? <Check className="h-4 w-4" /> : "2"}
-                </div>
-                <span className="hidden sm:inline font-medium">Vérification SMS</span>
-              </div>
-              <div className="flex-1 h-1 mx-4 bg-muted">
-                <div className={`h-full transition-all ${currentStep === "signature" ? "bg-primary" : "bg-muted"}`} style={{ width: currentStep === "signature" ? "100%" : "0%" }} />
-              </div>
-              <div className={`flex items-center gap-2 ${currentStep === "signature" ? "text-primary" : "text-muted-foreground"}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === "signature" ? "bg-primary text-white" : "bg-muted"}`}>
-                  3
-                </div>
-                <span className="hidden sm:inline font-medium">Signature</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Artisan & Client Info */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Émetteur</CardTitle>
+                <CardTitle className="text-lg">Artisan</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <p className="font-semibold">{artisan?.nomEntreprise}</p>
-              <p className="text-sm text-muted-foreground">{artisan?.adresse}</p>
-              <p className="text-sm text-muted-foreground">{artisan?.codePostal} {artisan?.ville}</p>
-              <p className="text-sm text-muted-foreground">SIRET: {artisan?.siret}</p>
+              {artisan?.adresse && <p className="text-sm text-muted-foreground">{artisan.adresse}</p>}
+              {(artisan?.codePostal || artisan?.ville) && <p className="text-sm text-muted-foreground">{artisan.codePostal} {artisan.ville}</p>}
+              {artisan?.telephone && <p className="text-sm text-muted-foreground">Tel: {artisan.telephone}</p>}
+              {artisan?.siret && <p className="text-sm text-muted-foreground">SIRET: {artisan.siret}</p>}
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2">
               <div className="flex items-center gap-2">
                 <User className="h-5 w-5 text-primary" />
                 <CardTitle className="text-lg">Client</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="font-semibold">{client?.nom}</p>
-              <p className="text-sm text-muted-foreground">{client?.adresse}</p>
-              <p className="text-sm text-muted-foreground">{client?.codePostal} {client?.ville}</p>
-              <p className="text-sm text-muted-foreground">{client?.email}</p>
+              <p className="font-semibold">{client?.prenom} {client?.nom}</p>
+              {client?.adresse && <p className="text-sm text-muted-foreground">{client.adresse}</p>}
+              {(client?.codePostal || client?.ville) && <p className="text-sm text-muted-foreground">{client.codePostal} {client.ville}</p>}
+              {client?.email && <p className="text-sm text-muted-foreground">{client.email}</p>}
             </CardContent>
           </Card>
         </div>
 
-        {/* Devis Details */}
+        {/* Devis Lines */}
         <Card>
           <CardHeader>
-            <CardTitle>Détail du devis</CardTitle>
-            <CardDescription>
-              Date: {formatDate(devis.dateDevis)} | Validité: {devis.dateValidite ? formatDate(devis.dateValidite) : 'Non spécifiée'}
-            </CardDescription>
+            <CardTitle>Detail du devis</CardTitle>
           </CardHeader>
           <CardContent>
-            {devis.objet && (
-              <div className="mb-4">
-                <p className="font-medium">Objet:</p>
-                <p className="text-muted-foreground">{devis.objet}</p>
-              </div>
-            )}
-
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="text-left p-3">Désignation</th>
-                    <th className="text-right p-3">Qté</th>
-                    <th className="text-right p-3">P.U. HT</th>
-                    <th className="text-right p-3">Total HT</th>
+                    <th className="text-left p-3 text-sm font-medium">Designation</th>
+                    <th className="text-right p-3 text-sm font-medium">Qte</th>
+                    <th className="text-right p-3 text-sm font-medium">P.U. HT</th>
+                    <th className="text-right p-3 text-sm font-medium">Total HT</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lignes.map((ligne, index) => (
+                  {lignes.map((ligne: any, index: number) => (
                     <tr key={index} className="border-t">
                       <td className="p-3">
-                        <p className="font-medium">{ligne.designation}</p>
-                        {ligne.description && (
-                          <p className="text-sm text-muted-foreground">{ligne.description}</p>
-                        )}
+                        <p className="font-medium text-sm">{ligne.designation}</p>
+                        {ligne.description && <p className="text-xs text-muted-foreground">{ligne.description}</p>}
                       </td>
-                      <td className="text-right p-3">{ligne.quantite} {ligne.unite}</td>
-                      <td className="text-right p-3">{formatCurrency(ligne.prixUnitaireHT)}</td>
-                      <td className="text-right p-3">{formatCurrency(ligne.montantHT || 0)}</td>
+                      <td className="text-right p-3 text-sm">{ligne.quantite} {ligne.unite}</td>
+                      <td className="text-right p-3 text-sm">{formatCurrency(ligne.prixUnitaireHT)}</td>
+                      <td className="text-right p-3 text-sm">{formatCurrency(ligne.montantHT || 0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -399,45 +352,53 @@ export default function SignatureDevis() {
 
             <div className="mt-4 flex justify-end">
               <div className="w-64 space-y-2">
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span>Total HT:</span>
                   <span className="font-medium">{formatCurrency(devis.totalHT || 0)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span>TVA:</span>
                   <span className="font-medium">{formatCurrency(devis.totalTVA || 0)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total TTC:</span>
-                  <span>{formatCurrency(devis.totalTTC || 0)}</span>
+                  <span className="text-primary">{formatCurrency(devis.totalTTC || 0)}</span>
                 </div>
               </div>
             </div>
+
+            {devis.conditionsPaiement && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm font-medium mb-1">Conditions de paiement</p>
+                <p className="text-sm text-muted-foreground">{devis.conditionsPaiement}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Step 1: Information */}
-        {currentStep === "info" && (
+        {/* Signature / Action block — only if not already processed */}
+        {!isAlreadyProcessed && !showRefuseForm && (
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
-                <CardTitle>Vos informations</CardTitle>
+                <Pen className="h-5 w-5 text-primary" />
+                <CardTitle>Accepter et signer ce devis</CardTitle>
               </div>
               <CardDescription>
-                Renseignez vos informations pour procéder à la signature.
+                Remplissez les informations ci-dessous puis signez pour accepter ce devis.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+            <CardContent className="space-y-5">
+              {/* Name + Email */}
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nom complet *</Label>
+                  <Label htmlFor="name">Nom complet du signataire *</Label>
                   <Input
                     id="name"
                     value={signataireName}
                     onChange={(e) => setSignataireName(e.target.value)}
-                    placeholder="Votre nom complet"
+                    placeholder="Prenom Nom"
                   />
                 </div>
                 <div className="space-y-2">
@@ -445,158 +406,14 @@ export default function SignatureDevis() {
                   <Input
                     id="email"
                     type="email"
-                    value={signataireEmail}
+                    value={signataireEmail || defaultEmail}
                     onChange={(e) => setSignataireEmail(e.target.value)}
                     placeholder="votre@email.com"
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="telephone">Numéro de téléphone *</Label>
-                <div className="flex gap-2">
-                  <Phone className="h-5 w-5 mt-2 text-muted-foreground" />
-                  <Input
-                    id="telephone"
-                    type="tel"
-                    value={telephone}
-                    onChange={(e) => setTelephone(e.target.value)}
-                    placeholder="06 12 34 56 78"
-                    className="flex-1"
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Un code de vérification sera envoyé à ce numéro pour sécuriser la signature.
-                </p>
-              </div>
 
-              <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <Shield className="h-5 w-5 text-blue-500 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-blue-900">Signature sécurisée</p>
-                    <p className="text-sm text-blue-700">
-                      Pour garantir l'authenticité de votre signature, nous utilisons une vérification par SMS.
-                      Vous recevrez un code à 6 chiffres sur votre téléphone.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                className="w-full"
-                onClick={handleRequestSms}
-                disabled={requestSmsMutation.isPending || !signataireName || !signataireEmail || !telephone}
-              >
-                {requestSmsMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Envoi du code...
-                  </>
-                ) : (
-                  <>
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Recevoir le code de vérification
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step 2: SMS Verification */}
-        {currentStep === "sms" && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                <CardTitle>Vérification SMS</CardTitle>
-              </div>
-              <CardDescription>
-                Entrez le code à 6 chiffres envoyé au {telephone}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {devCode && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Mode développement:</strong> Le code de vérification est <strong className="text-lg">{devCode}</strong>
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="smsCode">Code de vérification</Label>
-                <Input
-                  id="smsCode"
-                  type="text"
-                  maxLength={6}
-                  value={smsCode}
-                  onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="000000"
-                  className="text-center text-2xl tracking-widest"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentStep("info")}
-                  className="flex-1"
-                >
-                  Retour
-                </Button>
-                <Button
-                  onClick={handleVerifySms}
-                  disabled={verifySmsMutation.isPending || smsCode.length !== 6}
-                  className="flex-1"
-                >
-                  {verifySmsMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Vérification...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Vérifier le code
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <div className="text-center">
-                <Button
-                  variant="link"
-                  onClick={handleRequestSms}
-                  disabled={requestSmsMutation.isPending}
-                >
-                  Renvoyer le code
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step 3: Signature */}
-        {currentStep === "signature" && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Pen className="h-5 w-5 text-primary" />
-                <CardTitle>Votre signature</CardTitle>
-              </div>
-              <CardDescription>
-                En signant ce devis, vous acceptez les conditions et le montant proposé.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-                <div className="flex items-center gap-2 text-green-700">
-                  <Check className="h-5 w-5" />
-                  <span className="font-medium">Numéro de téléphone vérifié: {telephone}</span>
-                </div>
-              </div>
-
+              {/* Signature Canvas */}
               <div className="space-y-2">
                 <Label>Signature manuscrite *</Label>
                 <div className="border-2 border-dashed rounded-lg p-2 bg-white">
@@ -615,36 +432,96 @@ export default function SignatureDevis() {
                 </div>
                 <div className="flex justify-end">
                   <Button variant="outline" size="sm" onClick={clearSignature}>
-                    Effacer la signature
+                    Effacer
                   </Button>
                 </div>
               </div>
 
-              <div className="bg-muted p-4 rounded-lg text-sm text-muted-foreground">
-                <p>
-                  En cliquant sur "Signer et accepter le devis", je certifie avoir lu et accepté les termes de ce devis.
-                  Cette signature électronique a valeur légale conformément au règlement eIDAS.
-                </p>
+              {/* Checkbox */}
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="accept"
+                  checked={accepted}
+                  onCheckedChange={(val) => setAccepted(val === true)}
+                  className="mt-1"
+                />
+                <Label htmlFor="accept" className="text-sm leading-relaxed cursor-pointer">
+                  J'accepte ce devis et les conditions generales. Je certifie que les informations fournies sont exactes.
+                  Cette signature electronique a valeur legale conformement au reglement eIDAS.
+                </Label>
               </div>
 
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleSign}
-                disabled={isSigning || !hasSignature}
-              >
-                {isSigning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signature en cours...
-                  </>
-                ) : (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Signer et accepter le devis
-                  </>
-                )}
-              </Button>
+              {/* Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  size="lg"
+                  onClick={handleSign}
+                  disabled={isSigning || !hasSignature || !signataireName || !(signataireEmail || defaultEmail) || !accepted}
+                >
+                  {isSigning ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signature en cours...</>
+                  ) : (
+                    <><Check className="mr-2 h-4 w-4" /> Accepter et signer</>
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="lg"
+                  onClick={() => setShowRefuseForm(true)}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Refuser le devis
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Refuse form */}
+        {!isAlreadyProcessed && showRefuseForm && (
+          <Card className="border-red-200">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-red-600">
+                <XCircle className="h-5 w-5" />
+                <CardTitle>Refuser ce devis</CardTitle>
+              </div>
+              <CardDescription>
+                Vous pouvez indiquer un motif de refus (optionnel).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="motif">Motif du refus (optionnel)</Label>
+                <Textarea
+                  id="motif"
+                  value={motifRefus}
+                  onChange={(e) => setMotifRefus(e.target.value)}
+                  placeholder="Expliquez pourquoi vous refusez ce devis..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRefuseForm(false)}
+                  className="flex-1"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleRefuse}
+                  disabled={isRefusing}
+                  className="flex-1"
+                >
+                  {isRefusing ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Envoi...</>
+                  ) : (
+                    <><XCircle className="mr-2 h-4 w-4" /> Confirmer le refus</>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

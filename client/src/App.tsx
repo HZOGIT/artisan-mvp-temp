@@ -125,6 +125,7 @@ function Router() {
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/signup" component={SignUp} />
       <Route path="/signature/:token" component={SignatureDevis} />
+      <Route path="/devis-public/:token" component={SignatureDevis} />
       <Route path="/paiement/succes" component={PaiementSucces} />
       <Route path="/paiement/annule" component={PaiementAnnule} />
       <Route path="/portail/:token" component={PortailClient} />
