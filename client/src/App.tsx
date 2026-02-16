@@ -57,6 +57,7 @@ import DevisLigneEdit from "./pages/DevisLigneEdit";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import StatistiquesDevis from "./pages/StatistiquesDevis";
+import PortailGestion from "./pages/PortailGestion";
 import DashboardLayout from "./components/DashboardLayout";
 
 // BYPASS CLERK TEMPORARILY - Redirect all authenticated routes directly to dashboard
@@ -109,6 +110,7 @@ function AuthenticatedRoutes() {
         <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
         <Route path="/rapport-commande" component={RapportCommande} />
         <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
+        <Route path="/portail-gestion" component={PortailGestion} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -171,6 +173,7 @@ function Router() {
       <Route path="/modeles-email-transactionnels" component={() => <AuthenticatedRoutes />} />
       <Route path="/rapport-commande" component={() => <AuthenticatedRoutes />} />
       <Route path="/performances-fournisseurs" component={() => <AuthenticatedRoutes />} />
+      <Route path="/portail-gestion" component={() => <AuthenticatedRoutes />} />
       <Route component={NotFound} />
     </Switch>
   );

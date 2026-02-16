@@ -27,7 +27,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -68,6 +68,7 @@ const menuGroups: MenuGroup[] = [
       { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
       { icon: Upload, label: "Import Clients", path: "/clients/import" },
       { icon: Star, label: "Avis Clients", path: "/avis" },
+      { icon: Globe, label: "Portail Client", path: "/portail-gestion" },
     ],
   },
   {
@@ -76,6 +77,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: Calendar, label: "Interventions", path: "/interventions" },
       { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
+      { icon: Wrench, label: "Techniciens", path: "/techniciens" },
       { icon: HardHat, label: "Chantiers", path: "/chantiers" },
       { icon: Route, label: "Planification", path: "/planification" },
     ],
