@@ -30,7 +30,17 @@ import {
   avisClients, AvisClient, InsertAvisClient,
   demandesAvis, DemandeAvis, InsertDemandeAvis,
   techniciens, Technicien,
-  positionsTechniciens, PositionTechnicien
+  positionsTechniciens, PositionTechnicien,
+  chantiers, Chantier, InsertChantier,
+  phasesChantier, PhaseChantier, InsertPhaseChantier,
+  interventionsChantier, InterventionChantier, InsertInterventionChantier,
+  documentsChantier, DocumentChantier, InsertDocumentChantier,
+  rapportsPersonnalises, RapportPersonnalise, InsertRapportPersonnalise,
+  executionsRapports, ExecutionRapport, InsertExecutionRapport,
+  ecrituresComptables, EcritureComptable, InsertEcritureComptable,
+  planComptable, CompteComptable, InsertCompteComptable,
+  previsionsCA, PrevisionCA, InsertPrevisionCA,
+  historiqueCA, HistoriqueCA, InsertHistoriqueCA,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -1648,6 +1658,618 @@ export async function fixDuplicateNumbers(): Promise<void> {
   }
 
   console.log('[FixDuplicates] Done checking for duplicate numbers.');
+}
+
+// ============================================================================
+// CHANTIERS
+// ============================================================================
+
+export async function getChantiersByArtisan(artisanId: number): Promise<Chantier[]> {
+  const db = await getDb();
+  return await db.select().from(chantiers).where(eq(chantiers.artisanId, artisanId)).orderBy(desc(chantiers.createdAt));
+}
+
+export async function getChantierById(id: number): Promise<Chantier | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(chantiers).where(eq(chantiers.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createChantier(data: any): Promise<Chantier> {
+  const db = await getDb();
+  await db.insert(chantiers).values(data);
+  const result = await db.select().from(chantiers)
+    .where(and(eq(chantiers.artisanId, data.artisanId), eq(chantiers.reference, data.reference)))
+    .orderBy(desc(chantiers.id))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateChantier(id: number, data: any): Promise<Chantier | undefined> {
+  const db = await getDb();
+  await db.update(chantiers).set(data).where(eq(chantiers.id, id));
+  return getChantierById(id);
+}
+
+export async function deleteChantier(id: number): Promise<void> {
+  const db = await getDb();
+  // Delete related data first
+  await db.delete(documentsChantier).where(eq(documentsChantier.chantierId, id));
+  await db.delete(interventionsChantier).where(eq(interventionsChantier.chantierId, id));
+  await db.delete(phasesChantier).where(eq(phasesChantier.chantierId, id));
+  await db.delete(chantiers).where(eq(chantiers.id, id));
+}
+
+// Phases
+export async function getPhasesByChantier(chantierId: number): Promise<PhaseChantier[]> {
+  const db = await getDb();
+  return await db.select().from(phasesChantier).where(eq(phasesChantier.chantierId, chantierId)).orderBy(asc(phasesChantier.ordre));
+}
+
+export async function createPhaseChantier(data: any): Promise<PhaseChantier> {
+  const db = await getDb();
+  await db.insert(phasesChantier).values(data);
+  const result = await db.select().from(phasesChantier)
+    .where(eq(phasesChantier.chantierId, data.chantierId))
+    .orderBy(desc(phasesChantier.id))
+    .limit(1);
+  return result[0];
+}
+
+export async function updatePhaseChantier(id: number, data: any): Promise<PhaseChantier | undefined> {
+  const db = await getDb();
+  await db.update(phasesChantier).set(data).where(eq(phasesChantier.id, id));
+  const result = await db.select().from(phasesChantier).where(eq(phasesChantier.id, id)).limit(1);
+  return result[0];
+}
+
+export async function deletePhaseChantier(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(phasesChantier).where(eq(phasesChantier.id, id));
+}
+
+// Interventions chantier
+export async function getInterventionsByChantier(chantierId: number): Promise<InterventionChantier[]> {
+  const db = await getDb();
+  return await db.select().from(interventionsChantier).where(eq(interventionsChantier.chantierId, chantierId)).orderBy(asc(interventionsChantier.ordre));
+}
+
+export async function getAllInterventionsChantier(artisanId: number): Promise<InterventionChantier[]> {
+  const db = await getDb();
+  const chantierIds = await db.select({ id: chantiers.id }).from(chantiers).where(eq(chantiers.artisanId, artisanId));
+  if (chantierIds.length === 0) return [];
+  return await db.select().from(interventionsChantier).where(inArray(interventionsChantier.chantierId, chantierIds.map(c => c.id)));
+}
+
+export async function associerInterventionChantier(data: any): Promise<InterventionChantier> {
+  const db = await getDb();
+  await db.insert(interventionsChantier).values(data);
+  const result = await db.select().from(interventionsChantier)
+    .where(and(eq(interventionsChantier.chantierId, data.chantierId), eq(interventionsChantier.interventionId, data.interventionId)))
+    .orderBy(desc(interventionsChantier.id))
+    .limit(1);
+  return result[0];
+}
+
+export async function dissocierInterventionChantier(chantierId: number, interventionId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(interventionsChantier).where(and(eq(interventionsChantier.chantierId, chantierId), eq(interventionsChantier.interventionId, interventionId)));
+}
+
+// Documents chantier
+export async function getDocumentsByChantier(chantierId: number): Promise<DocumentChantier[]> {
+  const db = await getDb();
+  return await db.select().from(documentsChantier).where(eq(documentsChantier.chantierId, chantierId)).orderBy(desc(documentsChantier.uploadedAt));
+}
+
+export async function addDocumentChantier(data: any): Promise<DocumentChantier> {
+  const db = await getDb();
+  await db.insert(documentsChantier).values(data);
+  const result = await db.select().from(documentsChantier)
+    .where(eq(documentsChantier.chantierId, data.chantierId))
+    .orderBy(desc(documentsChantier.id))
+    .limit(1);
+  return result[0];
+}
+
+export async function deleteDocumentChantier(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(documentsChantier).where(eq(documentsChantier.id, id));
+}
+
+// Statistiques chantier
+export async function getStatistiquesChantier(chantierId: number): Promise<any> {
+  const db = await getDb();
+  const chantier = await getChantierById(chantierId);
+  if (!chantier) return null;
+  const phases = await getPhasesByChantier(chantierId);
+  const interventionsList = await getInterventionsByChantier(chantierId);
+  const documents = await getDocumentsByChantier(chantierId);
+
+  const phasesTerminees = phases.filter(p => p.statut === 'termine').length;
+  const budgetConsomme = parseFloat(String(chantier.budgetRealise || '0'));
+  const budgetTotal = parseFloat(String(chantier.budgetPrevisionnel || '0'));
+
+  return {
+    nombrePhases: phases.length,
+    phasesTerminees,
+    nombreInterventions: interventionsList.length,
+    nombreDocuments: documents.length,
+    budgetConsomme,
+    budgetTotal,
+    pourcentageBudget: budgetTotal > 0 ? Math.round((budgetConsomme / budgetTotal) * 100) : 0,
+    avancement: chantier.avancement || 0,
+  };
+}
+
+export async function calculerAvancementChantier(chantierId: number): Promise<any> {
+  const db = await getDb();
+  const phases = await getPhasesByChantier(chantierId);
+  if (phases.length === 0) return { avancement: 0 };
+
+  const totalAvancement = phases.reduce((sum, p) => sum + (p.avancement || 0), 0);
+  const avancement = Math.round(totalAvancement / phases.length);
+
+  await db.update(chantiers).set({ avancement }).where(eq(chantiers.id, chantierId));
+  return { avancement };
+}
+
+// ============================================================================
+// RAPPORTS PERSONNALISES
+// ============================================================================
+
+export async function getRapportsPersonnalisesByArtisanId(artisanId: number): Promise<RapportPersonnalise[]> {
+  const db = await getDb();
+  return await db.select().from(rapportsPersonnalises).where(eq(rapportsPersonnalises.artisanId, artisanId)).orderBy(desc(rapportsPersonnalises.updatedAt));
+}
+
+export async function getRapportPersonnaliseById(id: number): Promise<RapportPersonnalise | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(rapportsPersonnalises).where(eq(rapportsPersonnalises.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createRapportPersonnalise(data: any): Promise<RapportPersonnalise> {
+  const db = await getDb();
+  await db.insert(rapportsPersonnalises).values(data);
+  const result = await db.select().from(rapportsPersonnalises)
+    .where(eq(rapportsPersonnalises.artisanId, data.artisanId))
+    .orderBy(desc(rapportsPersonnalises.id))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateRapportPersonnalise(id: number, data: any): Promise<RapportPersonnalise | undefined> {
+  const db = await getDb();
+  await db.update(rapportsPersonnalises).set(data).where(eq(rapportsPersonnalises.id, id));
+  return getRapportPersonnaliseById(id);
+}
+
+export async function deleteRapportPersonnalise(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(executionsRapports).where(eq(executionsRapports.rapportId, id));
+  await db.delete(rapportsPersonnalises).where(eq(rapportsPersonnalises.id, id));
+}
+
+export async function toggleRapportFavori(id: number): Promise<RapportPersonnalise | undefined> {
+  const db = await getDb();
+  const rapport = await getRapportPersonnaliseById(id);
+  if (!rapport) return undefined;
+  await db.update(rapportsPersonnalises).set({ favori: !rapport.favori }).where(eq(rapportsPersonnalises.id, id));
+  return getRapportPersonnaliseById(id);
+}
+
+export async function executerRapport(rapportId: number, parametres?: Record<string, unknown>): Promise<any> {
+  const db = await getDb();
+  const startTime = Date.now();
+  const rapport = await getRapportPersonnaliseById(rapportId);
+  if (!rapport) throw new Error("Rapport non trouvé");
+
+  let resultats: any[] = [];
+
+  // Execute based on report type
+  switch (rapport.type) {
+    case 'ventes': {
+      const facturesList = await db.select().from(factures).where(eq(factures.artisanId, rapport.artisanId)).orderBy(desc(factures.dateFacture));
+      resultats = facturesList;
+      break;
+    }
+    case 'clients': {
+      resultats = await db.select().from(clients).where(eq(clients.artisanId, rapport.artisanId)).orderBy(desc(clients.createdAt));
+      break;
+    }
+    case 'interventions': {
+      resultats = await db.select().from(interventions).where(eq(interventions.artisanId, rapport.artisanId)).orderBy(desc(interventions.dateDebut));
+      break;
+    }
+    case 'stocks': {
+      resultats = await db.select().from(stocks).where(eq(stocks.artisanId, rapport.artisanId));
+      break;
+    }
+    case 'fournisseurs': {
+      resultats = await db.select().from(fournisseurs).where(eq(fournisseurs.artisanId, rapport.artisanId));
+      break;
+    }
+    case 'financier': {
+      const facturesList = await db.select().from(factures).where(eq(factures.artisanId, rapport.artisanId));
+      const totalCA = facturesList.filter(f => f.statut === 'payee').reduce((sum, f) => sum + parseFloat(String(f.totalTTC || '0')), 0);
+      resultats = [{ totalCA, nombreFactures: facturesList.length, facturesPayees: facturesList.filter(f => f.statut === 'payee').length }];
+      break;
+    }
+    default:
+      resultats = [];
+  }
+
+  const tempsExecution = Date.now() - startTime;
+
+  // Save execution history
+  await db.insert(executionsRapports).values({
+    rapportId,
+    artisanId: rapport.artisanId,
+    parametres: parametres || {},
+    resultats,
+    nombreLignes: resultats.length,
+    tempsExecution,
+  });
+
+  return { resultats, nombreLignes: resultats.length, tempsExecution };
+}
+
+export async function getHistoriqueExecutions(rapportId: number, limit: number = 10): Promise<ExecutionRapport[]> {
+  const db = await getDb();
+  return await db.select().from(executionsRapports)
+    .where(eq(executionsRapports.rapportId, rapportId))
+    .orderBy(desc(executionsRapports.dateExecution))
+    .limit(limit);
+}
+
+// ============================================================================
+// COMPTABILITE
+// ============================================================================
+
+export async function getEcrituresComptables(artisanId: number, dateDebut?: Date, dateFin?: Date): Promise<EcritureComptable[]> {
+  const db = await getDb();
+  const conditions: any[] = [eq(ecrituresComptables.artisanId, artisanId)];
+  if (dateDebut) conditions.push(gte(ecrituresComptables.dateEcriture, dateDebut));
+  if (dateFin) conditions.push(lte(ecrituresComptables.dateEcriture, dateFin));
+  return await db.select().from(ecrituresComptables).where(and(...conditions)).orderBy(desc(ecrituresComptables.dateEcriture));
+}
+
+export async function getGrandLivre(artisanId: number, dateDebut: Date, dateFin: Date): Promise<any[]> {
+  const db = await getDb();
+  const ecritures = await db.select().from(ecrituresComptables)
+    .where(and(
+      eq(ecrituresComptables.artisanId, artisanId),
+      gte(ecrituresComptables.dateEcriture, dateDebut),
+      lte(ecrituresComptables.dateEcriture, dateFin)
+    ))
+    .orderBy(asc(ecrituresComptables.numeroCompte), asc(ecrituresComptables.dateEcriture));
+
+  // Group by account number
+  const comptes = new Map<string, { numeroCompte: string; libelleCompte: string; ecritures: any[]; totalDebit: number; totalCredit: number; solde: number }>();
+  for (const e of ecritures) {
+    if (!comptes.has(e.numeroCompte)) {
+      comptes.set(e.numeroCompte, { numeroCompte: e.numeroCompte, libelleCompte: e.libelleCompte || '', ecritures: [], totalDebit: 0, totalCredit: 0, solde: 0 });
+    }
+    const compte = comptes.get(e.numeroCompte)!;
+    compte.ecritures.push(e);
+    compte.totalDebit += parseFloat(String(e.debit || '0'));
+    compte.totalCredit += parseFloat(String(e.credit || '0'));
+    compte.solde = compte.totalDebit - compte.totalCredit;
+  }
+  return Array.from(comptes.values());
+}
+
+export async function getBalance(artisanId: number, dateDebut: Date, dateFin: Date): Promise<any[]> {
+  const db = await getDb();
+  const ecritures = await db.select().from(ecrituresComptables)
+    .where(and(
+      eq(ecrituresComptables.artisanId, artisanId),
+      gte(ecrituresComptables.dateEcriture, dateDebut),
+      lte(ecrituresComptables.dateEcriture, dateFin)
+    ));
+
+  const comptes = new Map<string, { numeroCompte: string; libelleCompte: string; debit: number; credit: number; soldeDebiteur: number; soldeCrediteur: number }>();
+  for (const e of ecritures) {
+    if (!comptes.has(e.numeroCompte)) {
+      comptes.set(e.numeroCompte, { numeroCompte: e.numeroCompte, libelleCompte: e.libelleCompte || '', debit: 0, credit: 0, soldeDebiteur: 0, soldeCrediteur: 0 });
+    }
+    const c = comptes.get(e.numeroCompte)!;
+    c.debit += parseFloat(String(e.debit || '0'));
+    c.credit += parseFloat(String(e.credit || '0'));
+    const solde = c.debit - c.credit;
+    c.soldeDebiteur = solde > 0 ? solde : 0;
+    c.soldeCrediteur = solde < 0 ? Math.abs(solde) : 0;
+  }
+  return Array.from(comptes.values()).sort((a, b) => a.numeroCompte.localeCompare(b.numeroCompte));
+}
+
+export async function getJournalVentes(artisanId: number, dateDebut: Date, dateFin: Date): Promise<any[]> {
+  const db = await getDb();
+  return await db.select().from(ecrituresComptables)
+    .where(and(
+      eq(ecrituresComptables.artisanId, artisanId),
+      eq(ecrituresComptables.journal, 'VE'),
+      gte(ecrituresComptables.dateEcriture, dateDebut),
+      lte(ecrituresComptables.dateEcriture, dateFin)
+    ))
+    .orderBy(asc(ecrituresComptables.dateEcriture));
+}
+
+export async function getRapportTVA(artisanId: number, dateDebut: Date, dateFin: Date): Promise<{ tvaCollectee: number; tvaDeductible: number; tvaNette: number }> {
+  const db = await getDb();
+  const ecritures = await db.select().from(ecrituresComptables)
+    .where(and(
+      eq(ecrituresComptables.artisanId, artisanId),
+      gte(ecrituresComptables.dateEcriture, dateDebut),
+      lte(ecrituresComptables.dateEcriture, dateFin)
+    ));
+
+  let tvaCollectee = 0;
+  let tvaDeductible = 0;
+  for (const e of ecritures) {
+    // Comptes 44571x = TVA collectée, 44566x = TVA déductible
+    if (e.numeroCompte.startsWith('44571')) {
+      tvaCollectee += parseFloat(String(e.credit || '0'));
+    } else if (e.numeroCompte.startsWith('44566')) {
+      tvaDeductible += parseFloat(String(e.debit || '0'));
+    }
+  }
+  return { tvaCollectee, tvaDeductible, tvaNette: tvaCollectee - tvaDeductible };
+}
+
+export async function genererEcrituresFacture(factureId: number): Promise<any> {
+  const db = await getDb();
+  const [facture] = await db.select().from(factures).where(eq(factures.id, factureId)).limit(1);
+  if (!facture) throw new Error("Facture non trouvée");
+
+  const dateEcriture = facture.dateFacture || new Date();
+  const totalHT = parseFloat(String(facture.totalHT || '0'));
+  const totalTVA = parseFloat(String(facture.totalTVA || '0'));
+  const totalTTC = parseFloat(String(facture.totalTTC || '0'));
+  const pieceRef = facture.numero || `F-${factureId}`;
+
+  // Delete existing entries for this invoice
+  await db.delete(ecrituresComptables).where(eq(ecrituresComptables.factureId, factureId));
+
+  const entries = [
+    // Débit 411 - Client
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: `Facture ${pieceRef}`, pieceRef, debit: String(totalTTC), credit: '0.00', factureId },
+    // Crédit 706 - Ventes
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '706000', libelleCompte: 'Prestations de services', libelle: `Facture ${pieceRef}`, pieceRef, debit: '0.00', credit: String(totalHT), factureId },
+  ];
+
+  if (totalTVA > 0) {
+    // Crédit 44571 - TVA collectée
+    entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '445710', libelleCompte: 'TVA collectée', libelle: `Facture ${pieceRef}`, pieceRef, debit: '0.00', credit: String(totalTVA), factureId });
+  }
+
+  for (const entry of entries) {
+    await db.insert(ecrituresComptables).values(entry);
+  }
+
+  return { success: true, nombreEcritures: entries.length };
+}
+
+export async function getPlanComptable(artisanId: number): Promise<CompteComptable[]> {
+  const db = await getDb();
+  return await db.select().from(planComptable).where(eq(planComptable.artisanId, artisanId)).orderBy(asc(planComptable.numeroCompte));
+}
+
+export async function initPlanComptable(artisanId: number): Promise<void> {
+  const db = await getDb();
+  // Check if already initialized
+  const existing = await db.select().from(planComptable).where(eq(planComptable.artisanId, artisanId)).limit(1);
+  if (existing.length > 0) return;
+
+  const comptesParDefaut = [
+    { numeroCompte: '411000', libelle: 'Clients', classe: 4, type: 'actif' as const },
+    { numeroCompte: '445660', libelle: 'TVA déductible', classe: 4, type: 'actif' as const },
+    { numeroCompte: '445710', libelle: 'TVA collectée', classe: 4, type: 'passif' as const },
+    { numeroCompte: '512000', libelle: 'Banque', classe: 5, type: 'actif' as const },
+    { numeroCompte: '530000', libelle: 'Caisse', classe: 5, type: 'actif' as const },
+    { numeroCompte: '607000', libelle: 'Achats de marchandises', classe: 6, type: 'charge' as const },
+    { numeroCompte: '615000', libelle: 'Entretien et réparations', classe: 6, type: 'charge' as const },
+    { numeroCompte: '625000', libelle: 'Déplacements', classe: 6, type: 'charge' as const },
+    { numeroCompte: '706000', libelle: 'Prestations de services', classe: 7, type: 'produit' as const },
+    { numeroCompte: '707000', libelle: 'Ventes de marchandises', classe: 7, type: 'produit' as const },
+  ];
+
+  for (const compte of comptesParDefaut) {
+    await db.insert(planComptable).values({ artisanId, ...compte });
+  }
+}
+
+// ============================================================================
+// PREVISIONS CA
+// ============================================================================
+
+export async function getHistoriqueCA(artisanId: number, nombreMois: number = 24): Promise<HistoriqueCA[]> {
+  const db = await getDb();
+  return await db.select().from(historiqueCA)
+    .where(eq(historiqueCA.artisanId, artisanId))
+    .orderBy(desc(historiqueCA.annee), desc(historiqueCA.mois))
+    .limit(nombreMois);
+}
+
+export async function calculerHistoriqueCAMensuel(artisanId: number): Promise<void> {
+  const db = await getDb();
+  // Get all paid invoices for this artisan
+  const facturesList = await db.select().from(factures)
+    .where(and(eq(factures.artisanId, artisanId), eq(factures.statut, 'payee')));
+
+  // Group by month/year
+  const monthlyData = new Map<string, { ca: number; nbFactures: number; clientIds: Set<number> }>();
+
+  for (const f of facturesList) {
+    const date = f.dateFacture ? new Date(f.dateFacture) : new Date(f.createdAt);
+    const mois = date.getMonth() + 1;
+    const annee = date.getFullYear();
+    const key = `${annee}-${mois}`;
+
+    if (!monthlyData.has(key)) {
+      monthlyData.set(key, { ca: 0, nbFactures: 0, clientIds: new Set() });
+    }
+    const d = monthlyData.get(key)!;
+    d.ca += parseFloat(String(f.totalTTC || '0'));
+    d.nbFactures++;
+    d.clientIds.add(f.clientId);
+  }
+
+  // Upsert into historiqueCA
+  for (const [key, data] of monthlyData) {
+    const [anneeStr, moisStr] = key.split('-');
+    const annee = parseInt(anneeStr);
+    const mois = parseInt(moisStr);
+    const panierMoyen = data.nbFactures > 0 ? data.ca / data.nbFactures : 0;
+
+    // Delete existing entry
+    await db.delete(historiqueCA).where(and(
+      eq(historiqueCA.artisanId, artisanId),
+      eq(historiqueCA.mois, mois),
+      eq(historiqueCA.annee, annee)
+    ));
+
+    await db.insert(historiqueCA).values({
+      artisanId,
+      mois,
+      annee,
+      caTotal: String(data.ca),
+      nombreFactures: data.nbFactures,
+      nombreClients: data.clientIds.size,
+      panierMoyen: String(panierMoyen),
+    });
+  }
+}
+
+export async function getPrevisionsCA(artisanId: number, annee: number): Promise<PrevisionCA[]> {
+  const db = await getDb();
+  return await db.select().from(previsionsCA)
+    .where(and(eq(previsionsCA.artisanId, artisanId), eq(previsionsCA.annee, annee)))
+    .orderBy(asc(previsionsCA.mois));
+}
+
+export async function calculerPrevisionsCA(artisanId: number, methode: string): Promise<any> {
+  const db = await getDb();
+  const historique = await getHistoriqueCA(artisanId, 24);
+
+  if (historique.length === 0) {
+    return { message: "Pas assez de données historiques pour calculer les prévisions" };
+  }
+
+  const currentYear = new Date().getFullYear();
+  const predictions: { mois: number; caPrevisionnel: number; confiance: number }[] = [];
+
+  // Calculate average monthly CA from history
+  const monthlyAvg = new Map<number, { total: number; count: number }>();
+  for (const h of historique) {
+    if (!monthlyAvg.has(h.mois)) {
+      monthlyAvg.set(h.mois, { total: 0, count: 0 });
+    }
+    const m = monthlyAvg.get(h.mois)!;
+    m.total += parseFloat(String(h.caTotal || '0'));
+    m.count++;
+  }
+
+  const overallAvg = historique.reduce((sum, h) => sum + parseFloat(String(h.caTotal || '0')), 0) / historique.length;
+
+  for (let mois = 1; mois <= 12; mois++) {
+    let caPrevisionnel: number;
+    let confiance: number;
+
+    switch (methode) {
+      case 'saisonnalite': {
+        const monthData = monthlyAvg.get(mois);
+        caPrevisionnel = monthData ? monthData.total / monthData.count : overallAvg;
+        confiance = monthData ? Math.min(90, 50 + monthData.count * 15) : 30;
+        break;
+      }
+      case 'regression_lineaire': {
+        // Simple linear trend based on overall average with slight growth
+        caPrevisionnel = overallAvg * (1 + 0.02 * (mois / 12));
+        confiance = Math.min(75, 40 + historique.length * 2);
+        break;
+      }
+      default: { // moyenne_mobile
+        caPrevisionnel = overallAvg;
+        confiance = Math.min(80, 30 + historique.length * 3);
+      }
+    }
+
+    predictions.push({ mois, caPrevisionnel: Math.round(caPrevisionnel * 100) / 100, confiance: Math.round(confiance) });
+  }
+
+  // Save predictions
+  for (const pred of predictions) {
+    // Delete existing
+    await db.delete(previsionsCA).where(and(
+      eq(previsionsCA.artisanId, artisanId),
+      eq(previsionsCA.mois, pred.mois),
+      eq(previsionsCA.annee, currentYear)
+    ));
+
+    await db.insert(previsionsCA).values({
+      artisanId,
+      mois: pred.mois,
+      annee: currentYear,
+      caPrevisionnel: String(pred.caPrevisionnel),
+      methodeCalcul: methode as any,
+      confiance: String(pred.confiance),
+    });
+  }
+
+  return { predictions, methode, annee: currentYear };
+}
+
+export async function getComparaisonPrevisionsRealise(artisanId: number, annee: number): Promise<any[]> {
+  const db = await getDb();
+  const previsions = await getPrevisionsCA(artisanId, annee);
+  const historique = await db.select().from(historiqueCA)
+    .where(and(eq(historiqueCA.artisanId, artisanId), eq(historiqueCA.annee, annee)));
+
+  const historiqueMap = new Map(historique.map(h => [h.mois, h]));
+
+  return previsions.map(p => {
+    const h = historiqueMap.get(p.mois);
+    const caRealise = h ? parseFloat(String(h.caTotal || '0')) : 0;
+    const caPrevisionnel = parseFloat(String(p.caPrevisionnel || '0'));
+    const ecart = caRealise - caPrevisionnel;
+    const ecartPourcentage = caPrevisionnel > 0 ? (ecart / caPrevisionnel) * 100 : 0;
+    return {
+      mois: p.mois,
+      caPrevisionnel,
+      caRealise,
+      ecart: Math.round(ecart * 100) / 100,
+      ecartPourcentage: Math.round(ecartPourcentage * 10) / 10,
+    };
+  });
+}
+
+export async function savePrevisionCA(data: { artisanId: number; mois: number; annee: number; caPrevisionnel: string; methodeCalcul: string }): Promise<PrevisionCA> {
+  const db = await getDb();
+  // Delete existing
+  await db.delete(previsionsCA).where(and(
+    eq(previsionsCA.artisanId, data.artisanId),
+    eq(previsionsCA.mois, data.mois),
+    eq(previsionsCA.annee, data.annee)
+  ));
+
+  await db.insert(previsionsCA).values({
+    artisanId: data.artisanId,
+    mois: data.mois,
+    annee: data.annee,
+    caPrevisionnel: data.caPrevisionnel,
+    methodeCalcul: data.methodeCalcul as any,
+  });
+
+  const result = await db.select().from(previsionsCA)
+    .where(and(
+      eq(previsionsCA.artisanId, data.artisanId),
+      eq(previsionsCA.mois, data.mois),
+      eq(previsionsCA.annee, data.annee)
+    ))
+    .limit(1);
+  return result[0];
 }
 
 // One-time seed for test data (runs on server startup)
