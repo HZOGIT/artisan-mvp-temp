@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint, uniqueIndex } from "drizzle-orm/mysql-core";
 
 // ============================================================================
 // USERS TABLE (Core authentication)
@@ -125,7 +125,9 @@ export const devis = mysqlTable("devis", {
   totalTTC: decimal("totalTTC", { precision: 10, scale: 2 }).default("0.00"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({
+  uniqueNumero: uniqueIndex('unique_devis_artisan_numero').on(table.artisanId, table.numero),
+}));
 
 export type Devis = typeof devis.$inferSelect;
 export type InsertDevis = typeof devis.$inferInsert;
@@ -174,7 +176,9 @@ export const factures = mysqlTable("factures", {
   datePaiement: timestamp("datePaiement"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => ({
+  uniqueNumero: uniqueIndex('unique_factures_artisan_numero').on(table.artisanId, table.numero),
+}));
 
 export type Facture = typeof factures.$inferSelect;
 export type InsertFacture = typeof factures.$inferInsert;

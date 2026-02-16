@@ -2039,14 +2039,22 @@ const signatureRouter = router({
           message: `Le devis ${devisData.numero} a été accepté et signé par ${input.signataireName}`,
           lien: `/devis/${signature.devisId}`
         });
-        // Email notification to artisan
-        if (artisan?.email) {
+        // Email notification to artisan (fallback to user email if artisan.email not set)
+        let artisanEmail = artisan?.email;
+        if (!artisanEmail && artisan?.userId) {
+          const user = await db.getUserById(artisan.userId);
+          artisanEmail = user?.email || null;
+        }
+        console.log(`[Signature] Artisan notification: artisan.email=${artisan?.email || 'null'}, resolved=${artisanEmail || 'null'}`);
+        if (artisanEmail) {
           const { sendEmail } = await import('./_core/emailService');
           await sendEmail({
-            to: artisan.email,
+            to: artisanEmail,
             subject: `Devis ${devisData.numero} accepté et signé`,
             body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${input.signataireName}</strong> (${input.signataireEmail}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">MonArtisan Pro</p>`
           });
+        } else {
+          console.warn(`[Signature] No email found for artisan id=${devisData.artisanId} — notification email NOT sent`);
         }
       }
 
@@ -2090,11 +2098,16 @@ const signatureRouter = router({
           message: `Le devis ${devisData.numero} a été refusé par ${clientName}${input.motifRefus ? ` — Motif : ${input.motifRefus}` : ''}`,
           lien: `/devis/${signature.devisId}`
         });
-        // Email notification to artisan
-        if (artisan?.email) {
+        // Email notification to artisan (fallback to user email if artisan.email not set)
+        let artisanEmail = artisan?.email;
+        if (!artisanEmail && artisan?.userId) {
+          const user = await db.getUserById(artisan.userId);
+          artisanEmail = user?.email || null;
+        }
+        if (artisanEmail) {
           const { sendEmail } = await import('./_core/emailService');
           await sendEmail({
-            to: artisan.email,
+            to: artisanEmail,
             subject: `Devis ${devisData.numero} refusé par ${clientName}`,
             body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${clientName}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${input.motifRefus}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">MonArtisan Pro</p>`
           });

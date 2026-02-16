@@ -345,15 +345,26 @@ export async function getNextDevisNumber(artisanId: number): Promise<string> {
   const db = await getDb();
   const params = await db.select().from(parametresArtisan).where(eq(parametresArtisan.artisanId, artisanId)).limit(1);
   const prefix = params[0]?.prefixeDevis || 'DEV';
-  const compteur = (params[0]?.compteurDevis || 0) + 1;
-  
+  const compteurParam = (params[0]?.compteurDevis || 0) + 1;
+
+  // Also check MAX existing number in DB to avoid duplicates
+  const maxResult = await db.select({ maxNum: sql<string>`MAX(numero)` }).from(devis)
+    .where(eq(devis.artisanId, artisanId));
+  let maxFromDb = 0;
+  if (maxResult[0]?.maxNum) {
+    const match = maxResult[0].maxNum.match(/-(\d+)$/);
+    if (match) maxFromDb = parseInt(match[1], 10) + 1;
+  }
+
+  const compteur = Math.max(compteurParam, maxFromDb);
+
   // Update counter
   if (params[0]) {
     await db.update(parametresArtisan).set({ compteurDevis: compteur }).where(eq(parametresArtisan.artisanId, artisanId));
   } else {
     await db.insert(parametresArtisan).values({ artisanId, compteurDevis: compteur });
   }
-  
+
   return `${prefix}-${String(compteur).padStart(5, '0')}`;
 }
 
@@ -469,14 +480,25 @@ export async function getNextFactureNumber(artisanId: number): Promise<string> {
   const db = await getDb();
   const params = await db.select().from(parametresArtisan).where(eq(parametresArtisan.artisanId, artisanId)).limit(1);
   const prefix = params[0]?.prefixeFacture || 'FAC';
-  const compteur = (params[0]?.compteurFacture || 0) + 1;
-  
+  const compteurParam = (params[0]?.compteurFacture || 0) + 1;
+
+  // Also check MAX existing number in DB to avoid duplicates
+  const maxResult = await db.select({ maxNum: sql<string>`MAX(numero)` }).from(factures)
+    .where(eq(factures.artisanId, artisanId));
+  let maxFromDb = 0;
+  if (maxResult[0]?.maxNum) {
+    const match = maxResult[0].maxNum.match(/-(\d+)$/);
+    if (match) maxFromDb = parseInt(match[1], 10) + 1;
+  }
+
+  const compteur = Math.max(compteurParam, maxFromDb);
+
   if (params[0]) {
     await db.update(parametresArtisan).set({ compteurFacture: compteur }).where(eq(parametresArtisan.artisanId, artisanId));
   } else {
     await db.insert(parametresArtisan).values({ artisanId, compteurFacture: compteur });
   }
-  
+
   return `${prefix}-${String(compteur).padStart(5, '0')}`;
 }
 
@@ -1588,6 +1610,44 @@ export async function getTechnicienPlusProche(
   const suggestions = await getSuggestionsTechniciens(artisanId, latitude, longitude, dateIntervention);
   const available = suggestions.filter(s => s.disponible);
   return available.length > 0 ? available[0] : null;
+}
+
+// One-time fix for duplicate devis/factures numbers (runs before unique index is applied)
+export async function fixDuplicateNumbers(): Promise<void> {
+  const db = await getDb();
+
+  // Fix duplicate devis numbers per artisan
+  const allDevis = await db.select({ id: devis.id, artisanId: devis.artisanId, numero: devis.numero })
+    .from(devis).orderBy(asc(devis.id));
+  const seenDevis = new Map<string, boolean>();
+  for (const d of allDevis) {
+    const key = `${d.artisanId}:${d.numero}`;
+    if (seenDevis.has(key)) {
+      // Duplicate — assign next available number
+      const newNumero = await getNextDevisNumber(d.artisanId);
+      await db.update(devis).set({ numero: newNumero }).where(eq(devis.id, d.id));
+      console.log(`[FixDuplicates] Devis id=${d.id}: ${d.numero} → ${newNumero}`);
+    } else {
+      seenDevis.set(key, true);
+    }
+  }
+
+  // Fix duplicate facture numbers per artisan
+  const allFactures = await db.select({ id: factures.id, artisanId: factures.artisanId, numero: factures.numero })
+    .from(factures).orderBy(asc(factures.id));
+  const seenFactures = new Map<string, boolean>();
+  for (const f of allFactures) {
+    const key = `${f.artisanId}:${f.numero}`;
+    if (seenFactures.has(key)) {
+      const newNumero = await getNextFactureNumber(f.artisanId);
+      await db.update(factures).set({ numero: newNumero }).where(eq(factures.id, f.id));
+      console.log(`[FixDuplicates] Facture id=${f.id}: ${f.numero} → ${newNumero}`);
+    } else {
+      seenFactures.set(key, true);
+    }
+  }
+
+  console.log('[FixDuplicates] Done checking for duplicate numbers.');
 }
 
 // One-time seed for test data (runs on server startup)
