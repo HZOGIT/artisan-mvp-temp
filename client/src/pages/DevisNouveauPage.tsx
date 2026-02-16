@@ -46,6 +46,7 @@ export default function DevisNouveauPage() {
   const [clientId, setClientId] = useState<number>(0);
   const [dateDevis, setDateDevis] = useState(new Date().toISOString().split('T')[0]);
   const [dateExpiration, setDateExpiration] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+  const [objet, setObjet] = useState("");
   const [notes, setNotes] = useState("");
   const [lignes, setLignes] = useState<LigneDevis[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -216,6 +217,7 @@ export default function DevisNouveauPage() {
       // Créer le devis
       const devis = await createMutation.mutateAsync({
         clientId,
+        objet: objet || undefined,
         dateValidite: dateExpiration,
         notes,
       });
@@ -281,6 +283,19 @@ export default function DevisNouveauPage() {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Objet */}
+        <div>
+          <Label htmlFor="objet" className="block text-sm font-medium mb-2">
+            Objet du devis
+          </Label>
+          <Input
+            id="objet"
+            value={objet}
+            onChange={(e) => setObjet(e.target.value)}
+            placeholder="Ex: Rénovation salle de bain, Dépannage fuite..."
+          />
         </div>
 
         {/* Dates */}

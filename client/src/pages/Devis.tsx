@@ -284,6 +284,7 @@ export default function Devis() {
             <thead>
               <tr>
                 <th className="whitespace-nowrap">Numéro</th>
+                <th className="whitespace-nowrap">Date</th>
                 <th>Client</th>
                 <th>Objet</th>
                 <th className="whitespace-nowrap text-right">Montant TTC</th>
@@ -297,6 +298,7 @@ export default function Devis() {
                 return (
                   <tr key={devis.id} className="cursor-pointer" onClick={() => setLocation(`/devis/${devis.id}`)}>
                     <td className="font-medium whitespace-nowrap">{devis.numero}</td>
+                    <td className="whitespace-nowrap text-muted-foreground">{devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-"}</td>
                     <td className="whitespace-nowrap">{client ? `${client.nom} ${client.prenom}` : "-"}</td>
                     <td className="max-w-[200px] truncate">{devis.objet || "-"}</td>
                     <td className="font-medium text-right whitespace-nowrap">{formatCurrency(devis.totalTTC)}</td>
