@@ -201,7 +201,17 @@ const articlesRouter = router({
     .query(async ({ input }) => {
       return await db.getBibliothequeArticles(input?.metier, input?.categorie);
     }),
-  
+
+  // Alias list → getBibliotheque
+  list: publicProcedure
+    .input(z.object({
+      metier: z.string().optional(),
+      categorie: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      return await db.getBibliothequeArticles(input?.metier, input?.categorie);
+    }),
+
   search: publicProcedure
     .input(z.object({
       query: z.string(),
@@ -323,12 +333,28 @@ const articlesRouter = router({
 // DEVIS ROUTER
 // ============================================================================
 const devisRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const artisan = await db.getArtisanByUserId(ctx.user.id);
-    if (!artisan) return [];
-    // Utiliser la version sécurisée
-    return await dbSecure.getDevisByArtisanIdSecure(artisan.id);
-  }),
+  list: protectedProcedure
+    .input(z.object({ search: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const allDevis = await dbSecure.getDevisByArtisanIdSecure(artisan.id);
+      if (!input?.search) return allDevis;
+      const q = input.search.toLowerCase();
+      // Filtrer par numéro, objet ou nom client
+      const filtered = [];
+      for (const d of allDevis) {
+        if (d.numero?.toLowerCase().includes(q) || d.objet?.toLowerCase().includes(q)) {
+          filtered.push(d);
+          continue;
+        }
+        const client = await db.getClientById(d.clientId);
+        if (client && `${client.prenom || ''} ${client.nom}`.toLowerCase().includes(q)) {
+          filtered.push(d);
+        }
+      }
+      return filtered;
+    }),
   
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
@@ -344,7 +370,8 @@ const devisRouter = router({
       }
       const lignes = await db.getLignesDevisByDevisId(devis.id);
       const client = await dbSecure.getClientByIdSecure(devis.clientId, artisan.id);
-      return { ...devis, lignes, client };
+      const signature = await db.getSignatureByDevisId(devis.id);
+      return { ...devis, lignes, client, signatureToken: signature?.token || null };
     }),
   
   create: protectedProcedure
@@ -1706,17 +1733,60 @@ const dashboardRouter = router({
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) {
       return {
-        caMonth: 0,
-        caYear: 0,
-        devisEnCours: 0,
+        caMonth: 0, caYear: 0, devisEnCours: 0,
         facturesImpayees: { count: 0, total: 0 },
-        interventionsAVenir: 0,
-        totalClients: 0,
+        interventionsAVenir: 0, totalClients: 0,
+        totalDevis: 0, totalFactures: 0, totalInterventions: 0,
+        // Alias fields for audit compatibility
+        chiffreAffaires: 0, devisEnAttente: 0,
       };
     }
-    return await db.getDashboardStats(artisan.id);
+    const stats = await db.getDashboardStats(artisan.id);
+    return {
+      ...stats,
+      // Alias fields
+      chiffreAffaires: stats.caYear,
+      devisEnAttente: stats.devisEnCours,
+    };
   }),
-  
+
+  getRecentActivity: protectedProcedure
+    .input(z.object({ limit: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const limit = input?.limit || 10;
+      const activities: Array<{ type: string; titre: string; date: Date; id: number }> = [];
+
+      // Derniers devis
+      const allDevis = await dbSecure.getDevisByArtisanIdSecure(artisan.id);
+      for (const d of allDevis.slice(0, limit)) {
+        activities.push({ type: 'devis', titre: `Devis ${d.numero} créé`, date: new Date(d.createdAt), id: d.id });
+      }
+
+      // Dernières factures
+      const allFactures = await db.getFacturesByArtisanId(artisan.id);
+      for (const f of allFactures.slice(0, limit)) {
+        activities.push({ type: 'facture', titre: `Facture ${f.numero} ${f.statut === 'payee' ? 'payée' : 'créée'}`, date: new Date(f.createdAt), id: f.id });
+      }
+
+      // Dernières interventions
+      const allInterventions = await dbSecure.getInterventionsByArtisanIdSecure(artisan.id);
+      for (const i of allInterventions.slice(0, limit)) {
+        activities.push({ type: 'intervention', titre: `Intervention "${i.titre}" planifiée`, date: new Date(i.createdAt), id: i.id });
+      }
+
+      // Derniers clients
+      const allClients = await db.getClientsByArtisanId(artisan.id);
+      for (const c of allClients.slice(0, limit)) {
+        activities.push({ type: 'client', titre: `Client ${c.prenom || ''} ${c.nom} ajouté`, date: new Date(c.createdAt), id: c.id });
+      }
+
+      // Trier par date décroissante et limiter
+      activities.sort((a, b) => b.date.getTime() - a.date.getTime());
+      return activities.slice(0, limit);
+    }),
+
   getUpcomingInterventions: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
@@ -2448,6 +2518,15 @@ const modelesEmailRouter = router({
       }
       return modele;
     }),
+
+  // Modèles transactionnels (envoi_devis, envoi_facture, relance_devis, etc.)
+  listTransactionnels: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const all = await db.getModelesEmailByArtisanId(artisan.id);
+    const typesTransactionnels = ['envoi_devis', 'envoi_facture', 'relance_devis', 'confirmation_intervention', 'demande_avis', 'portail_client'];
+    return all.filter((m: any) => typesTransactionnels.includes(m.type));
+  }),
 
   getDefault: protectedProcedure
     .input(z.object({ type: z.string() }))
@@ -3695,14 +3774,27 @@ const avisRouter = router({
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
     const avis = await db.getAvisByArtisanId(artisan.id);
-    
+
     // Enrichir avec les infos client et intervention
     const enriched = await Promise.all(avis.map(async (a) => {
       const client = await db.getClientById(a.clientId);
       const intervention = a.interventionId ? await db.getInterventionById(a.interventionId) : null;
       return { ...a, client, intervention };
     }));
-    
+
+    return enriched;
+  }),
+
+  // Alias list → getAll
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const avis = await db.getAvisByArtisanId(artisan.id);
+    const enriched = await Promise.all(avis.map(async (a) => {
+      const client = await db.getClientById(a.clientId);
+      const intervention = a.interventionId ? await db.getInterventionById(a.interventionId) : null;
+      return { ...a, client, intervention };
+    }));
     return enriched;
   }),
 
@@ -3988,46 +4080,73 @@ const comptabiliteRouter = router({
 
   getGrandLivre: protectedProcedure
     .input(z.object({
-      dateDebut: z.date(),
-      dateFin: z.date(),
-    }))
+      dateDebut: z.date().optional(),
+      dateFin: z.date().optional(),
+    }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      return await db.getGrandLivre(artisan.id, input.dateDebut, input.dateFin);
+      const now = new Date();
+      const dateDebut = input?.dateDebut || new Date(now.getFullYear(), now.getMonth(), 1);
+      const dateFin = input?.dateFin || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return await db.getGrandLivre(artisan.id, dateDebut, dateFin);
     }),
 
   getBalance: protectedProcedure
     .input(z.object({
-      dateDebut: z.date(),
-      dateFin: z.date(),
-    }))
+      dateDebut: z.date().optional(),
+      dateFin: z.date().optional(),
+    }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      return await db.getBalance(artisan.id, input.dateDebut, input.dateFin);
+      const now = new Date();
+      const dateDebut = input?.dateDebut || new Date(now.getFullYear(), now.getMonth(), 1);
+      const dateFin = input?.dateFin || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return await db.getBalance(artisan.id, dateDebut, dateFin);
     }),
 
   getJournalVentes: protectedProcedure
     .input(z.object({
-      dateDebut: z.date(),
-      dateFin: z.date(),
-    }))
+      dateDebut: z.date().optional(),
+      dateFin: z.date().optional(),
+    }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      return await db.getJournalVentes(artisan.id, input.dateDebut, input.dateFin);
+      const now = new Date();
+      const dateDebut = input?.dateDebut || new Date(now.getFullYear(), now.getMonth(), 1);
+      const dateFin = input?.dateFin || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return await db.getJournalVentes(artisan.id, dateDebut, dateFin);
     }),
 
   getRapportTVA: protectedProcedure
     .input(z.object({
-      dateDebut: z.date(),
-      dateFin: z.date(),
-    }))
+      dateDebut: z.date().optional(),
+      dateFin: z.date().optional(),
+    }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return { tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
-      return await db.getRapportTVA(artisan.id, input.dateDebut, input.dateFin);
+      const now = new Date();
+      const dateDebut = input?.dateDebut || new Date(now.getFullYear(), now.getMonth(), 1);
+      const dateFin = input?.dateFin || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return await db.getRapportTVA(artisan.id, dateDebut, dateFin);
+    }),
+
+  // Alias getDeclarationTVA → getRapportTVA
+  getDeclarationTVA: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date().optional(),
+      dateFin: z.date().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
+      const now = new Date();
+      const dateDebut = input?.dateDebut || new Date(now.getFullYear(), now.getMonth(), 1);
+      const dateFin = input?.dateFin || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      return await db.getRapportTVA(artisan.id, dateDebut, dateFin);
     }),
 
   genererEcrituresFacture: protectedProcedure
@@ -4531,13 +4650,14 @@ const previsionsRouter = router({
     }),
 
   getPrevisions: protectedProcedure
-    .input(z.object({ annee: z.number() }))
+    .input(z.object({ annee: z.number().optional() }).optional())
     .query(async ({ ctx, input }) => {
       let artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         artisan = await db.createArtisan({ userId: ctx.user.id });
       }
-      return await db.getPrevisionsCA(artisan.id, input.annee);
+      const annee = input?.annee || new Date().getFullYear();
+      return await db.getPrevisionsCA(artisan.id, annee);
     }),
 
   calculer: protectedProcedure
@@ -4581,6 +4701,17 @@ const previsionsRouter = router({
         caPrevisionnel: input.caPrevisionnel,
         methodeCalcul: 'manuel',
       });
+    }),
+
+  // Alias getHistoriqueCA → getHistorique
+  getHistoriqueCA: protectedProcedure
+    .input(z.object({ nombreMois: z.number().default(24) }).optional())
+    .query(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        artisan = await db.createArtisan({ userId: ctx.user.id });
+      }
+      return await db.getHistoriqueCA(artisan.id, input?.nombreMois || 24);
     }),
 });
 
@@ -5490,6 +5621,159 @@ const alertesPrevisionsRouter = router({
 });
 
 // ============================================================================
+// STATISTIQUES ROUTER
+// ============================================================================
+const statistiquesRouter = router({
+  getDevisStats: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { total: 0, parStatut: {}, montantTotal: 0 };
+    const allDevis = await dbSecure.getDevisByArtisanIdSecure(artisan.id);
+    const parStatut: Record<string, number> = {};
+    let montantTotal = 0;
+    for (const d of allDevis) {
+      parStatut[d.statut || 'brouillon'] = (parStatut[d.statut || 'brouillon'] || 0) + 1;
+      montantTotal += parseFloat(d.totalTTC?.toString() || '0');
+    }
+    return { total: allDevis.length, parStatut, montantTotal };
+  }),
+
+  getFacturesStats: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { total: 0, parStatut: {}, montantPaye: 0, montantImpaye: 0 };
+    const allFactures = await db.getFacturesByArtisanId(artisan.id);
+    const parStatut: Record<string, number> = {};
+    let montantPaye = 0;
+    let montantImpaye = 0;
+    for (const f of allFactures) {
+      parStatut[f.statut || 'brouillon'] = (parStatut[f.statut || 'brouillon'] || 0) + 1;
+      const ttc = parseFloat(f.totalTTC?.toString() || '0');
+      if (f.statut === 'payee') montantPaye += ttc;
+      else if (f.statut !== 'annulee') montantImpaye += ttc;
+    }
+    return { total: allFactures.length, parStatut, montantPaye, montantImpaye };
+  }),
+
+  getCAMensuel: protectedProcedure
+    .input(z.object({ months: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getMonthlyCAStats(artisan.id, input?.months || 12);
+    }),
+
+  getTopClients: protectedProcedure
+    .input(z.object({ limit: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getTopClients(artisan.id, input?.limit || 5);
+    }),
+
+  getTauxConversion: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { totalDevis: 0, devisAcceptes: 0, rate: 0 };
+    return await db.getConversionRate(artisan.id);
+  }),
+});
+
+// ============================================================================
+// RELANCES ROUTER
+// ============================================================================
+const relancesRouter = router({
+  list: protectedProcedure
+    .input(z.object({ joursMinimum: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const joursMinimum = input?.joursMinimum || 7;
+      const allDevis = await db.getDevisNonSignes(artisan.id);
+      const results = [];
+      for (const d of allDevis) {
+        const joursDepuisCreation = Math.floor((Date.now() - new Date(d.dateDevis).getTime()) / (1000 * 60 * 60 * 24));
+        if (joursDepuisCreation < joursMinimum) continue;
+        const client = await db.getClientById(d.clientId);
+        const signature = await db.getSignatureByDevisId(d.id);
+        results.push({
+          devis: { id: d.id, numero: d.numero, dateDevis: d.dateDevis, totalTTC: d.totalTTC, statut: d.statut },
+          client: client ? { id: client.id, nom: `${client.prenom || ''} ${client.nom}`.trim(), email: client.email } : null,
+          signature: signature ? { id: signature.id, token: signature.token, createdAt: signature.createdAt } : null,
+          joursDepuisCreation,
+          joursDepuisEnvoi: signature ? Math.floor((Date.now() - new Date(signature.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : null,
+        });
+      }
+      return results;
+    }),
+});
+
+// ============================================================================
+// PORTAIL ROUTER (artisan-side portal management)
+// ============================================================================
+const portailRouter = router({
+  listClients: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const allClients = await db.getClientsByArtisanId(artisan.id);
+    const results = [];
+    for (const client of allClients) {
+      const access = await db.getPortalAccessByClientId(client.id, artisan.id);
+      let statut = 'inactif';
+      if (access) {
+        if (!access.isActive) statut = 'desactive';
+        else if (access.expiresAt && new Date(access.expiresAt) < new Date()) statut = 'expire';
+        else statut = 'actif';
+      }
+      results.push({
+        id: client.id,
+        nom: client.nom,
+        prenom: client.prenom,
+        email: client.email,
+        telephone: client.telephone,
+        statut,
+        portalToken: (access && access.isActive && (!access.expiresAt || new Date(access.expiresAt) >= new Date())) ? access.token : null,
+        lastAccessAt: access?.lastAccessAt || null,
+        expiresAt: access?.expiresAt || null,
+      });
+    }
+    return results;
+  }),
+});
+
+// ============================================================================
+// CALENDRIER ROUTER
+// ============================================================================
+const calendrierRouter = router({
+  getEvents: protectedProcedure
+    .input(z.object({
+      dateDebut: z.string().optional(),
+      dateFin: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const interventionsList = await dbSecure.getInterventionsByArtisanIdSecure(artisan.id);
+      const events = [];
+      for (const intervention of interventionsList) {
+        if (input?.dateDebut && new Date(intervention.dateDebut) < new Date(input.dateDebut)) continue;
+        if (input?.dateFin && new Date(intervention.dateDebut) > new Date(input.dateFin)) continue;
+        const client = await db.getClientById(intervention.clientId);
+        const technicien = intervention.technicienId ? await db.getTechnicienById(intervention.technicienId) : null;
+        events.push({
+          id: intervention.id,
+          title: intervention.titre,
+          start: intervention.dateDebut,
+          end: intervention.dateFin || intervention.dateDebut,
+          statut: intervention.statut,
+          type: 'intervention',
+          client: client ? { id: client.id, nom: `${client.prenom || ''} ${client.nom}`.trim() } : null,
+          technicien: technicien ? { id: technicien.id, nom: `${technicien.prenom || ''} ${technicien.nom}`.trim(), couleur: technicien.couleur } : null,
+          adresse: intervention.adresse,
+        });
+      }
+      return events;
+    }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({system: systemRouter,
@@ -5571,6 +5855,10 @@ export const appRouter = router({system: systemRouter,
   chantiers: chantiersRouter,
   integrationsComptables: integrationsComptablesRouter,
   devisIA: devisIARouter,
+  statistiques: statistiquesRouter,
+  relances: relancesRouter,
+  portail: portailRouter,
+  calendrier: calendrierRouter,
 });
 
 export type AppRouter = typeof appRouter;

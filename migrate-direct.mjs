@@ -6,7 +6,8 @@ async function migrate() {
     console.log('🚀 Démarrage de la migration...');
     
     // Créer la connexion
-    const connection = await mysql.createConnection(process.env.DATABASE_URL);
+    const connection = await mysql.createConnection({ uri: process.env.DATABASE_URL, charset: 'utf8mb4' });
+    await connection.execute('SET NAMES utf8mb4');
     console.log('✅ Connecté à la base de données');
     
     // Lire le fichier SQL

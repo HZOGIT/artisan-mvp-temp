@@ -279,8 +279,9 @@ const articles = [
 ];
 
 async function seedArticles() {
-  const connection = await mysql.createConnection(process.env.DATABASE_URL);
-  
+  const connection = await mysql.createConnection({ uri: process.env.DATABASE_URL, charset: 'utf8mb4' });
+  await connection.execute('SET NAMES utf8mb4');
+
   console.log('Connexion à la base de données...');
   
   try {

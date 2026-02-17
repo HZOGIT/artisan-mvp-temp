@@ -27,7 +27,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -56,9 +56,9 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: FileText, label: "Devis", path: "/devis" },
       { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
-      { icon: RefreshCw, label: "Relances", path: "/relances" },
       { icon: Receipt, label: "Factures", path: "/factures" },
       { icon: ClipboardList, label: "Contrats", path: "/contrats" },
+      { icon: RefreshCw, label: "Relances", path: "/relances" },
     ],
   },
   {
@@ -80,6 +80,7 @@ const menuGroups: MenuGroup[] = [
       { icon: Calendar, label: "Interventions", path: "/interventions" },
       { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
       { icon: Wrench, label: "Techniciens", path: "/techniciens" },
+      { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
       { icon: HardHat, label: "Chantiers", path: "/chantiers" },
       { icon: Route, label: "Planification", path: "/planification" },
     ],
@@ -104,7 +105,7 @@ const menuGroups: MenuGroup[] = [
       { icon: User, label: "Mon profil", path: "/profil" },
       { icon: Settings, label: "Paramètres", path: "/parametres" },
       { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
-      { icon: Mail, label: "Modèles Transac.", path: "/modeles-email-transactionnels" },
+      { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
     ],
   },
 ];

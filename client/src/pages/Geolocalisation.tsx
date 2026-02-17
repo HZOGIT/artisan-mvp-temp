@@ -2,36 +2,45 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Navigation, Clock, Battery, RefreshCw, Car, User, Route } from "lucide-react";
+import { MapPin, Clock, Battery, RefreshCw, Car, User } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { MapView } from "@/components/Map";
 
-interface TechnicienPosition {
-  technicien: {
-    id: number;
-    nom: string;
-    couleur: string | null;
-    specialite: string | null;
-  };
-  latitude: string;
-  longitude: string;
-  timestamp: Date;
-  enDeplacement: boolean | null;
-  batterie: number | null;
-  vitesse: string | null;
+// Matches the shape returned by getAllTechniciensPositions:
+// { ...technicien, position: lastPosition | null }
+interface TechWithPosition {
+  id: number;
+  nom: string;
+  prenom: string | null;
+  couleur: string | null;
+  specialite: string | null;
+  statut: string;
+  position: {
+    latitude: string;
+    longitude: string;
+    timestamp: Date;
+    enDeplacement: boolean | null;
+    batterie: number | null;
+    vitesse: string | null;
+  } | null;
 }
 
 export default function Geolocalisation() {
   const [selectedTechnicien, setSelectedTechnicien] = useState<number | null>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<Map<number, google.maps.marker.AdvancedMarkerElement>>(new Map());
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
-  
-  const { data: positions, isLoading, refetch } = trpc.geolocalisation.getPositions.useQuery();
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<Map<number, L.Marker>>(new Map());
+
+  const { data: allTechs, isLoading, refetch } = trpc.geolocalisation.getPositions.useQuery();
   const { data: techniciens } = trpc.techniciens.getAll.useQuery();
-  
+
+  // Only show techs with a position
+  const positions = (allTechs as TechWithPosition[] | undefined)?.filter(
+    (t): t is TechWithPosition & { position: NonNullable<TechWithPosition["position"]> } =>
+      t.position !== null
+  );
+
   // Auto-refresh toutes les 30 secondes
   useEffect(() => {
     const interval = setInterval(() => {
@@ -40,144 +49,135 @@ export default function Geolocalisation() {
     return () => clearInterval(interval);
   }, [refetch]);
 
-  // Créer un marqueur personnalisé avec la couleur du technicien
-  const createMarkerContent = useCallback((technicien: TechnicienPosition["technicien"], enDeplacement: boolean | null) => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <div style="
-        background-color: ${technicien.couleur || "#3B82F6"};
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 3px solid white;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        cursor: pointer;
-        position: relative;
-      ">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-        </svg>
-        ${enDeplacement ? `
+  // Créer une icône personnalisée avec la couleur du technicien
+  const createMarkerIcon = useCallback((couleur: string, enDeplacement: boolean | null) => {
+    return L.divIcon({
+      className: "",
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+      popupAnchor: [0, -18],
+      html: `
+        <div style="
+          background-color: ${couleur};
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 3px solid white;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          cursor: pointer;
+          position: relative;
+        ">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+          ${enDeplacement ? `
+            <div style="
+              position: absolute;
+              bottom: -2px;
+              right: -2px;
+              width: 12px;
+              height: 12px;
+              background-color: #22c55e;
+              border-radius: 50%;
+              border: 2px solid white;
+            "></div>
+          ` : ""}
+        </div>
+      `,
+    });
+  }, []);
+
+  // Créer le contenu du popup
+  const createPopupContent = useCallback((tech: TechWithPosition & { position: NonNullable<TechWithPosition["position"]> }) => {
+    return `
+      <div style="padding: 8px; min-width: 200px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
           <div style="
-            position: absolute;
-            bottom: -2px;
-            right: -2px;
             width: 12px;
             height: 12px;
-            background-color: #22c55e;
             border-radius: 50%;
-            border: 2px solid white;
+            background-color: ${tech.couleur || "#3B82F6"};
           "></div>
-        ` : ""}
+          <strong style="font-size: 14px;">${tech.nom}${tech.prenom ? " " + tech.prenom : ""}</strong>
+        </div>
+        ${tech.specialite ? `<p style="color: #666; font-size: 12px; margin: 4px 0;">${tech.specialite}</p>` : ""}
+        <div style="font-size: 12px; color: #666; margin-top: 8px;">
+          <p>📍 ${parseFloat(tech.position.latitude).toFixed(6)}, ${parseFloat(tech.position.longitude).toFixed(6)}</p>
+          <p>🕐 Dernière mise à jour: ${format(new Date(tech.position.timestamp), "HH:mm", { locale: fr })}</p>
+          ${tech.position.batterie ? `<p>🔋 Batterie: ${tech.position.batterie}%</p>` : ""}
+          ${tech.position.vitesse && parseFloat(tech.position.vitesse) > 0 ? `<p>🚗 Vitesse: ${parseFloat(tech.position.vitesse).toFixed(0)} km/h</p>` : ""}
+          <p style="margin-top: 4px;">
+            ${tech.position.enDeplacement
+              ? '<span style="color: #22c55e;">● En déplacement</span>'
+              : '<span style="color: #6b7280;">● Stationnaire</span>'}
+          </p>
+        </div>
       </div>
     `;
-    return div;
   }, []);
 
   // Mettre à jour les marqueurs sur la carte
-  const updateMarkers = useCallback((map: google.maps.Map, positionsData: TechnicienPosition[]) => {
-    if (!window.google) return;
+  const updateMarkers = useCallback((map: L.Map, data: (TechWithPosition & { position: NonNullable<TechWithPosition["position"]> })[]) => {
+    if (typeof L === "undefined") return;
 
     // Supprimer les marqueurs des techniciens qui ne sont plus dans la liste
-    const currentIds = new Set(positionsData.map(p => p.technicien.id));
+    const currentIds = new Set(data.map(t => t.id));
     markersRef.current.forEach((marker, id) => {
       if (!currentIds.has(id)) {
-        marker.map = null;
+        marker.remove();
         markersRef.current.delete(id);
       }
     });
 
     // Créer ou mettre à jour les marqueurs
-    positionsData.forEach((pos) => {
-      const position = {
-        lat: parseFloat(pos.latitude),
-        lng: parseFloat(pos.longitude),
-      };
-
-      let marker = markersRef.current.get(pos.technicien.id);
+    data.forEach((tech) => {
+      const latLng: L.LatLngExpression = [
+        parseFloat(tech.position.latitude),
+        parseFloat(tech.position.longitude),
+      ];
+      let marker = markersRef.current.get(tech.id);
 
       if (marker) {
-        // Mettre à jour la position du marqueur existant
-        marker.position = position;
-        marker.content = createMarkerContent(pos.technicien, pos.enDeplacement);
+        marker.setLatLng(latLng);
+        marker.setIcon(createMarkerIcon(tech.couleur || "#3B82F6", tech.position.enDeplacement));
+        marker.setPopupContent(createPopupContent(tech));
       } else {
-        // Créer un nouveau marqueur
-        marker = new google.maps.marker.AdvancedMarkerElement({
-          map,
-          position,
-          content: createMarkerContent(pos.technicien, pos.enDeplacement),
-          title: pos.technicien.nom,
+        marker = L.marker(latLng, {
+          icon: createMarkerIcon(tech.couleur || "#3B82F6", tech.position.enDeplacement),
+          title: tech.nom,
+        }).addTo(map);
+
+        marker.bindPopup(createPopupContent(tech));
+
+        marker.on("click", () => {
+          setSelectedTechnicien(tech.id);
         });
 
-        // Ajouter l'événement de clic
-        marker.addListener("click", () => {
-          if (!infoWindowRef.current) {
-            infoWindowRef.current = new google.maps.InfoWindow();
-          }
-
-          const content = `
-            <div style="padding: 8px; min-width: 200px;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <div style="
-                  width: 12px;
-                  height: 12px;
-                  border-radius: 50%;
-                  background-color: ${pos.technicien.couleur || "#3B82F6"};
-                "></div>
-                <strong style="font-size: 14px;">${pos.technicien.nom}</strong>
-              </div>
-              ${pos.technicien.specialite ? `<p style="color: #666; font-size: 12px; margin: 4px 0;">${pos.technicien.specialite}</p>` : ""}
-              <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                <p>📍 ${parseFloat(pos.latitude).toFixed(6)}, ${parseFloat(pos.longitude).toFixed(6)}</p>
-                <p>🕐 Dernière mise à jour: ${format(new Date(pos.timestamp), "HH:mm", { locale: fr })}</p>
-                ${pos.batterie ? `<p>🔋 Batterie: ${pos.batterie}%</p>` : ""}
-                ${pos.vitesse && parseFloat(pos.vitesse) > 0 ? `<p>🚗 Vitesse: ${parseFloat(pos.vitesse).toFixed(0)} km/h</p>` : ""}
-                <p style="margin-top: 4px;">
-                  ${pos.enDeplacement 
-                    ? '<span style="color: #22c55e;">● En déplacement</span>' 
-                    : '<span style="color: #6b7280;">● Stationnaire</span>'}
-                </p>
-              </div>
-            </div>
-          `;
-
-          infoWindowRef.current.setContent(content);
-          infoWindowRef.current.open(map, marker);
-          setSelectedTechnicien(pos.technicien.id);
-        });
-
-        markersRef.current.set(pos.technicien.id, marker);
+        markersRef.current.set(tech.id, marker);
       }
     });
 
     // Ajuster la vue pour montrer tous les marqueurs
-    if (positionsData.length > 0) {
-      const bounds = new google.maps.LatLngBounds();
-      positionsData.forEach((pos) => {
-        bounds.extend({
-          lat: parseFloat(pos.latitude),
-          lng: parseFloat(pos.longitude),
-        });
-      });
-      
-      // Ne pas zoomer trop près si un seul technicien
-      if (positionsData.length === 1) {
-        map.setCenter(bounds.getCenter());
-        map.setZoom(15);
+    if (data.length > 0) {
+      const bounds = L.latLngBounds(
+        data.map(t => [parseFloat(t.position.latitude), parseFloat(t.position.longitude)] as L.LatLngExpression)
+      );
+
+      if (data.length === 1) {
+        map.setView(bounds.getCenter(), 15);
       } else {
-        map.fitBounds(bounds, 50);
+        map.fitBounds(bounds, { padding: [50, 50] });
       }
     }
-  }, [createMarkerContent]);
+  }, [createMarkerIcon, createPopupContent]);
 
   // Callback quand la carte est prête
-  const handleMapReady = useCallback((map: google.maps.Map) => {
+  const handleMapReady = useCallback((map: L.Map) => {
     mapRef.current = map;
-    
-    // Mettre à jour les marqueurs si les positions sont déjà chargées
+
     if (positions && positions.length > 0) {
       updateMarkers(map, positions);
     }
@@ -191,20 +191,18 @@ export default function Geolocalisation() {
   }, [positions, updateMarkers]);
 
   // Centrer sur un technicien sélectionné
-  const centerOnTechnicien = useCallback((technicienId: number) => {
-    const pos = positions?.find(p => p.technicien.id === technicienId);
-    if (pos && mapRef.current) {
-      mapRef.current.setCenter({
-        lat: parseFloat(pos.latitude),
-        lng: parseFloat(pos.longitude),
-      });
-      mapRef.current.setZoom(16);
-      setSelectedTechnicien(technicienId);
+  const centerOnTechnicien = useCallback((techId: number) => {
+    const tech = positions?.find(t => t.id === techId);
+    if (tech && mapRef.current) {
+      mapRef.current.setView(
+        [parseFloat(tech.position.latitude), parseFloat(tech.position.longitude)],
+        16,
+      );
+      setSelectedTechnicien(techId);
 
-      // Ouvrir l'info window
-      const marker = markersRef.current.get(technicienId);
+      const marker = markersRef.current.get(techId);
       if (marker) {
-        google.maps.event.trigger(marker, "click");
+        marker.openPopup();
       }
     }
   }, [positions]);
@@ -249,43 +247,43 @@ export default function Geolocalisation() {
               {isLoading ? (
                 <p className="text-muted-foreground">Chargement...</p>
               ) : positions && positions.length > 0 ? (
-                positions.map((pos) => (
+                positions.map((tech) => (
                   <div
-                    key={pos.technicien.id}
+                    key={tech.id}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedTechnicien === pos.technicien.id
+                      selectedTechnicien === tech.id
                         ? "border-primary bg-primary/5"
                         : "hover:bg-muted/50"
                     }`}
-                    onClick={() => centerOnTechnicien(pos.technicien.id)}
+                    onClick={() => centerOnTechnicien(tech.id)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div
                           className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: pos.technicien.couleur || "#3B82F6" }}
+                          style={{ backgroundColor: tech.couleur || "#3B82F6" }}
                         />
-                        <span className="font-medium">{pos.technicien.nom}</span>
+                        <span className="font-medium">{tech.nom}{tech.prenom ? ` ${tech.prenom}` : ""}</span>
                       </div>
-                      {getStatutBadge(pos.enDeplacement)}
+                      {getStatutBadge(tech.position.enDeplacement)}
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
                       <div className="flex items-center gap-2">
                         <Clock className="h-3 w-3" />
                         <span>
-                          {format(new Date(pos.timestamp), "HH:mm", { locale: fr })}
+                          {format(new Date(tech.position.timestamp), "HH:mm", { locale: fr })}
                         </span>
                       </div>
-                      {pos.batterie && (
+                      {tech.position.batterie && (
                         <div className="flex items-center gap-2">
-                          <Battery className={`h-3 w-3 ${getBatterieColor(pos.batterie)}`} />
-                          <span>{pos.batterie}%</span>
+                          <Battery className={`h-3 w-3 ${getBatterieColor(tech.position.batterie)}`} />
+                          <span>{tech.position.batterie}%</span>
                         </div>
                       )}
-                      {pos.vitesse && parseFloat(pos.vitesse) > 0 && (
+                      {tech.position.vitesse && parseFloat(tech.position.vitesse) > 0 && (
                         <div className="flex items-center gap-2">
                           <Car className="h-3 w-3" />
-                          <span>{parseFloat(pos.vitesse).toFixed(0)} km/h</span>
+                          <span>{parseFloat(tech.position.vitesse).toFixed(0)} km/h</span>
                         </div>
                       )}
                     </div>
@@ -321,7 +319,7 @@ export default function Geolocalisation() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="text-center p-3 bg-muted/50 rounded-lg">
                   <p className="text-2xl font-bold text-green-600">
-                    {positions?.filter(p => p.enDeplacement).length || 0}
+                    {positions?.filter(t => t.position.enDeplacement).length || 0}
                   </p>
                   <p className="text-xs text-muted-foreground">En déplacement</p>
                 </div>
@@ -359,7 +357,7 @@ export default function Geolocalisation() {
           </Card>
         </div>
 
-        {/* Carte Google Maps */}
+        {/* Carte Leaflet */}
         <div className="lg:col-span-2">
           <Card className="h-[600px]">
             <CardHeader className="pb-2">
@@ -376,7 +374,7 @@ export default function Geolocalisation() {
             <CardContent className="h-[calc(100%-60px)] p-0">
               <MapView
                 className="w-full h-full rounded-b-lg"
-                initialCenter={{ lat: 48.8566, lng: 2.3522 }} // Paris par défaut
+                initialCenter={{ lat: 48.8566, lng: 2.3522 }}
                 initialZoom={12}
                 onMapReady={handleMapReady}
               />

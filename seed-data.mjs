@@ -3,8 +3,9 @@ import mysql from 'mysql2/promise';
 const DATABASE_URL = process.env.DATABASE_URL;
 
 async function seed() {
-  const connection = await mysql.createConnection(DATABASE_URL);
-  
+  const connection = await mysql.createConnection({ uri: DATABASE_URL, charset: 'utf8mb4' });
+  await connection.execute('SET NAMES utf8mb4');
+
   console.log('🌱 Insertion des données de test...');
   
   try {

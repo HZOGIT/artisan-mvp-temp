@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MapPin, Navigation, Clock, User, Check, AlertCircle, Route, Calendar, Search } from "lucide-react";
+import { MapPin, Navigation, Clock, User, Check, AlertCircle, Route, Search } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -37,10 +37,9 @@ export default function Planification() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedTechnicien, setSelectedTechnicien] = useState<number | null>(null);
   const [selectedIntervention, setSelectedIntervention] = useState<number | null>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
-  
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
+
   const { data: interventions } = trpc.interventions.list.useQuery();
   const { data: suggestions, refetch: refetchSuggestions, isLoading: loadingSuggestions } = trpc.interventions.getSuggestionsTechniciens.useQuery(
     {
@@ -50,7 +49,7 @@ export default function Planification() {
     },
     { enabled: !!coords }
   );
-  
+
   const assignerMutation = trpc.interventions.assignerTechnicien.useMutation({
     onSuccess: () => {
       toast.success("Technicien assigné avec succès");
@@ -61,49 +60,69 @@ export default function Planification() {
     },
   });
 
-  // Géocoder l'adresse
+  // Géocoder l'adresse via Nominatim (OpenStreetMap)
   const geocodeAdresse = useCallback(async () => {
-    if (!geocoderRef.current || !adresse) return;
-    
-    geocoderRef.current.geocode({ address: adresse }, (results, status) => {
-      if (status === "OK" && results && results[0]) {
-        const location = results[0].geometry.location;
-        const newCoords = { lat: location.lat(), lng: location.lng() };
+    if (!adresse) return;
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(adresse)}&limit=1&countrycodes=fr`,
+        { headers: { "Accept-Language": "fr" } }
+      );
+      const results = await response.json();
+
+      if (results.length > 0) {
+        const newCoords = { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
         setCoords(newCoords);
-        
+
         if (mapRef.current) {
-          mapRef.current.setCenter(newCoords);
-          mapRef.current.setZoom(14);
+          mapRef.current.setView([newCoords.lat, newCoords.lng], 14);
         }
       } else {
         toast.error("Adresse non trouvée");
       }
-    });
+    } catch {
+      toast.error("Erreur lors de la recherche d'adresse");
+    }
   }, [adresse]);
 
   // Callback quand la carte est prête
-  const handleMapReady = useCallback((map: google.maps.Map) => {
+  const handleMapReady = useCallback((map: L.Map) => {
     mapRef.current = map;
-    geocoderRef.current = new google.maps.Geocoder();
   }, []);
 
   // Mettre à jour les marqueurs sur la carte
   useEffect(() => {
-    if (!mapRef.current || !window.google) return;
+    if (!mapRef.current || typeof L === "undefined") return;
 
     // Supprimer les anciens marqueurs
-    markersRef.current.forEach(marker => {
-      marker.map = null;
-    });
+    markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
     // Ajouter le marqueur de destination
     if (coords) {
-      const destMarker = new google.maps.marker.AdvancedMarkerElement({
-        map: mapRef.current,
-        position: coords,
-        title: "Destination",
+      const destIcon = L.divIcon({
+        className: "",
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        html: `
+          <div style="
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="#ef4444" stroke="white" stroke-width="1">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3" fill="white"/>
+            </svg>
+          </div>
+        `,
       });
+      const destMarker = L.marker([coords.lat, coords.lng], { icon: destIcon })
+        .addTo(mapRef.current)
+        .bindPopup("Destination");
       markersRef.current.push(destMarker);
     }
 
@@ -111,37 +130,43 @@ export default function Planification() {
     if (suggestions) {
       suggestions.forEach((suggestion: Suggestion) => {
         if (suggestion.position) {
-          const content = document.createElement("div");
-          content.innerHTML = `
-            <div style="
-              background-color: ${suggestion.technicien.couleur || "#3B82F6"};
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              border: 3px solid ${suggestion.disponible ? "#22c55e" : "#ef4444"};
-              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-              cursor: pointer;
-            ">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-          `;
-
-          const marker = new google.maps.marker.AdvancedMarkerElement({
-            map: mapRef.current,
-            position: {
-              lat: parseFloat(suggestion.position.latitude),
-              lng: parseFloat(suggestion.position.longitude),
-            },
-            content,
-            title: suggestion.technicien.nom,
+          const icon = L.divIcon({
+            className: "",
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+            popupAnchor: [0, -16],
+            html: `
+              <div style="
+                background-color: ${suggestion.technicien.couleur || "#3B82F6"};
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 3px solid ${suggestion.disponible ? "#22c55e" : "#ef4444"};
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+                cursor: pointer;
+              ">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+              </div>
+            `,
           });
 
-          marker.addListener("click", () => {
+          const marker = L.marker(
+            [parseFloat(suggestion.position.latitude), parseFloat(suggestion.position.longitude)],
+            { icon, title: suggestion.technicien.nom }
+          ).addTo(mapRef.current!);
+
+          marker.bindPopup(`
+            <strong>${suggestion.technicien.nom}</strong><br/>
+            ${suggestion.technicien.specialite || ""}<br/>
+            ${suggestion.distance} km - ~${suggestion.tempsTrajet} min
+          `);
+
+          marker.on("click", () => {
             setSelectedTechnicien(suggestion.technicien.id);
           });
 
@@ -156,7 +181,7 @@ export default function Planification() {
       toast.error("Veuillez sélectionner une intervention et un technicien");
       return;
     }
-    
+
     assignerMutation.mutate({
       interventionId: selectedIntervention,
       technicienId: selectedTechnicien,
@@ -199,7 +224,7 @@ export default function Planification() {
                   </Button>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label>Date et heure</Label>
                 <Input
@@ -231,8 +256,8 @@ export default function Planification() {
               )}
 
               {coords && (
-                <Button 
-                  onClick={() => refetchSuggestions()} 
+                <Button
+                  onClick={() => refetchSuggestions()}
                   className="w-full"
                   disabled={loadingSuggestions}
                 >
@@ -287,13 +312,13 @@ export default function Planification() {
                         </Badge>
                       )}
                     </div>
-                    
+
                     {suggestion.technicien.specialite && (
                       <p className="text-xs text-muted-foreground mb-2">
                         {suggestion.technicien.specialite}
                       </p>
                     )}
-                    
+
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       {suggestion.position && (
                         <>
@@ -333,8 +358,8 @@ export default function Planification() {
 
           {/* Bouton d'assignation */}
           {selectedTechnicien && selectedIntervention && (
-            <Button 
-              onClick={handleAssigner} 
+            <Button
+              onClick={handleAssigner}
               className="w-full"
               disabled={assignerMutation.isPending}
             >
