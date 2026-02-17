@@ -205,62 +205,56 @@ async function fixDuplicates() {
       `SELECT id, HEX(sujet) as h, clientId FROM conversations WHERE artisanId = 1`
     ) as any;
 
-    const corruptedIds: number[] = [];
-    let hasCleanConv2 = false; // clientId=2 (Hab Doudi)
-    let hasCleanConv5 = false; // clientId=5 (Durand Pierre)
-
-    for (const c of allConvs) {
-      if (c.h && (c.h.includes('C383') || c.h.includes('EFBFBD') || c.h.includes('3F'))) {
-        corruptedIds.push(c.id);
-      } else {
-        if (c.clientId === 2) hasCleanConv2 = true;
-        if (c.clientId === 5) hasCleanConv5 = true;
-      }
-    }
-
-    if (corruptedIds.length > 0) {
-      console.log(`[FixDuplicates] Deleting ${corruptedIds.length} corrupted conversations: ${corruptedIds.join(',')}`);
-      for (const id of corruptedIds) {
+    // Delete ALL existing conversations for artisan 1 and re-insert cleanly
+    // This is a one-time data fix for corrupted encoding + incomplete inserts
+    const idsToDelete = (allConvs as any[]).map((c: any) => c.id);
+    if (idsToDelete.length > 0) {
+      console.log(`[FixDuplicates] Cleaning up ${idsToDelete.length} existing conversations for fresh insert`);
+      for (const id of idsToDelete) {
         await pool.execute(`DELETE FROM messages WHERE conversationId = ?`, [id]);
         await pool.execute(`DELETE FROM conversations WHERE id = ?`, [id]);
       }
     }
 
-    // Insert missing clean conversations
-    if (!hasCleanConv2) {
-      console.log('[FixDuplicates] Inserting conversation: Devis rénovation SDB (Hab Doudi)');
-      const [r1] = await pool.execute(
-        `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
-         VALUES (1, 2, ?, 'ouverte', ?, NOW() - INTERVAL 2 HOUR, 1, 0, NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 HOUR)`,
-        ['Devis r\u00E9novation SDB', 'Parfait, le 80x80 m\u2019int\u00E9resse beaucoup. On peut planifier un RDV cette semaine pour voir les \u00E9chantillons ?']
-      ) as any;
-      const c1 = r1.insertId;
-      const m1: [string, string, string][] = [
-        ['artisan', 'Bonjour M. Doudi, je vous envoie le devis pour la r\u00E9novation de votre salle de bain comme convenu lors de notre visite.', '3 DAY'],
-        ['client', 'Bonjour, merci pour le devis. J\u2019aurais une question sur le choix du carrelage, est-ce que vous proposez du gr\u00E8s c\u00E9rame grand format ?', '2 DAY 20 HOUR'],
-        ['artisan', 'Oui bien s\u00FBr, nous proposons du gr\u00E8s c\u00E9rame en 60x60 et 80x80. Je peux vous envoyer des \u00E9chantillons si vous le souhaitez. Le tarif reste le m\u00EAme que sur le devis.', '2 DAY 18 HOUR'],
-        ['client', 'Parfait, le 80x80 m\u2019int\u00E9resse beaucoup. On peut planifier un RDV cette semaine pour voir les \u00E9chantillons ?', '2 HOUR'],
-      ];
-      for (const [auteur, contenu, offset] of m1) {
-        await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, ?, ?, ?, NOW() - INTERVAL ${offset})`, [c1, auteur, contenu, auteur === 'artisan' ? 1 : 0]);
-      }
-      console.log(`[FixDuplicates] Inserted conv ${c1} with 4 messages`);
+    // Conversation 1: Hab Doudi (clientId=2) — 4 messages
+    console.log('[FixDuplicates] Inserting conv 1: Devis r\u00E9novation SDB');
+    const [r1] = await pool.execute(
+      `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
+       VALUES (1, 2, ?, 'ouverte', ?, NOW() - INTERVAL 2 HOUR, 1, 0, NOW() - INTERVAL 72 HOUR, NOW() - INTERVAL 2 HOUR)`,
+      ['Devis r\u00E9novation SDB', 'Parfait, le 80x80 m\u2019int\u00E9resse beaucoup. On peut planifier un RDV cette semaine pour voir les \u00E9chantillons ?']
+    ) as any;
+    const c1 = r1.insertId;
+    const m1: [string, string, number][] = [
+      ['artisan', 'Bonjour M. Doudi, je vous envoie le devis pour la r\u00E9novation de votre salle de bain comme convenu lors de notre visite.', 72],
+      ['client', 'Bonjour, merci pour le devis. J\u2019aurais une question sur le choix du carrelage, est-ce que vous proposez du gr\u00E8s c\u00E9rame grand format ?', 68],
+      ['artisan', 'Oui bien s\u00FBr, nous proposons du gr\u00E8s c\u00E9rame en 60x60 et 80x80. Je peux vous envoyer des \u00E9chantillons si vous le souhaitez. Le tarif reste le m\u00EAme que sur le devis.', 66],
+      ['client', 'Parfait, le 80x80 m\u2019int\u00E9resse beaucoup. On peut planifier un RDV cette semaine pour voir les \u00E9chantillons ?', 2],
+    ];
+    for (const [auteur, contenu, hours] of m1) {
+      await pool.execute(
+        `INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, ?, ?, ?, NOW() - INTERVAL ? HOUR)`,
+        [c1, auteur, contenu, auteur === 'artisan' ? 1 : 0, hours]
+      );
     }
+    console.log(`[FixDuplicates] Inserted conv ${c1} with 4 messages`);
 
-    if (!hasCleanConv5) {
-      console.log('[FixDuplicates] Inserting conversation: Intervention chaudière (Durand Pierre)');
-      const [r2] = await pool.execute(
-        `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
-         VALUES (1, 5, ?, 'ouverte', ?, NOW() - INTERVAL 5 HOUR, 1, 0, NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 5 HOUR)`,
-        ['Intervention chaudi\u00E8re \u2014 suivi', 'Merci pour l\u2019intervention. Par contre j\u2019ai remarqu\u00E9 un l\u00E9ger bruit au d\u00E9marrage, est-ce normal ?']
-      ) as any;
-      const c2 = r2.insertId;
-      await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'artisan', ?, 1, NOW() - INTERVAL 1 DAY)`,
-        [c2, 'Bonjour M. Durand, suite \u00E0 notre intervention sur votre chaudi\u00E8re ce matin, tout est en ordre. N\u2019h\u00E9sitez pas si vous avez des questions.']);
-      await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'client', ?, 0, NOW() - INTERVAL 5 HOUR)`,
-        [c2, 'Merci pour l\u2019intervention. Par contre j\u2019ai remarqu\u00E9 un l\u00E9ger bruit au d\u00E9marrage, est-ce normal ?']);
-      console.log(`[FixDuplicates] Inserted conv ${c2} with 2 messages`);
-    }
+    // Conversation 2: Durand Pierre (clientId=5) — 2 messages, 1 non lu artisan
+    console.log('[FixDuplicates] Inserting conv 2: Intervention chaudi\u00E8re');
+    const [r2] = await pool.execute(
+      `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
+       VALUES (1, 5, ?, 'ouverte', ?, NOW() - INTERVAL 5 HOUR, 1, 0, NOW() - INTERVAL 24 HOUR, NOW() - INTERVAL 5 HOUR)`,
+      ['Intervention chaudi\u00E8re \u2014 suivi', 'Merci pour l\u2019intervention. Par contre j\u2019ai remarqu\u00E9 un l\u00E9ger bruit au d\u00E9marrage, est-ce normal ?']
+    ) as any;
+    const c2 = r2.insertId;
+    await pool.execute(
+      `INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'artisan', ?, 1, NOW() - INTERVAL 24 HOUR)`,
+      [c2, 'Bonjour M. Durand, suite \u00E0 notre intervention sur votre chaudi\u00E8re ce matin, tout est en ordre. N\u2019h\u00E9sitez pas si vous avez des questions.']
+    );
+    await pool.execute(
+      `INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'client', ?, 0, NOW() - INTERVAL 5 HOUR)`,
+      [c2, 'Merci pour l\u2019intervention. Par contre j\u2019ai remarqu\u00E9 un l\u00E9ger bruit au d\u00E9marrage, est-ce normal ?']
+    );
+    console.log(`[FixDuplicates] Inserted conv ${c2} with 2 messages`);
 
     console.log('[FixDuplicates] Done.');
   } catch (e) {
