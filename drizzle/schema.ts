@@ -631,8 +631,14 @@ export const conversations = mysqlTable("conversations", {
   artisanId: int("artisanId").notNull(),
   clientId: int("clientId").notNull(),
   sujet: varchar("sujet", { length: 255 }),
-  statut: mysqlEnum("statut", ["active", "archivee"]).default("active"),
-  dernierMessageAt: timestamp("dernierMessageAt"),
+  statut: mysqlEnum("statut", ["ouverte", "fermee", "archivee"]).default("ouverte"),
+  devisId: int("devisId"),
+  factureId: int("factureId"),
+  interventionId: int("interventionId"),
+  dernierMessage: text("dernierMessage"),
+  dernierMessageDate: timestamp("dernierMessageDate"),
+  nonLuArtisan: int("nonLuArtisan").default(0),
+  nonLuClient: int("nonLuClient").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -646,10 +652,11 @@ export type InsertConversation = typeof conversations.$inferInsert;
 export const messages = mysqlTable("messages", {
   id: int("id").autoincrement().primaryKey(),
   conversationId: int("conversationId").notNull(),
-  expediteur: mysqlEnum("expediteur", ["artisan", "client"]).notNull(),
+  auteur: mysqlEnum("auteur", ["artisan", "client"]).notNull(),
   contenu: text("contenu").notNull(),
   lu: boolean("lu").default(false),
-  luAt: timestamp("luAt"),
+  pieceJointe: text("pieceJointe"),
+  pieceJointeUrl: text("pieceJointeUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

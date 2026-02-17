@@ -47,6 +47,8 @@ import {
   contratsMaintenance, ContratMaintenance, InsertContratMaintenance,
   facturesRecurrentes, FactureRecurrente, InsertFactureRecurrente,
   interventionsContrat, InterventionContrat, InsertInterventionContrat,
+  conversations, Conversation, InsertConversation,
+  messages, Message, InsertMessage,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -2666,6 +2668,117 @@ export async function updateInterventionContrat(id: number, data: Partial<Insert
   await db.update(interventionsContrat).set({ ...data, updatedAt: new Date() }).where(eq(interventionsContrat.id, id));
   const updated = await db.select().from(interventionsContrat).where(eq(interventionsContrat.id, id)).limit(1);
   return updated[0];
+}
+
+// ============================================================================
+// CONVERSATIONS & MESSAGES (Chat)
+// ============================================================================
+export async function getConversationsByArtisanId(artisanId: number): Promise<Conversation[]> {
+  const db = await getDb();
+  return db.select().from(conversations)
+    .where(eq(conversations.artisanId, artisanId))
+    .orderBy(desc(conversations.dernierMessageDate), desc(conversations.updatedAt));
+}
+
+export async function getConversationsByClientId(clientId: number, artisanId: number): Promise<Conversation[]> {
+  const db = await getDb();
+  return db.select().from(conversations)
+    .where(and(eq(conversations.clientId, clientId), eq(conversations.artisanId, artisanId)))
+    .orderBy(desc(conversations.dernierMessageDate));
+}
+
+export async function getConversationById(id: number): Promise<Conversation | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getOrCreateConversation(artisanId: number, clientId: number, sujet?: string): Promise<Conversation> {
+  const db = await getDb();
+  // Check for existing open conversation with same client
+  const existing = await db.select().from(conversations)
+    .where(and(
+      eq(conversations.artisanId, artisanId),
+      eq(conversations.clientId, clientId),
+      eq(conversations.statut, "ouverte")
+    ))
+    .orderBy(desc(conversations.updatedAt))
+    .limit(1);
+  if (existing[0] && !sujet) return existing[0];
+
+  // Create new conversation
+  const result = await db.insert(conversations).values({
+    artisanId, clientId, sujet: sujet || null, statut: "ouverte",
+  });
+  const created = await db.select().from(conversations).where(eq(conversations.id, result[0].insertId)).limit(1);
+  return created[0];
+}
+
+export async function updateConversation(id: number, data: Partial<InsertConversation>): Promise<Conversation> {
+  const db = await getDb();
+  await db.update(conversations).set({ ...data, updatedAt: new Date() }).where(eq(conversations.id, id));
+  const updated = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+  return updated[0];
+}
+
+export async function getMessagesByConversationId(conversationId: number): Promise<Message[]> {
+  const db = await getDb();
+  return db.select().from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(asc(messages.createdAt));
+}
+
+export async function createMessage(data: InsertMessage): Promise<Message> {
+  const db = await getDb();
+  const result = await db.insert(messages).values(data);
+  const insertId = result[0].insertId;
+
+  // Update conversation
+  const apercu = data.contenu.substring(0, 100);
+  const updateData: any = {
+    dernierMessage: apercu,
+    dernierMessageDate: new Date(),
+    updatedAt: new Date(),
+  };
+  if (data.auteur === "artisan") {
+    await db.update(conversations).set({
+      ...updateData,
+      nonLuClient: sql`nonLuClient + 1`,
+    }).where(eq(conversations.id, data.conversationId));
+  } else {
+    await db.update(conversations).set({
+      ...updateData,
+      nonLuArtisan: sql`nonLuArtisan + 1`,
+    }).where(eq(conversations.id, data.conversationId));
+  }
+
+  const created = await db.select().from(messages).where(eq(messages.id, insertId)).limit(1);
+  return created[0];
+}
+
+export async function markMessagesAsRead(conversationId: number, lecteur: "artisan" | "client"): Promise<void> {
+  const db = await getDb();
+  const auteurDesMessages = lecteur === "artisan" ? "client" : "artisan";
+  await db.update(messages).set({ lu: true })
+    .where(and(
+      eq(messages.conversationId, conversationId),
+      eq(messages.auteur, auteurDesMessages),
+      eq(messages.lu, false)
+    ));
+  // Reset unread counter
+  if (lecteur === "artisan") {
+    await db.update(conversations).set({ nonLuArtisan: 0 }).where(eq(conversations.id, conversationId));
+  } else {
+    await db.update(conversations).set({ nonLuClient: 0 }).where(eq(conversations.id, conversationId));
+  }
+}
+
+export async function getUnreadMessagesCount(artisanId: number): Promise<number> {
+  const db = await getDb();
+  const result = await db.select({ total: sql<number>`COALESCE(SUM(nonLuArtisan), 0)` })
+    .from(conversations)
+    .where(and(eq(conversations.artisanId, artisanId), ne(conversations.statut, "archivee")));
+  return result[0]?.total || 0;
 }
 
 // One-time seed for test data (runs on server startup)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -42,6 +44,30 @@ export default function PortailClient() {
     { enabled: !!token && accessData?.valid }
   );
 
+  // Chat state
+  const [selectedChatConv, setSelectedChatConv] = useState<number | null>(null);
+  const [chatMessage, setChatMessage] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: chatConversations, refetch: refetchChatConvs } = trpc.clientPortal.getConversations.useQuery(
+    { token: token || "" },
+    { enabled: !!token && accessData?.valid }
+  );
+
+  const { data: chatMessages, refetch: refetchChatMessages } = trpc.clientPortal.getConversationMessages.useQuery(
+    { token: token || "", conversationId: selectedChatConv! },
+    { enabled: !!token && accessData?.valid && !!selectedChatConv }
+  );
+
+  const sendClientMessage = trpc.clientPortal.sendClientMessage.useMutation({
+    onSuccess: () => {
+      setChatMessage("");
+      refetchChatMessages();
+      refetchChatConvs();
+    },
+    onError: () => toast.error("Erreur lors de l'envoi du message"),
+  });
+
   const demanderModification = trpc.clientPortal.demanderModification.useMutation({
     onSuccess: () => {
       setModificationSent(true);
@@ -52,6 +78,35 @@ export default function PortailClient() {
       toast.error("Erreur lors de l'envoi de la demande");
     },
   });
+
+  // Auto-scroll chat messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // Poll for new messages
+  useEffect(() => {
+    if (selectedChatConv) {
+      const interval = setInterval(() => {
+        refetchChatMessages();
+        refetchChatConvs();
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedChatConv, refetchChatMessages, refetchChatConvs]);
+
+  const totalUnreadChat = (chatConversations || []).reduce((sum, c) => sum + (c.nonLuClient || 0), 0);
+
+  const formatChatDate = (date: Date | string) => {
+    const d = new Date(date);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    if (days === 1) return "Hier";
+    if (days < 7) return d.toLocaleDateString("fr-FR", { weekday: "long" });
+    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  };
 
   if (accessLoading) {
     return (
@@ -157,7 +212,7 @@ export default function PortailClient() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 mb-6">
             <TabsTrigger value="devis" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Mes </span>Devis
@@ -175,6 +230,13 @@ export default function PortailClient() {
             <TabsTrigger value="interventions" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Mes </span>Interventions
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <MessageCircle className="h-4 w-4" />
+              Messages
+              {totalUnreadChat > 0 && (
+                <span className="ml-1 bg-blue-600 text-white text-xs rounded-full px-1.5">{totalUnreadChat}</span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="infos" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <User className="h-4 w-4" />
@@ -367,6 +429,123 @@ export default function PortailClient() {
                     </Card>
                   ))
               )}
+            </div>
+          </TabsContent>
+
+          {/* Messages Tab */}
+          <TabsContent value="messages">
+            <div className="grid gap-4 sm:grid-cols-3" style={{ minHeight: "500px" }}>
+              {/* Conversation list */}
+              <Card className={`${selectedChatConv ? "hidden sm:flex" : "flex"} flex-col`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-blue-600" />
+                    Conversations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 p-0 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    {!chatConversations || chatConversations.length === 0 ? (
+                      <div className="p-6 text-center text-gray-500">
+                        <MessageCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                        <p className="text-sm">Aucune conversation</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 p-2">
+                        {chatConversations.map((conv) => (
+                          <button
+                            key={conv.id}
+                            onClick={() => setSelectedChatConv(conv.id)}
+                            className={`w-full p-3 rounded-lg text-left transition-colors ${
+                              selectedChatConv === conv.id ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm truncate">{conv.sujet || "Conversation"}</span>
+                              {(conv.nonLuClient || 0) > 0 && (
+                                <Badge className="ml-2 shrink-0 bg-blue-600">{conv.nonLuClient}</Badge>
+                              )}
+                            </div>
+                            {conv.dernierMessage && (
+                              <p className="text-xs text-gray-500 truncate mt-1">{conv.dernierMessage}</p>
+                            )}
+                            {conv.dernierMessageDate && (
+                              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />{formatChatDate(conv.dernierMessageDate)}
+                              </p>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              {/* Message thread */}
+              <Card className={`sm:col-span-2 ${selectedChatConv ? "flex" : "hidden sm:flex"} flex-col`}>
+                {selectedChatConv ? (
+                  <>
+                    <CardHeader className="pb-2 border-b">
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => setSelectedChatConv(null)}>
+                          <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                        <CardTitle className="text-lg">
+                          {chatConversations?.find((c) => c.id === selectedChatConv)?.sujet || "Conversation"}
+                        </CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
+                      <ScrollArea className="flex-1 p-4" style={{ maxHeight: "400px" }}>
+                        <div className="space-y-3">
+                          {chatMessages?.map((msg) => (
+                            <div key={msg.id} className={`flex ${msg.auteur === "client" ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-[75%] rounded-lg p-3 ${
+                                msg.auteur === "client" ? "bg-blue-600 text-white" : "bg-gray-100"
+                              }`}>
+                                <p className="text-sm whitespace-pre-wrap">{msg.contenu}</p>
+                                <p className={`text-xs mt-1 ${msg.auteur === "client" ? "text-blue-200" : "text-gray-400"}`}>
+                                  {formatChatDate(msg.createdAt)}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                          <div ref={chatEndRef} />
+                        </div>
+                      </ScrollArea>
+                      <div className="p-3 border-t">
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!chatMessage.trim() || !selectedChatConv) return;
+                          sendClientMessage.mutate({
+                            token: token || "",
+                            conversationId: selectedChatConv,
+                            contenu: chatMessage.trim(),
+                          });
+                        }} className="flex gap-2">
+                          <Input
+                            value={chatMessage}
+                            onChange={(e) => setChatMessage(e.target.value)}
+                            placeholder="Votre message..."
+                            className="flex-1"
+                          />
+                          <Button type="submit" disabled={!chatMessage.trim() || sendClientMessage.isPending}>
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </form>
+                      </div>
+                    </CardContent>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-gray-500 py-16">
+                    <div className="text-center">
+                      <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                      <p>Sélectionnez une conversation</p>
+                    </div>
+                  </div>
+                )}
+              </Card>
             </div>
           </TabsContent>
 

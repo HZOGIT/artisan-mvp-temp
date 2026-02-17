@@ -15,7 +15,8 @@ import {
   ArrowRight,
   Clock,
   PercentIcon,
-  AlertTriangle
+  AlertTriangle,
+  MessageCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.getStats.useQuery();
   const { data: upcomingInterventions } = trpc.dashboard.getUpcomingInterventions.useQuery();
   const { data: conversionRate } = trpc.dashboard.getConversionRate.useQuery();
+  const { data: unreadMessages } = trpc.chat.getUnreadCount.useQuery();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
@@ -73,7 +75,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards - 2 cols mobile, 5 cols desktop */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-6">
         {/* CA du mois */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -160,6 +162,26 @@ export default function Dashboard() {
             <div className="text-2xl font-bold">{stats?.totalClients || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Dans votre base
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Messages non lus */}
+        <Card className={unreadMessages && unreadMessages > 0 ? "border-rose-200 bg-rose-50/30" : ""}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Messages
+            </CardTitle>
+            <div className="h-9 w-9 rounded-lg bg-rose-100 flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-rose-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{unreadMessages || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              <button onClick={() => setLocation("/chat")} className="text-primary hover:underline">
+                {unreadMessages && unreadMessages > 0 ? "Non lu(s) — Voir" : "Aucun non lu"}
+              </button>
             </p>
           </CardContent>
         </Card>

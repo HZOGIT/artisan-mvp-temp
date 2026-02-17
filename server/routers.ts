@@ -2901,6 +2901,51 @@ const clientPortalRouter = router({
       await db.deactivatePortalAccess(input.clientId, artisan.id);
       return { success: true };
     }),
+
+  // ---- PORTAL CHAT (public, token-based) ----
+  getConversations: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return db.getConversationsByClientId(access.clientId, access.artisanId);
+    }),
+
+  getConversationMessages: publicProcedure
+    .input(z.object({ token: z.string(), conversationId: z.number() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.clientId !== access.clientId || conv.artisanId !== access.artisanId)
+        throw new TRPCError({ code: "FORBIDDEN" });
+      await db.markMessagesAsRead(input.conversationId, 'client');
+      return db.getMessagesByConversationId(input.conversationId);
+    }),
+
+  sendClientMessage: publicProcedure
+    .input(z.object({ token: z.string(), conversationId: z.number(), contenu: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.clientId !== access.clientId || conv.artisanId !== access.artisanId)
+        throw new TRPCError({ code: "FORBIDDEN" });
+      return db.createMessage({
+        conversationId: input.conversationId,
+        auteur: 'client',
+        contenu: input.contenu,
+      });
+    }),
+
+  markClientMessagesAsRead: publicProcedure
+    .input(z.object({ token: z.string(), conversationId: z.number() }))
+    .mutation(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await db.markMessagesAsRead(input.conversationId, 'client');
+      return { success: true };
+    }),
 });
 
 // ============================================================================
@@ -3344,68 +3389,69 @@ const interventionsMobileRouter = router({
 // CHAT ROUTER
 // ============================================================================
 const chatRouter = router({
-  // Récupérer les conversations de l'artisan
   getConversations: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
     const convs = await db.getConversationsByArtisanId(artisan.id);
-    
-    // Enrichir avec les infos client
-    const enriched = await Promise.all(convs.map(async (conv) => {
+    return Promise.all(convs.map(async (conv) => {
       const client = await db.getClientById(conv.clientId);
-      const msgs = await db.getMessagesByConversationId(conv.id);
-      const unreadCount = msgs.filter(m => m.expediteur === 'client' && !m.lu).length;
-      return { ...conv, client, unreadCount };
+      return { ...conv, client };
     }));
-    
-    return enriched;
   }),
 
-  // Récupérer les messages d'une conversation
   getMessages: protectedProcedure
     .input(z.object({ conversationId: z.number() }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
-      }
-      
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
       const conv = await db.getConversationById(input.conversationId);
-      if (!conv || conv.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
-      
-      // Marquer les messages comme lus
+      if (!conv || conv.artisanId !== artisan.id) throw new TRPCError({ code: "FORBIDDEN" });
       await db.markMessagesAsRead(input.conversationId, 'artisan');
-      
-      return await db.getMessagesByConversationId(input.conversationId);
+      return db.getMessagesByConversationId(input.conversationId);
     }),
 
-  // Envoyer un message
   sendMessage: protectedProcedure
-    .input(z.object({
-      conversationId: z.number(),
-      contenu: z.string().min(1),
-    }))
+    .input(z.object({ conversationId: z.number(), contenu: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
-      }
-      
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
       const conv = await db.getConversationById(input.conversationId);
-      if (!conv || conv.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
-      
-      return await db.createMessage({
+      if (!conv || conv.artisanId !== artisan.id) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const msg = await db.createMessage({
         conversationId: input.conversationId,
-        expediteur: 'artisan',
+        auteur: 'artisan',
         contenu: input.contenu,
       });
+
+      // Email notification au client
+      try {
+        const client = await db.getClientById(conv.clientId);
+        if (client?.email) {
+          const portalAccess = await db.getPortalAccessByClientId(conv.clientId, artisan.id);
+          const portalLink = portalAccess?.token
+            ? `https://artisan.cheminov.com/portail/${portalAccess.token}`
+            : null;
+          await sendEmail({
+            to: client.email,
+            subject: `Nouveau message de ${artisan.nomEntreprise || 'votre artisan'}`,
+            body: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+              <h2 style="color:#2980b9">Nouveau message</h2>
+              <p>Bonjour ${client.prenom || client.nom},</p>
+              <p><strong>${artisan.nomEntreprise || 'Votre artisan'}</strong> vous a envoyé un message :</p>
+              <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:15px 0;border-left:4px solid #2980b9">
+                <p style="margin:0">${input.contenu.substring(0, 300)}${input.contenu.length > 300 ? '...' : ''}</p>
+              </div>
+              ${portalLink ? `<p><a href="${portalLink}" style="background:#2980b9;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;display:inline-block">Répondre sur le portail</a></p>` : ''}
+              <p style="color:#999;font-size:12px">Cet email a été envoyé automatiquement.</p>
+            </div>`,
+          });
+        }
+      } catch (e) { console.error('[Chat] Email notification error:', e); }
+
+      return msg;
     }),
 
-  // Démarrer une conversation avec un client
   startConversation: protectedProcedure
     .input(z.object({
       clientId: z.number(),
@@ -3414,50 +3460,57 @@ const chatRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
-      }
-      
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
       const client = await db.getClientById(input.clientId);
-      if (!client || client.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Client non trouvé" });
-      }
-      
+      if (!client || client.artisanId !== artisan.id) throw new TRPCError({ code: "FORBIDDEN" });
+
       const conv = await db.getOrCreateConversation(artisan.id, input.clientId, input.sujet);
-      
+
       if (input.premierMessage) {
         await db.createMessage({
           conversationId: conv.id,
-          expediteur: 'artisan',
+          auteur: 'artisan',
           contenu: input.premierMessage,
         });
       }
-      
+
       return conv;
     }),
 
-  // Compter les messages non lus
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return 0;
-    return await db.getUnreadMessagesCount(artisan.id);
+    return db.getUnreadMessagesCount(artisan.id);
   }),
 
-  // Archiver une conversation
   archiveConversation: protectedProcedure
     .input(z.object({ conversationId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
-      }
-      
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
       const conv = await db.getConversationById(input.conversationId);
-      if (!conv || conv.artisanId !== artisan.id) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
-      }
-      
-      return await db.updateConversation(input.conversationId, { statut: 'archivee' });
+      if (!conv || conv.artisanId !== artisan.id) throw new TRPCError({ code: "FORBIDDEN" });
+      return db.updateConversation(input.conversationId, { statut: 'archivee' });
+    }),
+
+  closeConversation: protectedProcedure
+    .input(z.object({ conversationId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.artisanId !== artisan.id) throw new TRPCError({ code: "FORBIDDEN" });
+      return db.updateConversation(input.conversationId, { statut: 'fermee' });
+    }),
+
+  reopenConversation: protectedProcedure
+    .input(z.object({ conversationId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.artisanId !== artisan.id) throw new TRPCError({ code: "FORBIDDEN" });
+      return db.updateConversation(input.conversationId, { statut: 'ouverte' });
     }),
 });
 
