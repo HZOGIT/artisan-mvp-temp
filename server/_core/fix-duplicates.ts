@@ -196,102 +196,82 @@ async function fixDuplicates() {
       // Doesn't exist, fine
     }
 
-    // --- Fix UTF-8 encoding: ensure connection uses utf8mb4 ---
+    // --- Fix UTF-8: force utf8mb4 on connection ---
     await pool.execute(`SET NAMES utf8mb4`);
 
-    // --- Re-insert chat demo data with correct UTF-8 encoding ---
-    // Check if conversations have corrupted data (contains replacement character)
-    const [convRows] = await pool.execute(
-      `SELECT id, sujet FROM conversations WHERE sujet LIKE '%�%' OR sujet LIKE '%Ã%' LIMIT 1`
+    // --- One-time chat demo data cleanup & re-insert with correct UTF-8 ---
+    // Use HEX check: correct UTF-8 'é' = C3A9, corrupted = 3F or EF BF BD or C383
+    const [hexCheck] = await pool.execute(
+      `SELECT id, HEX(sujet) as h FROM conversations WHERE artisanId = 1 AND sujet IS NOT NULL LIMIT 1`
     ) as any;
-    if (convRows.length > 0) {
-      console.log('[FixDuplicates] Found corrupted chat data, re-inserting...');
-      // Delete all messages then conversations (foreign key order)
+    // If data exists and contains C383 (double-encoded) or EFBFBD (replacement char) or 3F (question mark), it's corrupted
+    const needsReinsert = hexCheck.length > 0 && (
+      hexCheck[0].h.includes('C383') || hexCheck[0].h.includes('EFBFBD') || hexCheck[0].h.includes('3F')
+    );
+
+    if (needsReinsert) {
+      console.log('[FixDuplicates] Corrupted UTF-8 detected in chat data (HEX check), cleaning up...');
       await pool.execute(`DELETE FROM messages WHERE conversationId IN (SELECT id FROM conversations WHERE artisanId = 1)`);
       await pool.execute(`DELETE FROM conversations WHERE artisanId = 1`);
-      console.log('[FixDuplicates] Deleted corrupted conversations and messages');
 
-      // Re-insert conversation 1: Hab Doudi (clientId=2)
-      await pool.execute(
+      // Conversation 1: Hab Doudi (clientId=2)
+      const [r1] = await pool.execute(
         `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
-         VALUES (1, 2, 'Devis rénovation SDB', 'ouverte', 'Parfait, le 80x80 m''intéresse beaucoup. On peut planifier un RDV cette semaine pour voir les échantillons ?', NOW() - INTERVAL 2 HOUR, 1, 0, NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 HOUR)`
-      );
-      const [conv1Rows] = await pool.execute(`SELECT LAST_INSERT_ID() as id`) as any;
-      const conv1Id = conv1Rows[0].id;
-
-      // Messages for conversation 1
-      const conv1Messages = [
-        { auteur: 'artisan', contenu: 'Bonjour M. Doudi, je vous envoie le devis pour la rénovation de votre salle de bain comme convenu lors de notre visite.', offset: '3 DAY' },
-        { auteur: 'client', contenu: 'Bonjour, merci pour le devis. J\'aurais une question sur le choix du carrelage, est-ce que vous proposez du grès cérame grand format ?', offset: '2 DAY 20 HOUR' },
-        { auteur: 'artisan', contenu: 'Oui bien sûr, nous proposons du grès cérame en 60x60 et 80x80. Je peux vous envoyer des échantillons si vous le souhaitez. Le tarif reste le même que sur le devis.', offset: '2 DAY 18 HOUR' },
-        { auteur: 'client', contenu: 'Parfait, le 80x80 m\'intéresse beaucoup. On peut planifier un RDV cette semaine pour voir les échantillons ?', offset: '2 HOUR' },
+         VALUES (1, 2, ?, 'ouverte', ?, NOW() - INTERVAL 2 HOUR, 1, 0, NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 HOUR)`,
+        ['Devis rénovation SDB', 'Parfait, le 80x80 m\'intéresse beaucoup. On peut planifier un RDV cette semaine pour voir les échantillons ?']
+      ) as any;
+      const c1 = r1.insertId;
+      const m1 = [
+        ['artisan', 'Bonjour M. Doudi, je vous envoie le devis pour la rénovation de votre salle de bain comme convenu lors de notre visite.', '3 DAY'],
+        ['client', 'Bonjour, merci pour le devis. J\'aurais une question sur le choix du carrelage, est-ce que vous proposez du grès cérame grand format ?', '2 DAY 20 HOUR'],
+        ['artisan', 'Oui bien sûr, nous proposons du grès cérame en 60x60 et 80x80. Je peux vous envoyer des échantillons si vous le souhaitez. Le tarif reste le même que sur le devis.', '2 DAY 18 HOUR'],
+        ['client', 'Parfait, le 80x80 m\'intéresse beaucoup. On peut planifier un RDV cette semaine pour voir les échantillons ?', '2 HOUR'],
       ];
-      for (const msg of conv1Messages) {
-        await pool.execute(
-          `INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, ?, ?, ?, NOW() - INTERVAL ${msg.offset})`,
-          [conv1Id, msg.auteur, msg.contenu, msg.auteur === 'artisan' ? 1 : 0]
-        );
+      for (const [auteur, contenu, offset] of m1) {
+        await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, ?, ?, ?, NOW() - INTERVAL ${offset})`, [c1, auteur, contenu, auteur === 'artisan' ? 1 : 0]);
       }
-      console.log(`[FixDuplicates] Inserted conversation 1 (id=${conv1Id}) with 4 messages`);
 
-      // Re-insert conversation 2: Durand Pierre (clientId=5)
-      await pool.execute(
+      // Conversation 2: Durand Pierre (clientId=5)
+      const [r2] = await pool.execute(
         `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
-         VALUES (1, 5, 'Intervention chaudière — suivi', 'ouverte', 'Merci pour l''intervention. Par contre j''ai remarqué un léger bruit au démarrage, est-ce normal ?', NOW() - INTERVAL 5 HOUR, 1, 0, NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 5 HOUR)`
-      );
-      const [conv2Rows] = await pool.execute(`SELECT LAST_INSERT_ID() as id`) as any;
-      const conv2Id = conv2Rows[0].id;
+         VALUES (1, 5, ?, 'ouverte', ?, NOW() - INTERVAL 5 HOUR, 1, 0, NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 5 HOUR)`,
+        ['Intervention chaudière \u2014 suivi', 'Merci pour l\'intervention. Par contre j\'ai remarqué un léger bruit au démarrage, est-ce normal ?']
+      ) as any;
+      const c2 = r2.insertId;
+      await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'artisan', ?, 1, NOW() - INTERVAL 1 DAY)`, [c2, 'Bonjour M. Durand, suite à notre intervention sur votre chaudière ce matin, tout est en ordre. N\'hésitez pas si vous avez des questions.']);
+      await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'client', ?, 0, NOW() - INTERVAL 5 HOUR)`, [c2, 'Merci pour l\'intervention. Par contre j\'ai remarqué un léger bruit au démarrage, est-ce normal ?']);
 
-      const conv2Messages = [
-        { auteur: 'artisan', contenu: 'Bonjour M. Durand, suite à notre intervention sur votre chaudière ce matin, tout est en ordre. N\'hésitez pas si vous avez des questions.', offset: '1 DAY' },
-        { auteur: 'client', contenu: 'Merci pour l\'intervention. Par contre j\'ai remarqué un léger bruit au démarrage, est-ce normal ?', offset: '5 HOUR' },
-      ];
-      for (const msg of conv2Messages) {
-        await pool.execute(
-          `INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, ?, ?, ?, NOW() - INTERVAL ${msg.offset})`,
-          [conv2Id, msg.auteur, msg.contenu, msg.auteur === 'artisan' ? 1 : 0]
-        );
-      }
-      console.log(`[FixDuplicates] Inserted conversation 2 (id=${conv2Id}) with 2 messages`);
-    } else {
-      // Also check if there are NO conversations at all (first deploy)
-      const [anyConvs] = await pool.execute(`SELECT COUNT(*) as cnt FROM conversations WHERE artisanId = 1`) as any;
-      if (anyConvs[0].cnt === 0) {
-        console.log('[FixDuplicates] No conversations found, inserting demo data...');
-        // Same insert logic as above
-        await pool.execute(
+      console.log(`[FixDuplicates] Re-inserted 2 conversations (ids ${c1}, ${c2}) with 6 messages`);
+    } else if (hexCheck.length === 0) {
+      // No conversations exist at all — check if table is empty for this artisan
+      const [cnt] = await pool.execute(`SELECT COUNT(*) as c FROM conversations WHERE artisanId = 1`) as any;
+      if (cnt[0].c === 0) {
+        console.log('[FixDuplicates] No conversations, inserting demo data...');
+        const [r1] = await pool.execute(
           `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
-           VALUES (1, 2, 'Devis rénovation SDB', 'ouverte', 'Parfait, le 80x80 m''intéresse beaucoup. On peut planifier un RDV cette semaine pour voir les échantillons ?', NOW() - INTERVAL 2 HOUR, 1, 0, NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 HOUR)`
-        );
-        const [c1] = await pool.execute(`SELECT LAST_INSERT_ID() as id`) as any;
-        const c1Id = c1[0].id;
-        const msgs1 = [
+           VALUES (1, 2, ?, 'ouverte', ?, NOW() - INTERVAL 2 HOUR, 1, 0, NOW() - INTERVAL 3 DAY, NOW() - INTERVAL 2 HOUR)`,
+          ['Devis rénovation SDB', 'Parfait, le 80x80 m\'intéresse beaucoup. On peut planifier un RDV cette semaine pour voir les échantillons ?']
+        ) as any;
+        const c1 = r1.insertId;
+        for (const [auteur, contenu, offset] of [
           ['artisan', 'Bonjour M. Doudi, je vous envoie le devis pour la rénovation de votre salle de bain comme convenu lors de notre visite.', '3 DAY'],
           ['client', 'Bonjour, merci pour le devis. J\'aurais une question sur le choix du carrelage, est-ce que vous proposez du grès cérame grand format ?', '2 DAY 20 HOUR'],
-          ['artisan', 'Oui bien sûr, nous proposons du grès cérame en 60x60 et 80x80. Je peux vous envoyer des échantillons si vous le souhaitez. Le tarif reste le même que sur le devis.', '2 DAY 18 HOUR'],
+          ['artisan', 'Oui bien sûr, nous proposons du grès cérame en 60x60 et 80x80. Je peux vous envoyer des échantillons si vous le souhaitez.', '2 DAY 18 HOUR'],
           ['client', 'Parfait, le 80x80 m\'intéresse beaucoup. On peut planifier un RDV cette semaine pour voir les échantillons ?', '2 HOUR'],
-        ];
-        for (const [auteur, contenu, offset] of msgs1) {
-          await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, ?, ?, ?, NOW() - INTERVAL ${offset})`, [c1Id, auteur, contenu, auteur === 'artisan' ? 1 : 0]);
-        }
-
-        await pool.execute(
+        ]) { await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, ?, ?, ?, NOW() - INTERVAL ${offset})`, [c1, auteur, contenu, auteur === 'artisan' ? 1 : 0]); }
+        const [r2] = await pool.execute(
           `INSERT INTO conversations (artisanId, clientId, sujet, statut, dernierMessage, dernierMessageDate, nonLuArtisan, nonLuClient, createdAt, updatedAt)
-           VALUES (1, 5, 'Intervention chaudière — suivi', 'ouverte', 'Merci pour l''intervention. Par contre j''ai remarqué un léger bruit au démarrage, est-ce normal ?', NOW() - INTERVAL 5 HOUR, 1, 0, NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 5 HOUR)`
-        );
-        const [c2] = await pool.execute(`SELECT LAST_INSERT_ID() as id`) as any;
-        const c2Id = c2[0].id;
-        await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'artisan', 'Bonjour M. Durand, suite à notre intervention sur votre chaudière ce matin, tout est en ordre. N''hésitez pas si vous avez des questions.', 1, NOW() - INTERVAL 1 DAY)`, [c2Id]);
-        await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'client', 'Merci pour l''intervention. Par contre j''ai remarqué un léger bruit au démarrage, est-ce normal ?', 0, NOW() - INTERVAL 5 HOUR)`, [c2Id]);
+           VALUES (1, 5, ?, 'ouverte', ?, NOW() - INTERVAL 5 HOUR, 1, 0, NOW() - INTERVAL 1 DAY, NOW() - INTERVAL 5 HOUR)`,
+          ['Intervention chaudière \u2014 suivi', 'Merci pour l\'intervention. Par contre j\'ai remarqué un léger bruit au démarrage, est-ce normal ?']
+        ) as any;
+        const c2 = r2.insertId;
+        await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'artisan', ?, 1, NOW() - INTERVAL 1 DAY)`, [c2, 'Bonjour M. Durand, suite à notre intervention sur votre chaudière ce matin, tout est en ordre. N\'hésitez pas si vous avez des questions.']);
+        await pool.execute(`INSERT INTO messages (conversationId, auteur, contenu, lu, createdAt) VALUES (?, 'client', ?, 0, NOW() - INTERVAL 5 HOUR)`, [c2, 'Merci pour l\'intervention. Par contre j\'ai remarqué un léger bruit au démarrage, est-ce normal ?']);
         console.log('[FixDuplicates] Inserted 2 demo conversations with messages');
-      } else {
-        console.log('[FixDuplicates] Chat data looks OK, skipping re-insert');
       }
+    } else {
+      console.log('[FixDuplicates] Chat data UTF-8 looks correct, skipping');
     }
-
-    // Also fix any corrupted contrat data
-    await pool.execute(`UPDATE contrats_maintenance SET titre = 'Contrat maintenance chaudière gaz' WHERE titre LIKE '%chaudi%' AND (titre LIKE '%�%' OR titre LIKE '%Ã%')`);
-    await pool.execute(`UPDATE contrats_maintenance SET titre = 'Contrat entretien plomberie' WHERE titre LIKE '%plomberi%' AND (titre LIKE '%�%' OR titre LIKE '%Ã%')`);
 
     console.log('[FixDuplicates] Done.');
   } catch (e) {
