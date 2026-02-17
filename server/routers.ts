@@ -3058,8 +3058,7 @@ const contratsRouter = router({
       const montantTVA = montantHT * (tauxTVA / 100);
       const montantTTC = montantHT + montantTVA;
       
-      const facture = await db.createFacture({
-        artisanId: artisan.id,
+      const facture = await db.createFacture(artisan.id, {
         clientId: contrat.clientId,
         numero,
         objet: `${contrat.titre} - ${contrat.reference}`,
@@ -3069,7 +3068,7 @@ const contratsRouter = router({
         statut: "envoyee",
         notes: `Facture générée automatiquement pour le contrat ${contrat.reference}`,
       });
-      
+
       // Créer la ligne de facture
       await db.createLigneFacture({
         factureId: facture.id,
