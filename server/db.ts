@@ -44,6 +44,9 @@ import {
   previsionsCA, PrevisionCA, InsertPrevisionCA,
   historiqueCA, HistoriqueCA, InsertHistoriqueCA,
   clientPortalAccess, ClientPortalAccess, InsertClientPortalAccess,
+  contratsMaintenance, ContratMaintenance, InsertContratMaintenance,
+  facturesRecurrentes, FactureRecurrente, InsertFactureRecurrente,
+  interventionsContrat, InterventionContrat, InsertInterventionContrat,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -2566,6 +2569,103 @@ export async function seedHistoriqueCA(artisanId: number, data: { mois: number; 
     .where(and(eq(historiqueCA.artisanId, artisanId), eq(historiqueCA.mois, data.mois), eq(historiqueCA.annee, data.annee)))
     .limit(1);
   return result[0];
+}
+
+// ============================================================================
+// CONTRATS MAINTENANCE
+// ============================================================================
+export async function getContratsByArtisanId(artisanId: number): Promise<ContratMaintenance[]> {
+  const db = await getDb();
+  return db.select().from(contratsMaintenance)
+    .where(eq(contratsMaintenance.artisanId, artisanId))
+    .orderBy(desc(contratsMaintenance.createdAt));
+}
+
+export async function getContratsByClientId(clientId: number, artisanId: number): Promise<ContratMaintenance[]> {
+  const db = await getDb();
+  return db.select().from(contratsMaintenance)
+    .where(and(eq(contratsMaintenance.clientId, clientId), eq(contratsMaintenance.artisanId, artisanId)))
+    .orderBy(desc(contratsMaintenance.createdAt));
+}
+
+export async function getContratById(id: number): Promise<ContratMaintenance | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(contratsMaintenance)
+    .where(eq(contratsMaintenance.id, id))
+    .limit(1);
+  return result[0];
+}
+
+export async function getNextContratNumber(artisanId: number): Promise<string> {
+  const db = await getDb();
+  const result = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(contratsMaintenance)
+    .where(eq(contratsMaintenance.artisanId, artisanId));
+  const count = result[0]?.count || 0;
+  return `CTR-${String(count + 1).padStart(5, "0")}`;
+}
+
+export async function createContrat(data: InsertContratMaintenance): Promise<ContratMaintenance> {
+  const db = await getDb();
+  const result = await db.insert(contratsMaintenance).values(data);
+  const insertId = result[0].insertId;
+  const created = await db.select().from(contratsMaintenance).where(eq(contratsMaintenance.id, insertId)).limit(1);
+  return created[0];
+}
+
+export async function updateContrat(id: number, data: Partial<InsertContratMaintenance>): Promise<ContratMaintenance> {
+  const db = await getDb();
+  await db.update(contratsMaintenance).set({ ...data, updatedAt: new Date() }).where(eq(contratsMaintenance.id, id));
+  const updated = await db.select().from(contratsMaintenance).where(eq(contratsMaintenance.id, id)).limit(1);
+  return updated[0];
+}
+
+export async function deleteContrat(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(contratsMaintenance).where(eq(contratsMaintenance.id, id));
+}
+
+// ============================================================================
+// FACTURES RECURRENTES
+// ============================================================================
+export async function getFacturesRecurrentesByContratId(contratId: number): Promise<FactureRecurrente[]> {
+  const db = await getDb();
+  return db.select().from(facturesRecurrentes)
+    .where(eq(facturesRecurrentes.contratId, contratId))
+    .orderBy(desc(facturesRecurrentes.createdAt));
+}
+
+export async function createFactureRecurrente(data: InsertFactureRecurrente): Promise<FactureRecurrente> {
+  const db = await getDb();
+  const result = await db.insert(facturesRecurrentes).values(data);
+  const insertId = result[0].insertId;
+  const created = await db.select().from(facturesRecurrentes).where(eq(facturesRecurrentes.id, insertId)).limit(1);
+  return created[0];
+}
+
+// ============================================================================
+// INTERVENTIONS CONTRAT
+// ============================================================================
+export async function getInterventionsContratByContratId(contratId: number): Promise<InterventionContrat[]> {
+  const db = await getDb();
+  return db.select().from(interventionsContrat)
+    .where(eq(interventionsContrat.contratId, contratId))
+    .orderBy(desc(interventionsContrat.dateIntervention));
+}
+
+export async function createInterventionContrat(data: InsertInterventionContrat): Promise<InterventionContrat> {
+  const db = await getDb();
+  const result = await db.insert(interventionsContrat).values(data);
+  const insertId = result[0].insertId;
+  const created = await db.select().from(interventionsContrat).where(eq(interventionsContrat.id, insertId)).limit(1);
+  return created[0];
+}
+
+export async function updateInterventionContrat(id: number, data: Partial<InsertInterventionContrat>): Promise<InterventionContrat> {
+  const db = await getDb();
+  await db.update(interventionsContrat).set({ ...data, updatedAt: new Date() }).where(eq(interventionsContrat.id, id));
+  const updated = await db.select().from(interventionsContrat).where(eq(interventionsContrat.id, id)).limit(1);
+  return updated[0];
 }
 
 // One-time seed for test data (runs on server startup)

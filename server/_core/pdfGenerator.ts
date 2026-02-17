@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client } from "../db";
+import { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance } from "../db";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 
 // Register Roboto font for proper French accent support
@@ -380,6 +380,164 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     20,
     footerY + 20
   );
+
+  return Buffer.from(doc.output("arraybuffer"));
+}
+
+// ============================================================================
+// CONTRAT PDF
+// ============================================================================
+export interface PDFContratData {
+  contrat: ContratMaintenance;
+  artisan: Artisan;
+  client: Client;
+}
+
+const typeLabels: Record<string, string> = {
+  maintenance_preventive: "Maintenance Préventive",
+  entretien: "Entretien",
+  depannage: "Dépannage",
+  contrat_service: "Contrat de Service",
+};
+
+const periodiciteLabels: Record<string, string> = {
+  mensuel: "Mensuel",
+  trimestriel: "Trimestriel",
+  semestriel: "Semestriel",
+  annuel: "Annuel",
+};
+
+export function generateContratPDF(data: PDFContratData): Buffer {
+  const { contrat, artisan, client } = data;
+  const doc = new jsPDF();
+  registerFonts(doc);
+
+  const primaryColor: [number, number, number] = [41, 128, 185];
+  const darkGray: [number, number, number] = [80, 80, 80];
+
+  // En-tête
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, 210, 40, "F");
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(24);
+  doc.setFont("Roboto", "bold");
+  doc.text("CONTRAT DE MAINTENANCE", 20, 22);
+
+  doc.setTextColor(200, 200, 200);
+  doc.setFontSize(10);
+  doc.setFont("Roboto", "normal");
+  doc.text(`Réf: ${contrat.reference}`, 20, 32);
+  doc.text(`Type: ${typeLabels[contrat.type || "entretien"] || contrat.type}`, 120, 32);
+
+  // Artisan info
+  const artisanEndY = renderArtisanInfo(doc, artisan, darkGray);
+
+  // Client info
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...darkGray);
+  doc.text("CLIENT", 120, 55);
+
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(10);
+  doc.text(`${client.prenom || ""} ${client.nom}`, 120, 62);
+  let cy = 68;
+  if (client.adresse) { doc.text(client.adresse, 120, cy); cy += 6; }
+  if (client.codePostal) { doc.text(`${client.codePostal} ${client.ville || ""}`, 120, cy); cy += 6; }
+  if (client.email) { doc.text(`Email: ${client.email}`, 120, cy); cy += 6; }
+  if (client.telephone) { doc.text(`Tél: ${client.telephone}`, 120, cy); cy += 6; }
+
+  // Titre du contrat
+  let y = Math.max(artisanEndY, cy) + 10;
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...primaryColor);
+  doc.text(contrat.titre, 20, y);
+  y += 10;
+
+  // Description
+  if (contrat.description) {
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...darkGray);
+    const descLines = doc.splitTextToSize(contrat.description, 170);
+    doc.text(descLines, 20, y);
+    y += descLines.length * 5 + 5;
+  }
+
+  // Détails du contrat en tableau
+  const montantHT = parseFloat(contrat.montantHT || "0");
+  const tauxTVA = parseFloat(contrat.tauxTVA || "20");
+  const montantTVA = montantHT * (tauxTVA / 100);
+  const montantTTC = montantHT + montantTVA;
+
+  const detailsData = [
+    ["Périodicité", periodiciteLabels[contrat.periodicite] || contrat.periodicite],
+    ["Date de début", new Date(contrat.dateDebut).toLocaleDateString("fr-FR")],
+    ["Date de fin", contrat.dateFin ? new Date(contrat.dateFin).toLocaleDateString("fr-FR") : "Indéterminée"],
+    ["Reconduction tacite", contrat.reconduction ? "Oui" : "Non"],
+    ["Préavis de résiliation", `${contrat.preavisResiliation || 1} mois`],
+    ["Montant HT", `${montantHT.toFixed(2)} €`],
+    [`TVA (${tauxTVA}%)`, `${montantTVA.toFixed(2)} €`],
+    ["Montant TTC", `${montantTTC.toFixed(2)} €`],
+  ];
+
+  autoTable(doc, {
+    body: detailsData,
+    startY: y,
+    theme: "plain",
+    styles: { font: "Roboto", fontSize: 10, textColor: darkGray, cellPadding: 3 },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 60 },
+      1: { cellWidth: 110 },
+    },
+    margin: { left: 20, right: 20 },
+  });
+
+  y = (doc as any).lastAutoTable.finalY + 10;
+
+  // Conditions particulières
+  if (contrat.conditionsParticulieres) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...primaryColor);
+    doc.text("Conditions particulières", 20, y);
+    y += 7;
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...darkGray);
+    const condLines = doc.splitTextToSize(contrat.conditionsParticulieres, 170);
+    doc.text(condLines, 20, y);
+    y += condLines.length * 4 + 5;
+  }
+
+  // Signatures
+  if (y < 220) {
+    y = Math.max(y + 10, 220);
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...darkGray);
+    doc.text("Le prestataire", 30, y);
+    doc.text("Le client", 130, y);
+    y += 5;
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(9);
+    doc.text(artisan.nomEntreprise || "Artisan", 30, y + 5);
+    doc.text(`${client.prenom || ""} ${client.nom}`, 130, y + 5);
+
+    // Lignes de signature
+    doc.setDrawColor(180, 180, 180);
+    doc.line(25, y + 25, 90, y + 25);
+    doc.line(125, y + 25, 190, y + 25);
+  }
+
+  // Pied de page
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(150, 150, 150);
+  doc.text(`${artisan.nomEntreprise || ""}${artisan.siret ? ` — SIRET: ${artisan.siret}` : ""}`, 20, 285);
+  doc.text("Document généré automatiquement — Contrat de maintenance", 20, 289);
 
   return Buffer.from(doc.output("arraybuffer"));
 }

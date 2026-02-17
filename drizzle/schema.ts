@@ -525,12 +525,17 @@ export const contratsMaintenance = mysqlTable("contrats_maintenance", {
   reference: varchar("reference", { length: 50 }).notNull(),
   titre: varchar("titre", { length: 255 }).notNull(),
   description: text("description"),
+  type: mysqlEnum("type", ["maintenance_preventive", "entretien", "depannage", "contrat_service"]).default("entretien"),
   montantHT: decimal("montantHT", { precision: 10, scale: 2 }).notNull(),
   tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
   periodicite: mysqlEnum("periodicite", ["mensuel", "trimestriel", "semestriel", "annuel"]).notNull(),
   dateDebut: timestamp("dateDebut").notNull(),
   dateFin: timestamp("dateFin"),
+  reconduction: boolean("reconduction").default(true),
+  preavisResiliation: int("preavisResiliation").default(1),
   prochainFacturation: timestamp("prochainFacturation"),
+  prochainPassage: timestamp("prochainPassage"),
+  conditionsParticulieres: text("conditionsParticulieres"),
   statut: mysqlEnum("statut", ["actif", "suspendu", "termine", "annule"]).default("actif"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -555,6 +560,28 @@ export const facturesRecurrentes = mysqlTable("factures_recurrentes", {
 
 export type FactureRecurrente = typeof facturesRecurrentes.$inferSelect;
 export type InsertFactureRecurrente = typeof facturesRecurrentes.$inferInsert;
+
+// ============================================================================
+// INTERVENTIONS CONTRAT (Maintenance visits linked to contracts)
+// ============================================================================
+export const interventionsContrat = mysqlTable("interventions_contrat", {
+  id: int("id").autoincrement().primaryKey(),
+  contratId: int("contratId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  dateIntervention: timestamp("dateIntervention").notNull(),
+  duree: varchar("duree", { length: 50 }),
+  technicienNom: varchar("technicienNom", { length: 255 }),
+  statut: mysqlEnum("statut", ["planifiee", "en_cours", "effectuee", "annulee"]).default("planifiee"),
+  rapport: text("rapport"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type InterventionContrat = typeof interventionsContrat.$inferSelect;
+export type InsertInterventionContrat = typeof interventionsContrat.$inferInsert;
 
 // ============================================================================
 // INTERVENTIONS MOBILE (Mobile app data for field work)

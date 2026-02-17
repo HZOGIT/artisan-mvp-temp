@@ -58,6 +58,7 @@ const menuGroups: MenuGroup[] = [
       { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
       { icon: RefreshCw, label: "Relances", path: "/relances" },
       { icon: Receipt, label: "Factures", path: "/factures" },
+      { icon: ClipboardList, label: "Contrats", path: "/contrats" },
     ],
   },
   {

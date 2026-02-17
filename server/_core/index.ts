@@ -203,6 +203,39 @@ async function startServer() {
     }
   });
 
+  // Contrat PDF (authenticated via cookie)
+  app.get('/api/contrats/:id/pdf', async (req, res) => {
+    try {
+      const { getContratById, getArtisanByUserId, getClientById } = await import('../db');
+      const { generateContratPDF } = await import('./pdfGenerator');
+      const { jwtVerify } = await import('jose');
+
+      // Verify JWT from cookie
+      const token = req.cookies?.token;
+      if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret');
+      let payload: any;
+      try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+
+      const contrat = await getContratById(parseInt(req.params.id));
+      if (!contrat) { res.status(404).json({ error: 'Contrat non trouvé' }); return; }
+
+      const artisan = await getArtisanByUserId(payload.userId);
+      if (!artisan || contrat.artisanId !== artisan.id) { res.status(403).json({ error: 'Accès non autorisé' }); return; }
+
+      const client = await getClientById(contrat.clientId);
+      if (!client) { res.status(404).json({ error: 'Client non trouvé' }); return; }
+
+      const pdfBuffer = generateContratPDF({ contrat, artisan, client });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${contrat.reference}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[Contrat] PDF error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

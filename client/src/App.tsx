@@ -33,6 +33,7 @@ import PaiementSucces from "./pages/PaiementSucces";
 import PaiementAnnule from "./pages/PaiementAnnule";
 import PortailClient from "./pages/PortailClient";
 import Contrats from "./pages/Contrats";
+import ContratDetail from "./pages/ContratDetail";
 import InterventionsMobile from "./pages/InterventionsMobile";
 import Chat from "./pages/Chat";
 import Techniciens from "./pages/Techniciens";
@@ -87,6 +88,7 @@ function AuthenticatedRoutes() {
         <Route path="/profil" component={Profil} />
         <Route path="/parametres" component={Parametres} />
         <Route path="/contrats" component={Contrats} />
+        <Route path="/contrats/:id" component={ContratDetail} />
         <Route path="/mobile" component={InterventionsMobile} />
         <Route path="/chat" component={Chat} />
         <Route path="/techniciens" component={Techniciens} />
@@ -149,6 +151,7 @@ function Router() {
       <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
       <Route path="/profil" component={() => <AuthenticatedRoutes />} />
       <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
+      <Route path="/contrats/:rest*" component={() => <AuthenticatedRoutes />} />
       <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
       <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
       <Route path="/chat" component={() => <AuthenticatedRoutes />} />

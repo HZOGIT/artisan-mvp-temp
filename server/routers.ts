@@ -2934,16 +2934,28 @@ const contratsRouter = router({
       return { ...contrat, client, facturesRecurrentes };
     }),
 
+  getByClientId: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return db.getContratsByClientId(input.clientId, artisan.id);
+    }),
+
   create: protectedProcedure
     .input(z.object({
       clientId: z.number(),
       titre: z.string(),
       description: z.string().optional(),
+      type: z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]).optional(),
       montantHT: z.string(),
       tauxTVA: z.string().optional(),
       periodicite: z.enum(["mensuel", "trimestriel", "semestriel", "annuel"]),
       dateDebut: z.string(),
       dateFin: z.string().optional(),
+      reconduction: z.boolean().optional(),
+      preavisResiliation: z.number().optional(),
+      conditionsParticulieres: z.string().optional(),
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2952,22 +2964,25 @@ const contratsRouter = router({
         artisan = await db.createArtisan({ userId: ctx.user.id });
       }
       const reference = await db.getNextContratNumber(artisan.id);
-      
-      // Calculer la prochaine date de facturation
+
       const dateDebut = new Date(input.dateDebut);
       let prochainFacturation = new Date(dateDebut);
-      
+
       return await db.createContrat({
         artisanId: artisan.id,
         clientId: input.clientId,
         reference,
         titre: input.titre,
         description: input.description,
+        type: input.type || "entretien",
         montantHT: input.montantHT,
         tauxTVA: input.tauxTVA || "20.00",
         periodicite: input.periodicite,
         dateDebut,
         dateFin: input.dateFin ? new Date(input.dateFin) : undefined,
+        reconduction: input.reconduction ?? true,
+        preavisResiliation: input.preavisResiliation ?? 1,
+        conditionsParticulieres: input.conditionsParticulieres,
         prochainFacturation,
         statut: "actif",
         notes: input.notes,
@@ -2979,11 +2994,16 @@ const contratsRouter = router({
       id: z.number(),
       titre: z.string().optional(),
       description: z.string().optional(),
+      type: z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]).optional(),
       montantHT: z.string().optional(),
       tauxTVA: z.string().optional(),
       periodicite: z.enum(["mensuel", "trimestriel", "semestriel", "annuel"]).optional(),
       dateFin: z.string().optional(),
+      reconduction: z.boolean().optional(),
+      preavisResiliation: z.number().optional(),
+      conditionsParticulieres: z.string().optional(),
       statut: z.enum(["actif", "suspendu", "termine", "annule"]).optional(),
+      prochainPassage: z.string().optional(),
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2999,6 +3019,7 @@ const contratsRouter = router({
       return await db.updateContrat(id, {
         ...updateData,
         dateFin: updateData.dateFin ? new Date(updateData.dateFin) : undefined,
+        prochainPassage: updateData.prochainPassage ? new Date(updateData.prochainPassage) : undefined,
       });
     }),
 
@@ -3081,8 +3102,84 @@ const contratsRouter = router({
       
       // Mettre à jour la prochaine date de facturation
       await db.updateContrat(contrat.id, { prochainFacturation: periodeFin });
-      
+
       return facture;
+    }),
+
+  // Interventions liées au contrat
+  getInterventions: protectedProcedure
+    .input(z.object({ contratId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const contrat = await db.getContratById(input.contratId);
+      if (!contrat) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Contrat non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || contrat.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return db.getInterventionsContratByContratId(input.contratId);
+    }),
+
+  createIntervention: protectedProcedure
+    .input(z.object({
+      contratId: z.number(),
+      titre: z.string(),
+      description: z.string().optional(),
+      dateIntervention: z.string(),
+      duree: z.string().optional(),
+      technicienNom: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const contrat = await db.getContratById(input.contratId);
+      if (!contrat) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Contrat non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || contrat.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return db.createInterventionContrat({
+        contratId: input.contratId,
+        artisanId: artisan.id,
+        titre: input.titre,
+        description: input.description,
+        dateIntervention: new Date(input.dateIntervention),
+        duree: input.duree,
+        technicienNom: input.technicienNom,
+        notes: input.notes,
+        statut: "planifiee",
+      });
+    }),
+
+  updateIntervention: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      contratId: z.number(),
+      titre: z.string().optional(),
+      description: z.string().optional(),
+      dateIntervention: z.string().optional(),
+      duree: z.string().optional(),
+      technicienNom: z.string().optional(),
+      statut: z.enum(["planifiee", "en_cours", "effectuee", "annulee"]).optional(),
+      rapport: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const contrat = await db.getContratById(input.contratId);
+      if (!contrat) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Contrat non trouvé" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || contrat.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const { id, contratId, ...updateData } = input;
+      return db.updateInterventionContrat(id, {
+        ...updateData,
+        dateIntervention: updateData.dateIntervention ? new Date(updateData.dateIntervention) : undefined,
+      });
     }),
 });
 
