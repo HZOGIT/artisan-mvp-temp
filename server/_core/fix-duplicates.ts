@@ -256,6 +256,66 @@ async function fixDuplicates() {
     );
     console.log(`[FixDuplicates] Inserted conv ${c2} with 2 messages`);
 
+    // --- Seed suivi_chantier demo data ---
+    try {
+      // Create table if it doesn't exist (before drizzle push)
+      await pool.execute(`CREATE TABLE IF NOT EXISTS suivi_chantier (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        chantierId INT NOT NULL,
+        titre VARCHAR(255) NOT NULL,
+        description TEXT,
+        statut ENUM('a_faire','en_cours','termine') DEFAULT 'a_faire',
+        pourcentage INT DEFAULT 0,
+        ordre INT DEFAULT 1,
+        visibleClient BOOLEAN DEFAULT TRUE,
+        dateDebut DATE,
+        dateFin DATE,
+        commentaire TEXT,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL
+      )`);
+      const [existingSuivi] = await pool.execute('SELECT COUNT(*) as cnt FROM suivi_chantier') as any;
+      if (existingSuivi[0].cnt === 0) {
+        // Find a "Mise aux normes" chantier, or any en_cours chantier
+        const [chantierRows] = await pool.execute(
+          "SELECT id, nom FROM chantiers WHERE nom LIKE '%Mise aux normes%' LIMIT 1"
+        ) as any;
+        let chantierId: number | null = null;
+        if (chantierRows.length > 0) {
+          chantierId = chantierRows[0].id;
+          console.log(`[FixDuplicates] Suivi seed: using chantier "${chantierRows[0].nom}" (ID: ${chantierId})`);
+        } else {
+          const [fallback] = await pool.execute(
+            "SELECT id, nom FROM chantiers WHERE statut = 'en_cours' LIMIT 1"
+          ) as any;
+          if (fallback.length > 0) {
+            chantierId = fallback[0].id;
+            console.log(`[FixDuplicates] Suivi seed: using fallback chantier "${fallback[0].nom}" (ID: ${chantierId})`);
+          }
+        }
+        if (chantierId) {
+          const etapes = [
+            { titre: 'Diagnostic \u00e9lectrique initial', statut: 'termine', pourcentage: 100, ordre: 1 },
+            { titre: 'Remplacement tableau \u00e9lectrique', statut: 'termine', pourcentage: 100, ordre: 2 },
+            { titre: 'Mise en conformit\u00e9 des circuits', statut: 'en_cours', pourcentage: 60, ordre: 3 },
+            { titre: 'Contr\u00f4le Consuel et finitions', statut: 'a_faire', pourcentage: 0, ordre: 4 },
+          ];
+          for (const e of etapes) {
+            await pool.execute(
+              'INSERT INTO suivi_chantier (chantierId, titre, statut, pourcentage, ordre, visibleClient) VALUES (?, ?, ?, ?, ?, 1)',
+              [chantierId, e.titre, e.statut, e.pourcentage, e.ordre]
+            );
+          }
+          console.log(`[FixDuplicates] Seeded ${etapes.length} suivi_chantier etapes for chantier ${chantierId}`);
+        }
+      } else {
+        console.log('[FixDuplicates] suivi_chantier already has data, skipping seed');
+      }
+    } catch (e: any) {
+      // Table might not exist yet (before drizzle push)
+      console.log('[FixDuplicates] suivi_chantier seed skipped:', e.message);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
