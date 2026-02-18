@@ -1592,11 +1592,23 @@ const interventionsRouter = router({
 // ============================================================================
 const notificationsRouter = router({
   list: protectedProcedure
-    .input(z.object({ includeArchived: z.boolean().default(false) }).optional())
+    .input(z.object({
+      includeArchived: z.boolean().default(false),
+      nonLuesUniquement: z.boolean().default(false),
+      page: z.number().min(1).default(1),
+      limit: z.number().min(1).max(100).default(50),
+    }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      return await db.getNotificationsByArtisanId(artisan.id, input?.includeArchived || false);
+      const all = await db.getNotificationsByArtisanId(artisan.id, input?.includeArchived || false);
+      let filtered = all;
+      if (input?.nonLuesUniquement) {
+        filtered = all.filter((n: any) => !n.lu);
+      }
+      const page = input?.page || 1;
+      const limit = input?.limit || 50;
+      return filtered.slice((page - 1) * limit, page * limit);
     }),
   
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
@@ -1622,6 +1634,13 @@ const notificationsRouter = router({
   }),
   
   archive: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await db.archiveNotification(input.id);
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       await db.archiveNotification(input.id);
@@ -3066,11 +3085,24 @@ const clientPortalRouter = router({
       const conv = await db.getConversationById(input.conversationId);
       if (!conv || conv.clientId !== access.clientId || conv.artisanId !== access.artisanId)
         throw new TRPCError({ code: "FORBIDDEN" });
-      return db.createMessage({
+      const msg = await db.createMessage({
         conversationId: input.conversationId,
         auteur: 'client',
         contenu: input.contenu,
       });
+      // Notification pour l'artisan
+      try {
+        const client = await db.getClientById(access.clientId);
+        const clientName = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : 'Un client';
+        await db.createNotification({
+          artisanId: access.artisanId,
+          type: "info",
+          titre: `Nouveau message de ${clientName}`,
+          message: input.contenu.substring(0, 200),
+          lien: "/chat",
+        });
+      } catch (e) { console.error('[Notification] sendClientMessage error:', e); }
+      return msg;
     }),
 
   markClientMessagesAsRead: publicProcedure

@@ -27,11 +27,143 @@ import {
 import { getLoginUrl } from "@/const";
 import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles, Bell, CheckCircle, AlertTriangle, Clock, Info, XCircle } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { ScrollArea } from "./ui/scroll-area";
+import { trpc } from "@/lib/trpc";
+
+const notifTypeIcon: Record<string, any> = {
+  succes: CheckCircle,
+  alerte: AlertTriangle,
+  rappel: Clock,
+  info: Info,
+  erreur: XCircle,
+};
+
+const notifTypeColor: Record<string, string> = {
+  succes: "text-green-500",
+  alerte: "text-orange-500",
+  rappel: "text-blue-500",
+  info: "text-sky-500",
+  erreur: "text-red-500",
+};
+
+function formatRelativeDate(date: string | Date) {
+  const d = new Date(date);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "A l'instant";
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `Il y a ${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  if (diffD === 1) return "Hier";
+  if (diffD < 7) return `Il y a ${diffD} jours`;
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}
+
+function NotificationBell() {
+  const [, setLocation] = useLocation();
+  const [open, setOpen] = useState(false);
+  const { data: unreadCount = 0 } = trpc.notifications.getUnreadCount.useQuery(undefined, {
+    refetchInterval: 30000,
+  });
+  const { data: notifications = [], refetch } = trpc.notifications.list.useQuery(
+    { limit: 10 },
+    { enabled: open }
+  );
+  const markAsReadMutation = trpc.notifications.markAsRead.useMutation({ onSuccess: () => refetch() });
+  const markAllAsReadMutation = trpc.notifications.markAllAsRead.useMutation({ onSuccess: () => refetch() });
+
+  const handleClick = (notif: any) => {
+    if (!notif.lu) markAsReadMutation.mutate({ id: notif.id });
+    if (notif.lien) { setOpen(false); setLocation(notif.lien); }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button className="relative h-9 w-9 flex items-center justify-center rounded-lg hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Bell className="h-5 w-5 text-muted-foreground" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 h-5 min-w-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <span className="font-semibold text-sm">Notifications</span>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => markAllAsReadMutation.mutate()}
+              className="text-xs text-primary hover:underline"
+            >
+              Tout marquer comme lu
+            </button>
+          )}
+        </div>
+        <ScrollArea className="max-h-80">
+          {notifications.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              Aucune notification
+            </div>
+          ) : (
+            <div>
+              {notifications.map((notif: any) => {
+                const Icon = notifTypeIcon[notif.type] || Info;
+                const color = notifTypeColor[notif.type] || "text-muted-foreground";
+                return (
+                  <button
+                    key={notif.id}
+                    onClick={() => handleClick(notif)}
+                    className={`w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors border-b last:border-b-0 ${
+                      !notif.lu ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <div className="flex gap-3">
+                      <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm truncate ${!notif.lu ? "font-semibold" : ""}`}>
+                            {notif.titre}
+                          </span>
+                          {!notif.lu && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
+                        </div>
+                        {notif.message && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {notif.message}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formatRelativeDate(notif.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </ScrollArea>
+        <div className="border-t px-4 py-2">
+          <button
+            onClick={() => { setOpen(false); setLocation("/notifications"); }}
+            className="text-xs text-primary hover:underline w-full text-center"
+          >
+            Voir toutes les notifications
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type MenuItem = { icon: any; label: string; path: string };
 
@@ -368,20 +500,15 @@ function DashboardLayoutContent({
       </div>
 
       <SidebarInset>
-        {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
-                  </span>
-                </div>
-              </div>
-            </div>
+        <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+          <div className="flex items-center gap-2">
+            {isMobile && <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />}
+            <span className="tracking-tight text-foreground font-medium">
+              {activeMenuItem?.label ?? "Menu"}
+            </span>
           </div>
-        )}
+          <NotificationBell />
+        </div>
         <main className="flex-1 p-4 min-w-0">{children}</main>
       </SidebarInset>
     </>

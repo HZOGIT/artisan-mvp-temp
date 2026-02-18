@@ -55,6 +55,7 @@ import Chantiers from "./pages/Chantiers";
 import IntegrationsComptables from "./pages/IntegrationsComptables";
 import DevisIA from "./pages/DevisIA";
 import Assistant from "./pages/Assistant";
+import Notifications from "./pages/Notifications";
 import DevisLigneEdit from "./pages/DevisLigneEdit";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
@@ -115,6 +116,7 @@ function AuthenticatedRoutes() {
         <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
         <Route path="/portail-gestion" component={PortailGestion} />
         <Route path="/assistant" component={Assistant} />
+        <Route path="/notifications" component={Notifications} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -180,6 +182,7 @@ function Router() {
       <Route path="/performances-fournisseurs" component={() => <AuthenticatedRoutes />} />
       <Route path="/portail-gestion" component={() => <AuthenticatedRoutes />} />
       <Route path="/assistant" component={() => <AuthenticatedRoutes />} />
+      <Route path="/notifications" component={() => <AuthenticatedRoutes />} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -39,6 +39,32 @@ async function startServer() {
       console.log('[Database] MySQL connected successfully');
       // Seed test data (one-time, skips if data already exists)
       try { await seedTestData(); } catch (e) { console.error('[Seed] Error:', e); }
+      // Seed demo notifications (one-time)
+      try {
+        const { getPool } = await import('../db');
+        const pool = getPool();
+        if (pool) {
+          const [existing] = await pool.execute('SELECT COUNT(*) as cnt FROM notifications WHERE artisanId = 1');
+          if ((existing as any)[0].cnt === 0) {
+            const now = new Date();
+            const notifs = [
+              { type: 'succes', titre: 'Devis DEV-00026 accepte et signe', message: 'Le client Durand Pierre a accepte et signe le devis DEV-00026', lien: '/devis/26', lu: 0, hours: 2 },
+              { type: 'info', titre: 'Nouveau message de Hab Doudi', message: 'Bonjour, je souhaiterais modifier la date de mon intervention...', lien: '/chat', lu: 0, hours: 4 },
+              { type: 'rappel', titre: 'Intervention demain : Entretien chauffage M. Durand', message: 'Rappel: Intervention prevue demain a 09:00 chez Pierre Durand', lien: '/interventions', lu: 0, hours: 6 },
+              { type: 'alerte', titre: 'Stock bas : Joint torique (5 restants)', message: 'Le stock de Joint torique est descendu sous le seuil d\'alerte', lien: '/stocks', lu: 1, hours: 24 },
+              { type: 'rappel', titre: 'Facture FAC-00008 en retard de 35 jours', message: 'La facture FAC-00008 de 360.00 EUR est en retard de paiement', lien: '/factures/8', lu: 1, hours: 48 },
+            ];
+            for (const n of notifs) {
+              const createdAt = new Date(now.getTime() - n.hours * 3600000);
+              await pool.execute(
+                'INSERT INTO notifications (artisanId, type, titre, message, lien, lu, createdAt) VALUES (1, ?, ?, ?, ?, ?, ?)',
+                [n.type, n.titre, n.message, n.lien, n.lu, createdAt]
+              );
+            }
+            console.log('[Seed] 5 demo notifications inserted');
+          }
+        }
+      } catch (e) { console.error('[Seed] Notifications error:', e); }
     } else {
       console.error('[Database] MySQL connection failed: getDb returned null');
     }
