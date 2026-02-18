@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock, CalendarDays, ArrowRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -78,6 +79,47 @@ export default function PortailClient() {
       toast.error("Erreur lors de l'envoi de la demande");
     },
   });
+
+  // RDV state
+  const [rdvStep, setRdvStep] = useState(1);
+  const [rdvForm, setRdvForm] = useState({ titre: "", description: "", urgence: "normale" as "normale" | "urgente" | "tres_urgente" });
+  const [rdvSelectedSlot, setRdvSelectedSlot] = useState<string | null>(null);
+  const [rdvSuccess, setRdvSuccess] = useState(false);
+
+  const { data: creneauxDisponibles } = trpc.clientPortal.getCreneauxDisponibles.useQuery(
+    { token: token || "" },
+    { enabled: !!token && accessData?.valid }
+  );
+
+  const { data: mesRdv, refetch: refetchMesRdv } = trpc.clientPortal.getMesRdv.useQuery(
+    { token: token || "" },
+    { enabled: !!token && accessData?.valid }
+  );
+
+  const demanderRdvMutation = trpc.clientPortal.demanderRdv.useMutation({
+    onSuccess: () => {
+      setRdvStep(1);
+      setRdvForm({ titre: "", description: "", urgence: "normale" });
+      setRdvSelectedSlot(null);
+      setRdvSuccess(true);
+      refetchMesRdv();
+      setTimeout(() => setRdvSuccess(false), 5000);
+    },
+    onError: () => toast.error("Erreur lors de la demande de RDV"),
+  });
+
+  function groupSlotsByDay(slots: string[]): Record<string, string[]> {
+    const grouped: Record<string, string[]> = {};
+    for (const slot of slots) {
+      const day = new Date(slot).toISOString().split('T')[0];
+      if (!grouped[day]) grouped[day] = [];
+      grouped[day].push(slot);
+    }
+    return grouped;
+  }
+
+  const RDV_STATUT_LABELS: Record<string, string> = { en_attente: "En attente", confirme: "Confirmé", refuse: "Refusé", annule: "Annulé" };
+  const RDV_STATUT_COLORS: Record<string, string> = { en_attente: "bg-yellow-100 text-yellow-700", confirme: "bg-green-100 text-green-700", refuse: "bg-red-100 text-red-700", annule: "bg-gray-100 text-gray-500" };
 
   // Auto-scroll chat messages
   useEffect(() => {
@@ -212,7 +254,7 @@ export default function PortailClient() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6">
             <TabsTrigger value="devis" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Mes </span>Devis
@@ -237,6 +279,10 @@ export default function PortailClient() {
               {totalUnreadChat > 0 && (
                 <span className="ml-1 bg-blue-600 text-white text-xs rounded-full px-1.5">{totalUnreadChat}</span>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="rdv" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <CalendarDays className="h-4 w-4" />
+              <span className="hidden sm:inline">Prendre </span>RDV
             </TabsTrigger>
             <TabsTrigger value="infos" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <User className="h-4 w-4" />
@@ -645,6 +691,201 @@ export default function PortailClient() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+          </TabsContent>
+
+          {/* RDV Tab */}
+          <TabsContent value="rdv">
+            <div className="space-y-6">
+              {/* Success message */}
+              {rdvSuccess && (
+                <Card className="border-green-200 bg-green-50">
+                  <CardContent className="py-6 text-center">
+                    <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-600" />
+                    <p className="font-medium text-green-800">Votre demande de RDV a été envoyée !</p>
+                    <p className="text-sm text-green-600 mt-1">L'artisan vous confirmera le créneau.</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Wizard Step Indicator */}
+              <div className="flex items-center justify-center gap-2 mb-4">
+                {[1, 2, 3].map((step) => (
+                  <div key={step} className="flex items-center gap-1.5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${rdvStep >= step ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                      {step}
+                    </div>
+                    <span className={`text-xs hidden sm:inline ${rdvStep >= step ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
+                      {step === 1 ? 'Description' : step === 2 ? 'Créneau' : 'Confirmation'}
+                    </span>
+                    {step < 3 && <ArrowRight className="h-3.5 w-3.5 text-gray-300 mx-1" />}
+                  </div>
+                ))}
+              </div>
+
+              {/* Step 1: Form */}
+              {rdvStep === 1 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Décrivez votre besoin</CardTitle>
+                    <CardDescription>Expliquez le problème ou la prestation souhaitée</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Titre du problème *</label>
+                      <Input
+                        value={rdvForm.titre}
+                        onChange={(e) => setRdvForm((f) => ({ ...f, titre: e.target.value }))}
+                        placeholder="Ex: Fuite robinet cuisine"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Description</label>
+                      <Textarea
+                        value={rdvForm.description}
+                        onChange={(e) => setRdvForm((f) => ({ ...f, description: e.target.value }))}
+                        placeholder="Détails supplémentaires sur le problème..."
+                        rows={3}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Niveau d'urgence</label>
+                      <Select value={rdvForm.urgence} onValueChange={(v) => setRdvForm((f) => ({ ...f, urgence: v as any }))}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normale">Normale</SelectItem>
+                          <SelectItem value="urgente">Urgente</SelectItem>
+                          <SelectItem value="tres_urgente">Très urgente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={() => setRdvStep(2)} disabled={!rdvForm.titre.trim()} className="w-full">
+                      Choisir un créneau <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Step 2: Calendar with slots */}
+              {rdvStep === 2 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Choisissez un créneau</CardTitle>
+                    <CardDescription>Créneaux disponibles sur les 14 prochains jours (lun-ven, 8h-18h)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {!creneauxDisponibles || creneauxDisponibles.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <CalendarDays className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                        <p>Aucun créneau disponible pour le moment</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                        {Object.entries(groupSlotsByDay(creneauxDisponibles)).map(([day, daySlots]) => (
+                          <div key={day}>
+                            <h4 className="font-medium text-sm mb-2 capitalize">
+                              {new Date(day + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {daySlots.map((slot) => (
+                                <Button
+                                  key={slot}
+                                  size="sm"
+                                  variant={rdvSelectedSlot === slot ? "default" : "outline"}
+                                  onClick={() => setRdvSelectedSlot(slot)}
+                                  className="min-w-[70px]"
+                                >
+                                  {new Date(slot).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2 mt-6">
+                      <Button variant="outline" onClick={() => setRdvStep(1)}>
+                        <ArrowLeft className="h-4 w-4 mr-1" /> Retour
+                      </Button>
+                      <Button onClick={() => setRdvStep(3)} disabled={!rdvSelectedSlot} className="flex-1">
+                        Continuer <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Step 3: Confirmation */}
+              {rdvStep === 3 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Confirmez votre demande</CardTitle>
+                    <CardDescription>Vérifiez les informations avant d'envoyer</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                      <p><strong>Titre :</strong> {rdvForm.titre}</p>
+                      {rdvForm.description && <p><strong>Description :</strong> {rdvForm.description}</p>}
+                      <p><strong>Urgence :</strong> {rdvForm.urgence === 'normale' ? 'Normale' : rdvForm.urgence === 'urgente' ? 'Urgente' : 'Très urgente'}</p>
+                      <p><strong>Créneau :</strong> {rdvSelectedSlot && new Date(rdvSelectedSlot).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setRdvStep(2)}>
+                        <ArrowLeft className="h-4 w-4 mr-1" /> Retour
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        onClick={() =>
+                          demanderRdvMutation.mutate({
+                            token: token || "",
+                            titre: rdvForm.titre,
+                            description: rdvForm.description || undefined,
+                            urgence: rdvForm.urgence,
+                            dateProposee: rdvSelectedSlot!,
+                          })
+                        }
+                        disabled={demanderRdvMutation.isPending}
+                      >
+                        {demanderRdvMutation.isPending ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Envoi...</>
+                        ) : (
+                          <><Send className="h-4 w-4 mr-2" /> Envoyer la demande</>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Mes RDV existants */}
+              {mesRdv && mesRdv.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Mes rendez-vous</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {mesRdv.map((rdv: any) => (
+                        <div key={rdv.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{rdv.titre}</p>
+                            <p className="text-sm text-gray-500">
+                              {new Date(rdv.dateProposee).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                          <Badge className={RDV_STATUT_COLORS[rdv.statut] || "bg-gray-100"}>
+                            {RDV_STATUT_LABELS[rdv.statut] || rdv.statut}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
         </Tabs>

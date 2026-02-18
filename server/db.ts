@@ -49,6 +49,7 @@ import {
   interventionsContrat, InterventionContrat, InsertInterventionContrat,
   conversations, Conversation, InsertConversation,
   messages, Message, InsertMessage,
+  rdvEnLigne, RdvEnLigne, InsertRdvEnLigne,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -2848,4 +2849,98 @@ export async function seedTestData(): Promise<void> {
   }
 
   console.log('[Seed] Test data inserted successfully!');
+}
+
+// ============================================================================
+// RDV EN LIGNE
+// ============================================================================
+
+export async function createRdvEnLigne(data: InsertRdvEnLigne): Promise<RdvEnLigne> {
+  const db = await getDb();
+  const result = await db.insert(rdvEnLigne).values(data);
+  const insertId = result[0].insertId;
+  const created = await db.select().from(rdvEnLigne).where(eq(rdvEnLigne.id, insertId)).limit(1);
+  return created[0];
+}
+
+export async function getRdvByArtisanId(artisanId: number): Promise<RdvEnLigne[]> {
+  const db = await getDb();
+  return await db.select().from(rdvEnLigne)
+    .where(eq(rdvEnLigne.artisanId, artisanId))
+    .orderBy(desc(rdvEnLigne.createdAt));
+}
+
+export async function getRdvByClientId(clientId: number, artisanId: number): Promise<RdvEnLigne[]> {
+  const db = await getDb();
+  return await db.select().from(rdvEnLigne)
+    .where(and(
+      eq(rdvEnLigne.clientId, clientId),
+      eq(rdvEnLigne.artisanId, artisanId)
+    ))
+    .orderBy(desc(rdvEnLigne.createdAt));
+}
+
+export async function getRdvById(id: number): Promise<RdvEnLigne | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(rdvEnLigne).where(eq(rdvEnLigne.id, id)).limit(1);
+  return result[0];
+}
+
+export async function updateRdvStatut(
+  id: number,
+  statut: "en_attente" | "confirme" | "refuse" | "annule",
+  extra?: { motifRefus?: string; interventionId?: number }
+): Promise<RdvEnLigne> {
+  const db = await getDb();
+  await db.update(rdvEnLigne).set({
+    statut,
+    ...extra,
+  }).where(eq(rdvEnLigne.id, id));
+  const result = await db.select().from(rdvEnLigne).where(eq(rdvEnLigne.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getRdvPendingCount(artisanId: number): Promise<number> {
+  const db = await getDb();
+  const result = await db.select().from(rdvEnLigne)
+    .where(and(
+      eq(rdvEnLigne.artisanId, artisanId),
+      eq(rdvEnLigne.statut, "en_attente")
+    ));
+  return result.length;
+}
+
+export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Date): Promise<{ dateDebut: Date; dateFin: Date | null }[]> {
+  const db = await getDb();
+  const interventionsList = await db.select({
+    dateDebut: interventions.dateDebut,
+    dateFin: interventions.dateFin,
+  }).from(interventions)
+    .where(and(
+      eq(interventions.artisanId, artisanId),
+      ne(interventions.statut, "annulee"),
+      gte(interventions.dateDebut, debut),
+      lte(interventions.dateDebut, fin)
+    ));
+
+  const rdvList = await db.select({
+    dateProposee: rdvEnLigne.dateProposee,
+    dureeEstimee: rdvEnLigne.dureeEstimee,
+  }).from(rdvEnLigne)
+    .where(and(
+      eq(rdvEnLigne.artisanId, artisanId),
+      inArray(rdvEnLigne.statut, ["en_attente", "confirme"]),
+      gte(rdvEnLigne.dateProposee, debut),
+      lte(rdvEnLigne.dateProposee, fin)
+    ));
+
+  const occupied: { dateDebut: Date; dateFin: Date | null }[] = [];
+  for (const i of interventionsList) {
+    occupied.push({ dateDebut: i.dateDebut, dateFin: i.dateFin });
+  }
+  for (const r of rdvList) {
+    const end = new Date(r.dateProposee.getTime() + (r.dureeEstimee || 60) * 60000);
+    occupied.push({ dateDebut: r.dateProposee, dateFin: end });
+  }
+  return occupied;
 }

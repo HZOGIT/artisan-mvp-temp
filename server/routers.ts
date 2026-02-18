@@ -3203,6 +3203,97 @@ const clientPortalRouter = router({
       await db.markMessagesAsRead(input.conversationId, 'client');
       return { success: true };
     }),
+
+  // ---- RDV EN LIGNE (public, token-based) ----
+  getCreneauxDisponibles: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acces non autorise" });
+
+      const now = new Date();
+      const debut = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const fin = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+      const occupied = await db.getCreneauxOccupes(access.artisanId, debut, fin);
+
+      const slots: string[] = [];
+      const current = new Date(debut);
+      current.setHours(0, 0, 0, 0);
+
+      while (current <= fin) {
+        const dayOfWeek = current.getDay();
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          for (let hour = 8; hour < 18; hour++) {
+            const slotStart = new Date(current);
+            slotStart.setHours(hour, 0, 0, 0);
+            const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+
+            if (slotStart <= debut) continue;
+
+            const isOccupied = occupied.some(occ => {
+              const occEnd = occ.dateFin || new Date(occ.dateDebut.getTime() + 60 * 60 * 1000);
+              return slotStart < occEnd && slotEnd > occ.dateDebut;
+            });
+
+            if (!isOccupied) {
+              slots.push(slotStart.toISOString());
+            }
+          }
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      return slots;
+    }),
+
+  demanderRdv: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      titre: z.string().min(1),
+      description: z.string().optional(),
+      urgence: z.enum(["normale", "urgente", "tres_urgente"]).default("normale"),
+      dateProposee: z.string(),
+    }))
+    .mutation(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acces non autorise" });
+
+      const dateProposee = new Date(input.dateProposee);
+      const minDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      if (dateProposee < minDate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le creneau doit etre au moins 24h a l'avance" });
+      }
+
+      const rdv = await db.createRdvEnLigne({
+        artisanId: access.artisanId,
+        clientId: access.clientId,
+        titre: input.titre,
+        description: input.description,
+        urgence: input.urgence,
+        dateProposee,
+        dureeEstimee: 60,
+      });
+
+      const client = await db.getClientById(access.clientId);
+      const clientName = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : 'Un client';
+      await db.createNotification({
+        artisanId: access.artisanId,
+        type: "info",
+        titre: `Nouvelle demande de RDV de ${clientName}`,
+        message: `${input.titre} — ${dateProposee.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}`,
+        lien: "/rdv-en-ligne",
+      });
+
+      return rdv;
+    }),
+
+  getMesRdv: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acces non autorise" });
+      return db.getRdvByClientId(access.clientId, access.artisanId);
+    }),
 });
 
 // ============================================================================
@@ -6092,6 +6183,154 @@ const calendrierRouter = router({
 });
 
 // ============================================================================
+// RDV EN LIGNE ROUTER (Artisan side - protected)
+// ============================================================================
+const rdvRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      statut: z.enum(["en_attente", "confirme", "refuse", "annule"]).optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      let rdvList = await db.getRdvByArtisanId(artisan.id);
+      if (input?.statut) {
+        rdvList = rdvList.filter(r => r.statut === input.statut);
+      }
+      return Promise.all(rdvList.map(async (r) => {
+        const client = await db.getClientById(r.clientId);
+        return { ...r, client };
+      }));
+    }),
+
+  confirm: protectedProcedure
+    .input(z.object({ rdvId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouve" });
+
+      const rdv = await db.getRdvById(input.rdvId);
+      if (!rdv || rdv.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "RDV non trouve" });
+      }
+      if (rdv.statut !== "en_attente") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce RDV ne peut plus etre confirme" });
+      }
+
+      const dateFin = new Date(rdv.dateProposee.getTime() + (rdv.dureeEstimee || 60) * 60000);
+      const intervention = await db.createIntervention({
+        artisanId: artisan.id,
+        clientId: rdv.clientId,
+        titre: rdv.titre,
+        description: rdv.description || undefined,
+        dateDebut: rdv.dateProposee,
+        dateFin,
+        statut: "planifiee",
+      });
+
+      const updated = await db.updateRdvStatut(rdv.id, "confirme", { interventionId: intervention.id });
+
+      const client = await db.getClientById(rdv.clientId);
+      if (client?.email) {
+        const clientName = `${client.prenom || ''} ${client.nom}`.trim();
+        const artisanName = artisan.nomEntreprise || 'Votre artisan';
+        const dateStr = rdv.dateProposee.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        await sendEmail({
+          to: client.email,
+          subject: `${artisanName} — Votre RDV est confirme`,
+          body: `<p>Bonjour ${clientName},</p><p>Votre rendez-vous <strong>${rdv.titre}</strong> du <strong>${dateStr}</strong> a ete confirme.</p><p>Cordialement,<br/>${artisanName}</p>`,
+        });
+      }
+
+      return updated;
+    }),
+
+  refuse: protectedProcedure
+    .input(z.object({ rdvId: z.number(), motif: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouve" });
+
+      const rdv = await db.getRdvById(input.rdvId);
+      if (!rdv || rdv.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "RDV non trouve" });
+      }
+
+      const updated = await db.updateRdvStatut(rdv.id, "refuse", { motifRefus: input.motif });
+
+      const client = await db.getClientById(rdv.clientId);
+      if (client?.email) {
+        const clientName = `${client.prenom || ''} ${client.nom}`.trim();
+        const artisanName = artisan.nomEntreprise || 'Votre artisan';
+        await sendEmail({
+          to: client.email,
+          subject: `${artisanName} — RDV non disponible`,
+          body: `<p>Bonjour ${clientName},</p><p>Votre demande de rendez-vous <strong>${rdv.titre}</strong> n'a malheureusement pas pu etre acceptee.</p><p><strong>Motif :</strong> ${input.motif}</p><p>N'hesitez pas a proposer un autre creneau.</p><p>Cordialement,<br/>${artisanName}</p>`,
+        });
+      }
+
+      return updated;
+    }),
+
+  proposeAutreCreneau: protectedProcedure
+    .input(z.object({ rdvId: z.number(), nouvelleDateProposee: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouve" });
+
+      const rdv = await db.getRdvById(input.rdvId);
+      if (!rdv || rdv.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "RDV non trouve" });
+      }
+
+      await db.updateRdvStatut(rdv.id, "refuse", {
+        motifRefus: "Creneau non disponible — un autre creneau a ete propose",
+      });
+
+      const newRdv = await db.createRdvEnLigne({
+        artisanId: artisan.id,
+        clientId: rdv.clientId,
+        titre: rdv.titre,
+        description: rdv.description,
+        dateProposee: new Date(input.nouvelleDateProposee),
+        dureeEstimee: rdv.dureeEstimee,
+        urgence: rdv.urgence || "normale",
+      });
+
+      const client = await db.getClientById(rdv.clientId);
+      if (client?.email) {
+        const clientName = `${client.prenom || ''} ${client.nom}`.trim();
+        const artisanName = artisan.nomEntreprise || 'Votre artisan';
+        const newDateStr = new Date(input.nouvelleDateProposee).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        await sendEmail({
+          to: client.email,
+          subject: `${artisanName} — Nouveau creneau propose`,
+          body: `<p>Bonjour ${clientName},</p><p>Le creneau initialement demande n'est pas disponible. Un nouveau creneau vous est propose :</p><p><strong>${newDateStr}</strong></p><p>Connectez-vous a votre espace client pour confirmer.</p><p>Cordialement,<br/>${artisanName}</p>`,
+        });
+      }
+
+      return newRdv;
+    }),
+
+  getStats: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { enAttente: 0, confirmes: 0, refuses: 0 };
+    const all = await db.getRdvByArtisanId(artisan.id);
+    return {
+      enAttente: all.filter(r => r.statut === "en_attente").length,
+      confirmes: all.filter(r => r.statut === "confirme").length,
+      refuses: all.filter(r => r.statut === "refuse").length,
+    };
+  }),
+
+  getPendingCount: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return 0;
+    return db.getRdvPendingCount(artisan.id);
+  }),
+});
+
+// ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
 export const appRouter = router({system: systemRouter,
@@ -6174,6 +6413,7 @@ export const appRouter = router({system: systemRouter,
   integrationsComptables: integrationsComptablesRouter,
   devisIA: devisIARouter,
   statistiques: statistiquesRouter,
+  rdv: rdvRouter,
   relances: relancesRouter,
   portail: portailRouter,
   calendrier: calendrierRouter,

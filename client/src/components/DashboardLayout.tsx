@@ -67,6 +67,16 @@ function formatRelativeDate(date: string | Date) {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
+function RdvPendingBadge() {
+  const { data: count } = trpc.rdv.getPendingCount.useQuery(undefined, { refetchInterval: 30000 });
+  if (!count) return null;
+  return (
+    <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 min-w-5 text-center">
+      {count}
+    </span>
+  );
+}
+
 function NotificationBell() {
   const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
@@ -210,6 +220,7 @@ const menuGroups: MenuGroup[] = [
       { icon: Star, label: "Avis Clients", path: "/avis" },
       { icon: Globe, label: "Portail Client", path: "/portail-gestion" },
       { icon: MessageCircle, label: "Chat", path: "/chat" },
+      { icon: Clock, label: "RDV en ligne", path: "/rdv-en-ligne" },
     ],
   },
   {
@@ -445,6 +456,7 @@ function DashboardLayoutContent({
                                     className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
                                   />
                                   <span>{item.label}</span>
+                                  {item.path === "/rdv-en-ligne" && <RdvPendingBadge />}
                                 </SidebarMenuButton>
                               </SidebarMenuItem>
                             );

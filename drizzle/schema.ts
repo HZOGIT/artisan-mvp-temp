@@ -1543,3 +1543,25 @@ export const sessions = mysqlTable("sessions", {
 
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
+
+// ============================================================================
+// RDV EN LIGNE (Online Appointment Booking)
+// ============================================================================
+export const rdvEnLigne = mysqlTable("rdv_en_ligne", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  clientId: int("clientId").notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  dateProposee: timestamp("dateProposee").notNull(),
+  dureeEstimee: int("dureeEstimee").default(60),
+  statut: mysqlEnum("statut_rdv", ["en_attente", "confirme", "refuse", "annule"]).default("en_attente"),
+  motifRefus: text("motifRefus"),
+  urgence: mysqlEnum("urgence_rdv", ["normale", "urgente", "tres_urgente"]).default("normale"),
+  interventionId: int("interventionId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type RdvEnLigne = typeof rdvEnLigne.$inferSelect;
+export type InsertRdvEnLigne = typeof rdvEnLigne.$inferInsert;
