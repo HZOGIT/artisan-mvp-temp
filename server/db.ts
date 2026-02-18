@@ -50,6 +50,7 @@ import {
   conversations, Conversation, InsertConversation,
   messages, Message, InsertMessage,
   rdvEnLigne, RdvEnLigne, InsertRdvEnLigne,
+  suiviChantier, SuiviChantier, InsertSuiviChantier,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -2098,6 +2099,39 @@ export async function calculerAvancementChantier(chantierId: number): Promise<an
 
   await db.update(chantiers).set({ avancement }).where(eq(chantiers.id, chantierId));
   return { avancement };
+}
+
+// ============================================================================
+// SUIVI CHANTIER TEMPS REEL
+// ============================================================================
+
+export async function getSuiviByChantier(chantierId: number): Promise<SuiviChantier[]> {
+  const db = await getDb();
+  return await db.select().from(suiviChantier).where(eq(suiviChantier.chantierId, chantierId)).orderBy(asc(suiviChantier.ordre));
+}
+
+export async function getSuiviVisibleClient(chantierId: number): Promise<SuiviChantier[]> {
+  const db = await getDb();
+  return await db.select().from(suiviChantier).where(and(eq(suiviChantier.chantierId, chantierId), eq(suiviChantier.visibleClient, true))).orderBy(asc(suiviChantier.ordre));
+}
+
+export async function createSuiviChantier(data: any): Promise<SuiviChantier> {
+  const db = await getDb();
+  await db.insert(suiviChantier).values(data);
+  const result = await db.select().from(suiviChantier).where(eq(suiviChantier.chantierId, data.chantierId)).orderBy(desc(suiviChantier.id)).limit(1);
+  return result[0];
+}
+
+export async function updateSuiviChantier(id: number, data: any): Promise<SuiviChantier | undefined> {
+  const db = await getDb();
+  await db.update(suiviChantier).set(data).where(eq(suiviChantier.id, id));
+  const result = await db.select().from(suiviChantier).where(eq(suiviChantier.id, id)).limit(1);
+  return result[0];
+}
+
+export async function deleteSuiviChantier(id: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(suiviChantier).where(eq(suiviChantier.id, id));
 }
 
 // ============================================================================

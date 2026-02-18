@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock, CalendarDays, ArrowRight } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock, CalendarDays, ArrowRight, HardHat, CheckCircle2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -41,6 +42,11 @@ export default function PortailClient() {
   );
 
   const { data: clientInfo } = trpc.clientPortal.getClientInfo.useQuery(
+    { token: token || "" },
+    { enabled: !!token && accessData?.valid }
+  );
+
+  const { data: suiviChantiers } = trpc.clientPortal.getSuiviChantiers.useQuery(
     { token: token || "" },
     { enabled: !!token && accessData?.valid }
   );
@@ -254,7 +260,7 @@ export default function PortailClient() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 mb-6">
             <TabsTrigger value="devis" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Mes </span>Devis
@@ -283,6 +289,10 @@ export default function PortailClient() {
             <TabsTrigger value="rdv" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <CalendarDays className="h-4 w-4" />
               <span className="hidden sm:inline">Prendre </span>RDV
+            </TabsTrigger>
+            <TabsTrigger value="chantier" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <HardHat className="h-4 w-4" />
+              <span className="hidden sm:inline">Mon </span>Chantier
             </TabsTrigger>
             <TabsTrigger value="infos" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <User className="h-4 w-4" />
@@ -885,6 +895,93 @@ export default function PortailClient() {
                     </div>
                   </CardContent>
                 </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Mon Chantier Tab */}
+          <TabsContent value="chantier">
+            <div className="space-y-6">
+              {(!suiviChantiers || suiviChantiers.length === 0) ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <HardHat className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">Aucun chantier en cours pour le moment.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                suiviChantiers.map((chantier: any) => (
+                  <Card key={chantier.id}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{chantier.nom}</CardTitle>
+                          {chantier.description && (
+                            <CardDescription>{chantier.description}</CardDescription>
+                          )}
+                        </div>
+                        <Badge className={
+                          chantier.statut === "termine" ? "bg-green-100 text-green-800" :
+                          chantier.statut === "en_cours" ? "bg-blue-100 text-blue-800" :
+                          chantier.statut === "en_pause" ? "bg-yellow-100 text-yellow-800" :
+                          "bg-gray-100 text-gray-800"
+                        }>
+                          {(chantier.statut || "planifie").replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <div className="mt-3">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-500">Avancement global</span>
+                          <span className="font-semibold">{chantier.avancement || 0}%</span>
+                        </div>
+                        <Progress value={chantier.avancement || 0} className="h-3" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {chantier.etapes && chantier.etapes.length > 0 ? (
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-sm text-gray-700">Etapes du chantier</h4>
+                          <div className="relative">
+                            {chantier.etapes.map((etape: any, idx: number) => (
+                              <div key={etape.id} className="flex gap-4 pb-6 last:pb-0">
+                                {/* Vertical timeline line */}
+                                <div className="flex flex-col items-center">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                                    etape.statut === "termine" ? "bg-green-500 text-white" :
+                                    etape.statut === "en_cours" ? "bg-blue-500 text-white animate-pulse" :
+                                    "bg-gray-200 text-gray-500"
+                                  }`}>
+                                    {etape.statut === "termine" ? <CheckCircle2 className="h-4 w-4" /> : etape.ordre}
+                                  </div>
+                                  {idx < chantier.etapes.length - 1 && (
+                                    <div className={`w-0.5 flex-1 mt-1 ${
+                                      etape.statut === "termine" ? "bg-green-300" : "bg-gray-200"
+                                    }`} />
+                                  )}
+                                </div>
+                                {/* Content */}
+                                <div className="flex-1 pt-1">
+                                  <div className="flex items-center justify-between">
+                                    <h5 className={`font-medium ${etape.statut === "termine" ? "text-green-700" : etape.statut === "en_cours" ? "text-blue-700" : "text-gray-600"}`}>
+                                      {etape.titre}
+                                    </h5>
+                                    <span className="text-sm font-semibold">{etape.pourcentage}%</span>
+                                  </div>
+                                  {etape.description && (
+                                    <p className="text-sm text-gray-500 mt-0.5">{etape.description}</p>
+                                  )}
+                                  <Progress value={etape.pourcentage || 0} className="h-1.5 mt-2" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-sm text-center py-4">Les etapes de suivi seront bientot disponibles.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
               )}
             </div>
           </TabsContent>

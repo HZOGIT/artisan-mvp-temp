@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Building2, Calendar, Euro, Users, FileText, Trash2, Edit, ChevronRight, Clock, CheckCircle2, PauseCircle, XCircle, AlertCircle } from "lucide-react";
+import { Plus, Building2, Calendar, Euro, Users, FileText, Trash2, Edit, ChevronRight, Clock, CheckCircle2, PauseCircle, XCircle, AlertCircle, Eye, EyeOff, ListChecks } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export default function Chantiers() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -50,6 +51,39 @@ export default function Chantiers() {
     { chantierId: selectedChantier! },
     { enabled: !!selectedChantier }
   );
+  const { data: suiviEtapes } = trpc.chantiers.getSuivi.useQuery(
+    { chantierId: selectedChantier! },
+    { enabled: !!selectedChantier }
+  );
+
+  const [suiviForm, setSuiviForm] = useState({ titre: "", description: "", ordre: 1, visibleClient: true });
+  const [isSuiviDialogOpen, setIsSuiviDialogOpen] = useState(false);
+
+  const createSuiviMutation = trpc.chantiers.createSuivi.useMutation({
+    onSuccess: () => {
+      toast.success("Etape de suivi ajoutee");
+      utils.chantiers.getSuivi.invalidate();
+      setIsSuiviDialogOpen(false);
+      setSuiviForm({ titre: "", description: "", ordre: 1, visibleClient: true });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateSuiviMutation = trpc.chantiers.updateSuivi.useMutation({
+    onSuccess: () => {
+      toast.success("Etape mise a jour");
+      utils.chantiers.getSuivi.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteSuiviMutation = trpc.chantiers.deleteSuivi.useMutation({
+    onSuccess: () => {
+      toast.success("Etape supprimee");
+      utils.chantiers.getSuivi.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const createMutation = trpc.chantiers.create.useMutation({
     onSuccess: () => {
@@ -385,6 +419,7 @@ export default function Chantiers() {
                     <TabsTrigger value="phases">Phases</TabsTrigger>
                     <TabsTrigger value="interventions">Interventions</TabsTrigger>
                     <TabsTrigger value="documents">Documents</TabsTrigger>
+                    <TabsTrigger value="suivi">Suivi client</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="apercu" className="space-y-4">
@@ -571,6 +606,108 @@ export default function Chantiers() {
                         <FileText className="h-4 w-4 mr-2" />
                         Ajouter un document
                       </Button>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="suivi">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold flex items-center gap-2">
+                          <ListChecks className="h-4 w-4" />
+                          Etapes de suivi
+                        </h3>
+                        <Dialog open={isSuiviDialogOpen} onOpenChange={setIsSuiviDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm">
+                              <Plus className="h-4 w-4 mr-2" />
+                              Ajouter
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Nouvelle etape de suivi</DialogTitle>
+                              <DialogDescription>Cette etape sera visible par le client sur son portail.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label>Titre *</Label>
+                                <Input value={suiviForm.titre} onChange={(e) => setSuiviForm({ ...suiviForm, titre: e.target.value })} placeholder="Ex: Diagnostic initial" />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Description</Label>
+                                <Textarea value={suiviForm.description} onChange={(e) => setSuiviForm({ ...suiviForm, description: e.target.value })} placeholder="Details de l'etape..." />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Ordre</Label>
+                                  <Input type="number" value={suiviForm.ordre} onChange={(e) => setSuiviForm({ ...suiviForm, ordre: parseInt(e.target.value) || 1 })} />
+                                </div>
+                                <div className="flex items-center gap-2 pt-6">
+                                  <Switch checked={suiviForm.visibleClient} onCheckedChange={(v) => setSuiviForm({ ...suiviForm, visibleClient: v })} />
+                                  <Label>Visible client</Label>
+                                </div>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button onClick={() => {
+                                if (!suiviForm.titre) { toast.error("Titre requis"); return; }
+                                createSuiviMutation.mutate({ chantierId: selectedChantier!, ...suiviForm });
+                              }}>Ajouter</Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+
+                      {(!suiviEtapes || suiviEtapes.length === 0) ? (
+                        <p className="text-muted-foreground text-center py-8">Aucune etape de suivi definie</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {suiviEtapes.map((etape: any) => (
+                            <Card key={etape.id} className={etape.statut === "termine" ? "border-green-200 bg-green-50/30" : etape.statut === "en_cours" ? "border-blue-200 bg-blue-50/30" : ""}>
+                              <CardContent className="pt-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${
+                                      etape.statut === "termine" ? "bg-green-500 text-white" : etape.statut === "en_cours" ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-600"
+                                    }`}>
+                                      {etape.ordre}
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold">{etape.titre}</h4>
+                                      {etape.description && <p className="text-sm text-muted-foreground">{etape.description}</p>}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {etape.visibleClient ? <Eye className="h-4 w-4 text-green-500" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+                                    <Select
+                                      value={etape.statut || "a_faire"}
+                                      onValueChange={(v) => updateSuiviMutation.mutate({
+                                        id: etape.id,
+                                        statut: v as "a_faire" | "en_cours" | "termine",
+                                        pourcentage: v === "termine" ? 100 : v === "en_cours" ? 50 : 0,
+                                      })}
+                                    >
+                                      <SelectTrigger className="w-[130px] h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="a_faire">A faire</SelectItem>
+                                        <SelectItem value="en_cours">En cours</SelectItem>
+                                        <SelectItem value="termine">Termine</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button variant="ghost" size="sm" onClick={() => deleteSuiviMutation.mutate({ id: etape.id })}>
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                <Progress value={etape.pourcentage || 0} className="h-2" />
+                                <p className="text-xs text-muted-foreground mt-1">{etape.pourcentage || 0}%</p>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>

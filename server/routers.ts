@@ -3294,6 +3294,23 @@ const clientPortalRouter = router({
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acces non autorise" });
       return db.getRdvByClientId(access.clientId, access.artisanId);
     }),
+
+  // Suivi chantier visible par le client
+  getSuiviChantiers: publicProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acces non autorise" });
+      // Récupérer les chantiers du client
+      const chantiersClient = await db.getChantiersByArtisan(access.artisanId);
+      const mesChan = chantiersClient.filter((c: any) => c.clientId === access.clientId);
+      // Pour chaque chantier, récupérer les étapes visibles
+      const result = await Promise.all(mesChan.map(async (c: any) => {
+        const etapes = await db.getSuiviVisibleClient(c.id);
+        return { ...c, etapes };
+      }));
+      return result;
+    }),
 });
 
 // ============================================================================
@@ -5448,6 +5465,62 @@ const chantiersRouter = router({
     .input(z.object({ chantierId: z.number() }))
     .mutation(async ({ input }) => {
       return await db.calculerAvancementChantier(input.chantierId);
+    }),
+
+  // Suivi chantier temps réel
+  getSuivi: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .query(async ({ input }) => {
+      return await db.getSuiviByChantier(input.chantierId);
+    }),
+
+  createSuivi: protectedProcedure
+    .input(z.object({
+      chantierId: z.number(),
+      titre: z.string(),
+      description: z.string().optional(),
+      statut: z.enum(["a_faire", "en_cours", "termine"]).optional(),
+      pourcentage: z.number().min(0).max(100).optional(),
+      ordre: z.number().optional(),
+      visibleClient: z.boolean().optional(),
+      dateDebut: z.string().optional(),
+      dateFin: z.string().optional(),
+      commentaire: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await db.createSuiviChantier({
+        ...input,
+        dateDebut: input.dateDebut ? new Date(input.dateDebut) : undefined,
+        dateFin: input.dateFin ? new Date(input.dateFin) : undefined,
+      });
+    }),
+
+  updateSuivi: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      titre: z.string().optional(),
+      description: z.string().optional(),
+      statut: z.enum(["a_faire", "en_cours", "termine"]).optional(),
+      pourcentage: z.number().min(0).max(100).optional(),
+      ordre: z.number().optional(),
+      visibleClient: z.boolean().optional(),
+      dateDebut: z.string().optional(),
+      dateFin: z.string().optional(),
+      commentaire: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, ...data } = input;
+      return await db.updateSuiviChantier(id, {
+        ...data,
+        dateDebut: data.dateDebut ? new Date(data.dateDebut) : undefined,
+        dateFin: data.dateFin ? new Date(data.dateFin) : undefined,
+      });
+    }),
+
+  deleteSuivi: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      return await db.deleteSuiviChantier(input.id);
     }),
 });
 

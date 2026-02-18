@@ -1320,6 +1320,26 @@ export const documentsChantier = mysqlTable("documents_chantier", {
 export type DocumentChantier = typeof documentsChantier.$inferSelect;
 export type InsertDocumentChantier = typeof documentsChantier.$inferInsert;
 
+// Suivi chantier temps réel (étapes visibles par le client)
+export const suiviChantier = mysqlTable("suivi_chantier", {
+  id: int("id").autoincrement().primaryKey(),
+  chantierId: int("chantierId").notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  statut: mysqlEnum("statut", ["a_faire", "en_cours", "termine"]).default("a_faire"),
+  pourcentage: int("pourcentage").default(0),
+  ordre: int("ordre").default(1),
+  visibleClient: boolean("visibleClient").default(true),
+  dateDebut: date("dateDebut"),
+  dateFin: date("dateFin"),
+  commentaire: text("commentaire"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SuiviChantier = typeof suiviChantier.$inferSelect;
+export type InsertSuiviChantier = typeof suiviChantier.$inferInsert;
+
 // ============================================================================
 // INTEGRATIONS COMPTABLES
 // ============================================================================
