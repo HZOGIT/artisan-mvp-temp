@@ -236,6 +236,88 @@ async function startServer() {
     }
   });
 
+  // SSE streaming endpoint for AI assistant
+  app.post('/api/assistant/stream', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
+
+      const { getArtisanByUserId, getDashboardStats, getClientsByArtisanId, getDevisNonSignes, getInterventionsByArtisanId, getLowStockItems, getContratsByArtisanId, getArtisanById } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      const { message, history } = req.body;
+      if (!message) { res.status(400).json({ error: 'Message requis' }); return; }
+
+      // Build system prompt
+      const stats = await getDashboardStats(artisan.id);
+      const clientsList = await getClientsByArtisanId(artisan.id);
+      const recentClients = clientsList.slice(0, 5).map((c: any) => `${c.prenom || ''} ${c.nom}`.trim()).join(', ');
+      const devisNonSignes = await getDevisNonSignes(artisan.id);
+      const interventionsList = await getInterventionsByArtisanId(artisan.id);
+      const now = new Date();
+      const weekFromNow = new Date(now.getTime() + 7 * 86400000);
+      const interventionsSemaine = interventionsList.filter((i: any) => { const d = new Date(i.dateDebut); return d >= now && d <= weekFromNow && i.statut === 'planifiee'; });
+      const stocksBas = await getLowStockItems(artisan.id);
+      const contrats = await getContratsByArtisanId(artisan.id);
+      const contratsARenouveler = contrats.filter((c: any) => c.dateFin && new Date(c.dateFin) <= weekFromNow && c.statut === 'actif');
+      const artisanFull = await getArtisanById(artisan.id);
+
+      const systemPrompt = `Tu es MonAssistant, l'assistant IA de MonArtisan Pro. Tu aides l'artisan ${artisanFull?.nomEntreprise || 'Artisan'} (${artisanFull?.metier || 'artisan'}) dans sa gestion quotidienne.\n\nTu as accès aux données suivantes :\n- ${stats.devisEnCours} devis en attente de réponse\n- ${stats.facturesImpayees.count} factures impayées pour un total de ${stats.facturesImpayees.total.toFixed(2)} euros\n- CA du mois : ${stats.caMonth.toFixed(2)} euros\n- CA de l'année : ${stats.caYear.toFixed(2)} euros\n- ${interventionsSemaine.length} interventions cette semaine\n- ${stocksBas.length} articles en stock bas\n- ${devisNonSignes.length} devis envoyés en attente de signature\n- ${contratsARenouveler.length} contrats à renouveler prochainement\n- ${stats.totalClients} clients au total\n- Clients récents : ${recentClients || 'aucun'}\n- SIRET : ${artisanFull?.siret || 'non renseigné'}\n\nRéponds toujours en français, de manière concise et professionnelle. Utilise le tutoiement.\nUtilise le markdown pour formater tes réponses.`;
+
+      // Build messages array with history
+      const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+      if (Array.isArray(history)) {
+        for (const h of history.slice(-10)) {
+          messages.push({ role: h.role, content: h.content });
+        }
+      }
+      messages.push({ role: 'user', content: message });
+
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      const Anthropic = (await import('@anthropic-ai/sdk')).default;
+      const anthropic = new Anthropic();
+      const stream = anthropic.messages.stream({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        temperature: 0.7,
+        system: systemPrompt,
+        messages,
+      });
+
+      stream.on('text', (text) => {
+        res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
+      });
+
+      stream.on('end', () => {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      });
+
+      stream.on('error', (error) => {
+        console.error('[Assistant] Stream error:', error);
+        res.write(`data: ${JSON.stringify({ error: 'Erreur de génération' })}\n\n`);
+        res.end();
+      });
+
+      req.on('close', () => {
+        stream.abort();
+      });
+    } catch (error) {
+      console.error('[Assistant] Error:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Erreur serveur' });
+      }
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

@@ -11,6 +11,62 @@ import { COOKIE_NAME } from "../shared/const";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
 import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
+import Anthropic from "@anthropic-ai/sdk";
+
+// Rate limiter for AI endpoints
+const rateLimitMap = new Map<number, { count: number; resetTime: number }>();
+function checkRateLimit(artisanId: number): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(artisanId);
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(artisanId, { count: 1, resetTime: now + 3600000 });
+    return true;
+  }
+  if (entry.count >= 30) return false;
+  entry.count++;
+  return true;
+}
+
+async function buildSystemPrompt(artisanId: number): Promise<string> {
+  const artisan = await db.getArtisanById(artisanId);
+  const stats = await db.getDashboardStats(artisanId);
+  const clientsList = await db.getClientsByArtisanId(artisanId);
+  const recentClients = clientsList.slice(0, 5).map(c => `${c.prenom || ''} ${c.nom}`.trim()).join(', ');
+  const devisNonSignes = await db.getDevisNonSignes(artisanId);
+  const interventionsList = await db.getInterventionsByArtisanId(artisanId);
+  const now = new Date();
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000);
+  const interventionsSemaine = interventionsList.filter(i => {
+    const d = new Date(i.dateDebut);
+    return d >= now && d <= weekFromNow && i.statut === 'planifiee';
+  });
+  const stocksBas = await db.getLowStockItems(artisanId);
+  const contrats = await db.getContratsByArtisanId(artisanId);
+  const contratsARenouveler = contrats.filter(c => {
+    if (!c.dateFin) return false;
+    const fin = new Date(c.dateFin);
+    return fin <= weekFromNow && c.statut === 'actif';
+  });
+
+  return `Tu es MonAssistant, l'assistant IA de MonArtisan Pro. Tu aides l'artisan ${artisan?.nomEntreprise || 'Artisan'} (${artisan?.metier || 'artisan'}) dans sa gestion quotidienne.
+
+Tu as accès aux données suivantes :
+- ${stats.devisEnCours} devis en attente de réponse
+- ${stats.facturesImpayees.count} factures impayées pour un total de ${stats.facturesImpayees.total.toFixed(2)} euros
+- CA du mois : ${stats.caMonth.toFixed(2)} euros
+- CA de l'année : ${stats.caYear.toFixed(2)} euros
+- ${interventionsSemaine.length} interventions cette semaine
+- ${stocksBas.length} articles en stock bas
+- ${devisNonSignes.length} devis envoyés en attente de signature
+- ${contratsARenouveler.length} contrats à renouveler prochainement
+- ${stats.totalClients} clients au total
+- Clients récents : ${recentClients || 'aucun'}
+- SIRET : ${artisan?.siret || 'non renseigné'}
+
+Tu peux répondre aux questions sur l'activité, générer des lignes de devis, suggérer des emails de relance, analyser la rentabilité, prédire la trésorerie, donner des conseils de gestion.
+Réponds toujours en français, de manière concise et professionnelle. Utilise le tutoiement.
+Utilise le markdown pour formater tes réponses (listes, gras, tableaux si nécessaire).`;
+}
 
 // ============================================================================
 // ARTISAN ROUTER
@@ -5621,6 +5677,146 @@ const alertesPrevisionsRouter = router({
 });
 
 // ============================================================================
+// ASSISTANT IA ROUTER
+// ============================================================================
+const assistantRouter = router({
+  chat: protectedProcedure
+    .input(z.object({ message: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      if (!checkRateLimit(artisan.id)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite de 30 requêtes/heure atteinte" });
+
+      const systemPrompt = await buildSystemPrompt(artisan.id);
+      const client = new Anthropic();
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        temperature: 0.7,
+        system: systemPrompt,
+        messages: [{ role: "user", content: input.message }],
+      });
+      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      return { response: text };
+    }),
+
+  generateDevis: protectedProcedure
+    .input(z.object({ description: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      if (!checkRateLimit(artisan.id)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+
+      const articles = await db.getArticlesArtisan(artisan.id);
+      const biblio = await db.getBibliothequeArticles(artisan.metier || undefined);
+      const catalogue = [...articles.map(a => `${a.designation || a.nom} - ${a.prixUnitaireHT || a.prixBase}€/${a.unite}`),
+        ...biblio.slice(0, 50).map((a: any) => `${a.nom} - ${a.prix_base}€/${a.unite}`)].join('\n');
+
+      const client = new Anthropic();
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        temperature: 0.3,
+        system: `Tu es un assistant spécialisé dans la génération de devis pour artisans. Tu dois générer des lignes de devis au format JSON.
+Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un tableau JSON (pas de texte autour) au format :
+[{"designation":"...","quantite":1,"unite":"u","prixUnitaireHT":0,"tauxTVA":20}]`,
+        messages: [{ role: "user", content: `Génère les lignes de devis pour : ${input.description}` }],
+      });
+      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      try {
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        const lignes = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+        return { lignes, raw: text };
+      } catch {
+        return { lignes: [], raw: text };
+      }
+    }),
+
+  suggestRelances: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    if (!checkRateLimit(artisan.id)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+
+    const devisNonSignes = await db.getDevisNonSignes(artisan.id);
+    const devisARelancer = [];
+    for (const d of devisNonSignes) {
+      const jours = Math.floor((Date.now() - new Date(d.dateDevis).getTime()) / 86400000);
+      if (jours < 7) continue;
+      const cl = await db.getClientById(d.clientId);
+      devisARelancer.push({ numero: d.numero, objet: d.objet, totalTTC: d.totalTTC, jours, client: cl ? `${cl.prenom || ''} ${cl.nom}`.trim() : 'Client', email: cl?.email });
+    }
+    if (devisARelancer.length === 0) return [];
+
+    const liste = devisARelancer.map(d => `- Devis ${d.numero} (${d.objet || 'sans objet'}) : ${d.totalTTC}€ TTC, envoyé il y a ${d.jours} jours à ${d.client}`).join('\n');
+    const client = new Anthropic();
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      temperature: 0.7,
+      system: `Tu es un assistant qui génère des emails de relance professionnels et personnalisés pour un artisan. Pour chaque devis, génère un email court et cordial. Réponds en JSON : [{"numero":"...","objet":"...","email":{"sujet":"...","corps":"..."}}]`,
+      messages: [{ role: "user", content: `Génère des emails de relance pour ces devis :\n${liste}` }],
+    });
+    const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    try {
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+    } catch {
+      return [{ error: text }];
+    }
+  }),
+
+  analyseRentabilite: protectedProcedure
+    .input(z.object({ devisId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      if (!checkRateLimit(artisan.id)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+
+      const devisData = await db.getDevisById(input.devisId);
+      if (!devisData || devisData.artisanId !== artisan.id) throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+      const lignes = await db.getLignesDevisByDevisId(devisData.id);
+      const cl = await db.getClientById(devisData.clientId);
+      const articles = await db.getArticlesArtisan(artisan.id);
+
+      const detailLignes = lignes.map(l => `- ${l.designation}: ${l.quantite} ${l.unite} x ${l.prixUnitaireHT}€ HT (TVA ${l.tauxTVA}%)`).join('\n');
+      const prixRef = articles.slice(0, 30).map(a => `${a.designation || a.nom}: ${a.prixUnitaireHT || a.prixBase}€/${a.unite}`).join('\n');
+
+      const client = new Anthropic();
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        temperature: 0.5,
+        system: `Tu es un expert en analyse de rentabilité pour artisans. Analyse ce devis, compare les prix aux tarifs habituels, estime la marge, et donne des recommandations concrètes. Réponds en français avec du markdown.`,
+        messages: [{ role: "user", content: `Analyse ce devis :\nDevis ${devisData.numero} pour ${cl ? `${cl.prenom || ''} ${cl.nom}`.trim() : 'client'}\nTotal HT: ${devisData.totalHT}€ | Total TTC: ${devisData.totalTTC}€\n\nLignes :\n${detailLignes}\n\nTarifs habituels de l'artisan :\n${prixRef || 'Non disponibles'}` }],
+      });
+      return { analyse: response.content.filter(b => b.type === 'text').map(b => b.text).join('') };
+    }),
+
+  predictionTresorerie: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+    if (!checkRateLimit(artisan.id)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+
+    const factures = await db.getFacturesByArtisanId(artisan.id);
+    const devisList = await dbSecure.getDevisByArtisanIdSecure(artisan.id);
+
+    const facturesPayees = factures.filter(f => f.statut === 'payee').slice(0, 20).map(f => `FAC ${f.numero}: ${f.totalTTC}€ payée le ${f.datePaiement || f.createdAt}`).join('\n');
+    const facturesImpayees = factures.filter(f => f.statut !== 'payee' && f.statut !== 'annulee').map(f => `FAC ${f.numero}: ${f.totalTTC}€ (${f.statut}) échéance ${f.dateEcheance || 'non définie'}`).join('\n');
+    const devisAcceptes = devisList.filter(d => d.statut === 'accepte').map(d => `DEV ${d.numero}: ${d.totalTTC}€`).join('\n');
+
+    const client = new Anthropic();
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      temperature: 0.5,
+      system: `Tu es un expert en gestion de trésorerie pour artisans. Analyse les données financières et prédit les entrées/sorties sur les 3 prochains mois. Donne des alertes si tension de trésorerie. Réponds en français avec du markdown.`,
+      messages: [{ role: "user", content: `Données financières :\n\nFactures payées récentes :\n${facturesPayees || 'Aucune'}\n\nFactures impayées :\n${facturesImpayees || 'Aucune'}\n\nDevis acceptés (à facturer) :\n${devisAcceptes || 'Aucun'}` }],
+    });
+    return { prediction: response.content.filter(b => b.type === 'text').map(b => b.text).join('') };
+  }),
+});
+
+// ============================================================================
 // STATISTIQUES ROUTER
 // ============================================================================
 const statistiquesRouter = router({
@@ -5859,6 +6055,7 @@ export const appRouter = router({system: systemRouter,
   relances: relancesRouter,
   portail: portailRouter,
   calendrier: calendrierRouter,
+  assistant: assistantRouter,
 });
 
 export type AppRouter = typeof appRouter;

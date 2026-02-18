@@ -27,7 +27,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -42,6 +42,13 @@ interface MenuGroup {
 }
 
 const menuGroups: MenuGroup[] = [
+  {
+    title: "MonAssistant",
+    icon: Sparkles,
+    items: [
+      { icon: Sparkles, label: "MonAssistant", path: "/assistant" },
+    ],
+  },
   {
     title: "Tableau de bord",
     icon: LayoutDashboard,
