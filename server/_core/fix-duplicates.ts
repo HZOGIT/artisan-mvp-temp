@@ -311,6 +311,35 @@ async function fixDuplicates() {
       } else {
         console.log('[FixDuplicates] suivi_chantier already has data, skipping seed');
       }
+
+      // Ensure a demo portal access exists for suivi chantier testing
+      const [suiviRows] = await pool.execute(
+        'SELECT chantierId FROM suivi_chantier LIMIT 1'
+      ) as any;
+      if (suiviRows.length > 0) {
+        const [existingToken] = await pool.execute(
+          "SELECT id FROM client_portal_access WHERE token = 'demo-suivi-chantier-2026' LIMIT 1"
+        ) as any;
+        if (existingToken.length === 0) {
+          const [chantierInfo] = await pool.execute(
+            'SELECT clientId, artisanId FROM chantiers WHERE id = ?', [suiviRows[0].chantierId]
+          ) as any;
+          if (chantierInfo.length > 0) {
+            const { clientId: cid, artisanId: aid } = chantierInfo[0];
+            const [clientRow] = await pool.execute('SELECT email FROM clients WHERE id = ?', [cid]) as any;
+            const email = clientRow.length > 0 ? clientRow[0].email : 'demo@artisan.com';
+            const expiresAt = new Date();
+            expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+            await pool.execute(
+              'INSERT INTO client_portal_access (clientId, artisanId, token, email, expiresAt, isActive) VALUES (?, ?, ?, ?, ?, 1)',
+              [cid, aid, 'demo-suivi-chantier-2026', email, expiresAt]
+            );
+            console.log('[FixDuplicates] Created demo portal access: /portail/demo-suivi-chantier-2026');
+          }
+        } else {
+          console.log('[FixDuplicates] Demo portal token already exists');
+        }
+      }
     } catch (e: any) {
       // Table might not exist yet (before drizzle push)
       console.log('[FixDuplicates] suivi_chantier seed skipped:', e.message);
