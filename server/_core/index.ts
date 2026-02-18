@@ -39,6 +39,18 @@ async function startServer() {
       console.log('[Database] MySQL connected successfully');
       // Seed test data (one-time, skips if data already exists)
       try { await seedTestData(); } catch (e) { console.error('[Seed] Error:', e); }
+      // Migrate parametres_artisan: set default objectif values
+      try {
+        const { getPool: getMigPool } = await import('../db');
+        const migPool = getMigPool();
+        if (migPool) {
+          const [rows] = await migPool.execute("SELECT id FROM parametres_artisan WHERE (objectifCA IS NULL OR objectifCA = 0) AND (objectifDevis IS NULL OR objectifDevis = 0) LIMIT 1");
+          if ((rows as any[]).length > 0) {
+            await migPool.execute("UPDATE parametres_artisan SET objectifCA = 10000, objectifDevis = 15, objectifClients = 5 WHERE objectifCA IS NULL OR objectifCA = 0");
+            console.log('[Migration] Set default objectif values in parametres_artisan');
+          }
+        }
+      } catch (e) { console.error('[Migration] objectif values error:', e); }
       // Seed demo notifications (one-time)
       try {
         const { getPool } = await import('../db');

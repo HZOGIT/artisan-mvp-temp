@@ -258,6 +258,9 @@ export const parametresArtisan = mysqlTable("parametres_artisan", {
   notificationsEmail: boolean("notificationsEmail").default(true),
   rappelDevisJours: int("rappelDevisJours").default(7),
   rappelFactureJours: int("rappelFactureJours").default(30),
+  objectifCA: decimal("objectifCA", { precision: 10, scale: 2 }).default("0"),
+  objectifDevis: int("objectifDevis").default(0),
+  objectifClients: int("objectifClients").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

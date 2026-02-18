@@ -1909,6 +1909,96 @@ const dashboardRouter = router({
       if (!artisan) return [];
       return await db.getClientEvolution(artisan.id, input?.months || 12);
     }),
+
+  getObjectifs: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { objectifCA: 0, currentCA: 0, objectifDevis: 0, currentDevis: 0, objectifClients: 0, currentClients: 0 };
+    const params = await db.getParametresArtisan(artisan.id);
+    const stats = await db.getDashboardStats(artisan.id);
+    // Count devis created this month
+    const allDevis = await dbSecure.getDevisByArtisanIdSecure(artisan.id);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const devisThisMonth = allDevis.filter((d: any) => {
+      const cd = new Date(d.createdAt);
+      return cd.getMonth() === currentMonth && cd.getFullYear() === currentYear;
+    }).length;
+    // Count clients created this month
+    const allClients = await db.getClientsByArtisanId(artisan.id);
+    const clientsThisMonth = allClients.filter((c: any) => {
+      const cd = new Date(c.createdAt);
+      return cd.getMonth() === currentMonth && cd.getFullYear() === currentYear;
+    }).length;
+    return {
+      objectifCA: parseFloat(params?.objectifCA?.toString() || '0'),
+      currentCA: stats.caMonth || 0,
+      objectifDevis: params?.objectifDevis || 0,
+      currentDevis: devisThisMonth,
+      objectifClients: params?.objectifClients || 0,
+      currentClients: clientsThisMonth,
+    };
+  }),
+
+  getAlerts: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const alerts: Array<{ type: 'danger' | 'warning' | 'info'; titre: string; message: string; lien?: string }> = [];
+    const now = new Date();
+
+    // Factures impayées > 30 jours
+    const factures = await db.getFacturesByArtisanId(artisan.id);
+    const facturesRetard = factures.filter((f: any) => {
+      if (f.statut === 'payee' || f.statut === 'annulee') return false;
+      const created = new Date(f.dateEmission || f.createdAt);
+      const diffDays = Math.floor((now.getTime() - created.getTime()) / 86400000);
+      return diffDays > 30;
+    });
+    if (facturesRetard.length > 0) {
+      const total = facturesRetard.reduce((s: number, f: any) => s + parseFloat(f.totalTTC?.toString() || '0'), 0);
+      alerts.push({
+        type: 'danger',
+        titre: `${facturesRetard.length} facture(s) en retard de +30 jours`,
+        message: `Montant total : ${total.toFixed(2)} EUR`,
+        lien: '/factures',
+      });
+    }
+
+    // Devis en attente > 7 jours
+    const allDevis = await dbSecure.getDevisByArtisanIdSecure(artisan.id);
+    const devisAttente = allDevis.filter((d: any) => {
+      if (d.statut !== 'envoye') return false;
+      const created = new Date(d.createdAt);
+      const diffDays = Math.floor((now.getTime() - created.getTime()) / 86400000);
+      return diffDays > 7;
+    });
+    if (devisAttente.length > 0) {
+      alerts.push({
+        type: 'warning',
+        titre: `${devisAttente.length} devis sans reponse depuis +7 jours`,
+        message: `Pensez a relancer vos clients`,
+        lien: '/relances',
+      });
+    }
+
+    // Interventions dans les 48h
+    const interventions = await db.getUpcomingInterventions(artisan.id, 10);
+    const upcoming48h = interventions.filter((i: any) => {
+      const start = new Date(i.dateDebut);
+      const diffH = (start.getTime() - now.getTime()) / 3600000;
+      return diffH > 0 && diffH <= 48;
+    });
+    if (upcoming48h.length > 0) {
+      alerts.push({
+        type: 'info',
+        titre: `${upcoming48h.length} intervention(s) dans les 48h`,
+        message: upcoming48h.map((i: any) => i.titre).slice(0, 2).join(', '),
+        lien: '/interventions',
+      });
+    }
+
+    return alerts;
+  }),
 });
 
 // ============================================================================
