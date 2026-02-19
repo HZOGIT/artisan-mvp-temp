@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { toast } from "sonner";
 import { Users, UserPlus, Shield, Mail, Settings2, RotateCcw } from "lucide-react";
 import { PERMISSION_GROUPS, ROLE_TEMPLATES } from "@shared/permissions";
@@ -367,8 +367,8 @@ export default function Utilisateurs() {
 
       {/* Permissions management dialog */}
       <Dialog open={permDialogOpen} onOpenChange={setPermDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5" />
               Gérer les permissions — {permUser?.name}
@@ -391,7 +391,7 @@ export default function Utilisateurs() {
             <div className="py-8 text-center text-muted-foreground">Chargement des permissions...</div>
           ) : (
             <>
-              <ScrollArea className="flex-1 pr-4 -mr-4" style={{ maxHeight: "calc(85vh - 220px)" }}>
+              <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-2">
                 <div className="space-y-5 py-2">
                   {PERMISSION_GROUPS.map((group) => (
                     <div key={group.label}>
@@ -427,9 +427,9 @@ export default function Utilisateurs() {
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
 
-              <div className="flex items-center gap-2 pt-4 border-t mt-2">
+              <div className="flex-shrink-0 flex items-center gap-2 pt-4 border-t">
                 <Button
                   variant="outline"
                   size="sm"
