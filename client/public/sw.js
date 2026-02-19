@@ -1,4 +1,4 @@
-const CACHE_NAME = 'artisan-pro-v1';
+const CACHE_NAME = 'artisan-pro-v2';
 const STATIC_ASSETS = [
   '/',
   '/dashboard',
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (JS, CSS, images): cache-first
+  // Static assets (JS, CSS, images): network-first with cache fallback
   if (
     request.destination === 'script' ||
     request.destination === 'style' ||
@@ -57,16 +57,15 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/assets/')
   ) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
+      fetch(request)
+        .then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        });
-      })
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
