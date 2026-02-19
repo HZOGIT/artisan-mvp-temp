@@ -346,6 +346,23 @@ function DashboardLayoutContent({
   const activeMenuItem = allMenuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
+  // PWA install prompt
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    // Don't show if already installed as standalone
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
   // Controlled collapsible state: only the group containing the active page is initially open
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -522,6 +539,37 @@ function DashboardLayoutContent({
           </div>
           <NotificationBell />
         </div>
+        {showInstallBanner && (
+          <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between gap-4">
+            <p className="text-sm text-foreground">
+              <span className="font-medium">Installez MonArtisan Pro</span> sur votre appareil pour un accès rapide
+            </p>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowInstallBanner(false)}
+              >
+                Plus tard
+              </Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (installPrompt) {
+                    installPrompt.prompt();
+                    const result = await installPrompt.userChoice;
+                    if (result.outcome === 'accepted') {
+                      setShowInstallBanner(false);
+                    }
+                    setInstallPrompt(null);
+                  }
+                }}
+              >
+                Installer
+              </Button>
+            </div>
+          </div>
+        )}
         <main className="flex-1 p-4 min-w-0">{children}</main>
       </SidebarInset>
     </>
