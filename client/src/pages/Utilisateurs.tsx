@@ -367,32 +367,39 @@ export default function Utilisateurs() {
 
       {/* Permissions management dialog */}
       <Dialog open={permDialogOpen} onOpenChange={setPermDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5" />
-              Gérer les permissions — {permUser?.name}
-            </DialogTitle>
-            <div className="flex items-center gap-2 mt-1">
-              {permUser && (
-                <Badge className={roleBadgeColor[permUser.role] || ""} variant="secondary">
-                  {roleFr[permUser.role] || permUser.role}
-                </Badge>
-              )}
-              {hasAnyCustomization && (
-                <Badge variant="outline" className="text-orange-600 border-orange-300">
-                  personnalisé
-                </Badge>
-              )}
-            </div>
-          </DialogHeader>
+        <DialogContent
+          className="max-w-lg p-0"
+          style={{ display: "flex", flexDirection: "column", maxHeight: "80vh", overflow: "hidden" }}
+        >
+          {/* Fixed header */}
+          <div className="p-6 pb-3" style={{ flexShrink: 0 }}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                Gérer les permissions — {permUser?.name}
+              </DialogTitle>
+              <div className="flex items-center gap-2 mt-1">
+                {permUser && (
+                  <Badge className={roleBadgeColor[permUser.role] || ""} variant="secondary">
+                    {roleFr[permUser.role] || permUser.role}
+                  </Badge>
+                )}
+                {hasAnyCustomization && (
+                  <Badge variant="outline" className="text-orange-600 border-orange-300">
+                    personnalisé
+                  </Badge>
+                )}
+              </div>
+            </DialogHeader>
+          </div>
 
           {permLoading ? (
             <div className="py-8 text-center text-muted-foreground">Chargement des permissions...</div>
           ) : (
             <>
-              <div className="flex-1 min-h-0 overflow-y-auto pr-2 -mr-2">
-                <div className="space-y-5 py-2">
+              {/* Scrollable checkboxes area */}
+              <div className="px-6" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                <div className="space-y-5 py-1">
                   {PERMISSION_GROUPS.map((group) => (
                     <div key={group.label}>
                       <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -429,31 +436,34 @@ export default function Utilisateurs() {
                 </div>
               </div>
 
-              <div className="flex-shrink-0 flex items-center gap-2 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => permUser && resetPermsMutation.mutate({ userId: permUser.id })}
-                  disabled={resetPermsMutation.isPending || !permUser}
-                >
-                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                  Réinitialiser selon le rôle
-                </Button>
-                <div className="flex-1" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPermDialogOpen(false)}
-                >
-                  Annuler
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => permUser && updatePermsMutation.mutate({ userId: permUser.id, permissions: localPerms })}
-                  disabled={updatePermsMutation.isPending || !permUser}
-                >
-                  {updatePermsMutation.isPending ? "Sauvegarde..." : "Sauvegarder"}
-                </Button>
+              {/* Fixed footer buttons */}
+              <div className="p-6 pt-4 border-t" style={{ flexShrink: 0 }}>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => permUser && resetPermsMutation.mutate({ userId: permUser.id })}
+                    disabled={resetPermsMutation.isPending || !permUser}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    Réinitialiser selon le rôle
+                  </Button>
+                  <div className="flex-1" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPermDialogOpen(false)}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => permUser && updatePermsMutation.mutate({ userId: permUser.id, permissions: localPerms })}
+                    disabled={updatePermsMutation.isPending || !permUser}
+                  >
+                    {updatePermsMutation.isPending ? "Sauvegarde..." : "Sauvegarder"}
+                  </Button>
+                </div>
               </div>
             </>
           )}
