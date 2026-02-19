@@ -254,6 +254,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { icon: User, label: "Mon profil", path: "/profil" },
       { icon: Settings, label: "Paramètres", path: "/parametres" },
+      { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
       { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
       { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
     ],

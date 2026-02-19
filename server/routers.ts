@@ -4165,6 +4165,62 @@ const avisRouter = router({
       return demande;
     }),
 
+  // Envoyer une demande d'avis par client (trouve la dernière intervention automatiquement)
+  envoyerDemandeParClient: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
+      }
+
+      const client = await db.getClientById(input.clientId);
+      if (!client || !client.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'email" });
+      }
+
+      // Trouver la dernière intervention pour ce client
+      const interventions = await db.getInterventionsByClientId(input.clientId);
+      const artisanInterventions = interventions.filter(i => i.artisanId === artisan.id);
+
+      // Utiliser la dernière intervention, ou créer une demande sans intervention spécifique
+      const intervention = artisanInterventions[0];
+      if (!intervention) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune intervention trouvée pour ce client" });
+      }
+
+      const token = crypto.randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 14);
+
+      const demande = await db.createDemandeAvis({
+        artisanId: artisan.id,
+        clientId: client.id,
+        interventionId: intervention.id,
+        tokenDemande: token,
+        emailEnvoyeAt: new Date(),
+        expiresAt,
+      });
+
+      const baseUrl = ctx.req.headers.origin || 'http://localhost:3000';
+      const lienAvis = `${baseUrl}/avis/${token}`;
+
+      await sendEmail({
+        to: client.email,
+        subject: `Votre avis nous intéresse - ${artisan.nomEntreprise || 'Artisan'}`,
+        body: `
+          <h2>Bonjour ${client.nom},</h2>
+          <p>Nous espérons que vous êtes satisfait de nos services.</p>
+          <p>Votre avis est précieux et nous aide à améliorer nos prestations. Pourriez-vous prendre quelques instants pour nous laisser un retour ?</p>
+          <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
+          <p>Ce lien est valable pendant 14 jours.</p>
+          <p>Merci de votre confiance,<br>${artisan.nomEntreprise || 'Votre artisan'}</p>
+        `,
+      });
+
+      return demande;
+    }),
+
   // Répondre à un avis
   repondre: protectedProcedure
     .input(z.object({
