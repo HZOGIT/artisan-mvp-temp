@@ -518,6 +518,26 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] Multi-user migration error:', e.message);
     }
 
+    // --- Parametres personnalisation columns ---
+    try {
+      await pool.execute(`ALTER TABLE parametres_artisan ADD COLUMN couleurPrincipale VARCHAR(20) DEFAULT '#4F46E5'`);
+      console.log('[FixDuplicates] Added couleurPrincipale column');
+    } catch (e: any) {
+      if (!e.message.includes('Duplicate column')) console.log('[FixDuplicates] couleurPrincipale:', e.message);
+    }
+    try {
+      await pool.execute(`ALTER TABLE parametres_artisan ADD COLUMN couleurSecondaire VARCHAR(20) DEFAULT '#6366F1'`);
+      console.log('[FixDuplicates] Added couleurSecondaire column');
+    } catch (e: any) {
+      if (!e.message.includes('Duplicate column')) console.log('[FixDuplicates] couleurSecondaire:', e.message);
+    }
+    try {
+      await pool.execute(`ALTER TABLE parametres_artisan ADD COLUMN conditionsPaiementDefaut TEXT`);
+      console.log('[FixDuplicates] Added conditionsPaiementDefaut column');
+    } catch (e: any) {
+      if (!e.message.includes('Duplicate column')) console.log('[FixDuplicates] conditionsPaiementDefaut:', e.message);
+    }
+
     // --- Per-user permissions table + seed ---
     try {
       await pool.execute(`CREATE TABLE IF NOT EXISTS permissions_utilisateur (

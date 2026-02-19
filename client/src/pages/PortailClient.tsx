@@ -237,13 +237,18 @@ export default function PortailClient() {
       <header className="bg-white border-b shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-3">
+              {accessData.artisan?.logo && (
+                <img src={accessData.artisan.logo} alt="" className="h-10 w-10 rounded object-contain" />
+              )}
+              <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {accessData.artisan?.nomEntreprise || "Espace Client"}
               </h1>
               <p className="text-gray-500 text-sm mt-1">
                 Bienvenue, {accessData.client?.prenom} {accessData.client?.nom}
               </p>
+              </div>
             </div>
             <div className="text-sm text-gray-500 sm:text-right">
               {accessData.artisan?.telephone && (

@@ -284,6 +284,9 @@ export const parametresArtisan = mysqlTable("parametres_artisan", {
   vitrineZone: varchar("vitrineZone", { length: 500 }),
   vitrineServices: text("vitrineServices"),
   vitrineExperience: int("vitrineExperience"),
+  couleurPrincipale: varchar("couleurPrincipale", { length: 20 }).default("#4F46E5"),
+  couleurSecondaire: varchar("couleurSecondaire", { length: 20 }).default("#6366F1"),
+  conditionsPaiementDefaut: text("conditionsPaiementDefaut"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

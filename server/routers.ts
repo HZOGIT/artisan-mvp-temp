@@ -2544,6 +2544,9 @@ const parametresRouter = router({
       vitrineZone: z.string().optional(),
       vitrineServices: z.string().optional(),
       vitrineExperience: z.number().optional(),
+      couleurPrincipale: z.string().optional(),
+      couleurSecondaire: z.string().optional(),
+      conditionsPaiementDefaut: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -3012,7 +3015,7 @@ const clientPortalRouter = router({
       return {
         valid: true,
         client: client ? { id: client.id, nom: client.nom, prenom: client.prenom, email: client.email, telephone: client.telephone, adresse: client.adresse, codePostal: client.codePostal, ville: client.ville } : null,
-        artisan: artisan ? { id: artisan.id, nomEntreprise: artisan.nomEntreprise, telephone: artisan.telephone, email: artisan.email, adresse: artisan.adresse, codePostal: artisan.codePostal, ville: artisan.ville, siret: artisan.siret } : null,
+        artisan: artisan ? { id: artisan.id, nomEntreprise: artisan.nomEntreprise, telephone: artisan.telephone, email: artisan.email, adresse: artisan.adresse, codePostal: artisan.codePostal, ville: artisan.ville, siret: artisan.siret, logo: artisan.logo } : null,
       };
     }),
 

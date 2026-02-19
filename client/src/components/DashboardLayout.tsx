@@ -406,6 +406,7 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
   const userPermissions: string[] = (user as any)?.permissions || [];
   const filteredMenuGroups = filterMenuByPermissions(menuGroups, userPermissions);
   const filteredAllItems = filteredMenuGroups.flatMap((g) => g.items);
@@ -493,10 +494,15 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
+                  {artisanProfile?.logo && (
+                    <img src={artisanProfile.logo} alt="" className="h-7 w-7 rounded object-contain shrink-0" />
+                  )}
                   <span className="font-semibold tracking-tight truncate">
-                    Artisan MVP
+                    {artisanProfile?.nomEntreprise || "Artisan MVP"}
                   </span>
                 </div>
+              ) : artisanProfile?.logo ? (
+                <img src={artisanProfile.logo} alt="" className="h-7 w-7 rounded object-contain" />
               ) : null}
             </div>
           </SidebarHeader>

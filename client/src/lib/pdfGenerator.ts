@@ -19,6 +19,7 @@ interface Artisan {
   ville?: string | null;
   telephone?: string | null;
   email?: string | null;
+  logo?: string | null;
 }
 
 interface Client {
@@ -66,6 +67,11 @@ interface FactureData {
   totalTTC: number;
   montantPaye?: number | null;
   conditions?: string | null;
+}
+
+interface PdfOptions {
+  mentionsLegales?: string | null;
+  cgv?: string | null;
 }
 
 function formatDate(date: Date | string | null | undefined): string {
@@ -117,6 +123,15 @@ function addHeader(
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPos = 20;
 
+  // Logo in top-left if available
+  if (artisan.logo) {
+    try {
+      doc.addImage(artisan.logo, "AUTO", 20, 12, 25, 25);
+    } catch {
+      // If logo fails, continue without it
+    }
+  }
+
   doc.setFontSize(24);
   doc.setFont("Roboto", "bold");
   doc.setTextColor(41, 128, 185);
@@ -129,10 +144,11 @@ function addHeader(
   doc.text(`N° ${numero}`, pageWidth / 2, yPos, { align: "center" });
 
   yPos += 15;
+  const infoX = artisan.logo ? 50 : 20;
   doc.setFontSize(11);
   doc.setFont("Roboto", "bold");
   doc.setTextColor(0, 0, 0);
-  doc.text(artisan.nomEntreprise || "Mon Entreprise", 20, yPos);
+  doc.text(artisan.nomEntreprise || "Mon Entreprise", infoX, yPos);
 
   yPos += 6;
   doc.setFont("Roboto", "normal");
@@ -140,23 +156,23 @@ function addHeader(
   doc.setTextColor(60, 60, 60);
 
   if (artisan.adresse) {
-    doc.text(artisan.adresse, 20, yPos);
+    doc.text(artisan.adresse, infoX, yPos);
     yPos += 5;
   }
   if (artisan.codePostal || artisan.ville) {
-    doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`.trim(), 20, yPos);
+    doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`.trim(), infoX, yPos);
     yPos += 5;
   }
   if (artisan.telephone) {
-    doc.text(`Tél: ${artisan.telephone}`, 20, yPos);
+    doc.text(`Tél: ${artisan.telephone}`, infoX, yPos);
     yPos += 5;
   }
   if (artisan.email) {
-    doc.text(`Email: ${artisan.email}`, 20, yPos);
+    doc.text(`Email: ${artisan.email}`, infoX, yPos);
     yPos += 5;
   }
   if (artisan.siret) {
-    doc.text(`SIRET: ${artisan.siret}`, 20, yPos);
+    doc.text(`SIRET: ${artisan.siret}`, infoX, yPos);
     yPos += 5;
   }
 
@@ -348,27 +364,57 @@ function addTotals(
   return yPos + 15;
 }
 
-function addFooter(doc: jsPDF, conditions?: string | null): void {
+function addFooter(doc: jsPDF, conditions?: string | null, mentionsLegales?: string | null): void {
   const pageHeight = doc.internal.pageSize.getHeight();
   const pageWidth = doc.internal.pageSize.getWidth();
+
+  let footerY = pageHeight - 10;
+
+  // Mentions légales above the footer line
+  if (mentionsLegales) {
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.setFont("Roboto", "normal");
+    const mlLines = doc.splitTextToSize(mentionsLegales, pageWidth - 40);
+    const mlHeight = mlLines.length * 3.5;
+    doc.text(mlLines, 20, pageHeight - 18 - mlHeight);
+    footerY = pageHeight - 10;
+  }
 
   if (conditions) {
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.setFont("Roboto", "normal");
     const conditionsLines = doc.splitTextToSize(conditions, pageWidth - 40);
-    doc.text(conditionsLines, 20, pageHeight - 30);
+    const condY = mentionsLegales ? pageHeight - 45 : pageHeight - 30;
+    doc.text(conditionsLines, 20, condY);
   }
 
   doc.setDrawColor(200, 200, 200);
-  doc.line(20, pageHeight - 15, pageWidth - 20, pageHeight - 15);
+  doc.line(20, footerY - 5, pageWidth - 20, footerY - 5);
 
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text("Document généré par MonArtisan Pro", pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text("Document généré par MonArtisan Pro", pageWidth / 2, footerY, { align: "center" });
 }
 
-export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisData): void {
+function addCgvPage(doc: jsPDF, cgv: string): void {
+  doc.addPage();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFontSize(16);
+  doc.setFont("Roboto", "bold");
+  doc.setTextColor(41, 128, 185);
+  doc.text("Conditions Générales de Vente", pageWidth / 2, 25, { align: "center" });
+
+  doc.setFontSize(8);
+  doc.setFont("Roboto", "normal");
+  doc.setTextColor(60, 60, 60);
+  const lines = doc.splitTextToSize(cgv, pageWidth - 40);
+  doc.text(lines, 20, 40);
+}
+
+export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisData, options?: PdfOptions): void {
   const doc = new jsPDF();
   registerFonts(doc);
 
@@ -377,12 +423,17 @@ export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisD
   yPos = addDocumentInfo(doc, devis, "devis", yPos);
   yPos = addLignesTable(doc, devis.lignes, yPos);
   addTotals(doc, devis.totalHT, devis.totalTVA, devis.totalTTC, yPos);
-  addFooter(doc, devis.conditions);
+  addFooter(doc, devis.conditions, options?.mentionsLegales);
+
+  // Add CGV page if configured
+  if (options?.cgv) {
+    addCgvPage(doc, options.cgv);
+  }
 
   doc.save(`Devis_${devis.numero}.pdf`);
 }
 
-export function generateFacturePDF(artisan: Artisan, client: Client, facture: FactureData): void {
+export function generateFacturePDF(artisan: Artisan, client: Client, facture: FactureData, options?: PdfOptions): void {
   const doc = new jsPDF();
   registerFonts(doc);
 
@@ -391,7 +442,7 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
-  addFooter(doc, facture.conditions);
+  addFooter(doc, facture.conditions, options?.mentionsLegales);
 
   doc.save(`Facture_${facture.numero}.pdf`);
 }

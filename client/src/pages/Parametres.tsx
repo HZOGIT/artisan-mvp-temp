@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Settings, FileText, Bell, Save, Globe, ExternalLink } from "lucide-react";
+import { Settings, FileText, Bell, Save, Globe, ExternalLink, Palette, Upload, Trash2, Image } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Parametres() {
@@ -15,7 +15,7 @@ export default function Parametres() {
     prefixeFacture: "FAC-",
     mentionsLegalesDevis: "",
     mentionsLegalesFacture: "",
-    conditionsPaiementDefaut: "Paiement à réception de facture",
+    conditionsPaiementDefaut: "Paiement à 30 jours",
     delaiValiditeDevis: "30",
     notificationsEmail: true,
     vitrineActive: false,
@@ -24,10 +24,15 @@ export default function Parametres() {
     vitrineServices: "",
     vitrineExperience: "",
     slug: "",
+    couleurPrincipale: "#4F46E5",
+    couleurSecondaire: "#6366F1",
   });
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: parametres, isLoading } = trpc.parametres.get.useQuery();
-  const { data: artisan } = trpc.artisan.getProfile.useQuery();
+  const { data: artisan, refetch: refetchArtisan } = trpc.artisan.getProfile.useQuery();
 
   const updateMutation = trpc.parametres.update.useMutation({
     onSuccess: () => {
@@ -56,7 +61,7 @@ export default function Parametres() {
         prefixeFacture: parametres.prefixeFacture || "FAC-",
         mentionsLegalesDevis: parametres.mentionsLegales || "",
         mentionsLegalesFacture: parametres.conditionsGenerales || "",
-        conditionsPaiementDefaut: "Paiement à réception de facture",
+        conditionsPaiementDefaut: parametres.conditionsPaiementDefaut || "Paiement à 30 jours",
         delaiValiditeDevis: String(parametres.rappelDevisJours || 30),
         notificationsEmail: parametres.notificationsEmail ?? true,
         vitrineActive: parametres.vitrineActive ?? false,
@@ -64,13 +69,16 @@ export default function Parametres() {
         vitrineZone: parametres.vitrineZone || "",
         vitrineServices: services,
         vitrineExperience: String(parametres.vitrineExperience || ""),
+        couleurPrincipale: parametres.couleurPrincipale || "#4F46E5",
+        couleurSecondaire: parametres.couleurSecondaire || "#6366F1",
       }));
     }
   }, [parametres]);
 
   useEffect(() => {
-    if (artisan?.slug) {
-      setFormData((prev) => ({ ...prev, slug: artisan.slug || "" }));
+    if (artisan) {
+      if (artisan.slug) setFormData((prev) => ({ ...prev, slug: artisan.slug || "" }));
+      setLogoPreview(artisan.logo || null);
     }
   }, [artisan]);
 
@@ -81,6 +89,7 @@ export default function Parametres() {
       prefixeFacture: formData.prefixeFacture,
       mentionsLegales: formData.mentionsLegalesDevis,
       conditionsGenerales: formData.mentionsLegalesFacture,
+      conditionsPaiementDefaut: formData.conditionsPaiementDefaut,
       notificationsEmail: formData.notificationsEmail,
       rappelDevisJours: parseInt(formData.delaiValiditeDevis) || 30,
       vitrineActive: formData.vitrineActive,
@@ -88,9 +97,45 @@ export default function Parametres() {
       vitrineZone: formData.vitrineZone,
       vitrineServices: formData.vitrineServices,
       vitrineExperience: formData.vitrineExperience ? parseInt(formData.vitrineExperience) : undefined,
+      couleurPrincipale: formData.couleurPrincipale,
+      couleurSecondaire: formData.couleurSecondaire,
     });
     if (formData.slug && formData.slug !== (artisan?.slug || "")) {
       updateProfileMutation.mutate({ slug: formData.slug });
+    }
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Fichier trop volumineux (max 2 MB)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("logo", file);
+      const resp = await fetch("/api/upload-logo", { method: "POST", body: fd });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Erreur upload");
+      setLogoPreview(data.logoUrl);
+      refetchArtisan();
+      toast.success("Logo uploadé");
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de l'upload");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteLogo = async () => {
+    try {
+      const resp = await fetch("/api/upload-logo", { method: "DELETE" });
+      if (!resp.ok) throw new Error("Erreur suppression");
+      setLogoPreview(null);
+      refetchArtisan();
+      toast.success("Logo supprimé");
+    } catch (err: any) {
+      toast.error(err.message);
     }
   };
 
@@ -113,6 +158,104 @@ export default function Parametres() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Personnalisation */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Personnalisation
+            </CardTitle>
+            <CardDescription>
+              Logo, couleurs et identité visuelle
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Logo upload */}
+            <div className="space-y-2">
+              <Label>Logo de l'entreprise</Label>
+              <div className="flex items-start gap-4">
+                <div
+                  className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors overflow-hidden"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-1" />
+                  ) : (
+                    <div className="text-center">
+                      <Image className="h-8 w-8 mx-auto text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Cliquer</span>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleLogoUpload(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    <Upload className="h-4 w-4 mr-1.5" />
+                    {uploading ? "Upload..." : "Changer le logo"}
+                  </Button>
+                  {logoPreview && (
+                    <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={handleDeleteLogo}>
+                      <Trash2 className="h-4 w-4 mr-1.5" />
+                      Supprimer
+                    </Button>
+                  )}
+                  <p className="text-xs text-muted-foreground">PNG, JPG, WebP ou SVG. Max 2 MB.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Colors */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="couleurPrincipale">Couleur principale</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    id="couleurPrincipale"
+                    value={formData.couleurPrincipale}
+                    onChange={(e) => setFormData({ ...formData, couleurPrincipale: e.target.value })}
+                    className="w-10 h-10 rounded border cursor-pointer"
+                  />
+                  <Input
+                    value={formData.couleurPrincipale}
+                    onChange={(e) => setFormData({ ...formData, couleurPrincipale: e.target.value })}
+                    className="max-w-[120px] font-mono text-sm"
+                    placeholder="#4F46E5"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="couleurSecondaire">Couleur secondaire</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    id="couleurSecondaire"
+                    value={formData.couleurSecondaire}
+                    onChange={(e) => setFormData({ ...formData, couleurSecondaire: e.target.value })}
+                    className="w-10 h-10 rounded border cursor-pointer"
+                  />
+                  <Input
+                    value={formData.couleurSecondaire}
+                    onChange={(e) => setFormData({ ...formData, couleurSecondaire: e.target.value })}
+                    className="max-w-[120px] font-mono text-sm"
+                    placeholder="#6366F1"
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Numérotation */}
         <Card>
           <CardHeader>
@@ -163,10 +306,10 @@ export default function Parametres() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Mentions légales
+              Mentions légales et CGV
             </CardTitle>
             <CardDescription>
-              Textes qui apparaîtront sur vos documents
+              Textes qui apparaîtront sur vos documents PDF
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -176,28 +319,30 @@ export default function Parametres() {
                 id="conditionsPaiementDefaut"
                 value={formData.conditionsPaiementDefaut}
                 onChange={(e) => setFormData({ ...formData, conditionsPaiementDefaut: e.target.value })}
-                placeholder="Paiement à réception de facture"
+                placeholder="Paiement à 30 jours"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mentionsLegalesDevis">Mentions légales des devis</Label>
+              <Label htmlFor="mentionsLegalesDevis">Mentions légales</Label>
               <Textarea
                 id="mentionsLegalesDevis"
                 value={formData.mentionsLegalesDevis}
                 onChange={(e) => setFormData({ ...formData, mentionsLegalesDevis: e.target.value })}
-                placeholder="Mentions légales à afficher sur les devis..."
+                placeholder="Mentions légales à afficher en bas de page des PDF..."
                 rows={4}
               />
+              <p className="text-xs text-muted-foreground">Apparaissent en footer des PDF devis et factures.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mentionsLegalesFacture">Mentions légales des factures</Label>
+              <Label htmlFor="mentionsLegalesFacture">Conditions Générales de Vente (CGV)</Label>
               <Textarea
                 id="mentionsLegalesFacture"
                 value={formData.mentionsLegalesFacture}
                 onChange={(e) => setFormData({ ...formData, mentionsLegalesFacture: e.target.value })}
-                placeholder="Mentions légales à afficher sur les factures..."
-                rows={4}
+                placeholder="Conditions générales de vente..."
+                rows={6}
               />
+              <p className="text-xs text-muted-foreground">Si renseignées, ajoutées en page 2 des PDF devis.</p>
             </div>
           </CardContent>
         </Card>

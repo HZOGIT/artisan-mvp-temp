@@ -52,6 +52,7 @@ export default function DevisDetail() {
   );
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
   const { data: artisan } = trpc.artisan.getProfile.useQuery();
+  const { data: parametresData } = trpc.parametres.get.useQuery();
   const { data: signatureData } = trpc.signature.getSignatureByDevis.useQuery(
     { devisId: parseInt(id || "0") },
     { enabled: !!id }
@@ -218,6 +219,10 @@ export default function DevisDetail() {
         totalTVA: parseFloat(devis.totalTVA as any) || 0,
         totalTTC: parseFloat(devis.totalTTC as any) || 0,
         conditions: (devis as any).conditions || null,
+      },
+      {
+        mentionsLegales: parametresData?.mentionsLegales || null,
+        cgv: parametresData?.conditionsGenerales || null,
       }
     );
     toast.success("PDF généré avec succès");

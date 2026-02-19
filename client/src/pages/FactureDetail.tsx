@@ -111,6 +111,7 @@ export default function FactureDetail() {
   );
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
   const { data: artisan } = trpc.artisan.getProfile.useQuery();
+  const { data: parametresData } = trpc.parametres.get.useQuery();
 
   const updateMutation = trpc.factures.update.useMutation({
     onSuccess: () => {
@@ -251,6 +252,9 @@ export default function FactureDetail() {
         totalTTC: parseFloat(facture.totalTTC as any) || 0,
         montantPaye: parseFloat(facture.montantPaye as any) || 0,
         conditions: (facture as any).conditions || null,
+      },
+      {
+        mentionsLegales: parametresData?.mentionsLegales || null,
       }
     );
     toast.success("PDF généré avec succès");

@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import cookieParser from "cookie-parser";
+import multer from "multer";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -129,6 +130,59 @@ async function startServer() {
   // IMPORTANT: cookie-parser MUST be before routes to parse cookies
   app.use(cookieParser());
   console.log('OK cookieParser() charge');
+
+  // ============================================================
+  // API Upload Logo - multipart/form-data with multer
+  // ============================================================
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+  app.post('/api/upload-logo', upload.single('logo'), async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) return res.status(401).json({ error: 'Non authentifié' });
+
+      const file = req.file;
+      if (!file) return res.status(400).json({ error: 'Aucun fichier envoyé' });
+
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({ error: 'Type de fichier non supporté (PNG, JPG, WebP, SVG uniquement)' });
+      }
+
+      const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+
+      const { getArtisanByUserId, updateArtisan } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) return res.status(404).json({ error: 'Artisan non trouvé' });
+
+      await updateArtisan(artisan.id, { logo: base64 });
+      res.json({ success: true, logoUrl: base64 });
+    } catch (error: any) {
+      console.error('[Upload Logo] Error:', error);
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Fichier trop volumineux (max 2MB)' });
+      }
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
+
+  app.delete('/api/upload-logo', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) return res.status(401).json({ error: 'Non authentifié' });
+
+      const { getArtisanByUserId, updateArtisan } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) return res.status(404).json({ error: 'Artisan non trouvé' });
+
+      await updateArtisan(artisan.id, { logo: null });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Delete Logo] Error:', error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
 
   // ============================================================
   // API Articles - recherche bibliothèque
