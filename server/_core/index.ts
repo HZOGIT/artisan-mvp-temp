@@ -290,6 +290,134 @@ async function startServer() {
     }
   });
 
+  // ============================================================================
+  // COMPTABILITE EXPORTS (FEC + CSV)
+  // ============================================================================
+
+  // Helper: authenticate via JWT cookie
+  async function authFromCookie(req: any, res: any): Promise<any | null> {
+    const { getArtisanByUserId } = await import('../db');
+    const { jwtVerify } = await import('jose');
+    const token = req.cookies?.token;
+    if (!token) { res.status(401).json({ error: 'Non authentifié' }); return null; }
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret');
+    let payload: any;
+    try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return null; }
+    const artisan = await getArtisanByUserId(payload.userId);
+    if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return null; }
+    return artisan;
+  }
+
+  // Helper: format number with comma for FEC (French decimal format)
+  function fecAmount(val: string | number | null): string {
+    const num = typeof val === 'string' ? parseFloat(val) : (val || 0);
+    return num.toFixed(2).replace('.', ',');
+  }
+
+  // Helper: format date as YYYYMMDD for FEC
+  function fecDate(d: Date | string): string {
+    const date = new Date(d);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${y}${m}${day}`;
+  }
+
+  // GET /api/comptabilite/fec - Generate FEC file
+  app.get('/api/comptabilite/fec', async (req, res) => {
+    try {
+      const artisan = await authFromCookie(req, res);
+      if (!artisan) return;
+
+      const { getFacturesByArtisanId, getClientById } = await import('../db');
+      const dateDebut = req.query.dateDebut ? new Date(req.query.dateDebut as string) : new Date(new Date().getFullYear(), 0, 1);
+      const dateFin = req.query.dateFin ? new Date(req.query.dateFin as string) : new Date();
+      dateFin.setHours(23, 59, 59, 999);
+
+      const allFactures = await getFacturesByArtisanId(artisan.id);
+      const factures = allFactures.filter(f => {
+        const d = new Date(f.dateFacture);
+        return d >= dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
+      });
+
+      // FEC header
+      const header = 'JournalCode|JournalLib|EcritureNum|EcritureDate|CompteNum|CompteLib|CompAuxNum|CompAuxLib|PieceRef|PieceDate|EcritureLib|Debit|Credit|EcritureLet|DateLet|ValidDate|Montantdevise|Idevise';
+      const lines: string[] = [header];
+
+      let ecritureNum = 1;
+      for (const facture of factures) {
+        const client = await getClientById(facture.clientId);
+        const clientNom = client?.nom || 'Client';
+        const clientNum = `C${String(facture.clientId).padStart(5, '0')}`;
+        const ecritureDate = fecDate(facture.dateFacture);
+        const pieceRef = facture.numero;
+        const ecritureLib = `Facture ${facture.numero} - ${clientNom}`;
+        const ttc = parseFloat(facture.totalTTC?.toString() || '0');
+        const ht = parseFloat(facture.totalHT?.toString() || '0');
+        const tva = parseFloat(facture.totalTVA?.toString() || '0');
+        const validDate = fecDate(facture.dateFacture);
+        const num = String(ecritureNum).padStart(6, '0');
+
+        // Ligne 1: Débit 411000 (Clients) TTC
+        lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|411000|Clients|${clientNum}|${clientNom}|${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(ttc)}|${fecAmount(0)}||||EUR`);
+        // Ligne 2: Crédit 701000 (Ventes) HT
+        lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|701000|Ventes de produits finis||${clientNom}|${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(0)}|${fecAmount(ht)}||||EUR`);
+        // Ligne 3: Crédit 445710 (TVA collectée) TVA
+        if (tva > 0) {
+          lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|445710|TVA collectée|||${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(0)}|${fecAmount(tva)}||||EUR`);
+        }
+        ecritureNum++;
+      }
+
+      const content = lines.join('\n');
+      const siret = (artisan.siret || '00000000000000').replace(/\s/g, '');
+      const filename = `${siret}FEC${fecDate(dateFin)}.txt`;
+
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(content);
+    } catch (error) {
+      console.error('[Compta] FEC error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du FEC' });
+    }
+  });
+
+  // GET /api/comptabilite/export-csv - Export factures as CSV
+  app.get('/api/comptabilite/export-csv', async (req, res) => {
+    try {
+      const artisan = await authFromCookie(req, res);
+      if (!artisan) return;
+
+      const { getFacturesByArtisanId, getClientById } = await import('../db');
+      const dateDebut = req.query.dateDebut ? new Date(req.query.dateDebut as string) : new Date(new Date().getFullYear(), 0, 1);
+      const dateFin = req.query.dateFin ? new Date(req.query.dateFin as string) : new Date();
+      dateFin.setHours(23, 59, 59, 999);
+
+      const allFactures = await getFacturesByArtisanId(artisan.id);
+      const factures = allFactures.filter(f => {
+        const d = new Date(f.dateFacture);
+        return d >= dateDebut && d <= dateFin;
+      });
+
+      const csvHeader = 'Date;Numéro;Client;HT;TVA;TTC;Statut';
+      const csvLines: string[] = [csvHeader];
+
+      for (const f of factures) {
+        const client = await getClientById(f.clientId);
+        const date = new Date(f.dateFacture).toLocaleDateString('fr-FR');
+        csvLines.push(`${date};${f.numero};${client?.nom || 'Client'};${fecAmount(f.totalHT)};${fecAmount(f.totalTVA)};${fecAmount(f.totalTTC)};${f.statut}`);
+      }
+
+      const content = '\ufeff' + csvLines.join('\n'); // BOM for Excel
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="factures_${fecDate(dateDebut)}_${fecDate(dateFin)}.csv"`);
+      res.send(content);
+    } catch (error) {
+      console.error('[Compta] CSV error:', error);
+      res.status(500).json({ error: 'Erreur lors de l\'export CSV' });
+    }
+  });
+
   // SSE streaming endpoint for AI assistant
   app.post('/api/assistant/stream', async (req, res) => {
     try {

@@ -4529,6 +4529,46 @@ const comptabiliteRouter = router({
     await db.initPlanComptable(artisan.id);
     return { success: true };
   }),
+
+  // Aperçu FEC (premières lignes)
+  getFecPreview: protectedProcedure
+    .input(z.object({
+      dateDebut: z.date(),
+      dateFin: z.date(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { lines: [], totalFactures: 0, siret: '' };
+
+      const allFactures = await db.getFacturesByArtisanId(artisan.id);
+      const dateFin = new Date(input.dateFin);
+      dateFin.setHours(23, 59, 59, 999);
+      const factures = allFactures.filter(f => {
+        const d = new Date(f.dateFacture);
+        return d >= input.dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
+      });
+
+      const lines: { ecritureNum: string; ecritureDate: string; compteNum: string; compteLib: string; pieceRef: string; ecritureLib: string; debit: string; credit: string }[] = [];
+      let num = 1;
+      for (const facture of factures.slice(0, 10)) { // Limit preview to 10 factures
+        const client = await db.getClientById(facture.clientId);
+        const clientNom = client?.nom || 'Client';
+        const ecritureDate = new Date(facture.dateFacture).toISOString().slice(0, 10).replace(/-/g, '');
+        const numStr = String(num).padStart(6, '0');
+        const ttc = parseFloat(facture.totalTTC?.toString() || '0');
+        const ht = parseFloat(facture.totalHT?.toString() || '0');
+        const tva = parseFloat(facture.totalTVA?.toString() || '0');
+
+        lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '411000', compteLib: 'Clients', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: ttc.toFixed(2).replace('.', ','), credit: '0,00' });
+        lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '701000', compteLib: 'Ventes', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: '0,00', credit: ht.toFixed(2).replace('.', ',') });
+        if (tva > 0) {
+          lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '445710', compteLib: 'TVA collectée', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: '0,00', credit: tva.toFixed(2).replace('.', ',') });
+        }
+        num++;
+      }
+
+      return { lines, totalFactures: factures.length, siret: artisan.siret || '' };
+    }),
 });
 
 // ============================================================================

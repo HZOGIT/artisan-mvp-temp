@@ -6,7 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, FileText, Calculator, TrendingUp, TrendingDown, Euro } from "lucide-react";
+import { Download, FileText, Calculator, TrendingUp, TrendingDown, Euro, FileDown, FileSpreadsheet, Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { format, startOfYear, endOfYear, startOfMonth, endOfMonth } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -35,6 +37,11 @@ export default function Comptabilite() {
     dateFin: new Date(dateFin),
   });
 
+  const { data: fecPreview, isLoading: loadingFec } = trpc.comptabilite.getFecPreview.useQuery({
+    dateDebut: new Date(dateDebut),
+    dateFin: new Date(dateFin),
+  });
+
   const formatMontant = (montant: number | string | null) => {
     const num = typeof montant === 'string' ? parseFloat(montant) : (montant || 0);
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
@@ -54,6 +61,24 @@ export default function Comptabilite() {
     link.href = URL.createObjectURL(blob);
     link.download = `${filename}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     link.click();
+  };
+
+  const downloadFec = () => {
+    const url = `/api/comptabilite/fec?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    a.click();
+    toast.success("Téléchargement du FEC lancé");
+  };
+
+  const downloadCsv = () => {
+    const url = `/api/comptabilite/export-csv?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    a.click();
+    toast.success("Téléchargement du CSV lancé");
   };
 
   return (
@@ -157,6 +182,7 @@ export default function Comptabilite() {
             <TabsTrigger value="balance">Balance</TabsTrigger>
             <TabsTrigger value="grandlivre">Grand Livre</TabsTrigger>
             <TabsTrigger value="journal">Journal des Ventes</TabsTrigger>
+            <TabsTrigger value="exports">Exports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="balance">
@@ -372,6 +398,134 @@ export default function Comptabilite() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="exports">
+            <div className="space-y-6">
+              {/* Boutons d'export */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="cursor-pointer hover:border-primary transition-colors" onClick={downloadFec}>
+                  <CardContent className="pt-6 text-center space-y-3">
+                    <FileDown className="h-10 w-10 mx-auto text-primary" />
+                    <div>
+                      <h3 className="font-semibold">Générer le FEC</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Fichier des Écritures Comptables (Art. A.47 A-1 du LPF)
+                      </p>
+                    </div>
+                    <Badge variant="outline">
+                      {fecPreview?.totalFactures || 0} facture(s) sur la période
+                    </Badge>
+                    <Button className="w-full" onClick={(e) => { e.stopPropagation(); downloadFec(); }}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Télécharger .txt
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="cursor-pointer hover:border-primary transition-colors" onClick={downloadCsv}>
+                  <CardContent className="pt-6 text-center space-y-3">
+                    <FileSpreadsheet className="h-10 w-10 mx-auto text-green-600" />
+                    <div>
+                      <h3 className="font-semibold">Export CSV Factures</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Date, numéro, client, HT, TVA, TTC, statut
+                      </p>
+                    </div>
+                    <Badge variant="outline">Format Excel / LibreOffice</Badge>
+                    <Button variant="outline" className="w-full" onClick={(e) => { e.stopPropagation(); downloadCsv(); }}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Télécharger .csv
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6 text-center space-y-3">
+                    <FileText className="h-10 w-10 mx-auto text-red-500" />
+                    <div>
+                      <h3 className="font-semibold">Export PDF en lot</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Toutes les factures PDF de la période
+                      </p>
+                    </div>
+                    <Badge variant="outline">Bientôt disponible</Badge>
+                    <Button variant="secondary" className="w-full" disabled>
+                      <Download className="h-4 w-4 mr-2" />
+                      Télécharger .zip
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Aperçu FEC */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5" />
+                    Aperçu FEC
+                    {fecPreview && (
+                      <Badge variant="secondary" className="ml-2">
+                        {fecPreview.totalFactures} facture(s) → {fecPreview.lines.length} écritures
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <Button size="sm" onClick={downloadFec}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Télécharger
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {loadingFec ? (
+                    <p className="text-muted-foreground">Chargement...</p>
+                  ) : fecPreview && fecPreview.lines.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>N°</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Compte</TableHead>
+                            <TableHead>Libellé compte</TableHead>
+                            <TableHead>Pièce</TableHead>
+                            <TableHead>Libellé écriture</TableHead>
+                            <TableHead className="text-right">Débit</TableHead>
+                            <TableHead className="text-right">Crédit</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {fecPreview.lines.map((line, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-mono text-xs">{line.ecritureNum}</TableCell>
+                              <TableCell className="font-mono text-xs">{line.ecritureDate}</TableCell>
+                              <TableCell className="font-mono text-xs">{line.compteNum}</TableCell>
+                              <TableCell className="text-xs">{line.compteLib}</TableCell>
+                              <TableCell className="font-mono text-xs">{line.pieceRef}</TableCell>
+                              <TableCell className="text-xs max-w-[200px] truncate">{line.ecritureLib}</TableCell>
+                              <TableCell className="text-right font-mono text-xs">
+                                {line.debit !== '0,00' ? line.debit : ''}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs">
+                                {line.credit !== '0,00' ? line.credit : ''}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {fecPreview.totalFactures > 10 && (
+                        <p className="text-sm text-muted-foreground mt-4 text-center">
+                          Aperçu limité aux 10 premières factures sur {fecPreview.totalFactures}. Le fichier complet contiendra toutes les écritures.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">
+                      Aucune facture (hors brouillon/annulée) sur cette période
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
