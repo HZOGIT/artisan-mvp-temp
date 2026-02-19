@@ -63,3 +63,22 @@ export const adminOnlyProcedure = t.procedure.use(requireRole("admin"));
 export const adminArtisanProcedure = t.procedure.use(requireRole("admin", "artisan"));
 // Everyone except technicien (devis, factures, clients, chat)
 export const noTechProcedure = t.procedure.use(requireRole("admin", "artisan", "secretaire"));
+
+// Permission-based middleware factory
+export function requirePermission(...requiredPerms: string[]) {
+  return t.middleware(async (opts) => {
+    if (!opts.ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    // Admin bypasses all permission checks
+    if (opts.ctx.user.role === "admin") {
+      return opts.next({ ctx: opts.ctx });
+    }
+    const userPerms: string[] = (opts.ctx.user as any).permissions || [];
+    const hasAll = requiredPerms.every(p => userPerms.includes(p));
+    if (!hasAll) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Vous n'avez pas la permission requise" });
+    }
+    return opts.next({ ctx: opts.ctx });
+  });
+}

@@ -517,6 +517,70 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] Multi-user migration error:', e.message);
     }
 
+    // --- Per-user permissions table + seed ---
+    try {
+      await pool.execute(`CREATE TABLE IF NOT EXISTS permissions_utilisateur (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        userId INT NOT NULL,
+        permission VARCHAR(50) NOT NULL,
+        autorise BOOLEAN DEFAULT TRUE NOT NULL,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        UNIQUE KEY unique_user_permission (userId, permission),
+        INDEX idx_permissions_userId (userId)
+      )`);
+      console.log('[FixDuplicates] Created/verified permissions_utilisateur table');
+
+      // Permission templates (must match shared/permissions.ts ROLE_TEMPLATES)
+      const allPerms = [
+        'dashboard.voir','statistiques.voir',
+        'devis.voir','devis.creer','devis.supprimer',
+        'factures.voir','factures.creer','factures.supprimer',
+        'contrats.voir','contrats.gerer','relances.voir',
+        'clients.voir','clients.gerer','chat.voir','portail.gerer','rdv.gerer',
+        'interventions.voir','interventions.gerer','calendrier.voir',
+        'chantiers.voir','chantiers.gerer','techniciens.voir','geolocalisation.voir',
+        'articles.voir','comptabilite.voir','exports.voir',
+        'parametres.voir','utilisateurs.gerer','vitrine.gerer',
+      ];
+      const permTemplates: Record<string, string[]> = {
+        admin: allPerms,
+        artisan: allPerms.filter(p => p !== 'utilisateurs.gerer'),
+        secretaire: [
+          'dashboard.voir','statistiques.voir',
+          'devis.voir','devis.creer','devis.supprimer',
+          'factures.voir','factures.creer','factures.supprimer',
+          'contrats.voir','relances.voir',
+          'clients.voir','clients.gerer','chat.voir','portail.gerer','rdv.gerer',
+        ],
+        technicien: [
+          'dashboard.voir',
+          'interventions.voir','interventions.gerer','calendrier.voir',
+          'chantiers.voir','chantiers.gerer','techniciens.voir','geolocalisation.voir',
+        ],
+      };
+
+      // Seed permissions for existing users who don't have any yet
+      const [allUsersForPerms] = await pool.execute('SELECT id, role FROM users WHERE actif = 1') as any;
+      for (const u of allUsersForPerms) {
+        const [existing] = await pool.execute(
+          'SELECT COUNT(*) as cnt FROM permissions_utilisateur WHERE userId = ?', [u.id]
+        ) as any;
+        if (existing[0].cnt === 0) {
+          const perms = permTemplates[u.role] || permTemplates.artisan;
+          for (const perm of perms) {
+            await pool.execute(
+              'INSERT IGNORE INTO permissions_utilisateur (userId, permission, autorise) VALUES (?, ?, 1)',
+              [u.id, perm]
+            );
+          }
+          console.log(`[FixDuplicates] Seeded ${perms.length} permissions for user ${u.id} (${u.role})`);
+        }
+      }
+      console.log('[FixDuplicates] Permissions seed complete');
+    } catch (e: any) {
+      console.log('[FixDuplicates] Permissions migration error:', e.message);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);

@@ -23,6 +23,20 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // ============================================================================
+// PERMISSIONS UTILISATEUR (Per-user granular permissions)
+// ============================================================================
+export const permissionsUtilisateur = mysqlTable("permissions_utilisateur", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  permission: varchar("permission", { length: 50 }).notNull(),
+  autorise: boolean("autorise").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PermissionUtilisateur = typeof permissionsUtilisateur.$inferSelect;
+export type InsertPermissionUtilisateur = typeof permissionsUtilisateur.$inferInsert;
+
+// ============================================================================
 // ARTISANS TABLE (Professional profiles)
 // ============================================================================
 export const artisans = mysqlTable("artisans", {

@@ -11,6 +11,7 @@ import { COOKIE_NAME } from "../shared/const";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
 import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
+import { ROLE_TEMPLATES, ALL_PERMISSIONS } from "../shared/permissions";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Rate limiter for AI endpoints
@@ -6641,11 +6642,9 @@ const utilisateursRouter = router({
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
 
-      // Check if email already exists
       const existing = await db.getUserByEmail(input.email);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "Cet email est déjà utilisé" });
 
-      // Generate temporary password
       const tempPassword = Math.random().toString(36).slice(-10);
       const passwordHash = await hashPassword(tempPassword);
 
@@ -6658,7 +6657,14 @@ const utilisateursRouter = router({
         passwordHash,
       });
 
-      // Send invitation email
+      // Seed default permissions for the new user's role
+      const defaultPerms = ROLE_TEMPLATES[input.role] || ROLE_TEMPLATES.artisan;
+      try {
+        await db.setUserPermissions(newUser.id, [...defaultPerms], artisan.id);
+      } catch (e: any) {
+        console.log('[Utilisateurs] Permission seed failed:', e.message);
+      }
+
       const roleFr: Record<string, string> = { artisan: "Artisan", secretaire: "Secrétaire", technicien: "Technicien" };
       try {
         await sendEmail({
@@ -6693,6 +6699,9 @@ const utilisateursRouter = router({
       if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
       const updated = await db.updateUserRole(input.userId, input.role, artisan.id);
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur non trouvé dans votre entreprise" });
+      // Reset permissions to the new role's defaults
+      const defaultPerms = ROLE_TEMPLATES[input.role] || ROLE_TEMPLATES.artisan;
+      await db.setUserPermissions(input.userId, [...defaultPerms], artisan.id);
       return { id: updated.id, role: updated.role };
     }),
 
@@ -6707,6 +6716,45 @@ const utilisateursRouter = router({
       const updated = await db.toggleUserActif(input.userId, input.actif, artisan.id);
       if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur non trouvé dans votre entreprise" });
       return { id: updated.id, actif: updated.actif };
+    }),
+
+  getPermissions: adminOnlyProcedure
+    .input(z.object({ userId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const targetUser = await db.getUserById(input.userId);
+      if (!targetUser || (targetUser.artisanId !== artisan.id && targetUser.id !== artisan.userId))
+        throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur non trouvé" });
+      const permissions = await db.getUserPermissions(input.userId);
+      const roleDefaults = ROLE_TEMPLATES[targetUser.role] || [];
+      return { userId: input.userId, role: targetUser.role, permissions, roleDefaults: [...roleDefaults] };
+    }),
+
+  updatePermissions: adminOnlyProcedure
+    .input(z.object({
+      userId: z.number(),
+      permissions: z.array(z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const validPerms = input.permissions.filter(p => (ALL_PERMISSIONS as string[]).includes(p));
+      await db.setUserPermissions(input.userId, validPerms, artisan.id);
+      return { success: true, count: validPerms.length };
+    }),
+
+  resetPermissions: adminOnlyProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const targetUser = await db.getUserById(input.userId);
+      if (!targetUser || (targetUser.artisanId !== artisan.id && targetUser.id !== artisan.userId))
+        throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur non trouvé" });
+      const defaultPerms = ROLE_TEMPLATES[targetUser.role] || ROLE_TEMPLATES.artisan;
+      await db.setUserPermissions(input.userId, [...defaultPerms], artisan.id);
+      return { success: true, permissions: [...defaultPerms] };
     }),
 });
 

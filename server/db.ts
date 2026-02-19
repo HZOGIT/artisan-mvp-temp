@@ -51,6 +51,7 @@ import {
   messages, Message, InsertMessage,
   rdvEnLigne, RdvEnLigne, InsertRdvEnLigne,
   suiviChantier, SuiviChantier, InsertSuiviChantier,
+  permissionsUtilisateur, PermissionUtilisateur, InsertPermissionUtilisateur,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -3084,4 +3085,36 @@ export async function toggleUserActif(userId: number, actif: boolean, artisanId:
   await db.update(users).set({ actif }).where(eq(users.id, userId));
   const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return result[0];
+}
+
+// ============================================================================
+// PERMISSIONS PER USER
+// ============================================================================
+
+export async function getUserPermissions(userId: number): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select({ permission: permissionsUtilisateur.permission })
+    .from(permissionsUtilisateur)
+    .where(and(
+      eq(permissionsUtilisateur.userId, userId),
+      eq(permissionsUtilisateur.autorise, true)
+    ));
+  return rows.map(r => r.permission);
+}
+
+export async function setUserPermissions(userId: number, permissions: string[], artisanId: number): Promise<void> {
+  const db = await getDb();
+  // Verify user belongs to this enterprise
+  const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user[0] || user[0].artisanId !== artisanId) {
+    throw new Error("Utilisateur non trouvé dans votre entreprise");
+  }
+  // Delete all existing permissions for this user
+  await db.delete(permissionsUtilisateur).where(eq(permissionsUtilisateur.userId, userId));
+  // Insert new permissions
+  if (permissions.length > 0) {
+    await db.insert(permissionsUtilisateur).values(
+      permissions.map(p => ({ userId, permission: p, autorise: true }))
+    );
+  }
 }

@@ -262,37 +262,65 @@ const menuGroups: MenuGroup[] = [
   },
 ];
 
-// Role-based path access
-const roleAllowedPaths: Record<string, string[] | "*"> = {
-  admin: "*",
-  artisan: "*",
-  secretaire: [
-    "/dashboard", "/statistiques", "/devis", "/devis/nouveau", "/factures",
-    "/clients", "/clients/nouveau", "/clients/import", "/avis", "/chat",
-    "/rdv-en-ligne", "/relances", "/contrats", "/portail-gestion",
-    "/profil", "/assistant", "/notifications", "/modeles-email", "/modeles-email-transactionnels",
-  ],
-  technicien: [
-    "/dashboard", "/interventions", "/calendrier", "/chantiers",
-    "/mobile", "/geolocalisation", "/profil", "/assistant", "/notifications",
-  ],
+// Permission-based path access
+const pathPermissionMap: Record<string, string> = {
+  "/dashboard": "dashboard.voir",
+  "/statistiques": "statistiques.voir",
+  "/devis": "devis.voir",
+  "/devis/nouveau": "devis.creer",
+  "/factures": "factures.voir",
+  "/contrats": "contrats.voir",
+  "/relances": "relances.voir",
+  "/clients": "clients.voir",
+  "/clients/nouveau": "clients.gerer",
+  "/clients/import": "clients.gerer",
+  "/avis": "clients.voir",
+  "/portail-gestion": "portail.gerer",
+  "/chat": "chat.voir",
+  "/rdv-en-ligne": "rdv.gerer",
+  "/interventions": "interventions.voir",
+  "/calendrier": "calendrier.voir",
+  "/techniciens": "techniciens.voir",
+  "/geolocalisation": "geolocalisation.voir",
+  "/chantiers": "chantiers.voir",
+  "/planification": "interventions.gerer",
+  "/articles": "articles.voir",
+  "/stocks": "articles.voir",
+  "/rapport-commande": "exports.voir",
+  "/fournisseurs": "articles.voir",
+  "/rapports": "exports.voir",
+  "/comptabilite": "comptabilite.voir",
+  "/previsions": "comptabilite.voir",
+  "/parametres": "parametres.voir",
+  "/ma-vitrine": "vitrine.gerer",
+  "/modeles-email": "parametres.voir",
+  "/modeles-email-transactionnels": "parametres.voir",
+  "/utilisateurs": "utilisateurs.gerer",
+  "/profil": "",
+  "/assistant": "",
+  "/notifications": "",
+  "/mobile": "interventions.voir",
+  "/integrations-comptables": "comptabilite.voir",
+  "/devis-ia": "devis.creer",
+  "/calendrier-chantiers": "chantiers.voir",
+  "/tableau-bord-sync-comptable": "comptabilite.voir",
+  "/performances-fournisseurs": "articles.voir",
+  "/vehicules": "interventions.voir",
+  "/badges": "techniciens.voir",
+  "/alertes-previsions": "comptabilite.voir",
+  "/conges": "techniciens.voir",
 };
 
-function filterMenuByRole(groups: MenuGroup[], role: string): MenuGroup[] {
-  const allowed = roleAllowedPaths[role];
-  if (!allowed || allowed === "*") {
-    // admin/artisan: show everything, but only admin sees /utilisateurs
-    if (role !== "admin") {
-      return groups.map(g => ({
-        ...g,
-        items: g.items.filter(i => i.path !== "/utilisateurs"),
-      })).filter(g => g.items.length > 0);
-    }
-    return groups;
-  }
+function filterMenuByPermissions(groups: MenuGroup[], permissions: string[]): MenuGroup[] {
+  // If no permissions loaded yet (first render / cache), show all to avoid flash
+  if (permissions.length === 0) return groups;
   return groups.map(g => ({
     ...g,
-    items: g.items.filter(i => allowed.includes(i.path)),
+    items: g.items.filter(item => {
+      const required = pathPermissionMap[item.path];
+      if (!required) return true; // No permission required (profil, assistant, notifications)
+      return permissions.includes(required);
+    }),
   })).filter(g => g.items.length > 0);
 }
 
@@ -378,8 +406,8 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const userRole = (user as any)?.role || "admin";
-  const filteredMenuGroups = filterMenuByRole(menuGroups, userRole);
+  const userPermissions: string[] = (user as any)?.permissions || [];
+  const filteredMenuGroups = filterMenuByPermissions(menuGroups, userPermissions);
   const filteredAllItems = filteredMenuGroups.flatMap((g) => g.items);
   const activeMenuItem = filteredAllItems.find(item => item.path === location) || allMenuItems.find(item => item.path === location);
   const isMobile = useIsMobile();

@@ -1,8 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { Request, Response } from "express";
 import { getDb } from "../db";
-import { users } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { users, permissionsUtilisateur } from "../../drizzle/schema";
+import { eq, and } from "drizzle-orm";
+import { ALL_PERMISSIONS } from "../../shared/permissions";
 
 const JWT_SECRET = process.env.JWT_SECRET || "monartisan-dev-secret-2026";
 const SECRET_KEY = new TextEncoder().encode(JWT_SECRET);
@@ -107,6 +108,22 @@ export async function getUserFromRequest(req: Request) {
     if (user.actif === false) {
       return null;
     }
+
+    // Load permissions
+    let permissions: string[] = [];
+    if (user.role === "admin") {
+      // Admin bypass: always has all permissions, no DB query needed
+      permissions = [...ALL_PERMISSIONS];
+    } else {
+      const permRows = await db.select({ permission: permissionsUtilisateur.permission })
+        .from(permissionsUtilisateur)
+        .where(and(
+          eq(permissionsUtilisateur.userId, user.id),
+          eq(permissionsUtilisateur.autorise, true)
+        ));
+      permissions = permRows.map(r => r.permission);
+    }
+
     return {
       id: user.id,
       email: user.email || "",
@@ -115,6 +132,7 @@ export async function getUserFromRequest(req: Request) {
       role: user.role || "admin",
       artisanId: user.artisanId || null,
       actif: user.actif,
+      permissions,
     };
   } catch (error) {
     console.error("[Auth] Error getting user from request:", error);
