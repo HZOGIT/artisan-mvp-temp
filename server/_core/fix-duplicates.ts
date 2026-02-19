@@ -4,6 +4,7 @@
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
+import bcrypt from "bcryptjs";
 
 async function fixDuplicates() {
   const url = process.env.DATABASE_URL;
@@ -579,6 +580,46 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] Permissions seed complete');
     } catch (e: any) {
       console.log('[FixDuplicates] Permissions migration error:', e.message);
+    }
+
+    // --- Demo collaborators seed ---
+    try {
+      const demoCollabs = [
+        { email: 'marie.dupont@demo.fr', name: 'Dupont', prenom: 'Marie', role: 'secretaire' },
+        { email: 'lucas.martin@demo.fr', name: 'Martin', prenom: 'Lucas', role: 'technicien' },
+      ];
+      // Find the first artisan to attach collaborators to
+      const [artisanRows] = await pool.execute('SELECT id FROM artisans ORDER BY id LIMIT 1') as any;
+      if (artisanRows.length > 0) {
+        const artisanId = artisanRows[0].id;
+        const demoHash = await bcrypt.hash('demo1234', 10);
+        for (const c of demoCollabs) {
+          const [existing] = await pool.execute('SELECT id FROM users WHERE email = ?', [c.email]) as any;
+          if (existing.length === 0) {
+            await pool.execute(
+              `INSERT INTO users (email, name, prenom, password, loginMethod, role, artisanId, actif)
+               VALUES (?, ?, ?, ?, 'password', ?, ?, 1)`,
+              [c.email, c.name, c.prenom, demoHash, c.role, artisanId]
+            );
+            // Seed permissions for the new collaborator
+            const [newUser] = await pool.execute('SELECT id FROM users WHERE email = ?', [c.email]) as any;
+            if (newUser.length > 0) {
+              const perms = permTemplates[c.role] || permTemplates.artisan;
+              for (const perm of perms) {
+                await pool.execute(
+                  'INSERT IGNORE INTO permissions_utilisateur (userId, permission, autorise) VALUES (?, ?, 1)',
+                  [newUser[0].id, perm]
+                );
+              }
+            }
+            console.log(`[FixDuplicates] Created demo collaborator: ${c.prenom} ${c.name} (${c.role})`);
+          } else {
+            console.log(`[FixDuplicates] Demo collaborator ${c.email} already exists, skipping`);
+          }
+        }
+      }
+    } catch (e: any) {
+      console.log('[FixDuplicates] Demo collaborators seed error:', e.message);
     }
 
     console.log('[FixDuplicates] Done.');
