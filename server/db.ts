@@ -176,6 +176,13 @@ export async function getArtisanById(id: number): Promise<Artisan | undefined> {
 
 export async function getArtisanByUserId(userId: number): Promise<Artisan | undefined> {
   const db = await getDb();
+  // Check if user has artisanId set (collaborator linked to an enterprise)
+  const userResult = await db.select({ artisanId: users.artisanId }).from(users).where(eq(users.id, userId)).limit(1);
+  if (userResult[0]?.artisanId) {
+    const result = await db.select().from(artisans).where(eq(artisans.id, userResult[0].artisanId)).limit(1);
+    if (result[0]) return result[0];
+  }
+  // Fallback: direct owner (artisans.userId = userId)
   const result = await db.select().from(artisans).where(eq(artisans.userId, userId)).limit(1);
   return result[0];
 }
@@ -3019,4 +3026,62 @@ export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Da
     occupied.push({ dateDebut: r.dateProposee, dateFin: end });
   }
   return occupied;
+}
+
+// ============================================================================
+// MULTI-USER MANAGEMENT
+// ============================================================================
+
+export async function getUsersByArtisanId(artisanId: number): Promise<User[]> {
+  const db = await getDb();
+  // Get the owner (artisans.userId) + all users with users.artisanId = artisanId
+  const artisan = await db.select().from(artisans).where(eq(artisans.id, artisanId)).limit(1);
+  if (!artisan[0]) return [];
+  const result = await db.select().from(users).where(
+    or(eq(users.id, artisan[0].userId), eq(users.artisanId, artisanId))
+  );
+  return result;
+}
+
+export async function createCollaborator(data: {
+  email: string;
+  name: string;
+  prenom?: string;
+  role: "artisan" | "secretaire" | "technicien";
+  artisanId: number;
+  passwordHash: string;
+}): Promise<User> {
+  const db = await getDb();
+  await db.insert(users).values({
+    email: data.email,
+    name: data.name,
+    prenom: data.prenom || null,
+    role: data.role,
+    artisanId: data.artisanId,
+    password: data.passwordHash,
+    loginMethod: "password",
+    actif: true,
+  });
+  const result = await db.select().from(users).where(eq(users.email, data.email)).limit(1);
+  return result[0];
+}
+
+export async function updateUserRole(userId: number, role: string, artisanId: number): Promise<User | undefined> {
+  const db = await getDb();
+  // Verify user belongs to this enterprise
+  const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user[0] || user[0].artisanId !== artisanId) return undefined;
+  await db.update(users).set({ role: role as any }).where(eq(users.id, userId));
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result[0];
+}
+
+export async function toggleUserActif(userId: number, actif: boolean, artisanId: number): Promise<User | undefined> {
+  const db = await getDb();
+  // Verify user belongs to this enterprise
+  const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user[0] || user[0].artisanId !== artisanId) return undefined;
+  await db.update(users).set({ actif }).where(eq(users.id, userId));
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return result[0];
 }

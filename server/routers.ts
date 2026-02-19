@@ -1,11 +1,11 @@
 
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, adminOnlyProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import * as dbSecure from "./db-secure";
-import { createUserWithPassword, authenticateUser } from "./_core/auth";
+import { createUserWithPassword, authenticateUser, hashPassword } from "./_core/auth";
 import { createToken, setAuthCookie, clearAuthCookie } from "./_core/auth-simple";
 import { COOKIE_NAME } from "../shared/const";
 import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
@@ -6616,6 +6616,100 @@ const vitrineRouter = router({
     }),
 });
 
+// ============================================================================
+// UTILISATEURS ROUTER (Multi-user management)
+// ============================================================================
+const utilisateursRouter = router({
+  list: adminOnlyProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+    const usersList = await db.getUsersByArtisanId(artisan.id);
+    return usersList.map((u: any) => ({
+      id: u.id, name: u.name, prenom: u.prenom, email: u.email,
+      role: u.role, actif: u.actif, lastSignedIn: u.lastSignedIn, createdAt: u.createdAt,
+    }));
+  }),
+
+  invite: adminOnlyProcedure
+    .input(z.object({
+      email: z.string().email(),
+      nom: z.string().min(1),
+      prenom: z.string().optional(),
+      role: z.enum(["artisan", "secretaire", "technicien"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+
+      // Check if email already exists
+      const existing = await db.getUserByEmail(input.email);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "Cet email est déjà utilisé" });
+
+      // Generate temporary password
+      const tempPassword = Math.random().toString(36).slice(-10);
+      const passwordHash = await hashPassword(tempPassword);
+
+      const newUser = await db.createCollaborator({
+        email: input.email,
+        name: input.nom,
+        prenom: input.prenom,
+        role: input.role,
+        artisanId: artisan.id,
+        passwordHash,
+      });
+
+      // Send invitation email
+      const roleFr: Record<string, string> = { artisan: "Artisan", secretaire: "Secrétaire", technicien: "Technicien" };
+      try {
+        await sendEmail({
+          to: input.email,
+          subject: `Invitation à rejoindre ${artisan.nomEntreprise || 'MonArtisan Pro'}`,
+          body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:20px;">
+            <h2 style="color:#4F46E5;">Bienvenue sur MonArtisan Pro !</h2>
+            <p>Vous avez été invité(e) à rejoindre <strong>${artisan.nomEntreprise || 'l\'entreprise'}</strong> en tant que <strong>${roleFr[input.role] || input.role}</strong>.</p>
+            <p>Vos identifiants de connexion :</p>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
+              <p style="margin:4px 0;"><strong>Email :</strong> ${input.email}</p>
+              <p style="margin:4px 0;"><strong>Mot de passe temporaire :</strong> ${tempPassword}</p>
+            </div>
+            <p>Connectez-vous et changez votre mot de passe dès que possible.</p>
+            <p style="color:#6b7280;font-size:12px;margin-top:24px;">MonArtisan Pro - Gestion complète pour artisans du bâtiment</p>
+          </body></html>`,
+        });
+      } catch (e: any) {
+        console.log('[Utilisateurs] Email invitation failed:', e.message);
+      }
+
+      return { id: newUser.id, email: newUser.email, role: newUser.role };
+    }),
+
+  updateRole: adminOnlyProcedure
+    .input(z.object({
+      userId: z.number(),
+      role: z.enum(["artisan", "secretaire", "technicien"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const updated = await db.updateUserRole(input.userId, input.role, artisan.id);
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur non trouvé dans votre entreprise" });
+      return { id: updated.id, role: updated.role };
+    }),
+
+  toggleActif: adminOnlyProcedure
+    .input(z.object({
+      userId: z.number(),
+      actif: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const updated = await db.toggleUserActif(input.userId, input.actif, artisan.id);
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur non trouvé dans votre entreprise" });
+      return { id: updated.id, actif: updated.actif };
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
   auth: router({
     me: publicProcedure.query(({ ctx }) => {
@@ -6702,6 +6796,7 @@ export const appRouter = router({system: systemRouter,
   calendrier: calendrierRouter,
   assistant: assistantRouter,
   vitrine: vitrineRouter,
+  utilisateurs: utilisateursRouter,
 });
 
 export type AppRouter = typeof appRouter;

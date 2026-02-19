@@ -43,3 +43,23 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+// Role-based middleware factory
+export function requireRole(...allowedRoles: string[]) {
+  return t.middleware(async (opts) => {
+    if (!opts.ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    if (!allowedRoles.includes(opts.ctx.user.role)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Accès interdit pour votre rôle" });
+    }
+    return opts.next({ ctx: opts.ctx });
+  });
+}
+
+// Admin only (gestion utilisateurs)
+export const adminOnlyProcedure = t.procedure.use(requireRole("admin"));
+// Admin + Artisan (parametres, comptabilite, exports)
+export const adminArtisanProcedure = t.procedure.use(requireRole("admin", "artisan"));
+// Everyone except technicien (devis, factures, clients, chat)
+export const noTechProcedure = t.procedure.use(requireRole("admin", "artisan", "secretaire"));

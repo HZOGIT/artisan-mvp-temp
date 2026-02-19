@@ -103,11 +103,18 @@ export async function getUserFromRequest(req: Request) {
     }
 
     const user = result[0];
+    // Block inactive users
+    if (user.actif === false) {
+      return null;
+    }
     return {
       id: user.id,
       email: user.email || "",
       name: user.name || null,
-      role: user.role || "user",
+      prenom: user.prenom || null,
+      role: user.role || "admin",
+      artisanId: user.artisanId || null,
+      actif: user.actif,
     };
   } catch (error) {
     console.error("[Auth] Error getting user from request:", error);

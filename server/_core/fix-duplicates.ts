@@ -441,6 +441,82 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] Vitrine activation:', e.message);
     }
 
+    // --- Phase 6 Task 3: Multi-user roles migration ---
+    try {
+      // Add prenom column
+      try {
+        await pool.execute(`ALTER TABLE users ADD COLUMN prenom VARCHAR(255) NULL`);
+        console.log('[FixDuplicates] Added users.prenom');
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column name')) {
+          // Already exists
+        } else { console.log('[FixDuplicates] users.prenom:', e.message); }
+      }
+
+      // Add artisanId column
+      try {
+        await pool.execute(`ALTER TABLE users ADD COLUMN artisanId INT NULL`);
+        console.log('[FixDuplicates] Added users.artisanId');
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column name')) {
+          // Already exists
+        } else { console.log('[FixDuplicates] users.artisanId:', e.message); }
+      }
+
+      // Add actif column
+      try {
+        await pool.execute(`ALTER TABLE users ADD COLUMN actif BOOLEAN DEFAULT TRUE NOT NULL`);
+        console.log('[FixDuplicates] Added users.actif');
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column name')) {
+          // Already exists
+        } else { console.log('[FixDuplicates] users.actif:', e.message); }
+      }
+
+      // Step 1: Extend role enum to include all values (old + new)
+      try {
+        await pool.execute(`ALTER TABLE users MODIFY COLUMN role ENUM('user','admin','artisan','secretaire','technicien') DEFAULT 'artisan'`);
+        console.log('[FixDuplicates] Extended role enum with all values');
+      } catch (e: any) {
+        console.log('[FixDuplicates] role enum extend:', e.message);
+      }
+
+      // Step 2: Promote all existing 'user' role to 'admin'
+      const [promoted] = await pool.execute(`UPDATE users SET role='admin' WHERE role='user'`) as any;
+      console.log(`[FixDuplicates] Promoted ${promoted.affectedRows} users from 'user' to 'admin'`);
+
+      // Step 3: Remove 'user' from enum now that no rows use it
+      try {
+        await pool.execute(`ALTER TABLE users MODIFY COLUMN role ENUM('admin','artisan','secretaire','technicien') DEFAULT 'artisan'`);
+        console.log('[FixDuplicates] Finalized role enum (removed user)');
+      } catch (e: any) {
+        console.log('[FixDuplicates] role enum finalize:', e.message);
+      }
+
+      // Step 4: Set artisanId for existing users who own an artisan profile
+      const [usersNoArtisanId] = await pool.execute(
+        `SELECT u.id, a.id as aId FROM users u JOIN artisans a ON a.userId = u.id WHERE u.artisanId IS NULL`
+      ) as any;
+      for (const row of usersNoArtisanId) {
+        await pool.execute(`UPDATE users SET artisanId = ? WHERE id = ?`, [row.aId, row.id]);
+        console.log(`[FixDuplicates] Set artisanId=${row.aId} for user ${row.id}`);
+      }
+
+      // Step 5: Add index on artisanId
+      try {
+        await pool.execute(`ALTER TABLE users ADD INDEX idx_users_artisanId (artisanId)`);
+        console.log('[FixDuplicates] Added idx_users_artisanId index');
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_KEYNAME' || e.message?.includes('Duplicate key name')) {
+          // Already exists
+        } else { console.log('[FixDuplicates] artisanId index:', e.message); }
+      }
+
+      console.log('[FixDuplicates] Multi-user migration complete');
+    } catch (e: any) {
+      console.log('[FixDuplicates] Multi-user migration error:', e.message);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);

@@ -59,6 +59,7 @@ import Notifications from "./pages/Notifications";
 import RdvEnLigne from "./pages/RdvEnLigne";
 import Vitrine from "./pages/Vitrine";
 import MaVitrine from "./pages/MaVitrine";
+import Utilisateurs from "./pages/Utilisateurs";
 import DevisLigneEdit from "./pages/DevisLigneEdit";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
@@ -122,6 +123,7 @@ function AuthenticatedRoutes() {
         <Route path="/notifications" component={Notifications} />
         <Route path="/rdv-en-ligne" component={RdvEnLigne} />
         <Route path="/ma-vitrine" component={MaVitrine} />
+        <Route path="/utilisateurs" component={Utilisateurs} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -191,6 +193,7 @@ function Router() {
       <Route path="/notifications" component={() => <AuthenticatedRoutes />} />
       <Route path="/rdv-en-ligne" component={() => <AuthenticatedRoutes />} />
       <Route path="/ma-vitrine" component={() => <AuthenticatedRoutes />} />
+      <Route path="/utilisateurs" component={() => <AuthenticatedRoutes />} />
       <Route component={NotFound} />
     </Switch>
   );
