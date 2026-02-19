@@ -345,11 +345,30 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] suivi_chantier seed skipped:', e.message);
     }
 
+    // --- Add vitrine columns to parametres_artisan (before drizzle push) ---
+    const vitrineColumns = [
+      { name: 'vitrineActive', sql: 'ADD COLUMN vitrineActive BOOLEAN DEFAULT FALSE' },
+      { name: 'vitrineDescription', sql: 'ADD COLUMN vitrineDescription TEXT NULL' },
+      { name: 'vitrineZone', sql: 'ADD COLUMN vitrineZone VARCHAR(500) NULL' },
+      { name: 'vitrineServices', sql: 'ADD COLUMN vitrineServices TEXT NULL' },
+      { name: 'vitrineExperience', sql: 'ADD COLUMN vitrineExperience INT NULL' },
+    ];
+    for (const col of vitrineColumns) {
+      try {
+        await pool.execute(`ALTER TABLE parametres_artisan ${col.sql}`);
+        console.log(`[FixDuplicates] Added parametres_artisan.${col.name}`);
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column name')) {
+          // Already exists
+        } else { console.log(`[FixDuplicates] parametres_artisan.${col.name}:`, e.message); }
+      }
+    }
+
     // --- Generate slugs for artisans that don't have one ---
     try {
-      // Add slug column if it doesn't exist yet
+      // Add slug column if it doesn't exist yet (without UNIQUE first)
       try {
-        await pool.execute(`ALTER TABLE artisans ADD COLUMN slug VARCHAR(255) NULL UNIQUE`);
+        await pool.execute(`ALTER TABLE artisans ADD COLUMN slug VARCHAR(255) NULL`);
         console.log('[FixDuplicates] Added slug column to artisans');
       } catch (e: any) {
         if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column name')) {
@@ -357,6 +376,7 @@ async function fixDuplicates() {
         } else { console.log('[FixDuplicates] slug column:', e.message); }
       }
 
+      // Generate slugs for artisans without one
       const [artisansNoSlug] = await pool.execute(
         'SELECT id, nomEntreprise, specialite FROM artisans WHERE slug IS NULL OR slug = ""'
       ) as any;
@@ -367,11 +387,26 @@ async function fixDuplicates() {
           .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
           .substring(0, 200);
         let slug = base || `artisan-${a.id}`;
-        // Check for duplicates
         const [existing] = await pool.execute('SELECT id FROM artisans WHERE slug = ? AND id != ?', [slug, a.id]) as any;
         if (existing.length > 0) slug = `${slug}-${a.id}`;
         await pool.execute('UPDATE artisans SET slug = ? WHERE id = ?', [slug, a.id]);
         console.log(`[FixDuplicates] Generated slug "${slug}" for artisan ${a.id}`);
+      }
+
+      // Drop any auto-named unique index on slug (from previous deploy), then add with drizzle's expected name
+      try {
+        await pool.execute(`ALTER TABLE artisans DROP INDEX slug`);
+        console.log('[FixDuplicates] Dropped old slug index');
+      } catch (e: any) {
+        // Index doesn't exist with that name, fine
+      }
+      try {
+        await pool.execute(`ALTER TABLE artisans ADD UNIQUE INDEX artisans_slug_unique (slug)`);
+        console.log('[FixDuplicates] Added artisans_slug_unique index');
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_KEYNAME' || e.message?.includes('Duplicate key name')) {
+          // Already exists
+        } else { console.log('[FixDuplicates] slug index:', e.message); }
       }
     } catch (e: any) {
       console.log('[FixDuplicates] Slug generation:', e.message);
