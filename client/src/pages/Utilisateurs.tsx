@@ -31,189 +31,27 @@ const roleFr: Record<string, string> = {
   technicien: "Technicien",
 };
 
-// --- Permissions Dialog ---
-function PermissionsDialog({
-  userId,
-  userName,
-  userRole,
-  open,
-  onOpenChange,
-  onSaved,
-}: {
-  userId: number;
-  userName: string;
-  userRole: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
-}) {
-  const [localPerms, setLocalPerms] = useState<string[]>([]);
-  const [loaded, setLoaded] = useState(false);
+// Build dynamic permissions matrix from ROLE_TEMPLATES (static, outside component)
+const roles = ["admin", "artisan", "secretaire", "technicien"] as const;
+const matrixRows = PERMISSION_GROUPS.flatMap((group) =>
+  group.permissions.map((p) => ({
+    label: p.label,
+    group: group.label,
+    roles: roles.map((r) => (ROLE_TEMPLATES[r] || []).includes(p.code)),
+  })),
+);
 
-  const { data, isLoading } = trpc.utilisateurs.getPermissions.useQuery(
-    { userId },
-    { enabled: open },
-  );
-
-  const updateMutation = trpc.utilisateurs.updatePermissions.useMutation({
-    onSuccess: () => {
-      toast.success("Permissions sauvegardées");
-      onSaved();
-      onOpenChange(false);
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  const resetMutation = trpc.utilisateurs.resetPermissions.useMutation({
-    onSuccess: (result: any) => {
-      toast.success("Permissions réinitialisées selon le rôle");
-      setLocalPerms(result.permissions || []);
-      onSaved();
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  useEffect(() => {
-    if (data && !loaded) {
-      setLocalPerms(data.permissions || []);
-      setLoaded(true);
-    }
-  }, [data, loaded]);
-
-  // Reset loaded state when dialog closes
-  useEffect(() => {
-    if (!open) setLoaded(false);
-  }, [open]);
-
-  const roleDefaults = ROLE_TEMPLATES[userRole] || [];
-
-  const togglePermission = (code: string) => {
-    setLocalPerms((prev) =>
-      prev.includes(code) ? prev.filter((p) => p !== code) : [...prev, code],
-    );
-  };
-
-  const isCustomized = (code: string) => {
-    const inRole = roleDefaults.includes(code);
-    const inUser = localPerms.includes(code);
-    return inRole !== inUser;
-  };
-
-  const hasAnyCustomization = PERMISSION_GROUPS.some((g) =>
-    g.permissions.some((p) => isCustomized(p.code)),
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5" />
-            Permissions — {userName}
-          </DialogTitle>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge className={roleBadgeColor[userRole] || ""} variant="secondary">
-              {roleFr[userRole] || userRole}
-            </Badge>
-            {hasAnyCustomization && (
-              <Badge variant="outline" className="text-orange-600 border-orange-300">
-                personnalisé
-              </Badge>
-            )}
-          </div>
-        </DialogHeader>
-
-        {isLoading ? (
-          <div className="py-8 text-center text-muted-foreground">Chargement...</div>
-        ) : (
-          <>
-            <ScrollArea className="flex-1 pr-4 -mr-4" style={{ maxHeight: "calc(85vh - 200px)" }}>
-              <div className="space-y-5">
-                {PERMISSION_GROUPS.map((group) => (
-                  <div key={group.label}>
-                    <h4 className="text-sm font-semibold text-muted-foreground mb-2">
-                      {group.label}
-                    </h4>
-                    <div className="space-y-2">
-                      {group.permissions.map((perm) => {
-                        const checked = localPerms.includes(perm.code);
-                        const custom = isCustomized(perm.code);
-                        return (
-                          <label
-                            key={perm.code}
-                            className="flex items-center gap-3 py-1 px-2 rounded hover:bg-muted/50 cursor-pointer"
-                          >
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={() => togglePermission(perm.code)}
-                            />
-                            <span className="text-sm flex-1">{perm.label}</span>
-                            {custom && (
-                              <Badge
-                                variant="outline"
-                                className="text-orange-600 border-orange-300 text-[10px] px-1.5 py-0"
-                              >
-                                personnalisé
-                              </Badge>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-
-            <div className="flex items-center gap-2 pt-4 border-t mt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => resetMutation.mutate({ userId })}
-                disabled={resetMutation.isPending}
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                Réinitialiser selon le rôle
-              </Button>
-              <div className="flex-1" />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onOpenChange(false)}
-              >
-                Annuler
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => updateMutation.mutate({ userId, permissions: localPerms })}
-                disabled={updateMutation.isPending}
-              >
-                {updateMutation.isPending ? "Sauvegarde..." : "Sauvegarder"}
-              </Button>
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// --- Main Page ---
 export default function Utilisateurs() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({ email: "", nom: "", prenom: "", role: "secretaire" });
-  const [permUserId, setPermUserId] = useState<number | null>(null);
-  const [permUserName, setPermUserName] = useState("");
-  const [permUserRole, setPermUserRole] = useState("");
+  const [permDialogOpen, setPermDialogOpen] = useState(false);
+  const [permUser, setPermUser] = useState<{ id: number; name: string; role: string } | null>(null);
+  const [localPerms, setLocalPerms] = useState<string[]>([]);
+  const [permsLoaded, setPermsLoaded] = useState(false);
 
-  // Redirect non-admin users
-  if (user && (user as any).role !== "admin") {
-    setLocation("/dashboard");
-    return null;
-  }
-
+  // All hooks MUST be called before any conditional returns
   const { data: utilisateurs = [], refetch } = trpc.utilisateurs.list.useQuery();
   const inviteMutation = trpc.utilisateurs.invite.useMutation({
     onSuccess: () => {
@@ -222,16 +60,59 @@ export default function Utilisateurs() {
       setInviteForm({ email: "", nom: "", prenom: "", role: "secretaire" });
       refetch();
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err: any) => toast.error(err.message),
   });
   const updateRoleMutation = trpc.utilisateurs.updateRole.useMutation({
     onSuccess: () => { toast.success("Rôle modifié"); refetch(); },
-    onError: (err) => toast.error(err.message),
+    onError: (err: any) => toast.error(err.message),
   });
   const toggleActifMutation = trpc.utilisateurs.toggleActif.useMutation({
     onSuccess: () => { toast.success("Statut modifié"); refetch(); },
-    onError: (err) => toast.error(err.message),
+    onError: (err: any) => toast.error(err.message),
   });
+
+  // Permissions queries - always declared, enabled only when dialog is open
+  const { data: permData, isLoading: permLoading } = trpc.utilisateurs.getPermissions.useQuery(
+    { userId: permUser?.id ?? 0 },
+    { enabled: permDialogOpen && !!permUser },
+  );
+  const updatePermsMutation = trpc.utilisateurs.updatePermissions.useMutation({
+    onSuccess: () => {
+      toast.success("Permissions sauvegardées");
+      setPermDialogOpen(false);
+      refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+  const resetPermsMutation = trpc.utilisateurs.resetPermissions.useMutation({
+    onSuccess: (result: any) => {
+      toast.success("Permissions réinitialisées selon le rôle");
+      setLocalPerms(result.permissions || []);
+      refetch();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
+  // Sync permissions data when loaded
+  useEffect(() => {
+    if (permData && !permsLoaded) {
+      setLocalPerms(permData.permissions || []);
+      setPermsLoaded(true);
+    }
+  }, [permData, permsLoaded]);
+
+  // Reset loaded state when dialog closes
+  useEffect(() => {
+    if (!permDialogOpen) {
+      setPermsLoaded(false);
+    }
+  }, [permDialogOpen]);
+
+  // Redirect non-admin users (AFTER all hooks)
+  if (user && (user as any).role !== "admin") {
+    setLocation("/dashboard");
+    return null;
+  }
 
   const handleInvite = () => {
     if (!inviteForm.email || !inviteForm.nom) {
@@ -247,18 +128,24 @@ export default function Utilisateurs() {
   };
 
   const openPermissions = (u: any) => {
-    setPermUserId(u.id);
-    setPermUserName(u.prenom ? `${u.prenom} ${u.name}` : u.name || u.email);
-    setPermUserRole(u.role);
+    const displayName = u.prenom ? `${u.prenom} ${u.name}` : u.name || u.email;
+    setPermUser({ id: u.id, name: displayName, role: u.role });
+    setPermsLoaded(false);
+    setPermDialogOpen(true);
   };
 
-  // Build dynamic permissions matrix from ROLE_TEMPLATES
-  const roles = ["admin", "artisan", "secretaire", "technicien"];
-  const matrixRows = PERMISSION_GROUPS.flatMap((group) =>
-    group.permissions.map((p) => ({
-      label: p.label,
-      roles: roles.map((r) => (ROLE_TEMPLATES[r] || []).includes(p.code)),
-    })),
+  const togglePermission = (code: string) => {
+    setLocalPerms((prev) =>
+      prev.includes(code) ? prev.filter((p) => p !== code) : [...prev, code],
+    );
+  };
+
+  const roleDefaults = ROLE_TEMPLATES[permUser?.role || ""] || [];
+  const isCustomized = (code: string) => {
+    return roleDefaults.includes(code as any) !== localPerms.includes(code);
+  };
+  const hasAnyCustomization = PERMISSION_GROUPS.some((g) =>
+    g.permissions.some((p) => isCustomized(p.code)),
   );
 
   return (
@@ -339,6 +226,7 @@ export default function Utilisateurs() {
         </Dialog>
       </div>
 
+      {/* Team table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -409,16 +297,17 @@ export default function Utilisateurs() {
                     <TableCell>
                       {isAdmin ? (
                         <span className="text-xs text-muted-foreground">Propriétaire</span>
-                      ) : !isCurrentUser ? (
+                      ) : (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => openPermissions(u)}
+                          className="gap-1.5"
                         >
-                          <Settings2 className="h-4 w-4 mr-1" />
+                          <Settings2 className="h-4 w-4" />
                           Permissions
                         </Button>
-                      ) : null}
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -435,6 +324,7 @@ export default function Utilisateurs() {
         </CardContent>
       </Card>
 
+      {/* Permissions reference matrix */}
       <Card>
         <CardHeader>
           <CardTitle>Permissions par rôle (défauts)</CardTitle>
@@ -475,17 +365,100 @@ export default function Utilisateurs() {
         </CardContent>
       </Card>
 
-      {/* Permissions dialog */}
-      {permUserId !== null && (
-        <PermissionsDialog
-          userId={permUserId}
-          userName={permUserName}
-          userRole={permUserRole}
-          open={permUserId !== null}
-          onOpenChange={(open) => { if (!open) setPermUserId(null); }}
-          onSaved={() => refetch()}
-        />
-      )}
+      {/* Permissions management dialog */}
+      <Dialog open={permDialogOpen} onOpenChange={setPermDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              Gérer les permissions — {permUser?.name}
+            </DialogTitle>
+            <div className="flex items-center gap-2 mt-1">
+              {permUser && (
+                <Badge className={roleBadgeColor[permUser.role] || ""} variant="secondary">
+                  {roleFr[permUser.role] || permUser.role}
+                </Badge>
+              )}
+              {hasAnyCustomization && (
+                <Badge variant="outline" className="text-orange-600 border-orange-300">
+                  personnalisé
+                </Badge>
+              )}
+            </div>
+          </DialogHeader>
+
+          {permLoading ? (
+            <div className="py-8 text-center text-muted-foreground">Chargement des permissions...</div>
+          ) : (
+            <>
+              <ScrollArea className="flex-1 pr-4 -mr-4" style={{ maxHeight: "calc(85vh - 220px)" }}>
+                <div className="space-y-5 py-2">
+                  {PERMISSION_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        {group.label}
+                      </h4>
+                      <div className="space-y-1">
+                        {group.permissions.map((perm) => {
+                          const checked = localPerms.includes(perm.code);
+                          const custom = isCustomized(perm.code);
+                          return (
+                            <label
+                              key={perm.code}
+                              className="flex items-center gap-3 py-1.5 px-2 rounded hover:bg-muted/50 cursor-pointer"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={() => togglePermission(perm.code)}
+                              />
+                              <span className="text-sm flex-1">{perm.label}</span>
+                              {custom && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-orange-600 border-orange-300 text-[10px] px-1.5 py-0"
+                                >
+                                  personnalisé
+                                </Badge>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              <div className="flex items-center gap-2 pt-4 border-t mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => permUser && resetPermsMutation.mutate({ userId: permUser.id })}
+                  disabled={resetPermsMutation.isPending || !permUser}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                  Réinitialiser selon le rôle
+                </Button>
+                <div className="flex-1" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPermDialogOpen(false)}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => permUser && updatePermsMutation.mutate({ userId: permUser.id, permissions: localPerms })}
+                  disabled={updatePermsMutation.isPending || !permUser}
+                >
+                  {updatePermsMutation.isPending ? "Sauvegarde..." : "Sauvegarder"}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
