@@ -1,6 +1,6 @@
 
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router, adminOnlyProcedure } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, devisVoirProcedure, devisCreerProcedure, devisSupprimerProcedure, facturesVoirProcedure, facturesCreerProcedure, facturesSupprimerProcedure, comptaVoirProcedure, utilisateursGererProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
@@ -400,7 +400,7 @@ const articlesRouter = router({
 // DEVIS ROUTER
 // ============================================================================
 const devisRouter = router({
-  list: protectedProcedure
+  list: devisVoirProcedure
     .input(z.object({ search: z.string().optional() }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -423,7 +423,7 @@ const devisRouter = router({
       return filtered;
     }),
   
-  getById: protectedProcedure
+  getById: devisVoirProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -441,7 +441,7 @@ const devisRouter = router({
       return { ...devis, lignes, client, signatureToken: signature?.token || null };
     }),
   
-  create: protectedProcedure
+  create: devisCreerProcedure
     .input(z.object({
       clientId: z.number(),
       objet: z.string().optional(),
@@ -474,8 +474,8 @@ const devisRouter = router({
         totalTTC: "0.00",
       });
     }),
-  
-  update: protectedProcedure
+
+  update: devisCreerProcedure
     .input(z.object({
       id: z.number(),
       objet: z.string().optional(),
@@ -502,8 +502,8 @@ const devisRouter = router({
         // Ne pas modifier les totaux ici - ils sont recalculés automatiquement
       });
     }),
-  
-  delete: protectedProcedure
+
+  delete: devisSupprimerProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -1041,14 +1041,14 @@ const devisRouter = router({
 // FACTURES ROUTER
 // ============================================================================
 const facturesRouter = router({
-  list: protectedProcedure.query(async ({ ctx }) => {
+  list: facturesVoirProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
     // Utiliser la version sécurisée
     return await dbSecure.getFacturesByArtisanIdSecure(artisan.id);
   }),
-  
-  getById: protectedProcedure
+
+  getById: facturesVoirProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -1065,7 +1065,7 @@ const facturesRouter = router({
       return { ...facture, lignes, client };
     }),
   
-  create: protectedProcedure
+  create: facturesCreerProcedure
     .input(z.object({
       clientId: z.number(),
       objet: z.string().optional(),
@@ -1100,7 +1100,7 @@ const facturesRouter = router({
       });
     }),
   
-  update: protectedProcedure
+  update: facturesCreerProcedure
     .input(z.object({
       id: z.number(),
       objet: z.string().optional(),
@@ -1128,8 +1128,8 @@ const facturesRouter = router({
         datePaiement: datePaiement ? new Date(datePaiement) : undefined,
       });
     }),
-  
-  delete: protectedProcedure
+
+  delete: facturesSupprimerProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -4433,7 +4433,7 @@ const geolocalisationRouter = router({
 // COMPTABILITE ROUTER
 // ============================================================================
 const comptabiliteRouter = router({
-  getEcritures: protectedProcedure
+  getEcritures: comptaVoirProcedure
     .input(z.object({
       dateDebut: z.date().optional(),
       dateFin: z.date().optional(),
@@ -4444,7 +4444,7 @@ const comptabiliteRouter = router({
       return await db.getEcrituresComptables(artisan.id, input?.dateDebut, input?.dateFin);
     }),
 
-  getGrandLivre: protectedProcedure
+  getGrandLivre: comptaVoirProcedure
     .input(z.object({
       dateDebut: z.date().optional(),
       dateFin: z.date().optional(),
@@ -4458,7 +4458,7 @@ const comptabiliteRouter = router({
       return await db.getGrandLivre(artisan.id, dateDebut, dateFin);
     }),
 
-  getBalance: protectedProcedure
+  getBalance: comptaVoirProcedure
     .input(z.object({
       dateDebut: z.date().optional(),
       dateFin: z.date().optional(),
@@ -4472,7 +4472,7 @@ const comptabiliteRouter = router({
       return await db.getBalance(artisan.id, dateDebut, dateFin);
     }),
 
-  getJournalVentes: protectedProcedure
+  getJournalVentes: comptaVoirProcedure
     .input(z.object({
       dateDebut: z.date().optional(),
       dateFin: z.date().optional(),
@@ -4486,7 +4486,7 @@ const comptabiliteRouter = router({
       return await db.getJournalVentes(artisan.id, dateDebut, dateFin);
     }),
 
-  getRapportTVA: protectedProcedure
+  getRapportTVA: comptaVoirProcedure
     .input(z.object({
       dateDebut: z.date().optional(),
       dateFin: z.date().optional(),
@@ -4501,7 +4501,7 @@ const comptabiliteRouter = router({
     }),
 
   // Alias getDeclarationTVA → getRapportTVA
-  getDeclarationTVA: protectedProcedure
+  getDeclarationTVA: comptaVoirProcedure
     .input(z.object({
       dateDebut: z.date().optional(),
       dateFin: z.date().optional(),
@@ -4515,19 +4515,19 @@ const comptabiliteRouter = router({
       return await db.getRapportTVA(artisan.id, dateDebut, dateFin);
     }),
 
-  genererEcrituresFacture: protectedProcedure
+  genererEcrituresFacture: comptaVoirProcedure
     .input(z.object({ factureId: z.number() }))
     .mutation(async ({ input }) => {
       return await db.genererEcrituresFacture(input.factureId);
     }),
 
-  getPlanComptable: protectedProcedure.query(async ({ ctx }) => {
+  getPlanComptable: comptaVoirProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
     return await db.getPlanComptable(artisan.id);
   }),
 
-  initPlanComptable: protectedProcedure.mutation(async ({ ctx }) => {
+  initPlanComptable: comptaVoirProcedure.mutation(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
     await db.initPlanComptable(artisan.id);
@@ -4535,7 +4535,7 @@ const comptabiliteRouter = router({
   }),
 
   // Aperçu FEC (premières lignes)
-  getFecPreview: protectedProcedure
+  getFecPreview: comptaVoirProcedure
     .input(z.object({
       dateDebut: z.date(),
       dateFin: z.date(),
@@ -6624,7 +6624,7 @@ const vitrineRouter = router({
 // UTILISATEURS ROUTER (Multi-user management)
 // ============================================================================
 const utilisateursRouter = router({
-  list: adminOnlyProcedure.query(async ({ ctx }) => {
+  list: utilisateursGererProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
     const usersList = await db.getUsersByArtisanId(artisan.id);
@@ -6634,7 +6634,7 @@ const utilisateursRouter = router({
     }));
   }),
 
-  invite: adminOnlyProcedure
+  invite: utilisateursGererProcedure
     .input(z.object({
       email: z.string().email(),
       nom: z.string().min(1),
@@ -6692,7 +6692,7 @@ const utilisateursRouter = router({
       return { id: newUser.id, email: newUser.email, role: newUser.role };
     }),
 
-  updateRole: adminOnlyProcedure
+  updateRole: utilisateursGererProcedure
     .input(z.object({
       userId: z.number(),
       role: z.enum(["artisan", "secretaire", "technicien"]),
@@ -6708,7 +6708,7 @@ const utilisateursRouter = router({
       return { id: updated.id, role: updated.role };
     }),
 
-  toggleActif: adminOnlyProcedure
+  toggleActif: utilisateursGererProcedure
     .input(z.object({
       userId: z.number(),
       actif: z.boolean(),
@@ -6721,7 +6721,7 @@ const utilisateursRouter = router({
       return { id: updated.id, actif: updated.actif };
     }),
 
-  getPermissions: adminOnlyProcedure
+  getPermissions: utilisateursGererProcedure
     .input(z.object({ userId: z.number() }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -6734,7 +6734,7 @@ const utilisateursRouter = router({
       return { userId: input.userId, role: targetUser.role, permissions, roleDefaults: [...roleDefaults] };
     }),
 
-  updatePermissions: adminOnlyProcedure
+  updatePermissions: utilisateursGererProcedure
     .input(z.object({
       userId: z.number(),
       permissions: z.array(z.string()),
@@ -6747,7 +6747,7 @@ const utilisateursRouter = router({
       return { success: true, count: validPerms.length };
     }),
 
-  resetPermissions: adminOnlyProcedure
+  resetPermissions: utilisateursGererProcedure
     .input(z.object({ userId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);

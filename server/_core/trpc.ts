@@ -82,3 +82,13 @@ export function requirePermission(...requiredPerms: string[]) {
     return opts.next({ ctx: opts.ctx });
   });
 }
+
+// Pre-built permission procedures for common endpoints
+export const devisVoirProcedure = protectedProcedure.use(requirePermission("devis.voir"));
+export const devisCreerProcedure = protectedProcedure.use(requirePermission("devis.creer"));
+export const devisSupprimerProcedure = protectedProcedure.use(requirePermission("devis.supprimer"));
+export const facturesVoirProcedure = protectedProcedure.use(requirePermission("factures.voir"));
+export const facturesCreerProcedure = protectedProcedure.use(requirePermission("factures.creer"));
+export const facturesSupprimerProcedure = protectedProcedure.use(requirePermission("factures.supprimer"));
+export const comptaVoirProcedure = protectedProcedure.use(requirePermission("comptabilite.voir"));
+export const utilisateursGererProcedure = protectedProcedure.use(requirePermission("utilisateurs.gerer"));
