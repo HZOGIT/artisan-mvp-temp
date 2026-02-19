@@ -345,6 +345,38 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] suivi_chantier seed skipped:', e.message);
     }
 
+    // --- Generate slugs for artisans that don't have one ---
+    try {
+      // Add slug column if it doesn't exist yet
+      try {
+        await pool.execute(`ALTER TABLE artisans ADD COLUMN slug VARCHAR(255) NULL UNIQUE`);
+        console.log('[FixDuplicates] Added slug column to artisans');
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column name')) {
+          // Column already exists
+        } else { console.log('[FixDuplicates] slug column:', e.message); }
+      }
+
+      const [artisansNoSlug] = await pool.execute(
+        'SELECT id, nomEntreprise, specialite FROM artisans WHERE slug IS NULL OR slug = ""'
+      ) as any;
+
+      for (const a of artisansNoSlug) {
+        const base = (a.nomEntreprise || a.specialite || `artisan-${a.id}`)
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+          .substring(0, 200);
+        let slug = base || `artisan-${a.id}`;
+        // Check for duplicates
+        const [existing] = await pool.execute('SELECT id FROM artisans WHERE slug = ? AND id != ?', [slug, a.id]) as any;
+        if (existing.length > 0) slug = `${slug}-${a.id}`;
+        await pool.execute('UPDATE artisans SET slug = ? WHERE id = ?', [slug, a.id]);
+        console.log(`[FixDuplicates] Generated slug "${slug}" for artisan ${a.id}`);
+      }
+    } catch (e: any) {
+      console.log('[FixDuplicates] Slug generation:', e.message);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);

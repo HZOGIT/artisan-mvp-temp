@@ -57,6 +57,7 @@ import DevisIA from "./pages/DevisIA";
 import Assistant from "./pages/Assistant";
 import Notifications from "./pages/Notifications";
 import RdvEnLigne from "./pages/RdvEnLigne";
+import Vitrine from "./pages/Vitrine";
 import DevisLigneEdit from "./pages/DevisLigneEdit";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
@@ -140,6 +141,7 @@ function Router() {
       <Route path="/paiement/annule" component={PaiementAnnule} />
       <Route path="/portail/:token" component={PortailClient} />
       <Route path="/avis/:token" component={SoumettreAvis} />
+      <Route path="/vitrine/:slug" component={Vitrine} />
       {/* BYPASS CLERK - All routes go to authenticated routes */}
       <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
       <Route path="/clients/:rest*" component={() => <AuthenticatedRoutes />} />

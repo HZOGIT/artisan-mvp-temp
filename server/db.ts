@@ -180,6 +180,22 @@ export async function getArtisanByUserId(userId: number): Promise<Artisan | unde
   return result[0];
 }
 
+export async function getArtisanBySlug(slug: string): Promise<Artisan | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(artisans).where(eq(artisans.slug, slug)).limit(1);
+  return result[0];
+}
+
+export async function isSlugAvailable(slug: string, excludeArtisanId?: number): Promise<boolean> {
+  const db = await getDb();
+  if (excludeArtisanId) {
+    const result = await db.select().from(artisans).where(and(eq(artisans.slug, slug), ne(artisans.id, excludeArtisanId))).limit(1);
+    return result.length === 0;
+  }
+  const result = await db.select().from(artisans).where(eq(artisans.slug, slug)).limit(1);
+  return result.length === 0;
+}
+
 export async function createArtisan(data: InsertArtisan): Promise<Artisan> {
   const db = await getDb();
   await db.insert(artisans).values(data);
@@ -1468,6 +1484,32 @@ export async function getAvisByArtisanId(artisanId: number): Promise<AvisClient[
   return await db.select().from(avisClients)
     .where(eq(avisClients.artisanId, artisanId))
     .orderBy(desc(avisClients.createdAt));
+}
+
+export async function getPublishedAvisByArtisanId(artisanId: number): Promise<AvisClient[]> {
+  const db = await getDb();
+  return await db.select().from(avisClients)
+    .where(and(eq(avisClients.artisanId, artisanId), eq(avisClients.statut, 'publie')))
+    .orderBy(desc(avisClients.createdAt));
+}
+
+export async function getPublishedAvisStats(artisanId: number): Promise<{ moyenne: number; total: number; distribution: Record<number, number> }> {
+  const db = await getDb();
+  const allAvis = await db.select().from(avisClients)
+    .where(and(eq(avisClients.artisanId, artisanId), eq(avisClients.statut, 'publie')));
+  const total = allAvis.length;
+  const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let sum = 0;
+  allAvis.forEach(a => { sum += a.note; distribution[a.note] = (distribution[a.note] || 0) + 1; });
+  return { moyenne: total > 0 ? Math.round((sum / total) * 10) / 10 : 0, total, distribution };
+}
+
+export async function getVitrinePublicStats(artisanId: number): Promise<{ totalClients: number; totalInterventions: number }> {
+  const db = await getDb();
+  const clientsList = await db.select().from(clients).where(eq(clients.artisanId, artisanId));
+  const interventionsList = await db.select().from(interventions)
+    .where(and(eq(interventions.artisanId, artisanId), eq(interventions.statut, 'terminee')));
+  return { totalClients: clientsList.length, totalInterventions: interventionsList.length };
 }
 
 export async function getAvisById(id: number): Promise<AvisClient | undefined> {

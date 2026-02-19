@@ -38,6 +38,7 @@ export const artisans = mysqlTable("artisans", {
   iban: varchar("iban", { length: 34 }),
   codeAPE: varchar("codeAPE", { length: 10 }),
   logo: text("logo"),
+  slug: varchar("slug", { length: 255 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -261,6 +262,11 @@ export const parametresArtisan = mysqlTable("parametres_artisan", {
   objectifCA: decimal("objectifCA", { precision: 10, scale: 2 }).default("0"),
   objectifDevis: int("objectifDevis").default(0),
   objectifClients: int("objectifClients").default(0),
+  vitrineActive: boolean("vitrineActive").default(false),
+  vitrineDescription: text("vitrineDescription"),
+  vitrineZone: varchar("vitrineZone", { length: 500 }),
+  vitrineServices: text("vitrineServices"),
+  vitrineExperience: int("vitrineExperience"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

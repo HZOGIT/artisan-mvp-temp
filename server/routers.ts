@@ -112,16 +112,26 @@ const artisanRouter = router({
       iban: z.string().optional(),
       codeAPE: z.string().optional(),
       logo: z.string().optional(),
+      slug: z.string().optional(),
     }))
    .mutation(async ({ ctx, input }) => {
       let artisan = await db.getArtisanByUserId(ctx.user.id);
-      
+
       // Si le profil n'existe pas, le créer
       if (!artisan) {
         artisan = await db.createArtisan({ userId: ctx.user.id, ...input });
         return artisan;
       }
-      
+
+      // Sanitize slug if provided
+      if (input.slug) {
+        const slug = input.slug.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 200);
+        if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Slug invalide" });
+        const available = await db.isSlugAvailable(slug, artisan.id);
+        if (!available) throw new TRPCError({ code: "CONFLICT", message: "Ce slug est deja utilise" });
+        (input as any).slug = slug;
+      }
+
       // Sinon, le mettre à jour
       return await db.updateArtisan(artisan.id, input);
     }),
@@ -2528,13 +2538,23 @@ const parametresRouter = router({
       notificationsEmail: z.boolean().optional(),
       rappelDevisJours: z.number().optional(),
       rappelFactureJours: z.number().optional(),
+      vitrineActive: z.boolean().optional(),
+      vitrineDescription: z.string().optional(),
+      vitrineZone: z.string().optional(),
+      vitrineServices: z.string().optional(),
+      vitrineExperience: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
-      return await db.updateParametresArtisan(artisan.id, input);
+      const updateData = { ...input } as any;
+      if (input.vitrineServices !== undefined) {
+        const arr = input.vitrineServices.split('\n').map((s: string) => s.trim()).filter(Boolean);
+        updateData.vitrineServices = JSON.stringify(arr);
+      }
+      return await db.updateParametresArtisan(artisan.id, updateData);
     }),
 });
 
@@ -6406,6 +6426,100 @@ const rdvRouter = router({
 // ============================================================================
 // MAIN APP ROUTER
 // ============================================================================
+// ============================================================================
+// VITRINE ROUTER (Public showcase pages)
+// ============================================================================
+const vitrineRouter = router({
+  getBySlug: publicProcedure
+    .input(z.object({ slug: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const artisan = await db.getArtisanBySlug(input.slug);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Page vitrine non trouvee" });
+
+      const parametres = await db.getParametresArtisan(artisan.id);
+      if (!parametres?.vitrineActive) throw new TRPCError({ code: "NOT_FOUND", message: "Cette vitrine n'est pas active" });
+
+      const avisRaw = await db.getPublishedAvisByArtisanId(artisan.id);
+      const avis = await Promise.all(avisRaw.map(async (a: any) => {
+        const client = await db.getClientById(a.clientId);
+        return {
+          id: a.id, note: a.note, commentaire: a.commentaire,
+          reponseArtisan: a.reponseArtisan, reponseAt: a.reponseAt, createdAt: a.createdAt,
+          clientNom: client ? `${client.prenom || ''} ${client.nom}`.trim() : 'Client',
+        };
+      }));
+
+      const avisStats = await db.getPublishedAvisStats(artisan.id);
+      const publicStats = await db.getVitrinePublicStats(artisan.id);
+
+      const articles = await db.getArticlesArtisan(artisan.id);
+      const categories = [...new Set(articles.map((a: any) => a.categorie).filter(Boolean))];
+
+      let services: string[] = [];
+      try { services = parametres.vitrineServices ? JSON.parse(parametres.vitrineServices as string) : []; } catch { services = []; }
+
+      return {
+        artisan: {
+          nomEntreprise: artisan.nomEntreprise, specialite: artisan.specialite,
+          telephone: artisan.telephone, email: artisan.email,
+          ville: artisan.ville, codePostal: artisan.codePostal, adresse: artisan.adresse,
+          siret: artisan.siret, logo: artisan.logo,
+        },
+        vitrine: {
+          description: parametres.vitrineDescription,
+          zone: parametres.vitrineZone,
+          services: services.length > 0 ? services : categories,
+          experience: parametres.vitrineExperience,
+        },
+        avis, avisStats, publicStats,
+      };
+    }),
+
+  submitContact: publicProcedure
+    .input(z.object({
+      slug: z.string().min(1),
+      nom: z.string().min(1),
+      email: z.string().email(),
+      telephone: z.string().optional(),
+      message: z.string().min(10),
+    }))
+    .mutation(async ({ input }) => {
+      const artisan = await db.getArtisanBySlug(input.slug);
+      if (!artisan || !artisan.email) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouve" });
+
+      await sendEmail({
+        to: artisan.email,
+        subject: `Nouveau contact via votre vitrine - ${input.nom}`,
+        body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:20px;">
+          <h2 style="color:#1e40af;">Nouveau message depuis votre page vitrine</h2>
+          <p><strong>Nom :</strong> ${input.nom}</p>
+          <p><strong>Email :</strong> ${input.email}</p>
+          ${input.telephone ? `<p><strong>Telephone :</strong> ${input.telephone}</p>` : ''}
+          <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
+          <p style="white-space:pre-wrap;">${input.message}</p>
+          <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
+          <p style="color:#6b7280;font-size:12px;">Message envoye depuis votre page vitrine Artisan Pro</p>
+        </body></html>`,
+      });
+
+      await db.createNotification({
+        artisanId: artisan.id, type: 'info',
+        titre: 'Nouveau contact vitrine',
+        message: `${input.nom} vous a envoye un message via votre page vitrine`,
+        lien: '/parametres',
+      });
+
+      return { success: true };
+    }),
+
+  checkSlug: protectedProcedure
+    .input(z.object({ slug: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      return { available: await db.isSlugAvailable(input.slug, artisan?.id) };
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
   auth: router({
     me: publicProcedure.query(({ ctx }) => {
@@ -6491,6 +6605,7 @@ export const appRouter = router({system: systemRouter,
   portail: portailRouter,
   calendrier: calendrierRouter,
   assistant: assistantRouter,
+  vitrine: vitrineRouter,
 });
 
 export type AppRouter = typeof appRouter;

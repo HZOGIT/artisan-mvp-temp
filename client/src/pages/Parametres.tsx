@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Settings, FileText, Bell, Save } from "lucide-react";
+import { Settings, FileText, Bell, Save, Globe, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Parametres() {
@@ -18,9 +18,16 @@ export default function Parametres() {
     conditionsPaiementDefaut: "Paiement à réception de facture",
     delaiValiditeDevis: "30",
     notificationsEmail: true,
+    vitrineActive: false,
+    vitrineDescription: "",
+    vitrineZone: "",
+    vitrineServices: "",
+    vitrineExperience: "",
+    slug: "",
   });
 
   const { data: parametres, isLoading } = trpc.parametres.get.useQuery();
+  const { data: artisan } = trpc.artisan.getProfile.useQuery();
 
   const updateMutation = trpc.parametres.update.useMutation({
     onSuccess: () => {
@@ -31,9 +38,20 @@ export default function Parametres() {
     },
   });
 
+  const updateProfileMutation = trpc.artisan.updateProfile.useMutation({
+    onError: (err) => {
+      toast.error(err.message || "Erreur lors de la mise à jour du slug");
+    },
+  });
+
   useEffect(() => {
     if (parametres) {
-      setFormData({
+      let services = "";
+      if (parametres.vitrineServices) {
+        try { services = JSON.parse(parametres.vitrineServices).join("\n"); } catch { services = parametres.vitrineServices; }
+      }
+      setFormData((prev) => ({
+        ...prev,
         prefixeDevis: parametres.prefixeDevis || "DEV-",
         prefixeFacture: parametres.prefixeFacture || "FAC-",
         mentionsLegalesDevis: parametres.mentionsLegales || "",
@@ -41,9 +59,20 @@ export default function Parametres() {
         conditionsPaiementDefaut: "Paiement à réception de facture",
         delaiValiditeDevis: String(parametres.rappelDevisJours || 30),
         notificationsEmail: parametres.notificationsEmail ?? true,
-      });
+        vitrineActive: parametres.vitrineActive ?? false,
+        vitrineDescription: parametres.vitrineDescription || "",
+        vitrineZone: parametres.vitrineZone || "",
+        vitrineServices: services,
+        vitrineExperience: String(parametres.vitrineExperience || ""),
+      }));
     }
   }, [parametres]);
+
+  useEffect(() => {
+    if (artisan?.slug) {
+      setFormData((prev) => ({ ...prev, slug: artisan.slug || "" }));
+    }
+  }, [artisan]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +83,15 @@ export default function Parametres() {
       conditionsGenerales: formData.mentionsLegalesFacture,
       notificationsEmail: formData.notificationsEmail,
       rappelDevisJours: parseInt(formData.delaiValiditeDevis) || 30,
+      vitrineActive: formData.vitrineActive,
+      vitrineDescription: formData.vitrineDescription,
+      vitrineZone: formData.vitrineZone,
+      vitrineServices: formData.vitrineServices,
+      vitrineExperience: formData.vitrineExperience ? parseInt(formData.vitrineExperience) : undefined,
     });
+    if (formData.slug && formData.slug !== (artisan?.slug || "")) {
+      updateProfileMutation.mutate({ slug: formData.slug });
+    }
   };
 
   if (isLoading) {
@@ -184,6 +221,98 @@ export default function Parametres() {
               <Switch
                 checked={formData.notificationsEmail}
                 onCheckedChange={(checked) => setFormData({ ...formData, notificationsEmail: checked })}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Vitrine publique */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Ma page vitrine
+            </CardTitle>
+            <CardDescription>
+              Configurez votre page publique partageable avec vos clients
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Vitrine active</Label>
+                <p className="text-sm text-muted-foreground">
+                  Rendre votre page vitrine accessible au public
+                </p>
+              </div>
+              <Switch
+                checked={formData.vitrineActive}
+                onCheckedChange={(checked) => setFormData({ ...formData, vitrineActive: checked })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="slug">URL de votre vitrine</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">/vitrine/</span>
+                <Input
+                  id="slug"
+                  value={formData.slug}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  placeholder="mon-entreprise"
+                  className="max-w-xs"
+                />
+              </div>
+              {formData.slug && (
+                <a
+                  href={`/vitrine/${formData.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Voir ma vitrine
+                </a>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vitrineDescription">Description de l'entreprise</Label>
+              <Textarea
+                id="vitrineDescription"
+                value={formData.vitrineDescription}
+                onChange={(e) => setFormData({ ...formData, vitrineDescription: e.target.value })}
+                placeholder="Décrivez votre entreprise, votre savoir-faire..."
+                rows={4}
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="vitrineZone">Zone d'intervention</Label>
+                <Input
+                  id="vitrineZone"
+                  value={formData.vitrineZone}
+                  onChange={(e) => setFormData({ ...formData, vitrineZone: e.target.value })}
+                  placeholder="Paris et Île-de-France"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vitrineExperience">Années d'expérience</Label>
+                <Input
+                  id="vitrineExperience"
+                  type="number"
+                  value={formData.vitrineExperience}
+                  onChange={(e) => setFormData({ ...formData, vitrineExperience: e.target.value })}
+                  placeholder="15"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="vitrineServices">Services proposés (un par ligne)</Label>
+              <Textarea
+                id="vitrineServices"
+                value={formData.vitrineServices}
+                onChange={(e) => setFormData({ ...formData, vitrineServices: e.target.value })}
+                placeholder={"Installation plomberie\nDépannage urgent\nRénovation salle de bain"}
+                rows={4}
               />
             </div>
           </CardContent>
