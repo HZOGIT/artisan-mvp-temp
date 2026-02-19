@@ -412,6 +412,35 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] Slug generation:', e.message);
     }
 
+    // --- Activate vitrine for artisan 1 with demo data ---
+    try {
+      const [pa] = await pool.execute('SELECT vitrineActive FROM parametres_artisan WHERE artisanId = 1') as any;
+      if (pa.length > 0 && !pa[0].vitrineActive) {
+        const services = JSON.stringify([
+          'Installation plomberie',
+          'D\u00e9pannage urgent 24h/24',
+          'R\u00e9novation salle de bain',
+          'Mise aux normes \u00e9lectriques',
+          'Entretien chaudi\u00e8re',
+          'Plomberie g\u00e9n\u00e9rale'
+        ]);
+        await pool.execute(
+          `UPDATE parametres_artisan SET vitrineActive = TRUE, vitrineDescription = ?, vitrineZone = ?, vitrineServices = ?, vitrineExperience = ? WHERE artisanId = 1`,
+          [
+            'Entreprise sp\u00e9cialis\u00e9e en plomberie, \u00e9lectricit\u00e9 et chauffage depuis plus de 15 ans. Nous intervenons rapidement pour tous vos travaux de r\u00e9novation et d\u00e9pannage. Qualit\u00e9, ponctualit\u00e9 et transparence sont nos valeurs.',
+            'Paris et \u00cele-de-France',
+            services,
+            15
+          ]
+        );
+        console.log('[FixDuplicates] Activated vitrine for artisan 1 with demo data');
+      } else {
+        console.log('[FixDuplicates] Vitrine already active or artisan 1 not found');
+      }
+    } catch (e: any) {
+      console.log('[FixDuplicates] Vitrine activation:', e.message);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
