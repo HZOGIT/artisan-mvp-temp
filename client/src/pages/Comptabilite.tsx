@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, FileText, Calculator, TrendingUp, TrendingDown, Euro, FileDown, FileSpreadsheet, Eye } from "lucide-react";
+import { Download, FileText, Calculator, TrendingUp, TrendingDown, Euro, FileDown, FileSpreadsheet, Eye, FileCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -79,6 +79,24 @@ export default function Comptabilite() {
     a.download = '';
     a.click();
     toast.success("Téléchargement du CSV lancé");
+  };
+
+  const downloadPdfLot = () => {
+    const url = `/api/comptabilite/export-pdf-lot?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    a.click();
+    toast.success("Génération du ZIP PDF en cours...");
+  };
+
+  const downloadFacturxLot = () => {
+    const url = `/api/comptabilite/export-facturx-lot?dateDebut=${dateDebut}&dateFin=${dateFin}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    a.click();
+    toast.success("Génération du ZIP Factur-X en cours...");
   };
 
   return (
@@ -440,23 +458,47 @@ export default function Comptabilite() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="cursor-pointer hover:border-primary transition-colors" onClick={downloadPdfLot}>
                   <CardContent className="pt-6 text-center space-y-3">
                     <FileText className="h-10 w-10 mx-auto text-red-500" />
                     <div>
                       <h3 className="font-semibold">Export PDF en lot</h3>
                       <p className="text-sm text-muted-foreground">
-                        Toutes les factures PDF de la période
+                        Toutes les factures PDF de la période en ZIP
                       </p>
                     </div>
-                    <Badge variant="outline">Bientôt disponible</Badge>
-                    <Button variant="secondary" className="w-full" disabled>
+                    <Badge variant="outline">
+                      {fecPreview?.totalFactures || 0} facture(s) sur la période
+                    </Badge>
+                    <Button variant="outline" className="w-full" onClick={(e) => { e.stopPropagation(); downloadPdfLot(); }}>
                       <Download className="h-4 w-4 mr-2" />
                       Télécharger .zip
                     </Button>
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Factur-X — Facturation électronique 2026 */}
+              <Card className="cursor-pointer hover:border-primary transition-colors" onClick={downloadFacturxLot}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-4">
+                    <FileCode className="h-10 w-10 text-orange-500 shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">Factur-X — Facturation électronique</h3>
+                        <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">2026</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Export XML CII (profil MINIMUM) conforme EN 16931 pour toutes les factures de la période
+                      </p>
+                    </div>
+                    <Button variant="outline" onClick={(e) => { e.stopPropagation(); downloadFacturxLot(); }}>
+                      <Download className="h-4 w-4 mr-2" />
+                      ZIP des XML
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Aperçu FEC */}
               <Card>

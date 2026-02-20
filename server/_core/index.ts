@@ -472,6 +472,158 @@ async function startServer() {
     }
   });
 
+  // ============================================================================
+  // FACTUR-X (electronic invoicing) + PDF batch export
+  // ============================================================================
+
+  // GET /api/comptabilite/facturx/:factureId — Download PDF of a single invoice
+  app.get('/api/comptabilite/facturx/:factureId', async (req, res) => {
+    try {
+      const artisan = await authFromCookie(req, res);
+      if (!artisan) return;
+
+      const { getFactureById, getLignesFacturesByFactureId, getClientById } = await import('../db');
+      const facture = await getFactureById(parseInt(req.params.factureId));
+      if (!facture || facture.artisanId !== artisan.id) {
+        return res.status(404).json({ error: 'Facture non trouvée' });
+      }
+
+      const lignes = await getLignesFacturesByFactureId(facture.id);
+      const client = await getClientById(facture.clientId);
+      if (!client) return res.status(404).json({ error: 'Client introuvable' });
+
+      const { generateFacturePDF } = await import('./pdfGenerator');
+      const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Facture_${facture.numero}_FacturX.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[FacturX] PDF error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération Factur-X' });
+    }
+  });
+
+  // GET /api/comptabilite/facturx-xml/:factureId — Download raw Factur-X XML
+  app.get('/api/comptabilite/facturx-xml/:factureId', async (req, res) => {
+    try {
+      const artisan = await authFromCookie(req, res);
+      if (!artisan) return;
+
+      const { getFactureById, getLignesFacturesByFactureId, getClientById } = await import('../db');
+      const facture = await getFactureById(parseInt(req.params.factureId));
+      if (!facture || facture.artisanId !== artisan.id) {
+        return res.status(404).json({ error: 'Facture non trouvée' });
+      }
+
+      const lignes = await getLignesFacturesByFactureId(facture.id);
+      const client = await getClientById(facture.clientId);
+      if (!client) return res.status(404).json({ error: 'Client introuvable' });
+
+      const { generateFacturXML } = await import('./facturx');
+      const xml = generateFacturXML({ ...facture, lignes }, artisan, client);
+
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="FacturX_${facture.numero}.xml"`);
+      res.send(xml);
+    } catch (error) {
+      console.error('[FacturX] XML error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du XML Factur-X' });
+    }
+  });
+
+  // GET /api/comptabilite/export-facturx-lot — ZIP of all Factur-X XMLs for a period
+  app.get('/api/comptabilite/export-facturx-lot', async (req, res) => {
+    try {
+      const artisan = await authFromCookie(req, res);
+      if (!artisan) return;
+
+      const { getFacturesByArtisanId, getClientById, getLignesFacturesByFactureId } = await import('../db');
+      const { generateFacturXML } = await import('./facturx');
+      const archiver = (await import('archiver')).default;
+
+      const dateDebut = req.query.dateDebut ? new Date(req.query.dateDebut as string) : new Date(new Date().getFullYear(), 0, 1);
+      const dateFin = req.query.dateFin ? new Date(req.query.dateFin as string) : new Date();
+      dateFin.setHours(23, 59, 59, 999);
+
+      const allFactures = await getFacturesByArtisanId(artisan.id);
+      const factures = allFactures.filter(f => {
+        const d = new Date(f.dateFacture);
+        return d >= dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
+      });
+
+      if (factures.length === 0) {
+        return res.status(404).json({ error: 'Aucune facture sur cette période' });
+      }
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="FacturX_${fecDate(dateDebut)}_${fecDate(dateFin)}.zip"`);
+
+      const archive = archiver('zip', { zlib: { level: 5 } });
+      archive.pipe(res);
+
+      for (const facture of factures) {
+        const lignes = await getLignesFacturesByFactureId(facture.id);
+        const client = await getClientById(facture.clientId);
+        if (!client) continue;
+        const xml = generateFacturXML({ ...facture, lignes }, artisan, client);
+        const clientNom = (client.nom || 'Client').replace(/[^a-zA-Z0-9À-ÿ_-]/g, '_');
+        archive.append(xml, { name: `${facture.numero}_${clientNom}.xml` });
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      console.error('[FacturX] Lot export error:', error);
+      if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de l\'export Factur-X en lot' });
+    }
+  });
+
+  // GET /api/comptabilite/export-pdf-lot — ZIP of all invoice PDFs for a period
+  app.get('/api/comptabilite/export-pdf-lot', async (req, res) => {
+    try {
+      const artisan = await authFromCookie(req, res);
+      if (!artisan) return;
+
+      const { getFacturesByArtisanId, getClientById, getLignesFacturesByFactureId } = await import('../db');
+      const { generateFacturePDF } = await import('./pdfGenerator');
+      const archiver = (await import('archiver')).default;
+
+      const dateDebut = req.query.dateDebut ? new Date(req.query.dateDebut as string) : new Date(new Date().getFullYear(), 0, 1);
+      const dateFin = req.query.dateFin ? new Date(req.query.dateFin as string) : new Date();
+      dateFin.setHours(23, 59, 59, 999);
+
+      const allFactures = await getFacturesByArtisanId(artisan.id);
+      const factures = allFactures.filter(f => {
+        const d = new Date(f.dateFacture);
+        return d >= dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
+      });
+
+      if (factures.length === 0) {
+        return res.status(404).json({ error: 'Aucune facture sur cette période' });
+      }
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="Factures_PDF_${fecDate(dateDebut)}_${fecDate(dateFin)}.zip"`);
+
+      const archive = archiver('zip', { zlib: { level: 5 } });
+      archive.pipe(res);
+
+      for (const facture of factures) {
+        const lignes = await getLignesFacturesByFactureId(facture.id);
+        const client = await getClientById(facture.clientId);
+        if (!client) continue;
+        const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client });
+        const clientNom = (client.nom || 'Client').replace(/[^a-zA-Z0-9À-ÿ_-]/g, '_');
+        archive.append(pdfBuffer, { name: `${facture.numero}_${clientNom}.pdf` });
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      console.error('[Compta] PDF lot error:', error);
+      if (!res.headersSent) res.status(500).json({ error: 'Erreur lors de l\'export PDF en lot' });
+    }
+  });
+
   // SSE streaming endpoint for AI assistant
   app.post('/api/assistant/stream', async (req, res) => {
     try {
