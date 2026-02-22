@@ -639,12 +639,17 @@ async function startServer() {
   app.get('/api/paiement/debug-stripe', (_req, res) => {
     const key = process.env.STRIPE_SECRET_KEY || '';
     const whsec = process.env.STRIPE_WEBHOOK_SECRET || '';
+    const allKeys = Object.keys(process.env).sort();
     res.json({
       hasSecretKey: key.length > 0,
       keyPrefix: key ? key.substring(0, 8) + '...' : 'EMPTY',
       keyLength: key.length,
       hasWebhookSecret: whsec.length > 0,
-      allStripeVars: Object.keys(process.env).filter(k => k.toUpperCase().includes('STRIPE')),
+      stripeVars: allKeys.filter(k => k.toUpperCase().includes('STRIPE')),
+      hasDatabaseUrl: !!(process.env.DATABASE_URL),
+      hasJwtSecret: !!(process.env.JWT_SECRET),
+      totalEnvVars: allKeys.length,
+      envVarNames: allKeys.filter(k => !k.startsWith('npm_') && !k.startsWith('__') && !k.startsWith('LESS')),
     });
   });
 
