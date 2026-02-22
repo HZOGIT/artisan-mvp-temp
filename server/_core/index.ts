@@ -695,8 +695,11 @@ async function startServer() {
 
       res.json({ url: result.url, sessionId: result.sessionId });
     } catch (error: any) {
-      console.error('[Paiement] Create checkout error:', error);
-      res.status(500).json({ error: 'Erreur lors de la création de la session de paiement' });
+      console.error('[Paiement] Create checkout error:', error?.message || error);
+      const detail = error?.type === 'StripeAuthenticationError'
+        ? 'Clé Stripe invalide ou manquante'
+        : error?.message || 'Erreur inconnue';
+      res.status(500).json({ error: 'Erreur lors de la création de la session de paiement', detail });
     }
   });
 
