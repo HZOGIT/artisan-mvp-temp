@@ -32,6 +32,8 @@ async function startServer() {
   console.log('[Server] Starting...');
   console.log('[Database] Checking MySQL connection...');
   console.log('[Database] DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Missing');
+  console.log('[Stripe] STRIPE_SECRET_KEY:', process.env.STRIPE_SECRET_KEY ? 'Set' : 'Missing');
+  console.log('[Stripe] STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET ? 'Set' : 'Missing');
   
   try {
     const { getDb, seedTestData } = await import('../db');
@@ -633,6 +635,12 @@ async function startServer() {
   // PAIEMENT STRIPE — Portail client
   // ============================================================================
 
+  // GET /api/paiement/stripe-configured — client checks before showing pay button
+  app.get('/api/paiement/stripe-configured', (_req, res) => {
+    const key = process.env.STRIPE_SECRET_KEY || '';
+    res.json({ configured: key.length > 0 });
+  });
+
   // POST /api/paiement/create-checkout-session
   app.post('/api/paiement/create-checkout-session', async (req, res) => {
     try {
@@ -696,7 +704,9 @@ async function startServer() {
       res.json({ url: result.url, sessionId: result.sessionId });
     } catch (error: any) {
       console.error('[Paiement] Create checkout error:', error?.message || error);
-      const detail = error?.type === 'StripeAuthenticationError'
+      const detail = error?.message?.includes('STRIPE_SECRET_KEY is not configured')
+        ? 'Clé Stripe non configurée. Ajoutez STRIPE_SECRET_KEY dans les variables d\'environnement Railway.'
+        : error?.type === 'StripeAuthenticationError'
         ? 'Clé Stripe invalide ou manquante'
         : error?.message || 'Erreur inconnue';
       res.status(500).json({ error: 'Erreur lors de la création de la session de paiement', detail });
