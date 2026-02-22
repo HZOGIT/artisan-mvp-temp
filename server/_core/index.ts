@@ -635,14 +635,6 @@ async function startServer() {
   // PAIEMENT STRIPE — Portail client
   // ============================================================================
 
-  // TEMP diagnostic — shows STRIPE-related env var names (no values)
-  app.get('/api/paiement/debug-env', (_req, res) => {
-    const stripeVars = Object.keys(process.env).filter(k => k.toUpperCase().includes('STRIPE'));
-    const hasKey = !!(process.env.STRIPE_SECRET_KEY);
-    const keyPrefix = process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.substring(0, 7) + '...' : 'EMPTY';
-    res.json({ stripeVars, hasKey, keyPrefix });
-  });
-
   // POST /api/paiement/create-checkout-session
   app.post('/api/paiement/create-checkout-session', async (req, res) => {
     try {
