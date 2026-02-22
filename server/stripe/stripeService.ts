@@ -18,6 +18,7 @@ export interface CreateCheckoutSessionParams {
   userId: number;
   origin: string;
   tokenPaiement: string;
+  portalToken: string;
 }
 
 export interface CheckoutSessionResult {
@@ -40,6 +41,7 @@ export async function createCheckoutSession(params: CreateCheckoutSessionParams)
     userId,
     origin,
     tokenPaiement,
+    portalToken,
   } = params;
 
   // Convertir le montant en centimes (Stripe utilise les centimes)
@@ -75,8 +77,8 @@ export async function createCheckoutSession(params: CreateCheckoutSessionParams)
       numero_facture: numeroFacture,
       token_paiement: tokenPaiement,
     },
-    success_url: `${origin}/paiement/succes?session_id={CHECKOUT_SESSION_ID}&token=${tokenPaiement}`,
-    cancel_url: `${origin}/paiement/annule?token=${tokenPaiement}`,
+    success_url: `${origin}/portail/${portalToken}?paiement=succes&factureId=${factureId}`,
+    cancel_url: `${origin}/portail/${portalToken}?paiement=annule`,
   });
 
   if (!session.url) {

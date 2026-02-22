@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock, CalendarDays, ArrowRight, HardHat, CheckCircle2 } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock, CalendarDays, ArrowRight, HardHat, CheckCircle2, CreditCard } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -50,6 +50,47 @@ export default function PortailClient() {
     { token: token || "" },
     { enabled: !!token && accessData?.valid }
   );
+
+  // Paiement state
+  const [payingFactureId, setPayingFactureId] = useState<number | null>(null);
+
+  // Detect payment success from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('paiement') === 'succes') {
+      toast.success("Paiement effectué avec succès ! Merci.");
+      setActiveTab("factures");
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('paiement') === 'annule') {
+      toast.error("Paiement annulé.");
+      setActiveTab("factures");
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const handlePayerEnLigne = async (factureId: number) => {
+    if (!token) return;
+    setPayingFactureId(factureId);
+    try {
+      const response = await fetch('/api/paiement/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ factureId, token }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        toast.error(data.error || 'Erreur lors de la création du paiement');
+        return;
+      }
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (error) {
+      toast.error("Erreur de connexion au service de paiement");
+    } finally {
+      setPayingFactureId(null);
+    }
+  };
 
   // Chat state
   const [selectedChatConv, setSelectedChatConv] = useState<number | null>(null);
@@ -401,16 +442,33 @@ export default function PortailClient() {
                           <span className="font-bold text-lg text-gray-900 whitespace-nowrap">
                             {formatCurrency(facture.totalTTC)}
                           </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            asChild
-                          >
-                            <a href={`/api/portail/${token}/factures/${facture.id}/pdf`} target="_blank" rel="noopener noreferrer">
-                              <Download className="h-4 w-4 mr-1" />
-                              PDF
-                            </a>
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              asChild
+                            >
+                              <a href={`/api/portail/${token}/factures/${facture.id}/pdf`} target="_blank" rel="noopener noreferrer">
+                                <Download className="h-4 w-4 mr-1" />
+                                PDF
+                              </a>
+                            </Button>
+                            {(facture.statut === 'envoyee' || facture.statut === 'en_retard') && (
+                              <Button
+                                size="sm"
+                                onClick={() => handlePayerEnLigne(facture.id)}
+                                disabled={payingFactureId === facture.id}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                {payingFactureId === facture.id ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : (
+                                  <CreditCard className="h-4 w-4 mr-1" />
+                                )}
+                                Payer en ligne
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CardContent>

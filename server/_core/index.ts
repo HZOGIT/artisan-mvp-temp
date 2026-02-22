@@ -624,6 +624,118 @@ async function startServer() {
     }
   });
 
+  // ============================================================================
+  // PAIEMENT STRIPE — Portail client
+  // ============================================================================
+
+  // POST /api/paiement/create-checkout-session
+  app.post('/api/paiement/create-checkout-session', async (req, res) => {
+    try {
+      const { factureId, token } = req.body;
+      if (!factureId || !token) {
+        return res.status(400).json({ error: 'factureId et token requis' });
+      }
+
+      const { getClientPortalAccessByToken, getFactureById, getClientById, getArtisanById, createPaiementStripe } = await import('../db');
+      const access = await getClientPortalAccessByToken(token);
+      if (!access) {
+        return res.status(403).json({ error: 'Accès portail non autorisé ou expiré' });
+      }
+
+      const facture = await getFactureById(factureId);
+      if (!facture || facture.clientId !== access.clientId) {
+        return res.status(404).json({ error: 'Facture non trouvée' });
+      }
+
+      if (facture.statut === 'payee') {
+        return res.status(400).json({ error: 'Cette facture est déjà payée' });
+      }
+
+      const client = await getClientById(access.clientId);
+      const artisan = await getArtisanById(access.artisanId);
+      if (!client || !artisan) {
+        return res.status(404).json({ error: 'Données introuvables' });
+      }
+
+      const { nanoid } = await import('nanoid');
+      const tokenPaiement = nanoid(32);
+
+      const { createCheckoutSession } = await import('../stripe/stripeService');
+      const origin = `${req.protocol}://${req.get('host')}`;
+
+      const result = await createCheckoutSession({
+        factureId: facture.id,
+        numeroFacture: facture.numero,
+        montantTTC: parseFloat(facture.totalTTC?.toString() || '0'),
+        clientEmail: client.email || '',
+        clientName: `${client.prenom || ''} ${client.nom}`.trim(),
+        artisanName: artisan.nomEntreprise || 'Artisan',
+        artisanId: artisan.id,
+        userId: access.clientId,
+        origin,
+        tokenPaiement,
+        portalToken: token,
+      });
+
+      // Enregistrer le paiement dans la base
+      await createPaiementStripe({
+        factureId: facture.id,
+        artisanId: artisan.id,
+        stripeSessionId: result.sessionId,
+        montant: facture.totalTTC || '0',
+        statut: 'en_attente',
+        lienPaiement: result.url,
+        tokenPaiement,
+      });
+
+      res.json({ url: result.url, sessionId: result.sessionId });
+    } catch (error: any) {
+      console.error('[Paiement] Create checkout error:', error);
+      res.status(500).json({ error: 'Erreur lors de la création de la session de paiement' });
+    }
+  });
+
+  // GET /api/paiement/status/:factureId?token=XXX
+  app.get('/api/paiement/status/:factureId', async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      if (!token) {
+        return res.status(400).json({ error: 'Token requis' });
+      }
+
+      const { getClientPortalAccessByToken, getFactureById, getPaiementsByFactureId } = await import('../db');
+      const access = await getClientPortalAccessByToken(token);
+      if (!access) {
+        return res.status(403).json({ error: 'Accès portail non autorisé ou expiré' });
+      }
+
+      const factureId = parseInt(req.params.factureId);
+      const facture = await getFactureById(factureId);
+      if (!facture || facture.clientId !== access.clientId) {
+        return res.status(404).json({ error: 'Facture non trouvée' });
+      }
+
+      const paiements = await getPaiementsByFactureId(factureId);
+      const dernierPaiement = paiements.length > 0 ? paiements[paiements.length - 1] : null;
+
+      res.json({
+        factureId,
+        statutFacture: facture.statut,
+        montantTTC: facture.totalTTC,
+        montantPaye: facture.montantPaye,
+        datePaiement: facture.datePaiement,
+        modePaiement: (facture as any).modePaiement || null,
+        dernierPaiement: dernierPaiement ? {
+          statut: dernierPaiement.statut,
+          paidAt: dernierPaiement.paidAt,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error('[Paiement] Status error:', error);
+      res.status(500).json({ error: 'Erreur lors de la vérification du statut' });
+    }
+  });
+
   // SSE streaming endpoint for AI assistant
   app.post('/api/assistant/stream', async (req, res) => {
     try {

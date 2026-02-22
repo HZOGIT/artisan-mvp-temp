@@ -190,6 +190,7 @@ export const factures = mysqlTable("factures", {
   totalTTC: decimal("totalTTC", { precision: 10, scale: 2 }).default("0.00"),
   montantPaye: decimal("montantPaye", { precision: 10, scale: 2 }).default("0.00"),
   datePaiement: timestamp("datePaiement"),
+  modePaiement: varchar("modePaiement", { length: 50 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

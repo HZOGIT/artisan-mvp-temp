@@ -1255,6 +1255,17 @@ export async function createPaiementStripe(data: InsertPaiementStripe): Promise<
   return result[0];
 }
 
+export async function getPaiementByToken(token: string): Promise<PaiementStripe | null> {
+  const db = await getDb();
+  const [result] = await db.select().from(paiementsStripe).where(eq(paiementsStripe.tokenPaiement, token)).limit(1);
+  return result || null;
+}
+
+export async function updatePaiementStripe(id: number, data: Partial<InsertPaiementStripe>): Promise<void> {
+  const db = await getDb();
+  await db.update(paiementsStripe).set(data).where(eq(paiementsStripe.id, id));
+}
+
 // ============================================================================
 // DASHBOARD STATS
 // ============================================================================

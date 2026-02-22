@@ -642,6 +642,19 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] Demo collaborators seed error:', e.message);
     }
 
+    // Add modePaiement column to factures if not exists
+    try {
+      const [cols] = await pool.execute(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'factures' AND COLUMN_NAME = 'modePaiement'`
+      ) as any;
+      if (cols.length === 0) {
+        await pool.execute(`ALTER TABLE factures ADD COLUMN modePaiement VARCHAR(50) DEFAULT NULL`);
+        console.log('[FixDuplicates] Added modePaiement column to factures');
+      }
+    } catch (e: any) {
+      console.log('[FixDuplicates] modePaiement column check:', e.message);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
