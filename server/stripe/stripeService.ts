@@ -2,10 +2,18 @@ import Stripe from 'stripe';
 import { ENV } from '../_core/env';
 import { STRIPE_CONFIG, getInvoiceProductName, getInvoiceProductDescription } from './products';
 
-// Initialiser Stripe avec la clé secrète
-const stripe = new Stripe(ENV.stripeSecretKey || '', {
-  apiVersion: '2025-12-15.clover',
-});
+// Lazy Stripe initialization — avoids crash if STRIPE_SECRET_KEY not yet loaded
+let _stripe: Stripe | null = null;
+function getStripe(): Stripe {
+  if (!_stripe) {
+    const key = ENV.stripeSecretKey || process.env.STRIPE_SECRET_KEY || '';
+    if (!key) {
+      throw new Error('STRIPE_SECRET_KEY is not configured');
+    }
+    _stripe = new Stripe(key, { apiVersion: '2025-12-15.clover' });
+  }
+  return _stripe;
+}
 
 export interface CreateCheckoutSessionParams {
   factureId: number;
@@ -48,7 +56,7 @@ export async function createCheckoutSession(params: CreateCheckoutSessionParams)
   const amountInCents = Math.round(montantTTC * 100);
 
   // Créer la session de paiement
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     payment_method_types: ['card'],
     mode: 'payment',
     customer_email: clientEmail,
@@ -95,7 +103,7 @@ export async function createCheckoutSession(params: CreateCheckoutSessionParams)
  * Récupère les détails d'une session de paiement
  */
 export async function getCheckoutSession(sessionId: string): Promise<Stripe.Checkout.Session> {
-  return await stripe.checkout.sessions.retrieve(sessionId);
+  return await getStripe().checkout.sessions.retrieve(sessionId);
 }
 
 /**
@@ -106,7 +114,7 @@ export function constructWebhookEvent(
   signature: string,
   webhookSecret: string
 ): Stripe.Event {
-  return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+  return getStripe().webhooks.constructEvent(payload, signature, webhookSecret);
 }
 
 /**
@@ -116,4 +124,4 @@ export function isStripeConfigured(): boolean {
   return !!(ENV.stripeSecretKey && ENV.stripeSecretKey.length > 0);
 }
 
-export { stripe };
+export { getStripe as stripe };
