@@ -635,6 +635,19 @@ async function startServer() {
   // PAIEMENT STRIPE — Portail client
   // ============================================================================
 
+  // GET /api/paiement/debug-stripe — diagnostic (TEMP)
+  app.get('/api/paiement/debug-stripe', (_req, res) => {
+    const key = process.env.STRIPE_SECRET_KEY || '';
+    const whsec = process.env.STRIPE_WEBHOOK_SECRET || '';
+    res.json({
+      hasSecretKey: key.length > 0,
+      keyPrefix: key ? key.substring(0, 8) + '...' : 'EMPTY',
+      keyLength: key.length,
+      hasWebhookSecret: whsec.length > 0,
+      allStripeVars: Object.keys(process.env).filter(k => k.toUpperCase().includes('STRIPE')),
+    });
+  });
+
   // POST /api/paiement/create-checkout-session
   app.post('/api/paiement/create-checkout-session', async (req, res) => {
     try {
@@ -668,7 +681,10 @@ async function startServer() {
       const tokenPaiement = nanoid(32);
 
       const { createCheckoutSession } = await import('../stripe/stripeService');
-      const origin = `${req.protocol}://${req.get('host')}`;
+      // Use X-Forwarded-Proto for correct protocol behind Railway proxy
+      const proto = req.get('x-forwarded-proto') || req.protocol;
+      const origin = `${proto}://${req.get('host')}`;
+      console.log('[Paiement] origin:', origin, '| factureId:', factureId, '| montantTTC:', facture.totalTTC);
 
       const result = await createCheckoutSession({
         factureId: facture.id,
@@ -697,7 +713,14 @@ async function startServer() {
 
       res.json({ url: result.url, sessionId: result.sessionId });
     } catch (error: any) {
-      console.error('[Paiement] Create checkout error:', error?.message || error);
+      console.error('[Paiement] FULL ERROR:', JSON.stringify({
+        message: error?.message,
+        type: error?.type,
+        code: error?.code,
+        statusCode: error?.statusCode,
+        raw: error?.raw?.message,
+        stack: error?.stack?.split('\n').slice(0, 5),
+      }));
       const detail = error?.message?.includes('STRIPE_SECRET_KEY is not configured')
         ? 'Clé Stripe non configurée. Ajoutez STRIPE_SECRET_KEY dans les variables d\'environnement Railway.'
         : error?.type === 'StripeAuthenticationError'
