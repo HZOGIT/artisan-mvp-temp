@@ -635,23 +635,6 @@ async function startServer() {
   // PAIEMENT STRIPE — Portail client
   // ============================================================================
 
-  // GET /api/paiement/debug-stripe — diagnostic (TEMP)
-  app.get('/api/paiement/debug-stripe', (_req, res) => {
-    const key = process.env.STRIPE_SECRET_KEY || '';
-    const whsec = process.env.STRIPE_WEBHOOK_SECRET || '';
-    const allKeys = Object.keys(process.env).sort();
-    // Check if any env var VALUE starts with sk_ or whsec_ (user may have used wrong var name)
-    const varsWithStripeValues = allKeys.filter(k => {
-      const v = process.env[k] || '';
-      return v.startsWith('sk_') || v.startsWith('whsec_') || v.startsWith('pk_');
-    });
-    res.json({
-      hasSecretKey: key.length > 0,
-      keyPrefix: key ? key.substring(0, 8) + '...' : 'EMPTY',
-      hasWebhookSecret: whsec.length > 0,
-      varsWithStripeValues,
-    });
-  });
 
   // POST /api/paiement/create-checkout-session
   app.post('/api/paiement/create-checkout-session', async (req, res) => {

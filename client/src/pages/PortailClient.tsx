@@ -80,7 +80,7 @@ export default function PortailClient() {
       });
       const data = await response.json();
       if (!response.ok) {
-        toast.error(data.error || 'Erreur lors de la création du paiement');
+        toast.error(data.detail || data.error || 'Erreur lors de la création du paiement');
         return;
       }
       // Redirect to Stripe Checkout
