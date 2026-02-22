@@ -635,12 +635,6 @@ async function startServer() {
   // PAIEMENT STRIPE — Portail client
   // ============================================================================
 
-  // GET /api/paiement/stripe-configured — client checks before showing pay button
-  app.get('/api/paiement/stripe-configured', (_req, res) => {
-    const key = process.env.STRIPE_SECRET_KEY || '';
-    res.json({ configured: key.length > 0 });
-  });
-
   // POST /api/paiement/create-checkout-session
   app.post('/api/paiement/create-checkout-session', async (req, res) => {
     try {

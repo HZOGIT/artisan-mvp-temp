@@ -53,15 +53,6 @@ export default function PortailClient() {
 
   // Paiement state
   const [payingFactureId, setPayingFactureId] = useState<number | null>(null);
-  const [stripeConfigured, setStripeConfigured] = useState(false);
-
-  // Check if Stripe is configured
-  useEffect(() => {
-    fetch('/api/paiement/stripe-configured')
-      .then(r => r.json())
-      .then(d => setStripeConfigured(!!d.configured))
-      .catch(() => setStripeConfigured(false));
-  }, []);
 
   // Detect payment success from URL
   useEffect(() => {
@@ -462,7 +453,7 @@ export default function PortailClient() {
                                 PDF
                               </a>
                             </Button>
-                            {stripeConfigured && (facture.statut === 'envoyee' || facture.statut === 'en_retard') && (
+                            {(facture.statut === 'envoyee' || facture.statut === 'en_retard') && (
                               <Button
                                 size="sm"
                                 onClick={() => handlePayerEnLigne(facture.id)}

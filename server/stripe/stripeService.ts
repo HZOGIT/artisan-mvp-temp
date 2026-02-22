@@ -6,9 +6,12 @@ import { STRIPE_CONFIG, getInvoiceProductName, getInvoiceProductDescription } fr
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
   if (!_stripe) {
-    // Try multiple sources — ENV may be cached before Railway injects the var
-    const key = ENV.stripeSecretKey || process.env.STRIPE_SECRET_KEY || '';
+    // Read directly from process.env at call time (ENV caches at module load)
+    const key = process.env.STRIPE_SECRET_KEY || ENV.stripeSecretKey || '';
     if (!key) {
+      // Log available STRIPE-related env vars for diagnosis
+      const stripeVars = Object.keys(process.env).filter(k => k.toUpperCase().includes('STRIPE'));
+      console.error('[Stripe] STRIPE_SECRET_KEY missing. Available STRIPE vars:', stripeVars);
       throw new Error('STRIPE_SECRET_KEY is not configured');
     }
     _stripe = new Stripe(key, { apiVersion: '2025-12-15.clover' });
