@@ -118,8 +118,13 @@ async function startServer() {
   
   // Stripe webhook - MUST be before express.json() for signature verification
   app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-    const { handleStripeWebhook } = await import('../stripe/webhookHandler');
-    return handleStripeWebhook(req, res);
+    try {
+      const { handleStripeWebhook } = await import('../stripe/webhookHandler');
+      return handleStripeWebhook(req, res);
+    } catch (error: any) {
+      console.error('[Stripe Webhook] Route error:', error);
+      res.status(500).json({ error: 'Webhook route error', detail: error.message });
+    }
   });
   
   // Configure body parser with larger size limit for file uploads
