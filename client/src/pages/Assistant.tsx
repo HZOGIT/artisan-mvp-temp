@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
+
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,7 +25,7 @@ export default function Assistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Quick action states
@@ -45,9 +46,14 @@ export default function Assistant() {
   // Devis list for rentabilite dialog
   const { data: devisList } = trpc.devis.list.useQuery();
 
+  const scrollToBottom = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming) return;
@@ -248,8 +254,8 @@ export default function Assistant() {
           <p className="text-sm text-muted-foreground">Assistant IA pour votre gestion quotidienne</p>
         </CardHeader>
 
-        <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 p-4">
+        <CardContent className="flex-1 p-0 flex flex-col min-h-0">
+          <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto p-4">
             <div className="space-y-4">
               {messages.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -289,9 +295,8 @@ export default function Assistant() {
                   )}
                 </div>
               ))}
-              <div ref={messagesEndRef} />
             </div>
-          </ScrollArea>
+          </div>
 
           <div className="p-3 border-t">
             <form onSubmit={handleSubmit} className="flex gap-2">
