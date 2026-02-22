@@ -6,6 +6,7 @@ import { STRIPE_CONFIG, getInvoiceProductName, getInvoiceProductDescription } fr
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
   if (!_stripe) {
+    // Try multiple sources — ENV may be cached before Railway injects the var
     const key = ENV.stripeSecretKey || process.env.STRIPE_SECRET_KEY || '';
     if (!key) {
       throw new Error('STRIPE_SECRET_KEY is not configured');
@@ -13,6 +14,16 @@ function getStripe(): Stripe {
     _stripe = new Stripe(key, { apiVersion: '2025-12-15.clover' });
   }
   return _stripe;
+}
+
+// For webhook signature verification, we only need the webhooks helper —
+// create a minimal instance if the full key is missing
+function getWebhooksHelper(): Stripe {
+  // For constructEvent, any non-empty key works — the secret key is not used,
+  // only the webhook signing secret matters
+  if (_stripe) return _stripe;
+  const key = ENV.stripeSecretKey || process.env.STRIPE_SECRET_KEY || 'sk_placeholder_for_webhook_verify';
+  return new Stripe(key, { apiVersion: '2025-12-15.clover' });
 }
 
 export interface CreateCheckoutSessionParams {
@@ -114,7 +125,7 @@ export function constructWebhookEvent(
   signature: string,
   webhookSecret: string
 ): Stripe.Event {
-  return getStripe().webhooks.constructEvent(payload, signature, webhookSecret);
+  return getWebhooksHelper().webhooks.constructEvent(payload, signature, webhookSecret);
 }
 
 /**
