@@ -640,16 +640,16 @@ async function startServer() {
     const key = process.env.STRIPE_SECRET_KEY || '';
     const whsec = process.env.STRIPE_WEBHOOK_SECRET || '';
     const allKeys = Object.keys(process.env).sort();
+    // Check if any env var VALUE starts with sk_ or whsec_ (user may have used wrong var name)
+    const varsWithStripeValues = allKeys.filter(k => {
+      const v = process.env[k] || '';
+      return v.startsWith('sk_') || v.startsWith('whsec_') || v.startsWith('pk_');
+    });
     res.json({
       hasSecretKey: key.length > 0,
       keyPrefix: key ? key.substring(0, 8) + '...' : 'EMPTY',
-      keyLength: key.length,
       hasWebhookSecret: whsec.length > 0,
-      stripeVars: allKeys.filter(k => k.toUpperCase().includes('STRIPE')),
-      hasDatabaseUrl: !!(process.env.DATABASE_URL),
-      hasJwtSecret: !!(process.env.JWT_SECRET),
-      totalEnvVars: allKeys.length,
-      envVarNames: allKeys.filter(k => !k.startsWith('npm_') && !k.startsWith('__') && !k.startsWith('LESS')),
+      varsWithStripeValues,
     });
   });
 
