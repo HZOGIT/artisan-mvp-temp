@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance } from "../db";
+import { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur } from "../db";
+import type { Fournisseur } from "../../drizzle/schema";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 
 // Register Roboto font for proper French accent support
@@ -538,6 +539,202 @@ export function generateContratPDF(data: PDFContratData): Buffer {
   doc.setTextColor(150, 150, 150);
   doc.text(`${artisan.nomEntreprise || ""}${artisan.siret ? ` — SIRET: ${artisan.siret}` : ""}`, 20, 285);
   doc.text("Document généré automatiquement — Contrat de maintenance", 20, 289);
+
+  return Buffer.from(doc.output("arraybuffer"));
+}
+
+// ============================================================================
+// BON DE COMMANDE PDF
+// ============================================================================
+export interface PDFBonCommandeData {
+  commande: CommandeFournisseur & { lignes: LigneCommandeFournisseur[] };
+  artisan: Artisan;
+  fournisseur: Fournisseur;
+}
+
+export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
+  const { commande, artisan, fournisseur } = data;
+  const doc = new jsPDF();
+  registerFonts(doc);
+
+  // Couleurs — VERT pour bon de commande
+  const primaryColor: [number, number, number] = [22, 163, 74]; // Vert
+  const lightGray: [number, number, number] = [245, 245, 245];
+  const darkGray: [number, number, number] = [80, 80, 80];
+
+  // En-tête vert
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, 210, 40, "F");
+
+  // Titre
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(28);
+  doc.setFont("Roboto", "bold");
+  doc.text("BON DE COMMANDE", 20, 25);
+
+  // Numéro et date
+  doc.setTextColor(200, 230, 200);
+  doc.setFontSize(10);
+  doc.setFont("Roboto", "normal");
+  doc.text(`N° ${commande.numero || ''}`, 150, 15);
+  doc.text(
+    `Date: ${new Date(commande.dateCommande).toLocaleDateString("fr-FR")}`,
+    150,
+    22
+  );
+  if (commande.reference) {
+    doc.text(`Réf: ${commande.reference}`, 150, 29);
+  }
+
+  // Informations artisan (émetteur) — left side
+  renderArtisanInfo(doc, artisan, darkGray);
+
+  // Informations fournisseur (destinataire) — right side
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...darkGray);
+  doc.text("FOURNISSEUR", 120, 55);
+
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(10);
+  doc.text(fournisseur.nom, 120, 62);
+  let fy = 68;
+  if (fournisseur.contact) {
+    doc.text(`Contact: ${fournisseur.contact}`, 120, fy);
+    fy += 6;
+  }
+  if (fournisseur.adresse) {
+    doc.text(fournisseur.adresse, 120, fy);
+    fy += 6;
+  }
+  const fCpVille = `${fournisseur.codePostal || ""} ${fournisseur.ville || ""}`.trim();
+  if (fCpVille) {
+    doc.text(fCpVille, 120, fy);
+    fy += 6;
+  }
+  if (fournisseur.email) {
+    doc.text(`Email: ${fournisseur.email}`, 120, fy);
+    fy += 6;
+  }
+  if (fournisseur.telephone) {
+    doc.text(`Tél: ${fournisseur.telephone}`, 120, fy);
+    fy += 6;
+  }
+
+  // Tableau des lignes
+  const tableData = commande.lignes.map((ligne) => {
+    const quantite = Number(ligne.quantite) || 0;
+    const prixUnitaire = Number(ligne.prixUnitaire) || 0;
+    const tauxTVA = Number(ligne.tauxTVA) || 20;
+    const totalLigne = quantite * prixUnitaire;
+    return [
+      ligne.designation,
+      quantite.toString(),
+      ligne.unite || 'unité',
+      prixUnitaire > 0 ? `${prixUnitaire.toFixed(2)} €` : '-',
+      `${tauxTVA.toFixed(0)} %`,
+      totalLigne > 0 ? `${totalLigne.toFixed(2)} €` : '-',
+    ];
+  });
+
+  autoTable(doc, {
+    head: [["Désignation", "Qté", "Unité", "P.U. HT", "TVA", "Total HT"]],
+    body: tableData,
+    startY: 100,
+    headStyles: {
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      halign: "center",
+      font: "Roboto",
+    },
+    bodyStyles: {
+      textColor: darkGray,
+      font: "Roboto",
+    },
+    alternateRowStyles: {
+      fillColor: lightGray,
+    },
+    columnStyles: {
+      0: { halign: "left", cellWidth: 65 },
+      1: { halign: "center", cellWidth: 15 },
+      2: { halign: "center", cellWidth: 20 },
+      3: { halign: "right", cellWidth: 25 },
+      4: { halign: "center", cellWidth: 15 },
+      5: { halign: "right", cellWidth: 25 },
+    },
+    margin: { left: 20, right: 20 },
+  });
+
+  // Totaux
+  const totalHT = Number(commande.totalHT) || commande.lignes.reduce(
+    (sum, l) => sum + (Number(l.quantite) || 0) * (Number(l.prixUnitaire) || 0), 0
+  );
+  const totalTVA = Number(commande.totalTVA) || commande.lignes.reduce(
+    (sum, l) => sum + (Number(l.quantite) || 0) * (Number(l.prixUnitaire) || 0) * ((Number(l.tauxTVA) || 20) / 100), 0
+  );
+  const totalTTC = Number(commande.totalTTC) || totalHT + totalTVA;
+
+  let yPosition = (doc as any).lastAutoTable.finalY + 10;
+
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...darkGray);
+  doc.text(`Total HT: ${totalHT.toFixed(2)} €`, 140, yPosition);
+  yPosition += 7;
+  doc.text(`Total TVA: ${totalTVA.toFixed(2)} €`, 140, yPosition);
+  yPosition += 7;
+
+  // Total TTC en gras vert
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(12);
+  doc.setTextColor(...primaryColor);
+  doc.text(`TOTAL TTC: ${totalTTC.toFixed(2)} €`, 140, yPosition);
+  yPosition += 12;
+
+  // Délai de livraison
+  if (commande.delaiLivraison) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...darkGray);
+    doc.text("Délai de livraison :", 20, yPosition);
+    doc.setFont("Roboto", "normal");
+    doc.text(commande.delaiLivraison, 70, yPosition);
+    yPosition += 7;
+  }
+
+  // Adresse de livraison
+  if (commande.adresseLivraison) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...darkGray);
+    doc.text("Adresse de livraison :", 20, yPosition);
+    yPosition += 5;
+    doc.setFont("Roboto", "normal");
+    const addrLines = doc.splitTextToSize(commande.adresseLivraison, 170);
+    doc.text(addrLines, 20, yPosition);
+    yPosition += addrLines.length * 5 + 5;
+  }
+
+  // Notes
+  if (commande.notes) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...darkGray);
+    doc.text("Notes :", 20, yPosition);
+    yPosition += 5;
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(9);
+    const noteLines = doc.splitTextToSize(commande.notes, 170);
+    doc.text(noteLines, 20, yPosition);
+  }
+
+  // Pied de page
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(150, 150, 150);
+  doc.text(`${artisan.nomEntreprise || ""}${artisan.siret ? ` — SIRET: ${artisan.siret}` : ""}`, 20, 285);
+  doc.text("Document généré automatiquement — Bon de commande fournisseur", 20, 289);
 
   return Buffer.from(doc.output("arraybuffer"));
 }

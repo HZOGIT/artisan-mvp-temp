@@ -2805,7 +2805,18 @@ const commandesFournisseursRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    return await db.getCommandesFournisseursByArtisanId(artisan.id);
+    const commandes = await db.getCommandesFournisseursByArtisanId(artisan.id);
+    // Attach fournisseur name for each commande
+    const fournisseurIds = [...new Set(commandes.map(c => c.fournisseurId))];
+    const fournisseursMap = new Map<number, string>();
+    for (const fid of fournisseurIds) {
+      const f = await db.getFournisseurById(fid);
+      if (f) fournisseursMap.set(fid, f.nom);
+    }
+    return commandes.map(c => ({
+      ...c,
+      fournisseurNom: fournisseursMap.get(c.fournisseurId) || 'Inconnu',
+    }));
   }),
 
   getById: protectedProcedure
@@ -2829,13 +2840,18 @@ const commandesFournisseursRouter = router({
       fournisseurId: z.number(),
       reference: z.string().optional(),
       dateLivraisonPrevue: z.string().optional(),
+      delaiLivraison: z.string().optional(),
+      adresseLivraison: z.string().optional(),
       notes: z.string().optional(),
       lignes: z.array(z.object({
+        articleId: z.number().nullable().optional(),
         stockId: z.number().optional(),
         designation: z.string(),
         reference: z.string().optional(),
         quantite: z.number(),
-        prixUnitaire: z.number().optional()
+        unite: z.string().optional(),
+        prixUnitaire: z.number().optional(),
+        tauxTVA: z.number().optional(),
       }))
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2843,42 +2859,138 @@ const commandesFournisseursRouter = router({
       if (!artisan) {
         artisan = await db.createArtisan({ userId: ctx.user.id });
       }
-      
-      // Calculer le montant total
-      const montantTotal = input.lignes.reduce((sum, l) => {
-        return sum + (l.quantite * (l.prixUnitaire || 0));
-      }, 0);
-      
+
+      // Generate numero CMD-XXXXX
+      const numero = await db.getNextCommandeNumero(artisan.id);
+
+      // Calculate totals
+      let totalHT = 0;
+      let totalTVA = 0;
+      for (const l of input.lignes) {
+        const ligneHT = l.quantite * (l.prixUnitaire || 0);
+        const ligneTVA = ligneHT * ((l.tauxTVA ?? 20) / 100);
+        totalHT += ligneHT;
+        totalTVA += ligneTVA;
+      }
+      const totalTTC = totalHT + totalTVA;
+
       const commande = await db.createCommandeFournisseur({
         artisanId: artisan.id,
         fournisseurId: input.fournisseurId,
+        numero,
         reference: input.reference,
         dateLivraisonPrevue: input.dateLivraisonPrevue ? new Date(input.dateLivraisonPrevue) : undefined,
+        delaiLivraison: input.delaiLivraison,
+        adresseLivraison: input.adresseLivraison,
         notes: input.notes,
-        montantTotal: montantTotal.toFixed(2),
-        statut: "en_attente"
+        montantTotal: totalTTC.toFixed(2),
+        totalHT: totalHT.toFixed(2),
+        totalTVA: totalTVA.toFixed(2),
+        totalTTC: totalTTC.toFixed(2),
+        statut: "brouillon",
       });
-      
-      // Créer les lignes
+
+      // Create lines
       for (const ligne of input.lignes) {
+        const ligneHT = ligne.quantite * (ligne.prixUnitaire || 0);
         await db.createLigneCommandeFournisseur({
           commandeId: commande.id,
+          articleId: ligne.articleId ?? undefined,
           stockId: ligne.stockId,
           designation: ligne.designation,
           reference: ligne.reference,
           quantite: ligne.quantite.toFixed(2),
+          unite: ligne.unite || 'unité',
           prixUnitaire: ligne.prixUnitaire?.toFixed(2),
-          montantTotal: (ligne.quantite * (ligne.prixUnitaire || 0)).toFixed(2)
+          tauxTVA: (ligne.tauxTVA ?? 20).toFixed(2),
+          montantTotal: ligneHT.toFixed(2),
         });
       }
-      
+
       return commande;
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      fournisseurId: z.number().optional(),
+      reference: z.string().optional(),
+      dateLivraisonPrevue: z.string().nullable().optional(),
+      delaiLivraison: z.string().nullable().optional(),
+      adresseLivraison: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+      lignes: z.array(z.object({
+        articleId: z.number().nullable().optional(),
+        stockId: z.number().optional(),
+        designation: z.string(),
+        reference: z.string().optional(),
+        quantite: z.number(),
+        unite: z.string().optional(),
+        prixUnitaire: z.number().optional(),
+        tauxTVA: z.number().optional(),
+      })).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+
+      const updateData: any = {};
+      if (input.fournisseurId !== undefined) updateData.fournisseurId = input.fournisseurId;
+      if (input.reference !== undefined) updateData.reference = input.reference;
+      if (input.dateLivraisonPrevue !== undefined) updateData.dateLivraisonPrevue = input.dateLivraisonPrevue ? new Date(input.dateLivraisonPrevue) : null;
+      if (input.delaiLivraison !== undefined) updateData.delaiLivraison = input.delaiLivraison;
+      if (input.adresseLivraison !== undefined) updateData.adresseLivraison = input.adresseLivraison;
+      if (input.notes !== undefined) updateData.notes = input.notes;
+
+      // Recalculate totals if lines provided
+      if (input.lignes) {
+        let totalHT = 0;
+        let totalTVA = 0;
+        for (const l of input.lignes) {
+          const ligneHT = l.quantite * (l.prixUnitaire || 0);
+          const ligneTVA = ligneHT * ((l.tauxTVA ?? 20) / 100);
+          totalHT += ligneHT;
+          totalTVA += ligneTVA;
+        }
+        const totalTTC = totalHT + totalTVA;
+        updateData.montantTotal = totalTTC.toFixed(2);
+        updateData.totalHT = totalHT.toFixed(2);
+        updateData.totalTVA = totalTVA.toFixed(2);
+        updateData.totalTTC = totalTTC.toFixed(2);
+
+        // Delete old lines and recreate
+        await db.deleteLignesCommandeFournisseur(input.id);
+        for (const ligne of input.lignes) {
+          const ligneHT = ligne.quantite * (ligne.prixUnitaire || 0);
+          await db.createLigneCommandeFournisseur({
+            commandeId: input.id,
+            articleId: ligne.articleId ?? undefined,
+            stockId: ligne.stockId,
+            designation: ligne.designation,
+            reference: ligne.reference,
+            quantite: ligne.quantite.toFixed(2),
+            unite: ligne.unite || 'unité',
+            prixUnitaire: ligne.prixUnitaire?.toFixed(2),
+            tauxTVA: (ligne.tauxTVA ?? 20).toFixed(2),
+            montantTotal: ligneHT.toFixed(2),
+          });
+        }
+      }
+
+      await db.updateCommandeFournisseur(input.id, updateData);
+      return { success: true };
     }),
 
   updateStatut: protectedProcedure
     .input(z.object({
       id: z.number(),
-      statut: z.enum(["en_attente", "confirmee", "expediee", "livree", "annulee"]),
+      statut: z.enum(["brouillon", "envoyee", "confirmee", "livree", "annulee"]),
       dateLivraisonReelle: z.string().optional()
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2890,12 +3002,12 @@ const commandesFournisseursRouter = router({
       if (!artisan || commande.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
-      
+
       const updateData: any = { statut: input.statut };
       if (input.dateLivraisonReelle) {
         updateData.dateLivraisonReelle = new Date(input.dateLivraisonReelle);
       }
-      
+
       return await db.updateCommandeFournisseur(input.id, updateData);
     }),
 
@@ -2911,6 +3023,60 @@ const commandesFournisseursRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       await db.deleteCommandeFournisseur(input.id);
+      return { success: true };
+    }),
+
+  sendEmail: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const fournisseur = await db.getFournisseurById(commande.fournisseurId);
+      if (!fournisseur?.email) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le fournisseur n'a pas d'adresse email" });
+      }
+      const lignes = await db.getLignesCommandeFournisseur(commande.id);
+
+      // Generate PDF
+      const { generateBonCommandePDF } = await import('./_core/pdfGenerator');
+      const pdfBuffer = generateBonCommandePDF({ commande: { ...commande, lignes }, artisan, fournisseur });
+
+      // Send email via Resend
+      const resendKey = process.env.RESEND_API_KEY;
+      const emailFrom = process.env.EMAIL_FROM || 'MonArtisan Pro <noreply@artisan.cheminov.com>';
+      if (!resendKey) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Service email non configuré" });
+      }
+
+      const { Resend } = await import('resend');
+      const resend = new Resend(resendKey);
+      await resend.emails.send({
+        from: emailFrom,
+        to: fournisseur.email,
+        subject: `Bon de commande ${commande.numero || ''} - ${artisan.nomEntreprise || 'Artisan'}`,
+        html: `
+          <p>Bonjour ${fournisseur.contact || fournisseur.nom},</p>
+          <p>Veuillez trouver ci-joint notre bon de commande <strong>${commande.numero || ''}</strong>.</p>
+          ${commande.delaiLivraison ? `<p>Délai de livraison souhaité : ${commande.delaiLivraison}</p>` : ''}
+          ${commande.notes ? `<p>Notes : ${commande.notes}</p>` : ''}
+          <p>Cordialement,<br/>${artisan.nomEntreprise || 'Artisan'}</p>
+        `,
+        attachments: [{
+          filename: `bon-commande-${commande.numero || commande.id}.pdf`,
+          content: pdfBuffer.toString('base64'),
+          content_type: 'application/pdf',
+        }],
+      });
+
+      // Update statut to envoyee
+      await db.updateCommandeFournisseur(input.id, { statut: 'envoyee' as any });
+
       return { success: true };
     }),
 

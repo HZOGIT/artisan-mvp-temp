@@ -351,6 +351,39 @@ async function startServer() {
     }
   });
 
+  // Bon de commande PDF (authenticated via cookie)
+  app.get('/api/commandes-fournisseurs/:id/pdf', async (req, res) => {
+    try {
+      const { getCommandeFournisseurById, getArtisanByUserId, getFournisseurById, getLignesCommandeFournisseur } = await import('../db');
+      const { generateBonCommandePDF } = await import('./pdfGenerator');
+      const { jwtVerify } = await import('jose');
+
+      const token = req.cookies?.token;
+      if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret');
+      let payload: any;
+      try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+
+      const commande = await getCommandeFournisseurById(parseInt(req.params.id));
+      if (!commande) { res.status(404).json({ error: 'Commande non trouvée' }); return; }
+
+      const artisan = await getArtisanByUserId(payload.userId);
+      if (!artisan || commande.artisanId !== artisan.id) { res.status(403).json({ error: 'Accès non autorisé' }); return; }
+
+      const fournisseur = await getFournisseurById(commande.fournisseurId);
+      if (!fournisseur) { res.status(404).json({ error: 'Fournisseur non trouvé' }); return; }
+
+      const lignes = await getLignesCommandeFournisseur(commande.id);
+      const pdfBuffer = generateBonCommandePDF({ commande: { ...commande, lignes }, artisan, fournisseur });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="BonCommande_${commande.numero || commande.id}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[BonCommande] PDF error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+    }
+  });
+
   // ============================================================================
   // COMPTABILITE EXPORTS (FEC + CSV)
   // ============================================================================

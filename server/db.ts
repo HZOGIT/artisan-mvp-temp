@@ -1005,6 +1005,28 @@ export async function createLigneCommandeFournisseur(data: InsertLigneCommandeFo
   return result[0];
 }
 
+export async function deleteLignesCommandeFournisseur(commandeId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.commandeId, commandeId));
+}
+
+export async function getNextCommandeNumero(artisanId: number): Promise<string> {
+  const db = await getDb();
+  const result = await db.select({ numero: commandesFournisseurs.numero })
+    .from(commandesFournisseurs)
+    .where(eq(commandesFournisseurs.artisanId, artisanId))
+    .orderBy(desc(commandesFournisseurs.id));
+  let maxNum = 0;
+  for (const row of result) {
+    const match = row.numero?.match(/CMD-(\d+)/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  return `CMD-${String(maxNum + 1).padStart(5, '0')}`;
+}
+
 export async function getRapportCommandeFournisseur(artisanId: number): Promise<any[]> {
   const lowStockItems = await getLowStockItems(artisanId);
   if (lowStockItems.length === 0) return [];

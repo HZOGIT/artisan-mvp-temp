@@ -655,6 +655,84 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] modePaiement column check:', e.message);
     }
 
+    // ========================================================================
+    // Migrate commandes_fournisseurs: add new columns + fix statut enum
+    // ========================================================================
+    try {
+      // Add missing columns to commandes_fournisseurs
+      const newCols = [
+        { name: 'numero', sql: "VARCHAR(20) DEFAULT NULL" },
+        { name: 'totalHT', sql: "DECIMAL(10,2) DEFAULT NULL" },
+        { name: 'totalTVA', sql: "DECIMAL(10,2) DEFAULT NULL" },
+        { name: 'totalTTC', sql: "DECIMAL(10,2) DEFAULT NULL" },
+        { name: 'delaiLivraison', sql: "VARCHAR(100) DEFAULT NULL" },
+        { name: 'adresseLivraison', sql: "TEXT DEFAULT NULL" },
+      ];
+      for (const col of newCols) {
+        const [existing] = await pool.execute(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'commandes_fournisseurs' AND COLUMN_NAME = ?`,
+          [col.name]
+        ) as any;
+        if (existing.length === 0) {
+          await pool.execute(`ALTER TABLE commandes_fournisseurs ADD COLUMN ${col.name} ${col.sql}`);
+          console.log(`[FixDuplicates] Added ${col.name} to commandes_fournisseurs`);
+        }
+      }
+
+      // Migrate statut enum: en_attente→brouillon, expediee→envoyee
+      try {
+        await pool.execute(`ALTER TABLE commandes_fournisseurs MODIFY COLUMN statut ENUM('brouillon','envoyee','confirmee','livree','annulee') DEFAULT 'brouillon'`);
+        // Migrate old values
+        await pool.execute(`UPDATE commandes_fournisseurs SET statut = 'brouillon' WHERE statut = 'en_attente' OR statut IS NULL`);
+        await pool.execute(`UPDATE commandes_fournisseurs SET statut = 'envoyee' WHERE statut = 'expediee'`);
+        console.log('[FixDuplicates] Migrated commandes_fournisseurs statut enum');
+      } catch (e: any) {
+        // If old values still exist that prevent enum change, update them first
+        if (e.message?.includes('Data truncated')) {
+          await pool.execute(`UPDATE commandes_fournisseurs SET statut = 'brouillon' WHERE statut NOT IN ('brouillon','envoyee','confirmee','livree','annulee')`);
+          await pool.execute(`ALTER TABLE commandes_fournisseurs MODIFY COLUMN statut ENUM('brouillon','envoyee','confirmee','livree','annulee') DEFAULT 'brouillon'`);
+          console.log('[FixDuplicates] Migrated commandes_fournisseurs statut enum (retry)');
+        } else {
+          console.log('[FixDuplicates] statut enum migration:', e.message);
+        }
+      }
+
+      // Add missing columns to lignes_commandes_fournisseurs
+      const ligneNewCols = [
+        { name: 'articleId', sql: "INT DEFAULT NULL" },
+        { name: 'unite', sql: "VARCHAR(20) DEFAULT 'unité'" },
+        { name: 'tauxTVA', sql: "DECIMAL(5,2) DEFAULT 20.00" },
+      ];
+      for (const col of ligneNewCols) {
+        const [existing] = await pool.execute(
+          `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lignes_commandes_fournisseurs' AND COLUMN_NAME = ?`,
+          [col.name]
+        ) as any;
+        if (existing.length === 0) {
+          await pool.execute(`ALTER TABLE lignes_commandes_fournisseurs ADD COLUMN ${col.name} ${col.sql}`);
+          console.log(`[FixDuplicates] Added ${col.name} to lignes_commandes_fournisseurs`);
+        }
+      }
+
+      // Backfill numero for existing commandes without one
+      const [noNumero] = await pool.execute(
+        `SELECT id, artisanId FROM commandes_fournisseurs WHERE numero IS NULL OR numero = ''`
+      ) as any;
+      for (const cmd of noNumero) {
+        const [maxRows] = await pool.execute(
+          `SELECT COUNT(*) as cnt FROM commandes_fournisseurs WHERE artisanId = ? AND numero IS NOT NULL AND numero != ''`,
+          [cmd.artisanId]
+        ) as any;
+        const next = (maxRows[0]?.cnt || 0) + 1;
+        const numero = `CMD-${String(next).padStart(5, '0')}`;
+        await pool.execute(`UPDATE commandes_fournisseurs SET numero = ? WHERE id = ?`, [numero, cmd.id]);
+      }
+      if (noNumero.length > 0) console.log(`[FixDuplicates] Backfilled ${noNumero.length} commande numeros`);
+
+    } catch (e: any) {
+      console.log('[FixDuplicates] commandes_fournisseurs migration:', e.message);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
