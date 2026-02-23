@@ -38,7 +38,7 @@ function formatRelativeDate(date: string | Date) {
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "A l'instant";
+  if (diffMin < 1) return "À l'instant";
   if (diffMin < 60) return `Il y a ${diffMin} min`;
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `Il y a ${diffH}h`;
@@ -289,8 +289,8 @@ export default function Dashboard() {
         {/* CA Mensuel AreaChart */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">CA Mensuel</CardTitle>
-            <CardDescription>Evolution sur les 6 derniers mois</CardDescription>
+            <CardTitle className="text-base">CA mensuel</CardTitle>
+            <CardDescription>Évolution sur les 6 derniers mois</CardDescription>
           </CardHeader>
           <CardContent>
             {monthlyCA && monthlyCA.length > 0 ? (

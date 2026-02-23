@@ -119,7 +119,7 @@ export default function Parametres() {
       if (!resp.ok) throw new Error(data.error || "Erreur upload");
       setLogoPreview(data.logoUrl);
       refetchArtisan();
-      toast.success("Logo uploadé");
+      toast.success("Logo téléchargé");
     } catch (err: any) {
       toast.error(err.message || "Erreur lors de l'upload");
     } finally {
@@ -201,7 +201,7 @@ export default function Parametres() {
                   />
                   <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
                     <Upload className="h-4 w-4 mr-1.5" />
-                    {uploading ? "Upload..." : "Changer le logo"}
+                    {uploading ? "Envoi..." : "Changer le logo"}
                   </Button>
                   {logoPreview && (
                     <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={handleDeleteLogo}>

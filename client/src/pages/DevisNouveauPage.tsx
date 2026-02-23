@@ -180,10 +180,10 @@ export default function DevisNouveauPage() {
         }));
         setLignes([...lignes, ...newLignes]);
         setSelectedModeleId(null);
-        toast.success("Modele charge");
+        toast.success("Modèle chargé");
       }
     } catch (error) {
-      toast.error("Erreur lors du chargement du modele");
+      toast.error("Erreur lors du chargement du modèle");
     }
   };
 
@@ -330,7 +330,7 @@ export default function DevisNouveauPage() {
         {modeles.length > 0 && (
           <div>
             <Label className="block text-sm font-medium mb-2">
-              Charger un modele
+              Charger un modèle
             </Label>
             <select
               value={selectedModeleId || ""}
@@ -343,7 +343,7 @@ export default function DevisNouveauPage() {
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Selectionner un modele...</option>
+              <option value="">Sélectionner un modèle...</option>
               {modeles.map(modele => (
                 <option key={modele.id} value={modele.id}>
                   {modele.nom}

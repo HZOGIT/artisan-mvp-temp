@@ -153,8 +153,8 @@ export default function Assistant() {
     try {
       const result = await generateDevisMutation.mutateAsync({ description: desc });
       const lignes = result.lignes as Array<{ designation: string; quantite: number; unite: string; prixUnitaireHT: number; tauxTVA: number }>;
-      let content = `**Devis suggere pour : ${desc}**\n\n`;
-      content += `| Designation | Qte | Unite | Prix HT | TVA |\n|---|---|---|---|---|\n`;
+      let content = `**Devis suggéré pour : ${desc}**\n\n`;
+      content += `| Désignation | Qté | Unité | Prix HT | TVA |\n|---|---|---|---|---|\n`;
       for (const l of lignes) {
         content += `| ${l.designation} | ${l.quantite} | ${l.unite} | ${l.prixUnitaireHT.toFixed(2)} | ${l.tauxTVA}% |\n`;
       }
@@ -162,7 +162,7 @@ export default function Assistant() {
       content += `\n**Total HT : ${total.toFixed(2)} EUR**`;
       setMessages((prev) => [...prev, { role: "assistant", content }]);
     } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la generation du devis");
+      toast.error(error.message || "Erreur lors de la génération du devis");
     }
   };
 
@@ -221,15 +221,15 @@ export default function Assistant() {
   };
 
   const handleResumeDuJour = () => {
-    sendMessage("Fais-moi un resume de ma journee : interventions prevues, devis en attente, factures impayees, et les actions prioritaires.");
+    sendMessage("Fais-moi un résumé de ma journée : interventions prévues, devis en attente, factures impayées, et les actions prioritaires.");
   };
 
   const quickActions = [
-    { icon: FileText, label: "Generer un devis", color: "text-blue-500", onClick: () => setShowDevisDialog(true) },
+    { icon: FileText, label: "Générer un devis", color: "text-blue-500", onClick: () => setShowDevisDialog(true) },
     { icon: RefreshCw, label: "Suggestions relance", color: "text-orange-500", onClick: handleSuggestRelances },
-    { icon: Calculator, label: "Analyse rentabilite", color: "text-green-500", onClick: () => setShowRentabiliteDialog(true) },
-    { icon: TrendingUp, label: "Prediction tresorerie", color: "text-purple-500", onClick: handlePredictionTresorerie },
-    { icon: Calendar, label: "Resume du jour", color: "text-amber-500", onClick: handleResumeDuJour },
+    { icon: Calculator, label: "Analyse rentabilité", color: "text-green-500", onClick: () => setShowRentabiliteDialog(true) },
+    { icon: TrendingUp, label: "Prédiction trésorerie", color: "text-purple-500", onClick: handlePredictionTresorerie },
+    { icon: Calendar, label: "Résumé du jour", color: "text-amber-500", onClick: handleResumeDuJour },
   ];
 
   // Simple markdown-like rendering
@@ -349,7 +349,7 @@ export default function Assistant() {
       <Dialog open={showDevisDialog} onOpenChange={setShowDevisDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Generer un devis avec l'IA</DialogTitle>
+            <DialogTitle>Générer un devis avec l'IA</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -357,7 +357,7 @@ export default function Assistant() {
               <Textarea
                 value={devisDescription}
                 onChange={(e) => setDevisDescription(e.target.value)}
-                placeholder="Ex: Renovation complete d'une salle de bain de 8m2, remplacement baignoire par douche italienne..."
+                placeholder="Ex: Rénovation complète d'une salle de bain de 8m², remplacement baignoire par douche italienne..."
                 rows={4}
               />
             </div>
@@ -369,9 +369,9 @@ export default function Assistant() {
               disabled={!devisDescription.trim() || generateDevisMutation.isPending}
             >
               {generateDevisMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Generation...</>
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Génération...</>
               ) : (
-                "Generer"
+                "Générer"
               )}
             </Button>
           </DialogFooter>
@@ -382,11 +382,11 @@ export default function Assistant() {
       <Dialog open={showRentabiliteDialog} onOpenChange={setShowRentabiliteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Analyse de rentabilite</DialogTitle>
+            <DialogTitle>Analyse de rentabilité</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Selectionner un devis</Label>
+              <Label>Sélectionner un devis</Label>
               <Select value={selectedDevisId} onValueChange={setSelectedDevisId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir un devis..." />

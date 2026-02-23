@@ -360,12 +360,12 @@ export default function DevisDetail() {
                 <DialogHeader>
                   <DialogTitle>Envoyer le devis pour signature</DialogTitle>
                   <DialogDescription>
-                    Un email avec un lien de signature sera envoye a {devis.client?.email}. Le client pourra consulter le devis et le signer (ou refuser) en ligne.
+                    Un email avec un lien de signature sera envoyé à {devis.client?.email}. Le client pourra consulter le devis et le signer (ou refuser) en ligne.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                   <p className="text-sm text-muted-foreground">
-                    Le lien est valide 30 jours. Le statut du devis sera mis a jour automatiquement.
+                    Le lien est valide 30 jours. Le statut du devis sera mis à jour automatiquement.
                   </p>
                 </div>
                 <DialogFooter>
@@ -445,13 +445,13 @@ export default function DevisDetail() {
                 <Pen className="h-5 w-5" />
                 <div>
                   <p className="font-medium">
-                    {signatureData.statut === 'accepte' && `Devis accepte et signe par ${signatureData.signataireName}`}
-                    {signatureData.statut === 'refuse' && `Devis refuse${signatureData.motifRefus ? ` — ${signatureData.motifRefus}` : ''}`}
+                    {signatureData.statut === 'accepte' && `Devis accepté et signé par ${signatureData.signataireName}`}
+                    {signatureData.statut === 'refuse' && `Devis refusé${signatureData.motifRefus ? ` — ${signatureData.motifRefus}` : ''}`}
                     {signatureData.statut === 'en_attente' && 'Signature en attente du client'}
                   </p>
                   {signatureData.signedAt && (
                     <p className="text-sm text-muted-foreground">
-                      Le {format(new Date(signatureData.signedAt), "dd/MM/yyyy 'a' HH:mm", { locale: fr })}
+                      Le {format(new Date(signatureData.signedAt), "dd/MM/yyyy 'à' HH:mm", { locale: fr })}
                     </p>
                   )}
                 </div>
@@ -463,7 +463,7 @@ export default function DevisDetail() {
                   onClick={() => {
                     const url = `${window.location.origin}/devis-public/${signatureData.token}`;
                     navigator.clipboard.writeText(url);
-                    toast.success("Lien copie dans le presse-papier");
+                    toast.success("Lien copié dans le presse-papier");
                   }}
                 >
                   <Copy className="h-4 w-4 mr-1" />

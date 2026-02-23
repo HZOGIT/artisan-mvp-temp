@@ -195,7 +195,7 @@ const menuGroups: MenuGroup[] = [
     title: "Tableau de bord",
     icon: LayoutDashboard,
     items: [
-      { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+      { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
       { icon: BarChart3, label: "Statistiques", path: "/statistiques" },
     ],
   },
@@ -204,7 +204,7 @@ const menuGroups: MenuGroup[] = [
     icon: FileText,
     items: [
       { icon: FileText, label: "Devis", path: "/devis" },
-      { icon: FileText, label: "Nouveau Devis", path: "/devis/nouveau" },
+      { icon: FileText, label: "Nouveau devis", path: "/devis/nouveau" },
       { icon: Receipt, label: "Factures", path: "/factures" },
       { icon: ClipboardList, label: "Contrats", path: "/contrats" },
       { icon: RefreshCw, label: "Relances", path: "/relances" },
@@ -218,7 +218,7 @@ const menuGroups: MenuGroup[] = [
       { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
       { icon: Upload, label: "Import Clients", path: "/clients/import" },
       { icon: Star, label: "Avis Clients", path: "/avis" },
-      { icon: Globe, label: "Portail Client", path: "/portail-gestion" },
+      { icon: Globe, label: "Portail client", path: "/portail-gestion" },
       { icon: MessageCircle, label: "Chat", path: "/chat" },
       { icon: Clock, label: "RDV en ligne", path: "/rdv-en-ligne" },
     ],
@@ -358,10 +358,10 @@ export default function DashboardLayout({
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
+              Connexion requise
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
+              L'accès à cette application nécessite une authentification. Cliquez ci-dessous pour vous connecter.
             </p>
           </div>
           <Button
@@ -371,7 +371,7 @@ export default function DashboardLayout({
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            Sign in
+            Se connecter
           </Button>
         </div>
       </div>
@@ -587,7 +587,7 @@ function DashboardLayoutContent({
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>Déconnexion</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
