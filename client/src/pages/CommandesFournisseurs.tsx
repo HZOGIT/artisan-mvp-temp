@@ -155,7 +155,7 @@ export default function CommandesFournisseurs() {
             </thead>
             <tbody>
               {filtered.map((cmd: any) => (
-                <tr key={cmd.id} className="cursor-pointer" onClick={() => setLocation(`/commandes/${cmd.id}/modifier`)}>
+                <tr key={cmd.id} className="cursor-pointer" onClick={() => setLocation(`/commandes/${cmd.id}`)}>
                   <td className="font-medium whitespace-nowrap">{cmd.numero || '-'}</td>
                   <td className="whitespace-nowrap">{cmd.fournisseurNom || '-'}</td>
                   <td className="whitespace-nowrap text-muted-foreground">
@@ -177,9 +177,13 @@ export default function CommandesFournisseurs() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setLocation(`/commandes/${cmd.id}/modifier`)}>
+                        <DropdownMenuItem onClick={() => setLocation(`/commandes/${cmd.id}`)}>
                           <Eye className="h-4 w-4 mr-2" />
-                          Voir / Éditer
+                          Voir
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setLocation(`/commandes/${cmd.id}/modifier`)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Modifier
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <a href={`/api/commandes-fournisseurs/${cmd.id}/pdf`} target="_blank" rel="noopener noreferrer">

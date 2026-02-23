@@ -64,6 +64,7 @@ import DevisLigneEdit from "./pages/DevisLigneEdit";
 import CalendrierChantiers from "./pages/CalendrierChantiers";
 import CommandesFournisseurs from "./pages/CommandesFournisseurs";
 import CommandeFournisseurForm from "./pages/CommandeFournisseurForm";
+import CommandeFournisseurDetail from "./pages/CommandeFournisseurDetail";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import StatistiquesDevis from "./pages/StatistiquesDevis";
 import PortailGestion from "./pages/PortailGestion";
@@ -120,6 +121,7 @@ function AuthenticatedRoutes() {
         <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
         <Route path="/commandes/nouvelle" component={CommandeFournisseurForm} />
         <Route path="/commandes/:id/modifier" component={CommandeFournisseurForm} />
+        <Route path="/commandes/:id" component={CommandeFournisseurDetail} />
         <Route path="/commandes" component={CommandesFournisseurs} />
         <Route path="/rapport-commande" component={RapportCommande} />
         <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
