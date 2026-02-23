@@ -68,6 +68,7 @@ import CommandeFournisseurDetail from "./pages/CommandeFournisseurDetail";
 import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import StatistiquesDevis from "./pages/StatistiquesDevis";
 import PortailGestion from "./pages/PortailGestion";
+import Documentation from "./pages/Documentation";
 import DashboardLayout from "./components/DashboardLayout";
 
 // BYPASS CLERK TEMPORARILY - Redirect all authenticated routes directly to dashboard
@@ -131,6 +132,7 @@ function AuthenticatedRoutes() {
         <Route path="/rdv-en-ligne" component={RdvEnLigne} />
         <Route path="/ma-vitrine" component={MaVitrine} />
         <Route path="/utilisateurs" component={Utilisateurs} />
+        <Route path="/documentation" component={Documentation} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>
@@ -203,6 +205,7 @@ function Router() {
       <Route path="/rdv-en-ligne" component={() => <AuthenticatedRoutes />} />
       <Route path="/ma-vitrine" component={() => <AuthenticatedRoutes />} />
       <Route path="/utilisateurs" component={() => <AuthenticatedRoutes />} />
+      <Route path="/documentation" component={() => <AuthenticatedRoutes />} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -27,7 +27,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles, Bell, CheckCircle, AlertTriangle, Clock, Info, XCircle, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles, Bell, CheckCircle, AlertTriangle, Clock, Info, XCircle, ShoppingCart, BookOpen } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -253,6 +253,7 @@ const menuGroups: MenuGroup[] = [
     title: "Paramètres",
     icon: Settings,
     items: [
+      { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
       { icon: User, label: "Mon profil", path: "/profil" },
       { icon: Settings, label: "Paramètres", path: "/parametres" },
       { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
@@ -301,6 +302,7 @@ const pathPermissionMap: Record<string, string> = {
   "/profil": "",
   "/assistant": "",
   "/notifications": "",
+  "/documentation": "",
   "/mobile": "interventions.voir",
   "/integrations-comptables": "comptabilite.voir",
   "/devis-ia": "devis.creer",
