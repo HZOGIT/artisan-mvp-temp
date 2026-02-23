@@ -27,7 +27,7 @@ import {
 import { getLoginUrl } from "@/const";
 import { Upload } from "lucide-react";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles, Bell, CheckCircle, AlertTriangle, Clock, Info, XCircle } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles, Bell, CheckCircle, AlertTriangle, Clock, Info, XCircle, ShoppingCart } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -242,6 +242,7 @@ const menuGroups: MenuGroup[] = [
       { icon: Package, label: "Articles", path: "/articles" },
       { icon: Boxes, label: "Stocks", path: "/stocks" },
       { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
+      { icon: ShoppingCart, label: "Commandes", path: "/commandes" },
       { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
       { icon: FileText, label: "Rapports", path: "/rapports" },
       { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
@@ -287,6 +288,7 @@ const pathPermissionMap: Record<string, string> = {
   "/articles": "articles.voir",
   "/stocks": "articles.voir",
   "/rapport-commande": "exports.voir",
+  "/commandes": "articles.voir",
   "/fournisseurs": "articles.voir",
   "/rapports": "exports.voir",
   "/comptabilite": "comptabilite.voir",
