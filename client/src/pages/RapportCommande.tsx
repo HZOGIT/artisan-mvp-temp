@@ -138,7 +138,7 @@ export default function RapportCommande() {
     doc.setFontSize(8);
     doc.setTextColor(127, 140, 141);
     doc.text(
-      'Document généré par Artisan MVP',
+      'Document généré par MonArtisan Pro',
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 10,
       { align: 'center' }

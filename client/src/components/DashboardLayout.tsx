@@ -502,7 +502,7 @@ function DashboardLayoutContent({
                     <img src={artisanProfile.logo} alt="" className="h-7 w-7 rounded object-contain shrink-0" />
                   )}
                   <span className="font-semibold tracking-tight truncate">
-                    {artisanProfile?.nomEntreprise || "Artisan MVP"}
+                    {artisanProfile?.nomEntreprise || "MonArtisan Pro"}
                   </span>
                 </div>
               ) : artisanProfile?.logo ? (

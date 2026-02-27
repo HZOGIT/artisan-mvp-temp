@@ -187,7 +187,7 @@ export function exportDashboardToPDF(data: ExportData): void {
     doc.setFontSize(8);
     doc.setTextColor(127, 140, 141);
     doc.text(
-      `Page ${i} / ${pageCount} - Artisan MVP`,
+      `Page ${i} / ${pageCount} - MonArtisan Pro`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 10,
       { align: 'center' }

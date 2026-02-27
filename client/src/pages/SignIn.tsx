@@ -42,7 +42,7 @@ export default function SignIn() {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold text-foreground">Artisan MVP</span>
+            <span className="text-xl font-bold text-foreground">MonArtisan Pro</span>
           </div>
           <Button variant="outline" asChild>
             <a href="/">
