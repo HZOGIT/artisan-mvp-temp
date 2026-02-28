@@ -5,6 +5,7 @@ import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import PageEnConstruction from "./pages/PageEnConstruction";
 import Dashboard from "./pages/Dashboard";
 import { Clients } from "./pages/Clients";
 import { ClientsNouveauPage } from "./pages/ClientsNouveauPage";
@@ -148,6 +149,12 @@ function Router() {
       <Route path="/signin" component={SignInPage} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/signup" component={SignUp} />
+      <Route path="/mentions-legales" component={PageEnConstruction} />
+      <Route path="/cgv" component={PageEnConstruction} />
+      <Route path="/confidentialite" component={PageEnConstruction} />
+      <Route path="/contact" component={PageEnConstruction} />
+      <Route path="/aide" component={PageEnConstruction} />
+      <Route path="/guide" component={PageEnConstruction} />
       <Route path="/signature/:token" component={SignatureDevis} />
       <Route path="/devis-public/:token" component={SignatureDevis} />
       <Route path="/paiement/succes" component={PaiementSucces} />

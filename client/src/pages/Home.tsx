@@ -671,21 +671,21 @@ function TestimonialsSection() {
           </h2>
         </div>
         <div
-          className={`grid gap-8 md:grid-cols-3 transition-all duration-700 ${
+          className={`grid gap-8 md:grid-cols-3 items-stretch transition-all duration-700 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
         >
           {testimonials.map((t) => (
             <div
               key={t.name}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow h-full flex flex-col"
             >
               <StarRating rating={t.rating} />
-              <p className="mt-4 text-sm text-[#1F2937] leading-relaxed italic">
+              <p className="mt-4 text-sm text-[#1F2937] leading-relaxed italic flex-1">
                 "{t.text}"
               </p>
               <div className="mt-6 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-[#2563EB]/10 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-full bg-[#2563EB]/10 flex items-center justify-center shrink-0">
                   <span className="text-sm font-bold text-[#2563EB]">
                     {t.name.split(" ").map((n) => n[0]).join("")}
                   </span>
@@ -748,7 +748,7 @@ function FAQSection() {
 
   return (
     <section id="faq" className="py-20 sm:py-24 bg-[#F9FAFB]">
-      <div ref={ref} className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div ref={ref} className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-[#1F2937]">
             Questions fréquentes
@@ -799,7 +799,7 @@ function FinalCTASection() {
               Rejoignez les artisans qui ont choisi MonArtisan Pro pour développer leur activité.
             </p>
             <div className="mt-8">
-              <Button size="lg" asChild className="bg-white text-[#1E40AF] hover:bg-blue-50 text-base px-8 py-6">
+              <Button size="lg" asChild className="bg-white text-[#2563EB] hover:bg-blue-50 text-lg px-10 py-7 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
                 <a href="/signup">
                   Créer mon compte gratuitement
                   <ArrowRight className="ml-2 h-5 w-5" />
@@ -868,13 +868,13 @@ function Footer() {
             <h4 className="text-sm font-semibold text-white mb-4">Ressources</h4>
             <ul className="space-y-2">
               <li>
-                <span className="text-sm text-gray-400">Guide d'utilisation</span>
+                <a href="/guide" className="text-sm text-gray-400 hover:text-white transition-colors">Guide d'utilisation</a>
               </li>
               <li>
                 <span className="text-sm text-gray-400">Blog <span className="text-xs">(bientôt)</span></span>
               </li>
               <li>
-                <span className="text-sm text-gray-400">Centre d'aide</span>
+                <a href="/aide" className="text-sm text-gray-400 hover:text-white transition-colors">Centre d'aide</a>
               </li>
             </ul>
           </div>
@@ -884,16 +884,16 @@ function Footer() {
             <h4 className="text-sm font-semibold text-white mb-4">Légal</h4>
             <ul className="space-y-2">
               <li>
-                <span className="text-sm text-gray-400">Mentions légales</span>
+                <a href="/mentions-legales" className="text-sm text-gray-400 hover:text-white transition-colors">Mentions légales</a>
               </li>
               <li>
-                <span className="text-sm text-gray-400">CGV</span>
+                <a href="/cgv" className="text-sm text-gray-400 hover:text-white transition-colors">CGV</a>
               </li>
               <li>
-                <span className="text-sm text-gray-400">Politique de confidentialité</span>
+                <a href="/confidentialite" className="text-sm text-gray-400 hover:text-white transition-colors">Politique de confidentialité</a>
               </li>
               <li>
-                <span className="text-sm text-gray-400">Contact</span>
+                <a href="/contact" className="text-sm text-gray-400 hover:text-white transition-colors">Contact</a>
               </li>
             </ul>
           </div>
