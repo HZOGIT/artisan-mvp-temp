@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -48,6 +48,10 @@ export default function FactureDetail() {
   const [, setLocation] = useLocation();
   const [isAddLineDialogOpen, setIsAddLineDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isAvoirDialogOpen, setIsAvoirDialogOpen] = useState(false);
+  const [avoirType, setAvoirType] = useState<"total" | "partiel">("total");
+  const [avoirNotes, setAvoirNotes] = useState("");
+  const [avoirLignes, setAvoirLignes] = useState<Array<{designation: string; quantite: string; prixUnitaireHT: string; tauxTVA: string; unite: string}>>([]);
   const [paymentData, setPaymentData] = useState({
     montantPaye: "",
     datePaiement: format(new Date(), "yyyy-MM-dd"),
@@ -105,35 +109,67 @@ export default function FactureDetail() {
   }, []);
 
   const utils = trpc.useUtils();
+  const factureId = parseInt(id || "0");
   const { data: facture, isLoading } = trpc.factures.getById.useQuery(
-    { id: parseInt(id || "0") },
+    { id: factureId },
     { enabled: !!id }
   );
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
   const { data: artisan } = trpc.artisan.getProfile.useQuery();
   const { data: parametresData } = trpc.parametres.get.useQuery();
+  const { data: avoirs } = trpc.factures.getAvoirsByFacture.useQuery(
+    { factureId },
+    { enabled: !!id && !!facture }
+  );
+  const { data: auditLogs } = trpc.factures.getAuditLog.useQuery(
+    { factureId },
+    { enabled: !!id && !!facture }
+  );
 
   const updateMutation = trpc.factures.update.useMutation({
     onSuccess: () => {
-      utils.factures.getById.invalidate({ id: parseInt(id || "0") });
+      utils.factures.getById.invalidate({ id: factureId });
+      utils.factures.getAuditLog.invalidate({ factureId });
       toast.success("Facture mise à jour");
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 
   const addLineMutation = trpc.factures.addLigne.useMutation({
     onSuccess: () => {
-      utils.factures.getById.invalidate({ id: parseInt(id || "0") });
+      utils.factures.getById.invalidate({ id: factureId });
       setIsAddLineDialogOpen(false);
       resetLineForm();
       toast.success("Ligne ajoutée");
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 
   const markAsPaidMutation = trpc.factures.markAsPaid.useMutation({
     onSuccess: () => {
-      utils.factures.getById.invalidate({ id: parseInt(id || "0") });
+      utils.factures.getById.invalidate({ id: factureId });
+      utils.factures.getAuditLog.invalidate({ factureId });
       setIsPaymentDialogOpen(false);
       toast.success("Paiement enregistré");
+    },
+  });
+
+  const createAvoirMutation = trpc.factures.createAvoir.useMutation({
+    onSuccess: (data) => {
+      utils.factures.getById.invalidate({ id: factureId });
+      utils.factures.getAvoirsByFacture.invalidate({ factureId });
+      utils.factures.getAuditLog.invalidate({ factureId });
+      utils.factures.list.invalidate();
+      setIsAvoirDialogOpen(false);
+      toast.success(`Avoir ${data.numero} créé avec succès`);
+      setLocation(`/factures/${data.id}`);
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 
@@ -141,7 +177,8 @@ export default function FactureDetail() {
     onSuccess: (result) => {
       if (result.success) {
         toast.success(result.message);
-        utils.factures.getById.invalidate({ id: parseInt(id || "0") });
+        utils.factures.getById.invalidate({ id: factureId });
+        utils.factures.getAuditLog.invalidate({ factureId });
         setIsEmailDialogOpen(false);
         setEmailMessage("");
       } else {
@@ -163,7 +200,7 @@ export default function FactureDetail() {
       return;
     }
     sendByEmailMutation.mutate({
-      factureId: parseInt(id || "0"),
+      factureId,
       customMessage: emailMessage || undefined,
       attachPdf,
     });
@@ -188,13 +225,13 @@ export default function FactureDetail() {
       return;
     }
     addLineMutation.mutate({
-      factureId: parseInt(id || "0"),
+      factureId,
       ...lineFormData,
     });
   };
 
   const handleStatusChange = (newStatus: string) => {
-    updateMutation.mutate({ id: parseInt(id || "0"), statut: newStatus as any });
+    updateMutation.mutate({ id: factureId, statut: newStatus as any });
   };
 
   const handleMarkAsPaid = (e: React.FormEvent) => {
@@ -204,7 +241,7 @@ export default function FactureDetail() {
       return;
     }
     markAsPaidMutation.mutate({
-      id: parseInt(id || "0"),
+      id: factureId,
       ...paymentData,
     });
   };
@@ -223,6 +260,38 @@ export default function FactureDetail() {
     }
   };
 
+  const handleCreateAvoir = () => {
+    if (!facture) return;
+    if (avoirType === "total") {
+      // Avoir total : reprendre toutes les lignes de la facture
+      const lignes = (facture.lignes || []).map((l: any) => ({
+        designation: l.designation,
+        quantite: l.quantite?.toString() || "1",
+        prixUnitaireHT: l.prixUnitaireHT?.toString() || "0",
+        tauxTVA: l.tauxTVA?.toString() || "20.00",
+        unite: l.unite || "unité",
+      }));
+      createAvoirMutation.mutate({
+        factureOrigineId: factureId,
+        lignes,
+        objet: `Avoir total sur facture ${facture.numero}`,
+        notes: avoirNotes || undefined,
+      });
+    } else {
+      // Avoir partiel : utiliser les lignes personnalisées
+      if (avoirLignes.length === 0) {
+        toast.error("Ajoutez au moins une ligne à l'avoir");
+        return;
+      }
+      createAvoirMutation.mutate({
+        factureOrigineId: factureId,
+        lignes: avoirLignes,
+        objet: `Avoir partiel sur facture ${facture.numero}`,
+        notes: avoirNotes || undefined,
+      });
+    }
+  };
+
   const handleExportPDF = () => {
     if (!facture || !facture.client) {
       toast.error("Impossible de générer le PDF");
@@ -237,6 +306,7 @@ export default function FactureDetail() {
       prixUnitaire: parseFloat(l.prixUnitaireHT) || 0,
       tauxTva: parseFloat(l.tauxTVA) || 20,
     }));
+    const isAvoir = (facture as any).typeDocument === "avoir";
     generateFacturePDF(
       artisanData,
       facture.client,
@@ -252,6 +322,7 @@ export default function FactureDetail() {
         totalTTC: parseFloat(facture.totalTTC as any) || 0,
         montantPaye: parseFloat(facture.montantPaye as any) || 0,
         conditions: (facture as any).conditions || null,
+        isAvoir,
       },
       {
         mentionsLegales: parametresData?.mentionsLegales || null,
@@ -284,6 +355,21 @@ export default function FactureDetail() {
     );
   }
 
+  const currentStatut = facture.statut || "brouillon";
+  const isLocked = currentStatut !== "brouillon";
+  const isAvoir = (facture as any).typeDocument === "avoir";
+  const documentLabel = isAvoir ? "Avoir" : "Facture";
+
+  // Transitions de statut autorisées
+  const allowedTransitions: Record<string, string[]> = {
+    brouillon: ["envoyee"],
+    envoyee: ["payee", "en_retard"],
+    en_retard: ["payee"],
+    payee: [],
+    annulee: [],
+  };
+  const allowedNextStatuses = allowedTransitions[currentStatut] || [];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -295,18 +381,28 @@ export default function FactureDetail() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold text-foreground">{facture.numero}</h1>
-              <Badge className={statusColors[facture.statut || 'brouillon'] || "bg-gray-100"}>
-                {statusLabels[facture.statut || 'brouillon'] || facture.statut}
+              {isAvoir && (
+                <Badge className="bg-red-100 text-red-700 border-red-300">
+                  AVOIR
+                </Badge>
+              )}
+              <Badge className={statusColors[currentStatut] || "bg-gray-100"}>
+                {statusLabels[currentStatut] || currentStatut}
               </Badge>
+              {isLocked && (
+                <Lock className="h-4 w-4 text-amber-500" />
+              )}
             </div>
-            <p className="text-muted-foreground">{facture.objet || "Facture"}</p>
+            <p className="text-muted-foreground">{facture.objet || documentLabel}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={handleExportPDF}>
             <Download className="h-4 w-4 mr-2" />
             Export PDF
           </Button>
+
+          {/* Envoyer par email */}
           <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" disabled={!facture.client?.email}>
@@ -351,19 +447,25 @@ export default function FactureDetail() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Select value={facture.statut || 'brouillon'} onValueChange={handleStatusChange}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="brouillon">Brouillon</SelectItem>
-              <SelectItem value="envoyee">Envoyée</SelectItem>
-              <SelectItem value="payee">Payée</SelectItem>
-              <SelectItem value="en_retard">En retard</SelectItem>
-              <SelectItem value="annulee">Annulée</SelectItem>
-            </SelectContent>
-          </Select>
-          {facture.statut !== "payee" && (
+
+          {/* Changement de statut — uniquement les transitions autorisées */}
+          {allowedNextStatuses.length > 0 && (
+            <Select value="" onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Changer le statut" />
+              </SelectTrigger>
+              <SelectContent>
+                {allowedNextStatuses.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {statusLabels[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Marquer comme payée */}
+          {(currentStatut === "envoyee" || currentStatut === "en_retard") && (
             <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
               <DialogTrigger asChild>
                 <Button onClick={() => setPaymentData({ ...paymentData, montantPaye: String(facture.totalTTC || 0) })}>
@@ -414,8 +516,166 @@ export default function FactureDetail() {
               </DialogContent>
             </Dialog>
           )}
+
+          {/* Émettre un avoir — uniquement sur factures validées (pas sur les avoirs) */}
+          {isLocked && !isAvoir && (
+            <Dialog open={isAvoirDialogOpen} onOpenChange={(open) => {
+              setIsAvoirDialogOpen(open);
+              if (open) {
+                setAvoirType("total");
+                setAvoirNotes("");
+                setAvoirLignes([]);
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Émettre un avoir
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Émettre un avoir</DialogTitle>
+                  <DialogDescription>
+                    Créer un avoir sur la facture {facture.numero} ({formatCurrency(facture.totalTTC)})
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Type d'avoir</Label>
+                    <Select value={avoirType} onValueChange={(v) => setAvoirType(v as "total" | "partiel")}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="total">Avoir total (annulation complète)</SelectItem>
+                        <SelectItem value="partiel">Avoir partiel (montant personnalisé)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {avoirType === "total" && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                      <AlertTriangle className="h-4 w-4 inline mr-1" />
+                      L'avoir total reprendra toutes les lignes de la facture avec des montants négatifs pour un total de {formatCurrency(-(parseFloat(facture.totalTTC as any) || 0))}.
+                    </div>
+                  )}
+
+                  {avoirType === "partiel" && (
+                    <div className="space-y-3">
+                      <Label>Lignes de l'avoir</Label>
+                      {avoirLignes.map((ligne, idx) => (
+                        <div key={idx} className="grid grid-cols-5 gap-2 items-end">
+                          <div className="col-span-2">
+                            <Input
+                              placeholder="Désignation"
+                              value={ligne.designation}
+                              onChange={(e) => {
+                                const updated = [...avoirLignes];
+                                updated[idx].designation = e.target.value;
+                                setAvoirLignes(updated);
+                              }}
+                            />
+                          </div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Qté"
+                            value={ligne.quantite}
+                            onChange={(e) => {
+                              const updated = [...avoirLignes];
+                              updated[idx].quantite = e.target.value;
+                              setAvoirLignes(updated);
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Prix HT"
+                            value={ligne.prixUnitaireHT}
+                            onChange={(e) => {
+                              const updated = [...avoirLignes];
+                              updated[idx].prixUnitaireHT = e.target.value;
+                              setAvoirLignes(updated);
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setAvoirLignes(avoirLignes.filter((_, i) => i !== idx))}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAvoirLignes([...avoirLignes, { designation: "", quantite: "1", prixUnitaireHT: "", tauxTVA: "20.00", unite: "unité" }])}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Ajouter une ligne
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Notes (optionnel)</Label>
+                    <Textarea
+                      placeholder="Motif de l'avoir..."
+                      value={avoirNotes}
+                      onChange={(e) => setAvoirNotes(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAvoirDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button
+                    onClick={handleCreateAvoir}
+                    disabled={createAvoirMutation.isPending}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {createAvoirMutation.isPending ? "Création..." : "Créer l'avoir"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
+
+      {/* Verrouillage fiscal */}
+      {isLocked && (
+        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <Lock className="h-5 w-5 text-amber-600 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-amber-800">Document fiscal verrouillé — Non modifiable</p>
+            <p className="text-sm text-amber-600">
+              Conformément à l'article 286 du CGI, ce document ne peut plus être modifié.
+              {!isAvoir && " Pour corriger, émettez un avoir."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Référence facture d'origine (pour les avoirs) */}
+      {isAvoir && (facture as any).factureOrigineId && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <FileText className="h-5 w-5 text-red-600 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-red-800">
+              Avoir sur facture d'origine
+            </p>
+            <Button variant="link" className="p-0 h-auto text-red-700" onClick={() => setLocation(`/factures/${(facture as any).factureOrigineId}`)}>
+              Voir la facture d'origine
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Info Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -452,7 +712,7 @@ export default function FactureDetail() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total TTC</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(facture.totalTTC)}</p>
+            <p className={`text-2xl font-bold ${isAvoir ? "text-red-600" : "text-primary"}`}>{formatCurrency(facture.totalTTC)}</p>
             <p className="text-sm text-muted-foreground">HT: {formatCurrency(facture.totalHT)}</p>
           </CardContent>
         </Card>
@@ -462,136 +722,138 @@ export default function FactureDetail() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Lignes de la facture</CardTitle>
-            <Dialog open={isAddLineDialogOpen} onOpenChange={setIsAddLineDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" onClick={resetLineForm}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter une ligne
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Ajouter une ligne</DialogTitle>
-                  <DialogDescription>
-                    Sélectionnez un article ou saisissez manuellement
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleAddLine}>
-                  <div className="grid gap-4 py-4">
-                    {/* Désignation avec autocomplete */}
-                    <div className="relative" ref={dropdownRef}>
-                      <Label htmlFor="designation">Désignation *</Label>
-                      <div className="relative mt-1">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="designation"
-                          value={lineFormData.designation}
-                          onChange={(e) => {
-                            setLineFormData({ ...lineFormData, designation: e.target.value });
-                            searchArticles(e.target.value);
-                          }}
-                          onFocus={() => {
-                            if (lineFormData.designation.length >= 2) searchArticles(lineFormData.designation);
-                          }}
-                          placeholder="Tapez pour rechercher un article ou saisir librement..."
-                          className="pl-10"
-                          required
-                        />
-                        {isSearching && (
-                          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+            <CardTitle>Lignes {isAvoir ? "de l'avoir" : "de la facture"}</CardTitle>
+            {!isLocked && (
+              <Dialog open={isAddLineDialogOpen} onOpenChange={setIsAddLineDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" onClick={resetLineForm}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter une ligne
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Ajouter une ligne</DialogTitle>
+                    <DialogDescription>
+                      Sélectionnez un article ou saisissez manuellement
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleAddLine}>
+                    <div className="grid gap-4 py-4">
+                      {/* Désignation avec autocomplete */}
+                      <div className="relative" ref={dropdownRef}>
+                        <Label htmlFor="designation">Désignation *</Label>
+                        <div className="relative mt-1">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            id="designation"
+                            value={lineFormData.designation}
+                            onChange={(e) => {
+                              setLineFormData({ ...lineFormData, designation: e.target.value });
+                              searchArticles(e.target.value);
+                            }}
+                            onFocus={() => {
+                              if (lineFormData.designation.length >= 2) searchArticles(lineFormData.designation);
+                            }}
+                            placeholder="Tapez pour rechercher un article ou saisir librement..."
+                            className="pl-10"
+                            required
+                          />
+                          {isSearching && (
+                            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                          )}
+                        </div>
+                        {showDropdown && searchResults.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {searchResults.map((article) => (
+                              <button
+                                key={article.id}
+                                type="button"
+                                onClick={() => {
+                                  setLineFormData({
+                                    ...lineFormData,
+                                    designation: article.nom,
+                                    description: article.description || "",
+                                    prixUnitaireHT: article.prix_base,
+                                    unite: article.unite || "unité",
+                                  });
+                                  setShowDropdown(false);
+                                  toast.success(`${article.nom} sélectionné`);
+                                }}
+                                className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors"
+                              >
+                                <div className="font-medium text-sm">{article.nom}</div>
+                                <div className="text-xs text-gray-500">
+                                  {formatCurrency(article.prix_base)} / {article.unite}
+                                  <span className="ml-2 text-gray-400">{article.categorie}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
                         )}
                       </div>
-                      {showDropdown && searchResults.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {searchResults.map((article) => (
-                            <button
-                              key={article.id}
-                              type="button"
-                              onClick={() => {
-                                setLineFormData({
-                                  ...lineFormData,
-                                  designation: article.nom,
-                                  description: article.description || "",
-                                  prixUnitaireHT: article.prix_base,
-                                  unite: article.unite || "unité",
-                                });
-                                setShowDropdown(false);
-                                toast.success(`${article.nom} sélectionné`);
-                              }}
-                              className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b last:border-b-0 transition-colors"
-                            >
-                              <div className="font-medium text-sm">{article.nom}</div>
-                              <div className="text-xs text-gray-500">
-                                {formatCurrency(article.prix_base)} / {article.unite}
-                                <span className="ml-2 text-gray-400">{article.categorie}</span>
-                              </div>
-                            </button>
-                          ))}
+                      <div className="space-y-2">
+                        <Label htmlFor="reference">Référence</Label>
+                        <Input
+                          id="reference"
+                          value={lineFormData.reference}
+                          onChange={(e) => setLineFormData({ ...lineFormData, reference: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="quantite">Quantité</Label>
+                          <Input
+                            id="quantite"
+                            type="number"
+                            step="0.01"
+                            value={lineFormData.quantite}
+                            onChange={(e) => setLineFormData({ ...lineFormData, quantite: e.target.value })}
+                          />
                         </div>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reference">Référence</Label>
-                      <Input
-                        id="reference"
-                        value={lineFormData.reference}
-                        onChange={(e) => setLineFormData({ ...lineFormData, reference: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="quantite">Quantité</Label>
-                        <Input
-                          id="quantite"
-                          type="number"
-                          step="0.01"
-                          value={lineFormData.quantite}
-                          onChange={(e) => setLineFormData({ ...lineFormData, quantite: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="unite">Unité</Label>
-                        <Input
-                          id="unite"
-                          value={lineFormData.unite}
-                          onChange={(e) => setLineFormData({ ...lineFormData, unite: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="prixUnitaireHT">Prix HT *</Label>
-                        <Input
-                          id="prixUnitaireHT"
-                          type="number"
-                          step="0.01"
-                          value={lineFormData.prixUnitaireHT}
-                          onChange={(e) => setLineFormData({ ...lineFormData, prixUnitaireHT: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="tauxTVA">TVA %</Label>
-                        <Input
-                          id="tauxTVA"
-                          type="number"
-                          step="0.01"
-                          value={lineFormData.tauxTVA}
-                          onChange={(e) => setLineFormData({ ...lineFormData, tauxTVA: e.target.value })}
-                        />
+                        <div className="space-y-2">
+                          <Label htmlFor="unite">Unité</Label>
+                          <Input
+                            id="unite"
+                            value={lineFormData.unite}
+                            onChange={(e) => setLineFormData({ ...lineFormData, unite: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="prixUnitaireHT">Prix HT *</Label>
+                          <Input
+                            id="prixUnitaireHT"
+                            type="number"
+                            step="0.01"
+                            value={lineFormData.prixUnitaireHT}
+                            onChange={(e) => setLineFormData({ ...lineFormData, prixUnitaireHT: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="tauxTVA">TVA %</Label>
+                          <Input
+                            id="tauxTVA"
+                            type="number"
+                            step="0.01"
+                            value={lineFormData.tauxTVA}
+                            onChange={(e) => setLineFormData({ ...lineFormData, tauxTVA: e.target.value })}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setIsAddLineDialogOpen(false)}>
-                      Annuler
-                    </Button>
-                    <Button type="submit" disabled={addLineMutation.isPending}>
-                      {addLineMutation.isPending ? "Ajout..." : "Ajouter"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setIsAddLineDialogOpen(false)}>
+                        Annuler
+                      </Button>
+                      <Button type="submit" disabled={addLineMutation.isPending}>
+                        {addLineMutation.isPending ? "Ajout..." : "Ajouter"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -631,7 +893,7 @@ export default function FactureDetail() {
                   </tr>
                   <tr className="bg-muted/50">
                     <td colSpan={5} className="text-right font-bold">Total TTC</td>
-                    <td className="text-right font-bold text-primary">{formatCurrency(facture.totalTTC)}</td>
+                    <td className={`text-right font-bold ${isAvoir ? "text-red-600" : "text-primary"}`}>{formatCurrency(facture.totalTTC)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -640,13 +902,71 @@ export default function FactureDetail() {
             <div className="text-center py-8 text-muted-foreground">
               <Receipt className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>Aucune ligne dans cette facture</p>
-              <Button variant="link" onClick={() => setIsAddLineDialogOpen(true)}>
-                Ajouter une ligne
-              </Button>
+              {!isLocked && (
+                <Button variant="link" onClick={() => setIsAddLineDialogOpen(true)}>
+                  Ajouter une ligne
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Avoirs liés (pour les factures) */}
+      {!isAvoir && avoirs && avoirs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-red-500" />
+              Avoirs émis sur cette facture
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {avoirs.map((avoir: any) => (
+                <div
+                  key={avoir.id}
+                  className="flex items-center justify-between p-3 bg-red-50 border border-red-100 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
+                  onClick={() => setLocation(`/factures/${avoir.id}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <Badge className="bg-red-100 text-red-700">AVOIR</Badge>
+                    <span className="font-medium">{avoir.numero}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {avoir.dateFacture ? format(new Date(avoir.dateFacture), "dd/MM/yyyy") : ""}
+                    </span>
+                  </div>
+                  <span className="font-medium text-red-600">{formatCurrency(avoir.totalTTC)}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Journal d'audit */}
+      {auditLogs && auditLogs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Journal d'audit
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {auditLogs.map((log: any) => (
+                <div key={log.id} className="flex items-start gap-3 text-sm border-b last:border-0 pb-2 last:pb-0">
+                  <span className="text-muted-foreground whitespace-nowrap">
+                    {log.createdAt ? format(new Date(log.createdAt), "dd/MM/yyyy HH:mm", { locale: fr }) : ""}
+                  </span>
+                  <span className="text-foreground">{log.details || log.action}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

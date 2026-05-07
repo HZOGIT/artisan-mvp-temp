@@ -67,6 +67,7 @@ interface FactureData {
   totalTTC: number;
   montantPaye?: number | null;
   conditions?: string | null;
+  isAvoir?: boolean;
 }
 
 interface PdfOptions {
@@ -437,12 +438,30 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   const doc = new jsPDF();
   registerFonts(doc);
 
-  let yPos = addHeader(doc, artisan, "FACTURE", facture.numero);
+  const isAvoir = facture.isAvoir === true;
+  const headerType = isAvoir ? "AVOIR" : "FACTURE";
+
+  let yPos = addHeader(doc, artisan, headerType as "DEVIS" | "FACTURE", facture.numero);
+
+  // Pour les avoirs, ajouter un bandeau rouge bien visible
+  if (isAvoir) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFillColor(220, 53, 69);
+    doc.rect(0, yPos - 8, pageWidth, 10, "F");
+    doc.setFontSize(10);
+    doc.setFont("Roboto", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text("AVOIR — Document d'annulation", pageWidth / 2, yPos - 1, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    yPos += 8;
+  }
+
   yPos = addClientInfo(doc, client, yPos - 35);
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
   addFooter(doc, facture.conditions, options?.mentionsLegales);
 
-  doc.save(`Facture_${facture.numero}.pdf`);
+  const prefix = isAvoir ? "Avoir" : "Facture";
+  doc.save(`${prefix}_${facture.numero}.pdf`);
 }

@@ -34,6 +34,7 @@ const statusColors: Record<string, string> = {
 export default function Factures() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"tous" | "facture" | "avoir">("tous");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [formData, setFormData] = useState({
@@ -62,10 +63,10 @@ export default function Factures() {
   const deleteMutation = trpc.factures.delete.useMutation({
     onSuccess: () => {
       utils.factures.list.invalidate();
-      toast.success("Facture supprimée avec succès");
+      toast.success("Brouillon supprimé avec succès");
     },
-    onError: () => {
-      toast.error("Erreur lors de la suppression de la facture");
+    onError: (error) => {
+      toast.error(error.message || "Erreur lors de la suppression");
     },
   });
 
@@ -81,8 +82,12 @@ export default function Factures() {
     });
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette facture ?")) {
+  const handleDelete = (id: number, statut: string) => {
+    if (statut !== "brouillon") {
+      toast.error("Seuls les brouillons peuvent être supprimés (conformité fiscale)");
+      return;
+    }
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce brouillon ?")) {
       deleteMutation.mutate({ id });
     }
   };
@@ -95,6 +100,13 @@ export default function Factures() {
   const clientsMap = new Map((clients || []).map((c: any) => [c.id, c]));
 
   const filteredFactures = facturesList?.filter((facture: any) => {
+    // Filtre par type
+    if (typeFilter !== "tous") {
+      const docType = facture.typeDocument || "facture";
+      if (docType !== typeFilter) return false;
+    }
+
+    // Filtre par recherche
     const searchLower = searchQuery.toLowerCase();
     if (!searchLower) return true;
     const client = clientsMap.get(facture.clientId);
@@ -113,7 +125,7 @@ export default function Factures() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Factures</h1>
           <p className="text-muted-foreground mt-1">
-            Gérez vos factures clients
+            Gérez vos factures et avoirs clients
           </p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -188,15 +200,27 @@ export default function Factures() {
         </Dialog>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Rechercher une facture..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search + Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher une facture..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="tous">Tous les documents</SelectItem>
+            <SelectItem value="facture">Factures uniquement</SelectItem>
+            <SelectItem value="avoir">Avoirs uniquement</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Factures List */}
@@ -209,6 +233,7 @@ export default function Factures() {
           <table className="data-table">
             <thead>
               <tr>
+                <th className="whitespace-nowrap">Type</th>
                 <th className="whitespace-nowrap">Numéro</th>
                 <th className="whitespace-nowrap">Date</th>
                 <th>Client</th>
@@ -221,13 +246,22 @@ export default function Factures() {
             <tbody>
               {filteredFactures.map((facture: any) => {
                 const client = clientsMap.get(facture.clientId);
+                const isAvoir = facture.typeDocument === "avoir";
+                const isBrouillon = facture.statut === "brouillon";
                 return (
                   <tr key={facture.id} className="cursor-pointer" onClick={() => setLocation(`/factures/${facture.id}`)}>
+                    <td className="whitespace-nowrap">
+                      {isAvoir ? (
+                        <Badge className="bg-red-100 text-red-700 border-red-300 text-xs">AVOIR</Badge>
+                      ) : (
+                        <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs">FACTURE</Badge>
+                      )}
+                    </td>
                     <td className="font-medium whitespace-nowrap">{facture.numero}</td>
                     <td className="whitespace-nowrap text-muted-foreground">{facture.dateFacture ? format(new Date(facture.dateFacture), "dd/MM/yyyy") : "-"}</td>
                     <td className="whitespace-nowrap">{client ? `${client.nom} ${client.prenom || ''}`.trim() : "-"}</td>
                     <td className="max-w-[200px] truncate">{facture.objet || "-"}</td>
-                    <td className="font-medium text-right whitespace-nowrap">{formatCurrency(facture.totalTTC)}</td>
+                    <td className={`font-medium text-right whitespace-nowrap ${isAvoir ? "text-red-600" : ""}`}>{formatCurrency(facture.totalTTC)}</td>
                     <td className="whitespace-nowrap">
                       <Badge className={statusColors[facture.statut || 'brouillon'] || "bg-gray-100"}>
                         {statusLabels[facture.statut || 'brouillon'] || facture.statut}
@@ -245,17 +279,21 @@ export default function Factures() {
                             <Eye className="h-4 w-4 mr-2" />
                             Voir
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setLocation(`/factures/${facture.id}`)}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Modifier
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDelete(facture.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Supprimer
-                          </DropdownMenuItem>
+                          {isBrouillon && (
+                            <DropdownMenuItem onClick={() => setLocation(`/factures/${facture.id}`)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Modifier
+                            </DropdownMenuItem>
+                          )}
+                          {isBrouillon ? (
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(facture.id, facture.statut)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Supprimer
+                            </DropdownMenuItem>
+                          ) : null}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -273,7 +311,7 @@ export default function Factures() {
               {searchQuery ? "Aucune facture trouvée" : "Aucune facture"}
             </h3>
             <p className="text-muted-foreground text-center mb-4">
-              {searchQuery 
+              {searchQuery
                 ? "Essayez avec d'autres termes de recherche"
                 : "Commencez par créer votre première facture"}
             </p>

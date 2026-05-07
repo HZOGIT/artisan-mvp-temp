@@ -52,6 +52,7 @@ import {
   rdvEnLigne, RdvEnLigne, InsertRdvEnLigne,
   suiviChantier, SuiviChantier, InsertSuiviChantier,
   permissionsUtilisateur, PermissionUtilisateur, InsertPermissionUtilisateur,
+  auditLog, AuditLog, InsertAuditLog,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -618,6 +619,50 @@ export async function deleteFacture(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(facturesLignes).where(eq(facturesLignes.factureId, id));
   await db.delete(factures).where(eq(factures.id, id));
+}
+
+export async function getNextAvoirNumber(artisanId: number): Promise<string> {
+  const db = await getDb();
+  const params = await db.select().from(parametresArtisan).where(eq(parametresArtisan.artisanId, artisanId)).limit(1);
+  const prefix = params[0]?.prefixeAvoir || 'AV';
+  const compteurParam = (params[0]?.compteurAvoir || 0) + 1;
+
+  const maxResult = await db.select({ maxNum: sql<string>`MAX(numero)` }).from(factures)
+    .where(and(eq(factures.artisanId, artisanId), eq(factures.typeDocument, 'avoir')));
+  let maxFromDb = 0;
+  if (maxResult[0]?.maxNum) {
+    const match = maxResult[0].maxNum.match(/-(\d+)$/);
+    if (match) maxFromDb = parseInt(match[1], 10) + 1;
+  }
+
+  const compteur = Math.max(compteurParam, maxFromDb);
+
+  if (params[0]) {
+    await db.update(parametresArtisan).set({ compteurAvoir: compteur }).where(eq(parametresArtisan.artisanId, artisanId));
+  } else {
+    await db.insert(parametresArtisan).values({ artisanId, compteurAvoir: compteur });
+  }
+
+  return `${prefix}-${String(compteur).padStart(5, '0')}`;
+}
+
+export async function createAuditLog(data: { artisanId: number; userId: number; entityType: string; entityId: number; action: string; details?: string }): Promise<void> {
+  const db = await getDb();
+  await db.insert(auditLog).values(data);
+}
+
+export async function getAuditLogsByEntity(entityType: string, entityId: number): Promise<any[]> {
+  const db = await getDb();
+  return await db.select().from(auditLog)
+    .where(and(eq(auditLog.entityType, entityType), eq(auditLog.entityId, entityId)))
+    .orderBy(desc(auditLog.createdAt));
+}
+
+export async function getAvoirsByFactureId(factureOrigineId: number): Promise<Facture[]> {
+  const db = await getDb();
+  return await db.select().from(factures)
+    .where(and(eq(factures.factureOrigineId, factureOrigineId), eq(factures.typeDocument, 'avoir')))
+    .orderBy(desc(factures.createdAt));
 }
 
 // ============================================================================

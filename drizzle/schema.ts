@@ -182,6 +182,8 @@ export const factures = mysqlTable("factures", {
   dateFacture: timestamp("dateFacture").defaultNow().notNull(),
   dateEcheance: timestamp("dateEcheance"),
   statut: mysqlEnum("statut", ["brouillon", "envoyee", "payee", "en_retard", "annulee"]).default("brouillon"),
+  typeDocument: mysqlEnum("typeDocument", ["facture", "avoir"]).default("facture"),
+  factureOrigineId: int("factureOrigineId"),
   objet: text("objet"),
   conditionsPaiement: text("conditionsPaiement"),
   notes: text("notes"),
@@ -270,8 +272,10 @@ export const parametresArtisan = mysqlTable("parametres_artisan", {
   artisanId: int("artisanId").notNull().unique(),
   prefixeDevis: varchar("prefixeDevis", { length: 10 }).default("DEV"),
   prefixeFacture: varchar("prefixeFacture", { length: 10 }).default("FAC"),
+  prefixeAvoir: varchar("prefixeAvoir", { length: 10 }).default("AV"),
   compteurDevis: int("compteurDevis").default(1),
   compteurFacture: int("compteurFacture").default(1),
+  compteurAvoir: int("compteurAvoir").default(1),
   mentionsLegales: text("mentionsLegales"),
   conditionsGenerales: text("conditionsGenerales"),
   notificationsEmail: boolean("notificationsEmail").default(true),
@@ -1621,3 +1625,20 @@ export const rdvEnLigne = mysqlTable("rdv_en_ligne", {
 
 export type RdvEnLigne = typeof rdvEnLigne.$inferSelect;
 export type InsertRdvEnLigne = typeof rdvEnLigne.$inferInsert;
+
+// ============================================================================
+// AUDIT LOG (Journal d'audit - append-only, conformité fiscale)
+// ============================================================================
+export const auditLog = mysqlTable("audit_log", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  userId: int("userId").notNull(),
+  entityType: varchar("entityType", { length: 50 }).notNull(),
+  entityId: int("entityId").notNull(),
+  action: varchar("action", { length: 50 }).notNull(),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLog.$inferSelect;
+export type InsertAuditLog = typeof auditLog.$inferInsert;

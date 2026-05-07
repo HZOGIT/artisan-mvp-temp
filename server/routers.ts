@@ -1085,7 +1085,7 @@ const facturesRouter = router({
       }
       const numero = await db.getNextFactureNumber(artisan.id);
       // Utiliser la version sécurisée (créer une fonction si nécessaire)
-      return await db.createFacture(artisan.id, {
+      const newFacture = await db.createFacture(artisan.id, {
         clientId: input.clientId,
         numero,
         objet: input.objet,
@@ -1098,6 +1098,15 @@ const facturesRouter = router({
         totalTVA: "0.00",
         totalTTC: "0.00",
       });
+      await db.createAuditLog({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        entityType: "facture",
+        entityId: newFacture.id,
+        action: "creation",
+        details: `Création de la facture ${numero}`,
+      });
+      return newFacture;
     }),
   
   update: facturesCreerProcedure
@@ -1112,21 +1121,68 @@ const facturesRouter = router({
       datePaiement: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { id, dateEcheance, datePaiement, ...data } = input;
+      const { id, dateEcheance, datePaiement, statut, ...data } = input;
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
       }
-      // Vérifier que la facture appartient à l'artisan
       const facture = await dbSecure.getFactureByIdSecure(id, artisan.id);
       if (!facture) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
       }
-      return await db.updateFacture(id, {
-        ...data,
-        dateEcheance: dateEcheance ? new Date(dateEcheance) : undefined,
-        datePaiement: datePaiement ? new Date(datePaiement) : undefined,
-      });
+
+      const currentStatut = facture.statut || "brouillon";
+      const isLocked = currentStatut !== "brouillon";
+
+      // Si la facture est verrouillée, seul le changement de statut est autorisé (et dans le bon sens)
+      if (isLocked) {
+        const hasContentChanges = data.objet !== undefined || data.conditionsPaiement !== undefined || data.notes !== undefined || dateEcheance !== undefined;
+        if (hasContentChanges) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Document fiscal verrouillé — modification interdite. Émettez un avoir pour corriger." });
+        }
+      }
+
+      // Validation des transitions de statut autorisées
+      if (statut) {
+        const allowedTransitions: Record<string, string[]> = {
+          brouillon: ["envoyee"],
+          envoyee: ["payee", "en_retard"],
+          en_retard: ["payee"],
+          payee: [],
+          annulee: [],
+        };
+        const allowed = allowedTransitions[currentStatut] || [];
+        if (!allowed.includes(statut)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: `Transition de statut non autorisée: ${currentStatut} → ${statut}` });
+        }
+      }
+
+      const updateData: any = {};
+      if (!isLocked) {
+        if (data.objet !== undefined) updateData.objet = data.objet;
+        if (data.conditionsPaiement !== undefined) updateData.conditionsPaiement = data.conditionsPaiement;
+        if (data.notes !== undefined) updateData.notes = data.notes;
+        if (dateEcheance) updateData.dateEcheance = new Date(dateEcheance);
+      }
+      if (statut) updateData.statut = statut;
+      if (datePaiement) updateData.datePaiement = new Date(datePaiement);
+      if (data.montantPaye !== undefined) updateData.montantPaye = data.montantPaye;
+
+      const result = await db.updateFacture(id, updateData);
+
+      // Audit log
+      if (statut) {
+        await db.createAuditLog({
+          artisanId: artisan.id,
+          userId: ctx.user.id,
+          entityType: "facture",
+          entityId: id,
+          action: `statut_${statut}`,
+          details: `Changement de statut: ${currentStatut} → ${statut}`,
+        });
+      }
+
+      return result;
     }),
 
   delete: facturesSupprimerProcedure
@@ -1136,12 +1192,23 @@ const facturesRouter = router({
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
       }
-      // Vérifier que la facture appartient à l'artisan
       const facture = await dbSecure.getFactureByIdSecure(input.id, artisan.id);
       if (!facture) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
       }
+      // Seuls les brouillons peuvent être supprimés (conformité fiscale)
+      if (facture.statut !== "brouillon") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Un document fiscal validé ne peut pas être supprimé. Émettez un avoir pour l'annuler." });
+      }
       await db.deleteFacture(input.id);
+      await db.createAuditLog({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        entityType: "facture",
+        entityId: input.id,
+        action: "suppression_brouillon",
+        details: `Suppression du brouillon ${facture.numero}`,
+      });
       return { success: true };
     }),
   
@@ -1156,7 +1223,15 @@ const facturesRouter = router({
       prixUnitaireHT: z.string(),
       tauxTVA: z.string().default("20.00"),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Vérifier que la facture est encore modifiable
+      const factureCheck = await db.getFactureById(input.factureId);
+      if (!factureCheck) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+      }
+      if (factureCheck.statut !== "brouillon") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Document fiscal verrouillé — impossible d'ajouter des lignes." });
+      }
       const quantite = parseFloat(input.quantite);
       const prixUnitaireHT = parseFloat(input.prixUnitaireHT);
       const tauxTVA = parseFloat(input.tauxTVA);
@@ -1198,11 +1273,20 @@ const facturesRouter = router({
       if (!artisan || facture.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acces non autorise" });
       }
-      return await db.updateFacture(input.id, {
+      const result = await db.updateFacture(input.id, {
         montantPaye: input.montantPaye,
         datePaiement: new Date(input.datePaiement),
         statut: "payee",
       });
+      await db.createAuditLog({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        entityType: "facture",
+        entityId: input.id,
+        action: "paiement",
+        details: `Paiement de ${input.montantPaye} € enregistré le ${input.datePaiement}`,
+      });
+      return result;
     }),
 
   generatePDF: protectedProcedure
@@ -1300,6 +1384,15 @@ const facturesRouter = router({
           message: `La facture ${facture.numero} a été envoyée à ${client.email}`,
           lien: `/factures/${facture.id}`,
         });
+        // Audit log
+        await db.createAuditLog({
+          artisanId: artisan.id,
+          userId: ctx.user.id,
+          entityType: "facture",
+          entityId: facture.id,
+          action: "envoi_email",
+          details: `Facture ${facture.numero} envoyée par email à ${client.email}`,
+        });
       }
 
       return result;
@@ -1376,6 +1469,120 @@ const facturesRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       return await db.getPaiementsByFactureId(input.factureId);
+    }),
+
+  // Émettre un avoir (credit note) sur une facture validée
+  createAvoir: facturesCreerProcedure
+    .input(z.object({
+      factureOrigineId: z.number(),
+      lignes: z.array(z.object({
+        designation: z.string(),
+        description: z.string().optional(),
+        quantite: z.string(),
+        unite: z.string().optional(),
+        prixUnitaireHT: z.string(),
+        tauxTVA: z.string().default("20.00"),
+      })),
+      objet: z.string().optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      const factureOrigine = await dbSecure.getFactureByIdSecure(input.factureOrigineId, artisan.id);
+      if (!factureOrigine) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture d'origine non trouvée" });
+      }
+      if (factureOrigine.statut === "brouillon") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Impossible d'émettre un avoir sur un brouillon. Modifiez ou supprimez le brouillon directement." });
+      }
+
+      const numero = await db.getNextAvoirNumber(artisan.id);
+      const defaultObjet = `Avoir sur facture ${factureOrigine.numero}`;
+
+      const avoir = await db.createFacture(artisan.id, {
+        clientId: factureOrigine.clientId,
+        numero,
+        objet: input.objet || defaultObjet,
+        notes: input.notes,
+        conditionsPaiement: factureOrigine.conditionsPaiement,
+        statut: "envoyee",
+        typeDocument: "avoir",
+        factureOrigineId: input.factureOrigineId,
+        dateFacture: new Date(),
+        totalHT: "0.00",
+        totalTVA: "0.00",
+        totalTTC: "0.00",
+      });
+
+      // Ajouter les lignes (montants négatifs)
+      for (const ligne of input.lignes) {
+        const quantite = parseFloat(ligne.quantite);
+        const prixUnitaireHT = parseFloat(ligne.prixUnitaireHT);
+        const tauxTVA = parseFloat(ligne.tauxTVA);
+        const montantHT = -(Math.abs(quantite) * Math.abs(prixUnitaireHT));
+        const montantTVA = montantHT * (tauxTVA / 100);
+        const montantTTC = montantHT + montantTVA;
+
+        await db.createLigneFacture({
+          factureId: avoir.id,
+          designation: ligne.designation,
+          description: ligne.description,
+          quantite: String(quantite),
+          unite: ligne.unite,
+          prixUnitaireHT: String(-Math.abs(prixUnitaireHT)),
+          tauxTVA: ligne.tauxTVA,
+          montantHT: montantHT.toFixed(2),
+          montantTVA: montantTVA.toFixed(2),
+          montantTTC: montantTTC.toFixed(2),
+        });
+      }
+
+      await db.recalculateFactureTotals(avoir.id);
+
+      await db.createAuditLog({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        entityType: "facture",
+        entityId: avoir.id,
+        action: "creation_avoir",
+        details: `Avoir ${numero} émis sur facture ${factureOrigine.numero}`,
+      });
+      // Also log on the original invoice
+      await db.createAuditLog({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        entityType: "facture",
+        entityId: input.factureOrigineId,
+        action: "avoir_emis",
+        details: `Avoir ${numero} émis sur cette facture`,
+      });
+
+      return avoir;
+    }),
+
+  // Récupérer les avoirs liés à une facture
+  getAvoirsByFacture: facturesVoirProcedure
+    .input(z.object({ factureId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const facture = await dbSecure.getFactureByIdSecure(input.factureId, artisan.id);
+      if (!facture) return [];
+      return await db.getAvoirsByFactureId(input.factureId);
+    }),
+
+  // Journal d'audit d'une facture
+  getAuditLog: facturesVoirProcedure
+    .input(z.object({ factureId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const facture = await dbSecure.getFactureByIdSecure(input.factureId, artisan.id);
+      if (!facture) return [];
+      return await db.getAuditLogsByEntity("facture", input.factureId);
     }),
 });
 
