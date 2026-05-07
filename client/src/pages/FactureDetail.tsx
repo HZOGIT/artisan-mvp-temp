@@ -29,6 +29,7 @@ interface ArticleBibliotheque {
 
 const statusLabels: Record<string, string> = {
   brouillon: "Brouillon",
+  validee: "Validée",
   envoyee: "Envoyée",
   payee: "Payée",
   en_retard: "En retard",
@@ -37,6 +38,7 @@ const statusLabels: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
+  validee: "bg-amber-100 text-amber-800",
   envoyee: "bg-blue-100 text-blue-700",
   payee: "bg-green-100 text-green-700",
   en_retard: "bg-orange-100 text-orange-700",
@@ -384,12 +386,21 @@ export default function FactureDetail() {
   // Transitions de statut autorisées
   const allowedTransitions: Record<string, string[]> = {
     brouillon: ["envoyee"],
+    validee: ["envoyee", "payee", "annulee"],
     envoyee: ["payee", "en_retard"],
     en_retard: ["payee"],
     payee: [],
     annulee: [],
   };
   const allowedNextStatuses = allowedTransitions[currentStatut] || [];
+
+  // Le bouton "Envoyer par email" doit rester actif pour permettre les renvois.
+  // Le label change selon que le document a déjà été envoyé ou non.
+  const dejaEnvoye = currentStatut === "envoyee" || currentStatut === "payee" || currentStatut === "en_retard";
+  const sendButtonLabel = dejaEnvoye ? "Renvoyer par email" : "Envoyer par email";
+  const sendDialogTitle = dejaEnvoye
+    ? `Renvoyer ${isAvoir ? "l'avoir" : "la facture"} par email`
+    : `Envoyer ${isAvoir ? "l'avoir" : "la facture"} par email`;
 
   return (
     <div className="space-y-6">
@@ -423,19 +434,19 @@ export default function FactureDetail() {
             Export PDF
           </Button>
 
-          {/* Envoyer par email */}
+          {/* Envoyer / Renvoyer par email */}
           <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" disabled={!facture.client?.email}>
                 <Mail className="h-4 w-4 mr-2" />
-                Envoyer par email
+                {sendButtonLabel}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Envoyer la facture par email</DialogTitle>
+                <DialogTitle>{sendDialogTitle}</DialogTitle>
                 <DialogDescription>
-                  La facture sera envoyée à {facture.client?.email}
+                  {isAvoir ? "L'avoir" : "La facture"} sera {dejaEnvoye ? "renvoyé" : "envoyé"}{isAvoir ? "" : "e"} à {facture.client?.email}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -463,7 +474,9 @@ export default function FactureDetail() {
                   Annuler
                 </Button>
                 <Button onClick={handleSendByEmail} disabled={sendByEmailMutation.isPending}>
-                  {sendByEmailMutation.isPending ? "Envoi en cours..." : "Envoyer"}
+                  {sendByEmailMutation.isPending
+                    ? (dejaEnvoye ? "Renvoi en cours..." : "Envoi en cours...")
+                    : (dejaEnvoye ? "Renvoyer" : "Envoyer")}
                 </Button>
               </DialogFooter>
             </DialogContent>

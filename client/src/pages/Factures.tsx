@@ -17,6 +17,7 @@ import { fr } from "date-fns/locale";
 
 const statusLabels: Record<string, string> = {
   brouillon: "Brouillon",
+  validee: "Validée",
   envoyee: "Envoyée",
   payee: "Payée",
   en_retard: "En retard",
@@ -25,6 +26,7 @@ const statusLabels: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
+  validee: "bg-amber-100 text-amber-800",
   envoyee: "bg-blue-100 text-blue-700",
   payee: "bg-green-100 text-green-700",
   en_retard: "bg-orange-100 text-orange-700",

@@ -303,7 +303,7 @@ export const FactureInputSchema = z.object({
   totalTVA: MoneySchema,
   totalTTC: MoneySchema,
   statut: z
-    .enum(["brouillon", "envoyee", "payee", "partiellement_payee", "annulee"])
+    .enum(["brouillon", "validee", "envoyee", "payee", "partiellement_payee", "annulee"])
     .optional(),
   notes: z
     .string()

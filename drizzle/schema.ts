@@ -181,7 +181,7 @@ export const factures = mysqlTable("factures", {
   numero: varchar("numero", { length: 50 }).notNull(),
   dateFacture: timestamp("dateFacture").defaultNow().notNull(),
   dateEcheance: timestamp("dateEcheance"),
-  statut: mysqlEnum("statut", ["brouillon", "envoyee", "payee", "en_retard", "annulee"]).default("brouillon"),
+  statut: mysqlEnum("statut", ["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]).default("brouillon"),
   typeDocument: mysqlEnum("typeDocument", ["facture", "avoir"]).default("facture"),
   factureOrigineId: int("factureOrigineId"),
   objet: text("objet"),

@@ -1116,7 +1116,7 @@ const facturesRouter = router({
       conditionsPaiement: z.string().optional(),
       notes: z.string().optional(),
       dateEcheance: z.string().optional(),
-      statut: z.enum(["brouillon", "envoyee", "payee", "en_retard", "annulee"]).optional(),
+      statut: z.enum(["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]).optional(),
       montantPaye: z.string().optional(),
       datePaiement: z.string().optional(),
     }))
@@ -1374,14 +1374,21 @@ const facturesRouter = router({
       });
 
       if (result.success) {
-        // Mettre à jour le statut de la facture en "envoyée"
-        await db.updateFacture(facture.id, { statut: "envoyee" });
+        // Ne passer en "envoyee" que depuis brouillon/validee — on ne fait pas
+        // régresser un statut "payee"/"en_retard" lors d'un renvoi
+        const statutActuel = facture.statut || "brouillon";
+        const isFirstSend = statutActuel === "brouillon" || statutActuel === "validee";
+        if (isFirstSend) {
+          await db.updateFacture(facture.id, { statut: "envoyee" });
+        }
         // Créer une notification
+        const docLabel = facture.typeDocument === "avoir" ? "Avoir" : "Facture";
+        const verbe = isFirstSend ? "envoyé" : "renvoyé";
         await db.createNotification({
           artisanId: artisan.id,
           type: "succes",
-          titre: "Facture envoyée",
-          message: `La facture ${facture.numero} a été envoyée à ${client.email}`,
+          titre: `${docLabel} ${verbe}`,
+          message: `${docLabel} ${facture.numero} ${verbe}(e) à ${client.email}`,
           lien: `/factures/${facture.id}`,
         });
         // Audit log
@@ -1390,8 +1397,8 @@ const facturesRouter = router({
           userId: ctx.user.id,
           entityType: "facture",
           entityId: facture.id,
-          action: "envoi_email",
-          details: `Facture ${facture.numero} envoyée par email à ${client.email}`,
+          action: isFirstSend ? "envoi_email" : "renvoi_email",
+          details: `${docLabel} ${facture.numero} ${verbe}(e) par email à ${client.email}`,
         });
       }
 
@@ -1552,7 +1559,7 @@ const facturesRouter = router({
         objet: input.objet || defaultObjet,
         notes: input.notes,
         conditionsPaiement: factureOrigine.conditionsPaiement,
-        statut: "envoyee",
+        statut: "validee",
         typeDocument: "avoir",
         factureOrigineId: input.factureOrigineId,
         dateFacture: new Date(),

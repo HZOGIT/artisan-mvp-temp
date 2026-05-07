@@ -241,6 +241,7 @@ export default function PortailClient() {
   const getFactureStatutBadge = (statut: string) => {
     const config: Record<string, { className: string; label: string }> = {
       brouillon: { className: "bg-gray-100 text-gray-700 border-gray-200", label: "Brouillon" },
+      validee: { className: "bg-amber-100 text-amber-800 border-amber-200", label: "Validée" },
       envoyee: { className: "bg-blue-100 text-blue-700 border-blue-200", label: "En attente" },
       payee: { className: "bg-green-100 text-green-700 border-green-200", label: "Payée" },
       en_retard: { className: "bg-red-100 text-red-700 border-red-200", label: "En retard" },
