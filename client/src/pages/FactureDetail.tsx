@@ -360,6 +360,27 @@ export default function FactureDetail() {
   const isAvoir = (facture as any).typeDocument === "avoir";
   const documentLabel = isAvoir ? "Avoir" : "Facture";
 
+  // Calcul du solde restant pour les avoirs
+  const factureTotalTTC = parseFloat(facture.totalTTC as any) || 0;
+  const totalCouvertParAvoirs = (avoirs || []).reduce(
+    (sum: number, a: any) => sum + Math.abs(parseFloat(a.totalTTC) || 0),
+    0
+  );
+  const avoirTotalExistant = (avoirs || []).find(
+    (a: any) => Math.abs(Math.abs(parseFloat(a.totalTTC) || 0) - factureTotalTTC) < 0.01
+  );
+  const soldeAvoirRestant = Math.max(0, factureTotalTTC - totalCouvertParAvoirs);
+  const avoirBloque = !!avoirTotalExistant || soldeAvoirRestant <= 0.01;
+
+  // Montant TTC du nouvel avoir partiel en cours de saisie
+  const nouveauAvoirMontantTTC = avoirLignes.reduce((sum, l) => {
+    const q = Math.abs(parseFloat(l.quantite) || 0);
+    const pu = Math.abs(parseFloat(l.prixUnitaireHT) || 0);
+    const tva = parseFloat(l.tauxTVA) || 0;
+    return sum + q * pu * (1 + tva / 100);
+  }, 0);
+  const depasseSolde = avoirType === "partiel" && nouveauAvoirMontantTTC > soldeAvoirRestant + 0.01;
+
   // Transitions de statut autorisées
   const allowedTransitions: Record<string, string[]> = {
     brouillon: ["envoyee"],
@@ -518,7 +539,15 @@ export default function FactureDetail() {
           )}
 
           {/* Émettre un avoir — uniquement sur factures validées (pas sur les avoirs) */}
-          {isLocked && !isAvoir && (
+          {isLocked && !isAvoir && avoirBloque && (
+            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground border border-dashed border-gray-300 rounded-md px-3 py-2">
+              <Lock className="h-4 w-4" />
+              {avoirTotalExistant
+                ? `Avoir total déjà émis (${avoirTotalExistant.numero})`
+                : "Solde entièrement couvert par les avoirs"}
+            </span>
+          )}
+          {isLocked && !isAvoir && !avoirBloque && (
             <Dialog open={isAvoirDialogOpen} onOpenChange={(open) => {
               setIsAvoirDialogOpen(open);
               if (open) {
@@ -541,6 +570,13 @@ export default function FactureDetail() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
+                  {totalCouvertParAvoirs > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                      Montant déjà couvert par avoirs : <strong>{formatCurrency(totalCouvertParAvoirs)}</strong>
+                      {" "}/ Solde disponible : <strong>{formatCurrency(soldeAvoirRestant)}</strong>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label>Type d'avoir</Label>
                     <Select value={avoirType} onValueChange={(v) => setAvoirType(v as "total" | "partiel")}>
@@ -548,7 +584,10 @@ export default function FactureDetail() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="total">Avoir total (annulation complète)</SelectItem>
+                        <SelectItem value="total" disabled={totalCouvertParAvoirs > 0}>
+                          Avoir total (annulation complète)
+                          {totalCouvertParAvoirs > 0 && " — indisponible (avoirs partiels existants)"}
+                        </SelectItem>
                         <SelectItem value="partiel">Avoir partiel (montant personnalisé)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -620,6 +659,18 @@ export default function FactureDetail() {
                     </div>
                   )}
 
+                  {avoirType === "partiel" && avoirLignes.length > 0 && (
+                    <div className={`rounded-lg p-3 text-sm border ${depasseSolde ? "bg-red-50 border-red-200 text-red-800" : "bg-gray-50 border-gray-200 text-gray-700"}`}>
+                      Montant de cet avoir : <strong>{formatCurrency(nouveauAvoirMontantTTC)}</strong>
+                      {depasseSolde && (
+                        <div className="mt-1">
+                          <AlertTriangle className="h-4 w-4 inline mr-1" />
+                          Dépasse le solde disponible de {formatCurrency(soldeAvoirRestant)}.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label>Notes (optionnel)</Label>
                     <Textarea
@@ -636,7 +687,7 @@ export default function FactureDetail() {
                   </Button>
                   <Button
                     onClick={handleCreateAvoir}
-                    disabled={createAvoirMutation.isPending}
+                    disabled={createAvoirMutation.isPending || depasseSolde}
                     className="bg-red-600 hover:bg-red-700 text-white"
                   >
                     {createAvoirMutation.isPending ? "Création..." : "Créer l'avoir"}

@@ -1499,6 +1499,50 @@ const facturesRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Impossible d'émettre un avoir sur un brouillon. Modifiez ou supprimez le brouillon directement." });
       }
 
+      // Vérifier les avoirs déjà émis pour empêcher les doublons
+      const avoirsExistants = await db.getAvoirsByFactureId(input.factureOrigineId);
+      const factureTotalTTC = parseFloat(factureOrigine.totalTTC as any) || 0;
+      const totalCouvert = avoirsExistants.reduce(
+        (sum, a) => sum + Math.abs(parseFloat(a.totalTTC as any) || 0),
+        0
+      );
+
+      // Avoir total déjà émis : un seul avoir couvre intégralement la facture
+      const avoirTotal = avoirsExistants.find(
+        (a) => Math.abs(Math.abs(parseFloat(a.totalTTC as any) || 0) - factureTotalTTC) < 0.01
+      );
+      if (avoirTotal) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Un avoir total a déjà été émis sur cette facture (${avoirTotal.numero})`,
+        });
+      }
+
+      // Solde restant après les avoirs partiels existants
+      const soldeRestant = factureTotalTTC - totalCouvert;
+      if (soldeRestant <= 0.01) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Le solde de cette facture est entièrement couvert par les avoirs existants",
+        });
+      }
+
+      // Vérifier le montant du nouvel avoir
+      let nouveauMontantTTC = 0;
+      for (const ligne of input.lignes) {
+        const quantite = Math.abs(parseFloat(ligne.quantite) || 0);
+        const prixUnitaireHT = Math.abs(parseFloat(ligne.prixUnitaireHT) || 0);
+        const tauxTVA = parseFloat(ligne.tauxTVA) || 0;
+        const montantHT = quantite * prixUnitaireHT;
+        nouveauMontantTTC += montantHT * (1 + tauxTVA / 100);
+      }
+      if (nouveauMontantTTC > soldeRestant + 0.01) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Le montant de l'avoir (${nouveauMontantTTC.toFixed(2)} €) dépasse le solde disponible (${soldeRestant.toFixed(2)} €)`,
+        });
+      }
+
       const numero = await db.getNextAvoirNumber(artisan.id);
       const defaultObjet = `Avoir sur facture ${factureOrigine.numero}`;
 
