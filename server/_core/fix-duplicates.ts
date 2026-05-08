@@ -655,6 +655,18 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] modePaiement column check:', e.message);
     }
 
+    // Extend factures.statut enum to include 'validee' (drizzle-kit push skips
+    // enum modifications in non-interactive mode, so we apply this manually).
+    // Idempotent: running MODIFY with the same enum is a no-op.
+    try {
+      await pool.execute(
+        `ALTER TABLE factures MODIFY COLUMN statut ENUM('brouillon','validee','envoyee','payee','en_retard','annulee') DEFAULT 'brouillon'`
+      );
+      console.log('[FixDuplicates] Ensured factures.statut enum includes validee');
+    } catch (e: any) {
+      console.log('[FixDuplicates] factures.statut enum migration:', e.message || e);
+    }
+
     // ========================================================================
     // Migrate commandes_fournisseurs: add new columns + fix statut enum
     // ========================================================================
