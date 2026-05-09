@@ -157,6 +157,7 @@ async function startServer() {
       }
 
       const base64 = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+      console.log(`[Upload Logo] user=${user.id} mime=${file.mimetype} bytes=${file.size} b64chars=${base64.length}`);
 
       const { getArtisanByUserId, updateArtisan } = await import('../db');
       const artisan = await getArtisanByUserId(user.id);
@@ -165,11 +166,22 @@ async function startServer() {
       await updateArtisan(artisan.id, { logo: base64 });
       res.json({ success: true, logoUrl: base64 });
     } catch (error: any) {
-      console.error('[Upload Logo] Error:', error);
+      // Surface the actual error: hiding it as a generic 500 is what kept
+      // ER_DATA_TOO_LONG invisible for so long.
+      console.error('[Upload Logo] Error:', {
+        message: error?.message,
+        code: error?.code,
+        sqlState: error?.sqlState,
+        sqlMessage: error?.sqlMessage,
+      });
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'Fichier trop volumineux (max 2MB)' });
       }
-      res.status(500).json({ error: 'Erreur serveur' });
+      res.status(500).json({
+        error: 'Erreur serveur',
+        detail: error?.sqlMessage || error?.message || String(error),
+        code: error?.code,
+      });
     }
   });
 

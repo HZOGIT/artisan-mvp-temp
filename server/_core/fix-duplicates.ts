@@ -667,6 +667,17 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] factures.statut enum migration:', e.message || e);
     }
 
+    // Widen artisans.logo from TEXT (65 KB) to MEDIUMTEXT (16 MB). The upload
+    // endpoint accepts up to 2 MB binary which becomes ~2.7 MB once base64-
+    // encoded, so TEXT was hard-failing every realistic logo with ER_DATA_TOO_LONG.
+    // Idempotent: MODIFY to the same type is a no-op.
+    try {
+      await pool.execute(`ALTER TABLE artisans MODIFY COLUMN logo MEDIUMTEXT`);
+      console.log('[FixDuplicates] Widened artisans.logo to MEDIUMTEXT');
+    } catch (e: any) {
+      console.log('[FixDuplicates] artisans.logo widen:', e.message || e);
+    }
+
     // ========================================================================
     // Migrate commandes_fournisseurs: add new columns + fix statut enum
     // ========================================================================

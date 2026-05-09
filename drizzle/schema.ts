@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, date, bigint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, mediumtext, timestamp, varchar, decimal, boolean, json, date, bigint } from "drizzle-orm/mysql-core";
 
 // ============================================================================
 // USERS TABLE (Core authentication)
@@ -54,7 +54,7 @@ export const artisans = mysqlTable("artisans", {
   numeroTVA: varchar("numeroTVA", { length: 20 }),
   iban: varchar("iban", { length: 34 }),
   codeAPE: varchar("codeAPE", { length: 10 }),
-  logo: text("logo"),
+  logo: mediumtext("logo"),
   slug: varchar("slug", { length: 255 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

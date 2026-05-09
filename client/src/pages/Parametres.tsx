@@ -116,7 +116,10 @@ export default function Parametres() {
       fd.append("logo", file);
       const resp = await fetch("/api/upload-logo", { method: "POST", body: fd });
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Erreur upload");
+      if (!resp.ok) {
+        const msg = data.detail ? `${data.error}: ${data.detail}` : (data.error || "Erreur upload");
+        throw new Error(msg);
+      }
       setLogoPreview(data.logoUrl);
       refetchArtisan();
       toast.success("Logo téléchargé");
