@@ -13,6 +13,34 @@ function registerFonts(doc: jsPDF) {
   doc.setFont("Roboto", "normal");
 }
 
+// Logo box dimensions inside the 40mm header band (top-left corner).
+const LOGO_X = 15;
+const LOGO_Y = 8;
+const LOGO_W = 25;
+const LOGO_H = 24;
+// When a logo is rendered, the title slides right to leave room for it.
+const TITLE_X_WITH_LOGO = 45;
+const TITLE_X_NO_LOGO = 20;
+
+function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
+  const logo = (artisan as any).logo as string | null | undefined;
+  if (!logo || typeof logo !== "string") return false;
+  const match = logo.match(/^data:image\/(png|jpe?g|webp);base64,/i);
+  if (!match) {
+    // Unsupported format (e.g. SVG which jsPDF cannot rasterize). Render without logo.
+    return false;
+  }
+  const ext = match[1].toLowerCase();
+  const format = ext === "webp" ? "WEBP" : ext.startsWith("jp") ? "JPEG" : "PNG";
+  try {
+    doc.addImage(logo, format, LOGO_X, LOGO_Y, LOGO_W, LOGO_H);
+    return true;
+  } catch (err) {
+    console.error("[PDF] Logo render failed:", (err as Error).message);
+    return false;
+  }
+}
+
 export interface PDFDevisData {
   devis: Devis & { lignes: DevisLigne[] };
   artisan: Artisan;
@@ -89,11 +117,13 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, 210, 40, "F");
 
+  const hasLogo = renderLogo(doc, artisan);
+
   // Titre
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
   doc.setFont("Roboto", "bold");
-  doc.text("DEVIS", 20, 25);
+  doc.text("DEVIS", hasLogo ? TITLE_X_WITH_LOGO : TITLE_X_NO_LOGO, 25);
 
   // Numéro et date
   doc.setTextColor(200, 200, 200);
@@ -232,11 +262,13 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, 210, 40, "F");
 
+  const hasLogo = renderLogo(doc, artisan);
+
   // Titre
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
   doc.setFont("Roboto", "bold");
-  doc.text("FACTURE", 20, 25);
+  doc.text("FACTURE", hasLogo ? TITLE_X_WITH_LOGO : TITLE_X_NO_LOGO, 25);
 
   // Numéro et date
   doc.setTextColor(200, 200, 200);
@@ -420,15 +452,18 @@ export function generateContratPDF(data: PDFContratData): Buffer {
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, 210, 40, "F");
 
+  const hasLogo = renderLogo(doc, artisan);
+  const titleX = hasLogo ? TITLE_X_WITH_LOGO : TITLE_X_NO_LOGO;
+
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont("Roboto", "bold");
-  doc.text("CONTRAT DE MAINTENANCE", 20, 22);
+  doc.text("CONTRAT DE MAINTENANCE", titleX, 22);
 
   doc.setTextColor(200, 200, 200);
   doc.setFontSize(10);
   doc.setFont("Roboto", "normal");
-  doc.text(`Réf: ${contrat.reference}`, 20, 32);
+  doc.text(`Réf: ${contrat.reference}`, titleX, 32);
   doc.text(`Type: ${typeLabels[contrat.type || "entretien"] || contrat.type}`, 120, 32);
 
   // Artisan info
@@ -566,11 +601,13 @@ export function generateBonCommandePDF(data: PDFBonCommandeData): Buffer {
   doc.setFillColor(...primaryColor);
   doc.rect(0, 0, 210, 40, "F");
 
+  const hasLogo = renderLogo(doc, artisan);
+
   // Titre
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
   doc.setFont("Roboto", "bold");
-  doc.text("BON DE COMMANDE", 20, 25);
+  doc.text("BON DE COMMANDE", hasLogo ? TITLE_X_WITH_LOGO : TITLE_X_NO_LOGO, 25);
 
   // Numéro et date
   doc.setTextColor(200, 230, 200);
