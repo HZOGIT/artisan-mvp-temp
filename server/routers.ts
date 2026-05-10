@@ -49,7 +49,7 @@ async function buildSystemPrompt(artisanId: number): Promise<string> {
     return fin <= weekFromNow && c.statut === 'actif';
   });
 
-  return `Tu es MonAssistant, l'assistant IA de MonArtisan Pro. Tu aides l'artisan ${artisan?.nomEntreprise || 'Artisan'} (${artisan?.metier || 'artisan'}) dans sa gestion quotidienne.
+  return `Tu es MonAssistant, l'assistant IA de Operioz. Tu aides l'artisan ${artisan?.nomEntreprise || 'Artisan'} (${artisan?.metier || 'artisan'}) dans sa gestion quotidienne.
 
 Tu as accès aux données suivantes :
 - ${stats.devisEnCours} devis en attente de réponse
@@ -2338,7 +2338,7 @@ const signatureRouter = router({
 <p style="margin:0;font-size:13px;color:#9ca3af;">Si le bouton ne fonctionne pas, copiez ce lien : ${signatureUrl}</p>
 </td></tr>
 <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
-<p style="margin:0;font-size:12px;color:#9ca3af;">Ce message a été envoyé automatiquement depuis MonArtisan Pro</p>
+<p style="margin:0;font-size:12px;color:#9ca3af;">Ce message a été envoyé automatiquement depuis Operioz</p>
 </td></tr>
 </table></td></tr></table></body></html>`
         });
@@ -2555,7 +2555,7 @@ const signatureRouter = router({
           await sendEmail({
             to: artisanEmail,
             subject: `Devis ${devisData.numero} accepté et signé`,
-            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${input.signataireName}</strong> (${input.signataireEmail}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">MonArtisan Pro</p>`
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${input.signataireName}</strong> (${input.signataireEmail}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
           });
         } else {
           console.warn(`[Signature] No email found for artisan id=${devisData.artisanId} — notification email NOT sent`);
@@ -2613,7 +2613,7 @@ const signatureRouter = router({
           await sendEmail({
             to: artisanEmail,
             subject: `Devis ${devisData.numero} refusé par ${clientName}`,
-            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${clientName}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${input.motifRefus}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">MonArtisan Pro</p>`
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${clientName}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${input.motifRefus}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
           });
         }
       }
@@ -3307,7 +3307,7 @@ const commandesFournisseursRouter = router({
 
       // Send email via Resend
       const resendKey = process.env.RESEND_API_KEY;
-      const emailFrom = process.env.EMAIL_FROM || 'MonArtisan Pro <noreply@artisan.cheminov.com>';
+      const emailFrom = process.env.EMAIL_FROM || 'Operioz <noreply@artisan.cheminov.com>';
       if (!resendKey) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Service email non configuré" });
       }
@@ -3410,7 +3410,7 @@ const clientPortalRouter = router({
           <p style="margin:0;font-size:13px;color:#2563eb;word-break:break-all;">${portalUrl}</p>
         </td></tr>
         <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#9ca3af;">Ce message a été envoyé automatiquement depuis MonArtisan Pro</p>
+          <p style="margin:0;font-size:12px;color:#9ca3af;">Ce message a été envoyé automatiquement depuis Operioz</p>
         </td></tr>
       </table>
     </td></tr>
@@ -7022,7 +7022,7 @@ const vitrineRouter = router({
           <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
           <p style="white-space:pre-wrap;">${input.message}</p>
           <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
-          <p style="color:#6b7280;font-size:12px;">Message envoye depuis votre page vitrine Artisan Pro</p>
+          <p style="color:#6b7280;font-size:12px;">Message envoye depuis votre page vitrine Operioz</p>
         </body></html>`,
       });
 
@@ -7096,9 +7096,9 @@ const utilisateursRouter = router({
       try {
         await sendEmail({
           to: input.email,
-          subject: `Invitation à rejoindre ${artisan.nomEntreprise || 'MonArtisan Pro'}`,
+          subject: `Invitation à rejoindre ${artisan.nomEntreprise || 'Operioz'}`,
           body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:20px;">
-            <h2 style="color:#4F46E5;">Bienvenue sur MonArtisan Pro !</h2>
+            <h2 style="color:#4F46E5;">Bienvenue sur Operioz !</h2>
             <p>Vous avez été invité(e) à rejoindre <strong>${artisan.nomEntreprise || 'l\'entreprise'}</strong> en tant que <strong>${roleFr[input.role] || input.role}</strong>.</p>
             <p>Vos identifiants de connexion :</p>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
@@ -7106,7 +7106,7 @@ const utilisateursRouter = router({
               <p style="margin:4px 0;"><strong>Mot de passe temporaire :</strong> ${tempPassword}</p>
             </div>
             <p>Connectez-vous et changez votre mot de passe dès que possible.</p>
-            <p style="color:#6b7280;font-size:12px;margin-top:24px;">MonArtisan Pro - Gestion complète pour artisans du bâtiment</p>
+            <p style="color:#6b7280;font-size:12px;margin-top:24px;">Operioz - Gestion complète pour artisans du bâtiment</p>
           </body></html>`,
         });
       } catch (e: any) {

@@ -95,7 +95,7 @@ export function generateGuidePDF() {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(36);
   doc.setFont("helvetica", "bold");
-  doc.text("MonArtisan Pro", W / 2, 100, { align: "center" });
+  doc.text("Operioz", W / 2, 100, { align: "center" });
 
   doc.setFontSize(20);
   doc.setFont("helvetica", "normal");
@@ -324,7 +324,7 @@ export function generateGuidePDF() {
   heading1("10. Conseils et bonnes pratiques");
 
   heading2("Votre routine quotidienne recommandée");
-  paragraph("Voici un workflow simple pour tirer le meilleur parti de MonArtisan Pro au quotidien :");
+  paragraph("Voici un workflow simple pour tirer le meilleur parti de Operioz au quotidien :");
   bullet("Le matin : consultez le résumé du jour via l'assistant IA pour voir vos interventions et vos priorités");
   bullet("Avant chaque intervention : vérifiez vos stocks pour ne rien oublier");
   bullet("Après chaque intervention : mettez à jour le statut de l'intervention et vos stocks");
@@ -332,14 +332,14 @@ export function generateGuidePDF() {
   bullet("Chaque semaine : vérifiez les factures impayées et lancez des relances");
 
   heading2("Présentez l'app à vos clients");
-  paragraph("MonArtisan Pro vous aide à donner une image professionnelle. Voici comment en parler à vos clients :");
+  paragraph("Operioz vous aide à donner une image professionnelle. Voici comment en parler à vos clients :");
   bullet("« Vous recevrez votre devis par email avec un lien pour l'accepter en un clic »");
   bullet("« Vous pourrez suivre l'avancement de vos travaux depuis votre espace en ligne »");
   bullet("« Vous pourrez payer vos factures en ligne de façon sécurisée »");
   bullet("« Vous pouvez prendre rendez-vous directement depuis mon site »");
 
   heading2("En cas de question");
-  paragraph("Si vous avez une question sur l'utilisation de MonArtisan Pro, utilisez l'assistant IA intégré. Il connaît toutes les fonctionnalités et peut vous guider pas à pas.");
+  paragraph("Si vous avez une question sur l'utilisation de Operioz, utilisez l'assistant IA intégré. Il connaît toutes les fonctionnalités et peut vous guider pas à pas.");
 
   // ========== FOOTER sur chaque page ==========
   const pageCount = doc.getNumberOfPages();
@@ -347,9 +347,9 @@ export function generateGuidePDF() {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text("MonArtisan Pro — Guide Utilisateur", margin, 290);
+    doc.text("Operioz — Guide Utilisateur", margin, 290);
     doc.text(`Page ${i - 1} / ${pageCount - 1}`, W - margin, 290, { align: "right" });
   }
 
-  doc.save("guide-utilisateur-monartisan-pro.pdf");
+  doc.save("guide-utilisateur-operioz.pdf");
 }

@@ -502,7 +502,7 @@ function DashboardLayoutContent({
                     <img src={artisanProfile.logo} alt="" className="h-7 w-7 rounded object-contain shrink-0" />
                   )}
                   <span className="font-semibold tracking-tight truncate">
-                    {artisanProfile?.nomEntreprise || "MonArtisan Pro"}
+                    {artisanProfile?.nomEntreprise || "Operioz"}
                   </span>
                 </div>
               ) : artisanProfile?.logo ? (
@@ -618,7 +618,7 @@ function DashboardLayoutContent({
         {showInstallBanner && (
           <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between gap-4">
             <p className="text-sm text-foreground">
-              <span className="font-medium">Installez MonArtisan Pro</span> sur votre appareil pour un accès rapide
+              <span className="font-medium">Installez Operioz</span> sur votre appareil pour un accès rapide
             </p>
             <div className="flex gap-2 shrink-0">
               <Button

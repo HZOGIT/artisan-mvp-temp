@@ -515,7 +515,7 @@ function addFooter(doc: jsPDF, conditions?: string | null, mentionsLegales?: str
 
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text("Document généré par MonArtisan Pro", pageWidth / 2, footerY, { align: "center" });
+  doc.text("Document généré par Operioz", pageWidth / 2, footerY, { align: "center" });
 }
 
 function addCgvPage(doc: jsPDF, cgv: string): void {

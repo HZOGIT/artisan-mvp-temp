@@ -147,7 +147,7 @@ export function generateDevisEmailContent(params: {
         <!-- Footer -->
         <tr>
           <td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
-            <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis MonArtisan Pro</p>
+            <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis Operioz</p>
           </td>
         </tr>
 
@@ -236,7 +236,7 @@ export function generateFactureEmailContent(params: {
         <!-- Footer -->
         <tr>
           <td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
-            <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis MonArtisan Pro</p>
+            <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis Operioz</p>
           </td>
         </tr>
 

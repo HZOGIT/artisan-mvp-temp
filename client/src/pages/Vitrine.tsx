@@ -328,7 +328,7 @@ export default function Vitrine() {
           {artisan.telephone && <p>{artisan.telephone}</p>}
           {artisan.email && <p>{artisan.email}</p>}
           {artisan.siret && <p className="mt-2">SIRET : {artisan.siret}</p>}
-          <p className="mt-4 text-gray-500 text-xs">Propulse par Artisan Pro</p>
+          <p className="mt-4 text-gray-500 text-xs">Propulse par Operioz</p>
         </div>
       </footer>
     </div>

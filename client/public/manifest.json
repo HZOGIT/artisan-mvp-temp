@@ -1,6 +1,6 @@
 {
-  "name": "MonArtisan Pro",
-  "short_name": "Artisan Pro",
+  "name": "Operioz",
+  "short_name": "Operioz",
   "description": "Gestion complète pour artisans du bâtiment",
   "start_url": "/dashboard",
   "display": "standalone",

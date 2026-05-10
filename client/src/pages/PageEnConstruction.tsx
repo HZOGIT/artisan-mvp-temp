@@ -20,7 +20,7 @@ export default function PageEnConstruction() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
           <a href="/" className="flex items-center gap-2">
             <Wrench className="h-7 w-7 text-[#2563EB]" />
-            <span className="text-xl font-bold text-[#1F2937]">MonArtisan Pro</span>
+            <span className="text-xl font-bold text-[#1F2937]">Operioz</span>
           </a>
           <Button variant="outline" asChild>
             <a href="/">

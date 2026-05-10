@@ -141,7 +141,7 @@ function Navbar({
           {/* Logo */}
           <a href="/" className="flex items-center gap-2">
             <Wrench className="h-7 w-7 text-[#2563EB]" />
-            <span className="text-xl font-bold text-[#1F2937]">MonArtisan Pro</span>
+            <span className="text-xl font-bold text-[#1F2937]">Operioz</span>
           </a>
 
           {/* Desktop nav links */}
@@ -624,7 +624,7 @@ const testimonials = [
     name: "Marc Dubois",
     role: "Plombier à Lyon",
     rating: 5,
-    text: "Depuis que j'utilise MonArtisan Pro, je gagne 2 heures par jour sur ma gestion. Les devis partent en 5 minutes et mes clients peuvent payer en ligne. Un vrai game-changer.",
+    text: "Depuis que j'utilise Operioz, je gagne 2 heures par jour sur ma gestion. Les devis partent en 5 minutes et mes clients peuvent payer en ligne. Un vrai game-changer.",
   },
   {
     name: "Sophie Martin",
@@ -709,7 +709,7 @@ const faqItems = [
   {
     question: "Est-ce adapté à mon métier ?",
     answer:
-      "MonArtisan Pro est conçu pour les plombiers, électriciens, chauffagistes, climaticiens et artisans multi-métiers. Chaque métier dispose de sa propre bibliothèque d'articles avec plus de 300 références prêtes à l'emploi.",
+      "Operioz est conçu pour les plombiers, électriciens, chauffagistes, climaticiens et artisans multi-métiers. Chaque métier dispose de sa propre bibliothèque d'articles avec plus de 300 références prêtes à l'emploi.",
   },
   {
     question: "Puis-je importer mes clients existants ?",
@@ -734,12 +734,12 @@ const faqItems = [
   {
     question: "La facturation électronique 2026, c'est quoi ?",
     answer:
-      "À partir de 2026, toutes les entreprises françaises devront émettre et recevoir des factures au format électronique. MonArtisan Pro est déjà conforme avec la génération de factures aux normes et l'export FEC.",
+      "À partir de 2026, toutes les entreprises françaises devront émettre et recevoir des factures au format électronique. Operioz est déjà conforme avec la génération de factures aux normes et l'export FEC.",
   },
   {
     question: "Puis-je utiliser l'application sur mon téléphone ?",
     answer:
-      "Oui, MonArtisan Pro est une application responsive qui fonctionne parfaitement sur smartphone et tablette. Vous pouvez même l'installer comme une app depuis votre navigateur (PWA).",
+      "Oui, Operioz est une application responsive qui fonctionne parfaitement sur smartphone et tablette. Vous pouvez même l'installer comme une app depuis votre navigateur (PWA).",
   },
 ];
 
@@ -796,7 +796,7 @@ function FinalCTASection() {
               Prêt à simplifier votre gestion ?
             </h2>
             <p className="mt-4 text-lg text-blue-100 max-w-2xl mx-auto">
-              Rejoignez les artisans qui ont choisi MonArtisan Pro pour développer leur activité.
+              Rejoignez les artisans qui ont choisi Operioz pour développer leur activité.
             </p>
             <div className="mt-8">
               <Button size="lg" asChild className="bg-white text-[#2563EB] hover:bg-blue-50 text-lg px-10 py-7 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200 font-semibold">
@@ -829,7 +829,7 @@ function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Wrench className="h-6 w-6 text-[#2563EB]" />
-              <span className="text-lg font-bold text-white">MonArtisan Pro</span>
+              <span className="text-lg font-bold text-white">Operioz</span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
               La solution tout-en-un pour les artisans du bâtiment
@@ -902,7 +902,7 @@ function Footer() {
         {/* Bottom bar */}
         <div className="mt-12 pt-8 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-gray-500">
-            © {new Date().getFullYear()} MonArtisan Pro. Tous droits réservés.
+            © {new Date().getFullYear()} Operioz. Tous droits réservés.
           </p>
           <div className="flex items-center gap-4">
             <a href="#" className="text-gray-500 hover:text-white transition-colors" aria-label="LinkedIn">

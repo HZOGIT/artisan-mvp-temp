@@ -54,7 +54,7 @@ export default function SignUp() {
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold text-foreground">MonArtisan Pro</span>
+            <span className="text-xl font-bold text-foreground">Operioz</span>
           </div>
           <Button variant="outline" asChild>
             <a href="/">
@@ -71,7 +71,7 @@ export default function SignUp() {
           <CardHeader>
             <CardTitle>Créer un compte</CardTitle>
             <CardDescription>
-              Inscrivez-vous pour accéder à MonArtisan Pro
+              Inscrivez-vous pour accéder à Operioz
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'artisan-pro-v2';
+const CACHE_NAME = 'operioz-v1';
 const STATIC_ASSETS = [
   '/',
   '/dashboard',
@@ -88,7 +88,7 @@ self.addEventListener('fetch', (event) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hors ligne - MonArtisan Pro</title>
+  <title>Hors ligne - Operioz</title>
   <style>
     body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f8fafc; color: #1e293b; }
     .container { text-align: center; padding: 2rem; }
@@ -103,7 +103,7 @@ self.addEventListener('fetch', (event) => {
   <div class="container">
     <div class="icon">📡</div>
     <h1>Vous êtes hors ligne</h1>
-    <p>Reconnectez-vous pour accéder à MonArtisan Pro.</p>
+    <p>Reconnectez-vous pour accéder à Operioz.</p>
     <button onclick="window.location.reload()">Réessayer</button>
   </div>
 </body>

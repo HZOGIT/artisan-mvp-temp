@@ -138,7 +138,7 @@ export default function RapportCommande() {
     doc.setFontSize(8);
     doc.setTextColor(127, 140, 141);
     doc.text(
-      'Document généré par MonArtisan Pro',
+      'Document généré par Operioz',
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 10,
       { align: 'center' }

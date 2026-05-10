@@ -324,7 +324,7 @@ const sections: Section[] = [
       {
         title: "Votre routine quotidienne recommandée",
         content: [
-          "Voici un workflow simple pour tirer le meilleur parti de MonArtisan Pro au quotidien :",
+          "Voici un workflow simple pour tirer le meilleur parti de Operioz au quotidien :",
           "• Le matin : consultez le résumé du jour via l'assistant IA pour voir vos interventions et vos priorités",
           "• Avant chaque intervention : vérifiez vos stocks pour ne rien oublier",
           "• Après chaque intervention : mettez à jour le statut de l'intervention et vos stocks",
@@ -335,7 +335,7 @@ const sections: Section[] = [
       {
         title: "Comment présenter l'app à vos clients",
         content: [
-          "MonArtisan Pro vous aide à donner une image professionnelle. Voici comment en parler à vos clients :",
+          "Operioz vous aide à donner une image professionnelle. Voici comment en parler à vos clients :",
           "• « Vous recevrez votre devis par email avec un lien pour l'accepter en un clic »",
           "• « Vous pourrez suivre l'avancement de vos travaux depuis votre espace en ligne »",
           "• « Vous pourrez payer vos factures en ligne de façon sécurisée »",
@@ -345,7 +345,7 @@ const sections: Section[] = [
       {
         title: "En cas de question",
         content: [
-          "Si vous avez une question sur l'utilisation de MonArtisan Pro, utilisez l'assistant IA intégré. Il connaît toutes les fonctionnalités et peut vous guider pas à pas.",
+          "Si vous avez une question sur l'utilisation de Operioz, utilisez l'assistant IA intégré. Il connaît toutes les fonctionnalités et peut vous guider pas à pas.",
         ],
       },
     ],
@@ -407,7 +407,7 @@ export default function Documentation() {
             Guide d'utilisation
           </h1>
           <p className="text-muted-foreground">
-            Tout ce que vous devez savoir pour utiliser MonArtisan Pro
+            Tout ce que vous devez savoir pour utiliser Operioz
           </p>
         </div>
         <Button onClick={() => generateGuidePDF()}>
