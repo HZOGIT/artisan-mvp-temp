@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 
 type UseAuthOptions = {
@@ -9,14 +10,19 @@ type UseAuthOptions = {
 
 export function useAuth(options?: UseAuthOptions) {
   const [location, setLocation] = useLocation();
-  
+  const queryClient = useQueryClient();
+
   // Query current user
   const { data: user, isLoading: loading } = trpc.auth.me.useQuery();
-  
+
   // Logout mutation
+  // Without clearing the React Query cache, auth.me keeps returning the old
+  // user (staleTime is 5 min), so isAuthenticated stays true and the UI never
+  // updates — the original symptom of "rien ne se passe".
   const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      setLocation("/");
+    onSettled: () => {
+      queryClient.clear();
+      setLocation("/signin");
     },
   });
 
