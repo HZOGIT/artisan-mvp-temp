@@ -11,6 +11,190 @@ function registerFonts(doc: jsPDF) {
   doc.setFont("Roboto", "normal");
 }
 
+// ============================================================================
+// Header band — coloured strip with logo + title (browser-side)
+// ============================================================================
+
+type RGB = [number, number, number];
+type ImgFormat = "PNG" | "JPEG" | "WEBP";
+
+const PRIMARY: RGB = [30, 64, 175];   // #1e40af — devis & factures
+const AVOIR_RED: RGB = [220, 53, 69]; // sous-bandeau avoir
+
+const BAND_H = 40;
+const LOGO_X = 10;
+const LOGO_MAX_W = 30;
+const LOGO_MAX_H = 28;
+const TITLE_X_WITH_LOGO = 50;
+const TITLE_X_NO_LOGO = 15;
+const BLOCKS_TOP_Y = 53;              // y de départ des blocs sous le bandeau
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function getImageDimensions(data: Uint8Array, format: ImgFormat): { width: number; height: number } | null {
+  try {
+    const u16BE = (o: number) => (data[o] << 8) | data[o + 1];
+    const u32BE = (o: number) => (((data[o] << 24) >>> 0) + (data[o + 1] << 16) + (data[o + 2] << 8) + data[o + 3]) >>> 0;
+    const u16LE = (o: number) => data[o] | (data[o + 1] << 8);
+    const ascii = (a: number, b: number) => {
+      let s = "";
+      for (let i = a; i < b; i++) s += String.fromCharCode(data[i]);
+      return s;
+    };
+
+    if (format === "PNG") {
+      if (data.length < 24) return null;
+      if (data[0] !== 0x89 || data[1] !== 0x50 || data[2] !== 0x4e || data[3] !== 0x47) return null;
+      return { width: u32BE(16), height: u32BE(20) };
+    }
+    if (format === "JPEG") {
+      if (data[0] !== 0xff || data[1] !== 0xd8) return null;
+      let off = 2;
+      while (off + 9 < data.length) {
+        if (data[off] !== 0xff) return null;
+        let m = off;
+        while (m < data.length - 1 && data[m] === 0xff) m++;
+        const marker = data[m];
+        off = m + 1;
+        // Standalone markers (no length): SOI, EOI, RST0-7
+        if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+        if (off + 1 >= data.length) return null;
+        const segLen = u16BE(off);
+        const isSOF = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+        if (isSOF) {
+          if (off + 7 >= data.length) return null;
+          return { width: u16BE(off + 5), height: u16BE(off + 3) };
+        }
+        off += segLen;
+      }
+      return null;
+    }
+    if (format === "WEBP") {
+      if (data.length < 30) return null;
+      if (ascii(0, 4) !== "RIFF") return null;
+      if (ascii(8, 12) !== "WEBP") return null;
+      const chunk = ascii(12, 16);
+      if (chunk === "VP8 ") {
+        return { width: u16LE(26) & 0x3fff, height: u16LE(28) & 0x3fff };
+      }
+      if (chunk === "VP8L") {
+        const b0 = data[21], b1 = data[22], b2 = data[23], b3 = data[24];
+        return {
+          width: 1 + (((b1 & 0x3f) << 8) | b0),
+          height: 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6)),
+        };
+      }
+      if (chunk === "VP8X") {
+        return {
+          width: 1 + (data[24] | (data[25] << 8) | (data[26] << 16)),
+          height: 1 + (data[27] | (data[28] << 8) | (data[29] << 16)),
+        };
+      }
+      return null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function renderLogo(doc: jsPDF, logoUrl: string | null | undefined): boolean {
+  if (!logoUrl || typeof logoUrl !== "string") return false;
+  const m = logoUrl.match(/^data:image\/(png|jpe?g|webp);base64,(.+)$/i);
+  if (!m) return false;
+  const ext = m[1].toLowerCase();
+  const format: ImgFormat = ext === "webp" ? "WEBP" : ext.startsWith("jp") ? "JPEG" : "PNG";
+
+  let drawW = LOGO_MAX_W;
+  let drawH = LOGO_MAX_H;
+  try {
+    const bytes = base64ToBytes(m[2]);
+    const dims = getImageDimensions(bytes, format);
+    if (dims && dims.width > 0 && dims.height > 0) {
+      const ratio = dims.width / dims.height;
+      drawW = LOGO_MAX_W;
+      drawH = drawW / ratio;
+      if (drawH > LOGO_MAX_H) {
+        drawH = LOGO_MAX_H;
+        drawW = drawH * ratio;
+      }
+    }
+  } catch {
+    // Fall back to max box
+  }
+
+  const drawY = (BAND_H - drawH) / 2;
+  try {
+    doc.addImage(logoUrl, format, LOGO_X, drawY, drawW, drawH);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function renderHeaderBand(doc: jsPDF, artisan: Artisan, title: string, numero: string): void {
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...PRIMARY);
+  doc.rect(0, 0, pageW, BAND_H, "F");
+
+  const hasLogo = renderLogo(doc, artisan.logo);
+  const titleX = hasLogo ? TITLE_X_WITH_LOGO : TITLE_X_NO_LOGO;
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(22);
+  doc.text(title, titleX, 22);
+
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(11);
+  doc.text(`N° ${numero}`, titleX, 32);
+}
+
+function renderArtisanBlock(doc: jsPDF, artisan: Artisan, yStart: number): number {
+  let yPos = yStart;
+  doc.setFontSize(11);
+  doc.setFont("Roboto", "bold");
+  doc.setTextColor(0, 0, 0);
+  doc.text(artisan.nomEntreprise || "Mon Entreprise", 20, yPos);
+
+  yPos += 6;
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(60, 60, 60);
+
+  if (artisan.adresse) {
+    doc.text(artisan.adresse, 20, yPos);
+    yPos += 5;
+  }
+  if (artisan.codePostal || artisan.ville) {
+    doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`.trim(), 20, yPos);
+    yPos += 5;
+  }
+  if (artisan.telephone) {
+    doc.text(`Tél: ${artisan.telephone}`, 20, yPos);
+    yPos += 5;
+  }
+  if (artisan.email) {
+    doc.text(`Email: ${artisan.email}`, 20, yPos);
+    yPos += 5;
+  }
+  if (artisan.siret) {
+    doc.text(`SIRET: ${artisan.siret}`, 20, yPos);
+    yPos += 5;
+  }
+
+  return yPos;
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
 interface Artisan {
   nomEntreprise?: string | null;
   siret?: string | null;
@@ -115,71 +299,6 @@ function getStatutLabel(statut: string, type: "devis" | "facture"): string {
   }
 }
 
-function addHeader(
-  doc: jsPDF,
-  artisan: Artisan,
-  type: "DEVIS" | "FACTURE",
-  numero: string
-): number {
-  const pageWidth = doc.internal.pageSize.getWidth();
-  let yPos = 20;
-
-  // Logo in top-left if available
-  if (artisan.logo) {
-    try {
-      doc.addImage(artisan.logo, "AUTO", 20, 12, 25, 25);
-    } catch {
-      // If logo fails, continue without it
-    }
-  }
-
-  doc.setFontSize(24);
-  doc.setFont("Roboto", "bold");
-  doc.setTextColor(41, 128, 185);
-  doc.text(type, pageWidth / 2, yPos, { align: "center" });
-
-  yPos += 10;
-  doc.setFontSize(12);
-  doc.setFont("Roboto", "normal");
-  doc.setTextColor(100, 100, 100);
-  doc.text(`N° ${numero}`, pageWidth / 2, yPos, { align: "center" });
-
-  yPos += 15;
-  const infoX = artisan.logo ? 50 : 20;
-  doc.setFontSize(11);
-  doc.setFont("Roboto", "bold");
-  doc.setTextColor(0, 0, 0);
-  doc.text(artisan.nomEntreprise || "Mon Entreprise", infoX, yPos);
-
-  yPos += 6;
-  doc.setFont("Roboto", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(60, 60, 60);
-
-  if (artisan.adresse) {
-    doc.text(artisan.adresse, infoX, yPos);
-    yPos += 5;
-  }
-  if (artisan.codePostal || artisan.ville) {
-    doc.text(`${artisan.codePostal || ""} ${artisan.ville || ""}`.trim(), infoX, yPos);
-    yPos += 5;
-  }
-  if (artisan.telephone) {
-    doc.text(`Tél: ${artisan.telephone}`, infoX, yPos);
-    yPos += 5;
-  }
-  if (artisan.email) {
-    doc.text(`Email: ${artisan.email}`, infoX, yPos);
-    yPos += 5;
-  }
-  if (artisan.siret) {
-    doc.text(`SIRET: ${artisan.siret}`, infoX, yPos);
-    yPos += 5;
-  }
-
-  return yPos + 10;
-}
-
 function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
   const pageWidth = doc.internal.pageSize.getWidth();
   let yPos = yStart;
@@ -215,7 +334,7 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
     yPos += 5;
   }
 
-  return yStart + 55;
+  return yStart + 50;
 }
 
 function addDocumentInfo(
@@ -419,14 +538,17 @@ export function generateDevisPDF(artisan: Artisan, client: Client, devis: DevisD
   const doc = new jsPDF();
   registerFonts(doc);
 
-  let yPos = addHeader(doc, artisan, "DEVIS", devis.numero);
-  yPos = addClientInfo(doc, client, yPos - 35);
+  renderHeaderBand(doc, artisan, "DEVIS", devis.numero);
+
+  const yArtisanEnd = renderArtisanBlock(doc, artisan, BLOCKS_TOP_Y);
+  const yClientEnd = addClientInfo(doc, client, BLOCKS_TOP_Y);
+  let yPos = Math.max(yArtisanEnd, yClientEnd) + 5;
+
   yPos = addDocumentInfo(doc, devis, "devis", yPos);
   yPos = addLignesTable(doc, devis.lignes, yPos);
   addTotals(doc, devis.totalHT, devis.totalTVA, devis.totalTTC, yPos);
   addFooter(doc, devis.conditions, options?.mentionsLegales);
 
-  // Add CGV page if configured
   if (options?.cgv) {
     addCgvPage(doc, options.cgv);
   }
@@ -441,22 +563,25 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   const isAvoir = facture.isAvoir === true;
   const headerType = isAvoir ? "AVOIR" : "FACTURE";
 
-  let yPos = addHeader(doc, artisan, headerType as "DEVIS" | "FACTURE", facture.numero);
+  renderHeaderBand(doc, artisan, headerType, facture.numero);
 
-  // Pour les avoirs, ajouter un bandeau rouge bien visible
+  let blocksTopY = BLOCKS_TOP_Y;
   if (isAvoir) {
     const pageWidth = doc.internal.pageSize.getWidth();
-    doc.setFillColor(220, 53, 69);
-    doc.rect(0, yPos - 8, pageWidth, 10, "F");
+    doc.setFillColor(...AVOIR_RED);
+    doc.rect(0, BAND_H, pageWidth, 10, "F");
     doc.setFontSize(10);
     doc.setFont("Roboto", "bold");
     doc.setTextColor(255, 255, 255);
-    doc.text("AVOIR — Document d'annulation", pageWidth / 2, yPos - 1, { align: "center" });
+    doc.text("AVOIR — Document d'annulation", pageWidth / 2, BAND_H + 7, { align: "center" });
     doc.setTextColor(0, 0, 0);
-    yPos += 8;
+    blocksTopY += 10; // décale les blocs sous le sous-bandeau rouge
   }
 
-  yPos = addClientInfo(doc, client, yPos - 35);
+  const yArtisanEnd = renderArtisanBlock(doc, artisan, blocksTopY);
+  const yClientEnd = addClientInfo(doc, client, blocksTopY);
+  let yPos = Math.max(yArtisanEnd, yClientEnd) + 5;
+
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
