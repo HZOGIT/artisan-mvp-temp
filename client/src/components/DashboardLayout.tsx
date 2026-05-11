@@ -35,6 +35,99 @@ import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { ScrollArea } from "./ui/scroll-area";
 import { trpc } from "@/lib/trpc";
+import { AssistantFAB } from "./AssistantFAB";
+import { AssistantDrawer } from "./AssistantDrawer";
+import { useAssistantStream } from "@/hooks/useAssistantStream";
+
+// ============================================================================
+// MonAssistant — contextes par route
+// ============================================================================
+const ASSISTANT_CONTEXTS: Record<string, { context: string; prompts: string[] }> = {
+  "/dashboard": {
+    context: "L'artisan consulte son tableau de bord.",
+    prompts: [
+      "Résume mon activité du mois",
+      "Quelles sont mes priorités aujourd'hui ?",
+      "Analyse ma rentabilité",
+    ],
+  },
+  "/devis": {
+    context: "L'artisan consulte sa liste de devis.",
+    prompts: [
+      "Crée un nouveau devis pour un client",
+      "Quels devis sont en attente de réponse ?",
+      "Relance les devis non signés",
+    ],
+  },
+  "/devis/nouveau": {
+    context: "L'artisan crée un nouveau devis.",
+    prompts: [
+      "Génère un devis pour une rénovation salle de bain",
+      "Ajoute les lignes pour une installation électrique",
+      "Calcule le prix pour 3 jours de main d'œuvre",
+    ],
+  },
+  "/factures": {
+    context: "L'artisan consulte ses factures.",
+    prompts: [
+      "Quelles factures sont impayées ?",
+      "Rédige une relance pour les retards",
+      "Quel est mon CA ce mois ?",
+    ],
+  },
+  "/interventions": {
+    context: "L'artisan gère son planning d'interventions.",
+    prompts: [
+      "Planifie une intervention pour demain",
+      "Quelles interventions sont prévues cette semaine ?",
+      "Crée une intervention d'urgence",
+    ],
+  },
+  "/clients": {
+    context: "L'artisan consulte sa base clients.",
+    prompts: [
+      "Trouve le client avec des impayés",
+      "Quels clients n'ont pas commandé depuis 3 mois ?",
+      "Rédige un email de prospection",
+    ],
+  },
+  "/commandes": {
+    context: "L'artisan gère ses bons de commande fournisseurs.",
+    prompts: [
+      "Crée un bon de commande pour Point P",
+      "Quelles commandes sont en attente ?",
+      "Liste les articles à commander",
+    ],
+  },
+  "/stocks": {
+    context: "L'artisan consulte ses stocks.",
+    prompts: [
+      "Quels articles sont en rupture ?",
+      "Génère une commande de réapprovisionnement",
+      "Combien de stock il me reste ?",
+    ],
+  },
+};
+
+const ASSISTANT_FALLBACK = {
+  context: "L'artisan utilise Operioz.",
+  prompts: [
+    "Résume mon activité",
+    "Quelles sont mes priorités aujourd'hui ?",
+  ],
+};
+
+function getAssistantContextForPath(path: string): { context: string; prompts: string[] } {
+  if (ASSISTANT_CONTEXTS[path]) return ASSISTANT_CONTEXTS[path];
+  // Remonte vers les chemins parents (ex: /devis/123 -> /devis)
+  const parts = path.split("/").filter(Boolean);
+  while (parts.length > 0) {
+    parts.pop();
+    const candidate = "/" + parts.join("/");
+    if (ASSISTANT_CONTEXTS[candidate]) return ASSISTANT_CONTEXTS[candidate];
+  }
+  return ASSISTANT_FALLBACK;
+}
 
 const notifTypeIcon: Record<string, any> = {
   succes: CheckCircle,
@@ -412,6 +505,14 @@ function DashboardLayoutContent({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
   const userPermissions: string[] = (user as any)?.permissions || [];
+
+  // MonAssistant : ouvert/fermé + contexte dynamique selon la route active.
+  // La conversation persiste entre les ouvertures du drawer et entre les routes.
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const isAssistantPage = location === "/assistant";
+  const { context: assistantContext, prompts: assistantSuggestions } =
+    getAssistantContextForPath(location);
+  const assistant = useAssistantStream({ pageContext: assistantContext });
   const filteredMenuGroups = filterMenuByPermissions(menuGroups, userPermissions);
   const filteredAllItems = filteredMenuGroups.flatMap((g) => g.items);
   const activeMenuItem = filteredAllItems.find(item => item.path === location) || allMenuItems.find(item => item.path === location);
@@ -648,6 +749,21 @@ function DashboardLayoutContent({
         )}
         <main className="flex-1 p-4 min-w-0">{children}</main>
       </SidebarInset>
+
+      {/* MonAssistant — disponible sur toutes les pages sauf /assistant */}
+      <AssistantFAB
+        onClick={() => setIsAssistantOpen(true)}
+        hidden={isAssistantPage || isAssistantOpen}
+      />
+      <AssistantDrawer
+        isOpen={isAssistantOpen}
+        onClose={() => setIsAssistantOpen(false)}
+        messages={assistant.messages}
+        isStreaming={assistant.isStreaming}
+        onSendMessage={assistant.sendMessage}
+        onClear={assistant.clearMessages}
+        suggestedPrompts={assistantSuggestions}
+      />
     </>
   );
 }

@@ -13,6 +13,7 @@ import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./
 import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
 import { ROLE_TEMPLATES, ALL_PERMISSIONS } from "../shared/permissions";
 import Anthropic from "@anthropic-ai/sdk";
+import { buildSystemPrompt } from "./_core/assistantContext";
 
 // Rate limiter for AI endpoints
 const rateLimitMap = new Map<number, { count: number; resetTime: number }>();
@@ -28,46 +29,8 @@ function checkRateLimit(artisanId: number): boolean {
   return true;
 }
 
-async function buildSystemPrompt(artisanId: number): Promise<string> {
-  const artisan = await db.getArtisanById(artisanId);
-  const stats = await db.getDashboardStats(artisanId);
-  const clientsList = await db.getClientsByArtisanId(artisanId);
-  const recentClients = clientsList.slice(0, 5).map(c => `${c.prenom || ''} ${c.nom}`.trim()).join(', ');
-  const devisNonSignes = await db.getDevisNonSignes(artisanId);
-  const interventionsList = await db.getInterventionsByArtisanId(artisanId);
-  const now = new Date();
-  const weekFromNow = new Date(now.getTime() + 7 * 86400000);
-  const interventionsSemaine = interventionsList.filter(i => {
-    const d = new Date(i.dateDebut);
-    return d >= now && d <= weekFromNow && i.statut === 'planifiee';
-  });
-  const stocksBas = await db.getLowStockItems(artisanId);
-  const contrats = await db.getContratsByArtisanId(artisanId);
-  const contratsARenouveler = contrats.filter(c => {
-    if (!c.dateFin) return false;
-    const fin = new Date(c.dateFin);
-    return fin <= weekFromNow && c.statut === 'actif';
-  });
-
-  return `Tu es MonAssistant, l'assistant IA de Operioz. Tu aides l'artisan ${artisan?.nomEntreprise || 'Artisan'} (${artisan?.metier || 'artisan'}) dans sa gestion quotidienne.
-
-Tu as accès aux données suivantes :
-- ${stats.devisEnCours} devis en attente de réponse
-- ${stats.facturesImpayees.count} factures impayées pour un total de ${stats.facturesImpayees.total.toFixed(2)} euros
-- CA du mois : ${stats.caMonth.toFixed(2)} euros
-- CA de l'année : ${stats.caYear.toFixed(2)} euros
-- ${interventionsSemaine.length} interventions cette semaine
-- ${stocksBas.length} articles en stock bas
-- ${devisNonSignes.length} devis envoyés en attente de signature
-- ${contratsARenouveler.length} contrats à renouveler prochainement
-- ${stats.totalClients} clients au total
-- Clients récents : ${recentClients || 'aucun'}
-- SIRET : ${artisan?.siret || 'non renseigné'}
-
-Tu peux répondre aux questions sur l'activité, générer des lignes de devis, suggérer des emails de relance, analyser la rentabilité, prédire la trésorerie, donner des conseils de gestion.
-Réponds toujours en français, de manière concise et professionnelle. Utilise le tutoiement.
-Utilise le markdown pour formater tes réponses (listes, gras, tableaux si nécessaire).`;
-}
+// buildSystemPrompt déplacé dans ./_core/assistantContext.ts pour être partagé
+// entre la route SSE /api/assistant/stream et les quick actions ci-dessous.
 
 // ============================================================================
 // ARTISAN ROUTER
