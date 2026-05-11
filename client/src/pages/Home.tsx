@@ -300,10 +300,10 @@ function HeroSection() {
 
           {/* Title */}
           <h1 className="mt-6 text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
-            L'outil qui fait tourner
+            Gérez votre activité,
             <br />
             <span className="bg-gradient-to-r from-blue-300 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
-              votre entreprise artisanale
+              quel que soit votre métier
             </span>
           </h1>
 
