@@ -187,6 +187,152 @@ export const AGENT_TOOLS: Tool[] = [
       "Liste les devis envoyés en attente de réponse du client (statut envoye). Retourne id, numéro, client, montantTTC, date du devis.",
     input_schema: { type: "object", properties: {} },
   },
+
+  // ── Stocks & commandes fournisseurs ────────────────────────────────────
+  {
+    name: "verifier_stocks",
+    description:
+      "Vérifie tous les niveaux de stock. Retourne la liste des articles avec leur quantité, seuil d'alerte et statut (rupture | alerte | ok), ainsi qu'un récapitulatif des articles à réapprovisionner.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "creer_commande_fournisseur",
+    description:
+      "Crée un bon de commande fournisseur en brouillon pour réapprovisionner des articles. Retourne le numéro et l'id de la commande créée.",
+    input_schema: {
+      type: "object",
+      properties: {
+        fournisseurId: { type: "number", description: "ID du fournisseur (obtenu via chercher_fournisseur ou lister_fournisseurs)" },
+        lignes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              designation: { type: "string" },
+              quantite: { type: "number" },
+              unite: { type: "string" },
+              prixUnitaireHT: { type: "number" },
+            },
+            required: ["designation", "quantite"],
+          },
+        },
+        notes: { type: "string" },
+        delaiLivraison: { type: "string", description: "Texte libre, ex: '2 semaines'" },
+      },
+      required: ["fournisseurId", "lignes"],
+    },
+  },
+  {
+    name: "envoyer_commande_fournisseur",
+    description: "Envoie un bon de commande par email au fournisseur avec le PDF en pièce jointe.",
+    input_schema: {
+      type: "object",
+      properties: {
+        commandeId: { type: "number" },
+        messagePersonnalise: { type: "string" },
+      },
+      required: ["commandeId"],
+    },
+  },
+
+  // ── Clients ────────────────────────────────────────────────────────────
+  {
+    name: "lister_clients",
+    description:
+      "Liste les clients de l'artisan. Filtre optionnel par substring sur le nom/prénom/entreprise. Limite à 50 résultats.",
+    input_schema: {
+      type: "object",
+      properties: {
+        filtre: { type: "string", description: "Texte de filtrage (optionnel)" },
+      },
+    },
+  },
+  {
+    name: "creer_client",
+    description:
+      "Crée un nouveau client dans la base. Retourne l'id et le nom du client créé.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nom: { type: "string" },
+        prenom: { type: "string" },
+        email: { type: "string" },
+        telephone: { type: "string" },
+        adresse: { type: "string" },
+        ville: { type: "string" },
+        codePostal: { type: "string" },
+        type: { type: "string", enum: ["particulier", "professionnel"] },
+      },
+      required: ["nom"],
+    },
+  },
+
+  // ── Statistiques ───────────────────────────────────────────────────────
+  {
+    name: "get_statistiques",
+    description:
+      "Récupère les statistiques complètes de l'activité : CA du mois, CA de l'année, nombre de clients, devis en cours, factures impayées, interventions à venir, articles en rupture.",
+    input_schema: {
+      type: "object",
+      properties: {
+        periode: {
+          type: "string",
+          enum: ["jour", "semaine", "mois", "annee"],
+          description: "Optionnel — par défaut renvoie un récapitulatif complet incluant mois et année.",
+        },
+      },
+    },
+  },
+
+  // ── Fournisseurs ───────────────────────────────────────────────────────
+  {
+    name: "lister_fournisseurs",
+    description: "Liste tous les fournisseurs enregistrés avec leurs coordonnées.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "chercher_fournisseur",
+    description: "Recherche un fournisseur par nom. Insensible à la casse, retourne jusqu'à 5 résultats.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nom: { type: "string" },
+      },
+      required: ["nom"],
+    },
+  },
+
+  // ── Planning ───────────────────────────────────────────────────────────
+  {
+    name: "lister_interventions",
+    description:
+      "Liste les interventions planifiées. Filtres optionnels par statut, dateDebut (>=), dateFin (<=).",
+    input_schema: {
+      type: "object",
+      properties: {
+        statut: { type: "string", enum: ["planifiee", "en_cours", "terminee", "annulee"] },
+        dateDebut: { type: "string", description: "ISO 8601" },
+        dateFin: { type: "string", description: "ISO 8601" },
+      },
+    },
+  },
+  {
+    name: "modifier_intervention",
+    description:
+      "Modifie une intervention existante. Seuls les champs fournis sont mis à jour.",
+    input_schema: {
+      type: "object",
+      properties: {
+        interventionId: { type: "number" },
+        titre: { type: "string" },
+        dateDebut: { type: "string" },
+        dateFin: { type: "string" },
+        statut: { type: "string", enum: ["planifiee", "en_cours", "terminee", "annulee"] },
+        notes: { type: "string" },
+      },
+      required: ["interventionId"],
+    },
+  },
 ];
 
 // ============================================================================
@@ -200,6 +346,30 @@ export interface ToolContext {
 export type ToolResult =
   | { ok: true; data: unknown }
   | { ok: false; error: string };
+
+/**
+ * Injecte le messagePersonnalise dans le corps HTML en REMPLAÇANT le paragraphe
+ * d'introduction par défaut ("Veuillez trouver ci-joint le devis/la facture…").
+ * Évite la duplication où le message apparaissait à la fois dans le template ET
+ * en italique en bas du mail.
+ */
+function applyCustomEmailMessage(body: string, msg: string | undefined): string {
+  if (!msg) return body;
+  const formatted = msg.replace(/\n/g, "<br>");
+  const intro = `<p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">${formatted}</p>`;
+  const replaced = body.replace(
+    /<p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1\.6;">Veuillez trouver ci-joint[\s\S]*?<\/p>/,
+    intro
+  );
+  // Fallback si le template change : injecte en bas sans italique pour rester lisible.
+  if (replaced === body) {
+    return body.replace(
+      "</body>",
+      `<div style="padding:0 40px 24px 40px;font-size:14px;color:#374151;line-height:1.5;">${formatted}</div></body>`
+    );
+  }
+  return replaced;
+}
 
 function ok(data: unknown): ToolResult {
   return { ok: true, data };
@@ -335,12 +505,7 @@ async function sendDevisEmailHelper(devisId: number, customMessage: string | und
       : undefined,
   });
 
-  const finalBody = customMessage
-    ? body.replace(
-        "</body>",
-        `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${customMessage.replace(/\n/g, "<br>")}</div></body>`
-      )
-    : body;
+  const finalBody = applyCustomEmailMessage(body, customMessage);
 
   const result = await sendEmail({
     to: client.email,
@@ -493,12 +658,7 @@ async function sendFactureEmailHelper(factureId: number, customMessage: string |
       : undefined,
   });
 
-  const finalBody = customMessage
-    ? body.replace(
-        "</body>",
-        `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${customMessage.replace(/\n/g, "<br>")}</div></body>`
-      )
-    : body;
+  const finalBody = applyCustomEmailMessage(body, customMessage);
 
   const result = await sendEmail({
     to: client.email,
@@ -664,6 +824,356 @@ async function execListerDevisEnAttente(_input: any, ctx: ToolContext): Promise<
 }
 
 // ============================================================================
+// Stocks & commandes fournisseurs
+// ============================================================================
+
+async function execVerifierStocks(_input: any, ctx: ToolContext): Promise<ToolResult> {
+  const stocks = await db.getStocksByArtisanId(ctx.artisanId);
+  const items = stocks.map((s: any) => {
+    const quantite = Number(s.quantite ?? 0);
+    const seuil = Number(s.seuilAlerte ?? s.seuil ?? 0);
+    let statut: "rupture" | "alerte" | "ok" = "ok";
+    if (quantite <= 0) statut = "rupture";
+    else if (seuil > 0 && quantite <= seuil) statut = "alerte";
+    return {
+      id: s.id,
+      designation: s.designation || s.nom || `Article #${s.id}`,
+      quantite,
+      seuil,
+      unite: s.unite || "u",
+      statut,
+    };
+  });
+  const ruptures = items.filter(i => i.statut === "rupture");
+  const alertes = items.filter(i => i.statut === "alerte");
+  return ok({
+    total: items.length,
+    nbRuptures: ruptures.length,
+    nbAlertes: alertes.length,
+    aReapprovisionner: [...ruptures, ...alertes].slice(0, 30),
+    tousLesArticles: items.slice(0, 50),
+  });
+}
+
+async function assertFournisseurBelongs(fournisseurId: number, ctx: ToolContext): Promise<any> {
+  const f = await db.getFournisseurById(fournisseurId);
+  if (!f) throw new Error("Fournisseur introuvable");
+  if ((f as any).artisanId !== ctx.artisanId) throw new Error("Ce fournisseur n'appartient pas à votre compte");
+  return f;
+}
+
+async function execCreerCommandeFournisseur(input: any, ctx: ToolContext): Promise<ToolResult> {
+  if (!input?.fournisseurId || !Array.isArray(input?.lignes) || input.lignes.length === 0) {
+    return fail("fournisseurId et au moins une ligne sont requis");
+  }
+  try {
+    await assertFournisseurBelongs(Number(input.fournisseurId), ctx);
+    const numero = await db.getNextCommandeNumero(ctx.artisanId);
+
+    let totalHT = 0;
+    let totalTVA = 0;
+    const linesData: any[] = [];
+    for (let i = 0; i < input.lignes.length; i++) {
+      const l = input.lignes[i];
+      const quantite = Number(l.quantite) || 0;
+      const prix = Number(l.prixUnitaireHT) || 0;
+      const tva = Number(l.tauxTVA ?? 20);
+      const mHT = quantite * prix;
+      const mTVA = (mHT * tva) / 100;
+      totalHT += mHT;
+      totalTVA += mTVA;
+      linesData.push({
+        ordre: i + 1,
+        designation: l.designation,
+        quantite: String(quantite),
+        unite: l.unite || "u",
+        prixUnitaire: String(prix),
+        tauxTVA: String(tva),
+      });
+    }
+    const totalTTC = totalHT + totalTVA;
+
+    const commande = await db.createCommandeFournisseur({
+      artisanId: ctx.artisanId,
+      fournisseurId: Number(input.fournisseurId),
+      numero,
+      dateCommande: new Date(),
+      statut: "brouillon",
+      notes: input.notes || undefined,
+      delaiLivraison: input.delaiLivraison || undefined,
+      totalHT: totalHT.toFixed(2),
+      totalTVA: totalTVA.toFixed(2),
+      totalTTC: totalTTC.toFixed(2),
+    } as any);
+
+    for (const lineData of linesData) {
+      await db.createLigneCommandeFournisseur({
+        commandeId: commande.id,
+        ...lineData,
+      } as any);
+    }
+
+    return ok({
+      commandeId: commande.id,
+      numero: commande.numero,
+      totalTTC: commande.totalTTC,
+      message: `Bon de commande ${commande.numero} créé en brouillon (${totalTTC.toFixed(2)} € TTC)`,
+    });
+  } catch (e: any) {
+    return fail(e.message || "Erreur lors de la création de la commande");
+  }
+}
+
+async function execEnvoyerCommandeFournisseur(input: any, ctx: ToolContext): Promise<ToolResult> {
+  if (!input?.commandeId) return fail("commandeId est requis");
+  try {
+    const commande = await db.getCommandeFournisseurById(Number(input.commandeId));
+    if (!commande) return fail("Commande introuvable");
+    if ((commande as any).artisanId !== ctx.artisanId) return fail("Cette commande n'appartient pas à votre compte");
+
+    const fournisseur = await db.getFournisseurById((commande as any).fournisseurId);
+    if (!fournisseur) return fail("Fournisseur introuvable");
+    if (!(fournisseur as any).email) return fail("Le fournisseur n'a pas d'adresse email");
+
+    const artisan = await db.getArtisanById(ctx.artisanId);
+    if (!artisan) return fail("Profil artisan introuvable");
+
+    const lignes = await db.getLignesCommandeFournisseur(commande.id);
+    const { generateBonCommandePDF } = await import("./pdfGenerator");
+    const pdfBuffer = generateBonCommandePDF({
+      commande: { ...commande, lignes } as any,
+      artisan: artisan as any,
+      fournisseur: fournisseur as any,
+    });
+
+    const artisanName = (artisan as any).nomEntreprise || "Votre artisan";
+    const fournisseurNom = (fournisseur as any).nom || "Fournisseur";
+    const totalTTC = `${parseFloat((commande as any).totalTTC || "0").toFixed(2)} €`;
+    const body = `<!DOCTYPE html>
+<html lang="fr">
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+<tr><td style="background-color:#166534;padding:28px 40px;text-align:center;"><h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">${artisanName}</h1></td></tr>
+<tr><td style="padding:36px 40px 16px 40px;"><p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${fournisseurNom},</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le bon de commande <strong>${(commande as any).numero}</strong>.</p></td></tr>
+<tr><td style="padding:0 40px 28px 40px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;"><tr><td style="padding:20px 24px;font-size:14px;color:#111827;"><strong>Numéro :</strong> ${(commande as any).numero}<br><strong>Montant TTC :</strong> ${totalTTC}${(commande as any).delaiLivraison ? `<br><strong>Délai souhaité :</strong> ${(commande as any).delaiLivraison}` : ""}</td></tr></table></td></tr>
+<tr><td style="padding:0 40px 36px 40px;"><p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p><p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p></td></tr>
+<tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;"><p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis Operioz</p></td></tr>
+</table></td></tr></table></body></html>`;
+
+    const finalBody = applyCustomEmailMessage(body, input.messagePersonnalise);
+
+    const result = await sendEmail({
+      to: (fournisseur as any).email,
+      subject: `Bon de commande ${(commande as any).numero} — ${artisanName}`,
+      body: finalBody,
+      attachmentName: `BonCommande_${(commande as any).numero}.pdf`,
+      attachmentContent: pdfBuffer.toString("base64"),
+    });
+
+    if (!result.success) return fail(result.message);
+
+    await db.updateCommandeFournisseur(commande.id, { statut: "envoyee" } as any);
+    await db.createNotification({
+      artisanId: ctx.artisanId,
+      type: "succes",
+      titre: "Commande envoyée",
+      message: `Bon de commande ${(commande as any).numero} envoyé à ${(fournisseur as any).email}`,
+      lien: `/commandes/${commande.id}`,
+    });
+
+    return ok({
+      numero: (commande as any).numero,
+      to: (fournisseur as any).email,
+      message: `Bon de commande ${(commande as any).numero} envoyé à ${(fournisseur as any).email}`,
+    });
+  } catch (e: any) {
+    return fail(e.message || "Erreur lors de l'envoi de la commande");
+  }
+}
+
+// ============================================================================
+// Clients (étendu)
+// ============================================================================
+
+async function execListerClients(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const clients = await db.getClientsByArtisanId(ctx.artisanId);
+  const filtre = String(input?.filtre || "").toLowerCase().trim();
+  const filtered = filtre
+    ? clients.filter((c: any) => {
+        const full = `${c.prenom || ""} ${c.nom || ""}`.toLowerCase();
+        const entreprise = (c.entreprise || "").toLowerCase();
+        return full.includes(filtre) || entreprise.includes(filtre);
+      })
+    : clients;
+  const limited = filtered.slice(0, 50).map((c: any) => ({
+    id: c.id,
+    nom: c.nom,
+    prenom: c.prenom,
+    entreprise: c.entreprise || null,
+    email: c.email || null,
+    telephone: c.telephone || null,
+    ville: c.ville || null,
+  }));
+  return ok({ count: limited.length, total: filtered.length, clients: limited });
+}
+
+async function execCreerClient(input: any, ctx: ToolContext): Promise<ToolResult> {
+  if (!input?.nom) return fail("Le nom est requis");
+  try {
+    // Le champ "type" n'existe pas en DB ; on l'archive en notes si fourni.
+    const notesParts: string[] = [];
+    if (input.type) notesParts.push(`Type : ${input.type}`);
+    const client = await db.createClient(ctx.artisanId, {
+      nom: input.nom,
+      prenom: input.prenom || undefined,
+      email: input.email || undefined,
+      telephone: input.telephone || undefined,
+      adresse: input.adresse || undefined,
+      ville: input.ville || undefined,
+      codePostal: input.codePostal || undefined,
+      notes: notesParts.length > 0 ? notesParts.join(" — ") : undefined,
+    } as any);
+    return ok({
+      clientId: client.id,
+      nom: client.nom,
+      message: `Client ${client.prenom ? client.prenom + " " : ""}${client.nom} créé (ID ${client.id})`,
+    });
+  } catch (e: any) {
+    return fail(e.message || "Erreur lors de la création du client");
+  }
+}
+
+// ============================================================================
+// Statistiques
+// ============================================================================
+
+async function execGetStatistiques(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const stats = await db.getDashboardStats(ctx.artisanId);
+  const stocksBas = await db.getLowStockItems(ctx.artisanId);
+  const ruptures = await db.getStocksEnRupture(ctx.artisanId);
+  const interventions = await db.getInterventionsByArtisanId(ctx.artisanId);
+  const now = new Date();
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000);
+  const interventionsSemaine = interventions.filter((i: any) => {
+    const d = new Date(i.dateDebut);
+    return d >= now && d <= weekFromNow && i.statut === "planifiee";
+  }).length;
+  return ok({
+    periode: input?.periode || "mois+annee",
+    caMois: Number(stats.caMonth || 0).toFixed(2),
+    caAnnee: Number(stats.caYear || 0).toFixed(2),
+    totalClients: stats.totalClients,
+    devisEnCours: stats.devisEnCours,
+    facturesImpayeesNb: stats.facturesImpayees.count,
+    facturesImpayeesTotal: stats.facturesImpayees.total.toFixed(2),
+    interventionsSemaine,
+    stocksAlerte: stocksBas.length,
+    stocksRupture: ruptures.length,
+  });
+}
+
+// ============================================================================
+// Fournisseurs
+// ============================================================================
+
+async function execListerFournisseurs(_input: any, ctx: ToolContext): Promise<ToolResult> {
+  const fournisseurs = await db.getFournisseursByArtisanId(ctx.artisanId);
+  const limited = fournisseurs.slice(0, 50).map((f: any) => ({
+    id: f.id,
+    nom: f.nom,
+    email: f.email || null,
+    telephone: f.telephone || null,
+    ville: f.ville || null,
+    contact: f.contact || null,
+  }));
+  return ok({ count: limited.length, fournisseurs: limited });
+}
+
+async function execChercherFournisseur(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const query = String(input?.nom || "").toLowerCase().trim();
+  if (!query) return fail("Le paramètre 'nom' est requis");
+  const fournisseurs = await db.getFournisseursByArtisanId(ctx.artisanId);
+  const matches = fournisseurs
+    .filter((f: any) => (f.nom || "").toLowerCase().includes(query))
+    .slice(0, 5)
+    .map((f: any) => ({
+      id: f.id,
+      nom: f.nom,
+      email: f.email || null,
+      telephone: f.telephone || null,
+      ville: f.ville || null,
+    }));
+  return ok({ matches, count: matches.length });
+}
+
+// ============================================================================
+// Planning (étendu)
+// ============================================================================
+
+async function execListerInterventions(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const all = await db.getInterventionsByArtisanId(ctx.artisanId);
+  const dateMin = input?.dateDebut ? new Date(input.dateDebut) : null;
+  const dateMax = input?.dateFin ? new Date(input.dateFin) : null;
+  const filtered = all
+    .filter((i: any) => {
+      if (input?.statut && i.statut !== input.statut) return false;
+      const d = new Date(i.dateDebut);
+      if (dateMin && d < dateMin) return false;
+      if (dateMax && d > dateMax) return false;
+      return true;
+    })
+    .slice(0, 50)
+    .map((i: any) => ({
+      id: i.id,
+      titre: i.titre,
+      clientId: i.clientId,
+      dateDebut: i.dateDebut,
+      dateFin: i.dateFin,
+      statut: i.statut,
+      adresse: i.adresse || null,
+    }));
+  return ok({ count: filtered.length, interventions: filtered });
+}
+
+async function execModifierIntervention(input: any, ctx: ToolContext): Promise<ToolResult> {
+  if (!input?.interventionId) return fail("interventionId est requis");
+  try {
+    const existing = await db.getInterventionById(Number(input.interventionId));
+    if (!existing) return fail("Intervention introuvable");
+    if ((existing as any).artisanId !== ctx.artisanId) {
+      return fail("Cette intervention n'appartient pas à votre compte");
+    }
+    const update: Record<string, any> = {};
+    if (input.titre !== undefined) update.titre = input.titre;
+    if (input.dateDebut !== undefined) {
+      const d = new Date(input.dateDebut);
+      if (isNaN(d.getTime())) return fail("dateDebut invalide");
+      update.dateDebut = d;
+    }
+    if (input.dateFin !== undefined) {
+      const d = new Date(input.dateFin);
+      if (isNaN(d.getTime())) return fail("dateFin invalide");
+      update.dateFin = d;
+    }
+    if (input.statut !== undefined) update.statut = input.statut;
+    if (input.notes !== undefined) update.notes = input.notes;
+    if (Object.keys(update).length === 0) return fail("Aucun champ à modifier");
+    const updated = await db.updateIntervention(Number(input.interventionId), update);
+    return ok({
+      interventionId: updated?.id,
+      titre: updated?.titre,
+      statut: updated?.statut,
+      message: `Intervention #${input.interventionId} mise à jour`,
+    });
+  } catch (e: any) {
+    return fail(e.message || "Erreur lors de la mise à jour de l'intervention");
+  }
+}
+
+// ============================================================================
 // Dispatcher
 // ============================================================================
 
@@ -693,6 +1203,31 @@ export async function executeTool(
       return execListerFacturesImpayees(input as any, ctx);
     case "lister_devis_en_attente":
       return execListerDevisEnAttente(input as any, ctx);
+    // Stocks & commandes fournisseurs
+    case "verifier_stocks":
+      return execVerifierStocks(input as any, ctx);
+    case "creer_commande_fournisseur":
+      return execCreerCommandeFournisseur(input as any, ctx);
+    case "envoyer_commande_fournisseur":
+      return execEnvoyerCommandeFournisseur(input as any, ctx);
+    // Clients
+    case "lister_clients":
+      return execListerClients(input as any, ctx);
+    case "creer_client":
+      return execCreerClient(input as any, ctx);
+    // Statistiques
+    case "get_statistiques":
+      return execGetStatistiques(input as any, ctx);
+    // Fournisseurs
+    case "lister_fournisseurs":
+      return execListerFournisseurs(input as any, ctx);
+    case "chercher_fournisseur":
+      return execChercherFournisseur(input as any, ctx);
+    // Planning étendu
+    case "lister_interventions":
+      return execListerInterventions(input as any, ctx);
+    case "modifier_intervention":
+      return execModifierIntervention(input as any, ctx);
     default:
       return fail(`Outil inconnu: ${name}`);
   }

@@ -49,8 +49,8 @@ export default function Assistant() {
 
   // ── Dictée vocale (Web Speech API) ────────────────────────────────────────
   const speech = useSpeechRecognition();
-  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userEditedRef = useRef(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -66,37 +66,58 @@ export default function Assistant() {
     if (speech.isListening) {
       userEditedRef.current = false;
       setInput(speech.transcript);
-      if (autoSendTimerRef.current) {
-        clearTimeout(autoSendTimerRef.current);
-        autoSendTimerRef.current = null;
-      }
     }
   }, [speech.isListening, speech.transcript]);
 
-  // Auto-send 1s after listening stops with a final transcript
+  // À la fin de l'écoute : démarrer un compte à rebours de 3 s avant l'envoi auto
   useEffect(() => {
-    if (!speech.isListening && speech.finalTranscript && !userEditedRef.current) {
+    if (
+      !speech.isListening &&
+      speech.finalTranscript &&
+      !userEditedRef.current &&
+      countdown === null
+    ) {
       setInput(speech.finalTranscript);
-      autoSendTimerRef.current = setTimeout(() => {
-        const text = speech.finalTranscript.trim();
-        if (text && !userEditedRef.current) {
-          sendMessage(text);
-          setInput("");
-          speech.resetTranscript();
-        }
-        autoSendTimerRef.current = null;
-      }, 1000);
-      return () => {
-        if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
-      };
+      setCountdown(3);
     }
-  }, [speech.isListening, speech.finalTranscript]);
+  }, [speech.isListening, speech.finalTranscript, countdown]);
+
+  // Tick du compte à rebours, envoi au passage à 0
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      const text = speech.finalTranscript.trim();
+      if (text && !userEditedRef.current) {
+        sendMessage(text);
+        setInput("");
+        speech.resetTranscript();
+      }
+      setCountdown(null);
+      return;
+    }
+    const t = setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
 
   useEffect(() => {
     if (speech.error) toast.error(speech.error);
   }, [speech.error]);
 
+  const cancelAutoSend = () => {
+    setCountdown(null);
+    speech.resetTranscript();
+    setInput("");
+  };
+
   const handleMicClick = () => {
+    // Reclic pendant le compte à rebours : annule l'envoi auto et relance l'écoute
+    if (countdown !== null) {
+      setCountdown(null);
+      speech.resetTranscript();
+      setInput("");
+      speech.startListening();
+      return;
+    }
     if (!speech.isSupported) {
       toast.info(
         "Dictée vocale non disponible sur ce navigateur. Utilise Chrome, Edge ou Safari."
@@ -357,6 +378,7 @@ export default function Assistant() {
                   value={input}
                   onChange={(e) => {
                     userEditedRef.current = true;
+                    if (countdown !== null) setCountdown(null);
                     setInput(e.target.value);
                   }}
                   placeholder={speech.isListening ? "Écoute en cours…" : "Posez votre question..."}
@@ -403,8 +425,22 @@ export default function Assistant() {
               </div>
               {speech.isListening && (
                 <p className="text-[11px] text-red-500 font-medium px-1">
-                  Écoute en cours… (arrêt auto au silence)
+                  Écoute en cours… (arrêt auto après 5 s de silence)
                 </p>
+              )}
+              {countdown !== null && (
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <p className="text-[11px] text-blue-600 font-medium">
+                    Envoi dans {countdown}…
+                  </p>
+                  <button
+                    type="button"
+                    onClick={cancelAutoSend}
+                    className="text-[11px] text-red-500 hover:text-red-700 underline"
+                  >
+                    Annuler l'envoi
+                  </button>
+                </div>
               )}
             </form>
           </div>

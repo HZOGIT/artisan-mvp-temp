@@ -41,7 +41,7 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
 
   try {
     const emailOptions: Parameters<typeof resend.emails.send>[0] = {
-      from: ENV.emailFrom || "Artisan MVP <onboarding@resend.dev>",
+      from: ENV.emailFrom || "Operioz <onboarding@resend.dev>",
       to,
       subject,
       html: body,
@@ -276,7 +276,7 @@ Cordialement,
 ${artisanName}
 
 ---
-Ce message a été envoyé automatiquement depuis Artisan MVP.
+Ce message a été envoyé automatiquement depuis Operioz.
   `.trim();
 
   return { subject, body };
@@ -308,7 +308,7 @@ Cordialement,
 ${artisanName}
 
 ---
-Ce message a été envoyé automatiquement depuis Artisan MVP.
+Ce message a été envoyé automatiquement depuis Operioz.
   `.trim();
 
   return { subject, body };

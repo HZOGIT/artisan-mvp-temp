@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface UseSpeechRecognitionOptions {
   /** Locale BCP-47, défaut: fr-FR */
   lang?: string;
-  /** Auto-stop après N ms de silence, défaut: 2000 */
+  /** Auto-stop après N ms de silence, défaut: 5000 */
   silenceMs?: number;
 }
 
@@ -28,7 +28,7 @@ interface UseSpeechRecognitionReturn {
 export function useSpeechRecognition(
   options: UseSpeechRecognitionOptions = {}
 ): UseSpeechRecognitionReturn {
-  const { lang = "fr-FR", silenceMs = 2000 } = options;
+  const { lang = "fr-FR", silenceMs = 5000 } = options;
 
   const SpeechRecognitionCtor =
     typeof window !== "undefined"

@@ -848,9 +848,10 @@ async function startServer() {
       req.on('close', () => { aborted = true; });
 
       // Boucle agentique : on stream le texte au fur et à mesure, et si Claude
-      // demande un outil on l'exécute puis on relance un tour. Max 6 tours pour
-      // éviter les boucles infinies.
-      const MAX_TURNS = 6;
+      // demande un outil on l'exécute puis on relance un tour. Max 10 tours pour
+      // permettre des chaînes d'actions (ex: vérifier stocks → identifier
+      // ruptures → chercher fournisseur → créer commande → envoyer).
+      const MAX_TURNS = 10;
       let currentStream: any = null;
 
       try {
