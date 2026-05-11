@@ -824,11 +824,11 @@ async function startServer() {
         pageContext: typeof pageContext === 'string' ? pageContext : undefined,
       });
 
-      // Build messages array with history
-      const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+      // Build messages array with history (typé large pour accepter les tool_use/tool_result blocks)
+      const messages: any[] = [];
       if (Array.isArray(history)) {
         for (const h of history.slice(-10)) {
-          messages.push({ role: h.role, content: h.content });
+          if (h?.role && h?.content) messages.push({ role: h.role, content: h.content });
         }
       }
       messages.push({ role: 'user', content: message });
@@ -842,32 +842,75 @@ async function startServer() {
 
       const Anthropic = (await import('@anthropic-ai/sdk')).default;
       const anthropic = new Anthropic();
-      const stream = anthropic.messages.stream({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        temperature: 0.7,
-        system: systemPrompt,
-        messages,
-      });
+      const { AGENT_TOOLS, executeTool } = await import('./assistantTools');
 
-      stream.on('text', (text) => {
-        res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
-      });
+      let aborted = false;
+      req.on('close', () => { aborted = true; });
 
-      stream.on('end', () => {
-        res.write('data: [DONE]\n\n');
-        res.end();
-      });
+      // Boucle agentique : on stream le texte au fur et à mesure, et si Claude
+      // demande un outil on l'exécute puis on relance un tour. Max 6 tours pour
+      // éviter les boucles infinies.
+      const MAX_TURNS = 6;
+      let currentStream: any = null;
 
-      stream.on('error', (error) => {
-        console.error('[Assistant] Stream error:', error);
-        res.write(`data: ${JSON.stringify({ error: 'Erreur de génération' })}\n\n`);
-        res.end();
-      });
+      try {
+        for (let turn = 0; turn < MAX_TURNS && !aborted; turn++) {
+          currentStream = anthropic.messages.stream({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 2000,
+            temperature: 0.7,
+            system: systemPrompt,
+            tools: AGENT_TOOLS,
+            messages,
+          });
 
-      req.on('close', () => {
-        stream.abort();
-      });
+          currentStream.on('text', (text: string) => {
+            if (!aborted) res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
+          });
+
+          const finalMessage = await currentStream.finalMessage();
+
+          if (finalMessage.stop_reason !== 'tool_use') break;
+
+          const toolUses = (finalMessage.content as any[]).filter(b => b.type === 'tool_use');
+          if (toolUses.length === 0) break;
+
+          // Ajoute la réponse complète de l'assistant (texte + tool_use blocks) à l'historique
+          messages.push({ role: 'assistant', content: finalMessage.content });
+
+          // Exécute chaque outil et construit les tool_result
+          const toolResults: any[] = [];
+          for (const tu of toolUses) {
+            if (aborted) break;
+            res.write(`data: ${JSON.stringify({ toolUse: tu.name })}\n\n`);
+            const result = await executeTool(tu.name, tu.input, { artisanId: artisan.id });
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: tu.id,
+              content: JSON.stringify(result),
+              is_error: !result.ok,
+            });
+          }
+
+          if (toolResults.length === 0) break;
+          messages.push({ role: 'user', content: toolResults });
+        }
+
+        if (!aborted) {
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
+      } catch (err) {
+        console.error('[Assistant] Stream/tool error:', err);
+        if (!res.writableEnded) {
+          res.write(`data: ${JSON.stringify({ error: 'Erreur de génération' })}\n\n`);
+          res.end();
+        }
+      } finally {
+        if (currentStream && typeof currentStream.abort === 'function' && aborted) {
+          try { currentStream.abort(); } catch { /* noop */ }
+        }
+      }
     } catch (error) {
       console.error('[Assistant] Error:', error);
       if (!res.headersSent) {

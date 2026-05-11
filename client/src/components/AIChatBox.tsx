@@ -2,9 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Loader2, Send, User, Sparkles } from "lucide-react";
+import { Loader2, Send, User, Sparkles, Mic, MicOff } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { toast } from "sonner";
 
 /**
  * Message type matching server-side LLM Message interface
@@ -57,6 +59,12 @@ export type AIChatBoxProps = {
    * Click to send directly
    */
   suggestedPrompts?: string[];
+
+  /**
+   * Active le bouton micro de dictée vocale dans la zone de saisie.
+   * Utilise la Web Speech API native (Chrome, Edge, Safari ; pas Firefox).
+   */
+  enableVoice?: boolean;
 };
 
 /**
@@ -119,12 +127,65 @@ export function AIChatBox({
   height = "600px",
   emptyStateMessage = "Start a conversation with AI",
   suggestedPrompts,
+  enableVoice = false,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputAreaRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Dictée vocale (Web Speech API) ────────────────────────────────────────
+  const speech = useSpeechRecognition();
+  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userEditedRef = useRef(false);
+
+  useEffect(() => {
+    if (speech.isListening) {
+      userEditedRef.current = false;
+      setInput(speech.transcript);
+      if (autoSendTimerRef.current) {
+        clearTimeout(autoSendTimerRef.current);
+        autoSendTimerRef.current = null;
+      }
+    }
+  }, [speech.isListening, speech.transcript]);
+
+  useEffect(() => {
+    if (!speech.isListening && speech.finalTranscript && !userEditedRef.current) {
+      setInput(speech.finalTranscript);
+      autoSendTimerRef.current = setTimeout(() => {
+        const text = speech.finalTranscript.trim();
+        if (text && !userEditedRef.current) {
+          onSendMessage(text);
+          setInput("");
+          speech.resetTranscript();
+        }
+        autoSendTimerRef.current = null;
+      }, 1000);
+      return () => {
+        if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+      };
+    }
+  }, [speech.isListening, speech.finalTranscript, speech, onSendMessage]);
+
+  useEffect(() => {
+    if (speech.error) toast.error(speech.error);
+  }, [speech.error]);
+
+  const handleMicClick = () => {
+    if (!speech.isSupported) {
+      toast.info(
+        "Dictée vocale non disponible sur ce navigateur. Utilise Chrome, Edge ou Safari."
+      );
+      return;
+    }
+    if (speech.isListening) {
+      speech.stopListening();
+    } else {
+      speech.startListening();
+    }
+  };
 
   // Filter out system messages
   const displayMessages = messages.filter((msg) => msg.role !== "system");
@@ -169,6 +230,13 @@ export function AIChatBox({
     e.preventDefault();
     const trimmedInput = input.trim();
     if (!trimmedInput || isLoading) return;
+
+    // Annule un auto-send vocal en attente si l'utilisateur appuie sur Envoyer
+    if (autoSendTimerRef.current) {
+      clearTimeout(autoSendTimerRef.current);
+      autoSendTimerRef.current = null;
+    }
+    speech.resetTranscript();
 
     onSendMessage(trimmedInput);
     setInput("");
@@ -306,29 +374,77 @@ export function AIChatBox({
       <form
         ref={inputAreaRef}
         onSubmit={handleSubmit}
-        className="flex gap-2 p-4 border-t bg-background/50 items-end"
+        className="flex flex-col gap-1 p-4 border-t bg-background/50"
       >
-        <Textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className="flex-1 max-h-32 resize-none min-h-9"
-          rows={1}
-        />
-        <Button
-          type="submit"
-          size="icon"
-          disabled={!input.trim() || isLoading}
-          className="shrink-0 h-[38px] w-[38px]"
-        >
-          {isLoading ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Send className="size-4" />
+        <div className="flex gap-2 items-end">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => {
+              userEditedRef.current = true;
+              setInput(e.target.value);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={speech.isListening ? "Écoute en cours…" : placeholder}
+            className={cn(
+              "flex-1 max-h-32 resize-none min-h-9",
+              speech.isListening && "italic text-muted-foreground"
+            )}
+            rows={1}
+          />
+
+          {enableVoice && (
+            <div className="relative shrink-0">
+              {speech.isListening && (
+                <span
+                  aria-hidden
+                  className="absolute inset-0 rounded-md bg-red-500/40 animate-ping"
+                />
+              )}
+              <Button
+                type="button"
+                size="icon"
+                variant={speech.isListening ? "destructive" : "outline"}
+                onClick={handleMicClick}
+                disabled={!speech.isSupported}
+                className="relative h-[38px] w-[38px]"
+                aria-label={speech.isListening ? "Arrêter la dictée" : "Dictée vocale"}
+                title={
+                  !speech.isSupported
+                    ? "Dictée vocale non disponible sur ce navigateur. Utilise Chrome ou Safari."
+                    : speech.isListening
+                    ? "Arrêter la dictée"
+                    : "Dictée vocale"
+                }
+              >
+                {speech.isListening ? (
+                  <MicOff className="size-4" />
+                ) : (
+                  <Mic className="size-4" />
+                )}
+              </Button>
+            </div>
           )}
-        </Button>
+
+          <Button
+            type="submit"
+            size="icon"
+            disabled={!input.trim() || isLoading}
+            className="shrink-0 h-[38px] w-[38px]"
+          >
+            {isLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+          </Button>
+        </div>
+
+        {enableVoice && speech.isListening && (
+          <p className="text-[11px] text-red-500 font-medium px-1">
+            Écoute en cours… (arrêt auto au silence)
+          </p>
+        )}
       </form>
     </div>
   );

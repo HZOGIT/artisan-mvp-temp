@@ -102,6 +102,7 @@ export function AssistantDrawer({
             emptyStateMessage="Pose-moi une question sur ta page actuelle"
             height="100%"
             suggestedPrompts={suggestedPrompts}
+            enableVoice
             className="border-0 shadow-none rounded-none flex-1"
           />
         </div>

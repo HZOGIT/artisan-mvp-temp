@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import {
   Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar,
-  Loader2, User, Bot,
+  Loader2, User, Bot, Mic, MicOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/useMobile";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 type Message = {
   role: "user" | "assistant";
@@ -46,6 +47,11 @@ export default function Assistant() {
   // Devis list for rentabilite dialog
   const { data: devisList } = trpc.devis.list.useQuery();
 
+  // ── Dictée vocale (Web Speech API) ────────────────────────────────────────
+  const speech = useSpeechRecognition();
+  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userEditedRef = useRef(false);
+
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -54,6 +60,52 @@ export default function Assistant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  // Sync transcript -> input during listening
+  useEffect(() => {
+    if (speech.isListening) {
+      userEditedRef.current = false;
+      setInput(speech.transcript);
+      if (autoSendTimerRef.current) {
+        clearTimeout(autoSendTimerRef.current);
+        autoSendTimerRef.current = null;
+      }
+    }
+  }, [speech.isListening, speech.transcript]);
+
+  // Auto-send 1s after listening stops with a final transcript
+  useEffect(() => {
+    if (!speech.isListening && speech.finalTranscript && !userEditedRef.current) {
+      setInput(speech.finalTranscript);
+      autoSendTimerRef.current = setTimeout(() => {
+        const text = speech.finalTranscript.trim();
+        if (text && !userEditedRef.current) {
+          sendMessage(text);
+          setInput("");
+          speech.resetTranscript();
+        }
+        autoSendTimerRef.current = null;
+      }, 1000);
+      return () => {
+        if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+      };
+    }
+  }, [speech.isListening, speech.finalTranscript]);
+
+  useEffect(() => {
+    if (speech.error) toast.error(speech.error);
+  }, [speech.error]);
+
+  const handleMicClick = () => {
+    if (!speech.isSupported) {
+      toast.info(
+        "Dictée vocale non disponible sur ce navigateur. Utilise Chrome, Edge ou Safari."
+      );
+      return;
+    }
+    if (speech.isListening) speech.stopListening();
+    else speech.startListening();
+  };
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming) return;
@@ -299,24 +351,61 @@ export default function Assistant() {
           </div>
 
           <div className="p-3 border-t">
-            <form onSubmit={handleSubmit} className="flex gap-2">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Posez votre question..."
-                className="flex-1 min-h-[44px] max-h-[120px] resize-none"
-                rows={1}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-                disabled={isStreaming}
-              />
-              <Button type="submit" disabled={!input.trim() || isStreaming} className="self-end">
-                {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-1">
+              <div className="flex gap-2">
+                <Textarea
+                  value={input}
+                  onChange={(e) => {
+                    userEditedRef.current = true;
+                    setInput(e.target.value);
+                  }}
+                  placeholder={speech.isListening ? "Écoute en cours…" : "Posez votre question..."}
+                  className={`flex-1 min-h-[44px] max-h-[120px] resize-none ${
+                    speech.isListening ? "italic text-muted-foreground" : ""
+                  }`}
+                  rows={1}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                  disabled={isStreaming}
+                />
+                <div className="relative self-end">
+                  {speech.isListening && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 rounded-md bg-red-500/40 animate-ping"
+                    />
+                  )}
+                  <Button
+                    type="button"
+                    variant={speech.isListening ? "destructive" : "outline"}
+                    onClick={handleMicClick}
+                    disabled={!speech.isSupported || isStreaming}
+                    className="relative"
+                    aria-label={speech.isListening ? "Arrêter la dictée" : "Dictée vocale"}
+                    title={
+                      !speech.isSupported
+                        ? "Dictée vocale non disponible sur ce navigateur. Utilise Chrome ou Safari."
+                        : speech.isListening
+                        ? "Arrêter la dictée"
+                        : "Dictée vocale"
+                    }
+                  >
+                    {speech.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button type="submit" disabled={!input.trim() || isStreaming} className="self-end">
+                  {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+              </div>
+              {speech.isListening && (
+                <p className="text-[11px] text-red-500 font-medium px-1">
+                  Écoute en cours… (arrêt auto au silence)
+                </p>
+              )}
             </form>
           </div>
         </CardContent>
