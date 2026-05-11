@@ -38,6 +38,10 @@ import {
   Zap,
   Lock,
   CheckCircle2,
+  Leaf,
+  Sofa,
+  Truck,
+  ShoppingBag,
 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 
@@ -138,6 +142,7 @@ export default function Home() {
       <HeroSection />
       <ReassuranceBand />
       <FeaturesSection />
+      <TradesSection />
       <HowItWorksSection />
       <PricingSection />
       <TestimonialsSection />
@@ -303,7 +308,7 @@ function HeroSection() {
           </h1>
 
           <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
-            Devis, factures, clients, planning, paiements en ligne et assistant IA — tout en un. Conçu pour les artisans du bâtiment.
+            Devis, factures, clients, planning, paiements en ligne et assistant IA — tout en un. Pour les artisans, indépendants et professionnels du terrain.
           </p>
 
           {/* CTAs */}
@@ -851,6 +856,90 @@ function SecondaryFeatureCard({
   );
 }
 
+/* ───────────────────────────── 4b. SECTEURS D'ACTIVITÉ ───────────────────────────── */
+
+const sectors = [
+  {
+    icon: Wrench,
+    title: "Bâtiment & Rénovation",
+    examples: "(plombier, électricien, maçon, carreleur, couvreur...)",
+    tint: "bg-blue-50 text-blue-600 ring-blue-100",
+  },
+  {
+    icon: Leaf,
+    title: "Espaces verts & Extérieur",
+    examples: "(jardinier, paysagiste, pisciniste, arboriste...)",
+    tint: "bg-green-50 text-green-600 ring-green-100",
+  },
+  {
+    icon: Sofa,
+    title: "Aménagement intérieur",
+    examples: "(cuisiniste, menuisier, peintre, décorateur, poseur...)",
+    tint: "bg-amber-50 text-amber-600 ring-amber-100",
+  },
+  {
+    icon: Truck,
+    title: "Travaux publics & VRD",
+    examples: "(terrassier, enrobeur, canalisateur, paveur...)",
+    tint: "bg-orange-50 text-orange-600 ring-orange-100",
+  },
+  {
+    icon: ShoppingBag,
+    title: "Commerce & Services",
+    examples: "(vendeur, prestataire, artisan commerçant, installateur...)",
+    tint: "bg-violet-50 text-violet-600 ring-violet-100",
+  },
+  {
+    icon: Settings,
+    title: "Maintenance & Dépannage",
+    examples: "(technicien, réparateur, dépanneur, maintenancier...)",
+    tint: "bg-cyan-50 text-cyan-600 ring-cyan-100",
+  },
+] as const;
+
+function TradesSection() {
+  const { ref, isVisible } = useScrollReveal();
+
+  return (
+    <section className="py-20 sm:py-28 bg-slate-50 border-y border-slate-200">
+      <div ref={ref} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-3xl mx-auto mb-14">
+          <p className="text-sm font-semibold text-blue-600 uppercase tracking-wide">Secteurs</p>
+          <h2 className="mt-2 text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight">
+            Adapté à votre secteur d'activité
+          </h2>
+          <p className="mt-4 text-base sm:text-lg text-slate-600">
+            Operioz s'adapte à tous les professionnels indépendants, quel que soit votre métier.
+          </p>
+        </div>
+
+        <div
+          className={`grid gap-5 sm:grid-cols-2 lg:grid-cols-3 transition-all duration-700 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          }`}
+        >
+          {sectors.map((s) => (
+            <div
+              key={s.title}
+              className="group bg-white rounded-xl ring-1 ring-slate-200 p-6 hover:ring-blue-400 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            >
+              <div
+                className={`h-12 w-12 rounded-lg ring-1 flex items-center justify-center ${s.tint}`}
+              >
+                <s.icon className="h-6 w-6" />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold text-slate-900">{s.title}</h3>
+              <p className="mt-1.5 text-sm italic text-slate-500 leading-relaxed">
+                {s.examples}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ───────────────────────────── 5. COMMENT ÇA MARCHE ───────────────────────────── */
 
 function HowItWorksSection() {
@@ -1138,20 +1227,20 @@ const testimonials = [
   {
     initials: "SM",
     name: "Sophie Martin",
-    role: "Électricienne — Marseille",
+    role: "Paysagiste — Bordeaux",
     color: "from-indigo-500 to-violet-600",
     rating: 5,
     reviews: 31,
-    text: "L'assistant IA m'a alerté sur 4 devis en attente que j'avais oubliés — 8 600 € que j'allais perdre. Le portail client a clairement professionnalisé mon image auprès de mes clients pro.",
+    text: "Depuis Operioz, j'envoie mes devis d'aménagement depuis mon téléphone sur le chantier. Mes clients reçoivent tout en temps réel et paient en ligne. Un gain de temps énorme.",
   },
   {
     initials: "KB",
     name: "Karim Benali",
-    role: "Chauffagiste — Paris",
+    role: "Cuisiniste — Lyon",
     color: "from-violet-500 to-fuchsia-600",
     rating: 5,
     reviews: 22,
-    text: "Je gère 3 techniciens et 60 contrats de maintenance. La géolocalisation et la planification récurrente me font gagner 5 h par semaine. Tout est synchronisé entre mon téléphone et le bureau.",
+    text: "Je gère mes commandes fournisseurs, mes clients et mon planning depuis une seule app. J'ai gagné 5 h par semaine sur l'administratif.",
   },
 ];
 
@@ -1344,7 +1433,7 @@ function FinalCTASection() {
 
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
-          Rejoignez <span className="bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">500+ artisans</span> qui ont digitalisé leur activité
+          Rejoignez <span className="bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">500+ professionnels</span> qui ont digitalisé leur activité
         </h2>
         <p className="mt-5 text-lg text-slate-300 max-w-2xl mx-auto">
           14 jours gratuits · sans engagement · sans carte bancaire.
@@ -1413,7 +1502,7 @@ function Footer() {
               <span className="text-lg font-bold text-white">Operioz</span>
             </a>
             <p className="text-sm text-slate-400 leading-relaxed">
-              La solution tout-en-un pour les artisans du bâtiment.
+              Le logiciel de gestion tout-en-un pour les artisans, indépendants et professionnels du terrain.
             </p>
             <div className="mt-6 flex items-center gap-3">
               {[
@@ -1519,7 +1608,7 @@ function Footer() {
             © {new Date().getFullYear()} Operioz. Tous droits réservés.
           </p>
           <p className="text-xs text-slate-500">
-            Fait avec ❤ en France · Hébergé en Europe
+            Fait avec ❤ en France · Pour tous les professionnels 🇫🇷
           </p>
         </div>
       </div>

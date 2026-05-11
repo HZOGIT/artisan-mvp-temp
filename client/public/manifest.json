@@ -1,7 +1,7 @@
 {
   "name": "Operioz",
   "short_name": "Operioz",
-  "description": "Gestion complète pour artisans du bâtiment",
+  "description": "Gestion complète pour artisans, indépendants et professionnels",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
