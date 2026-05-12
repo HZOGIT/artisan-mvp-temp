@@ -375,6 +375,32 @@ export const AGENT_TOOLS: Tool[] = [
 ];
 
 // ============================================================================
+// Mapping outil → caches à invalider côté client
+// ============================================================================
+//
+// Chaque entrée déclare les clés de cache tRPC (matchées en substring sur le
+// queryKey) que le client doit invalider après l'exécution réussie de l'outil.
+// La route SSE émet un event { invalidate: [...] } juste après chaque tool_use,
+// et useAssistantStream rappelle le queryClient pour invalider.
+//
+// Notifications est inclus pour les outils qui créent une notification (envoi
+// devis/facture/relance/commande) afin de rafraîchir la cloche en temps réel.
+
+export const TOOL_INVALIDATIONS: Record<string, string[]> = {
+  creer_client: ["clients"],
+  creer_devis: ["devis"],
+  envoyer_devis: ["devis", "notifications"],
+  creer_et_envoyer_devis: ["devis", "notifications"],
+  creer_facture: ["factures", "devis"],
+  envoyer_facture: ["factures", "notifications"],
+  envoyer_relance: ["factures", "notifications"],
+  creer_intervention: ["interventions"],
+  modifier_intervention: ["interventions"],
+  creer_commande_fournisseur: ["commandesFournisseurs"],
+  envoyer_commande_fournisseur: ["commandesFournisseurs", "notifications"],
+};
+
+// ============================================================================
 // Tool executors
 // ============================================================================
 

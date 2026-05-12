@@ -35,9 +35,22 @@ import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { ScrollArea } from "./ui/scroll-area";
 import { trpc } from "@/lib/trpc";
+import { useQueryClient } from "@tanstack/react-query";
 import { AssistantFAB } from "./AssistantFAB";
 import { AssistantDrawer, type AssistantPanelSize } from "./AssistantDrawer";
 import { useAssistantStream } from "@/hooks/useAssistantStream";
+
+/**
+ * Vérifie récursivement si un queryKey tRPC contient une chaîne donnée.
+ * Les queryKey tRPC ont la forme [["clients", "list"], { input: ... }] ;
+ * un match en substring sur chaque string permet d'invalider toutes les
+ * variantes d'une entité (list, byId, getUnreadCount, etc.) en une fois.
+ */
+function queryKeyContains(key: unknown, needle: string): boolean {
+  if (typeof key === "string") return key.includes(needle);
+  if (Array.isArray(key)) return key.some((k) => queryKeyContains(k, needle));
+  return false;
+}
 
 const ASSISTANT_PANEL_SIZE_KEY = "operioz.assistant.panelSize";
 const ASSISTANT_PANEL_MARGIN: Record<AssistantPanelSize, string> = {
@@ -540,11 +553,22 @@ function DashboardLayoutContent({
   const isAssistantPage = location === "/assistant";
   const { context: assistantContext, prompts: assistantSuggestions } =
     getAssistantContextForPath(location);
+  const queryClient = useQueryClient();
   const assistant = useAssistantStream({
     pageContext: assistantContext,
     onNavigate: ({ page, filtre }) => {
       const target = filtre ? `${page}?filtre=${encodeURIComponent(filtre)}` : page;
       setLocation(target);
+    },
+    onInvalidate: (keys) => {
+      // L'IA a modifié des données : on invalide toutes les queries tRPC
+      // dont le queryKey contient une de ces chaînes. Match en substring
+      // pour couvrir list / byId / getUnreadCount / getLowStock etc.
+      for (const key of keys) {
+        queryClient.invalidateQueries({
+          predicate: (query) => queryKeyContains(query.queryKey, key),
+        });
+      }
     },
   });
   const filteredMenuGroups = filterMenuByPermissions(menuGroups, userPermissions);

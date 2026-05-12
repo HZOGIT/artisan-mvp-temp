@@ -8,6 +8,12 @@ interface UseAssistantStreamOptions {
   pageContext?: string;
   /** Appelé quand l'IA invoque l'outil naviguer_vers : redirige l'artisan vers la page concernée. */
   onNavigate?: (target: { page: string; filtre?: string; message?: string }) => void;
+  /**
+   * Appelé après chaque outil de l'IA qui a modifié des données. Reçoit les
+   * clés d'entités à invalider côté cache tRPC (clients, devis, factures,
+   * interventions, commandesFournisseurs, stocks, notifications).
+   */
+  onInvalidate?: (keys: string[]) => void;
 }
 
 interface UseAssistantStreamReturn {
@@ -36,6 +42,7 @@ export function useAssistantStream(
   const messagesRef = useRef<Message[]>([]);
   const pageContextRef = useRef<string | undefined>(options.pageContext);
   const onNavigateRef = useRef<UseAssistantStreamOptions["onNavigate"]>(options.onNavigate);
+  const onInvalidateRef = useRef<UseAssistantStreamOptions["onInvalidate"]>(options.onInvalidate);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -49,6 +56,10 @@ export function useAssistantStream(
   useEffect(() => {
     onNavigateRef.current = options.onNavigate;
   }, [options.onNavigate]);
+
+  useEffect(() => {
+    onInvalidateRef.current = options.onInvalidate;
+  }, [options.onInvalidate]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -130,6 +141,10 @@ export function useAssistantStream(
                 filtre: typeof parsed.filtre === "string" ? parsed.filtre : undefined,
                 message: typeof parsed.message === "string" ? parsed.message : undefined,
               });
+            }
+            if (Array.isArray(parsed.invalidate) && parsed.invalidate.length > 0) {
+              const keys = parsed.invalidate.filter((k: unknown): k is string => typeof k === "string");
+              if (keys.length > 0) onInvalidateRef.current?.(keys);
             }
           } catch {
             // chunk de pré-flush, ignore

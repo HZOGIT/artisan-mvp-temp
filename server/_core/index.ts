@@ -880,6 +880,7 @@ async function startServer() {
           messages.push({ role: 'assistant', content: finalMessage.content });
 
           // Exécute chaque outil et construit les tool_result
+          const { TOOL_INVALIDATIONS } = await import('./assistantTools');
           const toolResults: any[] = [];
           for (const tu of toolUses) {
             if (aborted) break;
@@ -891,6 +892,14 @@ async function startServer() {
               const nav = (result.data as any)?.navigate;
               if (nav?.page) {
                 res.write(`data: ${JSON.stringify({ navigate: nav.page, filtre: nav.filtre, message: nav.message })}\n\n`);
+              }
+            }
+            // Si l'outil a modifié des données, on émet un event invalidate
+            // pour que le client rafraîchisse le cache tRPC concerné.
+            if (result.ok) {
+              const keys = TOOL_INVALIDATIONS[tu.name];
+              if (keys && keys.length > 0) {
+                res.write(`data: ${JSON.stringify({ invalidate: keys })}\n\n`);
               }
             }
             toolResults.push({
