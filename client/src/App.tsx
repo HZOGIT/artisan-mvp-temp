@@ -162,58 +162,23 @@ function Router() {
       <Route path="/portail/:token" component={PortailClient} />
       <Route path="/avis/:token" component={SoumettreAvis} />
       <Route path="/vitrine/:slug" component={Vitrine} />
-      {/* BYPASS CLERK - All routes go to authenticated routes */}
-      <Route path="/dashboard" component={() => <AuthenticatedRoutes />} />
-      <Route path="/clients/:rest*" component={() => <AuthenticatedRoutes />} />
-      <Route path="/clients" component={() => <AuthenticatedRoutes />} />
-      <Route path="/devis/:id/ligne/nouvelle" component={() => <AuthenticatedRoutes />} />
-      <Route path="/devis/:rest*" component={() => <AuthenticatedRoutes />} />
-      <Route path="/devis" component={() => <AuthenticatedRoutes />} />
-      <Route path="/factures/:rest*" component={() => <AuthenticatedRoutes />} />
-      <Route path="/factures" component={() => <AuthenticatedRoutes />} />
-      <Route path="/interventions" component={() => <AuthenticatedRoutes />} />
-      <Route path="/articles" component={() => <AuthenticatedRoutes />} />
-      <Route path="/calendrier" component={() => <AuthenticatedRoutes />} />
-      <Route path="/statistiques" component={() => <AuthenticatedRoutes />} />
-      <Route path="/stocks" component={() => <AuthenticatedRoutes />} />
-      <Route path="/fournisseurs" component={() => <AuthenticatedRoutes />} />
-      <Route path="/profil" component={() => <AuthenticatedRoutes />} />
-      <Route path="/parametres" component={() => <AuthenticatedRoutes />} />
-      <Route path="/contrats/:rest*" component={() => <AuthenticatedRoutes />} />
-      <Route path="/contrats" component={() => <AuthenticatedRoutes />} />
-      <Route path="/mobile" component={() => <AuthenticatedRoutes />} />
-      <Route path="/chat" component={() => <AuthenticatedRoutes />} />
-      <Route path="/techniciens" component={() => <AuthenticatedRoutes />} />
-      <Route path="/avis" component={() => <AuthenticatedRoutes />} />
-      <Route path="/geolocalisation" component={() => <AuthenticatedRoutes />} />
-      <Route path="/comptabilite" component={() => <AuthenticatedRoutes />} />
-      <Route path="/planification" component={() => <AuthenticatedRoutes />} />
-      <Route path="/rapports" component={() => <AuthenticatedRoutes />} />
-      <Route path="/conges" component={() => <AuthenticatedRoutes />} />
-      <Route path="/previsions" component={() => <AuthenticatedRoutes />} />
-      <Route path="/vehicules" component={() => <AuthenticatedRoutes />} />
-      <Route path="/badges" component={() => <AuthenticatedRoutes />} />
-      <Route path="/alertes-previsions" component={() => <AuthenticatedRoutes />} />
-      <Route path="/chantiers" component={() => <AuthenticatedRoutes />} />
-      <Route path="/integrations-comptables" component={() => <AuthenticatedRoutes />} />
-      <Route path="/devis-ia" component={() => <AuthenticatedRoutes />} />
-      <Route path="/calendrier-chantiers" component={() => <AuthenticatedRoutes />} />
-      <Route path="/tableau-bord-sync-comptable" component={() => <AuthenticatedRoutes />} />
-      <Route path="/relances" component={() => <AuthenticatedRoutes />} />
-      <Route path="/modeles-email" component={() => <AuthenticatedRoutes />} />
-      <Route path="/modeles-email-transactionnels" component={() => <AuthenticatedRoutes />} />
-      <Route path="/commandes/:rest*" component={() => <AuthenticatedRoutes />} />
-      <Route path="/commandes" component={() => <AuthenticatedRoutes />} />
-      <Route path="/rapport-commande" component={() => <AuthenticatedRoutes />} />
-      <Route path="/performances-fournisseurs" component={() => <AuthenticatedRoutes />} />
-      <Route path="/portail-gestion" component={() => <AuthenticatedRoutes />} />
-      <Route path="/assistant" component={() => <AuthenticatedRoutes />} />
-      <Route path="/notifications" component={() => <AuthenticatedRoutes />} />
-      <Route path="/rdv-en-ligne" component={() => <AuthenticatedRoutes />} />
-      <Route path="/ma-vitrine" component={() => <AuthenticatedRoutes />} />
-      <Route path="/utilisateurs" component={() => <AuthenticatedRoutes />} />
-      <Route path="/documentation" component={() => <AuthenticatedRoutes />} />
-      <Route component={NotFound} />
+      {/*
+        Toutes les routes authentifiées passent par UN SEUL catch-all
+        AuthenticatedRoutes. Sa propre <Switch> interne dispatche vers le bon
+        composant de page. Conséquence : naviguer entre /devis et /factures
+        ne re-mount PLUS DashboardLayout, donc l'état (drawer ouvert,
+        conversation MonAssistant…) persiste entre les navigations.
+
+        L'ancienne version listait chaque route avec
+        `component={() => <AuthenticatedRoutes />}` — l'arrow inline créait
+        un nouveau composant à chaque render et provoquait un remount du
+        layout à chaque clic dans le menu.
+
+        Les URLs inconnues atteignent aussi ce catch-all et tombent sur le
+        NotFound interne d'AuthenticatedRoutes (ou sur l'écran "Connexion
+        requise" si l'utilisateur n'est pas connecté).
+      */}
+      <Route component={AuthenticatedRoutes} />
     </Switch>
   );
 }

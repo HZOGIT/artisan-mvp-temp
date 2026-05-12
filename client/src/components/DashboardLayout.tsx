@@ -507,8 +507,16 @@ function DashboardLayoutContent({
   const userPermissions: string[] = (user as any)?.permissions || [];
 
   // MonAssistant : ouvert/fermé + contexte dynamique selon la route active.
-  // La conversation persiste entre les ouvertures du drawer et entre les routes.
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  // La conversation et l'état d'ouverture persistent entre toutes les navigations
+  // (DashboardLayout n'est plus re-mount grâce au catch-all routing dans App.tsx).
+  //
+  // État initial : ouvert sur desktop (≥ md, 768px) pour que MonAssistant soit
+  // visible dès la connexion ; fermé sur mobile pour ne pas masquer l'app au
+  // premier chargement (le drawer mobile est en plein écran avec overlay).
+  const [isAssistantOpen, setIsAssistantOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(min-width: 768px)").matches;
+  });
   const isAssistantPage = location === "/assistant";
   const { context: assistantContext, prompts: assistantSuggestions } =
     getAssistantContextForPath(location);
