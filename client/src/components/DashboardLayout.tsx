@@ -706,7 +706,11 @@ function DashboardLayoutContent({
         />
       </div>
 
-      <SidebarInset>
+      <SidebarInset
+        className={`transition-[margin] duration-300 ease-out ${
+          isAssistantOpen ? "md:mr-[380px]" : ""
+        }`}
+      >
         <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
           <div className="flex items-center gap-2">
             {isMobile && <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />}

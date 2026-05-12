@@ -2,9 +2,7 @@ import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import * as db from "../db";
 import {
   sendEmail,
-  generateDevisEmailContent,
   generateFactureEmailContent,
-  generateRappelFactureContent,
 } from "./emailService";
 
 // ============================================================================
@@ -347,6 +345,176 @@ export type ToolResult =
   | { ok: true; data: unknown }
   | { ok: false; error: string };
 
+const PUBLIC_BASE_URL = "https://artisan.cheminov.com";
+
+/**
+ * Construit le corps HTML d'un email de devis avec lien de signature électronique.
+ * Réutilise le format visuel des emails Operioz + ajoute un gros bouton "Consulter
+ * et signer". Le paragraphe d'intro garde le pattern "Veuillez trouver ci-joint…"
+ * pour rester compatible avec applyCustomEmailMessage.
+ */
+function buildDevisSignatureEmailBody(params: {
+  artisanName: string;
+  clientName: string;
+  devisNumero: string;
+  devisObjet?: string;
+  totalTTC: string;
+  dateValidite?: string;
+  signatureUrl: string;
+}): { subject: string; body: string } {
+  const { artisanName, clientName, devisNumero, devisObjet, totalTTC, dateValidite, signatureUrl } = params;
+  const subject = `Devis ${devisNumero}${devisObjet ? ` - ${devisObjet}` : ""} de ${artisanName}`;
+  const body = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+        <tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${artisanName}</h1>
+        </td></tr>
+
+        <tr><td style="padding:36px 40px 16px 40px;">
+          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${devisNumero}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${devisObjet}&nbsp;&raquo;</em>` : ""} d'un montant de <strong>${totalTTC}</strong>${dateValidite ? `, valable jusqu'au <strong>${dateValidite}</strong>` : ""}. Vous pouvez le consulter et le signer électroniquement en un clic.</p>
+        </td></tr>
+
+        <tr><td style="padding:0 40px 24px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+            <tr><td style="padding:20px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro du devis</td>
+                  <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${devisNumero}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Montant TTC</td>
+                  <td style="padding:6px 0;font-size:16px;color:#1e40af;font-weight:700;text-align:right;border-top:1px solid #dbeafe;">${totalTTC}</td>
+                </tr>
+                ${dateValidite ? `<tr>
+                  <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Valable jusqu'au</td>
+                  <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;border-top:1px solid #dbeafe;">${dateValidite}</td>
+                </tr>` : ""}
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:0 40px 12px 40px;text-align:center;">
+          <a href="${signatureUrl}" style="display:inline-block;background-color:#1e40af;color:#ffffff;padding:14px 32px;border-radius:6px;text-decoration:none;font-size:16px;font-weight:600;">Consulter et signer le devis</a>
+        </td></tr>
+
+        <tr><td style="padding:0 40px 32px 40px;text-align:center;">
+          <p style="margin:0 0 6px 0;font-size:13px;color:#9ca3af;">Ce lien est valide pendant 30 jours.</p>
+          <p style="margin:0 0 16px 0;font-size:13px;color:#9ca3af;word-break:break-all;">Si le bouton ne fonctionne pas, copiez ce lien : ${signatureUrl}</p>
+          <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
+          <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
+        </td></tr>
+
+        <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis Operioz</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  return { subject, body };
+}
+
+/**
+ * Construit le corps HTML d'un email de relance facture impayée — même format
+ * visuel que les autres emails Operioz. Le paragraphe d'intro garde le pattern
+ * "Veuillez trouver ci-joint…" pour applyCustomEmailMessage.
+ */
+function buildRelanceEmailBody(params: {
+  artisanName: string;
+  clientName: string;
+  factureNumero: string;
+  totalTTC: string;
+  joursRetard: number;
+}): { subject: string; body: string } {
+  const { artisanName, clientName, factureNumero, totalTTC, joursRetard } = params;
+  const subject = `Rappel : facture ${factureNumero} en attente de règlement`;
+  const body = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+        <tr><td style="background-color:#dc2626;padding:28px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${artisanName}</h1>
+        </td></tr>
+
+        <tr><td style="padding:36px 40px 16px 40px;">
+          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint un rappel concernant la facture <strong>${factureNumero}</strong> d'un montant de <strong>${totalTTC}</strong>, en attente de règlement depuis ${joursRetard} jour(s).</p>
+        </td></tr>
+
+        <tr><td style="padding:0 40px 28px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
+            <tr><td style="padding:20px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro de facture</td>
+                  <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${factureNumero}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #fecaca;">Montant TTC</td>
+                  <td style="padding:6px 0;font-size:16px;color:#dc2626;font-weight:700;text-align:right;border-top:1px solid #fecaca;">${totalTTC}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #fecaca;">Jours de retard</td>
+                  <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;border-top:1px solid #fecaca;">${joursRetard}</td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <tr><td style="padding:0 40px 36px 40px;">
+          <p style="margin:0 0 14px 0;font-size:15px;color:#374151;line-height:1.6;">Nous vous serions reconnaissants de bien vouloir procéder au règlement dans les meilleurs délais.</p>
+          <p style="margin:0 0 24px 0;font-size:13px;color:#9ca3af;font-style:italic;">Si vous avez déjà effectué le paiement, veuillez ignorer ce message.</p>
+          <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
+          <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
+        </td></tr>
+
+        <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">Ce message a été envoyé automatiquement depuis Operioz</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  return { subject, body };
+}
+
+/**
+ * Récupère ou crée un lien de signature électronique pour un devis donné.
+ * Réutilise exactement le même mécanisme que la mutation tRPC manuelle
+ * `signature.createSignatureLink` (mêmes table, token, validité 30 jours).
+ */
+async function getOrCreateDevisSignatureUrl(devisId: number): Promise<string> {
+  const existing = await db.getSignatureByDevisId(devisId);
+  if (existing) {
+    return `${PUBLIC_BASE_URL}/devis-public/${existing.token}`;
+  }
+  const token =
+    crypto.randomUUID().replace(/-/g, "") +
+    crypto.randomUUID().replace(/-/g, "").slice(0, 32);
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+  await db.createSignatureDevis({ devisId, token, expiresAt });
+  return `${PUBLIC_BASE_URL}/devis-public/${token}`;
+}
+
 /**
  * Injecte le messagePersonnalise dans le corps HTML en REMPLAÇANT le paragraphe
  * d'introduction par défaut ("Veuillez trouver ci-joint le devis/la facture…").
@@ -493,8 +661,12 @@ async function sendDevisEmailHelper(devisId: number, customMessage: string | und
   const { generateDevisPDF } = await import("./pdfGenerator");
   const pdfBuffer = generateDevisPDF({ devis: { ...devisData, lignes }, artisan: artisan as any, client });
 
+  // Génère (ou récupère) le lien de signature électronique — même mécanisme
+  // que la mutation manuelle signature.createSignatureLink.
+  const signatureUrl = await getOrCreateDevisSignatureUrl(devisData.id);
+
   const totalTTC = `${parseFloat(devisData.totalTTC || "0").toFixed(2)} €`;
-  const { subject, body } = generateDevisEmailContent({
+  const { subject, body } = buildDevisSignatureEmailBody({
     artisanName: artisan.nomEntreprise || "Votre artisan",
     clientName: `${client.prenom || ""} ${client.nom}`.trim(),
     devisNumero: devisData.numero,
@@ -503,6 +675,7 @@ async function sendDevisEmailHelper(devisId: number, customMessage: string | und
     dateValidite: devisData.dateValidite
       ? new Date(devisData.dateValidite).toLocaleDateString("fr-FR")
       : undefined,
+    signatureUrl,
   });
 
   const finalBody = applyCustomEmailMessage(body, customMessage);
@@ -710,7 +883,7 @@ async function execEnvoyerRelance(input: any, ctx: ToolContext): Promise<ToolRes
       ? Math.max(0, Math.floor((Date.now() - new Date(factureData.dateEcheance).getTime()) / 86400000))
       : 0;
 
-    const { subject, body } = generateRappelFactureContent({
+    const { subject, body } = buildRelanceEmailBody({
       artisanName: artisan?.nomEntreprise || "Votre artisan",
       clientName: `${client.prenom || ""} ${client.nom}`.trim(),
       factureNumero: factureData.numero,
@@ -718,14 +891,14 @@ async function execEnvoyerRelance(input: any, ctx: ToolContext): Promise<ToolRes
       joursRetard,
     });
 
-    const finalBody = input.messagePersonnalise
-      ? `${body}\n\n${input.messagePersonnalise}`
-      : body;
+    // Même helper que devis/facture : le messagePersonnalise REMPLACE le paragraphe
+    // d'intro par défaut, sans doublon.
+    const finalBody = applyCustomEmailMessage(body, input.messagePersonnalise);
 
     const result = await sendEmail({
       to: client.email,
       subject,
-      body: finalBody.replace(/\n/g, "<br>"),
+      body: finalBody,
     });
 
     if (!result.success) return fail(result.message);

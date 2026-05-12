@@ -35,11 +35,21 @@ export function AssistantDrawer({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
+
+    // Sur desktop le drawer est un panneau collé à droite, pas modal : on ne
+    // bloque pas le scroll de l'app. Sur mobile il occupe tout l'écran avec
+    // overlay : on bloque pour éviter le scroll en arrière-plan.
+    const mql = window.matchMedia("(max-width: 767px)");
+    const isMobile = mql.matches;
     const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (isMobile) {
+      document.body.style.overflow = "hidden";
+    }
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
+      if (isMobile) {
+        document.body.style.overflow = prevOverflow;
+      }
     };
   }, [isOpen, onClose]);
 
@@ -53,9 +63,10 @@ export function AssistantDrawer({
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay — UNIQUEMENT sur mobile. Sur desktop le drawer est une colonne
+          non-modale : pas d'overlay, l'artisan continue à voir et utiliser l'app. */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 md:hidden ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onClose}
@@ -64,12 +75,11 @@ export function AssistantDrawer({
 
       {/* Drawer */}
       <aside
-        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] bg-background shadow-2xl border-l flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-40 w-full sm:w-[380px] bg-background shadow-2xl border-l flex flex-col transition-transform duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
         aria-label="MonAssistant"
-        aria-modal="true"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
