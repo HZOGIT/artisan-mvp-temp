@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Plus, Search, Receipt, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +35,21 @@ const statusColors: Record<string, string> = {
 
 export default function Factures() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"tous" | "facture" | "avoir">("tous");
+  // Filtre par statut piloté par l'URL ?filtre= (set par MonAssistant via naviguer_vers).
+  // "impayees" couvre les statuts non finaux : envoyee + en_retard + validee.
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const f = params.get("filtre");
+    if (f === "impayees" || f === "en_retard" || f === "brouillon") {
+      setStatusFilter(f);
+    } else if (!f) {
+      setStatusFilter("all");
+    }
+  }, [search]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [formData, setFormData] = useState({
@@ -108,6 +121,18 @@ export default function Factures() {
       if (docType !== typeFilter) return false;
     }
 
+    // Filtre par statut (depuis l'URL ?filtre=)
+    if (statusFilter === "impayees") {
+      // Tout ce qui n'est ni payé, ni annulé, ni brouillon
+      if (facture.statut === "payee" || facture.statut === "annulee" || facture.statut === "brouillon") {
+        return false;
+      }
+    } else if (statusFilter === "en_retard") {
+      if (facture.statut !== "en_retard") return false;
+    } else if (statusFilter === "brouillon") {
+      if (facture.statut !== "brouillon") return false;
+    }
+
     // Filtre par recherche
     const searchLower = searchQuery.toLowerCase();
     if (!searchLower) return true;
@@ -119,6 +144,13 @@ export default function Factures() {
       clientName.includes(searchLower)
     );
   });
+
+  const statusFilterLabel: Record<string, string> = {
+    impayees: "impayées",
+    en_retard: "en retard",
+    brouillon: "brouillons",
+  };
+  const activeStatusLabel = statusFilter !== "all" ? statusFilterLabel[statusFilter] : null;
 
   return (
     <div className="space-y-6">
@@ -201,6 +233,22 @@ export default function Factures() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {activeStatusLabel && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <span>
+            Filtre actif : <strong>{activeStatusLabel}</strong>
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 px-2 text-blue-900 hover:bg-blue-100"
+            onClick={() => setLocation("/factures")}
+          >
+            Réinitialiser
+          </Button>
+        </div>
+      )}
 
       {/* Search + Filter */}
       <div className="flex flex-col sm:flex-row gap-3">

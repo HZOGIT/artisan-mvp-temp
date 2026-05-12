@@ -6,6 +6,8 @@ export type Message = { role: "user" | "assistant"; content: string };
 interface UseAssistantStreamOptions {
   /** Texte injecté dans le system prompt côté serveur pour situer l'IA */
   pageContext?: string;
+  /** Appelé quand l'IA invoque l'outil naviguer_vers : redirige l'artisan vers la page concernée. */
+  onNavigate?: (target: { page: string; filtre?: string; message?: string }) => void;
 }
 
 interface UseAssistantStreamReturn {
@@ -33,6 +35,7 @@ export function useAssistantStream(
 
   const messagesRef = useRef<Message[]>([]);
   const pageContextRef = useRef<string | undefined>(options.pageContext);
+  const onNavigateRef = useRef<UseAssistantStreamOptions["onNavigate"]>(options.onNavigate);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -42,6 +45,10 @@ export function useAssistantStream(
   useEffect(() => {
     pageContextRef.current = options.pageContext;
   }, [options.pageContext]);
+
+  useEffect(() => {
+    onNavigateRef.current = options.onNavigate;
+  }, [options.onNavigate]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -117,6 +124,13 @@ export function useAssistantStream(
             const parsed = JSON.parse(data);
             if (parsed.content) appendChunk(parsed.content);
             if (parsed.error) toast.error(parsed.error);
+            if (typeof parsed.navigate === "string" && parsed.navigate.length > 0) {
+              onNavigateRef.current?.({
+                page: parsed.navigate,
+                filtre: typeof parsed.filtre === "string" ? parsed.filtre : undefined,
+                message: typeof parsed.message === "string" ? parsed.message : undefined,
+              });
+            }
           } catch {
             // chunk de pré-flush, ignore
           }

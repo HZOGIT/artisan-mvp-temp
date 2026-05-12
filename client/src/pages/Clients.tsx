@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useState, useCallback } from "react";
+import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ const initialFormData: ClientFormData = {
 
 export function Clients() {
   const [, navigate] = useLocation();
+  const search = useSearch();
   const utils = trpc.useUtils();
   
   // State pour le formulaire d'édition
@@ -40,8 +41,14 @@ export function Clients() {
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
   const [editingClientId, setEditingClientId] = useState<number | null>(null);
   
-  // State pour la recherche
+  // State pour la recherche. MonAssistant peut pré-remplir via ?filtre=
   const [searchQuery, setSearchQuery] = useState("");
+  useEffect(() => {
+    const f = new URLSearchParams(search).get("filtre");
+    // Sur Clients il n'y a pas de filtre statut prédéfini : on utilise le filtre
+    // comme texte de recherche (ex: "particulier") si fourni.
+    if (f) setSearchQuery(f);
+  }, [search]);
 
   // Queries
   const { data: clients = [], isLoading } = trpc.clients.list.useQuery();

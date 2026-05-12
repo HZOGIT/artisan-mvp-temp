@@ -885,6 +885,14 @@ async function startServer() {
             if (aborted) break;
             res.write(`data: ${JSON.stringify({ toolUse: tu.name })}\n\n`);
             const result = await executeTool(tu.name, tu.input, { artisanId: artisan.id });
+            // L'outil naviguer_vers déclenche un event SSE spécial pour
+            // que le client redirige l'artisan vers la page concernée.
+            if (tu.name === 'naviguer_vers' && result.ok) {
+              const nav = (result.data as any)?.navigate;
+              if (nav?.page) {
+                res.write(`data: ${JSON.stringify({ navigate: nav.page, filtre: nav.filtre, message: nav.message })}\n\n`);
+              }
+            }
             toolResults.push({
               type: 'tool_result',
               tool_use_id: tu.id,

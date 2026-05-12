@@ -36,8 +36,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { ScrollArea } from "./ui/scroll-area";
 import { trpc } from "@/lib/trpc";
 import { AssistantFAB } from "./AssistantFAB";
-import { AssistantDrawer } from "./AssistantDrawer";
+import { AssistantDrawer, type AssistantPanelSize } from "./AssistantDrawer";
 import { useAssistantStream } from "@/hooks/useAssistantStream";
+
+const ASSISTANT_PANEL_SIZE_KEY = "operioz.assistant.panelSize";
+const ASSISTANT_PANEL_MARGIN: Record<AssistantPanelSize, string> = {
+  sm: "md:mr-[380px]",
+  md: "md:mr-[520px]",
+  lg: "md:mr-[700px]",
+};
+function readPanelSize(): AssistantPanelSize {
+  if (typeof window === "undefined") return "md";
+  const raw = window.localStorage.getItem(ASSISTANT_PANEL_SIZE_KEY);
+  return raw === "sm" || raw === "md" || raw === "lg" ? raw : "md";
+}
 
 // ============================================================================
 // MonAssistant — contextes par route
@@ -517,10 +529,24 @@ function DashboardLayoutContent({
     if (typeof window === "undefined") return false;
     return window.matchMedia("(min-width: 768px)").matches;
   });
+  const [panelSize, setPanelSize] = useState<AssistantPanelSize>(() => readPanelSize());
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ASSISTANT_PANEL_SIZE_KEY, panelSize);
+    } catch {
+      // localStorage indisponible (mode privé) : ignore
+    }
+  }, [panelSize]);
   const isAssistantPage = location === "/assistant";
   const { context: assistantContext, prompts: assistantSuggestions } =
     getAssistantContextForPath(location);
-  const assistant = useAssistantStream({ pageContext: assistantContext });
+  const assistant = useAssistantStream({
+    pageContext: assistantContext,
+    onNavigate: ({ page, filtre }) => {
+      const target = filtre ? `${page}?filtre=${encodeURIComponent(filtre)}` : page;
+      setLocation(target);
+    },
+  });
   const filteredMenuGroups = filterMenuByPermissions(menuGroups, userPermissions);
   const filteredAllItems = filteredMenuGroups.flatMap((g) => g.items);
   const activeMenuItem = filteredAllItems.find(item => item.path === location) || allMenuItems.find(item => item.path === location);
@@ -716,7 +742,7 @@ function DashboardLayoutContent({
 
       <SidebarInset
         className={`transition-[margin] duration-300 ease-out ${
-          isAssistantOpen ? "md:mr-[380px]" : ""
+          isAssistantOpen ? ASSISTANT_PANEL_MARGIN[panelSize] : ""
         }`}
       >
         <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
@@ -775,6 +801,8 @@ function DashboardLayoutContent({
         onSendMessage={assistant.sendMessage}
         onClear={assistant.clearMessages}
         suggestedPrompts={assistantSuggestions}
+        panelSize={panelSize}
+        onPanelSizeChange={setPanelSize}
       />
     </>
   );

@@ -1,7 +1,10 @@
 import { useEffect } from "react";
-import { Sparkles, X, Trash2 } from "lucide-react";
+import { Sparkles, X, Trash2, PanelLeft, Maximize2 } from "lucide-react";
 import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { AIChatBox, type Message } from "./AIChatBox";
+
+export type AssistantPanelSize = "sm" | "md" | "lg";
 
 interface AssistantDrawerProps {
   isOpen: boolean;
@@ -12,11 +15,31 @@ interface AssistantDrawerProps {
   onClear: () => void;
   /** Bulles de suggestion affichées dans l'empty state */
   suggestedPrompts?: string[];
+  /** Largeur du panneau desktop (sm/md/lg). Sur mobile, plein écran quel que soit le size. */
+  panelSize?: AssistantPanelSize;
+  onPanelSizeChange?: (size: AssistantPanelSize) => void;
 }
+
+const PANEL_WIDTH_CLASS: Record<AssistantPanelSize, string> = {
+  sm: "sm:w-[380px]",
+  md: "sm:w-[520px]",
+  lg: "sm:w-[700px]",
+};
+
+const PANEL_SIZE_OPTIONS: {
+  size: AssistantPanelSize;
+  label: string;
+  icon: typeof PanelLeft;
+  iconSize: string;
+}[] = [
+  { size: "sm", label: "Compact", icon: PanelLeft, iconSize: "h-3.5 w-3.5" },
+  { size: "md", label: "Normal", icon: PanelLeft, iconSize: "h-4 w-4" },
+  { size: "lg", label: "Large", icon: Maximize2, iconSize: "h-4 w-4" },
+];
 
 /**
  * Panneau latéral droit qui héberge MonAssistant.
- * - 380px sur desktop, plein écran sur mobile.
+ * - Trois largeurs desktop (sm 380, md 520, lg 700), plein écran sur mobile.
  * - Overlay cliquable + ESC pour fermer.
  * - Bloque le scroll du body quand ouvert.
  */
@@ -28,6 +51,8 @@ export function AssistantDrawer({
   onSendMessage,
   onClear,
   suggestedPrompts,
+  panelSize = "md",
+  onPanelSizeChange,
 }: AssistantDrawerProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -75,31 +100,60 @@ export function AssistantDrawer({
 
       {/* Drawer */}
       <aside
-        className={`fixed inset-y-0 right-0 z-40 w-full sm:w-[380px] bg-background shadow-2xl border-l flex flex-col transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-40 w-full ${PANEL_WIDTH_CLASS[panelSize]} bg-background shadow-2xl border-l flex flex-col transition-[transform,width] duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         role="dialog"
         aria-label="MonAssistant"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm">
+        <div className="flex items-center justify-between p-4 border-b shrink-0 gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 shadow-sm shrink-0">
               <Sparkles className="h-4 w-4 text-white" />
             </span>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold">MonAssistant</p>
-              <p className="text-[11px] text-muted-foreground">Assistant IA contextuel</p>
+            <div className="leading-tight min-w-0">
+              <p className="text-sm font-semibold truncate">MonAssistant</p>
+              <p className="text-[11px] text-muted-foreground truncate">Assistant IA contextuel</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            aria-label="Fermer le panneau"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            {onPanelSizeChange && (
+              <div className="hidden md:flex items-center gap-0.5 mr-1 rounded-md border bg-muted/40 p-0.5">
+                {PANEL_SIZE_OPTIONS.map(({ size, label, icon: Icon, iconSize }) => {
+                  const isActive = panelSize === size;
+                  return (
+                    <Tooltip key={size}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => onPanelSizeChange(size)}
+                          aria-label={`Taille ${label}`}
+                          aria-pressed={isActive}
+                          className={`h-7 w-7 inline-flex items-center justify-center rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            isActive
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "text-muted-foreground hover:text-foreground hover:bg-background"
+                          }`}
+                        >
+                          <Icon className={iconSize} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{label}</TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Fermer le panneau"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Chat */}

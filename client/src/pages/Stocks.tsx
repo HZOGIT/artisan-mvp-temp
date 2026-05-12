@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearch } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,20 @@ type MouvementFormData = {
 
 export default function Stocks() {
   const { user, loading: authLoading } = useAuth();
+  const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
+  // Tab actif piloté par ?filtre= (set par MonAssistant via naviguer_vers).
+  // rupture / alerte → onglet "Stock bas", sinon "Tous les articles".
+  const [activeTab, setActiveTab] = useState<"all" | "low">(() => {
+    if (typeof window === "undefined") return "all";
+    const f = new URLSearchParams(window.location.search).get("filtre");
+    return f === "rupture" || f === "alerte" ? "low" : "all";
+  });
+  useEffect(() => {
+    const f = new URLSearchParams(search).get("filtre");
+    if (f === "rupture" || f === "alerte") setActiveTab("low");
+    else if (!f) setActiveTab("all");
+  }, [search]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMouvementDialogOpen, setIsMouvementDialogOpen] = useState(false);
@@ -396,7 +410,7 @@ export default function Stocks() {
           </Card>
         )}
 
-        <Tabs defaultValue="all" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "all" | "low")} className="space-y-4">
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="all">Tous les articles</TabsTrigger>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useLocation, useSearch } from "wouter";
 import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,19 @@ const statusColors: Record<string, string> = {
 };
 
 export default function Interventions() {
+  const [, setLocation] = useLocation();
+  const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const f = params.get("filtre");
+    if (f === "planifiee" || f === "en_cours" || f === "terminee") {
+      setStatusFilter(f);
+    } else if (!f) {
+      setStatusFilter("all");
+    }
+  }, [search]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedIntervention, setSelectedIntervention] = useState<any>(null);
@@ -149,13 +162,18 @@ export default function Interventions() {
   };
 
   const filteredInterventions = interventionsList?.filter((intervention: any) => {
+    if (statusFilter !== "all" && intervention.statut !== statusFilter) return false;
     const searchLower = searchQuery.toLowerCase();
+    if (!searchLower) return true;
     return (
       intervention.titre?.toLowerCase().includes(searchLower) ||
       intervention.description?.toLowerCase().includes(searchLower) ||
       intervention.adresse?.toLowerCase().includes(searchLower)
     );
   });
+
+  const activeStatusLabel =
+    statusFilter !== "all" ? statusLabels[statusFilter] : null;
 
   return (
     <div className="space-y-6">
@@ -340,6 +358,22 @@ export default function Interventions() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {activeStatusLabel && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <span>
+            Filtre actif : <strong>{activeStatusLabel}</strong>
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 px-2 text-blue-900 hover:bg-blue-100"
+            onClick={() => setLocation("/interventions")}
+          >
+            Réinitialiser
+          </Button>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative max-w-md">

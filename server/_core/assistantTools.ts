@@ -331,6 +331,47 @@ export const AGENT_TOOLS: Tool[] = [
       required: ["interventionId"],
     },
   },
+
+  // ── Navigation UI ──────────────────────────────────────────────────────
+  {
+    name: "naviguer_vers",
+    description:
+      "Redirige l'artisan vers une page de l'application avec un filtre optionnel pour afficher des données spécifiques. À appeler APRÈS avoir listé des données pour que l'artisan puisse voir tous les résultats filtrés dans la page concernée. Le résumé court reste affiché dans le panneau de chat.",
+    input_schema: {
+      type: "object",
+      properties: {
+        page: {
+          type: "string",
+          enum: ["/factures", "/devis", "/clients", "/interventions", "/stocks", "/commandes"],
+          description: "Page de destination",
+        },
+        filtre: {
+          type: "string",
+          enum: [
+            "impayees",
+            "en_retard",
+            "brouillon",
+            "envoye",
+            "envoyee",
+            "accepte",
+            "refuse",
+            "planifiee",
+            "en_cours",
+            "terminee",
+            "rupture",
+            "alerte",
+          ],
+          description:
+            "Filtre à appliquer sur la page. Valeurs valides selon la page : factures → impayees, en_retard, brouillon ; devis → brouillon, envoye, accepte, refuse ; interventions → planifiee, en_cours, terminee ; stocks → rupture, alerte ; commandes → brouillon, envoyee.",
+        },
+        message: {
+          type: "string",
+          description: "Message court affiché à l'artisan pour confirmer la navigation (optionnel).",
+        },
+      },
+      required: ["page"],
+    },
+  },
 ];
 
 // ============================================================================
@@ -1347,6 +1388,36 @@ async function execModifierIntervention(input: any, ctx: ToolContext): Promise<T
 }
 
 // ============================================================================
+// Navigation UI
+// ============================================================================
+
+const VALID_NAV_PAGES = [
+  "/factures",
+  "/devis",
+  "/clients",
+  "/interventions",
+  "/stocks",
+  "/commandes",
+];
+
+async function execNaviguerVers(input: any, _ctx: ToolContext): Promise<ToolResult> {
+  const page = String(input?.page || "").trim();
+  if (!VALID_NAV_PAGES.includes(page)) {
+    return fail(`Page invalide : ${page || "(vide)"}. Valeurs autorisées : ${VALID_NAV_PAGES.join(", ")}`);
+  }
+  const filtre = input?.filtre ? String(input.filtre).trim() : undefined;
+  const message = input?.message ? String(input.message).trim() : undefined;
+  // Le payload est consommé côté route SSE pour émettre un event 'navigate'
+  // au client AVANT de renvoyer le résultat à Claude.
+  return ok({
+    navigate: { page, filtre, message },
+    confirmation: filtre
+      ? `Page ${page} ouverte avec le filtre « ${filtre} »`
+      : `Page ${page} ouverte`,
+  });
+}
+
+// ============================================================================
 // Dispatcher
 // ============================================================================
 
@@ -1401,6 +1472,9 @@ export async function executeTool(
       return execListerInterventions(input as any, ctx);
     case "modifier_intervention":
       return execModifierIntervention(input as any, ctx);
+    // Navigation UI
+    case "naviguer_vers":
+      return execNaviguerVers(input as any, ctx);
     default:
       return fail(`Outil inconnu: ${name}`);
   }

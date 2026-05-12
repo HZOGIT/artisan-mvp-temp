@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Plus, Search, ShoppingCart, MoreHorizontal, Eye, Pencil, Trash2, Download, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -34,9 +34,18 @@ function formatCurrency(value: any): string {
 
 export default function CommandesFournisseurs() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatut, setFilterStatut] = useState("tous");
   const [filterFournisseur, setFilterFournisseur] = useState("tous");
+  useEffect(() => {
+    const f = new URLSearchParams(search).get("filtre");
+    if (f && Object.prototype.hasOwnProperty.call(statusLabels, f)) {
+      setFilterStatut(f);
+    } else if (!f) {
+      setFilterStatut("tous");
+    }
+  }, [search]);
 
   const { data: commandes, isLoading } = trpc.commandesFournisseurs.list.useQuery();
   const { data: fournisseurs } = trpc.fournisseurs.list.useQuery();

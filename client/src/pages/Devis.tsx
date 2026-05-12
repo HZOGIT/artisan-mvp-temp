@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, Receipt, Download, FileSpreadsheet } from "lucide-react";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
@@ -31,8 +31,17 @@ const statusColors: Record<string, string> = {
 
 export default function Devis() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  // Lecture du filtre ?filtre= défini par MonAssistant (naviguer_vers).
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const f = params.get("filtre");
+    if (f && Object.prototype.hasOwnProperty.call(statusLabels, f)) {
+      setStatusFilter(f);
+    }
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
   const utils = trpc.useUtils();
   const { data: devisList, isLoading } = trpc.devis.list.useQuery();
   const { data: clients } = trpc.clients.list.useQuery();
