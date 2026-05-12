@@ -13,13 +13,13 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "chercher_client",
     description:
-      "Recherche un client par nom ou prénom pour obtenir son ID. Insensible à la casse, retourne jusqu'à 5 résultats. À utiliser AVANT toute action liée à un client si tu n'as pas son ID.",
+      "Recherche un client par nom, prénom, entreprise ou email. Insensible à la casse et aux accents. Accepte une requête multi-mots (ex: 'Michel dad' trouve DAD Michel) : matche TOUS les mots dans n'importe quel ordre, et tombe en mode partiel scoré si aucun match strict. Retourne jusqu'à 5 résultats. À utiliser AVANT toute action liée à un client si tu n'as pas son ID.",
     input_schema: {
       type: "object",
       properties: {
         nom: {
           type: "string",
-          description: "Texte à chercher dans le nom, prénom ou entreprise du client.",
+          description: "Mots à chercher (nom, prénom, entreprise, email). Peut contenir plusieurs mots séparés par des espaces.",
         },
       },
       required: ["nom"],
@@ -159,16 +159,24 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "creer_intervention",
     description:
-      "Planifie une intervention dans le calendrier. Les dates doivent être au format ISO 8601 (ex: 2026-05-13T08:00:00).",
+      "Planifie une intervention dans le calendrier. Les dates doivent être au format ISO 8601 (ex: 2026-05-13T08:00:00). Le titre doit décrire la nature du travail (ex: 'Débouchage WC', 'Réparation fuite', 'Entretien chaudière') — pas un libellé générique. L'adresse est facultative : si non fournie, l'adresse postale du client est utilisée automatiquement.",
     input_schema: {
       type: "object",
       properties: {
         clientId: { type: "number" },
-        titre: { type: "string" },
-        description: { type: "string" },
+        titre: {
+          type: "string",
+          description:
+            "Nature du travail à effectuer, déduite de la demande de l'artisan. Exemples : 'Débouchage WC', 'Réparation fuite cuisine', 'Entretien chaudière annuel', 'Installation chauffe-eau'. Utilise 'Intervention' uniquement si aucun détail n'a été donné.",
+        },
+        description: { type: "string", description: "Notes ou détails complémentaires (optionnel)." },
         dateDebut: { type: "string", description: "Date/heure ISO 8601" },
         dateFin: { type: "string", description: "Date/heure ISO 8601" },
-        adresse: { type: "string" },
+        adresse: {
+          type: "string",
+          description:
+            "Adresse de l'intervention (optionnel). Si vide, l'adresse postale du client est utilisée automatiquement.",
+        },
       },
       required: ["clientId", "titre", "dateDebut", "dateFin"],
     },
@@ -613,26 +621,73 @@ function fail(error: string): ToolResult {
   return { ok: false, error };
 }
 
+/**
+ * Normalise une chaîne pour la recherche tolérante : lower-case, trim, suppression
+ * des accents (NFD + filtrage des diacritiques). "Mëlissâ" → "melissa".
+ */
+function normalizeForSearch(s: string | null | undefined): string {
+  // NFD décompose les caractères accentués (é → e + ́). Le range ̀-ͯ
+  // couvre les "combining diacritical marks" qu'on supprime ensuite.
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 async function execChercherClient(input: any, ctx: ToolContext): Promise<ToolResult> {
-  const query = String(input?.nom || "").toLowerCase().trim();
-  if (!query) return fail("Le paramètre 'nom' est requis");
+  const raw = String(input?.nom || "").trim();
+  if (!raw) return fail("Le paramètre 'nom' est requis");
+  const queryNorm = normalizeForSearch(raw);
+  const words = queryNorm.split(/\s+/).filter((w) => w.length > 0);
+  if (words.length === 0) return fail("Le paramètre 'nom' est requis");
+
   const clients = await db.getClientsByArtisanId(ctx.artisanId);
-  const matches = clients
-    .filter((c: any) => {
-      const full = `${c.prenom || ""} ${c.nom || ""}`.toLowerCase();
-      const entreprise = (c.entreprise || "").toLowerCase();
-      return full.includes(query) || entreprise.includes(query);
-    })
-    .slice(0, 5)
-    .map((c: any) => ({
-      id: c.id,
-      nom: c.nom,
-      prenom: c.prenom,
-      entreprise: c.entreprise || null,
-      email: c.email || null,
-      telephone: c.telephone || null,
-      ville: c.ville || null,
-    }));
+  const haystackOf = (c: any) =>
+    normalizeForSearch(
+      `${c.prenom || ""} ${c.nom || ""} ${c.entreprise || ""} ${c.email || ""}`
+    );
+
+  type Candidate = { c: any; score: number };
+
+  // Passe 1 — la chaîne complète normalisée apparaît telle quelle dans le client.
+  let candidates: Candidate[] = clients
+    .filter((c: any) => haystackOf(c).includes(queryNorm))
+    .map((c: any) => ({ c, score: 1000 }));
+
+  // Passe 2 — TOUS les mots présents (dans n'importe quel ordre, n'importe quel champ).
+  // Couvre le cas "Michel dad" → DAD Michel : on cherche "michel" ET "dad" séparément.
+  if (candidates.length === 0) {
+    candidates = clients
+      .filter((c: any) => {
+        const h = haystackOf(c);
+        return words.every((w) => h.includes(w));
+      })
+      .map((c: any) => ({ c, score: words.length * 10 }));
+  }
+
+  // Passe 3 — recherche partielle : on garde les clients qui matchent au moins
+  // un mot, et on trie par nombre de mots matchés décroissant.
+  if (candidates.length === 0) {
+    candidates = clients
+      .map((c: any) => {
+        const h = haystackOf(c);
+        const score = words.reduce((acc, w) => acc + (h.includes(w) ? 1 : 0), 0);
+        return { c, score };
+      })
+      .filter((m: Candidate) => m.score > 0)
+      .sort((a: Candidate, b: Candidate) => b.score - a.score);
+  }
+
+  const matches = candidates.slice(0, 5).map(({ c }) => ({
+    id: c.id,
+    nom: c.nom,
+    prenom: c.prenom,
+    entreprise: c.entreprise || null,
+    email: c.email || null,
+    telephone: c.telephone || null,
+    ville: c.ville || null,
+  }));
   return ok({ matches, count: matches.length });
 }
 
@@ -994,12 +1049,24 @@ async function execCreerIntervention(input: any, ctx: ToolContext): Promise<Tool
     return fail("clientId, titre, dateDebut et dateFin sont requis");
   }
   try {
-    await assertClientBelongs(Number(input.clientId), ctx);
+    // assertClientBelongs renvoie l'enregistrement client : on le réutilise
+    // pour récupérer l'adresse postale par défaut.
+    const client = await assertClientBelongs(Number(input.clientId), ctx);
     const dateDebut = new Date(input.dateDebut);
     const dateFin = new Date(input.dateFin);
     if (isNaN(dateDebut.getTime()) || isNaN(dateFin.getTime())) {
       return fail("Format de date invalide (utiliser ISO 8601)");
     }
+
+    // Adresse : on prend celle fournie par l'IA si non vide, sinon on
+    // recompose depuis l'adresse postale du client (rue + CP + ville).
+    const inputAdresse = typeof input.adresse === "string" ? input.adresse.trim() : "";
+    const clientAdresse = [client.adresse, client.codePostal, client.ville]
+      .map((p) => (typeof p === "string" ? p.trim() : ""))
+      .filter((p) => p.length > 0)
+      .join(" ");
+    const adresse = inputAdresse || clientAdresse || undefined;
+
     const intervention = await db.createIntervention({
       artisanId: ctx.artisanId,
       clientId: Number(input.clientId),
@@ -1007,14 +1074,27 @@ async function execCreerIntervention(input: any, ctx: ToolContext): Promise<Tool
       description: input.description || undefined,
       dateDebut,
       dateFin,
-      adresse: input.adresse || undefined,
+      adresse,
       statut: "planifiee",
     } as any);
+
+    const clientFullName = `${client.prenom || ""} ${client.nom || ""}`.trim() || `Client #${client.id}`;
+    const dateLabel = dateDebut.toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const heureFin = dateFin.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
     return ok({
       interventionId: intervention.id,
       titre: intervention.titre,
+      client: clientFullName,
+      adresse: adresse || null,
       dateDebut: intervention.dateDebut,
-      message: `Intervention "${intervention.titre}" planifiée le ${dateDebut.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}`,
+      dateFin: intervention.dateFin,
+      message: `Intervention « ${intervention.titre} » planifiée pour ${clientFullName}${adresse ? ` à ${adresse}` : ""} le ${dateLabel} (jusqu'à ${heureFin}). ID #${intervention.id}.`,
     });
   } catch (e: any) {
     return fail(e.message || "Erreur lors de la création de l'intervention");
