@@ -622,6 +622,51 @@ function fail(error: string): ToolResult {
 }
 
 /**
+ * Garde-fou et trace de sécurité avant tout envoi d'email par l'IA.
+ *
+ * Vérifie que le destinataire (client/fournisseur) appartient bien à
+ * l'artisan courant — défense en profondeur au cas où un identifiant
+ * mal référencé pointerait vers une entité d'un autre tenant. Logue
+ * ensuite la correspondance entité → destinataire pour permettre la
+ * traçabilité dans Railway en cas d'incident.
+ *
+ * Throw si le destinataire n'appartient pas à l'artisan : le helper
+ * appelant capture l'erreur et la remonte comme fail() au tool.
+ */
+function assertEmailRecipient(params: {
+  ctx: ToolContext;
+  entity: string; // "Devis", "Facture", "Relance", "Commande"
+  entityId: number | string;
+  entityNumero?: string | null;
+  recipient: {
+    type: "client" | "fournisseur";
+    id: number;
+    artisanId: number | null | undefined;
+    nom?: string | null;
+    prenom?: string | null;
+    email?: string | null;
+  };
+}): void {
+  const { ctx, entity, entityId, entityNumero, recipient } = params;
+  if (recipient.artisanId !== ctx.artisanId) {
+    throw new Error(
+      `Sécurité: ${recipient.type} #${recipient.id} n'appartient pas à votre compte`
+    );
+  }
+  if (!recipient.email) {
+    throw new Error(`Le ${recipient.type} n'a pas d'adresse email`);
+  }
+  const displayName =
+    recipient.type === "client"
+      ? `${recipient.prenom || ""} ${recipient.nom || ""}`.trim() || `#${recipient.id}`
+      : recipient.nom || `#${recipient.id}`;
+  const numeroPart = entityNumero ? ` (numero=${entityNumero})` : "";
+  console.log(
+    `[EMAIL-SECURITY] ${entity} #${entityId}${numeroPart} → ${recipient.type}Id=${recipient.id} (${displayName}) → email=${recipient.email}`
+  );
+}
+
+/**
  * Normalise une chaîne pour la recherche tolérante : lower-case, trim, suppression
  * des accents (NFD + filtrage des diacritiques). "Mëlissâ" → "melissa".
  */
@@ -778,6 +823,20 @@ async function sendDevisEmailHelper(devisId: number, customMessage: string | und
   const client = await db.getClientById(devisData.clientId);
   if (!client) throw new Error("Client introuvable");
   if (!client.email) throw new Error("Le client n'a pas d'adresse email");
+  assertEmailRecipient({
+    ctx,
+    entity: "Devis",
+    entityId: devisData.id,
+    entityNumero: devisData.numero,
+    recipient: {
+      type: "client",
+      id: client.id,
+      artisanId: client.artisanId,
+      nom: client.nom,
+      prenom: client.prenom,
+      email: client.email,
+    },
+  });
 
   const lignes = await db.getLignesDevisByDevisId(devisData.id);
   const { generateDevisPDF } = await import("./pdfGenerator");
@@ -821,7 +880,13 @@ async function sendDevisEmailHelper(devisId: number, customMessage: string | und
     });
   }
 
-  return { ...result, numero: devisData.numero, to: client.email };
+  return {
+    ...result,
+    numero: devisData.numero,
+    to: client.email,
+    clientId: client.id,
+    clientNom: `${client.prenom || ""} ${client.nom || ""}`.trim() || `#${client.id}`,
+  };
 }
 
 async function execEnvoyerDevis(input: any, ctx: ToolContext): Promise<ToolResult> {
@@ -829,7 +894,13 @@ async function execEnvoyerDevis(input: any, ctx: ToolContext): Promise<ToolResul
   try {
     const result = await sendDevisEmailHelper(Number(input.devisId), input.messagePersonnalise, ctx);
     if (!result.success) return fail(result.message);
-    return ok({ numero: result.numero, to: result.to, message: `Devis ${result.numero} envoyé à ${result.to}` });
+    return ok({
+      numero: result.numero,
+      to: result.to,
+      clientId: result.clientId,
+      clientNom: result.clientNom,
+      message: `Devis ${result.numero} envoyé à ${result.clientNom} (${result.to})`,
+    });
   } catch (e: any) {
     return fail(e.message || "Erreur lors de l'envoi du devis");
   }
@@ -849,8 +920,10 @@ async function execCreerEtEnvoyerDevis(input: any, ctx: ToolContext): Promise<To
       devisId: devisRecord.id,
       numero: devisRecord.numero,
       to: sendResult.to,
+      clientId: sendResult.clientId,
+      clientNom: sendResult.clientNom,
       totalTTC: devisRecord.totalTTC,
-      message: `Devis ${devisRecord.numero} (${parseFloat(devisRecord.totalTTC || "0").toFixed(2)} €) créé et envoyé à ${sendResult.to}`,
+      message: `Devis ${devisRecord.numero} (${parseFloat(devisRecord.totalTTC || "0").toFixed(2)} €) créé et envoyé à ${sendResult.clientNom} (${sendResult.to})`,
     });
   } catch (e: any) {
     return fail(e.message || "Erreur lors de la création/envoi du devis");
@@ -937,6 +1010,20 @@ async function sendFactureEmailHelper(factureId: number, customMessage: string |
   const client = await db.getClientById(factureData.clientId);
   if (!client) throw new Error("Client introuvable");
   if (!client.email) throw new Error("Le client n'a pas d'adresse email");
+  assertEmailRecipient({
+    ctx,
+    entity: "Facture",
+    entityId: factureData.id,
+    entityNumero: factureData.numero,
+    recipient: {
+      type: "client",
+      id: client.id,
+      artisanId: client.artisanId,
+      nom: client.nom,
+      prenom: client.prenom,
+      email: client.email,
+    },
+  });
 
   const lignes = await db.getLignesFacturesByFactureId(factureData.id);
   const { generateFacturePDF } = await import("./pdfGenerator");
@@ -976,7 +1063,13 @@ async function sendFactureEmailHelper(factureId: number, customMessage: string |
     });
   }
 
-  return { ...result, numero: factureData.numero, to: client.email };
+  return {
+    ...result,
+    numero: factureData.numero,
+    to: client.email,
+    clientId: client.id,
+    clientNom: `${client.prenom || ""} ${client.nom || ""}`.trim() || `#${client.id}`,
+  };
 }
 
 async function execEnvoyerFacture(input: any, ctx: ToolContext): Promise<ToolResult> {
@@ -984,7 +1077,13 @@ async function execEnvoyerFacture(input: any, ctx: ToolContext): Promise<ToolRes
   try {
     const result = await sendFactureEmailHelper(Number(input.factureId), input.messagePersonnalise, ctx);
     if (!result.success) return fail(result.message);
-    return ok({ numero: result.numero, to: result.to, message: `Facture ${result.numero} envoyée à ${result.to}` });
+    return ok({
+      numero: result.numero,
+      to: result.to,
+      clientId: result.clientId,
+      clientNom: result.clientNom,
+      message: `Facture ${result.numero} envoyée à ${result.clientNom} (${result.to})`,
+    });
   } catch (e: any) {
     return fail(e.message || "Erreur lors de l'envoi de la facture");
   }
@@ -999,7 +1098,22 @@ async function execEnvoyerRelance(input: any, ctx: ToolContext): Promise<ToolRes
 
     const artisan = await db.getArtisanById(ctx.artisanId);
     const client = await db.getClientById(factureData.clientId);
-    if (!client?.email) return fail("Le client n'a pas d'adresse email");
+    if (!client) return fail("Client introuvable");
+    if (!client.email) return fail("Le client n'a pas d'adresse email");
+    assertEmailRecipient({
+      ctx,
+      entity: "Relance",
+      entityId: factureData.id,
+      entityNumero: factureData.numero,
+      recipient: {
+        type: "client",
+        id: client.id,
+        artisanId: client.artisanId,
+        nom: client.nom,
+        prenom: client.prenom,
+        email: client.email,
+      },
+    });
 
     const joursRetard = factureData.dateEcheance
       ? Math.max(0, Math.floor((Date.now() - new Date(factureData.dateEcheance).getTime()) / 86400000))
@@ -1033,11 +1147,14 @@ async function execEnvoyerRelance(input: any, ctx: ToolContext): Promise<ToolRes
       lien: `/factures/${factureData.id}`,
     });
 
+    const clientNom = `${client.prenom || ""} ${client.nom || ""}`.trim() || `#${client.id}`;
     return ok({
       numero: factureData.numero,
       to: client.email,
+      clientId: client.id,
+      clientNom,
       joursRetard,
-      message: `Relance envoyée à ${client.email} (facture ${factureData.numero}, ${joursRetard} j de retard)`,
+      message: `Relance envoyée à ${clientNom} (${client.email}) — facture ${factureData.numero}, ${joursRetard} j de retard`,
     });
   } catch (e: any) {
     return fail(e.message || "Erreur lors de l'envoi de la relance");
@@ -1254,6 +1371,19 @@ async function execEnvoyerCommandeFournisseur(input: any, ctx: ToolContext): Pro
     const fournisseur = await db.getFournisseurById((commande as any).fournisseurId);
     if (!fournisseur) return fail("Fournisseur introuvable");
     if (!(fournisseur as any).email) return fail("Le fournisseur n'a pas d'adresse email");
+    assertEmailRecipient({
+      ctx,
+      entity: "Commande",
+      entityId: commande.id,
+      entityNumero: (commande as any).numero,
+      recipient: {
+        type: "fournisseur",
+        id: (fournisseur as any).id,
+        artisanId: (fournisseur as any).artisanId,
+        nom: (fournisseur as any).nom,
+        email: (fournisseur as any).email,
+      },
+    });
 
     const artisan = await db.getArtisanById(ctx.artisanId);
     if (!artisan) return fail("Profil artisan introuvable");
@@ -1307,7 +1437,9 @@ async function execEnvoyerCommandeFournisseur(input: any, ctx: ToolContext): Pro
     return ok({
       numero: (commande as any).numero,
       to: (fournisseur as any).email,
-      message: `Bon de commande ${(commande as any).numero} envoyé à ${(fournisseur as any).email}`,
+      fournisseurId: (fournisseur as any).id,
+      fournisseurNom: (fournisseur as any).nom,
+      message: `Bon de commande ${(commande as any).numero} envoyé à ${(fournisseur as any).nom} (${(fournisseur as any).email})`,
     });
   } catch (e: any) {
     return fail(e.message || "Erreur lors de l'envoi de la commande");
