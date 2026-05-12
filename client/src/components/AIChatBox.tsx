@@ -65,6 +65,12 @@ export type AIChatBoxProps = {
    * Utilise la Web Speech API native (Chrome, Edge, Safari ; pas Firefox).
    */
   enableVoice?: boolean;
+
+  /**
+   * Locale BCP-47 pour la reconnaissance vocale (ex: "fr-FR", "ar-MA", "tr-TR").
+   * Défaut: "fr-FR". Ignoré si enableVoice est false.
+   */
+  voiceLang?: string;
 };
 
 /**
@@ -128,6 +134,7 @@ export function AIChatBox({
   emptyStateMessage = "Start a conversation with AI",
   suggestedPrompts,
   enableVoice = false,
+  voiceLang,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -136,7 +143,7 @@ export function AIChatBox({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ── Dictée vocale (Web Speech API) ────────────────────────────────────────
-  const speech = useSpeechRecognition();
+  const speech = useSpeechRecognition({ lang: voiceLang });
   const userEditedRef = useRef(false);
   const [countdown, setCountdown] = useState<number | null>(null);
 

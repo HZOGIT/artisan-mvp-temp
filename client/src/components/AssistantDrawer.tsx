@@ -1,7 +1,13 @@
-import { useEffect } from "react";
-import { Sparkles, X, Trash2, PanelLeft, Maximize2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Sparkles, X, Trash2, PanelLeft, Maximize2, Globe, ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { AIChatBox, type Message } from "./AIChatBox";
 
 export type AssistantPanelSize = "sm" | "md" | "lg";
@@ -37,11 +43,144 @@ const PANEL_SIZE_OPTIONS: {
   { size: "lg", label: "Large", icon: Maximize2, iconSize: "h-4 w-4" },
 ];
 
+// ============================================================================
+// Langues supportées par MonAssistant (vocal + UI)
+// ============================================================================
+//
+// La locale BCP-47 est utilisée pour la Web Speech API. Le placeholder et
+// l'empty state s'affichent dans la langue choisie. Les données saisies par
+// l'artisan (et donc le contenu DB final : titre de devis, désignation de
+// ligne…) restent en français — le system prompt côté serveur s'en charge.
+
+type VoiceLangCode =
+  | "fr-FR"
+  | "ar-MA"
+  | "ar-DZ"
+  | "ar-TN"
+  | "ar-SA"
+  | "tr-TR"
+  | "en-US"
+  | "es-ES"
+  | "pt-BR";
+
+interface VoiceLangEntry {
+  code: VoiceLangCode;
+  flag: string;
+  label: string;
+  placeholder: string;
+  emptyState: string;
+  rtl?: boolean;
+}
+
+const VOICE_LANGS: VoiceLangEntry[] = [
+  {
+    code: "fr-FR",
+    flag: "🇫🇷",
+    label: "Français",
+    placeholder: "Demande-moi ce que tu veux…",
+    emptyState: "Pose-moi une question sur ta page actuelle",
+  },
+  {
+    code: "ar-MA",
+    flag: "🇲🇦",
+    label: "العربية (المغرب) — Darija",
+    placeholder: "قل لي اش بغيتي…",
+    emptyState: "اسألني عن الصفحة الحالية",
+    rtl: true,
+  },
+  {
+    code: "ar-DZ",
+    flag: "🇩🇿",
+    label: "العربية (الجزائر) — Darja",
+    placeholder: "قل لي واش تحب…",
+    emptyState: "اسألني عن الصفحة الحالية",
+    rtl: true,
+  },
+  {
+    code: "ar-TN",
+    flag: "🇹🇳",
+    label: "العربية (تونس) — Derja",
+    placeholder: "قل لي شنو تحب…",
+    emptyState: "اسألني عن الصفحة الحالية",
+    rtl: true,
+  },
+  {
+    code: "ar-SA",
+    flag: "🇸🇦",
+    label: "العربية (الفصحى)",
+    placeholder: "اطرح سؤالك…",
+    emptyState: "اسألني عن صفحتك الحالية",
+    rtl: true,
+  },
+  {
+    code: "tr-TR",
+    flag: "🇹🇷",
+    label: "Türkçe",
+    placeholder: "Ne istediğini söyle…",
+    emptyState: "Mevcut sayfan hakkında bana sor",
+  },
+  {
+    code: "en-US",
+    flag: "🇬🇧",
+    label: "English",
+    placeholder: "Ask me anything…",
+    emptyState: "Ask me about your current page",
+  },
+  {
+    code: "es-ES",
+    flag: "🇪🇸",
+    label: "Español",
+    placeholder: "Pregúntame lo que quieras…",
+    emptyState: "Pregúntame sobre tu página actual",
+  },
+  {
+    code: "pt-BR",
+    flag: "🇧🇷",
+    label: "Português",
+    placeholder: "Pergunte-me qualquer coisa…",
+    emptyState: "Pergunte sobre sua página atual",
+  },
+];
+
+const VOICE_LANG_BY_CODE: Record<VoiceLangCode, VoiceLangEntry> = Object.fromEntries(
+  VOICE_LANGS.map((l) => [l.code, l])
+) as Record<VoiceLangCode, VoiceLangEntry>;
+
+const VOICE_LANG_STORAGE_KEY = "operioz.voiceLang";
+
+function isVoiceLangCode(v: unknown): v is VoiceLangCode {
+  return typeof v === "string" && v in VOICE_LANG_BY_CODE;
+}
+
+/**
+ * Détermine la langue initiale : (1) localStorage, (2) navigator.language
+ * mappé sur une variante supportée, (3) fr-FR par défaut.
+ */
+function getInitialVoiceLang(): VoiceLangCode {
+  if (typeof window === "undefined") return "fr-FR";
+  const saved = window.localStorage.getItem(VOICE_LANG_STORAGE_KEY);
+  if (isVoiceLangCode(saved)) return saved;
+
+  const nav = (window.navigator.language || "").toLowerCase();
+  // Match exact (ex: "ar-ma" → "ar-MA")
+  for (const l of VOICE_LANGS) {
+    if (l.code.toLowerCase() === nav) return l.code;
+  }
+  // Match préfixe : "ar-eg" → premier "ar-*" disponible (ar-SA Fusha)
+  const prefix = nav.split("-")[0];
+  if (prefix) {
+    const fallback = VOICE_LANGS.find((l) => l.code.toLowerCase().startsWith(prefix + "-"));
+    if (fallback) return fallback.code;
+  }
+  return "fr-FR";
+}
+
 /**
  * Panneau latéral droit qui héberge MonAssistant.
  * - Trois largeurs desktop (sm 380, md 520, lg 700), plein écran sur mobile.
  * - Overlay cliquable + ESC pour fermer.
  * - Bloque le scroll du body quand ouvert.
+ * - Sélecteur de langue dans le footer (voix + placeholder + empty state).
  */
 export function AssistantDrawer({
   isOpen,
@@ -54,6 +193,16 @@ export function AssistantDrawer({
   panelSize = "md",
   onPanelSizeChange,
 }: AssistantDrawerProps) {
+  const [voiceLang, setVoiceLang] = useState<VoiceLangCode>(() => getInitialVoiceLang());
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VOICE_LANG_STORAGE_KEY, voiceLang);
+    } catch {
+      // localStorage indisponible (mode privé) : ignore.
+    }
+  }, [voiceLang]);
+
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -85,6 +234,8 @@ export function AssistantDrawer({
   const waitingFirstChunk =
     isStreaming &&
     (!lastMessage || lastMessage.role === "user" || lastMessage.content === "");
+
+  const langEntry = VOICE_LANG_BY_CODE[voiceLang];
 
   return (
     <>
@@ -162,29 +313,58 @@ export function AssistantDrawer({
             messages={messages}
             onSendMessage={onSendMessage}
             isLoading={waitingFirstChunk}
-            placeholder="Demande-moi ce que tu veux…"
-            emptyStateMessage="Pose-moi une question sur ta page actuelle"
+            placeholder={langEntry.placeholder}
+            emptyStateMessage={langEntry.emptyState}
             height="100%"
             suggestedPrompts={suggestedPrompts}
             enableVoice
+            voiceLang={voiceLang}
             className="border-0 shadow-none rounded-none flex-1"
           />
         </div>
 
-        {/* Footer */}
-        {messages.length > 0 && (
-          <div className="p-3 border-t shrink-0">
+        {/* Footer — sélecteur de langue + bouton effacer */}
+        <div className="flex items-center justify-between gap-2 p-3 border-t shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-muted-foreground hover:text-foreground gap-1.5"
+                aria-label="Changer la langue de MonAssistant"
+              >
+                <Globe className="h-3.5 w-3.5" />
+                <span className="text-base leading-none">{langEntry.flag}</span>
+                <span className="text-xs hidden sm:inline">{langEntry.label.split(" — ")[0]}</span>
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              {VOICE_LANGS.map((l) => (
+                <DropdownMenuItem
+                  key={l.code}
+                  onClick={() => setVoiceLang(l.code)}
+                  className={l.code === voiceLang ? "bg-accent" : ""}
+                >
+                  <span className="text-base mr-2 leading-none">{l.flag}</span>
+                  <span className="text-sm">{l.label}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {messages.length > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-muted-foreground hover:text-foreground"
+              className="h-8 text-muted-foreground hover:text-foreground"
               onClick={onClear}
             >
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Effacer la conversation
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              <span className="text-xs">Effacer</span>
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </aside>
     </>
   );
