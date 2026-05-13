@@ -1,512 +1,475 @@
-import { trpc } from "@/lib/trpc";
-import CalendarWidget from "@/components/CalendarWidget";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import {
-  Euro, FileText, Receipt, Calendar, Users, TrendingUp, Plus, ArrowRight,
-  Clock, AlertTriangle, MessageCircle, AlertCircle, Info, Target,
-  UserPlus, ShieldAlert, Activity,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import {
+  Euro,
+  FileText,
+  Receipt,
+  Target,
+  TrendingUp,
+  Users,
+  Settings2,
+  LayoutGrid,
 } from "lucide-react";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import { StatCard, type StatCardColor } from "@/components/dashboard/StatCard";
+import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
+import { AlertsBar, type DashboardAlert } from "@/components/dashboard/AlertsBar";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { DashboardWidget } from "@/components/dashboard/DashboardWidget";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Legend,
-} from "recharts";
+  CustomizePanel,
+  type CustomizableWidget,
+} from "@/components/dashboard/CustomizePanel";
+import { RevenueChartWidget } from "@/components/dashboard/widgets/RevenueChart";
+import { DevisRepartitionWidget } from "@/components/dashboard/widgets/DevisRepartition";
+import { TopClientsWidget } from "@/components/dashboard/widgets/TopClients";
+import { RecentActivityWidget } from "@/components/dashboard/widgets/RecentActivity";
+import { UpcomingInterventionsWidget } from "@/components/dashboard/widgets/UpcomingInterventions";
+import { ObjectifsWidget } from "@/components/dashboard/widgets/Objectifs";
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-const DEVIS_STATUS_COLORS: Record<string, string> = {
-  brouillon: '#94a3b8',
-  envoye: '#3b82f6',
-  accepte: '#10b981',
-  refuse: '#ef4444',
-  expire: '#f59e0b',
-};
-const DEVIS_STATUS_LABELS: Record<string, string> = {
-  brouillon: 'Brouillon',
-  envoye: 'Envoyé',
-  accepte: 'Accepté',
-  refuse: 'Refusé',
-  expire: 'Expiré',
-};
+// ============================================================================
+// Définition des widgets disponibles dans le dashboard
+// ============================================================================
 
-function formatRelativeDate(date: string | Date) {
-  const d = new Date(date);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "À l'instant";
-  if (diffMin < 60) return `Il y a ${diffMin} min`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `Il y a ${diffH}h`;
-  const diffD = Math.floor(diffH / 24);
-  if (diffD === 1) return "Hier";
-  if (diffD < 7) return `Il y a ${diffD} jours`;
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+interface WidgetDef extends CustomizableWidget {
+  render: () => React.ReactNode;
 }
 
-const activityIcons: Record<string, any> = {
-  devis: FileText,
-  facture: Receipt,
-  intervention: Calendar,
-  client: UserPlus,
-};
-const activityColors: Record<string, string> = {
-  devis: 'text-blue-500',
-  facture: 'text-green-500',
-  intervention: 'text-orange-500',
-  client: 'text-purple-500',
-};
+function useWidgetDefinitions(): WidgetDef[] {
+  return useMemo(
+    () => [
+      {
+        id: "revenue",
+        label: "Évolution du CA",
+        description: "Chiffre d'affaires sur les 6 derniers mois",
+        render: () => <RevenueChartWidget />,
+      },
+      {
+        id: "devisRepartition",
+        label: "Répartition des devis",
+        description: "Distribution par statut (brouillon, envoyé, accepté…)",
+        render: () => <DevisRepartitionWidget />,
+      },
+      {
+        id: "topClients",
+        label: "Top clients",
+        description: "Vos 5 meilleurs clients par chiffre d'affaires",
+        render: () => <TopClientsWidget />,
+      },
+      {
+        id: "recentActivity",
+        label: "Activité récente",
+        description: "Derniers devis, factures, clients et interventions",
+        render: () => <RecentActivityWidget />,
+      },
+      {
+        id: "upcomingInterventions",
+        label: "Prochaines interventions",
+        description: "Vos 3 prochains rendez-vous planifiés",
+        render: () => <UpcomingInterventionsWidget />,
+      },
+      {
+        id: "objectifs",
+        label: "Objectifs du mois",
+        description: "Progression CA, devis et nouveaux clients",
+        render: () => <ObjectifsWidget />,
+      },
+    ],
+    []
+  );
+}
+
+const DEFAULT_ORDER = [
+  "revenue",
+  "devisRepartition",
+  "topClients",
+  "recentActivity",
+  "upcomingInterventions",
+  "objectifs",
+];
+
+const ORDER_KEY = "operioz.dashboard.widgetOrder";
+const HIDDEN_KEY = "operioz.dashboard.hiddenWidgets";
+
+function loadOrder(allIds: string[]): string[] {
+  if (typeof window === "undefined") return allIds;
+  try {
+    const raw = window.localStorage.getItem(ORDER_KEY);
+    if (!raw) return allIds;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return allIds;
+    // Garde uniquement les ids encore valides + ajoute en fin les nouveaux ids.
+    const valid = parsed.filter((id: unknown) => typeof id === "string" && allIds.includes(id));
+    const missing = allIds.filter((id) => !valid.includes(id));
+    return [...valid, ...missing];
+  } catch {
+    return allIds;
+  }
+}
+
+function saveOrder(order: string[]) {
+  try {
+    window.localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+  } catch {
+    /* noop */
+  }
+}
+
+function loadHidden(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set(parsed.filter((x) => typeof x === "string"));
+    }
+  } catch {
+    /* noop */
+  }
+  return new Set();
+}
+
+function saveHidden(set: Set<string>) {
+  try {
+    window.localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(set)));
+  } catch {
+    /* noop */
+  }
+}
+
+// ============================================================================
+// Page Dashboard
+// ============================================================================
+
+const formatEUR = (v: number) =>
+  new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(v);
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.getStats.useQuery();
-  const { data: upcomingInterventions } = trpc.dashboard.getUpcomingInterventions.useQuery();
   const { data: conversionRate } = trpc.dashboard.getConversionRate.useQuery();
-  const { data: unreadMessages } = trpc.chat.getUnreadCount.useQuery();
-  const { data: monthlyCA } = trpc.dashboard.getMonthlyCA.useQuery({ months: 6 });
-  const { data: topClients } = trpc.dashboard.getTopClients.useQuery({ limit: 5 });
-  const { data: recentActivity } = trpc.dashboard.getRecentActivity.useQuery({ limit: 8 });
-  const { data: objectifs } = trpc.dashboard.getObjectifs.useQuery();
   const { data: alerts } = trpc.dashboard.getAlerts.useQuery();
-  const { data: devisStats } = trpc.statistiques.getDevisStats.useQuery();
+  const { data: objectifs } = trpc.dashboard.getObjectifs.useQuery();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+  const widgetDefs = useWidgetDefinitions();
+  const allIds = useMemo(() => widgetDefs.map((w) => w.id), [widgetDefs]);
+
+  const [order, setOrder] = useState<string[]>(() => loadOrder(DEFAULT_ORDER));
+  const [hidden, setHidden] = useState<Set<string>>(() => loadHidden());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+
+  useEffect(() => {
+    saveOrder(order);
+  }, [order]);
+
+  useEffect(() => {
+    saveHidden(hidden);
+  }, [hidden]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
   };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setOrder((prev) => {
+      const from = prev.indexOf(String(active.id));
+      const to = prev.indexOf(String(over.id));
+      if (from < 0 || to < 0) return prev;
+      return arrayMove(prev, from, to);
+    });
+  };
+
+  const handleToggleHidden = (id: string, visible: boolean) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (visible) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleReset = () => {
+    setOrder(DEFAULT_ORDER);
+    setHidden(new Set());
+  };
+
+  // ── Données dérivées ────────────────────────────────────────────────────
+  const firstName = useMemo(() => {
+    const n = (user as any)?.name || "";
+    return n.split(/\s+/)[0] || null;
+  }, [user]);
+
+  const rate =
+    typeof conversionRate === "number"
+      ? conversionRate
+      : (conversionRate as any)?.rate || 0;
+  const devisAcceptes =
+    typeof conversionRate === "number"
+      ? undefined
+      : (conversionRate as any)?.devisAcceptes;
+  const totalDevisConv =
+    typeof conversionRate === "number"
+      ? undefined
+      : (conversionRate as any)?.totalDevis;
+
+  const facturesImpayeesCount = stats?.facturesImpayees?.count || 0;
+  const facturesImpayeesTotal = stats?.facturesImpayees?.total || 0;
+
+  // Visible widgets in order
+  const visibleOrder = order.filter((id) => !hidden.has(id) && allIds.includes(id));
+  const widgetById = useMemo(
+    () => Object.fromEntries(widgetDefs.map((w) => [w.id, w])),
+    [widgetDefs]
+  );
+
+  // Stat cards definition
+  const statCards: Array<{
+    title: string;
+    value: number | string;
+    subtitle?: string;
+    icon: typeof Euro;
+    color: StatCardColor;
+    formatter?: (v: number) => string;
+    suffix?: string;
+    onClick?: () => void;
+    badge?: number;
+    pulse?: boolean;
+    footer?: React.ReactNode;
+  }> = [
+    {
+      title: "CA du mois",
+      value: stats?.caMonth || 0,
+      subtitle: `${formatEUR(stats?.caYear || 0)} cette année`,
+      icon: Euro,
+      color: "blue",
+      formatter: formatEUR,
+      onClick: () => setLocation("/rapports"),
+    },
+    {
+      title: "CA de l'année",
+      value: stats?.caYear || 0,
+      subtitle:
+        objectifs?.objectifCA && objectifs.objectifCA > 0
+          ? `Objectif : ${formatEUR(objectifs.objectifCA)}`
+          : "Cumul annuel",
+      icon: TrendingUp,
+      color: "green",
+      formatter: formatEUR,
+      onClick: () => setLocation("/rapports"),
+    },
+    {
+      title: "Devis en attente",
+      value: stats?.devisEnCours || 0,
+      subtitle: stats?.devisEnCours
+        ? `${stats.devisEnCours} à relancer`
+        : "Aucun devis en attente",
+      icon: FileText,
+      color: "orange",
+      onClick: () => setLocation("/devis?filtre=envoye"),
+      badge: (stats?.devisEnCours || 0) > 10 ? stats?.devisEnCours : undefined,
+    },
+    {
+      title: "Factures impayées",
+      value: facturesImpayeesCount,
+      subtitle: `${formatEUR(facturesImpayeesTotal)} à encaisser`,
+      icon: Receipt,
+      color: "red",
+      onClick: () => setLocation("/factures?filtre=impayees"),
+      pulse: facturesImpayeesCount > 0,
+    },
+    {
+      title: "Clients",
+      value: stats?.totalClients || 0,
+      subtitle: "Dans votre base",
+      icon: Users,
+      color: "violet",
+      onClick: () => setLocation("/clients"),
+    },
+    {
+      title: "Taux conversion",
+      value: Math.round(rate),
+      suffix: "%",
+      subtitle:
+        devisAcceptes !== undefined && totalDevisConv
+          ? `${devisAcceptes}/${totalDevisConv} devis acceptés`
+          : "Devis acceptés",
+      icon: Target,
+      color: "cyan",
+      onClick: () => setLocation("/statistiques"),
+      footer: (
+        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full bg-cyan-500 transition-all"
+            style={{ width: `${Math.min(100, Math.max(0, rate))}%` }}
+          />
+        </div>
+      ),
+    },
+  ];
 
   if (statsLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-6">
+        <div className="h-32 rounded-2xl bg-muted/60 animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-28 rounded-xl bg-muted/60 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-64 rounded-xl bg-muted/60 animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }
 
-  const nextInterventions = (upcomingInterventions || []).slice(0, 3);
-  const rate = typeof conversionRate === 'number' ? conversionRate : (conversionRate as any)?.rate || 0;
-  const totalDevis = (conversionRate as any)?.totalDevis || 0;
-  const devisAcceptes = (conversionRate as any)?.devisAcceptes || 0;
-
-  // Prepare pie chart data
-  const devisPieData = devisStats?.parStatut
-    ? Object.entries(devisStats.parStatut).map(([key, value]) => ({
-        name: DEVIS_STATUS_LABELS[key] || key,
-        value: value as number,
-        color: DEVIS_STATUS_COLORS[key] || '#94a3b8',
-      })).filter(d => d.value > 0)
-    : [];
-
-  // Objectifs progress
-  const objCA = objectifs ? Math.min(100, objectifs.objectifCA > 0 ? (objectifs.currentCA / objectifs.objectifCA) * 100 : 0) : 0;
-  const objDevis = objectifs ? Math.min(100, objectifs.objectifDevis > 0 ? (objectifs.currentDevis / objectifs.objectifDevis) * 100 : 0) : 0;
-  const objClients = objectifs ? Math.min(100, objectifs.objectifClients > 0 ? (objectifs.currentClients / objectifs.objectifClients) * 100 : 0) : 0;
-
-  const alertIcon = { danger: AlertCircle, warning: AlertTriangle, info: Info };
-  const alertBg = { danger: 'bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800', warning: 'bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800', info: 'bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800' };
-  const alertText = { danger: 'text-red-700 dark:text-red-400', warning: 'text-orange-700 dark:text-orange-400', info: 'text-blue-700 dark:text-blue-400' };
+  const dashboardAlerts: DashboardAlert[] = (alerts || []) as DashboardAlert[];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Tableau de bord</h1>
-          <p className="text-muted-foreground mt-1">Vue d'ensemble de votre activité</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setLocation("/devis/nouveau")} variant="outline" size="sm">
-            <Plus className="h-4 w-4 mr-1" /> Devis
-          </Button>
-          <Button onClick={() => setLocation("/factures")} variant="outline" size="sm">
-            <Plus className="h-4 w-4 mr-1" /> Facture
-          </Button>
-          <Button onClick={() => setLocation("/clients/nouveau")} size="sm">
-            <Plus className="h-4 w-4 mr-1" /> Client
-          </Button>
-        </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-6"
+    >
+      {/* Welcome banner */}
+      <WelcomeBanner
+        firstName={firstName}
+        devisEnAttente={stats?.devisEnCours || 0}
+        facturesImpayees={facturesImpayeesCount}
+        interventionsAVenir={stats?.interventionsAVenir || 0}
+        onCreateDevis={() => setLocation("/devis/nouveau")}
+        onCreateFacture={() => setLocation("/factures")}
+        onCreateIntervention={() => setLocation("/interventions")}
+      />
+
+      {/* Alerts */}
+      <AlertsBar alerts={dashboardAlerts} onNavigate={(path) => setLocation(path)} />
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {statCards.map((card, i) => (
+          <StatCard key={card.title} {...card} index={i} />
+        ))}
       </div>
 
-      {/* Alertes intelligentes */}
-      {alerts && alerts.length > 0 && (
-        <div className="space-y-2">
-          {alerts.map((alert: any, i: number) => {
-            const Icon = alertIcon[alert.type as keyof typeof alertIcon] || Info;
-            return (
-              <div
-                key={i}
-                className={`flex items-center gap-3 p-3 rounded-lg border ${alertBg[alert.type as keyof typeof alertBg] || ''}`}
-              >
-                <Icon className={`h-5 w-5 shrink-0 ${alertText[alert.type as keyof typeof alertText] || ''}`} />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${alertText[alert.type as keyof typeof alertText] || ''}`}>
-                    {alert.titre}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{alert.message}</p>
-                </div>
-                {alert.lien && (
-                  <Button variant="ghost" size="sm" onClick={() => setLocation(alert.lien)}>
-                    Voir <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">CA du mois</CardTitle>
-            <div className="h-9 w-9 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <Euro className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats?.caMonth || 0)}</div>
-            <p className="text-xs text-muted-foreground mt-1">{formatCurrency(stats?.caYear || 0)} cette année</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Devis en attente</CardTitle>
-            <div className="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.devisEnCours || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">En attente de réponse</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Factures impayées</CardTitle>
-            <div className="h-9 w-9 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-              <Receipt className="h-4 w-4 text-orange-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.facturesImpayees?.count || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">{formatCurrency(stats?.facturesImpayees?.total || 0)} à encaisser</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Taux conversion</CardTitle>
-            <div className="h-9 w-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-              <TrendingUp className="h-4 w-4 text-indigo-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Math.round(rate)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">{devisAcceptes}/{totalDevis} devis acceptés</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Clients</CardTitle>
-            <div className="h-9 w-9 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-              <Users className="h-4 w-4 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalClients || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">Dans votre base</p>
-          </CardContent>
-        </Card>
-        <Card className={unreadMessages && unreadMessages > 0 ? "border-rose-200 bg-rose-50/30 dark:border-rose-800 dark:bg-rose-950/20" : ""}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Messages</CardTitle>
-            <div className="h-9 w-9 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
-              <MessageCircle className="h-4 w-4 text-rose-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{unreadMessages || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              <button onClick={() => setLocation("/chat")} className="text-primary hover:underline">
-                {unreadMessages && unreadMessages > 0 ? "Non lu(s) — Voir" : "Aucun non lu"}
-              </button>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Objectifs mensuels */}
-      {objectifs && (objectifs.objectifCA > 0 || objectifs.objectifDevis > 0 || objectifs.objectifClients > 0) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Target className="h-5 w-5 text-primary" />
-              Objectifs du mois
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6 md:grid-cols-3">
-              {objectifs.objectifCA > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Chiffre d'affaires</span>
-                    <span className="font-medium">{formatCurrency(objectifs.currentCA)} / {formatCurrency(objectifs.objectifCA)}</span>
-                  </div>
-                  <Progress value={objCA} className="h-2" />
-                  <p className="text-xs text-muted-foreground text-right">{Math.round(objCA)}%</p>
-                </div>
-              )}
-              {objectifs.objectifDevis > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Devis créés</span>
-                    <span className="font-medium">{objectifs.currentDevis} / {objectifs.objectifDevis}</span>
-                  </div>
-                  <Progress value={objDevis} className="h-2" />
-                  <p className="text-xs text-muted-foreground text-right">{Math.round(objDevis)}%</p>
-                </div>
-              )}
-              {objectifs.objectifClients > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Nouveaux clients</span>
-                    <span className="font-medium">{objectifs.currentClients} / {objectifs.objectifClients}</span>
-                  </div>
-                  <Progress value={objClients} className="h-2" />
-                  <p className="text-xs text-muted-foreground text-right">{Math.round(objClients)}%</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Charts row: CA mensuel + Devis PieChart */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* CA Mensuel AreaChart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">CA mensuel</CardTitle>
-            <CardDescription>Évolution sur les 6 derniers mois</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {monthlyCA && monthlyCA.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={monthlyCA}>
-                  <defs>
-                    <linearGradient id="colorCA" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="text-muted-foreground" />
-                  <Tooltip formatter={(value: number) => [formatCurrency(value), 'CA']} />
-                  <Area type="monotone" dataKey="ca" stroke="#3b82f6" strokeWidth={2} fill="url(#colorCA)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
-                Aucune donnée disponible
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Devis par statut PieChart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Répartition des devis</CardTitle>
-            <CardDescription>{devisStats?.total || 0} devis au total</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {devisPieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <RechartsPieChart>
-                  <Pie
-                    data={devisPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {devisPieData.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
-                Aucun devis
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top clients + Activité récente */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Top 5 clients BarChart */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Top 5 clients</CardTitle>
-                <CardDescription>Par chiffre d'affaires</CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setLocation("/clients")}>
-                Voir tout <ArrowRight className="h-3 w-3 ml-1" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {topClients && topClients.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart
-                  data={topClients.map((c: any) => ({
-                    nom: c.client ? `${c.client.prenom || ''} ${c.client.nom}`.trim() : c.nom || 'Inconnu',
-                    ca: c.totalCA || c.ca || 0,
-                  }))}
-                  layout="vertical"
-                  margin={{ left: 20 }}
+      {/* Drag & drop widget grid */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={visibleOrder} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {visibleOrder.map((id) => {
+              const widget = widgetById[id];
+              if (!widget) return null;
+              return (
+                <DashboardWidget
+                  key={id}
+                  id={id}
+                  title={widget.label}
+                  subtitle={widget.description}
+                  removable
+                  onRemove={() => handleToggleHidden(id, false)}
                 >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(1)}k`} />
-                  <YAxis type="category" dataKey="nom" tick={{ fontSize: 11 }} width={100} />
-                  <Tooltip formatter={(value: number) => [formatCurrency(value), 'CA']} />
-                  <Bar dataKey="ca" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
-                Aucune donnée
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Activité récente */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-5 w-5 text-primary" />
-              Activité récente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentActivity && recentActivity.length > 0 ? (
-              <div className="space-y-3">
-                {recentActivity.map((a: any, i: number) => {
-                  const Icon = activityIcons[a.type] || FileText;
-                  const color = activityColors[a.type] || 'text-muted-foreground';
-                  return (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 bg-muted ${color}`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate">{a.titre}</p>
-                        <p className="text-xs text-muted-foreground">{formatRelativeDate(a.date)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                Aucune activité récente
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Interventions + Calendar */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Prochaines interventions</CardTitle>
-                <CardDescription>{stats?.interventionsAVenir || 0} planifiée(s)</CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setLocation("/interventions")}>
-                Voir tout <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {nextInterventions.length > 0 ? (
-              <div className="space-y-3">
-                {nextInterventions.map((intervention: any) => (
-                  <div
-                    key={intervention.id}
-                    className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => setLocation("/interventions")}
-                  >
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Calendar className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-foreground truncate">{intervention.titre}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {intervention.client?.nom} {intervention.client?.prenom}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {format(new Date(intervention.dateDebut), "EEE d MMM à HH:mm", { locale: fr })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-32 text-center">
-                <Calendar className="h-8 w-8 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">Aucune intervention planifiée</p>
-                <Button variant="link" size="sm" className="mt-2" onClick={() => setLocation("/interventions")}>
-                  Planifier une intervention
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <CalendarWidget />
-      </div>
-
-      {/* Actions rapides */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Actions rapides</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="justify-start h-auto py-3" onClick={() => setLocation("/clients/nouveau")}>
-              <Users className="h-4 w-4 mr-2 text-purple-600" /> Nouveau client
-            </Button>
-            <Button variant="outline" className="justify-start h-auto py-3" onClick={() => setLocation("/devis/nouveau")}>
-              <FileText className="h-4 w-4 mr-2 text-blue-600" /> Nouveau devis
-            </Button>
-            <Button variant="outline" className="justify-start h-auto py-3" onClick={() => setLocation("/factures")}>
-              <Receipt className="h-4 w-4 mr-2 text-green-600" /> Nouvelle facture
-            </Button>
-            <Button variant="outline" className="justify-start h-auto py-3" onClick={() => setLocation("/interventions")}>
-              <Calendar className="h-4 w-4 mr-2 text-orange-600" /> Intervention
-            </Button>
+                  {widget.render()}
+                </DashboardWidget>
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </SortableContext>
+        <DragOverlay>
+          {activeId && widgetById[activeId] ? (
+            <div className="rounded-xl border border-primary/40 bg-card shadow-2xl p-4 opacity-95">
+              <p className="text-sm font-semibold">{widgetById[activeId].label}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Déposez ici pour réorganiser
+              </p>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      {/* Quick actions */}
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+          <LayoutGrid className="h-3.5 w-3.5" /> Actions rapides
+        </h2>
+        <QuickActions
+          onNewDevis={() => setLocation("/devis/nouveau")}
+          onNewFacture={() => setLocation("/factures")}
+          onNewClient={() => setLocation("/clients/nouveau")}
+          onNewIntervention={() => setLocation("/interventions")}
+        />
+      </div>
+
+      {/* Customize entry point */}
+      <div className="flex justify-center pt-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCustomizeOpen(true)}
+        >
+          <Settings2 className="h-3.5 w-3.5 mr-2" />
+          Personnaliser le dashboard
+        </Button>
+      </div>
+
+      {/* Customize panel */}
+      <CustomizePanel
+        isOpen={customizeOpen}
+        onClose={() => setCustomizeOpen(false)}
+        widgets={widgetDefs.map((w) => ({
+          id: w.id,
+          label: w.label,
+          description: w.description,
+        }))}
+        hiddenIds={hidden}
+        onToggle={handleToggleHidden}
+        onReset={() => {
+          handleReset();
+          setCustomizeOpen(false);
+        }}
+      />
+    </motion.div>
   );
 }

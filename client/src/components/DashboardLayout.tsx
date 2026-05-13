@@ -1,72 +1,74 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
-import { Upload } from "lucide-react";
-import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users, FileText, Receipt, Calendar, CalendarDays, Package, User, Settings, BarChart3, Boxes, Building2, ClipboardList, RefreshCw, Mail, Star, Calculator, Route, LineChart, HardHat, ChevronRight, Globe, Wrench, MessageCircle, MapPin, Sparkles, Bell, CheckCircle, AlertTriangle, Clock, Info, XCircle, ShoppingCart, BookOpen } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
-import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
-import { Button } from "./ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { ScrollArea } from "./ui/scroll-area";
 import { trpc } from "@/lib/trpc";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAssistantStream } from "@/hooks/useAssistantStream";
 import { AssistantFAB } from "./AssistantFAB";
 import { AssistantDrawer, type AssistantPanelSize } from "./AssistantDrawer";
-import { useAssistantStream } from "@/hooks/useAssistantStream";
-
-/**
- * Vérifie récursivement si un queryKey tRPC contient une chaîne donnée.
- * Les queryKey tRPC ont la forme [["clients", "list"], { input: ... }] ;
- * un match en substring sur chaque string permet d'invalider toutes les
- * variantes d'une entité (list, byId, getUnreadCount, etc.) en une fois.
- */
-function queryKeyContains(key: unknown, needle: string): boolean {
-  if (typeof key === "string") return key.includes(needle);
-  if (Array.isArray(key)) return key.some((k) => queryKeyContains(k, needle));
-  return false;
-}
-
-const ASSISTANT_PANEL_SIZE_KEY = "operioz.assistant.panelSize";
-const ASSISTANT_PANEL_MARGIN: Record<AssistantPanelSize, string> = {
-  sm: "md:mr-[380px]",
-  md: "md:mr-[520px]",
-  lg: "md:mr-[700px]",
-};
-function readPanelSize(): AssistantPanelSize {
-  if (typeof window === "undefined") return "md";
-  const raw = window.localStorage.getItem(ASSISTANT_PANEL_SIZE_KEY);
-  return raw === "sm" || raw === "md" || raw === "lg" ? raw : "md";
-}
+import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertTriangle,
+  Bell,
+  BookOpen,
+  Boxes,
+  Briefcase,
+  Building2,
+  Calculator,
+  Calendar,
+  CalendarDays,
+  ChevronRight,
+  ClipboardList,
+  CheckCircle,
+  Clock,
+  FileText,
+  Globe,
+  HardHat,
+  Info,
+  LayoutDashboard,
+  LineChart,
+  LogOut,
+  Mail,
+  MapPin,
+  MessageCircle,
+  MoreHorizontal,
+  Package,
+  PanelLeft,
+  RefreshCw,
+  Receipt,
+  Route,
+  Settings,
+  ShoppingCart,
+  Sparkles,
+  Star,
+  Upload,
+  User,
+  Users,
+  Wrench,
+  X,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 
 // ============================================================================
 // MonAssistant — contextes par route
 // ============================================================================
+
 const ASSISTANT_CONTEXTS: Record<string, { context: string; prompts: string[] }> = {
   "/dashboard": {
     context: "L'artisan consulte son tableau de bord.",
@@ -136,15 +138,11 @@ const ASSISTANT_CONTEXTS: Record<string, { context: string; prompts: string[] }>
 
 const ASSISTANT_FALLBACK = {
   context: "L'artisan utilise Operioz.",
-  prompts: [
-    "Résume mon activité",
-    "Quelles sont mes priorités aujourd'hui ?",
-  ],
+  prompts: ["Résume mon activité", "Quelles sont mes priorités aujourd'hui ?"],
 };
 
-function getAssistantContextForPath(path: string): { context: string; prompts: string[] } {
+function getAssistantContextForPath(path: string) {
   if (ASSISTANT_CONTEXTS[path]) return ASSISTANT_CONTEXTS[path];
-  // Remonte vers les chemins parents (ex: /devis/123 -> /devis)
   const parts = path.split("/").filter(Boolean);
   while (parts.length > 0) {
     parts.pop();
@@ -154,7 +152,239 @@ function getAssistantContextForPath(path: string): { context: string; prompts: s
   return ASSISTANT_FALLBACK;
 }
 
-const notifTypeIcon: Record<string, any> = {
+// ============================================================================
+// Navigation — groupes + items + permissions + style rail
+// ============================================================================
+
+type GroupId =
+  | "assistant"
+  | "dashboard"
+  | "commercial"
+  | "clients"
+  | "terrain"
+  | "gestion"
+  | "parametres";
+
+interface MenuItem {
+  icon: LucideIcon;
+  label: string;
+  path: string;
+}
+
+interface NavGroup {
+  id: GroupId;
+  title: string;
+  icon: LucideIcon;
+  /** Couleur dominante du groupe (utilisée pour le surlignage). */
+  color: "violet" | "blue" | "emerald" | "orange" | "rose" | "cyan" | "slate";
+  items: MenuItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "assistant",
+    title: "MonAssistant",
+    icon: Sparkles,
+    color: "violet",
+    items: [{ icon: Sparkles, label: "MonAssistant", path: "/assistant" }],
+  },
+  {
+    id: "dashboard",
+    title: "Tableau de bord",
+    icon: LayoutDashboard,
+    color: "blue",
+    items: [
+      { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
+      { icon: LineChart, label: "Statistiques", path: "/statistiques" },
+    ],
+  },
+  {
+    id: "commercial",
+    title: "Commercial",
+    icon: Briefcase,
+    color: "emerald",
+    items: [
+      { icon: FileText, label: "Devis", path: "/devis" },
+      { icon: FileText, label: "Nouveau devis", path: "/devis/nouveau" },
+      { icon: Receipt, label: "Factures", path: "/factures" },
+      { icon: ClipboardList, label: "Contrats", path: "/contrats" },
+      { icon: RefreshCw, label: "Relances", path: "/relances" },
+    ],
+  },
+  {
+    id: "clients",
+    title: "Clients",
+    icon: Users,
+    color: "orange",
+    items: [
+      { icon: Users, label: "Clients", path: "/clients" },
+      { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
+      { icon: Upload, label: "Import Clients", path: "/clients/import" },
+      { icon: Star, label: "Avis Clients", path: "/avis" },
+      { icon: Globe, label: "Portail client", path: "/portail-gestion" },
+      { icon: MessageCircle, label: "Chat", path: "/chat" },
+      { icon: Clock, label: "RDV en ligne", path: "/rdv-en-ligne" },
+    ],
+  },
+  {
+    id: "terrain",
+    title: "Terrain",
+    icon: Wrench,
+    color: "rose",
+    items: [
+      { icon: Calendar, label: "Interventions", path: "/interventions" },
+      { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
+      { icon: Wrench, label: "Techniciens", path: "/techniciens" },
+      { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
+      { icon: HardHat, label: "Chantiers", path: "/chantiers" },
+      { icon: Route, label: "Planification", path: "/planification" },
+    ],
+  },
+  {
+    id: "gestion",
+    title: "Gestion",
+    icon: Package,
+    color: "cyan",
+    items: [
+      { icon: Package, label: "Articles", path: "/articles" },
+      { icon: Boxes, label: "Stocks", path: "/stocks" },
+      { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
+      { icon: ShoppingCart, label: "Commandes", path: "/commandes" },
+      { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
+      { icon: FileText, label: "Rapports", path: "/rapports" },
+      { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
+      { icon: LineChart, label: "Prévisions CA", path: "/previsions" },
+    ],
+  },
+  {
+    id: "parametres",
+    title: "Paramètres",
+    icon: Settings,
+    color: "slate",
+    items: [
+      { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
+      { icon: User, label: "Mon profil", path: "/profil" },
+      { icon: Settings, label: "Paramètres", path: "/parametres" },
+      { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
+      { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
+      { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
+      { icon: Users, label: "Utilisateurs", path: "/utilisateurs" },
+    ],
+  },
+];
+
+const pathPermissionMap: Record<string, string> = {
+  "/dashboard": "dashboard.voir",
+  "/statistiques": "statistiques.voir",
+  "/devis": "devis.voir",
+  "/devis/nouveau": "devis.creer",
+  "/factures": "factures.voir",
+  "/contrats": "contrats.voir",
+  "/relances": "relances.voir",
+  "/clients": "clients.voir",
+  "/clients/nouveau": "clients.gerer",
+  "/clients/import": "clients.gerer",
+  "/avis": "clients.voir",
+  "/portail-gestion": "portail.gerer",
+  "/chat": "chat.voir",
+  "/rdv-en-ligne": "rdv.gerer",
+  "/interventions": "interventions.voir",
+  "/calendrier": "calendrier.voir",
+  "/techniciens": "techniciens.voir",
+  "/geolocalisation": "geolocalisation.voir",
+  "/chantiers": "chantiers.voir",
+  "/planification": "interventions.gerer",
+  "/articles": "articles.voir",
+  "/stocks": "articles.voir",
+  "/rapport-commande": "exports.voir",
+  "/commandes": "articles.voir",
+  "/fournisseurs": "articles.voir",
+  "/rapports": "exports.voir",
+  "/comptabilite": "comptabilite.voir",
+  "/previsions": "comptabilite.voir",
+  "/parametres": "parametres.voir",
+  "/ma-vitrine": "vitrine.gerer",
+  "/modeles-email": "parametres.voir",
+  "/modeles-email-transactionnels": "parametres.voir",
+  "/utilisateurs": "utilisateurs.gerer",
+  "/profil": "",
+  "/assistant": "",
+  "/notifications": "",
+  "/documentation": "",
+  "/mobile": "interventions.voir",
+  "/integrations-comptables": "comptabilite.voir",
+  "/devis-ia": "devis.creer",
+  "/calendrier-chantiers": "chantiers.voir",
+  "/tableau-bord-sync-comptable": "comptabilite.voir",
+  "/performances-fournisseurs": "articles.voir",
+  "/vehicules": "interventions.voir",
+  "/badges": "techniciens.voir",
+  "/alertes-previsions": "comptabilite.voir",
+  "/conges": "techniciens.voir",
+};
+
+function filterGroupByPermissions(group: NavGroup, permissions: string[]): NavGroup {
+  if (permissions.length === 0) return group;
+  return {
+    ...group,
+    items: group.items.filter((item) => {
+      const required = pathPermissionMap[item.path];
+      if (!required) return true;
+      return permissions.includes(required);
+    }),
+  };
+}
+
+const RAIL_COLORS: Record<NavGroup["color"], { iconActive: string; bgActive: string; ring: string; hover: string }> = {
+  violet: {
+    iconActive: "text-violet-500",
+    bgActive: "bg-violet-100 dark:bg-violet-900/30",
+    ring: "ring-violet-500/30",
+    hover: "hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20",
+  },
+  blue: {
+    iconActive: "text-blue-500",
+    bgActive: "bg-blue-100 dark:bg-blue-900/30",
+    ring: "ring-blue-500/30",
+    hover: "hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20",
+  },
+  emerald: {
+    iconActive: "text-emerald-500",
+    bgActive: "bg-emerald-100 dark:bg-emerald-900/30",
+    ring: "ring-emerald-500/30",
+    hover: "hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20",
+  },
+  orange: {
+    iconActive: "text-orange-500",
+    bgActive: "bg-orange-100 dark:bg-orange-900/30",
+    ring: "ring-orange-500/30",
+    hover: "hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20",
+  },
+  rose: {
+    iconActive: "text-rose-500",
+    bgActive: "bg-rose-100 dark:bg-rose-900/30",
+    ring: "ring-rose-500/30",
+    hover: "hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20",
+  },
+  cyan: {
+    iconActive: "text-cyan-500",
+    bgActive: "bg-cyan-100 dark:bg-cyan-900/30",
+    ring: "ring-cyan-500/30",
+    hover: "hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/20",
+  },
+  slate: {
+    iconActive: "text-slate-700 dark:text-slate-300",
+    bgActive: "bg-slate-100 dark:bg-slate-800",
+    ring: "ring-slate-500/30",
+    hover: "hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800",
+  },
+};
+
+// ============================================================================
+// Notifications — cloche + badge RDV
+// ============================================================================
+
+const notifTypeIcon: Record<string, LucideIcon> = {
   succes: CheckCircle,
   alerte: AlertTriangle,
   rappel: Clock,
@@ -175,7 +405,7 @@ function formatRelativeDate(date: string | Date) {
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "A l'instant";
+  if (diffMin < 1) return "À l'instant";
   if (diffMin < 60) return `Il y a ${diffMin} min`;
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `Il y a ${diffH}h`;
@@ -186,7 +416,9 @@ function formatRelativeDate(date: string | Date) {
 }
 
 function RdvPendingBadge() {
-  const { data: count } = trpc.rdv.getPendingCount.useQuery(undefined, { refetchInterval: 30000 });
+  const { data: count } = trpc.rdv.getPendingCount.useQuery(undefined, {
+    refetchInterval: 30000,
+  });
   if (!count) return null;
   return (
     <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 min-w-5 text-center">
@@ -205,12 +437,19 @@ function NotificationBell() {
     { limit: 10 },
     { enabled: open }
   );
-  const markAsReadMutation = trpc.notifications.markAsRead.useMutation({ onSuccess: () => refetch() });
-  const markAllAsReadMutation = trpc.notifications.markAllAsRead.useMutation({ onSuccess: () => refetch() });
+  const markAsReadMutation = trpc.notifications.markAsRead.useMutation({
+    onSuccess: () => refetch(),
+  });
+  const markAllAsReadMutation = trpc.notifications.markAllAsRead.useMutation({
+    onSuccess: () => refetch(),
+  });
 
   const handleClick = (notif: any) => {
     if (!notif.lu) markAsReadMutation.mutate({ id: notif.id });
-    if (notif.lien) { setOpen(false); setLocation(notif.lien); }
+    if (notif.lien) {
+      setOpen(false);
+      setLocation(notif.lien);
+    }
   };
 
   return (
@@ -282,7 +521,10 @@ function NotificationBell() {
         </ScrollArea>
         <div className="border-t px-4 py-2">
           <button
-            onClick={() => { setOpen(false); setLocation("/notifications"); }}
+            onClick={() => {
+              setOpen(false);
+              setLocation("/notifications");
+            }}
             className="text-xs text-primary hover:underline w-full text-center"
           >
             Voir toutes les notifications
@@ -293,197 +535,51 @@ function NotificationBell() {
   );
 }
 
-type MenuItem = { icon: any; label: string; path: string };
+// ============================================================================
+// Constantes layout
+// ============================================================================
 
-interface MenuGroup {
-  title: string;
-  icon: any;
-  items: MenuItem[];
-}
-
-const menuGroups: MenuGroup[] = [
-  {
-    title: "MonAssistant",
-    icon: Sparkles,
-    items: [
-      { icon: Sparkles, label: "MonAssistant", path: "/assistant" },
-    ],
-  },
-  {
-    title: "Tableau de bord",
-    icon: LayoutDashboard,
-    items: [
-      { icon: LayoutDashboard, label: "Tableau de bord", path: "/dashboard" },
-      { icon: BarChart3, label: "Statistiques", path: "/statistiques" },
-    ],
-  },
-  {
-    title: "Commercial",
-    icon: FileText,
-    items: [
-      { icon: FileText, label: "Devis", path: "/devis" },
-      { icon: FileText, label: "Nouveau devis", path: "/devis/nouveau" },
-      { icon: Receipt, label: "Factures", path: "/factures" },
-      { icon: ClipboardList, label: "Contrats", path: "/contrats" },
-      { icon: RefreshCw, label: "Relances", path: "/relances" },
-    ],
-  },
-  {
-    title: "Clients",
-    icon: Users,
-    items: [
-      { icon: Users, label: "Clients", path: "/clients" },
-      { icon: Upload, label: "Nouveau Client", path: "/clients/nouveau" },
-      { icon: Upload, label: "Import Clients", path: "/clients/import" },
-      { icon: Star, label: "Avis Clients", path: "/avis" },
-      { icon: Globe, label: "Portail client", path: "/portail-gestion" },
-      { icon: MessageCircle, label: "Chat", path: "/chat" },
-      { icon: Clock, label: "RDV en ligne", path: "/rdv-en-ligne" },
-    ],
-  },
-  {
-    title: "Terrain",
-    icon: Calendar,
-    items: [
-      { icon: Calendar, label: "Interventions", path: "/interventions" },
-      { icon: CalendarDays, label: "Calendrier", path: "/calendrier" },
-      { icon: Wrench, label: "Techniciens", path: "/techniciens" },
-      { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
-      { icon: HardHat, label: "Chantiers", path: "/chantiers" },
-      { icon: Route, label: "Planification", path: "/planification" },
-    ],
-  },
-  {
-    title: "Gestion",
-    icon: Package,
-    items: [
-      { icon: Package, label: "Articles", path: "/articles" },
-      { icon: Boxes, label: "Stocks", path: "/stocks" },
-      { icon: ClipboardList, label: "Rapport Commande", path: "/rapport-commande" },
-      { icon: ShoppingCart, label: "Commandes", path: "/commandes" },
-      { icon: Building2, label: "Fournisseurs", path: "/fournisseurs" },
-      { icon: FileText, label: "Rapports", path: "/rapports" },
-      { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
-      { icon: LineChart, label: "Prévisions CA", path: "/previsions" },
-    ],
-  },
-  {
-    title: "Paramètres",
-    icon: Settings,
-    items: [
-      { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
-      { icon: User, label: "Mon profil", path: "/profil" },
-      { icon: Settings, label: "Paramètres", path: "/parametres" },
-      { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
-      { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
-      { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
-      { icon: Users, label: "Utilisateurs", path: "/utilisateurs" },
-    ],
-  },
-];
-
-// Permission-based path access
-const pathPermissionMap: Record<string, string> = {
-  "/dashboard": "dashboard.voir",
-  "/statistiques": "statistiques.voir",
-  "/devis": "devis.voir",
-  "/devis/nouveau": "devis.creer",
-  "/factures": "factures.voir",
-  "/contrats": "contrats.voir",
-  "/relances": "relances.voir",
-  "/clients": "clients.voir",
-  "/clients/nouveau": "clients.gerer",
-  "/clients/import": "clients.gerer",
-  "/avis": "clients.voir",
-  "/portail-gestion": "portail.gerer",
-  "/chat": "chat.voir",
-  "/rdv-en-ligne": "rdv.gerer",
-  "/interventions": "interventions.voir",
-  "/calendrier": "calendrier.voir",
-  "/techniciens": "techniciens.voir",
-  "/geolocalisation": "geolocalisation.voir",
-  "/chantiers": "chantiers.voir",
-  "/planification": "interventions.gerer",
-  "/articles": "articles.voir",
-  "/stocks": "articles.voir",
-  "/rapport-commande": "exports.voir",
-  "/commandes": "articles.voir",
-  "/fournisseurs": "articles.voir",
-  "/rapports": "exports.voir",
-  "/comptabilite": "comptabilite.voir",
-  "/previsions": "comptabilite.voir",
-  "/parametres": "parametres.voir",
-  "/ma-vitrine": "vitrine.gerer",
-  "/modeles-email": "parametres.voir",
-  "/modeles-email-transactionnels": "parametres.voir",
-  "/utilisateurs": "utilisateurs.gerer",
-  "/profil": "",
-  "/assistant": "",
-  "/notifications": "",
-  "/documentation": "",
-  "/mobile": "interventions.voir",
-  "/integrations-comptables": "comptabilite.voir",
-  "/devis-ia": "devis.creer",
-  "/calendrier-chantiers": "chantiers.voir",
-  "/tableau-bord-sync-comptable": "comptabilite.voir",
-  "/performances-fournisseurs": "articles.voir",
-  "/vehicules": "interventions.voir",
-  "/badges": "techniciens.voir",
-  "/alertes-previsions": "comptabilite.voir",
-  "/conges": "techniciens.voir",
+const ASSISTANT_PANEL_SIZE_KEY = "operioz.assistant.panelSize";
+const ASSISTANT_PANEL_MARGIN: Record<AssistantPanelSize, string> = {
+  sm: "md:mr-[380px]",
+  md: "md:mr-[520px]",
+  lg: "md:mr-[700px]",
 };
 
-function filterMenuByPermissions(groups: MenuGroup[], permissions: string[]): MenuGroup[] {
-  // If no permissions loaded yet (first render / cache), show all to avoid flash
-  if (permissions.length === 0) return groups;
-  return groups.map(g => ({
-    ...g,
-    items: g.items.filter(item => {
-      const required = pathPermissionMap[item.path];
-      if (!required) return true; // No permission required (profil, assistant, notifications)
-      return permissions.includes(required);
-    }),
-  })).filter(g => g.items.length > 0);
+function readPanelSize(): AssistantPanelSize {
+  if (typeof window === "undefined") return "md";
+  const raw = window.localStorage.getItem(ASSISTANT_PANEL_SIZE_KEY);
+  return raw === "sm" || raw === "md" || raw === "lg" ? raw : "md";
 }
 
-const allMenuItems = menuGroups.flatMap((g) => g.items);
+// Items visibles dans la bottom nav mobile (par défaut). "Plus" → drawer avec
+// les groupes restants.
+const MOBILE_PRIMARY: { id: GroupId; path: string; label: string; icon: LucideIcon }[] = [
+  { id: "dashboard", path: "/dashboard", label: "Accueil", icon: LayoutDashboard },
+  { id: "commercial", path: "/devis", label: "Commercial", icon: Briefcase },
+  { id: "clients", path: "/clients", label: "Clients", icon: Users },
+  { id: "terrain", path: "/interventions", label: "Terrain", icon: Wrench },
+];
 
-const SIDEBAR_WIDTH_KEY = "sidebar-width";
-const DEFAULT_WIDTH = 280;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 480;
+// ============================================================================
+// DashboardLayout
+// ============================================================================
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
-    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
-  });
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useAuth();
 
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
-  }, [sidebarWidth]);
-
-  if (loading) {
-    return <DashboardLayoutSkeleton />
-  }
+  if (loading) return <DashboardLayoutSkeleton />;
 
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Connexion requise
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              L'accès à cette application nécessite une authentification. Cliquez ci-dessous pour vous connecter.
-            </p>
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-center">
+            Connexion requise
+          </h1>
+          <p className="text-sm text-muted-foreground text-center max-w-sm">
+            L'accès à cette application nécessite une authentification.
+          </p>
           <Button
             onClick={() => {
               window.location.href = getLoginUrl();
@@ -498,58 +594,51 @@ export default function DashboardLayout({
     );
   }
 
-  return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": `${sidebarWidth}px`,
-        } as CSSProperties
-      }
-    >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
-        {children}
-      </DashboardLayoutContent>
-    </SidebarProvider>
-  );
+  return <DashboardLayoutContent>{children}</DashboardLayoutContent>;
 }
 
-type DashboardLayoutContentProps = {
-  children: React.ReactNode;
-  setSidebarWidth: (width: number) => void;
-};
-
-function DashboardLayoutContent({
-  children,
-  setSidebarWidth,
-}: DashboardLayoutContentProps) {
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
-  const { state, toggleSidebar } = useSidebar();
-  const isCollapsed = state === "collapsed";
-  const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
   const userPermissions: string[] = (user as any)?.permissions || [];
 
-  // MonAssistant : ouvert/fermé + contexte dynamique selon la route active.
-  // La conversation et l'état d'ouverture persistent entre toutes les navigations
-  // (DashboardLayout n'est plus re-mount grâce au catch-all routing dans App.tsx).
-  //
-  // État initial : ouvert sur desktop (≥ md, 768px) pour que MonAssistant soit
-  // visible dès la connexion ; fermé sur mobile pour ne pas masquer l'app au
-  // premier chargement (le drawer mobile est en plein écran avec overlay).
+  // Groupes filtrés par permissions
+  const filteredGroups: NavGroup[] = useMemo(
+    () =>
+      NAV_GROUPS.map((g) => filterGroupByPermissions(g, userPermissions)).filter(
+        (g) => g.items.length > 0
+      ),
+    [userPermissions]
+  );
+
+  const flatItems = useMemo(
+    () => filteredGroups.flatMap((g) => g.items),
+    [filteredGroups]
+  );
+  const activeItem = flatItems.find((i) => i.path === location);
+  const activeGroup = filteredGroups.find((g) =>
+    g.items.some((i) => i.path === location)
+  );
+
+  // Panneau de navigation (overlay) déployé pour un groupe donné
+  const [openGroupId, setOpenGroupId] = useState<GroupId | null>(null);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+
+  // MonAssistant
   const [isAssistantOpen, setIsAssistantOpen] = useState(() => {
     if (typeof window === "undefined") return false;
-    return window.matchMedia("(min-width: 768px)").matches;
+    return window.matchMedia("(min-width: 1024px)").matches;
   });
   const [panelSize, setPanelSize] = useState<AssistantPanelSize>(() => readPanelSize());
   useEffect(() => {
     try {
       window.localStorage.setItem(ASSISTANT_PANEL_SIZE_KEY, panelSize);
     } catch {
-      // localStorage indisponible (mode privé) : ignore
+      /* noop */
     }
   }, [panelSize]);
+
   const isAssistantPage = location === "/assistant";
   const { context: assistantContext, prompts: assistantSuggestions } =
     getAssistantContextForPath(location);
@@ -561,9 +650,6 @@ function DashboardLayoutContent({
       setLocation(target);
     },
     onInvalidate: (keys) => {
-      // L'IA a modifié des données : on invalide toutes les queries tRPC
-      // dont le queryKey contient une de ces chaînes. Match en substring
-      // pour couvrir list / byId / getUnreadCount / getLowStock etc.
       for (const key of keys) {
         queryClient.invalidateQueries({
           predicate: (query) => queryKeyContains(query.queryKey, key),
@@ -571,224 +657,248 @@ function DashboardLayoutContent({
       }
     },
   });
-  const filteredMenuGroups = filterMenuByPermissions(menuGroups, userPermissions);
-  const filteredAllItems = filteredMenuGroups.flatMap((g) => g.items);
-  const activeMenuItem = filteredAllItems.find(item => item.path === location) || allMenuItems.find(item => item.path === location);
-  const isMobile = useIsMobile();
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
-
   useEffect(() => {
-    // Don't show if already installed as standalone
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-
+    if (window.matchMedia("(display-mode: standalone)").matches) return;
     const handler = (e: any) => {
       e.preventDefault();
       setInstallPrompt(e);
       setShowInstallBanner(true);
     };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // Controlled collapsible state: only the group containing the active page is initially open
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    menuGroups.forEach((group) => {
-      initial[group.title] = group.items.some((item) => location === item.path);
-    });
-    return initial;
-  });
-
+  // ESC ferme le panneau de navigation
   useEffect(() => {
-    if (isCollapsed) {
-      setIsResizing(false);
-    }
-  }, [isCollapsed]);
+    if (!openGroupId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenGroupId(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openGroupId]);
 
+  // Ferme le panneau et le drawer mobile lors d'une navigation
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
+    setOpenGroupId(null);
+    setMobileMoreOpen(false);
+  }, [location]);
 
-      const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
-      const newWidth = e.clientX - sidebarLeft;
-      if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
-        setSidebarWidth(newWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    if (isResizing) {
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
+  const handleRailGroupClick = (group: NavGroup) => {
+    // Groupe à 1 item → on navigue direct.
+    if (group.items.length === 1) {
+      setLocation(group.items[0].path);
+      setOpenGroupId(null);
+      return;
     }
+    setOpenGroupId((prev) => (prev === group.id ? null : group.id));
+  };
 
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-  }, [isResizing, setSidebarWidth]);
+  const handleNavigate = (path: string) => {
+    setLocation(path);
+    setOpenGroupId(null);
+    setMobileMoreOpen(false);
+  };
+
+  const userInitial = (user?.name || user?.email || "?").charAt(0).toUpperCase();
 
   return (
-    <>
-      <div className="relative" ref={sidebarRef}>
-        <Sidebar
-          collapsible="icon"
-          className="border-r-0"
-          disableTransition={isResizing}
-        >
-          <SidebarHeader className="h-16 justify-center">
-            <div className="flex items-center gap-3 px-2 transition-all w-full">
-              <button
-                onClick={toggleSidebar}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
-                aria-label="Toggle navigation"
-              >
-                <PanelLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  {artisanProfile?.logo && (
-                    <img src={artisanProfile.logo} alt="" className="h-7 w-7 rounded object-contain shrink-0" />
-                  )}
-                  <span className="font-semibold tracking-tight truncate">
-                    {artisanProfile?.nomEntreprise || "Operioz"}
-                  </span>
-                </div>
-              ) : artisanProfile?.logo ? (
-                <img src={artisanProfile.logo} alt="" className="h-7 w-7 rounded object-contain" />
-              ) : null}
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent className="gap-0 overflow-y-auto">
-            <SidebarMenu className="px-2 py-1">
-              {filteredMenuGroups.map((group) => {
-                return (
-                  <Collapsible
-                    key={group.title}
-                    open={openGroups[group.title] ?? false}
-                    onOpenChange={(open) =>
-                      setOpenGroups((prev) => ({ ...prev, [group.title]: open }))
-                    }
-                    className="group/collapsible"
+    <div className="relative min-h-screen flex bg-background text-foreground">
+      {/* ─── RAIL — DESKTOP ─────────────────────────────────────────────────── */}
+      <nav
+        aria-label="Navigation principale"
+        className="hidden md:flex fixed inset-y-0 left-0 z-40 w-16 flex-col items-center justify-between border-r border-border bg-card/80 backdrop-blur-sm py-3"
+      >
+        <div className="flex flex-col items-center gap-1.5 w-full">
+          <button
+            onClick={() => setLocation("/dashboard")}
+            aria-label="Accueil Operioz"
+            className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white inline-flex items-center justify-center shadow-md hover:shadow-lg transition-shadow mb-2"
+          >
+            {artisanProfile?.logo ? (
+              <img
+                src={artisanProfile.logo}
+                alt=""
+                className="h-7 w-7 rounded object-contain"
+              />
+            ) : (
+              <Sparkles className="h-5 w-5" />
+            )}
+          </button>
+          {filteredGroups.map((group) => {
+            const styles = RAIL_COLORS[group.color];
+            const isActive = activeGroup?.id === group.id;
+            const isOpen = openGroupId === group.id;
+            const Icon = group.icon;
+            return (
+              <Tooltip key={group.id} delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => handleRailGroupClick(group)}
+                    aria-label={group.title}
+                    aria-pressed={isActive}
+                    className={`h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      isActive || isOpen ? `${styles.bgActive} ${styles.iconActive}` : styles.hover
+                    } ${group.id === "assistant" && isAssistantOpen ? "ring-2 ring-violet-500/30" : ""}`}
                   >
-                    <SidebarMenuItem>
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton
-                          tooltip={group.title}
-                          className="h-9 font-medium text-muted-foreground hover:text-foreground"
-                        >
-                          <group.icon className="h-4 w-4" />
-                          <span className="text-xs uppercase tracking-wider">{group.title}</span>
-                          <ChevronRight className="ml-auto h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenu className="pl-2">
-                          {group.items.map((item) => {
-                            const isActive = location === item.path;
-                            return (
-                              <SidebarMenuItem key={item.path}>
-                                <SidebarMenuButton
-                                  isActive={isActive}
-                                  onClick={() => setLocation(item.path)}
-                                  tooltip={item.label}
-                                  className="h-9 transition-all font-normal"
-                                >
-                                  <item.icon
-                                    className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
-                                  />
-                                  <span>{item.label}</span>
-                                  {item.path === "/rdv-en-ligne" && <RdvPendingBadge />}
-                                </SidebarMenuButton>
-                              </SidebarMenuItem>
-                            );
-                          })}
-                        </SidebarMenu>
-                      </CollapsibleContent>
-                    </SidebarMenuItem>
-                  </Collapsible>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarContent>
+                    <Icon className="h-5 w-5" />
+                    {group.id === "clients" && <RdvPendingBadge />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{group.title}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
 
-          <SidebarFooter className="p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-9 w-9 border shrink-0">
-                    <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none">
-                      {user?.name || "-"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
-                    </p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={logout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="h-10 w-10 rounded-full bg-secondary/60 hover:bg-secondary text-secondary-foreground inline-flex items-center justify-center font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Mon compte"
+            >
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="text-xs font-semibold">{userInitial}</AvatarFallback>
+              </Avatar>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium truncate">{user?.name || "—"}</span>
+                <span className="text-xs text-muted-foreground truncate">{user?.email || ""}</span>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setLocation("/profil")}>
+              <User className="h-4 w-4 mr-2" /> Mon profil
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation("/parametres")}>
+              <Settings className="h-4 w-4 mr-2" /> Paramètres
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={logout}
+              className="cursor-pointer text-destructive focus:text-destructive"
+            >
+              <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </nav>
+
+      {/* ─── PANNEAU DE NAVIGATION (overlay, desktop) ───────────────────────── */}
+      <AnimatePresence>
+        {openGroupId && (
+          <>
+            <motion.div
+              key="nav-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="hidden md:block fixed inset-0 left-16 z-30 bg-background/40 backdrop-blur-[3px]"
+              onClick={() => setOpenGroupId(null)}
+              aria-hidden
+            />
+            {(() => {
+              const group = filteredGroups.find((g) => g.id === openGroupId);
+              if (!group) return null;
+              const styles = RAIL_COLORS[group.color];
+              const GroupIcon = group.icon;
+              return (
+                <motion.aside
+                  key="nav-panel"
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  exit={{ x: -20, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 280, damping: 28 }}
+                  className="hidden md:flex fixed inset-y-0 left-16 z-30 w-60 flex-col border-r border-border bg-card shadow-xl"
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Déconnexion</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarFooter>
-        </Sidebar>
-        <div
-          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
-          onMouseDown={() => {
-            if (isCollapsed) return;
-            setIsResizing(true);
-          }}
-          style={{ zIndex: 50 }}
-        />
-      </div>
+                  <div className="flex items-center gap-3 px-4 py-4 border-b border-border">
+                    <div className={`h-9 w-9 rounded-lg ${styles.bgActive} inline-flex items-center justify-center`}>
+                      <GroupIcon className={`h-4 w-4 ${styles.iconActive}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{group.title}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {group.items.length} {group.items.length > 1 ? "options" : "option"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setOpenGroupId(null)}
+                      aria-label="Fermer le panneau"
+                      className="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <ul className="p-2 space-y-0.5">
+                      {group.items.map((item) => {
+                        const ItemIcon = item.icon;
+                        const isItemActive = location === item.path;
+                        return (
+                          <li key={item.path}>
+                            <button
+                              onClick={() => handleNavigate(item.path)}
+                              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                                isItemActive
+                                  ? `${styles.bgActive} ${styles.iconActive} font-medium`
+                                  : "text-foreground hover:bg-accent"
+                              }`}
+                            >
+                              <ItemIcon className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{item.label}</span>
+                              {item.path === "/rdv-en-ligne" && <RdvPendingBadge />}
+                              {isItemActive && <ChevronRight className="h-3.5 w-3.5 ml-auto opacity-60" />}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </ScrollArea>
+                </motion.aside>
+              );
+            })()}
+          </>
+        )}
+      </AnimatePresence>
 
-      <SidebarInset
-        className={`transition-[margin] duration-300 ease-out ${
+      {/* ─── COLONNE PRINCIPALE ─────────────────────────────────────────────── */}
+      <div
+        className={`flex-1 min-w-0 flex flex-col md:ml-16 transition-[margin] duration-300 ease-out ${
           isAssistantOpen ? ASSISTANT_PANEL_MARGIN[panelSize] : ""
         }`}
       >
-        <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-          <div className="flex items-center gap-2">
-            {isMobile && <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />}
-            <span className="tracking-tight text-foreground font-medium">
-              {activeMenuItem?.label ?? "Menu"}
+        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 h-14 px-3 md:px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:backdrop-blur border-b border-border">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Sur mobile, bouton qui ouvre le drawer "Plus" */}
+            <button
+              className="md:hidden h-9 w-9 inline-flex items-center justify-center rounded-lg hover:bg-accent"
+              onClick={() => setMobileMoreOpen(true)}
+              aria-label="Ouvrir le menu"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+            <span className="font-medium tracking-tight truncate text-sm md:text-base">
+              {activeItem?.label || activeGroup?.title || "Operioz"}
             </span>
           </div>
           <NotificationBell />
-        </div>
+        </header>
+
         {showInstallBanner && (
           <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between gap-4">
             <p className="text-sm text-foreground">
               <span className="font-medium">Installez Operioz</span> sur votre appareil pour un accès rapide
             </p>
             <div className="flex gap-2 shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowInstallBanner(false)}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setShowInstallBanner(false)}>
                 Plus tard
               </Button>
               <Button
@@ -797,9 +907,7 @@ function DashboardLayoutContent({
                   if (installPrompt) {
                     installPrompt.prompt();
                     const result = await installPrompt.userChoice;
-                    if (result.outcome === 'accepted') {
-                      setShowInstallBanner(false);
-                    }
+                    if (result.outcome === "accepted") setShowInstallBanner(false);
                     setInstallPrompt(null);
                   }
                 }}
@@ -809,10 +917,149 @@ function DashboardLayoutContent({
             </div>
           </div>
         )}
-        <main className="flex-1 p-4 min-w-0">{children}</main>
-      </SidebarInset>
 
-      {/* MonAssistant — disponible sur toutes les pages sauf /assistant */}
+        <main className="flex-1 p-4 pb-20 md:pb-4 min-w-0 max-w-full overflow-x-hidden">
+          {children}
+        </main>
+      </div>
+
+      {/* ─── BOTTOM NAV — MOBILE ────────────────────────────────────────────── */}
+      <nav
+        aria-label="Navigation mobile"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur-sm"
+      >
+        <div className="grid grid-cols-5">
+          {MOBILE_PRIMARY.map((p) => {
+            const groupAvailable = filteredGroups.find((g) => g.id === p.id);
+            if (!groupAvailable) return null;
+            const isActive = location === p.path || activeGroup?.id === p.id;
+            const Icon = p.icon;
+            return (
+              <button
+                key={p.id}
+                onClick={() => handleNavigate(p.path)}
+                className={`flex flex-col items-center justify-center gap-1 py-2.5 transition-colors ${
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] font-medium">{p.label}</span>
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setMobileMoreOpen(true)}
+            className="flex flex-col items-center justify-center gap-1 py-2.5 text-muted-foreground hover:text-foreground"
+          >
+            <MoreHorizontal className="h-5 w-5" />
+            <span className="text-[10px] font-medium">Plus</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ─── DRAWER MOBILE "PLUS" ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {mobileMoreOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="md:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]"
+              onClick={() => setMobileMoreOpen(false)}
+              aria-hidden
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 260, damping: 28 }}
+              className="md:hidden fixed inset-y-0 left-0 z-50 w-[85%] max-w-sm bg-background shadow-2xl flex flex-col"
+              role="dialog"
+              aria-label="Menu principal"
+            >
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 inline-flex items-center justify-center text-white">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold leading-tight">
+                      {artisanProfile?.nomEntreprise || "Operioz"}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">{user?.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileMoreOpen(false)}
+                  className="h-8 w-8 inline-flex items-center justify-center rounded-lg hover:bg-accent"
+                  aria-label="Fermer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <ScrollArea className="flex-1">
+                <div className="p-2 space-y-4">
+                  {filteredGroups.map((group) => {
+                    const styles = RAIL_COLORS[group.color];
+                    const GroupIcon = group.icon;
+                    return (
+                      <div key={group.id}>
+                        <div className="flex items-center gap-2 px-2 py-1">
+                          <div className={`h-7 w-7 rounded-lg ${styles.bgActive} inline-flex items-center justify-center`}>
+                            <GroupIcon className={`h-3.5 w-3.5 ${styles.iconActive}`} />
+                          </div>
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {group.title}
+                          </span>
+                        </div>
+                        <ul className="space-y-0.5 mt-1">
+                          {group.items.map((item) => {
+                            const ItemIcon = item.icon;
+                            const isItemActive = location === item.path;
+                            return (
+                              <li key={item.path}>
+                                <button
+                                  onClick={() => handleNavigate(item.path)}
+                                  className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                                    isItemActive
+                                      ? `${styles.bgActive} ${styles.iconActive} font-medium`
+                                      : "text-foreground hover:bg-accent"
+                                  }`}
+                                >
+                                  <ItemIcon className="h-4 w-4 shrink-0" />
+                                  <span className="truncate">{item.label}</span>
+                                  {item.path === "/rdv-en-ligne" && <RdvPendingBadge />}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+
+              <div className="p-3 border-t border-border">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-destructive hover:text-destructive"
+                  onClick={() => {
+                    setMobileMoreOpen(false);
+                    logout();
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" /> Déconnexion
+                </Button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ─── MonAssistant FAB + Drawer ──────────────────────────────────────── */}
       <AssistantFAB
         onClick={() => setIsAssistantOpen(true)}
         hidden={isAssistantPage || isAssistantOpen}
@@ -828,6 +1075,19 @@ function DashboardLayoutContent({
         panelSize={panelSize}
         onPanelSizeChange={setPanelSize}
       />
-    </>
+
+    </div>
   );
+}
+
+/**
+ * Vérifie récursivement si un queryKey tRPC contient une chaîne donnée.
+ * Les queryKey tRPC ont la forme [["clients", "list"], { input: ... }] ;
+ * un match en substring sur chaque string permet d'invalider toutes les
+ * variantes d'une entité (list, byId, getUnreadCount, etc.) en une fois.
+ */
+function queryKeyContains(key: unknown, needle: string): boolean {
+  if (typeof key === "string") return key.includes(needle);
+  if (Array.isArray(key)) return key.some((k) => queryKeyContains(k, needle));
+  return false;
 }
