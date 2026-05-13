@@ -8,7 +8,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Switch } from "./ui/switch";
 import { AIChatBox, type Message } from "./AIChatBox";
+
+const AUTO_SEND_STORAGE_KEY = "operioz.assistant.autoSend";
+
+function getInitialAutoSend(): boolean {
+  if (typeof window === "undefined") return true;
+  const raw = window.localStorage.getItem(AUTO_SEND_STORAGE_KEY);
+  // Défaut true (comportement historique). Seul "false" désactive l'envoi auto.
+  return raw !== "false";
+}
 
 export type AssistantPanelSize = "sm" | "md" | "lg";
 
@@ -194,6 +204,7 @@ export function AssistantDrawer({
   onPanelSizeChange,
 }: AssistantDrawerProps) {
   const [voiceLang, setVoiceLang] = useState<VoiceLangCode>(() => getInitialVoiceLang());
+  const [autoSend, setAutoSend] = useState<boolean>(() => getInitialAutoSend());
 
   useEffect(() => {
     try {
@@ -202,6 +213,14 @@ export function AssistantDrawer({
       // localStorage indisponible (mode privé) : ignore.
     }
   }, [voiceLang]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUTO_SEND_STORAGE_KEY, autoSend ? "true" : "false");
+    } catch {
+      /* noop */
+    }
+  }, [autoSend]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -319,12 +338,13 @@ export function AssistantDrawer({
             suggestedPrompts={suggestedPrompts}
             enableVoice
             voiceLang={voiceLang}
+            autoSend={autoSend}
             className="border-0 shadow-none rounded-none flex-1"
           />
         </div>
 
-        {/* Footer — sélecteur de langue + bouton effacer */}
-        <div className="flex items-center justify-between gap-2 p-3 border-t shrink-0">
+        {/* Footer — sélecteur de langue + envoi auto + bouton effacer */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-t shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -352,6 +372,24 @@ export function AssistantDrawer({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                <Switch
+                  checked={autoSend}
+                  onCheckedChange={setAutoSend}
+                  aria-label="Envoi automatique après silence"
+                />
+                <span className="hidden sm:inline">Envoi auto</span>
+              </label>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {autoSend
+                ? "Envoi automatique 5 s après la fin de la dictée"
+                : "Pas d'envoi automatique — clique Envoyer ou appuie sur Entrée"}
+            </TooltipContent>
+          </Tooltip>
 
           {messages.length > 0 && (
             <Button

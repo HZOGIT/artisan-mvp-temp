@@ -71,6 +71,13 @@ export type AIChatBoxProps = {
    * Défaut: "fr-FR". Ignoré si enableVoice est false.
    */
   voiceLang?: string;
+
+  /**
+   * Si true (défaut), démarre un countdown 5 s après la fin de la dictée pour
+   * envoyer automatiquement. Si false, le texte reste dans l'input et
+   * l'artisan doit cliquer Envoyer (ou Entrée) pour le transmettre.
+   */
+  autoSend?: boolean;
 };
 
 /**
@@ -124,6 +131,8 @@ export type AIChatBoxProps = {
  * };
  * ```
  */
+const AUTO_SEND_COUNTDOWN_SECONDS = 5;
+
 export function AIChatBox({
   messages,
   onSendMessage,
@@ -135,6 +144,7 @@ export function AIChatBox({
   suggestedPrompts,
   enableVoice = false,
   voiceLang,
+  autoSend = true,
 }: AIChatBoxProps) {
   const [input, setInput] = useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -155,7 +165,9 @@ export function AIChatBox({
     }
   }, [speech.isListening, speech.transcript]);
 
-  // À la fin de l'écoute : démarrer un compte à rebours de 3 s avant l'envoi auto
+  // À la fin de l'écoute : démarrer un compte à rebours de 5 s avant l'envoi
+  // auto. Si autoSend est désactivé, on remplit juste l'input et on attend que
+  // l'artisan valide manuellement (Entrée ou bouton Envoyer).
   useEffect(() => {
     if (
       !speech.isListening &&
@@ -164,9 +176,11 @@ export function AIChatBox({
       countdown === null
     ) {
       setInput(speech.finalTranscript);
-      setCountdown(3);
+      if (autoSend) {
+        setCountdown(AUTO_SEND_COUNTDOWN_SECONDS);
+      }
     }
-  }, [speech.isListening, speech.finalTranscript, countdown]);
+  }, [speech.isListening, speech.finalTranscript, countdown, autoSend]);
 
   // Tick du compte à rebours, envoi au passage à 0
   useEffect(() => {
@@ -193,6 +207,26 @@ export function AIChatBox({
     setCountdown(null);
     speech.resetTranscript();
     setInput("");
+  };
+
+  /**
+   * Envoi immédiat — disponible pendant la dictée OU pendant le countdown.
+   * Stoppe la reco si elle tourne, prend le meilleur texte disponible
+   * (transcript live > finalTranscript > input actuel) et le transmet.
+   */
+  const sendNow = () => {
+    const candidate =
+      (speech.transcript || speech.finalTranscript || input || "").trim();
+    if (!candidate || isLoading) return;
+    if (speech.isListening) {
+      speech.stopListening();
+    }
+    setCountdown(null);
+    speech.resetTranscript();
+    setInput("");
+    onSendMessage(candidate);
+    scrollToBottom();
+    textareaRef.current?.focus();
   };
 
   const handleMicClick = () => {
@@ -468,23 +502,65 @@ export function AIChatBox({
           </Button>
         </div>
 
-        {enableVoice && speech.isListening && (
-          <p className="text-[11px] text-red-500 font-medium px-1">
-            Écoute en cours… (arrêt auto après 5 s de silence)
-          </p>
-        )}
+        {enableVoice && speech.isListening && (() => {
+          const max = speech.silenceMaxMs || 1;
+          const remaining = speech.silenceCountdownMs ?? max;
+          // Pourcentage RESTANT (la barre se vide pendant le silence).
+          const pct = Math.max(0, Math.min(100, (remaining / max) * 100));
+          const secondsLeft = Math.ceil(remaining / 1000);
+          return (
+            <div className="flex flex-col gap-1.5 px-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] text-red-500 font-medium">
+                  Écoute en cours… arrêt dans {secondsLeft}s si silence
+                </p>
+                <button
+                  type="button"
+                  onClick={sendNow}
+                  disabled={isLoading || !(speech.transcript || input).trim()}
+                  className="text-[11px] font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-green-600/40 disabled:cursor-not-allowed rounded px-2.5 py-1 transition-colors"
+                >
+                  Envoyer maintenant →
+                </button>
+              </div>
+              <div
+                className="h-1 w-full bg-red-100 rounded-full overflow-hidden"
+                role="progressbar"
+                aria-label="Temps de silence restant"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(pct)}
+              >
+                <div
+                  className="h-full bg-red-500 transition-[width] duration-100 linear"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()}
         {enableVoice && countdown !== null && (
           <div className="flex items-center justify-between gap-2 px-1">
             <p className="text-[11px] text-blue-600 font-medium">
               Envoi dans {countdown}…
             </p>
-            <button
-              type="button"
-              onClick={cancelAutoSend}
-              className="text-[11px] text-red-500 hover:text-red-700 underline"
-            >
-              Annuler l'envoi
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={cancelAutoSend}
+                className="text-[11px] font-medium text-white bg-red-500 hover:bg-red-600 rounded px-2.5 py-1 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={sendNow}
+                disabled={isLoading || !input.trim()}
+                className="text-[11px] font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-green-600/40 disabled:cursor-not-allowed rounded px-2.5 py-1 transition-colors"
+              >
+                Envoyer maintenant →
+              </button>
+            </div>
           </div>
         )}
       </form>

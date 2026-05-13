@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface UseSpeechRecognitionOptions {
   /** Locale BCP-47, défaut: fr-FR */
   lang?: string;
-  /** Auto-stop après N ms de silence, défaut: 5000 */
+  /** Auto-stop après N ms de silence, défaut: 10000 (10 s) */
   silenceMs?: number;
 }
 
@@ -19,16 +19,29 @@ interface UseSpeechRecognitionReturn {
   startListening: () => void;
   stopListening: () => void;
   resetTranscript: () => void;
+  /**
+   * Ms restantes avant l'arrêt automatique pour cause de silence. Null quand
+   * pas en écoute. Sert à afficher un countdown ou une barre de progression.
+   */
+  silenceCountdownMs: number | null;
+  /** Configuration du seuil de silence (ms). Utile pour calculer une progression. */
+  silenceMaxMs: number;
 }
+
+const DEFAULT_SILENCE_MS = 10_000;
+const TICK_INTERVAL_MS = 100;
 
 /**
  * Wrapper React de la Web Speech API (SpeechRecognition).
  * Zéro dépendance, fonctionne en Chrome, Edge, Safari (desktop + mobile).
+ * Expose un countdown ms pour permettre à l'UI d'afficher une barre de
+ * progression qui se remplit pendant le silence et se recharge dès qu'un
+ * nouveau résultat arrive.
  */
 export function useSpeechRecognition(
   options: UseSpeechRecognitionOptions = {}
 ): UseSpeechRecognitionReturn {
-  const { lang = "fr-FR", silenceMs = 5000 } = options;
+  const { lang = "fr-FR", silenceMs = DEFAULT_SILENCE_MS } = options;
 
   const SpeechRecognitionCtor =
     typeof window !== "undefined"
@@ -41,10 +54,30 @@ export function useSpeechRecognition(
   const [transcript, setTranscript] = useState("");
   const [finalTranscript, setFinalTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [silenceCountdownMs, setSilenceCountdownMs] = useState<number | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceArmedAtRef = useRef<number>(0);
+  const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const manualStopRef = useRef(false);
+
+  const stopTicking = useCallback(() => {
+    if (tickIntervalRef.current) {
+      clearInterval(tickIntervalRef.current);
+      tickIntervalRef.current = null;
+    }
+    setSilenceCountdownMs(null);
+  }, []);
+
+  const startTicking = useCallback(() => {
+    if (tickIntervalRef.current) return;
+    tickIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - silenceArmedAtRef.current;
+      const remaining = Math.max(0, silenceMs - elapsed);
+      setSilenceCountdownMs(remaining);
+    }, TICK_INTERVAL_MS);
+  }, [silenceMs]);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -55,6 +88,8 @@ export function useSpeechRecognition(
 
   const armSilenceTimer = useCallback(() => {
     clearSilenceTimer();
+    silenceArmedAtRef.current = Date.now();
+    setSilenceCountdownMs(silenceMs);
     silenceTimerRef.current = setTimeout(() => {
       try {
         recognitionRef.current?.stop();
@@ -62,7 +97,8 @@ export function useSpeechRecognition(
         /* noop */
       }
     }, silenceMs);
-  }, [silenceMs, clearSilenceTimer]);
+    startTicking();
+  }, [silenceMs, clearSilenceTimer, startTicking]);
 
   const startListening = useCallback(() => {
     if (!isSupported || isListening) return;
@@ -97,6 +133,7 @@ export function useSpeechRecognition(
       if (final) {
         setFinalTranscript((prev) => (prev + final).trim());
       }
+      // L'artisan parle → on relance le compteur de silence.
       armSilenceTimer();
     };
 
@@ -119,6 +156,7 @@ export function useSpeechRecognition(
 
     recognition.onend = () => {
       clearSilenceTimer();
+      stopTicking();
       setIsListening(false);
       recognitionRef.current = null;
     };
@@ -131,17 +169,26 @@ export function useSpeechRecognition(
       setIsListening(false);
       recognitionRef.current = null;
     }
-  }, [SpeechRecognitionCtor, isSupported, isListening, lang, armSilenceTimer, clearSilenceTimer]);
+  }, [
+    SpeechRecognitionCtor,
+    isSupported,
+    isListening,
+    lang,
+    armSilenceTimer,
+    clearSilenceTimer,
+    stopTicking,
+  ]);
 
   const stopListening = useCallback(() => {
     manualStopRef.current = true;
     clearSilenceTimer();
+    stopTicking();
     try {
       recognitionRef.current?.stop();
     } catch {
       /* noop */
     }
-  }, [clearSilenceTimer]);
+  }, [clearSilenceTimer, stopTicking]);
 
   const resetTranscript = useCallback(() => {
     setTranscript("");
@@ -152,6 +199,7 @@ export function useSpeechRecognition(
   useEffect(() => {
     return () => {
       clearSilenceTimer();
+      stopTicking();
       try {
         recognitionRef.current?.abort();
       } catch {
@@ -159,7 +207,7 @@ export function useSpeechRecognition(
       }
       recognitionRef.current = null;
     };
-  }, [clearSilenceTimer]);
+  }, [clearSilenceTimer, stopTicking]);
 
   return {
     isListening,
@@ -170,5 +218,7 @@ export function useSpeechRecognition(
     startListening,
     stopListening,
     resetTranscript,
+    silenceCountdownMs,
+    silenceMaxMs: silenceMs,
   };
 }
