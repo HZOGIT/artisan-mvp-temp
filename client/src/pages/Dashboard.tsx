@@ -30,7 +30,6 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
 import { StatCard, type StatCardColor } from "@/components/dashboard/StatCard";
 import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { AlertsBar, type DashboardAlert } from "@/components/dashboard/AlertsBar";
@@ -199,10 +198,13 @@ export default function Dashboard() {
   );
 
   const handleDragStart = (event: DragStartEvent) => {
+    // [DnD] Logs diagnostic temporaires - a retirer une fois le drag valide.
+    console.log("[DnD] drag started", event.active.id);
     setActiveId(String(event.active.id));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    console.log("[DnD] drag ended", event.active.id, "->", event.over?.id);
     setActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -362,13 +364,12 @@ export default function Dashboard() {
 
   const dashboardAlerts: DashboardAlert[] = (alerts || []) as DashboardAlert[];
 
+  // Pas de motion.div outer : framer-motion sur le parent du sortable peut
+  // intercepter les pointer events ou casser le timing de re-render qui
+  // active le PointerSensor. /dnd-test fonctionne car il n'a aucun parent
+  // framer-motion ; on s'aligne strictement sur ce pattern.
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       {/* Welcome banner */}
       <WelcomeBanner
         firstName={firstName}
@@ -470,6 +471,6 @@ export default function Dashboard() {
           setCustomizeOpen(false);
         }}
       />
-    </motion.div>
+    </div>
   );
 }

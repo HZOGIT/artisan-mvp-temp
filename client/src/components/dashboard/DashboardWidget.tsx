@@ -5,33 +5,32 @@ import { GripVertical, X } from "lucide-react";
 interface DashboardWidgetProps {
   id: string;
   title: string;
-  /** Description courte sous le titre. */
   subtitle?: string;
-  /** Icône à gauche du titre. */
   icon?: React.ReactNode;
-  /** Actions rendues à droite du header (boutons "Voir tout" etc.). */
   actions?: React.ReactNode;
   /** Si true, affiche un bouton X qui appelle onRemove. */
   removable?: boolean;
   onRemove?: () => void;
-  /** Si false, désactive le drag (pour les widgets fixes ou en mode lecture). */
+  /** Si false, désactive le drag. */
   draggable?: boolean;
   className?: string;
   children: React.ReactNode;
 }
 
 /**
- * Conteneur réutilisable pour chaque widget du dashboard.
+ * Conteneur sortable pour les widgets du dashboard.
  *
- * Stratégie DnD volontairement minimaliste :
- *  - Wrapper externe = simple <div> auquel @dnd-kit applique transform +
- *    transition via le style. AUCUN motion.div à l'intérieur du sortable
- *    pour éviter toute interférence framer-motion ↔ pointer events.
- *  - Handle de drag dédié en position absolute top-right : reçoit
- *    `listeners` + `attributes`. Le reste du widget reste cliquable
- *    normalement (header X, contenu interactif).
- *  - L'animation d'entrée est gérée au niveau parent via les transitions
- *    CSS de @dnd-kit (qui anime aussi le réarrangement smooth des voisins).
+ * Alignement strict sur le pattern de /dnd-test qui fonctionne :
+ *  - `attributes` + `listeners` sont posés SUR LE DIV RACINE (le même qui
+ *    porte setNodeRef). Le widget entier est le drag handle. C'est aussi
+ *    la recommandation officielle @dnd-kit pour le cas simple.
+ *  - L'icône GripVertical reste comme repère visuel (cursor-grab) mais
+ *    elle n'a plus de listeners séparés.
+ *  - Le bouton X de masquage appelle `stopPropagation` sur onPointerDown
+ *    et onClick pour ne pas amorcer un drag quand on tente juste de
+ *    masquer le widget.
+ *  - Aucun framer-motion à l'intérieur du sortable : zéro chance
+ *    d'interception de pointer events.
  */
 export function DashboardWidget({
   id,
@@ -66,26 +65,22 @@ export function DashboardWidget({
       ref={setNodeRef}
       style={style}
       data-widget-id={id}
-      className={`group/widget relative bg-card text-card-foreground rounded-xl border border-border shadow-sm hover:shadow-md ${
-        isDragging ? "shadow-2xl ring-2 ring-primary/30" : ""
-      } ${className || ""}`}
+      {...attributes}
+      {...listeners}
+      className={`group/widget relative bg-card text-card-foreground rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow touch-none select-none ${
+        draggable ? "cursor-grab active:cursor-grabbing" : ""
+      } ${isDragging ? "shadow-2xl ring-2 ring-primary/30" : ""} ${className || ""}`}
     >
-      {/* Handle de drag — absolute top-right, toujours dans le flux pointer,
-          jamais masqué par opacity-0 (ce qui pouvait sembler le rendre
-          inactif lors des tests utilisateur). */}
-      {draggable && (
-        <div
-          {...attributes}
-          {...listeners}
-          aria-label={`Déplacer le widget ${title}`}
-          className="absolute top-2 right-12 z-10 h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-accent cursor-grab active:cursor-grabbing opacity-50 group-hover/widget:opacity-100 transition-opacity touch-none select-none"
-        >
-          <GripVertical className="h-4 w-4" />
-        </div>
-      )}
-
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/60 pr-20">
         <div className="flex items-center gap-2 min-w-0">
+          {draggable && (
+            <span
+              aria-hidden
+              className="shrink-0 h-7 w-7 inline-flex items-center justify-center text-muted-foreground/50 group-hover/widget:text-muted-foreground transition-colors"
+            >
+              <GripVertical className="h-4 w-4" />
+            </span>
+          )}
           {icon && <span className="shrink-0">{icon}</span>}
           <div className="min-w-0">
             <h3 className="text-sm font-semibold tracking-tight truncate">{title}</h3>
@@ -99,9 +94,13 @@ export function DashboardWidget({
           {removable && onRemove && (
             <button
               type="button"
-              onClick={onRemove}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
               aria-label="Masquer le widget"
-              className="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -109,6 +108,10 @@ export function DashboardWidget({
         </div>
       </div>
 
+      {/* Le contenu reste interactif (les charts Recharts, les boutons "Voir
+          tout" etc.). Pour qu'un clic ne déclenche pas un drag par accident,
+          on s'appuie sur PointerSensor activationConstraint distance: 8 :
+          un clic sans mouvement n'active pas le drag. */}
       <div className="p-4">{children}</div>
     </div>
   );
