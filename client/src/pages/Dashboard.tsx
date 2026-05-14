@@ -165,9 +165,6 @@ export default function Dashboard() {
   const [order, setOrder] = useState<string[]>(() => loadOrder(DEFAULT_ORDER));
   const [hidden, setHidden] = useState<Set<string>>(() => loadHidden());
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  // Drag state HTML5 natif piloté ici, transmis aux widgets en props.
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     saveOrder(order);
@@ -176,41 +173,6 @@ export default function Dashboard() {
   useEffect(() => {
     saveHidden(hidden);
   }, [hidden]);
-
-  const handleWidgetDragStart = (id: string) => {
-    setDraggedId(id);
-  };
-
-  const handleWidgetDragOver = (_e: React.DragEvent, id: string) => {
-    if (!draggedId || draggedId === id) return;
-    setDropTargetId(id);
-  };
-
-  const handleWidgetDragLeave = (id: string) => {
-    setDropTargetId((prev) => (prev === id ? null : prev));
-  };
-
-  const handleWidgetDrop = (targetId: string) => {
-    if (draggedId && draggedId !== targetId) {
-      setOrder((prev) => {
-        const next = [...prev];
-        const fromIdx = next.indexOf(draggedId);
-        const toIdx = next.indexOf(targetId);
-        if (fromIdx < 0 || toIdx < 0) return prev;
-        next.splice(fromIdx, 1);
-        next.splice(toIdx, 0, draggedId);
-        return next;
-      });
-    }
-    setDraggedId(null);
-    setDropTargetId(null);
-  };
-
-  const handleWidgetDragEnd = () => {
-    // Reset systematique meme si le drop est tombe en dehors d'une zone valide.
-    setDraggedId(null);
-    setDropTargetId(null);
-  };
 
   const handleToggleHidden = (id: string, visible: boolean) => {
     setHidden((prev) => {
@@ -387,7 +349,9 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Drag & drop widget grid (HTML5 natif - desktop). */}
+      {/* Grille statique des widgets — l'ordre vient de localStorage,
+          les widgets masqués sont filtrés. Le réordonnancement se fait
+          via le panneau "Personnaliser" (toggle ON/OFF). */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {visibleOrder.map((id) => {
           const widget = widgetById[id];
@@ -400,13 +364,6 @@ export default function Dashboard() {
               subtitle={widget.description}
               removable
               onRemove={() => handleToggleHidden(id, false)}
-              isDragged={draggedId === id}
-              isDropTarget={dropTargetId === id && draggedId !== id}
-              onDragStart={handleWidgetDragStart}
-              onDragOver={handleWidgetDragOver}
-              onDragLeave={handleWidgetDragLeave}
-              onDrop={handleWidgetDrop}
-              onDragEnd={handleWidgetDragEnd}
             >
               {widget.render()}
             </DashboardWidget>
