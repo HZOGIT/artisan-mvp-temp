@@ -70,7 +70,6 @@ import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import StatistiquesDevis from "./pages/StatistiquesDevis";
 import PortailGestion from "./pages/PortailGestion";
 import Documentation from "./pages/Documentation";
-import DndTest from "./pages/DndTest";
 import DashboardLayout from "./components/DashboardLayout";
 
 // BYPASS CLERK TEMPORARILY - Redirect all authenticated routes directly to dashboard
@@ -163,9 +162,6 @@ function Router() {
       <Route path="/portail/:token" component={PortailClient} />
       <Route path="/avis/:token" component={SoumettreAvis} />
       <Route path="/vitrine/:slug" component={Vitrine} />
-      {/* Page de diagnostic DnD isolée — sans DashboardLayout pour eliminer
-          toute interference de wrapper parent dans les tests. */}
-      <Route path="/dnd-test" component={DndTest} />
       {/*
         Toutes les routes authentifiées passent par UN SEUL catch-all
         AuthenticatedRoutes. Sa propre <Switch> interne dispatche vers le bon

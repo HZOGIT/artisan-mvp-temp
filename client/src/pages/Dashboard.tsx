@@ -3,23 +3,6 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import {
-  DndContext,
-  DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  rectSortingStrategy,
-  sortableKeyboardCoordinates,
-} from "@dnd-kit/sortable";
-import {
   Euro,
   FileText,
   Receipt,
@@ -181,8 +164,10 @@ export default function Dashboard() {
 
   const [order, setOrder] = useState<string[]>(() => loadOrder(DEFAULT_ORDER));
   const [hidden, setHidden] = useState<Set<string>>(() => loadHidden());
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  // Drag state HTML5 natif piloté ici, transmis aux widgets en props.
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     saveOrder(order);
@@ -192,28 +177,39 @@ export default function Dashboard() {
     saveHidden(hidden);
   }, [hidden]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  const handleDragStart = (event: DragStartEvent) => {
-    // [DnD] Logs diagnostic temporaires - a retirer une fois le drag valide.
-    console.log("[DnD] drag started", event.active.id);
-    setActiveId(String(event.active.id));
+  const handleWidgetDragStart = (id: string) => {
+    setDraggedId(id);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    console.log("[DnD] drag ended", event.active.id, "->", event.over?.id);
-    setActiveId(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setOrder((prev) => {
-      const from = prev.indexOf(String(active.id));
-      const to = prev.indexOf(String(over.id));
-      if (from < 0 || to < 0) return prev;
-      return arrayMove(prev, from, to);
-    });
+  const handleWidgetDragOver = (_e: React.DragEvent, id: string) => {
+    if (!draggedId || draggedId === id) return;
+    setDropTargetId(id);
+  };
+
+  const handleWidgetDragLeave = (id: string) => {
+    setDropTargetId((prev) => (prev === id ? null : prev));
+  };
+
+  const handleWidgetDrop = (targetId: string) => {
+    if (draggedId && draggedId !== targetId) {
+      setOrder((prev) => {
+        const next = [...prev];
+        const fromIdx = next.indexOf(draggedId);
+        const toIdx = next.indexOf(targetId);
+        if (fromIdx < 0 || toIdx < 0) return prev;
+        next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, draggedId);
+        return next;
+      });
+    }
+    setDraggedId(null);
+    setDropTargetId(null);
+  };
+
+  const handleWidgetDragEnd = () => {
+    // Reset systematique meme si le drop est tombe en dehors d'une zone valide.
+    setDraggedId(null);
+    setDropTargetId(null);
   };
 
   const handleToggleHidden = (id: string, visible: boolean) => {
@@ -391,44 +387,32 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Drag & drop widget grid */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={visibleOrder} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {visibleOrder.map((id) => {
-              const widget = widgetById[id];
-              if (!widget) return null;
-              return (
-                <DashboardWidget
-                  key={id}
-                  id={id}
-                  title={widget.label}
-                  subtitle={widget.description}
-                  removable
-                  onRemove={() => handleToggleHidden(id, false)}
-                >
-                  {widget.render()}
-                </DashboardWidget>
-              );
-            })}
-          </div>
-        </SortableContext>
-        <DragOverlay>
-          {activeId && widgetById[activeId] ? (
-            <div className="rounded-xl border border-primary/40 bg-card shadow-2xl p-4 opacity-95">
-              <p className="text-sm font-semibold">{widgetById[activeId].label}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Déposez ici pour réorganiser
-              </p>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      {/* Drag & drop widget grid (HTML5 natif - desktop). */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {visibleOrder.map((id) => {
+          const widget = widgetById[id];
+          if (!widget) return null;
+          return (
+            <DashboardWidget
+              key={id}
+              id={id}
+              title={widget.label}
+              subtitle={widget.description}
+              removable
+              onRemove={() => handleToggleHidden(id, false)}
+              isDragged={draggedId === id}
+              isDropTarget={dropTargetId === id && draggedId !== id}
+              onDragStart={handleWidgetDragStart}
+              onDragOver={handleWidgetDragOver}
+              onDragLeave={handleWidgetDragLeave}
+              onDrop={handleWidgetDrop}
+              onDragEnd={handleWidgetDragEnd}
+            >
+              {widget.render()}
+            </DashboardWidget>
+          );
+        })}
+      </div>
 
       {/* Quick actions */}
       <div>

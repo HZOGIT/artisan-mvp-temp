@@ -1,5 +1,3 @@
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, X } from "lucide-react";
 
 interface DashboardWidgetProps {
@@ -11,26 +9,35 @@ interface DashboardWidgetProps {
   /** Si true, affiche un bouton X qui appelle onRemove. */
   removable?: boolean;
   onRemove?: () => void;
-  /** Si false, désactive le drag. */
-  draggable?: boolean;
+  /** Active le drag HTML5 natif. */
+  enableDrag?: boolean;
   className?: string;
   children: React.ReactNode;
+  // ── Drag state piloté par le parent ───────────────────────────────────
+  /** True si CE widget est actuellement en cours de drag. */
+  isDragged?: boolean;
+  /** True si CE widget est la cible de drop courante (un autre widget est traîné par-dessus). */
+  isDropTarget?: boolean;
+  onDragStart?: (id: string) => void;
+  onDragOver?: (e: React.DragEvent, id: string) => void;
+  onDragLeave?: (id: string) => void;
+  onDrop?: (id: string) => void;
+  onDragEnd?: () => void;
 }
 
 /**
- * Conteneur sortable pour les widgets du dashboard.
+ * Conteneur de widget avec drag & drop HTML5 natif.
  *
- * Alignement strict sur le pattern de /dnd-test qui fonctionne :
- *  - `attributes` + `listeners` sont posés SUR LE DIV RACINE (le même qui
- *    porte setNodeRef). Le widget entier est le drag handle. C'est aussi
- *    la recommandation officielle @dnd-kit pour le cas simple.
- *  - L'icône GripVertical reste comme repère visuel (cursor-grab) mais
- *    elle n'a plus de listeners séparés.
- *  - Le bouton X de masquage appelle `stopPropagation` sur onPointerDown
- *    et onClick pour ne pas amorcer un drag quand on tente juste de
- *    masquer le widget.
- *  - Aucun framer-motion à l'intérieur du sortable : zéro chance
- *    d'interception de pointer events.
+ * On a abandonné @dnd-kit : sur le Dashboard Operioz, ses pointer events
+ * étaient absorbés quelque part dans la chaîne de wrappers (DashboardLayout
+ * rail/bottom-nav, AssistantDrawer, Recharts SVG, framer-motion résiduel)
+ * — confirmé par /dnd-test qui marche en isolation mais pas /dashboard
+ * (console vide, aucun event sensor déclenché). Le drag HTML5 natif est
+ * géré par le navigateur lui-même : zéro chance d'interception côté React.
+ *
+ * Limite connue : HTML5 drag & drop ne déclenche pas pour les events tactiles
+ * sur mobile. Le réordonnancement est donc desktop-only ; le masquage de
+ * widgets via le panneau "Personnaliser" reste accessible sur mobile.
  */
 export function DashboardWidget({
   id,
@@ -40,43 +47,70 @@ export function DashboardWidget({
   actions,
   removable,
   onRemove,
-  draggable = true,
+  enableDrag = true,
   className,
   children,
+  isDragged,
+  isDropTarget,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
 }: DashboardWidgetProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id, disabled: !draggable });
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 999 : "auto",
-  };
-
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       data-widget-id={id}
-      {...attributes}
-      {...listeners}
-      className={`group/widget relative bg-card text-card-foreground rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow touch-none select-none ${
-        draggable ? "cursor-grab active:cursor-grabbing" : ""
-      } ${isDragging ? "shadow-2xl ring-2 ring-primary/30" : ""} ${className || ""}`}
+      draggable={enableDrag}
+      onDragStart={(e) => {
+        if (!enableDrag) return;
+        // Indispensable pour que Firefox déclenche dragstart.
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", id);
+        onDragStart?.(id);
+      }}
+      onDragOver={(e) => {
+        if (!enableDrag) return;
+        e.preventDefault(); // Autorise le drop
+        e.dataTransfer.dropEffect = "move";
+        onDragOver?.(e, id);
+      }}
+      onDragEnter={(e) => {
+        if (!enableDrag) return;
+        e.preventDefault();
+      }}
+      onDragLeave={() => {
+        if (!enableDrag) return;
+        onDragLeave?.(id);
+      }}
+      onDrop={(e) => {
+        if (!enableDrag) return;
+        e.preventDefault();
+        onDrop?.(id);
+      }}
+      onDragEnd={() => {
+        if (!enableDrag) return;
+        onDragEnd?.();
+      }}
+      style={{
+        opacity: isDragged ? 0.4 : 1,
+        cursor: enableDrag ? "grab" : "default",
+      }}
+      className={`group/widget relative bg-card text-card-foreground rounded-xl border shadow-sm hover:shadow-md transition-all select-none ${
+        isDragged ? "shadow-2xl ring-2 ring-primary/40" : ""
+      } ${
+        isDropTarget
+          ? "ring-2 ring-dashed ring-primary outline outline-2 outline-offset-2 outline-primary/40 bg-primary/5"
+          : "border-border"
+      } ${className || ""}`}
     >
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/60 pr-20">
         <div className="flex items-center gap-2 min-w-0">
-          {draggable && (
+          {enableDrag && (
             <span
               aria-hidden
               className="shrink-0 h-7 w-7 inline-flex items-center justify-center text-muted-foreground/50 group-hover/widget:text-muted-foreground transition-colors"
+              title="Glissez pour réorganiser"
             >
               <GripVertical className="h-4 w-4" />
             </span>
@@ -94,13 +128,17 @@ export function DashboardWidget({
           {removable && onRemove && (
             <button
               type="button"
-              onPointerDown={(e) => e.stopPropagation()}
+              // Empêche le draggable parent de prendre la main quand on clique X.
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove();
               }}
               aria-label="Masquer le widget"
               className="h-7 w-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+              style={{ cursor: "pointer" }}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -108,11 +146,15 @@ export function DashboardWidget({
         </div>
       </div>
 
-      {/* Le contenu reste interactif (les charts Recharts, les boutons "Voir
-          tout" etc.). Pour qu'un clic ne déclenche pas un drag par accident,
-          on s'appuie sur PointerSensor activationConstraint distance: 8 :
-          un clic sans mouvement n'active pas le drag. */}
-      <div className="p-4">{children}</div>
+      <div
+        className="p-4"
+        // Empêche que le contenu interactif (charts, boutons) déclenche un
+        // drag accidentel. Les enfants gardent leur interactivité.
+        draggable={false}
+        onDragStart={(e) => e.preventDefault()}
+      >
+        {children}
+      </div>
     </div>
   );
 }
