@@ -756,6 +756,92 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] commandes_fournisseurs migration:', e.message);
     }
 
+    // ========================================================================
+    // MODULES — tables modules + artisan_modules + 3 colonnes artisans + seed
+    // Bloc entierement defensif : si une erreur survient, on logue et on
+    // CONTINUE pour ne JAMAIS bloquer le demarrage du serveur.
+    // ========================================================================
+    try {
+      // 1) Tables (CREATE IF NOT EXISTS = idempotent)
+      await pool.execute(`CREATE TABLE IF NOT EXISTS modules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        slug VARCHAR(50) NOT NULL UNIQUE,
+        label VARCHAR(100) NOT NULL,
+        description TEXT,
+        icon VARCHAR(50) NOT NULL,
+        categorie VARCHAR(50) NOT NULL,
+        plan_minimum VARCHAR(20) NOT NULL DEFAULT 'essentiel',
+        actif_par_defaut BOOLEAN NOT NULL DEFAULT TRUE,
+        ordre INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`);
+      console.log('[Modules] Table modules OK');
+
+      await pool.execute(`CREATE TABLE IF NOT EXISTS artisan_modules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        artisan_id INT NOT NULL,
+        module_slug VARCHAR(50) NOT NULL,
+        actif BOOLEAN NOT NULL DEFAULT TRUE,
+        activated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_artisan_module (artisan_id, module_slug),
+        INDEX idx_artisan_modules_artisan (artisan_id)
+      )`);
+      console.log('[Modules] Table artisan_modules OK');
+
+      // 2) Colonnes artisans — ALTER ADD avec gestion ER_DUP_FIELDNAME.
+      const alterCols = [
+        { name: 'metier', sql: "ADD COLUMN metier VARCHAR(100) NULL" },
+        { name: 'plan', sql: "ADD COLUMN plan VARCHAR(20) DEFAULT 'essentiel'" },
+        { name: 'onboarding_completed', sql: "ADD COLUMN onboarding_completed BOOLEAN DEFAULT FALSE" },
+      ];
+      for (const col of alterCols) {
+        try {
+          await pool.execute(`ALTER TABLE artisans ${col.sql}`);
+          console.log(`[Modules] Added artisans.${col.name}`);
+        } catch (e: any) {
+          const msg = e?.message || '';
+          const code = e?.code || '';
+          if (code === 'ER_DUP_FIELDNAME' || msg.includes('Duplicate column name')) {
+            // colonne deja presente, ok
+          } else {
+            console.log(`[Modules] artisans.${col.name} :`, msg);
+          }
+        }
+      }
+      console.log('[Modules] Colonnes artisans OK');
+
+      // 3) Seed catalogue 15 modules (INSERT IGNORE = idempotent)
+      const seedModules: Array<[string, string, string, string, string, string, number, number]> = [
+        ['devis', 'Devis', 'Créez et envoyez des devis professionnels', 'FileText', 'commercial', 'essentiel', 1, 1],
+        ['factures', 'Factures', 'Facturez vos clients et suivez les paiements', 'Receipt', 'commercial', 'essentiel', 1, 2],
+        ['contrats', 'Contrats', 'Gérez vos contrats de maintenance', 'FileCheck', 'commercial', 'pro', 1, 3],
+        ['relances', 'Relances', 'Relancez automatiquement les impayés', 'Bell', 'commercial', 'essentiel', 1, 4],
+        ['signature', 'Signature électronique', 'Faites signer vos devis en ligne', 'PenTool', 'commercial', 'pro', 1, 5],
+        ['clients', 'Clients', 'Gérez votre base clients', 'Users', 'clients', 'essentiel', 1, 6],
+        ['portail_client', 'Portail client', 'Espace dédié pour vos clients', 'Globe', 'clients', 'pro', 1, 7],
+        ['chat', 'Chat client', 'Messagerie intégrée avec vos clients', 'MessageCircle', 'clients', 'pro', 0, 8],
+        ['rdv', 'Prise de RDV', 'Permettez à vos clients de prendre RDV', 'Calendar', 'clients', 'pro', 0, 9],
+        ['interventions', 'Interventions', 'Planifiez et suivez vos interventions', 'Wrench', 'terrain', 'essentiel', 1, 10],
+        ['geolocalisation', 'Géolocalisation', 'Localisez vos techniciens', 'MapPin', 'terrain', 'entreprise', 0, 11],
+        ['stocks', 'Stocks', 'Gérez vos articles et stocks', 'Package', 'gestion', 'pro', 1, 12],
+        ['commandes', 'Commandes fournisseurs', 'Créez des bons de commande', 'ShoppingCart', 'gestion', 'pro', 1, 13],
+        ['comptabilite', 'Comptabilité', 'Export FEC et rapports financiers', 'Calculator', 'gestion', 'essentiel', 1, 14],
+        ['assistant_ia', 'Assistant IA', 'MonAssistant votre IA intégrée', 'Sparkles', 'ia', 'pro', 1, 15],
+      ];
+      for (const m of seedModules) {
+        await pool.execute(
+          `INSERT IGNORE INTO modules
+           (slug, label, description, icon, categorie, plan_minimum, actif_par_defaut, ordre)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          m
+        );
+      }
+      console.log(`[Modules] Seed ${seedModules.length} modules OK`);
+    } catch (e: any) {
+      console.error('[Modules] Migration non-bloquante :', e?.message || e);
+      // NE JAMAIS throw ici : on doit laisser le serveur demarrer.
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);

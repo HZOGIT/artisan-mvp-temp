@@ -3196,3 +3196,147 @@ export async function setUserPermissions(userId: number, permissions: string[], 
     );
   }
 }
+
+// ============================================================================
+// MODULES — catalogue + activation par artisan
+//
+// Implementation 100% raw SQL via mysql2 pool : on n'utilise PAS Drizzle ORM
+// pour ces tables, donc PAS BESOIN de les declarer dans drizzle/schema.ts.
+// Ca evite que drizzle-kit push (s'il etait reactive un jour) detecte une
+// divergence entre schema.ts et la DB, ce qui avait causer le hang Railway.
+// ============================================================================
+
+async function ensurePool() {
+  // Garantit que _pool est initialise avant tout raw query.
+  await getDb();
+  const p = getPool();
+  if (!p) throw new Error('mysql pool unavailable');
+  return p;
+}
+
+export interface ModuleRow {
+  id: number;
+  slug: string;
+  label: string;
+  description: string | null;
+  icon: string;
+  categorie: string;
+  plan_minimum: string;
+  actif_par_defaut: number; // tinyint(1)
+  ordre: number;
+}
+
+export async function getModules(): Promise<ModuleRow[]> {
+  const pool = await ensurePool();
+  const [rows] = await pool.execute('SELECT * FROM modules ORDER BY ordre ASC') as any;
+  return rows as ModuleRow[];
+}
+
+export async function getModuleBySlug(slug: string): Promise<ModuleRow | undefined> {
+  const pool = await ensurePool();
+  const [rows] = await pool.execute('SELECT * FROM modules WHERE slug = ? LIMIT 1', [slug]) as any;
+  return (rows as ModuleRow[])[0];
+}
+
+/**
+ * Slugs des modules actifs pour cet artisan.
+ * - Si l'artisan n'a aucune entree artisan_modules → fallback sur les modules
+ *   actif_par_defaut = 1 (cas d'un artisan jamais initialise).
+ * - Sinon → uniquement les modules avec actif = 1.
+ */
+export async function getArtisanModulesActifs(artisanId: number): Promise<string[]> {
+  const pool = await ensurePool();
+  const [prefs] = await pool.execute(
+    'SELECT module_slug, actif FROM artisan_modules WHERE artisan_id = ?',
+    [artisanId]
+  ) as any;
+  const arr = prefs as Array<{ module_slug: string; actif: number }>;
+  if (arr.length === 0) {
+    const [defaults] = await pool.execute(
+      'SELECT slug FROM modules WHERE actif_par_defaut = TRUE'
+    ) as any;
+    return (defaults as Array<{ slug: string }>).map((r) => r.slug);
+  }
+  return arr.filter((r) => r.actif === 1 || (r.actif as any) === true).map((r) => r.module_slug);
+}
+
+export async function setArtisanModule(
+  artisanId: number,
+  moduleSlug: string,
+  actif: boolean
+): Promise<void> {
+  const pool = await ensurePool();
+  await pool.execute(
+    `INSERT INTO artisan_modules (artisan_id, module_slug, actif)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE actif = VALUES(actif)`,
+    [artisanId, moduleSlug, actif ? 1 : 0]
+  );
+}
+
+/**
+ * Initialise les preferences d'un nouvel artisan : insere une entree pour
+ * chaque module actif_par_defaut = TRUE. Idempotent (ON DUPLICATE KEY UPDATE).
+ */
+export async function initArtisanModules(artisanId: number): Promise<void> {
+  const all = await getModules();
+  for (const m of all) {
+    if (m.actif_par_defaut) {
+      await setArtisanModule(artisanId, m.slug, true);
+    }
+  }
+}
+
+export async function updateArtisanOnboarding(
+  artisanId: number,
+  data: { onboardingCompleted?: boolean; metier?: string; plan?: string }
+): Promise<void> {
+  const sets: string[] = [];
+  const values: any[] = [];
+  if (data.onboardingCompleted !== undefined) {
+    sets.push('onboarding_completed = ?');
+    values.push(data.onboardingCompleted ? 1 : 0);
+  }
+  if (data.metier !== undefined) {
+    sets.push('metier = ?');
+    values.push(data.metier);
+  }
+  if (data.plan !== undefined) {
+    sets.push('plan = ?');
+    values.push(data.plan);
+  }
+  if (sets.length === 0) return;
+  values.push(artisanId);
+  const pool = await ensurePool();
+  await pool.execute(
+    `UPDATE artisans SET ${sets.join(', ')} WHERE id = ?`,
+    values
+  );
+}
+
+/**
+ * Lit les colonnes onboarding_completed / metier / plan d'un artisan via
+ * raw SQL (ces colonnes ne sont pas dans le schema Drizzle). Renvoie null
+ * si la table ne les a pas (vieille DB sans migration appliquee).
+ */
+export async function getArtisanOnboardingStatus(
+  artisanId: number
+): Promise<{ onboardingCompleted: boolean; metier: string | null; plan: string | null } | null> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT onboarding_completed, metier, plan FROM artisans WHERE id = ? LIMIT 1',
+      [artisanId]
+    ) as any;
+    const r = (rows as any[])[0];
+    if (!r) return null;
+    return {
+      onboardingCompleted: r.onboarding_completed === 1 || r.onboarding_completed === true,
+      metier: r.metier ?? null,
+      plan: r.plan ?? null,
+    };
+  } catch {
+    // Colonnes absentes (migration pas encore appliquee) → null gracieux.
+    return null;
+  }
+}

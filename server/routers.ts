@@ -7148,7 +7148,114 @@ const utilisateursRouter = router({
     }),
 });
 
+// ============================================================================
+// MODULES ROUTER — catalogue + activation par artisan + onboarding
+// Implementation 100% raw SQL via db.* helpers, schema.ts intact.
+// ============================================================================
+
+const PLAN_ORDER: Record<string, number> = { essentiel: 0, pro: 1, entreprise: 2 };
+function isPlanInsuffisant(planModule: string, planArtisan: string | null | undefined): boolean {
+  const m = PLAN_ORDER[planModule] ?? 0;
+  const a = PLAN_ORDER[planArtisan || "essentiel"] ?? 0;
+  return m > a;
+}
+
+const modulesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const all = await db.getModules();
+    const actifs = await db.getArtisanModulesActifs(artisan.id);
+    const status = await db.getArtisanOnboardingStatus(artisan.id);
+    const plan = status?.plan || "essentiel";
+    return all.map((m) => ({
+      id: m.id,
+      slug: m.slug,
+      label: m.label,
+      description: m.description,
+      icon: m.icon,
+      categorie: m.categorie,
+      planMinimum: m.plan_minimum,
+      actifParDefaut: m.actif_par_defaut === 1,
+      ordre: m.ordre,
+      actif: actifs.includes(m.slug),
+      locked: isPlanInsuffisant(m.plan_minimum, plan),
+    }));
+  }),
+
+  getMine: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [] as string[];
+    return await db.getArtisanModulesActifs(artisan.id);
+  }),
+
+  getOnboardingStatus: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { onboardingCompleted: true, metier: null, plan: null };
+    const status = await db.getArtisanOnboardingStatus(artisan.id);
+    return status || { onboardingCompleted: true, metier: null, plan: null };
+  }),
+
+  toggle: protectedProcedure
+    .input(z.object({ slug: z.string(), actif: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan introuvable" });
+      const module = await db.getModuleBySlug(input.slug);
+      if (!module) throw new TRPCError({ code: "NOT_FOUND", message: "Module inconnu" });
+      const status = await db.getArtisanOnboardingStatus(artisan.id);
+      const plan = status?.plan || "essentiel";
+      if (input.actif && isPlanInsuffisant(module.plan_minimum, plan)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Passez au plan supérieur pour activer ce module",
+        });
+      }
+      await db.setArtisanModule(artisan.id, input.slug, input.actif);
+      return { success: true };
+    }),
+
+  completeOnboarding: protectedProcedure
+    .input(
+      z.object({
+        metier: z.string().optional(),
+        plan: z.string().optional(),
+        moduleSlugs: z.array(z.string()).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan introuvable" });
+      await db.updateArtisanOnboarding(artisan.id, {
+        onboardingCompleted: true,
+        metier: input.metier,
+        plan: input.plan,
+      });
+      if (input.moduleSlugs) {
+        const all = await db.getModules();
+        const planArtisan = input.plan || "essentiel";
+        for (const m of all) {
+          if (isPlanInsuffisant(m.plan_minimum, planArtisan)) continue;
+          const wanted = input.moduleSlugs.includes(m.slug);
+          await db.setArtisanModule(artisan.id, m.slug, wanted);
+        }
+      } else {
+        await db.initArtisanModules(artisan.id);
+      }
+      return { success: true };
+    }),
+
+  skipOnboarding: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan introuvable" });
+    await db.updateArtisanOnboarding(artisan.id, { onboardingCompleted: true });
+    await db.initArtisanModules(artisan.id);
+    return { success: true };
+  }),
+});
+
 export const appRouter = router({system: systemRouter,
+  modules: modulesRouter,
   auth: router({
     me: publicProcedure.query(({ ctx }) => {
       return ctx.user;
