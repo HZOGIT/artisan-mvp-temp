@@ -952,15 +952,25 @@ async function startServer() {
     serveStatic(app);
   }
 
+  // En production (Railway, Vercel, …), on DOIT listen exactement sur
+  // process.env.PORT et sur 0.0.0.0. Tenter de "trouver un autre port"
+  // si l'attribué est busy fait que le proxy route vers du vide → l'app
+  // apparait DOWN ("Application failed to respond"). En dev local, on
+  // garde le fallback sur le port disponible pour ne pas bloquer.
   const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  const host = "0.0.0.0";
+  const isProd = process.env.NODE_ENV === "production";
 
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  let port = preferredPort;
+  if (!isProd) {
+    port = await findAvailablePort(preferredPort);
+    if (port !== preferredPort) {
+      console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    }
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, host, () => {
+    console.log(`Server running on http://${host}:${port}/ (env=${process.env.NODE_ENV || "dev"})`);
   });
 }
 
