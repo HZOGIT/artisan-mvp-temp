@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Calendar, FileText, Plus, Receipt } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Calendar, FileText, Plus, Receipt, Search } from "lucide-react";
 
 interface WelcomeBannerProps {
   /** Prénom affiché (peut être null/undefined → fallback "bonjour"). */
@@ -13,6 +14,8 @@ interface WelcomeBannerProps {
   onCreateDevis?: () => void;
   onCreateFacture?: () => void;
   onCreateIntervention?: () => void;
+  /** Ouvre la palette de recherche globale (Ctrl+K). */
+  onOpenSearch?: () => void;
 }
 
 /**
@@ -30,15 +33,20 @@ export function WelcomeBanner({
   onCreateDevis,
   onCreateFacture,
   onCreateIntervention,
+  onOpenSearch,
 }: WelcomeBannerProps) {
-  const today = new Date().toLocaleDateString("fr-FR", {
+  const now = new Date();
+  const today = now.toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
 
-  const hour = new Date().getHours();
+  const hour = now.getHours();
+  const dayOfWeek = now.getDay(); // 0 = dimanche, 6 = samedi
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
   const greeting =
     hour < 6 ? "Bonne nuit" : hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
 
@@ -52,10 +60,30 @@ export function WelcomeBanner({
   if (interventionsAVenir > 0) {
     summaryParts.push(`${interventionsAVenir} intervention${interventionsAVenir > 1 ? "s" : ""} à venir`);
   }
-  const summary =
-    summaryParts.length === 0
-      ? "Tout est sous contrôle pour le moment. Bonne journée !"
-      : `Vous avez ${summaryParts.join(", ").replace(/, ([^,]*)$/, " et $1")}.`;
+
+  // Resume contextuel : weekend vs semaine + presence/absence d'urgences.
+  let summary: string;
+  if (summaryParts.length === 0) {
+    summary = isWeekend
+      ? "Aucune urgence aujourd'hui — profitez bien de votre week-end."
+      : "Tout est sous contrôle pour le moment. Bonne journée !";
+  } else {
+    summary = `Vous avez ${summaryParts.join(", ").replace(/, ([^,]*)$/, " et $1")}.`;
+    if (facturesImpayees >= 3) {
+      summary += " Pensez aux relances pour les paiements en retard.";
+    } else if (devisEnAttente >= 5) {
+      summary += " N'hésitez pas à relancer vos prospects.";
+    }
+  }
+
+  // Detection Mac vs Windows pour afficher le bon raccourci.
+  const [isMac, setIsMac] = useState(false);
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      setIsMac(/Mac|iPhone|iPad|iPod/i.test(navigator.userAgent));
+    }
+  }, []);
+  const cmdKey = isMac ? "⌘" : "Ctrl";
 
   return (
     <motion.section
@@ -80,7 +108,7 @@ export function WelcomeBanner({
         </h1>
         <p className="mt-2 text-sm md:text-base text-blue-100/90 max-w-2xl">{summary}</p>
 
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-2 items-center">
           {onCreateDevis && (
             <button
               type="button"
@@ -106,6 +134,20 @@ export function WelcomeBanner({
               className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm px-3 py-2 text-sm font-medium transition-all border border-white/20 hover:border-white/30"
             >
               <Plus className="h-4 w-4" /> <Calendar className="h-3.5 w-3.5" /> Intervention
+            </button>
+          )}
+          {onOpenSearch && (
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              title="Recherche globale"
+              className="ml-auto inline-flex items-center gap-2 rounded-lg bg-white/5 hover:bg-white/15 backdrop-blur-sm px-2.5 py-1.5 text-xs text-blue-100/90 hover:text-white transition-all border border-white/10 hover:border-white/20"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Rechercher</span>
+              <kbd className="inline-flex items-center rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-[10px] font-mono">
+                {cmdKey} K
+              </kbd>
             </button>
           )}
         </div>

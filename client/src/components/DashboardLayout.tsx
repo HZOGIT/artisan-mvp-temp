@@ -696,17 +696,24 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Seul le groupe contenant la route active est ouvert par defaut ; les autres
   // sont replies pour eviter le mur d'items sur iPhone.
   const [openMobileGroups, setOpenMobileGroups] = useState<Set<string>>(new Set());
-  // Recherche globale Ctrl+K / Cmd+K.
+  // Recherche globale Ctrl+K / Cmd+K + CustomEvent "operioz:open-search"
+  // pour permettre a n'importe quel composant (ex : WelcomeBanner) d'ouvrir
+  // la palette sans avoir a recevoir un callback via props.
   const [searchOpen, setSearchOpen] = useState(false);
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         setSearchOpen(true);
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const onOpen = () => setSearchOpen(true);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("operioz:open-search", onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("operioz:open-search", onOpen);
+    };
   }, []);
 
   // MonAssistant

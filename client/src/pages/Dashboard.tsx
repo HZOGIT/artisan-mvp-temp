@@ -416,6 +416,7 @@ export default function Dashboard() {
           onCreateDevis={() => setLocation("/devis/nouveau")}
           onCreateFacture={() => setLocation("/factures")}
           onCreateIntervention={() => setLocation("/interventions")}
+          onOpenSearch={() => window.dispatchEvent(new CustomEvent("operioz:open-search"))}
         />
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -515,6 +516,7 @@ export default function Dashboard() {
           onCreateDevis={() => setLocation("/devis/nouveau")}
           onCreateFacture={() => setLocation("/factures")}
           onCreateIntervention={() => setLocation("/interventions")}
+          onOpenSearch={() => window.dispatchEvent(new CustomEvent("operioz:open-search"))}
         />
 
         <AlertsBar alerts={dashboardAlerts} onNavigate={(path) => setLocation(path)} />
