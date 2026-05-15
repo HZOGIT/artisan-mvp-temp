@@ -11,6 +11,7 @@ import { useLocation, useSearch } from "wouter";
 import { Plus, Search, Receipt, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { StatutBadge } from "@/components/StatutBadge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -313,9 +314,7 @@ export default function Factures() {
                     <td className="max-w-[200px] truncate">{facture.objet || "-"}</td>
                     <td className={`font-medium text-right whitespace-nowrap ${isAvoir ? "text-red-600" : ""}`}>{formatCurrency(facture.totalTTC)}</td>
                     <td className="whitespace-nowrap">
-                      <Badge className={statusColors[facture.statut || 'brouillon'] || "bg-gray-100"}>
-                        {statusLabels[facture.statut || 'brouillon'] || facture.statut}
-                      </Badge>
+                      <StatutBadge statut={facture.statut || 'brouillon'} />
                     </td>
                     <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>

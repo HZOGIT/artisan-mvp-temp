@@ -11,6 +11,7 @@ import { useLocation, useSearch } from "wouter";
 import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { StatutBadge } from "@/components/StatutBadge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -412,9 +413,7 @@ export default function Interventions() {
                       : "-"}
                   </td>
                   <td className="whitespace-nowrap">
-                    <Badge className={statusColors[intervention.statut || 'planifiee'] || "bg-gray-100"}>
-                      {statusLabels[intervention.statut || 'planifiee'] || intervention.statut}
-                    </Badge>
+                    <StatutBadge statut={intervention.statut || 'planifiee'} />
                   </td>
                   <td className="whitespace-nowrap">
                     <DropdownMenu>

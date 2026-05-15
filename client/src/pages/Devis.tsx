@@ -8,7 +8,7 @@ import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, Receipt, D
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
+import { StatutBadge } from "@/components/StatutBadge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -312,9 +312,7 @@ export default function Devis() {
                     <td className="max-w-[200px] truncate">{devis.objet || "-"}</td>
                     <td className="font-medium text-right whitespace-nowrap">{formatCurrency(devis.totalTTC)}</td>
                     <td className="whitespace-nowrap">
-                      <Badge className={statusColors[devis.statut] || "bg-gray-100"}>
-                        {statusLabels[devis.statut] || devis.statut}
-                      </Badge>
+                      <StatutBadge statut={devis.statut} />
                     </td>
                     <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
