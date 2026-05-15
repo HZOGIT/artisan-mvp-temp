@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import compression from "compression";
 import { createServer } from "http";
 import net from "net";
 import cookieParser from "cookie-parser";
@@ -105,8 +106,24 @@ async function startServer() {
   
   const app = express();
   const server = createServer(app);
-  
+
   console.log('=== SERVER SETUP ===');
+
+  // ─────────────────────────────────────────────────────────────────
+  // Compression HTTP gzip. Applique TRES TOT dans la chaine pour que
+  // toutes les reponses (JSON tRPC, HTML statique, JS chunks) en
+  // beneficient. threshold 1024 octets = pas la peine pour les petites
+  // reponses (overhead > gain). level 6 = bon compromis CPU/ratio.
+  // x-no-compression header → bypass (utile pour debug Railway).
+  // ─────────────────────────────────────────────────────────────────
+  app.use(compression({
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) return false;
+      return compression.filter(req, res);
+    },
+    level: 6,
+    threshold: 1024,
+  }));
   
   // TODO: Re-enable CSP with proper Clerk directives
   // Temporarily disabled to allow Clerk to load
