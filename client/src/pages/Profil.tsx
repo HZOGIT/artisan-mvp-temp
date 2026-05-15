@@ -14,13 +14,31 @@ import {
 import { Building, Phone, Mail, MapPin, Save, CreditCard, KeyRound, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+// Enum strict des specialites artisan, aligne sur drizzle/schema.ts.
+// Le backend (tRPC updateProfile) attend exactement ces 4 valeurs.
+type Specialite = "plomberie" | "electricite" | "chauffage" | "multi-services";
+const SPECIALITES: Specialite[] = ["plomberie", "electricite", "chauffage", "multi-services"];
+
 export default function Profil() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    nomEntreprise: string;
+    siret: string;
+    numeroTVA: string;
+    codeAPE: string;
+    specialite: Specialite;
+    telephone: string;
+    email: string;
+    adresse: string;
+    codePostal: string;
+    ville: string;
+    tauxTVA: string;
+    iban: string;
+  }>({
     nomEntreprise: "",
     siret: "",
     numeroTVA: "",
     codeAPE: "",
-    specialite: "plomberie" as string,
+    specialite: "plomberie",
     telephone: "",
     email: "",
     adresse: "",
@@ -43,12 +61,19 @@ export default function Profil() {
 
   useEffect(() => {
     if (artisan) {
+      // Le backend peut renvoyer specialite=null ou une valeur historique
+      // hors-enum → on retombe sur "plomberie" pour rester dans l'union.
+      const specRaw = artisan.specialite as string | null | undefined;
+      const specialite: Specialite =
+        specRaw && SPECIALITES.includes(specRaw as Specialite)
+          ? (specRaw as Specialite)
+          : "plomberie";
       setFormData({
         nomEntreprise: artisan.nomEntreprise || "",
         siret: artisan.siret || "",
         numeroTVA: (artisan as any).numeroTVA || "",
         codeAPE: (artisan as any).codeAPE || "",
-        specialite: artisan.specialite || "plomberie",
+        specialite,
         telephone: artisan.telephone || "",
         email: artisan.email || "",
         adresse: artisan.adresse || "",
@@ -139,7 +164,7 @@ export default function Profil() {
                 <Label>Spécialité</Label>
                 <Select
                   value={formData.specialite}
-                  onValueChange={(v) => setFormData({ ...formData, specialite: v })}
+                  onValueChange={(v) => setFormData({ ...formData, specialite: v as Specialite })}
                 >
                   <SelectTrigger>
                     <SelectValue />
