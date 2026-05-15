@@ -842,6 +842,42 @@ async function fixDuplicates() {
       // NE JAMAIS throw ici : on doit laisser le serveur demarrer.
     }
 
+    // ========================================================================
+    // Force l'artisan demo (id=1) en plan ENTREPRISE + active TOUS les modules.
+    // Bloc separe, idempotent, non-bloquant.
+    // ========================================================================
+    try {
+      const [planUpdate] = await pool.execute(
+        "UPDATE artisans SET plan = 'entreprise' WHERE id = 1"
+      ) as any;
+      if (planUpdate.affectedRows > 0) {
+        console.log("[Demo] Artisan 1 -> plan='entreprise'");
+      } else {
+        console.log("[Demo] Artisan id=1 introuvable (ou deja en entreprise) - skip");
+      }
+
+      const [modUpsert] = await pool.execute(
+        `INSERT INTO artisan_modules (artisan_id, module_slug, actif)
+         SELECT 1, slug, TRUE FROM modules
+         ON DUPLICATE KEY UPDATE actif = TRUE`
+      ) as any;
+      console.log(`[Demo] artisan_modules upsert : affectedRows=${modUpsert.affectedRows}`);
+
+      // Marque aussi onboarding_completed=TRUE pour ne pas bloquer la
+      // navigation derriere /onboarding pour ce compte demo.
+      await pool.execute(
+        "UPDATE artisans SET onboarding_completed = TRUE WHERE id = 1"
+      );
+
+      const [pRows] = await pool.execute("SELECT plan FROM artisans WHERE id = 1") as any;
+      const [cRows] = await pool.execute(
+        "SELECT COUNT(*) AS cnt FROM artisan_modules WHERE artisan_id = 1 AND actif = TRUE"
+      ) as any;
+      console.log(`[Demo] Verification : plan=${pRows[0]?.plan ?? '(null)'}, modules actifs=${cRows[0]?.cnt ?? 0}`);
+    } catch (e: any) {
+      console.log("[Demo] Force entreprise :", e?.message || e);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
