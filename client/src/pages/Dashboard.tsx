@@ -219,12 +219,14 @@ export default function Dashboard() {
   const facturesImpayeesTotal = stats?.facturesImpayees?.total || 0;
 
   // ── État adaptatif (3 niveaux) ──────────────────────────────────────────
+  // Logique : un artisan avec 19 clients + 26 devis doit voir le dashboard
+  // complet → state 3 declenche des qu'UN seul des deux compteurs depasse 10.
   const totalClients = stats?.totalClients || 0;
   const totalDevis = stats?.totalDevis || 0;
   const totalFactures = stats?.totalFactures || 0;
   const dashboardState: DashboardState = useMemo(() => {
     if (totalClients < 3 && totalDevis < 3) return "nouveau";
-    if (totalClients > 20 && totalDevis > 20) return "confirme";
+    if (totalClients > 10 || totalDevis > 10) return "confirme";
     return "demarrage";
   }, [totalClients, totalDevis]);
 
