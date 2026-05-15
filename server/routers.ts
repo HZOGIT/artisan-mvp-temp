@@ -7466,7 +7466,112 @@ const importRouter = router({
     }),
 });
 
+// ============================================================================
+// SEARCH ROUTER — recherche globale Ctrl+K
+// Raw SQL en parallele sur 5 entites, max 5 resultats par entite,
+// match LIKE %q% sur les colonnes pertinentes.
+// ============================================================================
+
+const searchRouter = router({
+  global: protectedProcedure
+    .input(z.object({ query: z.string().min(1).max(100) }))
+    .query(async ({ ctx, input }) => {
+      const q = input.query.trim();
+      if (q.length < 2) return { results: [] as Array<{ id: number; type: string; title: string; subtitle: string; url: string }> };
+
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { results: [] };
+      const artisanId = artisan.id;
+      const like = `%${q}%`;
+
+      // Lazy import du pool pour eviter un cycle avec db.ts.
+      const pool = db.getPool();
+      if (!pool) return { results: [] };
+
+      // 5 queries en parallele, chacune limitee a 5 lignes max.
+      const [
+        [clientsRows],
+        [devisRows],
+        [facturesRows],
+        [interventionsRows],
+        [fournisseursRows],
+      ] = await Promise.all([
+        pool.execute(
+          `SELECT id, TRIM(CONCAT(COALESCE(prenom, ''), ' ', nom)) AS title,
+                  COALESCE(email, telephone, ville, '') AS subtitle
+           FROM clients
+           WHERE artisanId = ?
+             AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ?
+                  OR telephone LIKE ? OR ville LIKE ?)
+           ORDER BY id DESC
+           LIMIT 5`,
+          [artisanId, like, like, like, like, like]
+        ),
+        pool.execute(
+          `SELECT id, CONCAT(numero, COALESCE(CONCAT(' — ', objet), '')) AS title,
+                  CONCAT(IFNULL(statut, ''), ' — ', FORMAT(COALESCE(totalTTC, 0), 2), ' €') AS subtitle
+           FROM devis
+           WHERE artisanId = ?
+             AND (numero LIKE ? OR objet LIKE ?)
+           ORDER BY id DESC
+           LIMIT 5`,
+          [artisanId, like, like]
+        ),
+        pool.execute(
+          `SELECT id, CONCAT(numero, COALESCE(CONCAT(' — ', objet), '')) AS title,
+                  CONCAT(IFNULL(statut, ''), ' — ', FORMAT(COALESCE(totalTTC, 0), 2), ' €') AS subtitle
+           FROM factures
+           WHERE artisanId = ?
+             AND (numero LIKE ? OR objet LIKE ?)
+           ORDER BY id DESC
+           LIMIT 5`,
+          [artisanId, like, like]
+        ),
+        pool.execute(
+          `SELECT id, titre AS title,
+                  CONCAT(IFNULL(statut, ''), ' — ', DATE_FORMAT(dateDebut, '%d/%m/%Y')) AS subtitle
+           FROM interventions
+           WHERE artisanId = ?
+             AND (titre LIKE ? OR description LIKE ?)
+           ORDER BY dateDebut DESC
+           LIMIT 5`,
+          [artisanId, like, like]
+        ),
+        pool.execute(
+          `SELECT id, nom AS title,
+                  COALESCE(email, telephone, '') AS subtitle
+           FROM fournisseurs
+           WHERE artisanId = ?
+             AND (nom LIKE ? OR email LIKE ?)
+           ORDER BY id DESC
+           LIMIT 3`,
+          [artisanId, like, like]
+        ),
+      ]) as any;
+
+      const toResults = (rows: any[], type: string, basePath: string) =>
+        (rows as Array<{ id: number; title: string; subtitle: string }>).map((r) => ({
+          id: Number(r.id),
+          type,
+          title: String(r.title || ''),
+          subtitle: String(r.subtitle || ''),
+          url: `${basePath}/${r.id}`,
+        }));
+
+      return {
+        results: [
+          ...toResults(clientsRows as any[], 'client', '/clients'),
+          ...toResults(devisRows as any[], 'devis', '/devis'),
+          ...toResults(facturesRows as any[], 'facture', '/factures'),
+          ...toResults(interventionsRows as any[], 'intervention', '/interventions'),
+          ...toResults(fournisseursRows as any[], 'fournisseur', '/fournisseurs'),
+        ],
+      };
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
+  search: searchRouter,
   modules: modulesRouter,
   importErp: importRouter,
   auth: router({

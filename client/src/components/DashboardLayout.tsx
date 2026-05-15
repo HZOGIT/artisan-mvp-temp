@@ -19,6 +19,7 @@ import { useAssistantStream } from "@/hooks/useAssistantStream";
 import { AssistantFAB } from "./AssistantFAB";
 import { AssistantDrawer, type AssistantPanelSize } from "./AssistantDrawer";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { GlobalSearch } from "./GlobalSearch";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -51,6 +52,7 @@ import {
   RefreshCw,
   Receipt,
   Route,
+  Search,
   Settings,
   ShoppingCart,
   Sparkles,
@@ -694,6 +696,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Seul le groupe contenant la route active est ouvert par defaut ; les autres
   // sont replies pour eviter le mur d'items sur iPhone.
   const [openMobileGroups, setOpenMobileGroups] = useState<Set<string>>(new Set());
+  // Recherche globale Ctrl+K / Cmd+K.
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // MonAssistant
   const [isAssistantOpen, setIsAssistantOpen] = useState(() => {
@@ -1021,7 +1035,31 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {activeItem?.label || activeGroup?.title || "Operioz"}
             </span>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-2">
+            {/* Bouton de recherche globale. Desktop : pill discret avec
+                placeholder + raccourci ; Mobile : juste une icone loupe. */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Rechercher (Ctrl+K)"
+              className="hidden sm:inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/40 hover:bg-accent px-3 text-xs text-muted-foreground transition-colors min-w-[200px]"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span className="flex-1 text-left">Rechercher…</span>
+              <kbd className="inline-flex h-5 items-center rounded border border-border bg-background/60 px-1.5 font-mono text-[10px]">
+                Ctrl K
+              </kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Rechercher"
+              className="sm:hidden h-9 w-9 inline-flex items-center justify-center rounded-lg hover:bg-accent text-muted-foreground"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <NotificationBell />
+          </div>
         </header>
 
         {showInstallBanner && (
@@ -1241,6 +1279,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         panelSize={panelSize}
         onPanelSizeChange={setPanelSize}
       />
+
+      {/* ─── Recherche globale Ctrl+K ──────────────────────────────────────── */}
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
     </div>
   );
