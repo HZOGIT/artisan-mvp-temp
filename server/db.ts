@@ -1338,54 +1338,109 @@ export async function updatePaiementStripe(id: number, data: Partial<InsertPaiem
 // ============================================================================
 
 export async function getDashboardStats(artisanId: number): Promise<any> {
-  const db = await getDb();
-  
-  const clientsList = await db.select().from(clients).where(eq(clients.artisanId, artisanId));
-  const devisList = await db.select().from(devis).where(eq(devis.artisanId, artisanId));
-  const facturesList = await db.select().from(factures).where(eq(factures.artisanId, artisanId));
-  const interventionsList = await db.select().from(interventions).where(eq(interventions.artisanId, artisanId));
-  
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  
-  const facturesPayees = facturesList.filter(f => f.statut === 'payee');
-  const facturesThisMonth = facturesPayees.filter(f => {
-    const date = f.datePaiement ? new Date(f.datePaiement) : new Date(f.createdAt);
-    return date >= startOfMonth;
-  });
-  const caMonth = facturesThisMonth.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0);
-  
-  const facturesThisYear = facturesPayees.filter(f => {
-    const date = f.datePaiement ? new Date(f.datePaiement) : new Date(f.createdAt);
-    return date >= startOfYear;
-  });
-  const caYear = facturesThisYear.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0);
-  
-  const devisEnCours = devisList.filter(d => d.statut === 'brouillon' || d.statut === 'envoye').length;
-  
-  const facturesImpayeesList = facturesList.filter(f => f.statut !== 'payee' && f.statut !== 'annulee');
+  // Ancienne implementation : 4 SELECT complets ramenes en memoire Node, puis
+  // filter/reduce en JavaScript → O(N) memoire pour 1000+ factures.
+  // Nouvelle implementation : 8 agregations SQL → O(1) memoire Node + plus
+  // rapide cote MySQL grace aux index idx_*_artisanId ajoutes par fix-duplicates.
+  //
+  // Note : colonnes en camelCase (artisanId, totalTTC, datePaiement,
+  // dateDebut, createdAt), confirmees via drizzle/schema.ts.
+  const pool = await ensurePool();
+
+  // Toutes les queries lancees en parallele pour minimiser la latence totale.
+  const [
+    [caMonthRow],
+    [caYearRow],
+    [devisEnCoursRow],
+    [facturesImpayeesRow],
+    [totalClientsRow],
+    [interventionsAVenirRow],
+    [totalDevisRow],
+    [totalFacturesRow],
+    [totalInterventionsRow],
+  ] = await Promise.all([
+    pool.execute(
+      `SELECT COALESCE(SUM(totalTTC), 0) AS total
+       FROM factures
+       WHERE artisanId = ?
+         AND statut = 'payee'
+         AND MONTH(COALESCE(datePaiement, createdAt)) = MONTH(CURRENT_DATE())
+         AND YEAR(COALESCE(datePaiement, createdAt))  = YEAR(CURRENT_DATE())`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COALESCE(SUM(totalTTC), 0) AS total
+       FROM factures
+       WHERE artisanId = ?
+         AND statut = 'payee'
+         AND YEAR(COALESCE(datePaiement, createdAt)) = YEAR(CURRENT_DATE())`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COUNT(*) AS cnt
+       FROM devis
+       WHERE artisanId = ?
+         AND statut IN ('brouillon', 'envoye')`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COUNT(*) AS cnt, COALESCE(SUM(totalTTC), 0) AS total
+       FROM factures
+       WHERE artisanId = ?
+         AND statut NOT IN ('payee', 'annulee', 'brouillon')`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COUNT(*) AS cnt FROM clients WHERE artisanId = ?`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COUNT(*) AS cnt
+       FROM interventions
+       WHERE artisanId = ?
+         AND statut = 'planifiee'
+         AND dateDebut >= NOW()`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COUNT(*) AS cnt FROM devis WHERE artisanId = ?`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COUNT(*) AS cnt FROM factures WHERE artisanId = ?`,
+      [artisanId]
+    ),
+    pool.execute(
+      `SELECT COUNT(*) AS cnt FROM interventions WHERE artisanId = ?`,
+      [artisanId]
+    ),
+  ]) as any;
+
+  const caMonth = Number(caMonthRow?.[0]?.total ?? 0);
+  const caYear = Number(caYearRow?.[0]?.total ?? 0);
+  const devisEnCours = Number(devisEnCoursRow?.[0]?.cnt ?? 0);
   const facturesImpayees = {
-    count: facturesImpayeesList.length,
-    total: facturesImpayeesList.reduce((sum, f) => sum + parseFloat(f.totalTTC?.toString() || '0'), 0)
+    count: Number(facturesImpayeesRow?.[0]?.cnt ?? 0),
+    total: Number(facturesImpayeesRow?.[0]?.total ?? 0),
   };
-  
-  const interventionsAVenir = interventionsList.filter(i => {
-    if (i.statut !== 'planifiee') return false;
-    const dateDebut = new Date(i.dateDebut);
-    return dateDebut >= now;
-  }).length;
-  
+  const totalClients = Number(totalClientsRow?.[0]?.cnt ?? 0);
+  const interventionsAVenir = Number(interventionsAVenirRow?.[0]?.cnt ?? 0);
+  const totalDevis = Number(totalDevisRow?.[0]?.cnt ?? 0);
+  const totalFactures = Number(totalFacturesRow?.[0]?.cnt ?? 0);
+  const totalInterventions = Number(totalInterventionsRow?.[0]?.cnt ?? 0);
+
+  // Cles inchangees pour preserver la compatibilite avec le frontend
+  // (Dashboard.tsx, dashboard router → alias chiffreAffaires/devisEnAttente).
   return {
     caMonth,
     caYear,
     devisEnCours,
     facturesImpayees,
-    totalClients: clientsList.length,
+    totalClients,
     interventionsAVenir,
-    totalDevis: devisList.length,
-    totalFactures: facturesList.length,
-    totalInterventions: interventionsList.length,
+    totalDevis,
+    totalFactures,
+    totalInterventions,
   };
 }
 
