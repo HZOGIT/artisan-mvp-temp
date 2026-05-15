@@ -690,6 +690,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Panneau de navigation (overlay) déployé pour un groupe donné
   const [openGroupId, setOpenGroupId] = useState<GroupId | null>(null);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  // Etat des groupes ouverts dans le drawer mobile (accordion).
+  // Seul le groupe contenant la route active est ouvert par defaut ; les autres
+  // sont replies pour eviter le mur d'items sur iPhone.
+  const [openMobileGroups, setOpenMobileGroups] = useState<Set<string>>(new Set());
 
   // MonAssistant
   const [isAssistantOpen, setIsAssistantOpen] = useState(() => {
@@ -753,6 +757,38 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     setOpenGroupId(null);
     setMobileMoreOpen(false);
   }, [location]);
+
+  // Sync de l'accordion mobile : a chaque changement de route, on ouvre
+  // automatiquement le groupe qui contient la route active. Les autres
+  // groupes restent dans leur etat precedent (ouvert/ferme) — l'artisan
+  // garde le controle s'il a deliberement ouvert/ferme un groupe.
+  useEffect(() => {
+    if (!activeGroup) return;
+    setOpenMobileGroups((prev) => {
+      if (prev.has(activeGroup.id)) return prev;
+      const next = new Set(prev);
+      next.add(activeGroup.id);
+      return next;
+    });
+  }, [activeGroup]);
+
+  // A chaque ouverture du drawer mobile, on REINITIALISE l'accordion :
+  // tous les groupes sont fermes SAUF celui de la route active. Comportement
+  // attendu par le spec ("Par defaut tous les groupes sont FERMES").
+  useEffect(() => {
+    if (mobileMoreOpen) {
+      setOpenMobileGroups(new Set(activeGroup ? [activeGroup.id] : []));
+    }
+  }, [mobileMoreOpen, activeGroup]);
+
+  const toggleMobileGroup = (gid: string) => {
+    setOpenMobileGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(gid)) next.delete(gid);
+      else next.add(gid);
+      return next;
+    });
+  };
 
   const handleRailGroupClick = (group: NavGroup) => {
     // Groupe à 1 item → on navigue direct.
@@ -1065,50 +1101,84 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
 
-              <ScrollArea className="flex-1">
-                <div className="p-2 space-y-4">
+              {/* overflow-y-auto natif (au lieu de Radix ScrollArea) : plus
+                  fiable sur iOS Safari pour le calcul de hauteur. min-h-0
+                  est CRITIQUE pour qu'un enfant flex-1 dans un parent flex
+                  hauteur fixe puisse retrecir et scroller. */}
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                <div className="p-2 space-y-1">
                   {filteredGroups.map((group) => {
                     const styles = RAIL_COLORS[group.color];
                     const GroupIcon = group.icon;
+                    const isOpen = openMobileGroups.has(group.id);
                     return (
-                      <div key={group.id}>
-                        <div className="flex items-center gap-2 px-2 py-1">
-                          <div className={`h-7 w-7 rounded-lg ${styles.bgActive} inline-flex items-center justify-center`}>
+                      <div key={group.id} className="rounded-lg overflow-hidden">
+                        {/* Header cliquable du groupe */}
+                        <button
+                          type="button"
+                          onClick={() => toggleMobileGroup(group.id)}
+                          aria-expanded={isOpen}
+                          className={`w-full flex items-center gap-2 px-2 py-2.5 rounded-lg transition-colors ${
+                            isOpen ? "bg-accent/50" : "hover:bg-accent/30"
+                          }`}
+                        >
+                          <div className={`h-7 w-7 shrink-0 rounded-lg ${styles.bgActive} inline-flex items-center justify-center`}>
                             <GroupIcon className={`h-3.5 w-3.5 ${styles.iconActive}`} />
                           </div>
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <span className="flex-1 text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {group.title}
                           </span>
-                        </div>
-                        <ul className="space-y-0.5 mt-1">
-                          {group.items.map((item) => {
-                            const ItemIcon = item.icon;
-                            const isItemActive = location === item.path;
-                            return (
-                              <li key={item.path}>
-                                <button
-                                  onClick={() => handleNavigate(item.path)}
-                                  className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm transition-colors text-left ${
-                                    isItemActive
-                                      ? `${styles.bgActive} ${styles.iconActive} font-medium`
-                                      : "text-foreground hover:bg-accent"
-                                  }`}
-                                >
-                                  <ItemIcon className="h-4 w-4 shrink-0" />
-                                  <span className="truncate">{item.label}</span>
-                                  {item.path === "/rdv-en-ligne" && <RdvPendingBadge />}
-                                </button>
+                          <ChevronRight
+                            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+                          />
+                        </button>
+
+                        {/* Items repliables — animation hauteur via AnimatePresence */}
+                        <AnimatePresence initial={false}>
+                          {isOpen && (
+                            <motion.ul
+                              key="items"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2, ease: "easeOut" }}
+                              className="overflow-hidden"
+                            >
+                              <li className="pt-1 pb-1.5 space-y-0.5">
+                                {group.items.map((item) => {
+                                  const ItemIcon = item.icon;
+                                  const isItemActive = location === item.path;
+                                  return (
+                                    <button
+                                      key={item.path}
+                                      type="button"
+                                      onClick={() => handleNavigate(item.path)}
+                                      className={`w-full flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                                        isItemActive
+                                          ? `${styles.bgActive} ${styles.iconActive} font-medium`
+                                          : "text-foreground hover:bg-accent"
+                                      }`}
+                                    >
+                                      <ItemIcon className="h-4 w-4 shrink-0" />
+                                      <span className="truncate">{item.label}</span>
+                                      {item.path === "/rdv-en-ligne" && <RdvPendingBadge />}
+                                    </button>
+                                  );
+                                })}
                               </li>
-                            );
-                          })}
-                        </ul>
+                            </motion.ul>
+                          )}
+                        </AnimatePresence>
                       </div>
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
 
-              <div className="p-3 border-t border-border">
+              <div
+                className="p-3 border-t border-border shrink-0"
+                style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+              >
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-destructive hover:text-destructive"
