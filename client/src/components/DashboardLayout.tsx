@@ -39,6 +39,7 @@ import {
   HardHat,
   Info,
   LayoutDashboard,
+  LayoutGrid,
   LineChart,
   LogOut,
   Mail,
@@ -265,6 +266,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
       { icon: User, label: "Mon profil", path: "/profil" },
       { icon: Settings, label: "Paramètres", path: "/parametres" },
+      { icon: LayoutGrid, label: "Mes modules", path: "/modules" },
       { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
       { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
       { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
@@ -321,6 +323,9 @@ const pathPermissionMap: Record<string, string> = {
   "/badges": "techniciens.voir",
   "/alertes-previsions": "comptabilite.voir",
   "/conges": "techniciens.voir",
+  "/modules": "",
+  "/onboarding": "",
+  "/import": "",
 };
 
 function filterGroupByPermissions(group: NavGroup, permissions: string[]): NavGroup {
@@ -331,6 +336,61 @@ function filterGroupByPermissions(group: NavGroup, permissions: string[]): NavGr
       const required = pathPermissionMap[item.path];
       if (!required) return true;
       return permissions.includes(required);
+    }),
+  };
+}
+
+// ============================================================================
+// Sidebar adaptative selon les modules actifs de l'artisan
+// ============================================================================
+const MODULE_TO_LABELS: Record<string, string[]> = {
+  devis: ["Devis", "Nouveau devis"],
+  factures: ["Factures"],
+  contrats: ["Contrats"],
+  relances: ["Relances"],
+  clients: ["Clients", "Nouveau Client", "Import Clients", "Avis Clients"],
+  portail_client: ["Portail client"],
+  chat: ["Chat"],
+  rdv: ["RDV en ligne"],
+  interventions: ["Interventions", "Calendrier", "Chantiers", "Planification"],
+  geolocalisation: ["Géolocalisation", "Techniciens"],
+  stocks: ["Stocks", "Articles"],
+  commandes: ["Commandes", "Fournisseurs", "Rapport Commande"],
+  comptabilite: ["Comptabilité", "Rapports", "Prévisions CA"],
+  assistant_ia: ["MonAssistant"],
+};
+
+const ALWAYS_VISIBLE_LABELS = new Set([
+  "Tableau de bord",
+  "Statistiques",
+  "Mon profil",
+  "Paramètres",
+  "Guide d'utilisation",
+  "Mes modules",
+]);
+
+/**
+ * Filtre les items d'un groupe selon la liste des modules actifs.
+ * Si modulesActifs est null (loading, pas connecte) → fallback show-all.
+ */
+function filterGroupByModules(group: NavGroup, modulesActifs: string[] | null): NavGroup {
+  if (!modulesActifs) return group;
+  const labelToModules = new Map<string, string[]>();
+  for (const [moduleSlug, labels] of Object.entries(MODULE_TO_LABELS)) {
+    for (const lbl of labels) {
+      const arr = labelToModules.get(lbl) || [];
+      arr.push(moduleSlug);
+      labelToModules.set(lbl, arr);
+    }
+  }
+  const actifsSet = new Set(modulesActifs);
+  return {
+    ...group,
+    items: group.items.filter((item) => {
+      if (ALWAYS_VISIBLE_LABELS.has(item.label)) return true;
+      const owners = labelToModules.get(item.label);
+      if (!owners) return true;
+      return owners.some((slug) => actifsSet.has(slug));
     }),
   };
 }
@@ -601,15 +661,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
+  // Modules actifs pour cet artisan. Quand isLoading ou pas connecté → null
+  // (= show-all, comportement actuel) pour ne pas masquer la nav pendant
+  // le 1er fetch ni si le backend modules est down.
+  const { data: modulesActifsRaw } = trpc.modules.getMine.useQuery();
+  const modulesActifs = modulesActifsRaw ?? null;
   const userPermissions: string[] = (user as any)?.permissions || [];
 
-  // Groupes filtrés par permissions
+  // Groupes filtrés : (1) permissions utilisateur, (2) modules actifs.
   const filteredGroups: NavGroup[] = useMemo(
     () =>
-      NAV_GROUPS.map((g) => filterGroupByPermissions(g, userPermissions)).filter(
-        (g) => g.items.length > 0
-      ),
-    [userPermissions]
+      NAV_GROUPS.map((g) => filterGroupByPermissions(g, userPermissions))
+        .map((g) => filterGroupByModules(g, modulesActifs))
+        .filter((g) => g.items.length > 0),
+    [userPermissions, modulesActifs]
   );
 
   const flatItems = useMemo(

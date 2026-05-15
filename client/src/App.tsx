@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
@@ -70,12 +71,43 @@ import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
 import StatistiquesDevis from "./pages/StatistiquesDevis";
 import PortailGestion from "./pages/PortailGestion";
 import Documentation from "./pages/Documentation";
+import ModulesPage from "./pages/Modules";
+import Onboarding from "./pages/Onboarding";
 import DashboardLayout from "./components/DashboardLayout";
+import { trpc } from "./lib/trpc";
 
-// BYPASS CLERK TEMPORARILY - Redirect all authenticated routes directly to dashboard
+// Routes accessibles MEME quand l'onboarding n'est pas terminé.
+// L'artisan peut toujours accéder à son profil/paramètres/MonAssistant
+// même s'il n'a pas validé l'onboarding.
+const ONBOARDING_BYPASS = new Set([
+  "/onboarding",
+  "/profil",
+  "/parametres",
+  "/assistant",
+  "/notifications",
+]);
+
 function AuthenticatedRoutes() {
-  const [location] = useLocation();
-  
+  const [location, setLocation] = useLocation();
+  // getOnboardingStatus est une route publique-protected qui lit les
+  // colonnes onboarding_completed/metier/plan via raw SQL. Si la migration
+  // n'a pas tourne, retourne {onboardingCompleted: true} → pas de redirect.
+  const { data: onboardingStatus, isLoading: onbLoading } =
+    trpc.modules.getOnboardingStatus.useQuery();
+
+  useEffect(() => {
+    if (onbLoading) return;
+    if (!onboardingStatus) return;
+    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) {
+      setLocation("/onboarding");
+    }
+  }, [onboardingStatus, onbLoading, location, setLocation]);
+
+  // L'onboarding est plein écran : pas de DashboardLayout autour.
+  if (location === "/onboarding") {
+    return <Onboarding />;
+  }
+
   return (
     <DashboardLayout>
       <Switch location={location}>
@@ -134,6 +166,7 @@ function AuthenticatedRoutes() {
         <Route path="/ma-vitrine" component={MaVitrine} />
         <Route path="/utilisateurs" component={Utilisateurs} />
         <Route path="/documentation" component={Documentation} />
+        <Route path="/modules" component={ModulesPage} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>

@@ -11,6 +11,11 @@ import {
   Users,
   Settings2,
   LayoutGrid,
+  Check,
+  CircleDashed,
+  CreditCard,
+  Sparkles,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard, type StatCardColor } from "@/components/dashboard/StatCard";
@@ -151,6 +156,8 @@ const formatEUR = (v: number) =>
     maximumFractionDigits: 0,
   }).format(v);
 
+type DashboardState = "nouveau" | "demarrage" | "confirme";
+
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
@@ -158,6 +165,7 @@ export default function Dashboard() {
   const { data: conversionRate } = trpc.dashboard.getConversionRate.useQuery();
   const { data: alerts } = trpc.dashboard.getAlerts.useQuery();
   const { data: objectifs } = trpc.dashboard.getObjectifs.useQuery();
+  const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
 
   const widgetDefs = useWidgetDefinitions();
   const allIds = useMemo(() => widgetDefs.map((w) => w.id), [widgetDefs]);
@@ -209,6 +217,60 @@ export default function Dashboard() {
 
   const facturesImpayeesCount = stats?.facturesImpayees?.count || 0;
   const facturesImpayeesTotal = stats?.facturesImpayees?.total || 0;
+
+  // ── État adaptatif (3 niveaux) ──────────────────────────────────────────
+  const totalClients = stats?.totalClients || 0;
+  const totalDevis = stats?.totalDevis || 0;
+  const totalFactures = stats?.totalFactures || 0;
+  const dashboardState: DashboardState = useMemo(() => {
+    if (totalClients < 3 && totalDevis < 3) return "nouveau";
+    if (totalClients > 20 && totalDevis > 20) return "confirme";
+    return "demarrage";
+  }, [totalClients, totalDevis]);
+
+  // ── Checklist d'onboarding (state nouveau uniquement) ───────────────────
+  const checklist = useMemo(
+    () => [
+      {
+        id: "profil",
+        label: "Compléter votre profil",
+        done: !!(artisanProfile as any)?.logo && !!(artisanProfile as any)?.siret,
+        icon: UserPlus,
+        action: () => setLocation("/profil"),
+      },
+      {
+        id: "client",
+        label: "Ajouter votre premier client",
+        done: totalClients > 0,
+        icon: Users,
+        action: () => setLocation("/clients/nouveau"),
+      },
+      {
+        id: "devis",
+        label: "Créer votre premier devis",
+        done: totalDevis > 0,
+        icon: FileText,
+        action: () => setLocation("/devis/nouveau"),
+      },
+      {
+        id: "facture",
+        label: "Envoyer votre première facture",
+        done: totalFactures > 0,
+        icon: Receipt,
+        action: () => setLocation("/factures"),
+      },
+      {
+        id: "paiement",
+        label: "Configurer le paiement en ligne",
+        done: false,
+        icon: CreditCard,
+        action: () => setLocation("/parametres"),
+      },
+    ],
+    [artisanProfile, totalClients, totalDevis, totalFactures, setLocation]
+  );
+  const checklistDone = checklist.filter((c) => c.done).length;
+  const checklistProgress = Math.round((checklistDone / checklist.length) * 100);
 
   // Visible widgets in order
   const visibleOrder = order.filter((id) => !hidden.has(id) && allIds.includes(id));
@@ -322,13 +384,158 @@ export default function Dashboard() {
 
   const dashboardAlerts: DashboardAlert[] = (alerts || []) as DashboardAlert[];
 
-  // Pas de motion.div outer : framer-motion sur le parent du sortable peut
-  // intercepter les pointer events ou casser le timing de re-render qui
-  // active le PointerSensor. /dnd-test fonctionne car il n'a aucun parent
-  // framer-motion ; on s'aligne strictement sur ce pattern.
+  // ── STATE 1 — Nouveau : checklist + MonAssistant CTA ────────────────────
+  if (dashboardState === "nouveau") {
+    return (
+      <div className="space-y-6">
+        <WelcomeBanner
+          firstName={firstName}
+          devisEnAttente={stats?.devisEnCours || 0}
+          facturesImpayees={facturesImpayeesCount}
+          interventionsAVenir={stats?.interventionsAVenir || 0}
+          onCreateDevis={() => setLocation("/devis/nouveau")}
+          onCreateFacture={() => setLocation("/factures")}
+          onCreateIntervention={() => setLocation("/interventions")}
+        />
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">Vos premières étapes</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {checklistDone} sur {checklist.length} terminé{checklistDone > 1 ? "s" : ""}
+              </p>
+            </div>
+            <span className="text-2xl font-bold tabular-nums">{checklistProgress}%</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-muted overflow-hidden mb-4">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-cyan-500 transition-all"
+              style={{ width: `${checklistProgress}%` }}
+            />
+          </div>
+          <ul className="space-y-2">
+            {checklist.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={item.action}
+                    className="w-full flex items-center gap-3 rounded-lg p-3 hover:bg-accent/50 transition-colors text-left"
+                  >
+                    <span className={`shrink-0 h-6 w-6 inline-flex items-center justify-center rounded-full ${
+                      item.done ? "bg-emerald-500 text-white" : "border-2 border-muted-foreground/30 text-muted-foreground"
+                    }`}>
+                      {item.done ? <Check className="h-3.5 w-3.5" /> : <CircleDashed className="h-3 w-3" />}
+                    </span>
+                    <Icon className={`h-4 w-4 shrink-0 ${item.done ? "text-emerald-500" : "text-muted-foreground"}`} />
+                    <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : "font-medium"}`}>
+                      {item.label}
+                    </span>
+                    {!item.done && <span className="text-xs text-primary font-medium">Commencer →</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-700 to-indigo-800 text-white p-6 shadow-lg">
+          <div aria-hidden className="absolute -top-16 -right-10 h-64 w-64 rounded-full bg-fuchsia-400/20 blur-3xl animate-blob" />
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="h-12 w-12 inline-flex items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
+                <Sparkles className="h-6 w-6" />
+              </span>
+              <div>
+                <h2 className="text-xl font-bold tracking-tight">MonAssistant peut tout faire pour vous !</h2>
+                <p className="text-sm text-violet-100/80">Dites-lui simplement ce que vous voulez faire.</p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                { label: "Crée mon premier devis", path: "/devis/nouveau" },
+                { label: "Ajoute mon premier client", path: "/clients/nouveau" },
+                { label: "Planifie une intervention", path: "/interventions" },
+              ].map((s) => (
+                <button
+                  key={s.label}
+                  type="button"
+                  onClick={() => setLocation(s.path)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 px-3 py-2 text-xs font-medium transition-all"
+                >
+                  {s.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setLocation("/assistant")}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white text-violet-700 hover:bg-violet-50 px-3 py-2 text-xs font-semibold transition-all shadow"
+              >
+                Ouvrir MonAssistant 🎤
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── STATE 2 — Démarrage : 4 cards + 2 widgets + MonAssistant compact ────
+  if (dashboardState === "demarrage") {
+    const minimalWidgets = ["recentActivity", "upcomingInterventions"];
+    return (
+      <div className="space-y-6">
+        <WelcomeBanner
+          firstName={firstName}
+          devisEnAttente={stats?.devisEnCours || 0}
+          facturesImpayees={facturesImpayeesCount}
+          interventionsAVenir={stats?.interventionsAVenir || 0}
+          onCreateDevis={() => setLocation("/devis/nouveau")}
+          onCreateFacture={() => setLocation("/factures")}
+          onCreateIntervention={() => setLocation("/interventions")}
+        />
+
+        <AlertsBar alerts={dashboardAlerts} onNavigate={(path) => setLocation(path)} />
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[statCards[0], statCards[2], statCards[3], statCards[4]].map((card, i) => (
+            <StatCard key={card.title} {...card} index={i} />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {minimalWidgets.map((id) => {
+            const widget = widgetById[id];
+            if (!widget) return null;
+            return (
+              <DashboardWidget key={id} id={id} title={widget.label} subtitle={widget.description}>
+                {widget.render()}
+              </DashboardWidget>
+            );
+          })}
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-3">
+          <span className="h-10 w-10 inline-flex items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 text-white shrink-0">
+            <Sparkles className="h-5 w-5" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Besoin d'aide ? MonAssistant est là.</p>
+            <p className="text-xs text-muted-foreground">Demandez-lui de créer un devis, planifier une intervention…</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setLocation("/assistant")}>
+            Ouvrir
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── STATE 3 — Confirmé : dashboard complet ──────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Welcome banner */}
       <WelcomeBanner
         firstName={firstName}
         devisEnAttente={stats?.devisEnCours || 0}
@@ -339,10 +546,8 @@ export default function Dashboard() {
         onCreateIntervention={() => setLocation("/interventions")}
       />
 
-      {/* Alerts */}
       <AlertsBar alerts={dashboardAlerts} onNavigate={(path) => setLocation(path)} />
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statCards.map((card, i) => (
           <StatCard key={card.title} {...card} index={i} />
