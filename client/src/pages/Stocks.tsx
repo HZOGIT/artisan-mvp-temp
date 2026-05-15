@@ -270,20 +270,20 @@ export default function Stocks() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Stocks</h1>
-            <p className="text-muted-foreground">Suivez vos articles et recevez des alertes de réapprovisionnement</p>
+            <p className="text-muted-foreground mt-1">Suivez vos articles et recevez des alertes de réapprovisionnement</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={() => generateAlertsMutation.mutate()}>
-              <Bell className="mr-2 h-4 w-4" />
+              <Bell className="h-4 w-4 mr-2" />
               Générer alertes
             </Button>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-2" />
                   Ajouter un article
                 </Button>
               </DialogTrigger>
