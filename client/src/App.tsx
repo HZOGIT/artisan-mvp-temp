@@ -73,6 +73,7 @@ import PortailGestion from "./pages/PortailGestion";
 import Documentation from "./pages/Documentation";
 import ModulesPage from "./pages/Modules";
 import Onboarding from "./pages/Onboarding";
+import ImportPage from "./pages/Import";
 import DashboardLayout from "./components/DashboardLayout";
 import { trpc } from "./lib/trpc";
 
@@ -167,6 +168,7 @@ function AuthenticatedRoutes() {
         <Route path="/utilisateurs" component={Utilisateurs} />
         <Route path="/documentation" component={Documentation} />
         <Route path="/modules" component={ModulesPage} />
+        <Route path="/import" component={ImportPage} />
         <Route component={NotFound} />
       </Switch>
     </DashboardLayout>

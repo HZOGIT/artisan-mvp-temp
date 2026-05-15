@@ -7254,8 +7254,221 @@ const modulesRouter = router({
   }),
 });
 
+// ============================================================================
+// IMPORT ROUTER — import multi-ERP clients/devis/factures via CSV
+// L'utilisateur upload un CSV cote client, parse en JSON et envoie
+// les rows + un mapping {colonneCSV: champOperioz}.
+// ============================================================================
+
+function pickField<T extends Record<string, any>>(
+  row: T,
+  mapping: Record<string, string>,
+  field: string
+): string | undefined {
+  // Cherche la colonne CSV qui mappe vers `field` cote Operioz.
+  const csvCol = Object.keys(mapping).find((k) => mapping[k] === field);
+  if (!csvCol) return undefined;
+  const v = row[csvCol];
+  if (v === undefined || v === null || v === "") return undefined;
+  return String(v).trim();
+}
+
+const importRouter = router({
+  importClients: protectedProcedure
+    .input(z.object({
+      rows: z.array(z.record(z.string(), z.any())).max(5000),
+      mapping: z.record(z.string(), z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan introuvable" });
+
+      const existingClients = await db.getClientsByArtisanId(artisan.id);
+      const seenEmails = new Set(
+        existingClients
+          .map((c: any) => (c.email || "").toLowerCase().trim())
+          .filter((e) => e.length > 0)
+      );
+
+      const results = {
+        imported: 0,
+        errors: 0,
+        duplicates: 0,
+        errorDetails: [] as string[],
+      };
+
+      let lineNum = 1;
+      for (const row of input.rows) {
+        lineNum++;
+        try {
+          const nom = pickField(row, input.mapping, "nom");
+          if (!nom) {
+            results.errors++;
+            results.errorDetails.push(`Ligne ${lineNum} : nom manquant`);
+            continue;
+          }
+          const email = pickField(row, input.mapping, "email")?.toLowerCase();
+          if (email && seenEmails.has(email)) {
+            results.duplicates++;
+            continue;
+          }
+          await db.createClient(artisan.id, {
+            nom,
+            prenom: pickField(row, input.mapping, "prenom") || undefined,
+            email: email || undefined,
+            telephone: pickField(row, input.mapping, "telephone") || undefined,
+            adresse: pickField(row, input.mapping, "adresse") || undefined,
+            codePostal: pickField(row, input.mapping, "codePostal") || undefined,
+            ville: pickField(row, input.mapping, "ville") || undefined,
+            notes: pickField(row, input.mapping, "notes") || undefined,
+          } as any);
+          results.imported++;
+          if (email) seenEmails.add(email);
+        } catch (err: any) {
+          results.errors++;
+          results.errorDetails.push(`Ligne ${lineNum} : ${err?.message || "erreur"}`);
+        }
+      }
+      return results;
+    }),
+
+  importDevis: protectedProcedure
+    .input(z.object({
+      rows: z.array(z.record(z.string(), z.any())).max(5000),
+      mapping: z.record(z.string(), z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan introuvable" });
+
+      const existingClients = await db.getClientsByArtisanId(artisan.id);
+      const findClientByName = (full: string) => {
+        const norm = full.toLowerCase().trim();
+        return existingClients.find((c: any) => {
+          const fn = `${c.prenom || ""} ${c.nom || ""}`.toLowerCase().trim();
+          const inv = `${c.nom || ""} ${c.prenom || ""}`.toLowerCase().trim();
+          return fn === norm || inv === norm || (c.nom || "").toLowerCase() === norm;
+        });
+      };
+
+      const results = {
+        imported: 0,
+        errors: 0,
+        duplicates: 0,
+        errorDetails: [] as string[],
+      };
+
+      let lineNum = 1;
+      for (const row of input.rows) {
+        lineNum++;
+        try {
+          const nomClient = pickField(row, input.mapping, "nomClient");
+          if (!nomClient) {
+            results.errors++;
+            results.errorDetails.push(`Ligne ${lineNum} : nomClient manquant`);
+            continue;
+          }
+          const client = findClientByName(nomClient);
+          if (!client) {
+            results.errors++;
+            results.errorDetails.push(`Ligne ${lineNum} : client "${nomClient}" introuvable (importez d'abord les clients)`);
+            continue;
+          }
+          const dateDevisStr = pickField(row, input.mapping, "dateDevis");
+          const objet = pickField(row, input.mapping, "objetDevis") || "Devis importé";
+          const totalTTC = pickField(row, input.mapping, "totalTTC") || "0";
+          const statut = (pickField(row, input.mapping, "statut") || "brouillon") as any;
+          const dateDevis = dateDevisStr ? new Date(dateDevisStr) : new Date();
+          const dateValidite = new Date(dateDevis.getTime() + 30 * 86400000);
+
+          await db.createDevis(artisan.id, {
+            clientId: client.id,
+            objet,
+            statut,
+            dateDevis,
+            dateValidite,
+            totalTTC,
+            notes: pickField(row, input.mapping, "notes") || undefined,
+          } as any);
+          results.imported++;
+        } catch (err: any) {
+          results.errors++;
+          results.errorDetails.push(`Ligne ${lineNum} : ${err?.message || "erreur"}`);
+        }
+      }
+      return results;
+    }),
+
+  importFactures: protectedProcedure
+    .input(z.object({
+      rows: z.array(z.record(z.string(), z.any())).max(5000),
+      mapping: z.record(z.string(), z.string()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan introuvable" });
+
+      const existingClients = await db.getClientsByArtisanId(artisan.id);
+      const findClientByName = (full: string) => {
+        const norm = full.toLowerCase().trim();
+        return existingClients.find((c: any) => {
+          const fn = `${c.prenom || ""} ${c.nom || ""}`.toLowerCase().trim();
+          const inv = `${c.nom || ""} ${c.prenom || ""}`.toLowerCase().trim();
+          return fn === norm || inv === norm || (c.nom || "").toLowerCase() === norm;
+        });
+      };
+
+      const results = {
+        imported: 0,
+        errors: 0,
+        duplicates: 0,
+        errorDetails: [] as string[],
+      };
+
+      let lineNum = 1;
+      for (const row of input.rows) {
+        lineNum++;
+        try {
+          const nomClient = pickField(row, input.mapping, "nomClient");
+          if (!nomClient) {
+            results.errors++;
+            results.errorDetails.push(`Ligne ${lineNum} : nomClient manquant`);
+            continue;
+          }
+          const client = findClientByName(nomClient);
+          if (!client) {
+            results.errors++;
+            results.errorDetails.push(`Ligne ${lineNum} : client "${nomClient}" introuvable`);
+            continue;
+          }
+          const dateFactStr = pickField(row, input.mapping, "dateFacture");
+          const datePaiementStr = pickField(row, input.mapping, "datePaiement");
+          const dateFacture = dateFactStr ? new Date(dateFactStr) : new Date();
+          const dateEcheance = new Date(dateFacture.getTime() + 30 * 86400000);
+
+          await db.createFacture(artisan.id, {
+            clientId: client.id,
+            objet: pickField(row, input.mapping, "objetFacture") || "Facture importée",
+            statut: (pickField(row, input.mapping, "statut") || "brouillon") as any,
+            dateFacture,
+            dateEcheance,
+            datePaiement: datePaiementStr ? new Date(datePaiementStr) : undefined,
+            modePaiement: pickField(row, input.mapping, "modePaiement") || undefined,
+            totalTTC: pickField(row, input.mapping, "totalTTC") || "0",
+          } as any);
+          results.imported++;
+        } catch (err: any) {
+          results.errors++;
+          results.errorDetails.push(`Ligne ${lineNum} : ${err?.message || "erreur"}`);
+        }
+      }
+      return results;
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
   modules: modulesRouter,
+  importErp: importRouter,
   auth: router({
     me: publicProcedure.query(({ ctx }) => {
       return ctx.user;

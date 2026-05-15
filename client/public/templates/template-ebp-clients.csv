@@ -1,0 +1,3 @@
+CodeClient;NomClient;PrenomClient;Email;Telephone;Adresse;CodePostal;Ville;Siret;RaisonSociale
+CLI001;Dupont;Jean;jean.dupont@example.com;0612345678;12 rue de la Paix;75002;Paris;12345678901234;Dupont SARL
+CLI002;Martin;Sophie;sophie.martin@example.com;0623456789;5 avenue des Tilleuls;69003;Lyon;;

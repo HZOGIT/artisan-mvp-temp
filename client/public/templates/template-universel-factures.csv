@@ -1,0 +1,3 @@
+numeroFacture,dateFacture,objetFacture,nomClient,totalHT,totalTTC,statut,datePaiement,modePaiement
+FAC-00001,2025-02-01,Rénovation salle de bain,Dupont Jean,2500.00,3000.00,payee,2025-02-15,virement
+FAC-00002,2025-02-10,Installation chauffe-eau,Martin Sophie,800.00,960.00,envoyee,,

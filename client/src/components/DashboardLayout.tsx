@@ -267,6 +267,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: User, label: "Mon profil", path: "/profil" },
       { icon: Settings, label: "Paramètres", path: "/parametres" },
       { icon: LayoutGrid, label: "Mes modules", path: "/modules" },
+      { icon: Upload, label: "Importer des données", path: "/import" },
       { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
       { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
       { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
