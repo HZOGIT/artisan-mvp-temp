@@ -161,11 +161,29 @@ type DashboardState = "nouveau" | "demarrage" | "confirme";
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { data: stats, isLoading: statsLoading } = trpc.dashboard.getStats.useQuery();
-  const { data: conversionRate } = trpc.dashboard.getConversionRate.useQuery();
-  const { data: alerts } = trpc.dashboard.getAlerts.useQuery();
-  const { data: objectifs } = trpc.dashboard.getObjectifs.useQuery();
-  const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
+  // staleTime cible : eviter refetch a chaque mount/focus de fenetre.
+  // 30s pour stats principales (changent rapidement), 5min pour donnees
+  // qui evoluent peu (objectifs, profil).
+  const { data: stats, isLoading: statsLoading } = trpc.dashboard.getStats.useQuery(
+    undefined,
+    { staleTime: 30 * 1000, refetchOnWindowFocus: false }
+  );
+  const { data: conversionRate } = trpc.dashboard.getConversionRate.useQuery(
+    undefined,
+    { staleTime: 60 * 1000, refetchOnWindowFocus: false }
+  );
+  const { data: alerts } = trpc.dashboard.getAlerts.useQuery(
+    undefined,
+    { staleTime: 60 * 1000, refetchOnWindowFocus: false }
+  );
+  const { data: objectifs } = trpc.dashboard.getObjectifs.useQuery(
+    undefined,
+    { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
+  );
+  const { data: artisanProfile } = trpc.artisan.getProfile.useQuery(
+    undefined,
+    { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
+  );
 
   const widgetDefs = useWidgetDefinitions();
   const allIds = useMemo(() => widgetDefs.map((w) => w.id), [widgetDefs]);

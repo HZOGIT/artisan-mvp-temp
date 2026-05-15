@@ -1,85 +1,103 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
-import PageEnConstruction from "./pages/PageEnConstruction";
-import Dashboard from "./pages/Dashboard";
-import { Clients } from "./pages/Clients";
-import { ClientsNouveauPage } from "./pages/ClientsNouveauPage";
-import DevisNouveauPage from "./pages/DevisNouveauPage";
-import ClientDetail from "./pages/ClientDetail";
-import ImportClients from "./pages/ImportClients";
-import Devis from "./pages/Devis";
-import DevisDetail from "./pages/DevisDetail";
-import Factures from "./pages/Factures";
-import FactureDetail from "./pages/FactureDetail";
-import Interventions from "./pages/Interventions";
-import Articles from "./pages/Articles";
-import Profil from "./pages/Profil";
-import Parametres from "./pages/Parametres";
-import Calendrier from "./pages/Calendrier";
-import DashboardAdvanced from "./pages/DashboardAdvanced";
-import Stocks from "./pages/Stocks";
-import Fournisseurs from "./pages/Fournisseurs";
-import RapportCommande from "./pages/RapportCommande";
-import RelancesDevis from "./pages/RelancesDevis";
-import SignatureDevis from "./pages/SignatureDevis";
-import ModelesEmail from "./pages/ModelesEmail";
-import ModelesEmailTransactionnels from "./pages/ModelesEmailTransactionnels";
-import PerformancesFournisseurs from "./pages/PerformancesFournisseurs";
-import PaiementSucces from "./pages/PaiementSucces";
-import PaiementAnnule from "./pages/PaiementAnnule";
-import PortailClient from "./pages/PortailClient";
-import Contrats from "./pages/Contrats";
-import ContratDetail from "./pages/ContratDetail";
-import InterventionsMobile from "./pages/InterventionsMobile";
-import Chat from "./pages/Chat";
-import Techniciens from "./pages/Techniciens";
-import Avis from "./pages/Avis";
-import SoumettreAvis from "./pages/SoumettreAvis";
-import Geolocalisation from "./pages/Geolocalisation";
-import Comptabilite from "./pages/Comptabilite";
-import DevisOptions from "./pages/DevisOptions";
-import Planification from "./pages/Planification";
-import Rapports from "./pages/Rapports";
-import Conges from "./pages/Conges";
-import Previsions from "./pages/Previsions";
-import Vehicules from "./pages/Vehicules";
-import Badges from "./pages/Badges";
-import SignInPage from "./pages/SignIn";
-import SignUp from "./pages/SignUp";
-import AlertesPrevisions from "./pages/AlertesPrevisions";
-import Chantiers from "./pages/Chantiers";
-import IntegrationsComptables from "./pages/IntegrationsComptables";
-import DevisIA from "./pages/DevisIA";
-import Assistant from "./pages/Assistant";
-import Notifications from "./pages/Notifications";
-import RdvEnLigne from "./pages/RdvEnLigne";
-import Vitrine from "./pages/Vitrine";
-import MaVitrine from "./pages/MaVitrine";
-import Utilisateurs from "./pages/Utilisateurs";
-import DevisLigneEdit from "./pages/DevisLigneEdit";
-import CalendrierChantiers from "./pages/CalendrierChantiers";
-import CommandesFournisseurs from "./pages/CommandesFournisseurs";
-import CommandeFournisseurForm from "./pages/CommandeFournisseurForm";
-import CommandeFournisseurDetail from "./pages/CommandeFournisseurDetail";
-import TableauBordSyncComptable from "./pages/TableauBordSyncComptable";
-import StatistiquesDevis from "./pages/StatistiquesDevis";
-import PortailGestion from "./pages/PortailGestion";
-import Documentation from "./pages/Documentation";
-import ModulesPage from "./pages/Modules";
-import Onboarding from "./pages/Onboarding";
-import ImportPage from "./pages/Import";
-import DashboardLayout from "./components/DashboardLayout";
 import { trpc } from "./lib/trpc";
 
+// ============================================================================
+// IMPORTS EAGER — pages critiques chargées dans le bundle initial
+// (route racine + auth + dashboard immediatement disponible apres login)
+// ============================================================================
+import Home from "./pages/Home";
+import SignInPage from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
+import Dashboard from "./pages/Dashboard";
+import Onboarding from "./pages/Onboarding";
+import NotFound from "./pages/NotFound";
+import DashboardLayout from "./components/DashboardLayout";
+
+// ============================================================================
+// IMPORTS LAZY — pages chargees a la demande via React.lazy + Suspense.
+// Chaque page devient un chunk webpack/Vite separe → bundle initial reduit.
+// ============================================================================
+const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
+const Clients = lazy(() => import("./pages/Clients").then((m) => ({ default: m.Clients })));
+const ClientsNouveauPage = lazy(() => import("./pages/ClientsNouveauPage").then((m) => ({ default: m.ClientsNouveauPage })));
+const ClientDetail = lazy(() => import("./pages/ClientDetail"));
+const ImportClients = lazy(() => import("./pages/ImportClients"));
+const Devis = lazy(() => import("./pages/Devis"));
+const DevisNouveauPage = lazy(() => import("./pages/DevisNouveauPage"));
+const DevisDetail = lazy(() => import("./pages/DevisDetail"));
+const DevisLigneEdit = lazy(() => import("./pages/DevisLigneEdit"));
+const Factures = lazy(() => import("./pages/Factures"));
+const FactureDetail = lazy(() => import("./pages/FactureDetail"));
+const Interventions = lazy(() => import("./pages/Interventions"));
+const Articles = lazy(() => import("./pages/Articles"));
+const Profil = lazy(() => import("./pages/Profil"));
+const Parametres = lazy(() => import("./pages/Parametres"));
+const Calendrier = lazy(() => import("./pages/Calendrier"));
+const Stocks = lazy(() => import("./pages/Stocks"));
+const Fournisseurs = lazy(() => import("./pages/Fournisseurs"));
+const RapportCommande = lazy(() => import("./pages/RapportCommande"));
+const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
+const SignatureDevis = lazy(() => import("./pages/SignatureDevis"));
+const ModelesEmail = lazy(() => import("./pages/ModelesEmail"));
+const ModelesEmailTransactionnels = lazy(() => import("./pages/ModelesEmailTransactionnels"));
+const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFournisseurs"));
+const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
+const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
+const PortailClient = lazy(() => import("./pages/PortailClient"));
+const Contrats = lazy(() => import("./pages/Contrats"));
+const ContratDetail = lazy(() => import("./pages/ContratDetail"));
+const InterventionsMobile = lazy(() => import("./pages/InterventionsMobile"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Techniciens = lazy(() => import("./pages/Techniciens"));
+const Avis = lazy(() => import("./pages/Avis"));
+const SoumettreAvis = lazy(() => import("./pages/SoumettreAvis"));
+const Geolocalisation = lazy(() => import("./pages/Geolocalisation"));
+const Comptabilite = lazy(() => import("./pages/Comptabilite"));
+const Planification = lazy(() => import("./pages/Planification"));
+const Rapports = lazy(() => import("./pages/Rapports"));
+const Conges = lazy(() => import("./pages/Conges"));
+const Previsions = lazy(() => import("./pages/Previsions"));
+const Vehicules = lazy(() => import("./pages/Vehicules"));
+const Badges = lazy(() => import("./pages/Badges"));
+const AlertesPrevisions = lazy(() => import("./pages/AlertesPrevisions"));
+const Chantiers = lazy(() => import("./pages/Chantiers"));
+const IntegrationsComptables = lazy(() => import("./pages/IntegrationsComptables"));
+const DevisIA = lazy(() => import("./pages/DevisIA"));
+const Assistant = lazy(() => import("./pages/Assistant"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const RdvEnLigne = lazy(() => import("./pages/RdvEnLigne"));
+const Vitrine = lazy(() => import("./pages/Vitrine"));
+const MaVitrine = lazy(() => import("./pages/MaVitrine"));
+const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
+const CalendrierChantiers = lazy(() => import("./pages/CalendrierChantiers"));
+const CommandesFournisseurs = lazy(() => import("./pages/CommandesFournisseurs"));
+const CommandeFournisseurForm = lazy(() => import("./pages/CommandeFournisseurForm"));
+const CommandeFournisseurDetail = lazy(() => import("./pages/CommandeFournisseurDetail"));
+const TableauBordSyncComptable = lazy(() => import("./pages/TableauBordSyncComptable"));
+const StatistiquesDevis = lazy(() => import("./pages/StatistiquesDevis"));
+const PortailGestion = lazy(() => import("./pages/PortailGestion"));
+const Documentation = lazy(() => import("./pages/Documentation"));
+const ModulesPage = lazy(() => import("./pages/Modules"));
+const ImportPage = lazy(() => import("./pages/Import"));
+
+// Skeleton de chargement pour les pages lazy.
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-64 w-full">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <p className="text-sm text-muted-foreground">Chargement…</p>
+      </div>
+    </div>
+  );
+}
+
 // Routes accessibles MEME quand l'onboarding n'est pas terminé.
-// L'artisan peut toujours accéder à son profil/paramètres/MonAssistant
-// même s'il n'a pas validé l'onboarding.
 const ONBOARDING_BYPASS = new Set([
   "/onboarding",
   "/profil",
@@ -90,9 +108,6 @@ const ONBOARDING_BYPASS = new Set([
 
 function AuthenticatedRoutes() {
   const [location, setLocation] = useLocation();
-  // getOnboardingStatus est une route publique-protected qui lit les
-  // colonnes onboarding_completed/metier/plan via raw SQL. Si la migration
-  // n'a pas tourne, retourne {onboardingCompleted: true} → pas de redirect.
   const { data: onboardingStatus, isLoading: onbLoading } =
     trpc.modules.getOnboardingStatus.useQuery();
 
@@ -104,73 +119,77 @@ function AuthenticatedRoutes() {
     }
   }, [onboardingStatus, onbLoading, location, setLocation]);
 
-  // L'onboarding est plein écran : pas de DashboardLayout autour.
+  // L'onboarding est plein écran : pas de DashboardLayout autour, et il est
+  // EAGER (pas dans Suspense) pour eviter le flash de skeleton sur le premier
+  // ecran apres signup.
   if (location === "/onboarding") {
     return <Onboarding />;
   }
 
   return (
     <DashboardLayout>
-      <Switch location={location}>
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/clients" component={Clients} />
-        <Route path="/clients/nouveau" component={ClientsNouveauPage} />
-        <Route path="/clients/import" component={ImportClients} />
-        <Route path="/clients/:id" component={ClientDetail} />
-        <Route path="/devis" component={Devis} />
-        <Route path="/devis/nouveau" component={DevisNouveauPage} />
-        <Route path="/devis/:id" component={DevisDetail} />
-        <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
-        <Route path="/factures" component={Factures} />
-        <Route path="/factures/:id" component={FactureDetail} />
-        <Route path="/interventions" component={Interventions} />
-        <Route path="/articles" component={Articles} />
-        <Route path="/calendrier" component={Calendrier} />
-        <Route path="/statistiques" component={StatistiquesDevis} />
-        <Route path="/stocks" component={Stocks} />
-        <Route path="/fournisseurs" component={Fournisseurs} />
-        <Route path="/profil" component={Profil} />
-        <Route path="/parametres" component={Parametres} />
-        <Route path="/contrats" component={Contrats} />
-        <Route path="/contrats/:id" component={ContratDetail} />
-        <Route path="/mobile" component={InterventionsMobile} />
-        <Route path="/chat" component={Chat} />
-        <Route path="/techniciens" component={Techniciens} />
-        <Route path="/avis" component={Avis} />
-        <Route path="/geolocalisation" component={Geolocalisation} />
-        <Route path="/comptabilite" component={Comptabilite} />
-        <Route path="/planification" component={Planification} />
-        <Route path="/rapports" component={Rapports} />
-        <Route path="/conges" component={Conges} />
-        <Route path="/previsions" component={Previsions} />
-        <Route path="/vehicules" component={Vehicules} />
-        <Route path="/badges" component={Badges} />
-        <Route path="/alertes-previsions" component={AlertesPrevisions} />
-        <Route path="/chantiers" component={Chantiers} />
-        <Route path="/integrations-comptables" component={IntegrationsComptables} />
-        <Route path="/devis-ia" component={DevisIA} />
-        <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
-        <Route path="/tableau-bord-sync-comptable" component={TableauBordSyncComptable} />
-        <Route path="/relances" component={RelancesDevis} />
-        <Route path="/modeles-email" component={ModelesEmail} />
-        <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
-        <Route path="/commandes/nouvelle" component={CommandeFournisseurForm} />
-        <Route path="/commandes/:id/modifier" component={CommandeFournisseurForm} />
-        <Route path="/commandes/:id" component={CommandeFournisseurDetail} />
-        <Route path="/commandes" component={CommandesFournisseurs} />
-        <Route path="/rapport-commande" component={RapportCommande} />
-        <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
-        <Route path="/portail-gestion" component={PortailGestion} />
-        <Route path="/assistant" component={Assistant} />
-        <Route path="/notifications" component={Notifications} />
-        <Route path="/rdv-en-ligne" component={RdvEnLigne} />
-        <Route path="/ma-vitrine" component={MaVitrine} />
-        <Route path="/utilisateurs" component={Utilisateurs} />
-        <Route path="/documentation" component={Documentation} />
-        <Route path="/modules" component={ModulesPage} />
-        <Route path="/import" component={ImportPage} />
-        <Route component={NotFound} />
-      </Switch>
+      <Suspense fallback={<PageLoader />}>
+        <Switch location={location}>
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/clients" component={Clients} />
+          <Route path="/clients/nouveau" component={ClientsNouveauPage} />
+          <Route path="/clients/import" component={ImportClients} />
+          <Route path="/clients/:id" component={ClientDetail} />
+          <Route path="/devis" component={Devis} />
+          <Route path="/devis/nouveau" component={DevisNouveauPage} />
+          <Route path="/devis/:id" component={DevisDetail} />
+          <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
+          <Route path="/factures" component={Factures} />
+          <Route path="/factures/:id" component={FactureDetail} />
+          <Route path="/interventions" component={Interventions} />
+          <Route path="/articles" component={Articles} />
+          <Route path="/calendrier" component={Calendrier} />
+          <Route path="/statistiques" component={StatistiquesDevis} />
+          <Route path="/stocks" component={Stocks} />
+          <Route path="/fournisseurs" component={Fournisseurs} />
+          <Route path="/profil" component={Profil} />
+          <Route path="/parametres" component={Parametres} />
+          <Route path="/contrats" component={Contrats} />
+          <Route path="/contrats/:id" component={ContratDetail} />
+          <Route path="/mobile" component={InterventionsMobile} />
+          <Route path="/chat" component={Chat} />
+          <Route path="/techniciens" component={Techniciens} />
+          <Route path="/avis" component={Avis} />
+          <Route path="/geolocalisation" component={Geolocalisation} />
+          <Route path="/comptabilite" component={Comptabilite} />
+          <Route path="/planification" component={Planification} />
+          <Route path="/rapports" component={Rapports} />
+          <Route path="/conges" component={Conges} />
+          <Route path="/previsions" component={Previsions} />
+          <Route path="/vehicules" component={Vehicules} />
+          <Route path="/badges" component={Badges} />
+          <Route path="/alertes-previsions" component={AlertesPrevisions} />
+          <Route path="/chantiers" component={Chantiers} />
+          <Route path="/integrations-comptables" component={IntegrationsComptables} />
+          <Route path="/devis-ia" component={DevisIA} />
+          <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
+          <Route path="/tableau-bord-sync-comptable" component={TableauBordSyncComptable} />
+          <Route path="/relances" component={RelancesDevis} />
+          <Route path="/modeles-email" component={ModelesEmail} />
+          <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
+          <Route path="/commandes/nouvelle" component={CommandeFournisseurForm} />
+          <Route path="/commandes/:id/modifier" component={CommandeFournisseurForm} />
+          <Route path="/commandes/:id" component={CommandeFournisseurDetail} />
+          <Route path="/commandes" component={CommandesFournisseurs} />
+          <Route path="/rapport-commande" component={RapportCommande} />
+          <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
+          <Route path="/portail-gestion" component={PortailGestion} />
+          <Route path="/assistant" component={Assistant} />
+          <Route path="/notifications" component={Notifications} />
+          <Route path="/rdv-en-ligne" component={RdvEnLigne} />
+          <Route path="/ma-vitrine" component={MaVitrine} />
+          <Route path="/utilisateurs" component={Utilisateurs} />
+          <Route path="/documentation" component={Documentation} />
+          <Route path="/modules" component={ModulesPage} />
+          <Route path="/import" component={ImportPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
     </DashboardLayout>
   );
 }
@@ -179,42 +198,33 @@ function Router() {
   const [location] = useLocation();
 
   return (
-    <Switch location={location}>
-      <Route path="/" component={Home} />
-      <Route path="/signin" component={SignInPage} />
-      <Route path="/sign-in" component={SignInPage} />
-      <Route path="/signup" component={SignUp} />
-      <Route path="/mentions-legales" component={PageEnConstruction} />
-      <Route path="/cgv" component={PageEnConstruction} />
-      <Route path="/confidentialite" component={PageEnConstruction} />
-      <Route path="/contact" component={PageEnConstruction} />
-      <Route path="/aide" component={PageEnConstruction} />
-      <Route path="/guide" component={PageEnConstruction} />
-      <Route path="/signature/:token" component={SignatureDevis} />
-      <Route path="/devis-public/:token" component={SignatureDevis} />
-      <Route path="/paiement/succes" component={PaiementSucces} />
-      <Route path="/paiement/annule" component={PaiementAnnule} />
-      <Route path="/portail/:token" component={PortailClient} />
-      <Route path="/avis/:token" component={SoumettreAvis} />
-      <Route path="/vitrine/:slug" component={Vitrine} />
-      {/*
-        Toutes les routes authentifiées passent par UN SEUL catch-all
-        AuthenticatedRoutes. Sa propre <Switch> interne dispatche vers le bon
-        composant de page. Conséquence : naviguer entre /devis et /factures
-        ne re-mount PLUS DashboardLayout, donc l'état (drawer ouvert,
-        conversation MonAssistant…) persiste entre les navigations.
-
-        L'ancienne version listait chaque route avec
-        `component={() => <AuthenticatedRoutes />}` — l'arrow inline créait
-        un nouveau composant à chaque render et provoquait un remount du
-        layout à chaque clic dans le menu.
-
-        Les URLs inconnues atteignent aussi ce catch-all et tombent sur le
-        NotFound interne d'AuthenticatedRoutes (ou sur l'écran "Connexion
-        requise" si l'utilisateur n'est pas connecté).
-      */}
-      <Route component={AuthenticatedRoutes} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch location={location}>
+        <Route path="/" component={Home} />
+        <Route path="/signin" component={SignInPage} />
+        <Route path="/sign-in" component={SignInPage} />
+        <Route path="/signup" component={SignUp} />
+        <Route path="/mentions-legales" component={PageEnConstruction} />
+        <Route path="/cgv" component={PageEnConstruction} />
+        <Route path="/confidentialite" component={PageEnConstruction} />
+        <Route path="/contact" component={PageEnConstruction} />
+        <Route path="/aide" component={PageEnConstruction} />
+        <Route path="/guide" component={PageEnConstruction} />
+        <Route path="/signature/:token" component={SignatureDevis} />
+        <Route path="/devis-public/:token" component={SignatureDevis} />
+        <Route path="/paiement/succes" component={PaiementSucces} />
+        <Route path="/paiement/annule" component={PaiementAnnule} />
+        <Route path="/portail/:token" component={PortailClient} />
+        <Route path="/avis/:token" component={SoumettreAvis} />
+        <Route path="/vitrine/:slug" component={Vitrine} />
+        {/*
+          Toutes les routes authentifiées passent par UN SEUL catch-all
+          AuthenticatedRoutes pour que DashboardLayout (et MonAssistant
+          drawer) persiste entre les navigations.
+        */}
+        <Route component={AuthenticatedRoutes} />
+      </Switch>
+    </Suspense>
   );
 }
 
