@@ -781,6 +781,36 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [mobileMoreOpen, activeGroup]);
 
+  // Demande de permission notifications (PWA) — 30s apres montage du layout
+  // authentifie. Best-effort : certains navigateurs exigent un user gesture
+  // explicite et refuseront silencieusement la requete automatique. Cela ne
+  // bloque rien — si l'utilisateur a refuse ou si la requete echoue, la
+  // permission reste "default" et on n'insiste pas.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+    const t = setTimeout(() => {
+      // Re-check au cas ou l'etat a change entre temps.
+      if (Notification.permission !== "default") return;
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          try {
+            new Notification("Operioz", {
+              body: "Notifications activées ! Vous serez alerté des nouveaux devis et factures.",
+              icon: "/icons/icon-192.png",
+            });
+          } catch {
+            /* noop — service worker requis sur certains navigateurs */
+          }
+        }
+      }).catch(() => {
+        // Navigateur peut refuser sans user gesture — silencieux.
+      });
+    }, 30000);
+    return () => clearTimeout(t);
+  }, []);
+
   const toggleMobileGroup = (gid: string) => {
     setOpenMobileGroups((prev) => {
       const next = new Set(prev);

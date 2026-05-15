@@ -7485,6 +7485,52 @@ export const appRouter = router({system: systemRouter,
           const user = await createUserWithPassword(input.email, input.password, input.name);
           const token = await createToken({ id: user.id, email: user.email });
           setAuthCookie(ctx.res, token, ctx.req);
+
+          // Email de bienvenue (best-effort, n'echoue pas si Resend indispo).
+          try {
+            await sendEmail({
+              to: input.email,
+              subject: "Bienvenue sur Operioz ! 🎉",
+              body: `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#2563eb;padding:32px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Bienvenue sur Operioz ! 🎉</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px;">
+          <p style="margin:0 0 16px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour${input.name ? ` ${input.name}` : ""},</p>
+          <p style="margin:0 0 16px 0;font-size:15px;color:#374151;line-height:1.6;">
+            Votre compte Operioz a été créé avec succès. Vous bénéficiez de 14 jours d'essai gratuit sur toutes les fonctionnalités.
+          </p>
+          <p style="margin:0 0 12px 0;font-size:15px;color:#374151;line-height:1.6;"><strong>Pour bien démarrer :</strong></p>
+          <ol style="margin:0 0 24px 20px;padding:0;font-size:15px;color:#374151;line-height:1.8;">
+            <li>Complétez votre profil et ajoutez votre logo</li>
+            <li>Importez vos clients depuis votre ancien logiciel</li>
+            <li>Créez votre premier devis avec MonAssistant IA</li>
+          </ol>
+          <p style="margin:24px 0;text-align:center;">
+            <a href="https://artisan.cheminov.com/dashboard" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
+              Accéder à mon espace →
+            </a>
+          </p>
+          <p style="margin:24px 0 0 0;font-size:13px;color:#6b7280;line-height:1.6;">
+            En cas de question, répondez simplement à cet email — notre équipe est là pour vous aider.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">© ${new Date().getFullYear()} Operioz. Le logiciel de gestion tout-en-un pour les professionnels.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`,
+            });
+          } catch (mailErr) {
+            console.error("[Signup] Welcome email failed (non-blocking):", mailErr);
+          }
+
           return { success: true, user };
         } catch (error) {
           if (error instanceof Error && error.message === 'User already exists') {
