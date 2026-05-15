@@ -138,6 +138,28 @@ async function startServer() {
   app.use(cookieParser());
 
   // ─────────────────────────────────────────────────────────────────
+  // Headers de securite HTTP. Applique a TOUTES les reponses.
+  // - X-Frame-Options DENY : interdit l'inclusion d'Operioz dans un iframe
+  //   (anti clickjacking).
+  // - X-Content-Type-Options nosniff : interdit au navigateur de deviner
+  //   le type MIME (anti XSS via fichiers uploades).
+  // - Strict-Transport-Security : force HTTPS pendant 1 an, inclus
+  //   sous-domaines.
+  // - Referrer-Policy : ne pas leak de path complet en cross-origin.
+  // - Permissions-Policy : restreint l'acces aux APIs sensibles. Camera off,
+  //   micro et geoloc autorises uniquement pour notre origin (MonAssistant
+  //   vocal + page Geolocalisation).
+  // ─────────────────────────────────────────────────────────────────
+  app.use((req, res, next) => {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(self)');
+    next();
+  });
+
+  // ─────────────────────────────────────────────────────────────────
   // Rate limit sur l'authentification : max 5 tentatives / 15min / IP.
   // S'applique aux routes tRPC auth.signin et auth.signup.
   // Implementation Map en memoire — single instance Railway hobby, suffisant.
