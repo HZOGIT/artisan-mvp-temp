@@ -185,10 +185,10 @@ export default function Chantiers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Chantiers</h1>
-          <p className="text-muted-foreground">Gérez vos projets multi-interventions</p>
+          <p className="text-muted-foreground mt-1">Gérez vos projets multi-interventions</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>

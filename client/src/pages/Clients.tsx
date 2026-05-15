@@ -151,13 +151,13 @@ export function Clients() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Clients</h1>
-          <p className="text-gray-600">Gérez votre base de clients</p>
+          <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
+          <p className="text-muted-foreground mt-1">Gérez votre base de clients</p>
         </div>
-        <Button onClick={() => navigate('/clients/nouveau')} className="gap-2">
-          <Plus className="w-4 h-4" />
+        <Button onClick={() => navigate('/clients/nouveau')}>
+          <Plus className="h-4 w-4 mr-2" />
           Nouveau client
         </Button>
       </div>

@@ -96,10 +96,10 @@ export default function CommandesFournisseurs() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Bons de commande fournisseurs</h1>
-          <p className="text-muted-foreground">Gérez vos commandes auprès de vos fournisseurs</p>
+          <h1 className="text-3xl font-bold tracking-tight">Bons de commande fournisseurs</h1>
+          <p className="text-muted-foreground mt-1">Gérez vos commandes auprès de vos fournisseurs</p>
         </div>
         <Button onClick={() => setLocation("/commandes/nouvelle")}>
           <Plus className="h-4 w-4 mr-2" />

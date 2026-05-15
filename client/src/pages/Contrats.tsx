@@ -212,8 +212,8 @@ export default function Contrats() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Contrats de maintenance</h1>
-          <p className="text-muted-foreground">Gérez vos contrats de maintenance et la facturation récurrente</p>
+          <h1 className="text-3xl font-bold tracking-tight">Contrats de maintenance</h1>
+          <p className="text-muted-foreground mt-1">Gérez vos contrats de maintenance et la facturation récurrente</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open);

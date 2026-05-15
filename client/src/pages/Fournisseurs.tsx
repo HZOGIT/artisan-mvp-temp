@@ -226,15 +226,15 @@ export default function Fournisseurs() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Fournisseurs</h1>
-            <p className="text-muted-foreground">Gérez vos fournisseurs et leurs articles associés</p>
+            <p className="text-muted-foreground mt-1">Gérez vos fournisseurs et leurs articles associés</p>
           </div>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="h-4 w-4 mr-2" />
                 Nouveau fournisseur
               </Button>
             </DialogTrigger>
