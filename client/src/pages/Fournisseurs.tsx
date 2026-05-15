@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Plus, Search, Building2, Edit, Trash2, Package, Link2, Unlink } from "lucide-react";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 
 type FournisseurFormData = {
   nom: string;
@@ -182,14 +183,14 @@ export default function Fournisseurs() {
   };
 
   const filteredFournisseurs = fournisseurs?.filter(f =>
-    f.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (f.contact && f.contact.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (f.ville && f.ville.toLowerCase().includes(searchQuery.toLowerCase()))
+    matchSearch(f.nom, searchQuery) ||
+    matchSearch(f.contact, searchQuery) ||
+    matchSearch(f.ville, searchQuery)
   );
 
   const filteredArticles = articles?.filter((a: any) =>
-    a.designation.toLowerCase().includes(articleSearchQuery.toLowerCase()) ||
-    a.reference.toLowerCase().includes(articleSearchQuery.toLowerCase())
+    matchSearch(a.designation, articleSearchQuery) ||
+    matchSearch(a.reference, articleSearchQuery)
   );
 
   // Get article details from the articles list

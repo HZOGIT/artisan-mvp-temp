@@ -9,6 +9,7 @@ import {
   CheckCircle, ArrowRight, BookOpen
 } from "lucide-react";
 import { generateGuidePDF } from "@/lib/generateGuidePDF";
+import { matchSearch } from "@/lib/normalize";
 
 interface Section {
   id: string;
@@ -384,14 +385,13 @@ export default function Documentation() {
 
   const filteredSections = useMemo(() => {
     if (!searchQuery.trim()) return sections;
-    const q = searchQuery.toLowerCase();
     return sections
       .map((section) => ({
         ...section,
         subsections: section.subsections.filter(
           (sub) =>
-            sub.title.toLowerCase().includes(q) ||
-            sub.content.some((line) => line.toLowerCase().includes(q))
+            matchSearch(sub.title, searchQuery) ||
+            sub.content.some((line) => matchSearch(line, searchQuery))
         ),
       }))
       .filter((s) => s.subsections.length > 0);

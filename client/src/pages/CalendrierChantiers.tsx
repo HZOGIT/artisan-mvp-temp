@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -483,14 +484,13 @@ export default function CalendrierChantiers() {
   // Filtrer les interventions pour le PDF
   const pdfFilteredInterventions = useMemo(() => {
     return filteredInterventions.filter(i => {
-      // Filtre par recherche
+      // Filtre par recherche — insensible aux accents et a la casse.
       if (pdfSearchTerm) {
-        const searchLower = pdfSearchTerm.toLowerCase();
-        const matchesSearch = 
-          i.chantierNom?.toLowerCase().includes(searchLower) ||
-          i.description?.toLowerCase().includes(searchLower) ||
-          i.technicienNom?.toLowerCase().includes(searchLower) ||
-          i.adresse?.toLowerCase().includes(searchLower);
+        const matchesSearch =
+          matchSearch(i.chantierNom, pdfSearchTerm) ||
+          matchSearch(i.description, pdfSearchTerm) ||
+          matchSearch(i.technicienNom, pdfSearchTerm) ||
+          matchSearch(i.adresse, pdfSearchTerm);
         if (!matchesSearch) return false;
       }
       // Filtre par chantier

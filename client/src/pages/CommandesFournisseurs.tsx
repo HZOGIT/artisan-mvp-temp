@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useLocation, useSearch } from "wouter";
 import { Plus, Search, ShoppingCart, MoreHorizontal, Eye, Pencil, Trash2, Download, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 
 const statusLabels: Record<string, string> = {
@@ -83,11 +84,10 @@ export default function CommandesFournisseurs() {
     if (filterStatut !== "tous" && c.statut !== filterStatut) return false;
     if (filterFournisseur !== "tous" && c.fournisseurId.toString() !== filterFournisseur) return false;
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
       return (
-        c.numero?.toLowerCase().includes(q) ||
-        c.fournisseurNom?.toLowerCase().includes(q) ||
-        c.reference?.toLowerCase().includes(q)
+        matchSearch(c.numero, searchQuery) ||
+        matchSearch(c.fournisseurNom, searchQuery) ||
+        matchSearch(c.reference, searchQuery)
       );
     }
     return true;

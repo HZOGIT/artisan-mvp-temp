@@ -10,6 +10,7 @@ import * as XLSX from "xlsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { StatutBadge } from "@/components/StatutBadge";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -199,19 +200,19 @@ export default function Devis() {
       return false;
     }
     
-    // Filtre par recherche (numéro, objet, ou nom du client)
-    const searchLower = searchQuery.toLowerCase();
-    if (searchLower) {
+    // Filtre par recherche (numero, objet, ou nom du client) — insensible
+    // aux accents et a la casse.
+    if (searchQuery) {
       const client = clientsMap.get(devis.clientId);
-      const clientName = client ? `${client.nom} ${client.prenom}`.toLowerCase() : "";
-      
+      const clientName = client ? `${client.nom} ${client.prenom}` : "";
+
       return (
-        devis.numero?.toLowerCase().includes(searchLower) ||
-        devis.objet?.toLowerCase().includes(searchLower) ||
-        clientName.includes(searchLower)
+        matchSearch(devis.numero, searchQuery) ||
+        matchSearch(devis.objet, searchQuery) ||
+        matchSearch(clientName, searchQuery)
       );
     }
-    
+
     return true;
   });
 

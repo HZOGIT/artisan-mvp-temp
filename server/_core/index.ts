@@ -294,12 +294,17 @@ async function startServer() {
       const pool = getPool();
       if (!pool) return res.status(500).json({ error: 'Database unavailable' });
 
+      // COLLATE utf8mb4_general_ci : insensible aux accents et a la casse.
+      // Recherche elargie au-dela du nom : description et categorie.
       let query = `
         SELECT id, nom, description, prix_base, unite, metier, categorie, sous_categorie, duree_moyenne_minutes
         FROM bibliotheque_articles
-        WHERE visible = 1 AND nom LIKE ?
+        WHERE visible = 1
+          AND (nom COLLATE utf8mb4_general_ci LIKE ?
+               OR description COLLATE utf8mb4_general_ci LIKE ?
+               OR categorie COLLATE utf8mb4_general_ci LIKE ?)
       `;
-      const params: any[] = [`%${q}%`];
+      const params: any[] = [`%${q}%`, `%${q}%`, `%${q}%`];
 
       if (metier) { query += ' AND metier = ?'; params.push(metier); }
       if (categorie) { query += ' AND categorie = ?'; params.push(categorie); }

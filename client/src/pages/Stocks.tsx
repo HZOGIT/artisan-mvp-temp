@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { Loader2, Plus, Search, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, History, Bell } from "lucide-react";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 
 type StockFormData = {
   reference: string;
@@ -236,9 +237,9 @@ export default function Stocks() {
   };
 
   const filteredStocks = stocks?.filter(stock =>
-    stock.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    stock.designation.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (stock.fournisseur && stock.fournisseur.toLowerCase().includes(searchQuery.toLowerCase()))
+    matchSearch(stock.reference, searchQuery) ||
+    matchSearch(stock.designation, searchQuery) ||
+    matchSearch(stock.fournisseur, searchQuery)
   );
 
   const isLowStock = (stock: any) => {

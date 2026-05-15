@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge";
 import { StatutBadge } from "@/components/StatutBadge";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -164,12 +165,11 @@ export default function Interventions() {
 
   const filteredInterventions = interventionsList?.filter((intervention: any) => {
     if (statusFilter !== "all" && intervention.statut !== statusFilter) return false;
-    const searchLower = searchQuery.toLowerCase();
-    if (!searchLower) return true;
+    if (!searchQuery) return true;
     return (
-      intervention.titre?.toLowerCase().includes(searchLower) ||
-      intervention.description?.toLowerCase().includes(searchLower) ||
-      intervention.adresse?.toLowerCase().includes(searchLower)
+      matchSearch(intervention.titre, searchQuery) ||
+      matchSearch(intervention.description, searchQuery) ||
+      matchSearch(intervention.adresse, searchQuery)
     );
   });
 

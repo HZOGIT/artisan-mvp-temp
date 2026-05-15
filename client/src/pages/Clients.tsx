@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 
 interface ClientFormData {
   nom: string;
@@ -141,11 +142,13 @@ export function Clients() {
     setSearchQuery(e.target.value);
   }, []);
 
-  // Filtrer les clients
+  // Filtrer les clients (recherche insensible aux accents et a la casse).
   const filteredClients = clients.filter(client =>
-    client.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.telephone?.includes(searchQuery)
+    matchSearch(client.nom, searchQuery) ||
+    matchSearch(client.prenom, searchQuery) ||
+    matchSearch(client.email, searchQuery) ||
+    matchSearch(client.ville, searchQuery) ||
+    (client.telephone ? client.telephone.includes(searchQuery) : false)
   );
 
   return (

@@ -15,6 +15,7 @@ import {
   X, RotateCcw, Search,
 } from "lucide-react";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 import { useIsMobile } from "@/hooks/useMobile";
 
 export default function Chat() {
@@ -116,9 +117,8 @@ export default function Chat() {
     if (filter === "fermees" && c.statut !== "fermee") return false;
     if (filter === "archivees" && c.statut !== "archivee") return false;
     if (search) {
-      const q = search.toLowerCase();
-      const clientName = `${c.client?.prenom || ""} ${c.client?.nom || ""}`.toLowerCase();
-      return clientName.includes(q) || (c.sujet || "").toLowerCase().includes(q);
+      const clientName = `${c.client?.prenom || ""} ${c.client?.nom || ""}`;
+      return matchSearch(clientName, search) || matchSearch(c.sujet, search);
     }
     return true;
   });

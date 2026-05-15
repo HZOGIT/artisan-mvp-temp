@@ -11,6 +11,7 @@ import { Search, Package, Filter, Plus, Pencil, Trash2, Upload, Download, MoreHo
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 
 const categorieLabels: Record<string, string> = {
   prestation: "Prestation",
@@ -251,11 +252,10 @@ export default function Articles() {
   };
 
   const filteredArticles = articles?.filter((article: any) => {
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = !searchLower ||
-      article.nom?.toLowerCase().includes(searchLower) ||
-      article.description?.toLowerCase().includes(searchLower) ||
-      article.sous_categorie?.toLowerCase().includes(searchLower);
+    const matchesSearch = !searchQuery ||
+      matchSearch(article.nom, searchQuery) ||
+      matchSearch(article.description, searchQuery) ||
+      matchSearch(article.sous_categorie, searchQuery);
     const matchesCategory = categoryFilter === "all" || article.categorie === categoryFilter;
     const matchesMetier = metierFilter === "all" || article.metier === metierFilter;
     return matchesSearch && matchesCategory && matchesMetier;

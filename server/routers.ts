@@ -7497,12 +7497,17 @@ const searchRouter = router({
         [fournisseursRows],
       ] = await Promise.all([
         pool.execute(
+          // COLLATE utf8mb4_general_ci : recherche insensible aux accents
+          // ET a la casse (ex : "evi" trouve "Evrard" ET "Évrard").
           `SELECT id, TRIM(CONCAT(COALESCE(prenom, ''), ' ', nom)) AS title,
                   COALESCE(email, telephone, ville, '') AS subtitle
            FROM clients
            WHERE artisanId = ?
-             AND (nom LIKE ? OR prenom LIKE ? OR email LIKE ?
-                  OR telephone LIKE ? OR ville LIKE ?)
+             AND (nom COLLATE utf8mb4_general_ci LIKE ?
+                  OR prenom COLLATE utf8mb4_general_ci LIKE ?
+                  OR email COLLATE utf8mb4_general_ci LIKE ?
+                  OR telephone COLLATE utf8mb4_general_ci LIKE ?
+                  OR ville COLLATE utf8mb4_general_ci LIKE ?)
            ORDER BY id DESC
            LIMIT 5`,
           [artisanId, like, like, like, like, like]
@@ -7512,7 +7517,8 @@ const searchRouter = router({
                   CONCAT(IFNULL(statut, ''), ' — ', FORMAT(COALESCE(totalTTC, 0), 2), ' €') AS subtitle
            FROM devis
            WHERE artisanId = ?
-             AND (numero LIKE ? OR objet LIKE ?)
+             AND (numero COLLATE utf8mb4_general_ci LIKE ?
+                  OR objet COLLATE utf8mb4_general_ci LIKE ?)
            ORDER BY id DESC
            LIMIT 5`,
           [artisanId, like, like]
@@ -7522,7 +7528,8 @@ const searchRouter = router({
                   CONCAT(IFNULL(statut, ''), ' — ', FORMAT(COALESCE(totalTTC, 0), 2), ' €') AS subtitle
            FROM factures
            WHERE artisanId = ?
-             AND (numero LIKE ? OR objet LIKE ?)
+             AND (numero COLLATE utf8mb4_general_ci LIKE ?
+                  OR objet COLLATE utf8mb4_general_ci LIKE ?)
            ORDER BY id DESC
            LIMIT 5`,
           [artisanId, like, like]
@@ -7532,7 +7539,8 @@ const searchRouter = router({
                   CONCAT(IFNULL(statut, ''), ' — ', DATE_FORMAT(dateDebut, '%d/%m/%Y')) AS subtitle
            FROM interventions
            WHERE artisanId = ?
-             AND (titre LIKE ? OR description LIKE ?)
+             AND (titre COLLATE utf8mb4_general_ci LIKE ?
+                  OR description COLLATE utf8mb4_general_ci LIKE ?)
            ORDER BY dateDebut DESC
            LIMIT 5`,
           [artisanId, like, like]
@@ -7542,7 +7550,8 @@ const searchRouter = router({
                   COALESCE(email, telephone, '') AS subtitle
            FROM fournisseurs
            WHERE artisanId = ?
-             AND (nom LIKE ? OR email LIKE ?)
+             AND (nom COLLATE utf8mb4_general_ci LIKE ?
+                  OR email COLLATE utf8mb4_general_ci LIKE ?)
            ORDER BY id DESC
            LIMIT 3`,
           [artisanId, like, like]

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Plus, Trash2, Search, Loader2, Send, Save } from "lucide-react";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 
 interface LigneCommande {
   id: string;
@@ -112,10 +113,9 @@ export default function CommandeFournisseurForm() {
     setIsSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        // Search artisan's own articles locally
-        const q = query.toLowerCase();
+        // Search artisan's own articles locally (accent-insensitive).
         const localResults = (artisanArticles || [])
-          .filter((a: any) => a.designation?.toLowerCase().includes(q) || a.reference?.toLowerCase().includes(q))
+          .filter((a: any) => matchSearch(a.designation, query) || matchSearch(a.reference, query))
           .slice(0, 5)
           .map((a: any) => ({
             id: a.id,

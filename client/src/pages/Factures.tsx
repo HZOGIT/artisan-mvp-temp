@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge";
 import { StatutBadge } from "@/components/StatutBadge";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -134,15 +135,14 @@ export default function Factures() {
       if (facture.statut !== "brouillon") return false;
     }
 
-    // Filtre par recherche
-    const searchLower = searchQuery.toLowerCase();
-    if (!searchLower) return true;
+    // Filtre par recherche — insensible aux accents et a la casse.
+    if (!searchQuery) return true;
     const client = clientsMap.get(facture.clientId);
-    const clientName = client ? `${client.nom} ${client.prenom}`.toLowerCase() : "";
+    const clientName = client ? `${client.nom} ${client.prenom}` : "";
     return (
-      facture.numero?.toLowerCase().includes(searchLower) ||
-      facture.objet?.toLowerCase().includes(searchLower) ||
-      clientName.includes(searchLower)
+      matchSearch(facture.numero, searchQuery) ||
+      matchSearch(facture.objet, searchQuery) ||
+      matchSearch(clientName, searchQuery)
     );
   });
 

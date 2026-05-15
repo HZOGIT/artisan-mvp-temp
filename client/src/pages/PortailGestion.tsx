@@ -8,6 +8,7 @@ import { Globe, Send, Copy, RefreshCw, ShieldOff, Search, Loader2, ExternalLink,
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 
 export default function PortailGestion() {
   const [search, setSearch] = useState("");
@@ -48,11 +49,10 @@ export default function PortailGestion() {
           {(clients || [])
             .filter((c) => {
               if (!search) return true;
-              const q = search.toLowerCase();
               return (
-                c.nom.toLowerCase().includes(q) ||
-                (c.prenom || "").toLowerCase().includes(q) ||
-                (c.email || "").toLowerCase().includes(q)
+                matchSearch(c.nom, search) ||
+                matchSearch(c.prenom, search) ||
+                matchSearch(c.email, search)
               );
             })
             .map((client) => (

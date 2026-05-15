@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, FileText, Loader2, Search, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { Switch as SwitchUI } from "@/components/ui/switch";
@@ -184,12 +185,11 @@ export default function Contrats() {
   const filteredContrats = (contrats || []).filter((c) => {
     if (filterStatut !== "tous" && c.statut !== filterStatut) return false;
     if (search) {
-      const q = search.toLowerCase();
-      const clientName = `${c.client?.prenom || ""} ${c.client?.nom || ""}`.toLowerCase();
+      const clientName = `${c.client?.prenom || ""} ${c.client?.nom || ""}`;
       return (
-        c.reference.toLowerCase().includes(q) ||
-        c.titre.toLowerCase().includes(q) ||
-        clientName.includes(q)
+        matchSearch(c.reference, search) ||
+        matchSearch(c.titre, search) ||
+        matchSearch(clientName, search)
       );
     }
     return true;

@@ -9,6 +9,7 @@ import { ArrowLeft, Save, Package, Check, Search, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
+import { matchSearch } from "@/lib/normalize";
 import {
   Dialog,
   DialogContent,
@@ -59,18 +60,12 @@ export default function DevisLigneEdit() {
     if (!articles) return [];
     if (!searchQuery) return articles.slice(0, 100);
     
-    const query = searchQuery.toLowerCase();
-    return articles.filter((article: any) => {
-      const reference = (article.reference || "").toLowerCase();
-      const designation = (article.designation || "").toLowerCase();
-      const description = (article.description || "").toLowerCase();
-      const categorie = (article.categorie || "").toLowerCase();
-      
-      return reference.includes(query) || 
-             designation.includes(query) || 
-             description.includes(query) ||
-             categorie.includes(query);
-    }).slice(0, 100);
+    return articles.filter((article: any) =>
+      matchSearch(article.reference, searchQuery) ||
+      matchSearch(article.designation, searchQuery) ||
+      matchSearch(article.description, searchQuery) ||
+      matchSearch(article.categorie, searchQuery)
+    ).slice(0, 100);
   }, [articles, searchQuery]);
 
   // Grouper les articles par catégorie
