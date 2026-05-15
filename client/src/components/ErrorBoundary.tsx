@@ -1,6 +1,5 @@
-import { cn } from "@/lib/utils";
-import { AlertTriangle, RotateCcw } from "lucide-react";
-import { Component, ReactNode } from "react";
+import { AlertTriangle, Home, RotateCcw } from "lucide-react";
+import { Component, ErrorInfo, ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
@@ -21,35 +20,66 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // Pour la prod, on logue dans la console — le stack trace n'est PAS
+    // expose a l'utilisateur final (UI user-friendly, voir render()).
+    console.error("[App ErrorBoundary]", error, info);
+  }
+
   render() {
     if (this.state.hasError) {
+      const isProd = (import.meta as any).env?.PROD;
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
-            <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
-            />
+        <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-slate-50 via-rose-50/20 to-orange-50/30">
+          <div className="max-w-md w-full text-center">
+            <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-xl mb-5">
+              <AlertTriangle className="h-10 w-10" />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
+              Oups ! Une erreur est survenue
+            </h1>
+            <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+              Ne vous inquiétez pas, vos données sont en sécurité.
+              <br />
+              Réessayez en rechargeant la page ou retournez au tableau de bord.
+            </p>
 
-            <h2 className="text-xl mb-4">An unexpected error occurred.</h2>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
-              </pre>
+            <div className="mt-7 flex flex-col sm:flex-row gap-2 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 font-medium text-sm transition-colors"
+              >
+                <RotateCcw className="h-4 w-4" /> Recharger la page
+              </button>
+              <button
+                onClick={() => {
+                  window.location.href = "/dashboard";
+                }}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition-colors shadow-md"
+              >
+                <Home className="h-4 w-4" /> Tableau de bord
+              </button>
             </div>
 
-            <button
-              onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg",
-                "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
-              )}
-            >
-              <RotateCcw size={16} />
-              Reload Page
-            </button>
+            {/* Stack trace UNIQUEMENT en dev — masque en production pour ne
+                pas exposer de details techniques aux utilisateurs finaux. */}
+            {!isProd && this.state.error && (
+              <details className="mt-8 text-left">
+                <summary className="text-xs cursor-pointer text-slate-500 hover:text-slate-700">
+                  Détails techniques (dev)
+                </summary>
+                <pre className="mt-2 p-3 bg-slate-900 text-slate-200 rounded text-[10px] overflow-auto max-h-64">
+                  {this.state.error.stack || this.state.error.message}
+                </pre>
+              </details>
+            )}
+
+            <p className="mt-8 text-xs text-slate-500">
+              Si le problème persiste, contactez{" "}
+              <a href="mailto:support@operioz.fr" className="text-blue-600 hover:underline">
+                support@operioz.fr
+              </a>
+            </p>
           </div>
         </div>
       );
