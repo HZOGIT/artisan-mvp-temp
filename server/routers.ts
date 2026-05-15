@@ -7513,6 +7513,58 @@ export const appRouter = router({system: systemRouter,
       clearAuthCookie(ctx.res);
       return { success: true };
     }),
+
+    /** Modifier l'adresse email de l'utilisateur courant. */
+    updateEmail: protectedProcedure
+      .input(z.object({ newEmail: z.string().email() }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getUserByEmail(input.newEmail);
+        if (existing && existing.id !== ctx.user.id) {
+          throw new TRPCError({ code: 'CONFLICT', message: 'Email déjà utilisé' });
+        }
+        await db.updateUser(ctx.user.id, { email: input.newEmail });
+        return { success: true };
+      }),
+
+    /** Modifier le mot de passe : verifie l'ancien puis hash le nouveau. */
+    updatePassword: protectedProcedure
+      .input(z.object({
+        currentPassword: z.string().min(1),
+        newPassword: z.string().min(6),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await db.getUserById(ctx.user.id);
+        if (!user || !user.password) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Aucun mot de passe configuré sur ce compte' });
+        }
+        const { verifyPassword, hashPassword } = await import('./_core/auth');
+        const ok = await verifyPassword(input.currentPassword, user.password);
+        if (!ok) {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Mot de passe actuel incorrect' });
+        }
+        const hashed = await hashPassword(input.newPassword);
+        await db.updateUser(ctx.user.id, { password: hashed });
+        return { success: true };
+      }),
+
+    /** Suppression du compte (soft delete : actif=false). Deconnecte ensuite. */
+    deleteAccount: protectedProcedure
+      .input(z.object({ confirmation: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.confirmation !== 'SUPPRIMER') {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Confirmation incorrecte' });
+        }
+        // Soft-delete : marque inactif + invalide l'email pour autoriser
+        // sa reutilisation. Conserve les donnees liees (devis/factures)
+        // pour conformite legale (l'artisan peut avoir besoin de les
+        // recuperer pour la comptabilite).
+        await db.updateUser(ctx.user.id, {
+          actif: false,
+          email: `deleted_${ctx.user.id}_${Date.now()}@operioz.fr`,
+        } as any);
+        clearAuthCookie(ctx.res);
+        return { success: true };
+      }),
   }),
   artisan: artisanRouter,
   clients: clientsRouter,
