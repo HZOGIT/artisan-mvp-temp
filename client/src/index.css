@@ -248,3 +248,9 @@
 
 .animation-delay-2000 { animation-delay: 2s; }
 .animation-delay-4000 { animation-delay: 4s; }
+
+@keyframes operioz-shimmer {
+  0%, 100% { box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25); }
+  50% { box-shadow: 0 4px 24px rgba(139, 92, 246, 0.6), 0 0 16px rgba(217, 70, 239, 0.3); }
+}
+.animate-pulse-shimmer { animation: operioz-shimmer 2.5s ease-in-out infinite; }
