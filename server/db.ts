@@ -3198,6 +3198,27 @@ export async function setUserPermissions(userId: number, permissions: string[], 
 }
 
 // ============================================================================
+// Cache en memoire (TTL) pour les queries lues frequemment.
+// Map<string, {data, expiresAt}> avec invalidation manuelle.
+// ============================================================================
+const memCache = new Map<string, { data: any; expiresAt: number }>();
+
+function getCached<T>(key: string, ttlMs: number, fetcher: () => Promise<T>): Promise<T> {
+  const c = memCache.get(key);
+  if (c && c.expiresAt > Date.now()) return Promise.resolve(c.data as T);
+  return fetcher().then((data) => {
+    memCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+    return data;
+  });
+}
+
+export function invalidateCache(prefix: string): void {
+  for (const k of Array.from(memCache.keys())) {
+    if (k.startsWith(prefix)) memCache.delete(k);
+  }
+}
+
+// ============================================================================
 // MODULES — catalogue + activation par artisan
 //
 // Implementation 100% raw SQL via mysql2 pool : on n'utilise PAS Drizzle ORM
@@ -3227,9 +3248,12 @@ export interface ModuleRow {
 }
 
 export async function getModules(): Promise<ModuleRow[]> {
-  const pool = await ensurePool();
-  const [rows] = await pool.execute('SELECT * FROM modules ORDER BY ordre ASC') as any;
-  return rows as ModuleRow[];
+  // Catalogue tres statique → cache 5 min, partage entre tous les artisans.
+  return getCached("modules:all", 5 * 60 * 1000, async () => {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute('SELECT * FROM modules ORDER BY ordre ASC') as any;
+    return rows as ModuleRow[];
+  });
 }
 
 export async function getModuleBySlug(slug: string): Promise<ModuleRow | undefined> {
@@ -3245,19 +3269,22 @@ export async function getModuleBySlug(slug: string): Promise<ModuleRow | undefin
  * - Sinon → uniquement les modules avec actif = 1.
  */
 export async function getArtisanModulesActifs(artisanId: number): Promise<string[]> {
-  const pool = await ensurePool();
-  const [prefs] = await pool.execute(
-    'SELECT module_slug, actif FROM artisan_modules WHERE artisan_id = ?',
-    [artisanId]
-  ) as any;
-  const arr = prefs as Array<{ module_slug: string; actif: number }>;
-  if (arr.length === 0) {
-    const [defaults] = await pool.execute(
-      'SELECT slug FROM modules WHERE actif_par_defaut = TRUE'
+  // TTL 60s : les toggles modules invalident via invalidateCache("modules:actifs:").
+  return getCached(`modules:actifs:${artisanId}`, 60 * 1000, async () => {
+    const pool = await ensurePool();
+    const [prefs] = await pool.execute(
+      'SELECT module_slug, actif FROM artisan_modules WHERE artisan_id = ?',
+      [artisanId]
     ) as any;
-    return (defaults as Array<{ slug: string }>).map((r) => r.slug);
-  }
-  return arr.filter((r) => r.actif === 1 || (r.actif as any) === true).map((r) => r.module_slug);
+    const arr = prefs as Array<{ module_slug: string; actif: number }>;
+    if (arr.length === 0) {
+      const [defaults] = await pool.execute(
+        'SELECT slug FROM modules WHERE actif_par_defaut = TRUE'
+      ) as any;
+      return (defaults as Array<{ slug: string }>).map((r) => r.slug);
+    }
+    return arr.filter((r) => r.actif === 1 || (r.actif as any) === true).map((r) => r.module_slug);
+  });
 }
 
 export async function setArtisanModule(
@@ -3272,6 +3299,8 @@ export async function setArtisanModule(
      ON DUPLICATE KEY UPDATE actif = VALUES(actif)`,
     [artisanId, moduleSlug, actif ? 1 : 0]
   );
+  // Invalide le cache : la liste de modules actifs vient de changer.
+  invalidateCache(`modules:actifs:${artisanId}`);
 }
 
 /**

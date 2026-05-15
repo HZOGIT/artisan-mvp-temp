@@ -843,6 +843,32 @@ async function fixDuplicates() {
     }
 
     // ========================================================================
+    // Index SQL pour accelerer les requetes par artisan_id (filtre present
+    // sur quasi toutes les queries). MySQL ne supporte pas IF NOT EXISTS
+    // sur CREATE INDEX → catch ER_DUP_KEYNAME pour idempotence.
+    // ========================================================================
+    const indexes: Array<{ table: string; col: string; name: string }> = [
+      { table: 'clients', col: 'artisanId', name: 'idx_clients_artisanId' },
+      { table: 'devis', col: 'artisanId', name: 'idx_devis_artisanId' },
+      { table: 'factures', col: 'artisanId', name: 'idx_factures_artisanId' },
+      { table: 'interventions', col: 'artisanId', name: 'idx_interventions_artisanId' },
+      { table: 'notifications', col: 'artisanId', name: 'idx_notifications_artisanId' },
+      { table: 'artisan_modules', col: 'artisan_id', name: 'idx_artisan_modules_artisan_id' },
+    ];
+    for (const idx of indexes) {
+      try {
+        await pool.execute(`ALTER TABLE ${idx.table} ADD INDEX ${idx.name} (${idx.col})`);
+        console.log(`[Index] ${idx.name} cree`);
+      } catch (e: any) {
+        if (e?.code === 'ER_DUP_KEYNAME' || e?.message?.includes('Duplicate key name')) {
+          // index deja present, ok
+        } else {
+          console.log(`[Index] ${idx.name} :`, e?.message);
+        }
+      }
+    }
+
+    // ========================================================================
     // Force l'artisan demo (id=1) en plan ENTREPRISE + active TOUS les modules.
     // Bloc separe, idempotent, non-bloquant.
     // ========================================================================

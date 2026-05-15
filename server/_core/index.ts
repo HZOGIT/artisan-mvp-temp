@@ -136,6 +136,40 @@ async function startServer() {
   
   // IMPORTANT: cookie-parser MUST be before routes to parse cookies
   app.use(cookieParser());
+
+  // ─────────────────────────────────────────────────────────────────
+  // Rate limit sur l'authentification : max 5 tentatives / 15min / IP.
+  // S'applique aux routes tRPC auth.signin et auth.signup.
+  // Implementation Map en memoire — single instance Railway hobby, suffisant.
+  // ─────────────────────────────────────────────────────────────────
+  const authAttempts = new Map<string, { count: number; resetAt: number }>();
+  const AUTH_MAX = 5;
+  const AUTH_WINDOW_MS = 15 * 60 * 1000;
+  app.use('/api/trpc', (req, res, next) => {
+    // Cible uniquement les mutations auth.signin / auth.signup.
+    const path = req.path || '';
+    const isAuth = path.includes('auth.signin') || path.includes('auth.signup');
+    if (!isAuth) return next();
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+      || req.socket.remoteAddress
+      || 'unknown';
+    const now = Date.now();
+    let entry = authAttempts.get(ip);
+    if (!entry || entry.resetAt <= now) {
+      entry = { count: 1, resetAt: now + AUTH_WINDOW_MS };
+      authAttempts.set(ip, entry);
+      return next();
+    }
+    entry.count++;
+    if (entry.count > AUTH_MAX) {
+      const retryAfterS = Math.ceil((entry.resetAt - now) / 1000);
+      res.setHeader('Retry-After', retryAfterS);
+      return res.status(429).json({
+        error: { message: 'Trop de tentatives. Réessayez dans 15 minutes.', code: 'TOO_MANY_REQUESTS' },
+      });
+    }
+    next();
+  });
   console.log('OK cookieParser() charge');
 
   // ============================================================
