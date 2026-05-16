@@ -85,6 +85,10 @@ const Documentation = lazy(() => import("./pages/Documentation"));
 const ModulesPage = lazy(() => import("./pages/Modules"));
 const ImportPage = lazy(() => import("./pages/Import"));
 const Support = lazy(() => import("./pages/Support"));
+const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
+const CGU = lazy(() => import("./pages/legal/CGU"));
+const CGV = lazy(() => import("./pages/legal/CGV"));
+const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
 
 // Skeleton de chargement pour les pages lazy.
 function PageLoader() {
@@ -189,6 +193,11 @@ function AuthenticatedRoutes() {
           <Route path="/modules" component={ModulesPage} />
           <Route path="/import" component={ImportPage} />
           <Route path="/support" component={Support} />
+          {/* Pages legales — publiques, pas d'auth requise */}
+          <Route path="/mentions-legales" component={MentionsLegales} />
+          <Route path="/cgu" component={CGU} />
+          <Route path="/cgv" component={CGV} />
+          <Route path="/confidentialite" component={Confidentialite} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>

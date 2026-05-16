@@ -44,6 +44,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { CookieBanner } from "@/components/CookieBanner";
 
 /* ───────────────────────────── KEYFRAMES (inline) ───────────────────────────── */
 /* Injected once. Tailwind handles everything else. */
@@ -149,6 +150,7 @@ export default function Home() {
       <FAQSection />
       <FinalCTASection />
       <Footer />
+      <CookieBanner />
     </div>
   );
 }
@@ -1578,6 +1580,11 @@ function Footer() {
               <li>
                 <a href="/mentions-legales" className="text-sm text-slate-400 hover:text-white transition-colors">
                   Mentions légales
+                </a>
+              </li>
+              <li>
+                <a href="/cgu" className="text-sm text-slate-400 hover:text-white transition-colors">
+                  CGU
                 </a>
               </li>
               <li>
