@@ -313,3 +313,151 @@ Ce message a été envoyé automatiquement depuis Operioz.
 
   return { subject, body };
 }
+
+// ============================================================================
+// T5 — Emails transactionnels subscription
+// Templates HTML uniformes (header + CTA + footer) compatibles
+// avec sendEmail() ci-dessus (champs to, subject, body).
+// ============================================================================
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]!));
+}
+
+function baseTemplate(opts: {
+  headerColor?: string;
+  title: string;
+  body: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+  footer?: string;
+}): string {
+  const headerColor = opts.headerColor || "#2563eb";
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+        <tr><td style="background:${headerColor};padding:32px 40px;text-align:center;">
+          <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">${escapeHtml(opts.title)}</h1>
+        </td></tr>
+        <tr><td style="padding:32px 40px;color:#374151;font-size:15px;line-height:1.6;">
+          ${opts.body}
+          ${opts.ctaLabel && opts.ctaUrl ? `
+          <p style="margin:24px 0;text-align:center;">
+            <a href="${opts.ctaUrl}" style="display:inline-block;background:${headerColor};color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">${escapeHtml(opts.ctaLabel)} →</a>
+          </p>` : ""}
+          ${opts.footer ? `<p style="margin:16px 0 0 0;font-size:13px;color:#6b7280;line-height:1.5;">${opts.footer}</p>` : ""}
+        </td></tr>
+        <tr><td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">© ${new Date().getFullYear()} Operioz — Le logiciel de gestion tout-en-un pour les professionnels.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+export function buildTrialEndingJ3Email(params: {
+  firstName?: string | null;
+  stats?: { devis?: number; clients?: number; factures?: number };
+  appUrl: string;
+}): { subject: string; body: string } {
+  const greet = params.firstName ? `Bonjour ${escapeHtml(params.firstName)},` : "Bonjour,";
+  const stats = params.stats || {};
+  const statsLine = (stats.devis || stats.clients || stats.factures)
+    ? `<p style="margin:0 0 16px 0;">Pendant votre essai, vous avez deja cree <strong>${stats.devis || 0} devis</strong>, <strong>${stats.clients || 0} clients</strong> et <strong>${stats.factures || 0} factures</strong>. Continuez sur votre lancee !</p>`
+    : "";
+  return {
+    subject: "⏰ Plus que 3 jours pour votre essai Operioz",
+    body: baseTemplate({
+      title: "Plus que 3 jours d'essai gratuit",
+      body: `<p style="margin:0 0 16px 0;">${greet}</p>
+        ${statsLine}
+        <p style="margin:0 0 8px 0;">Choisissez votre plan pour continuer sans interruption :</p>
+        <ul style="margin:0 0 16px 20px;padding:0;">
+          <li><strong>Essentiel</strong> — 29€/mois — Artisan seul</li>
+          <li><strong>Pro</strong> — 49€/mois — Equipe jusqu'a 3 users</li>
+          <li><strong>Entreprise</strong> — 89€/mois — 10 users inclus</li>
+        </ul>`,
+      ctaLabel: "Choisir mon plan",
+      ctaUrl: `${params.appUrl}/parametres?tab=abonnement`,
+      footer: "Vos donnees sont conservees meme si vous decidez de ne pas continuer immediatement.",
+    }),
+  };
+}
+
+export function buildTrialEndingJ1Email(params: {
+  firstName?: string | null;
+  appUrl: string;
+}): { subject: string; body: string } {
+  const greet = params.firstName ? `Bonjour ${escapeHtml(params.firstName)},` : "Bonjour,";
+  return {
+    subject: "🚨 Dernier jour de votre essai Operioz",
+    body: baseTemplate({
+      headerColor: "#dc2626",
+      title: "Dernier jour d'essai gratuit",
+      body: `<p style="margin:0 0 16px 0;">${greet}</p>
+        <p style="margin:0 0 16px 0;">Votre essai gratuit se termine <strong>demain</strong>. Choisissez votre plan maintenant pour ne pas perdre l'acces a vos donnees.</p>`,
+      ctaLabel: "Choisir mon plan maintenant",
+      ctaUrl: `${params.appUrl}/parametres?tab=abonnement`,
+      footer: "Apres expiration, vos donnees restent conservees 30 jours.",
+    }),
+  };
+}
+
+export function buildPaymentConfirmedEmail(params: {
+  planName: string;
+  nextRenewalDate?: Date | null;
+  appUrl: string;
+}): { subject: string; body: string } {
+  const renewalLine = params.nextRenewalDate
+    ? `<p style="margin:0 0 16px 0;">Prochain renouvellement le <strong>${params.nextRenewalDate.toLocaleDateString("fr-FR")}</strong>.</p>`
+    : "";
+  return {
+    subject: `Paiement confirme — Bienvenue sur Operioz ${escapeHtml(params.planName)}`,
+    body: baseTemplate({
+      headerColor: "#10b981",
+      title: "Paiement confirme",
+      body: `<p style="margin:0 0 16px 0;">Merci pour votre confiance ! Votre abonnement <strong>${escapeHtml(params.planName)}</strong> est actif.</p>
+        ${renewalLine}`,
+      ctaLabel: "Acceder a mon espace",
+      ctaUrl: `${params.appUrl}/dashboard`,
+    }),
+  };
+}
+
+export function buildPaymentFailedEmail(params: { appUrl: string }): { subject: string; body: string } {
+  return {
+    subject: "⚠️ Probleme de paiement — Action requise",
+    body: baseTemplate({
+      headerColor: "#f59e0b",
+      title: "Echec de paiement",
+      body: `<p style="margin:0 0 16px 0;">Le paiement de votre abonnement Operioz n'a pas pu etre effectue. Merci de mettre a jour votre moyen de paiement <strong>sous 7 jours</strong> pour eviter la suspension.</p>`,
+      ctaLabel: "Mettre a jour ma carte",
+      ctaUrl: `${params.appUrl}/parametres?tab=abonnement`,
+    }),
+  };
+}
+
+export function buildSubscriptionCanceledEmail(params: {
+  endsAt?: Date | null;
+  appUrl: string;
+}): { subject: string; body: string } {
+  const dateLine = params.endsAt
+    ? `<p style="margin:0 0 16px 0;">Vous avez encore acces jusqu'au <strong>${params.endsAt.toLocaleDateString("fr-FR")}</strong>.</p>`
+    : "";
+  return {
+    subject: "Confirmation de resiliation Operioz",
+    body: baseTemplate({
+      title: "Votre abonnement est resilie",
+      body: `<p style="margin:0 0 16px 0;">Votre abonnement Operioz a bien ete resilie comme demande.</p>
+        ${dateLine}
+        <p style="margin:0 0 16px 0;">Vos donnees sont conservees pendant 30 jours. Vous pouvez vous reabonner a tout moment.</p>`,
+      ctaLabel: "Renouveler mon abonnement",
+      ctaUrl: `${params.appUrl}/parametres?tab=abonnement`,
+    }),
+  };
+}

@@ -1056,6 +1056,110 @@ async function startServer() {
   server.listen(port, host, () => {
     console.log(`Server running on http://${host}:${port}/ (env=${process.env.NODE_ENV || "dev"})`);
   });
+
+  // ==========================================================================
+  // T5 — Scheduler horaire : sessions expirees + emails J-3/J-1 + bascule
+  // trials terminés en 'expired'. Best-effort, ne crashe pas le process si
+  // une iteration echoue.
+  // ==========================================================================
+  const runScheduler = async () => {
+    try {
+      const db = await import("../db");
+      const { sendEmail, buildTrialEndingJ3Email, buildTrialEndingJ1Email } = await import("./emailService");
+      const appUrl = process.env.APP_URL || "https://artisan.cheminov.com";
+
+      // 1) Nettoyage des sessions expirees.
+      const cleaned = await db.cleanExpiredSessions();
+      if (cleaned > 0) console.log(`[Scheduler] ${cleaned} session(s) expiree(s) nettoyee(s)`);
+
+      // 2) Bascule des trials termines en 'expired'. On le fait AVANT les
+      //    envois d'email pour ne pas envoyer un J-3 alors qu'il est deja
+      //    a 0 jour (edge case du scheduler qui aurait saute des heures).
+      try {
+        const pool = db.getPool();
+        if (pool) {
+          const [r] = await pool.execute(
+            `UPDATE subscriptions SET status='expired', plan='expired'
+             WHERE status='trialing' AND trial_ends_at < NOW()`
+          ) as any;
+          if (r.affectedRows > 0) {
+            console.log(`[Scheduler] ${r.affectedRows} trial(s) expire(s) -> plan='expired'`);
+          }
+        }
+      } catch (e: any) {
+        console.warn("[Scheduler] expire trials:", e?.message || e);
+      }
+
+      // 3) Emails J-3 (trials qui se terminent dans EXACTEMENT 3 jours).
+      //    On utilise DATE() pour matcher par jour calendaire et eviter
+      //    un envoi a la minute pres.
+      try {
+        const pool = db.getPool();
+        if (pool) {
+          const [rows] = await pool.execute(`
+            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
+            FROM artisans a
+            JOIN users u ON u.id = a.userId
+            JOIN subscriptions s ON s.artisan_id = a.id
+            WHERE s.status = 'trialing'
+              AND DATE(s.trial_ends_at) = DATE(DATE_ADD(NOW(), INTERVAL 3 DAY))
+          `) as any;
+          for (const row of rows as any[]) {
+            if (!row.email) continue;
+            const { subject, body } = buildTrialEndingJ3Email({
+              firstName: row.prenom, appUrl,
+            });
+            await sendEmail({ to: row.email, subject, body });
+          }
+          if ((rows as any[]).length > 0) {
+            console.log(`[Scheduler] ${(rows as any[]).length} email(s) J-3 envoye(s)`);
+          }
+        }
+      } catch (e: any) {
+        console.warn("[Scheduler] J-3:", e?.message || e);
+      }
+
+      // 4) Emails J-1.
+      try {
+        const pool = db.getPool();
+        if (pool) {
+          const [rows] = await pool.execute(`
+            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
+            FROM artisans a
+            JOIN users u ON u.id = a.userId
+            JOIN subscriptions s ON s.artisan_id = a.id
+            WHERE s.status = 'trialing'
+              AND DATE(s.trial_ends_at) = DATE(DATE_ADD(NOW(), INTERVAL 1 DAY))
+          `) as any;
+          for (const row of rows as any[]) {
+            if (!row.email) continue;
+            const { subject, body } = buildTrialEndingJ1Email({
+              firstName: row.prenom, appUrl,
+            });
+            await sendEmail({ to: row.email, subject, body });
+          }
+          if ((rows as any[]).length > 0) {
+            console.log(`[Scheduler] ${(rows as any[]).length} email(s) J-1 envoye(s)`);
+          }
+        }
+      } catch (e: any) {
+        console.warn("[Scheduler] J-1:", e?.message || e);
+      }
+    } catch (e: any) {
+      console.error("[Scheduler] erreur generale:", e?.message || e);
+    }
+  };
+
+  // Premier tick apres 60s (laisse le temps a la migration de tourner), puis
+  // toutes les heures. On ne lance le scheduler qu'en prod pour ne pas
+  // envoyer des emails depuis chaque session de dev.
+  if (isProd) {
+    setTimeout(runScheduler, 60_000);
+    setInterval(runScheduler, 60 * 60 * 1000);
+    console.log("[Scheduler] Active (toutes les heures)");
+  } else {
+    console.log("[Scheduler] Skip (NODE_ENV != production)");
+  }
 }
 
 startServer().catch(console.error);
