@@ -20,6 +20,8 @@ import { AssistantFAB } from "./AssistantFAB";
 import { AssistantDrawer, type AssistantPanelSize } from "./AssistantDrawer";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { GlobalSearch } from "./GlobalSearch";
+import { TrialBanner } from "./TrialBanner";
+import { ExpiredBlocker } from "./ExpiredBlocker";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -664,6 +666,21 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
+  // Subscription : on l'utilise pour le TrialBanner et le blocage
+  // ExpiredBlocker. On garde frais 1 min pour reagir vite a un paiement.
+  const { data: subscription } = trpc.subscription.getCurrent.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
+  const trialEnded =
+    subscription?.status === "trialing" && subscription.trialDaysLeft <= 0;
+  const isBlocked =
+    subscription?.status === "expired" ||
+    (subscription?.status === "canceled" && subscription.currentPeriodEnd && new Date(subscription.currentPeriodEnd) < new Date()) ||
+    trialEnded;
+  // Routes ou on laisse passer meme bloque (renouvellement, profil, deconnexion).
+  const blockerAllowed =
+    location.startsWith("/parametres") ||
+    location.startsWith("/profil");
   // Modules actifs pour cet artisan. Quand isLoading ou pas connecté → null
   // (= show-all, comportement actuel) pour ne pas masquer la nav pendant
   // le 1er fetch ni si le backend modules est down.
@@ -1096,7 +1113,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         )}
 
         <main className="flex-1 p-4 pb-20 md:pb-4 min-w-0 max-w-full overflow-x-hidden">
-          {children}
+          {/* Bandeau d'essai (J-7 / J-3 / J-1). Pas affiche si plan actif. */}
+          <TrialBanner />
+          {/* Blocage si abonnement expire ET pas deja sur une page de
+              gestion (parametres / profil) ou l'utilisateur peut renouveler. */}
+          {isBlocked && !blockerAllowed ? <ExpiredBlocker /> : children}
         </main>
       </div>
 

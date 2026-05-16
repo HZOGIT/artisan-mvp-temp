@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearch, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,8 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Settings, FileText, Bell, Save, Globe, ExternalLink, Palette, Upload, Trash2, Image } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Settings, FileText, Bell, Save, Globe, ExternalLink, Palette, Upload, Trash2, Image, CreditCard } from "lucide-react";
 import { toast } from "sonner";
+import { AbonnementSection } from "@/components/AbonnementSection";
 
 export default function Parametres() {
   const [formData, setFormData] = useState({
@@ -150,6 +153,26 @@ export default function Parametres() {
     );
   }
 
+  // Lecture du tab actif depuis l'URL (?tab=abonnement pour deep link
+  // depuis le banner ou le webhook de checkout success).
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const initialTab = new URLSearchParams(search).get("tab") === "abonnement" ? "abonnement" : "general";
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+
+  // Toast post-checkout : Stripe ramene sur ?success=1 ou ?canceled=1.
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get("success") === "1") {
+      toast.success("Abonnement actif. Bienvenue !");
+      // On enleve le query param de l'URL pour ne pas re-afficher au refresh.
+      navigate("/parametres?tab=abonnement", { replace: true });
+    } else if (params.get("canceled") === "1") {
+      toast("Paiement annule, vous pouvez reessayer quand vous voulez.");
+      navigate("/parametres?tab=abonnement", { replace: true });
+    }
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -160,6 +183,23 @@ export default function Parametres() {
         </p>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="general" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Général
+          </TabsTrigger>
+          <TabsTrigger value="abonnement" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            Abonnement
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="abonnement" className="mt-6">
+          <AbonnementSection />
+        </TabsContent>
+
+        <TabsContent value="general" className="mt-6">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Personnalisation */}
         <Card>
@@ -474,6 +514,8 @@ export default function Parametres() {
           </Button>
         </div>
       </form>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
