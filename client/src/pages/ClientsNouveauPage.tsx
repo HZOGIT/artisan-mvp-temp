@@ -130,6 +130,8 @@ export function ClientsNouveauPage() {
               <input
                 id="email"
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
@@ -145,6 +147,8 @@ export function ClientsNouveauPage() {
               <input
                 id="telephone"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 name="telephone"
                 value={formData.telephone}
                 onChange={handleInputChange}
