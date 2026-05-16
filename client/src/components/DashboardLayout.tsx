@@ -40,6 +40,7 @@ import {
   FileText,
   Globe,
   HardHat,
+  HelpCircle,
   Info,
   LayoutDashboard,
   LayoutGrid,
@@ -268,6 +269,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "slate",
     items: [
       { icon: BookOpen, label: "Guide d'utilisation", path: "/documentation" },
+      { icon: HelpCircle, label: "Support", path: "/support" },
       { icon: User, label: "Mon profil", path: "/profil" },
       { icon: Settings, label: "Paramètres", path: "/parametres" },
       { icon: LayoutGrid, label: "Mes modules", path: "/modules" },
@@ -738,6 +740,34 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(min-width: 1024px)").matches;
   });
+
+  // Bus event 'operioz:open-assistant' : permet a la page Support
+  // (et tout autre composant) de demander l'ouverture du drawer IA
+  // sans avoir a recevoir setIsAssistantOpen via props.
+  useEffect(() => {
+    const onOpen = () => setIsAssistantOpen(true);
+    window.addEventListener("operioz:open-assistant", onOpen);
+    return () => window.removeEventListener("operioz:open-assistant", onOpen);
+  }, []);
+
+  // Tawk.to chat widget — chat live optionnel pour assistance utilisateur.
+  // TAWK_ID est un placeholder. Pour activer le widget, creer un compte gratuit
+  // sur https://tawk.to puis remplacer 'placeholder' par votre property ID
+  // (visible dans Admin > Channels > Chat Widget > Direct Chat Link).
+  // Le script ne charge RIEN si TAWK_ID === 'placeholder'.
+  useEffect(() => {
+    const TAWK_ID = import.meta.env.VITE_TAWK_ID || "placeholder";
+    if (TAWK_ID === "placeholder" || typeof window === "undefined") return;
+    if (document.getElementById("tawk-script")) return;
+    const script = document.createElement("script");
+    script.id = "tawk-script";
+    script.async = true;
+    script.src = `https://embed.tawk.to/${TAWK_ID}/default`;
+    script.charset = "UTF-8";
+    script.setAttribute("crossorigin", "*");
+    document.head.appendChild(script);
+  }, []);
+
   const [panelSize, setPanelSize] = useState<AssistantPanelSize>(() => readPanelSize());
   useEffect(() => {
     try {

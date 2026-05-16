@@ -7912,10 +7912,50 @@ const devicesRouter = router({
   }),
 });
 
+// ============================================================================
+// SUPPORT ROUTER — formulaire de contact qui envoie un email a support@operioz.com
+// ============================================================================
+const supportRouter = router({
+  contact: protectedProcedure
+    .input(z.object({
+      nom: z.string().min(1).max(120),
+      email: z.string().email(),
+      sujet: z.enum(["technique", "facturation", "suggestion", "autre"]),
+      message: z.string().min(10).max(5000),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const subjectLabels: Record<string, string> = {
+        technique: "Probleme technique",
+        facturation: "Question facturation",
+        suggestion: "Suggestion",
+        autre: "Autre",
+      };
+      const subjectLabel = subjectLabels[input.sujet] || input.sujet;
+      const body = `<html><body style="font-family:Arial,sans-serif;color:#1f2937;">
+        <h2 style="color:#2563eb;">Nouveau message support (${subjectLabel})</h2>
+        <table cellpadding="6" style="border-collapse:collapse;">
+          <tr><td><strong>De :</strong></td><td>${input.nom} &lt;${input.email}&gt;</td></tr>
+          <tr><td><strong>User ID :</strong></td><td>${ctx.user.id} (artisanId ${ctx.user.artisanId ?? "—"})</td></tr>
+          <tr><td><strong>Sujet :</strong></td><td>${subjectLabel}</td></tr>
+        </table>
+        <div style="background:#f9fafb;border-left:3px solid #2563eb;padding:12px 16px;margin-top:16px;white-space:pre-wrap;">
+          ${input.message.replace(/[<>]/g, (c) => c === "<" ? "&lt;" : "&gt;")}
+        </div>
+      </body></html>`;
+      await sendEmail({
+        to: process.env.SUPPORT_EMAIL || "support@operioz.com",
+        subject: `[Support Operioz] ${subjectLabel} — ${input.nom}`,
+        body,
+      });
+      return { success: true };
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
   search: searchRouter,
   subscription: subscriptionRouter,
   devices: devicesRouter,
+  support: supportRouter,
   modules: modulesRouter,
   importErp: importRouter,
   auth: router({

@@ -84,6 +84,7 @@ const PortailGestion = lazy(() => import("./pages/PortailGestion"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const ModulesPage = lazy(() => import("./pages/Modules"));
 const ImportPage = lazy(() => import("./pages/Import"));
+const Support = lazy(() => import("./pages/Support"));
 
 // Skeleton de chargement pour les pages lazy.
 function PageLoader() {
@@ -187,6 +188,7 @@ function AuthenticatedRoutes() {
           <Route path="/documentation" component={Documentation} />
           <Route path="/modules" component={ModulesPage} />
           <Route path="/import" component={ImportPage} />
+          <Route path="/support" component={Support} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>
