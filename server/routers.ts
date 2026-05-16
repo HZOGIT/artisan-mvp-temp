@@ -285,19 +285,34 @@ const articlesRouter = router({
       categorie: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // SECURITE : verifier que l'article appartient bien a cet artisan.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      const art = artisan ? await db.getArticleArtisanById(input.id) : null;
+      if (!art || !artisan || art.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Article non trouve" });
+      }
       const { id, ...data } = input;
       return await db.updateArticleArtisan(id, data);
     }),
-  
+
   deleteArtisanArticle: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : verifier ownership avant suppression.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      const art = artisan ? await db.getArticleArtisanById(input.id) : null;
+      if (!art || !artisan || art.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Article non trouve" });
+      }
       await db.deleteArticleArtisan(input.id);
       return { success: true };
     }),
-  
+
   // CRUD Bibliothèque d'articles
-  createBibliothequeArticle: protectedProcedure
+  // SECURITE : la bibliotheque est PARTAGEE entre tous les artisans (en
+  // lecture). Les mutations sont donc reservees aux admins Operioz pour
+  // ne pas qu'un artisan pollue/efface les articles vus par les autres.
+  createBibliothequeArticle: adminOnlyProcedure
     .input(z.object({
       nom: z.string().min(1),
       description: z.string().optional(),
@@ -311,7 +326,7 @@ const articlesRouter = router({
       return await db.createBibliothequeArticle(input);
     }),
 
-  updateBibliothequeArticle: protectedProcedure
+  updateBibliothequeArticle: adminOnlyProcedure
     .input(z.object({
       id: z.number(),
       nom: z.string().optional(),
@@ -327,7 +342,7 @@ const articlesRouter = router({
       return await db.updateBibliothequeArticle(id, data);
     }),
 
-  deleteBibliothequeArticle: protectedProcedure
+  deleteBibliothequeArticle: adminOnlyProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       await db.deleteBibliothequeArticle(input.id);
@@ -494,15 +509,22 @@ const devisRouter = router({
       prixUnitaireHT: z.string(),
       tauxTVA: z.string().default("20.00"),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : verifier l'ownership du devis avant d'ajouter une ligne.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      const devisOwned = artisan ? await db.getDevisById(input.devisId) : null;
+      if (!devisOwned || !artisan || devisOwned.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
+      }
+
       const quantite = parseFloat(input.quantite);
       const prixUnitaireHT = parseFloat(input.prixUnitaireHT);
       const tauxTVA = parseFloat(input.tauxTVA);
-      
+
       const montantHT = quantite * prixUnitaireHT;
       const montantTVA = montantHT * (tauxTVA / 100);
       const montantTTC = montantHT + montantTVA;
-      
+
       const ligne = await db.createLigneDevis({
         devisId: input.devisId,
         reference: input.reference,
@@ -516,11 +538,11 @@ const devisRouter = router({
         montantTVA: montantTVA.toFixed(2),
         montantTTC: montantTTC.toFixed(2),
       });
-      
+
       await db.recalculateDevisTotals(input.devisId);
       return ligne;
     }),
-  
+
   updateLigne: protectedProcedure
     .input(z.object({
       id: z.number(),
@@ -533,9 +555,16 @@ const devisRouter = router({
       prixUnitaireHT: z.string().optional(),
       tauxTVA: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : ownership du devis parent.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      const devisOwned = artisan ? await db.getDevisById(input.devisId) : null;
+      if (!devisOwned || !artisan || devisOwned.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
+      }
+
       const { id, devisId, ...data } = input;
-      
+
       if (data.quantite || data.prixUnitaireHT || data.tauxTVA) {
         const existingLigne = await db.getLignesDevisByDevisId(devisId);
         const ligne = existingLigne.find(l => l.id === id);
@@ -543,11 +572,11 @@ const devisRouter = router({
           const quantite = parseFloat(data.quantite || String(ligne.quantite));
           const prixUnitaireHT = parseFloat(data.prixUnitaireHT || String(ligne.prixUnitaireHT));
           const tauxTVA = parseFloat(data.tauxTVA || String(ligne.tauxTVA));
-          
+
           const montantHT = quantite * prixUnitaireHT;
           const montantTVA = montantHT * (tauxTVA / 100);
           const montantTTC = montantHT + montantTVA;
-          
+
           Object.assign(data, {
             montantHT: montantHT.toFixed(2),
             montantTVA: montantTVA.toFixed(2),
@@ -555,15 +584,21 @@ const devisRouter = router({
           });
         }
       }
-      
+
       const updated = await db.updateLigneDevis(id, data);
       await db.recalculateDevisTotals(devisId);
       return updated;
     }),
-  
+
   deleteLigne: protectedProcedure
     .input(z.object({ id: z.number(), devisId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : ownership du devis parent.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      const devisOwned = artisan ? await db.getDevisById(input.devisId) : null;
+      if (!devisOwned || !artisan || devisOwned.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
+      }
       await db.deleteLigneDevis(input.id);
       await db.recalculateDevisTotals(input.devisId);
       return { success: true };
@@ -1187,10 +1222,11 @@ const facturesRouter = router({
       tauxTVA: z.string().default("20.00"),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Vérifier que la facture est encore modifiable
-      const factureCheck = await db.getFactureById(input.factureId);
-      if (!factureCheck) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+      // SECURITE : ownership de la facture + check brouillon (conformite fiscale).
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      const factureCheck = artisan ? await db.getFactureById(input.factureId) : null;
+      if (!factureCheck || !artisan || factureCheck.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvee" });
       }
       if (factureCheck.statut !== "brouillon") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Document fiscal verrouillé — impossible d'ajouter des lignes." });
@@ -1764,6 +1800,11 @@ const interventionsRouter = router({
       if (!artisan || intervention.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // SECURITE : valider aussi que le technicien appartient bien a cet artisan.
+      const tech = await db.getTechnicienById(input.technicienId);
+      if (!tech || tech.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Technicien non autorise" });
+      }
       return await db.updateIntervention(input.interventionId, {
         technicienId: input.technicienId
       });
@@ -1851,11 +1892,14 @@ const notificationsRouter = router({
   
   markAsRead: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
-      await db.markNotificationAsRead(input.id);
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : on passe l'artisanId au helper pour forcer WHERE artisanId.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND" });
+      await db.markNotificationAsRead(input.id, artisan.id);
       return { success: true };
     }),
-  
+
   markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) {
@@ -1864,18 +1908,24 @@ const notificationsRouter = router({
     await db.markAllNotificationsAsRead(artisan.id);
     return { success: true };
   }),
-  
+
   archive: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
-      await db.archiveNotification(input.id);
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : ownership enforced cote helper.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND" });
+      await db.archiveNotification(input.id, artisan.id);
       return { success: true };
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
-      await db.archiveNotification(input.id);
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : ownership enforced cote helper.
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND" });
+      await db.archiveNotification(input.id, artisan.id);
       return { success: true };
     }),
 
@@ -4739,7 +4789,20 @@ const avisRouter = router({
 // ============================================================================
 // ============================================================================
 // GEOLOCALISATION ROUTER
+// SECURITE RGPD CRITIQUE : la position GPS d'un technicien est une donnee
+// hautement sensible. Tous les endpoints qui prennent un technicienId DOIVENT
+// verifier que ce technicien appartient bien a l'artisan authentifie.
 // ============================================================================
+
+async function assertTechnicienOwner(technicienId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const tech = artisan ? await db.getTechnicienById(technicienId) : null;
+  if (!tech || !artisan || tech.artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouve" });
+  }
+  return { tech, artisan };
+}
+
 const geolocalisationRouter = router({
   updatePosition: protectedProcedure
     .input(z.object({
@@ -4753,7 +4816,8 @@ const geolocalisationRouter = router({
       enDeplacement: z.boolean().optional(),
       interventionEnCoursId: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.updatePositionTechnicien(input);
     }),
 
@@ -4765,7 +4829,8 @@ const geolocalisationRouter = router({
 
   getLastPosition: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.getLastPositionByTechnicienId(input.technicienId);
     }),
 
@@ -4775,7 +4840,8 @@ const geolocalisationRouter = router({
       dateDebut: z.date(),
       dateFin: z.date(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.getPositionsHistorique(input.technicienId, input.dateDebut, input.dateFin);
     }),
 
@@ -4805,13 +4871,15 @@ const geolocalisationRouter = router({
       adresseDepart: z.string().optional(),
       adresseArrivee: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.createHistoriqueDeplacement(input);
     }),
 
   getHistoriqueDeplacements: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.getHistoriqueDeplacementsByTechnicienId(input.technicienId);
     }),
 });
@@ -5786,7 +5854,20 @@ const badgesRouter = router({
 
 // ============================================================================
 // CHANTIERS MULTI-INTERVENTIONS ROUTER
+// SECURITE : chaque endpoint qui prend un chantierId / id / phaseId /
+// documentId / suiviId valide l'ownership via le helper assertChantierOwner
+// (ou via les helpers getXxxById + check chantier parent pour les sous-ressources).
 // ============================================================================
+
+async function assertChantierOwner(chantierId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const chantier = artisan ? await db.getChantierById(chantierId) : null;
+  if (!chantier || !artisan || chantier.artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Chantier non trouve" });
+  }
+  return { chantier, artisan };
+}
+
 const chantiersRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -5796,8 +5877,9 @@ const chantiersRouter = router({
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
-      return await db.getChantierById(input.id);
+    .query(async ({ ctx, input }) => {
+      const { chantier } = await assertChantierOwner(input.id, ctx.user.id);
+      return chantier;
     }),
 
   create: protectedProcedure
@@ -5839,7 +5921,8 @@ const chantiersRouter = router({
       budgetRealise: z.string().optional(),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertChantierOwner(input.id, ctx.user.id);
       const { id, dateFinReelle, ...rest } = input;
       return await db.updateChantier(id, {
         ...rest,
@@ -5849,14 +5932,16 @@ const chantiersRouter = router({
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertChantierOwner(input.id, ctx.user.id);
       return await db.deleteChantier(input.id);
     }),
 
   // Phases
   getPhases: protectedProcedure
     .input(z.object({ chantierId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.getPhasesByChantier(input.chantierId);
     }),
 
@@ -5870,7 +5955,8 @@ const chantiersRouter = router({
       dateFinPrevue: z.string().optional(),
       budgetPhase: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.createPhaseChantier({
         ...input,
         dateDebutPrevue: input.dateDebutPrevue ? new Date(input.dateDebutPrevue) : undefined,
@@ -5888,7 +5974,11 @@ const chantiersRouter = router({
       dateFinReelle: z.string().optional(),
       coutReel: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : on charge la phase pour recuperer son chantierId puis on check.
+      const phase = await db.getPhaseChantierById(input.id);
+      if (!phase) throw new TRPCError({ code: "NOT_FOUND", message: "Phase non trouvee" });
+      await assertChantierOwner(phase.chantierId, ctx.user.id);
       const { id, dateDebutReelle, dateFinReelle, ...rest } = input;
       return await db.updatePhaseChantier(id, {
         ...rest,
@@ -5899,14 +5989,18 @@ const chantiersRouter = router({
 
   deletePhase: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const phase = await db.getPhaseChantierById(input.id);
+      if (!phase) throw new TRPCError({ code: "NOT_FOUND", message: "Phase non trouvee" });
+      await assertChantierOwner(phase.chantierId, ctx.user.id);
       return await db.deletePhaseChantier(input.id);
     }),
 
   // Interventions
   getInterventions: protectedProcedure
     .input(z.object({ chantierId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.getInterventionsByChantier(input.chantierId);
     }),
 
@@ -5923,7 +6017,15 @@ const chantiersRouter = router({
       phaseId: z.number().optional(),
       ordre: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE : verifier que LES DEUX ressources (chantier ET intervention)
+      // appartiennent au meme artisan, sinon on permettrait d'associer
+      // une intervention d'un autre artisan a son propre chantier.
+      const { artisan } = await assertChantierOwner(input.chantierId, ctx.user.id);
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvee" });
+      }
       return await db.associerInterventionChantier(input);
     }),
 
@@ -5932,14 +6034,16 @@ const chantiersRouter = router({
       chantierId: z.number(),
       interventionId: z.number(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.dissocierInterventionChantier(input.chantierId, input.interventionId);
     }),
 
   // Documents
   getDocuments: protectedProcedure
     .input(z.object({ chantierId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.getDocumentsByChantier(input.chantierId);
     }),
 
@@ -5951,33 +6055,40 @@ const chantiersRouter = router({
       url: z.string(),
       taille: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.addDocumentChantier(input);
     }),
 
   deleteDocument: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const doc = await db.getDocumentChantierById(input.id);
+      if (!doc) throw new TRPCError({ code: "NOT_FOUND", message: "Document non trouve" });
+      await assertChantierOwner(doc.chantierId, ctx.user.id);
       return await db.deleteDocumentChantier(input.id);
     }),
 
   // Statistiques
   getStatistiques: protectedProcedure
     .input(z.object({ chantierId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.getStatistiquesChantier(input.chantierId);
     }),
 
   calculerAvancement: protectedProcedure
     .input(z.object({ chantierId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.calculerAvancementChantier(input.chantierId);
     }),
 
   // Suivi chantier temps réel
   getSuivi: protectedProcedure
     .input(z.object({ chantierId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.getSuiviByChantier(input.chantierId);
     }),
 
@@ -5994,7 +6105,8 @@ const chantiersRouter = router({
       dateFin: z.string().optional(),
       commentaire: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertChantierOwner(input.chantierId, ctx.user.id);
       return await db.createSuiviChantier({
         ...input,
         dateDebut: input.dateDebut ? new Date(input.dateDebut) : undefined,
@@ -6015,7 +6127,10 @@ const chantiersRouter = router({
       dateFin: z.string().optional(),
       commentaire: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const suivi = await db.getSuiviChantierById(input.id);
+      if (!suivi) throw new TRPCError({ code: "NOT_FOUND", message: "Suivi non trouve" });
+      await assertChantierOwner(suivi.chantierId, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateSuiviChantier(id, {
         ...data,
@@ -6026,7 +6141,10 @@ const chantiersRouter = router({
 
   deleteSuivi: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const suivi = await db.getSuiviChantierById(input.id);
+      if (!suivi) throw new TRPCError({ code: "NOT_FOUND", message: "Suivi non trouve" });
+      await assertChantierOwner(suivi.chantierId, ctx.user.id);
       return await db.deleteSuiviChantier(input.id);
     }),
 });

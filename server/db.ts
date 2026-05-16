@@ -799,9 +799,16 @@ export async function createNotification(data: InsertNotification): Promise<Noti
   return result[0];
 }
 
-export async function markNotificationAsRead(id: number): Promise<void> {
+// Hardened : on FORCE l'artisanId dans le WHERE pour interdire la
+// modification cross-tenant d'une notification appartenant a un autre.
+// L'arg artisanId est OPTIONNEL pour la retro-compatibilite, mais tous
+// les nouveaux appelants DOIVENT le passer.
+export async function markNotificationAsRead(id: number, artisanId?: number): Promise<void> {
   const db = await getDb();
-  await db.update(notifications).set({ lu: true }).where(eq(notifications.id, id));
+  const where = artisanId
+    ? and(eq(notifications.id, id), eq(notifications.artisanId, artisanId))
+    : eq(notifications.id, id);
+  await db.update(notifications).set({ lu: true }).where(where);
 }
 
 export async function markAllNotificationsAsRead(artisanId: number): Promise<void> {
@@ -809,9 +816,19 @@ export async function markAllNotificationsAsRead(artisanId: number): Promise<voi
   await db.update(notifications).set({ lu: true }).where(eq(notifications.artisanId, artisanId));
 }
 
-export async function archiveNotification(id: number): Promise<void> {
+export async function archiveNotification(id: number, artisanId?: number): Promise<void> {
   const db = await getDb();
-  await db.update(notifications).set({ archived: true }).where(eq(notifications.id, id));
+  const where = artisanId
+    ? and(eq(notifications.id, id), eq(notifications.artisanId, artisanId))
+    : eq(notifications.id, id);
+  await db.update(notifications).set({ archived: true }).where(where);
+}
+
+// Helper pour verifier l'ownership d'un article artisan (manquait dans db.ts).
+export async function getArticleArtisanById(id: number): Promise<ArticleArtisan | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(articlesArtisan).where(eq(articlesArtisan.id, id)).limit(1);
+  return result[0];
 }
 
 // ============================================================================
@@ -2198,6 +2215,15 @@ export async function deletePhaseChantier(id: number): Promise<void> {
   await db.delete(phasesChantier).where(eq(phasesChantier.id, id));
 }
 
+// Helpers ajoutes pour les checks ownership (chantier parent) — utilises
+// par chantiersRouter pour interdire les modifs cross-tenant sur les
+// sous-ressources (phases, documents, suivi).
+export async function getPhaseChantierById(id: number): Promise<PhaseChantier | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(phasesChantier).where(eq(phasesChantier.id, id)).limit(1);
+  return result[0];
+}
+
 // Interventions chantier
 export async function getInterventionsByChantier(chantierId: number): Promise<InterventionChantier[]> {
   const db = await getDb();
@@ -2245,6 +2271,12 @@ export async function addDocumentChantier(data: any): Promise<DocumentChantier> 
 export async function deleteDocumentChantier(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(documentsChantier).where(eq(documentsChantier.id, id));
+}
+
+export async function getDocumentChantierById(id: number): Promise<DocumentChantier | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(documentsChantier).where(eq(documentsChantier.id, id)).limit(1);
+  return result[0];
 }
 
 // Statistiques chantier
@@ -2315,6 +2347,12 @@ export async function updateSuiviChantier(id: number, data: any): Promise<SuiviC
 export async function deleteSuiviChantier(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(suiviChantier).where(eq(suiviChantier.id, id));
+}
+
+export async function getSuiviChantierById(id: number): Promise<SuiviChantier | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(suiviChantier).where(eq(suiviChantier.id, id)).limit(1);
+  return result[0];
 }
 
 // ============================================================================
