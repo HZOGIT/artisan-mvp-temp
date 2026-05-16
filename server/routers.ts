@@ -7579,8 +7579,225 @@ const searchRouter = router({
     }),
 });
 
+// ============================================================================
+// SUBSCRIPTION ROUTER (T2) — Stripe Billing
+// Plans : Essentiel 29€, Pro 49€, Entreprise 89€. Essai 30j sur tous.
+// Stripe Customer/Subscription created on demand au premier checkout.
+// ============================================================================
+const subscriptionRouter = router({
+
+  // Statut actuel de l'abonnement (lit DB + calcule isTrialing/daysLeft).
+  getCurrent: protectedProcedure.query(async ({ ctx }) => {
+    const artisanId = ctx.user.artisanId;
+    if (!artisanId) {
+      return {
+        plan: 'trial', status: 'trialing', isTrialing: true,
+        trialDaysLeft: 30, trialEndsAt: null, currentPeriodEnd: null,
+        cancelAtPeriodEnd: false, maxUsers: 1, maxDevicesPerUser: 3,
+        maxConcurrentSessions: 2, stripeSubscriptionId: null,
+      };
+    }
+    const sub = await db.getSubscription(artisanId);
+    const now = new Date();
+    const trialEndsAt = sub?.trialEndsAt || null;
+    const isTrialing = sub?.status === 'trialing' && trialEndsAt !== null && trialEndsAt > now;
+    const trialDaysLeft = trialEndsAt
+      ? Math.max(0, Math.ceil((trialEndsAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+    return {
+      plan: sub?.plan || 'trial',
+      status: sub?.status || 'trialing',
+      isTrialing,
+      trialDaysLeft,
+      trialEndsAt: sub?.trialEndsAt || null,
+      currentPeriodEnd: sub?.currentPeriodEnd || null,
+      cancelAtPeriodEnd: !!sub?.cancelAtPeriodEnd,
+      maxUsers: sub?.maxUsers || 1,
+      maxDevicesPerUser: sub?.maxDevicesPerUser || 3,
+      maxConcurrentSessions: sub?.maxConcurrentSessions || 2,
+      stripeSubscriptionId: sub?.stripeSubscriptionId || null,
+    };
+  }),
+
+  // Cree une session Stripe Checkout pour s'abonner.
+  createCheckout: protectedProcedure
+    .input(z.object({
+      plan: z.enum(['essentiel', 'pro', 'entreprise']),
+      interval: z.enum(['month', 'year']),
+      extraUsers: z.number().min(0).max(50).default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisanId = ctx.user.artisanId;
+      if (!artisanId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Aucun artisan associe' });
+
+      const { stripe } = await import('./stripe/stripeService');
+      const stripeClient = stripe();
+
+      // Prix Stripe (configurés dans Stripe Dashboard, IDs dans env).
+      const PRICES: Record<string, Record<string, string | undefined>> = {
+        essentiel: {
+          month: process.env.STRIPE_PRICE_ESSENTIEL_MONTH,
+          year: process.env.STRIPE_PRICE_ESSENTIEL_YEAR,
+        },
+        pro: {
+          month: process.env.STRIPE_PRICE_PRO_MONTH,
+          year: process.env.STRIPE_PRICE_PRO_YEAR,
+        },
+        entreprise: {
+          month: process.env.STRIPE_PRICE_ENTREPRISE_MONTH,
+          year: process.env.STRIPE_PRICE_ENTREPRISE_YEAR,
+        },
+      };
+      const EXTRA_USER_PRICES: Record<string, Record<string, string | undefined>> = {
+        pro: {
+          month: process.env.STRIPE_PRICE_EXTRA_USER_PRO_MONTH,
+          year: process.env.STRIPE_PRICE_EXTRA_USER_PRO_YEAR,
+        },
+        entreprise: {
+          month: process.env.STRIPE_PRICE_EXTRA_USER_ENT_MONTH,
+          year: process.env.STRIPE_PRICE_EXTRA_USER_ENT_YEAR,
+        },
+      };
+
+      const mainPriceId = PRICES[input.plan]?.[input.interval];
+      if (!mainPriceId) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: `Prix Stripe non configure pour ${input.plan} ${input.interval}. Voir SETUP_STRIPE.md.`,
+        });
+      }
+
+      const sub = await db.getSubscription(artisanId);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+
+      // Cree ou recupere le Customer Stripe.
+      let customerId = sub?.stripeCustomerId || null;
+      if (!customerId) {
+        const customer = await stripeClient.customers.create({
+          email: ctx.user.email || undefined,
+          name: artisan?.nomEntreprise || ctx.user.email || `Artisan ${artisanId}`,
+          metadata: { artisanId: String(artisanId) },
+        });
+        customerId = customer.id;
+        await db.updateSubscription(artisanId, { stripeCustomerId: customerId });
+      }
+
+      // Build line items.
+      const lineItems: any[] = [{ price: mainPriceId, quantity: 1 }];
+      if (input.extraUsers > 0 && input.plan !== 'essentiel') {
+        const extraPriceId = EXTRA_USER_PRICES[input.plan]?.[input.interval];
+        if (extraPriceId) {
+          lineItems.push({ price: extraPriceId, quantity: input.extraUsers });
+        }
+      }
+
+      const appUrl = process.env.APP_URL || 'https://artisan.cheminov.com';
+
+      const session = await stripeClient.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        subscription_data: {
+          trial_period_days: 30,
+          metadata: {
+            artisanId: String(artisanId),
+            plan: input.plan,
+            extraUsers: String(input.extraUsers),
+          },
+        },
+        success_url: `${appUrl}/parametres?tab=abonnement&success=1`,
+        cancel_url: `${appUrl}/parametres?tab=abonnement&canceled=1`,
+        metadata: { artisanId: String(artisanId), plan: input.plan },
+      });
+
+      return { url: session.url };
+    }),
+
+  // Portail client Stripe (gerer carte, factures, etc.).
+  createPortal: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisanId = ctx.user.artisanId;
+    if (!artisanId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Aucun artisan associe' });
+
+    const sub = await db.getSubscription(artisanId);
+    if (!sub?.stripeCustomerId) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Aucun abonnement actif trouve' });
+    }
+
+    const { stripe } = await import('./stripe/stripeService');
+    const stripeClient = stripe();
+    const appUrl = process.env.APP_URL || 'https://artisan.cheminov.com';
+
+    const session = await stripeClient.billingPortal.sessions.create({
+      customer: sub.stripeCustomerId,
+      return_url: `${appUrl}/parametres?tab=abonnement`,
+    });
+    return { url: session.url };
+  }),
+
+  // Annule a la fin de la periode courante (Stripe convention).
+  cancel: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisanId = ctx.user.artisanId;
+    if (!artisanId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Aucun artisan associe' });
+
+    const sub = await db.getSubscription(artisanId);
+    if (!sub?.stripeSubscriptionId) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Aucun abonnement actif' });
+    }
+
+    const { stripe } = await import('./stripe/stripeService');
+    await stripe().subscriptions.update(sub.stripeSubscriptionId, { cancel_at_period_end: true });
+    await db.updateSubscription(artisanId, { cancelAtPeriodEnd: true });
+    return { success: true };
+  }),
+
+  // Reactive un abonnement annule (avant la fin de periode).
+  reactivate: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisanId = ctx.user.artisanId;
+    if (!artisanId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Aucun artisan associe' });
+
+    const sub = await db.getSubscription(artisanId);
+    if (!sub?.stripeSubscriptionId) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Aucun abonnement trouve' });
+    }
+
+    const { stripe } = await import('./stripe/stripeService');
+    await stripe().subscriptions.update(sub.stripeSubscriptionId, { cancel_at_period_end: false });
+    await db.updateSubscription(artisanId, { cancelAtPeriodEnd: false });
+    return { success: true };
+  }),
+});
+
+// ============================================================================
+// DEVICES ROUTER (T3) — gestion des appareils enregistres
+// ============================================================================
+const devicesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    return db.getDevices(ctx.user.id);
+  }),
+
+  revoke: protectedProcedure
+    .input(z.object({ deviceId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await db.deleteDevice(input.deviceId, ctx.user.id);
+      return { success: true };
+    }),
+
+  revokeAll: protectedProcedure.mutation(async ({ ctx }) => {
+    // Cote serveur on ne sait pas (proprement) qui est l'appareil courant
+    // sans le UA de la requete. On lit l'en-tete user-agent ici.
+    const ua = String(ctx.req?.headers?.['user-agent'] || '');
+    const { generateFingerprint } = await import('./_core/deviceUtils');
+    const currentFp = generateFingerprint(ua);
+    const removed = await db.deleteOtherDevices(ctx.user.id, currentFp);
+    return { success: true, removed };
+  }),
+});
+
 export const appRouter = router({system: systemRouter,
   search: searchRouter,
+  subscription: subscriptionRouter,
+  devices: devicesRouter,
   modules: modulesRouter,
   importErp: importRouter,
   auth: router({

@@ -3424,3 +3424,389 @@ export async function getArtisanOnboardingStatus(
     return null;
   }
 }
+
+// ============================================================================
+// T2 — Helpers subscriptions / devices / sessions (raw SQL)
+// Les 3 tables n'existent PAS dans drizzle/schema.ts (regle absolue), donc
+// tout passe par raw SQL avec snake_case (DB) → camelCase (TS) en sortie.
+// ============================================================================
+
+export interface SubscriptionRow {
+  id: number;
+  artisanId: number;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripePriceId: string | null;
+  plan: string;
+  status: string;
+  trialEndsAt: Date | null;
+  currentPeriodStart: Date | null;
+  currentPeriodEnd: Date | null;
+  cancelAtPeriodEnd: boolean;
+  maxUsers: number;
+  maxDevicesPerUser: number;
+  maxConcurrentSessions: number;
+}
+
+function rowToSubscription(r: any): SubscriptionRow | null {
+  if (!r) return null;
+  return {
+    id: Number(r.id),
+    artisanId: Number(r.artisan_id),
+    stripeCustomerId: r.stripe_customer_id ?? null,
+    stripeSubscriptionId: r.stripe_subscription_id ?? null,
+    stripePriceId: r.stripe_price_id ?? null,
+    plan: String(r.plan || 'trial'),
+    status: String(r.status || 'trialing'),
+    trialEndsAt: r.trial_ends_at ? new Date(r.trial_ends_at) : null,
+    currentPeriodStart: r.current_period_start ? new Date(r.current_period_start) : null,
+    currentPeriodEnd: r.current_period_end ? new Date(r.current_period_end) : null,
+    cancelAtPeriodEnd: r.cancel_at_period_end === 1 || r.cancel_at_period_end === true,
+    maxUsers: Number(r.max_users || 1),
+    maxDevicesPerUser: Number(r.max_devices_per_user || 3),
+    maxConcurrentSessions: Number(r.max_concurrent_sessions || 2),
+  };
+}
+
+export async function getSubscription(artisanId: number): Promise<SubscriptionRow | null> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT * FROM subscriptions WHERE artisan_id = ? LIMIT 1',
+      [artisanId]
+    ) as any;
+    return rowToSubscription((rows as any[])[0]);
+  } catch (e) {
+    // Table pas encore migree : on renvoie null, l'appelant traitera comme
+    // un essai gratuit (= ne bloque personne).
+    return null;
+  }
+}
+
+export interface UpdateSubscriptionInput {
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripePriceId?: string;
+  plan?: string;
+  status?: string;
+  trialEndsAt?: Date | null;
+  currentPeriodStart?: Date | null;
+  currentPeriodEnd?: Date | null;
+  cancelAtPeriodEnd?: boolean;
+  maxUsers?: number;
+  maxDevicesPerUser?: number;
+  maxConcurrentSessions?: number;
+}
+
+// Mapping camelCase TS -> snake_case SQL.
+const SUB_COL_MAP: Record<keyof UpdateSubscriptionInput, string> = {
+  stripeCustomerId: 'stripe_customer_id',
+  stripeSubscriptionId: 'stripe_subscription_id',
+  stripePriceId: 'stripe_price_id',
+  plan: 'plan',
+  status: 'status',
+  trialEndsAt: 'trial_ends_at',
+  currentPeriodStart: 'current_period_start',
+  currentPeriodEnd: 'current_period_end',
+  cancelAtPeriodEnd: 'cancel_at_period_end',
+  maxUsers: 'max_users',
+  maxDevicesPerUser: 'max_devices_per_user',
+  maxConcurrentSessions: 'max_concurrent_sessions',
+};
+
+export async function updateSubscription(artisanId: number, data: UpdateSubscriptionInput): Promise<void> {
+  const pool = await ensurePool();
+  const cols: string[] = [];
+  const vals: any[] = [];
+  for (const [key, val] of Object.entries(data)) {
+    if (val === undefined) continue;
+    const sqlCol = SUB_COL_MAP[key as keyof UpdateSubscriptionInput];
+    if (!sqlCol) continue;
+    cols.push(`${sqlCol} = ?`);
+    vals.push(val instanceof Date ? val : val);
+  }
+  if (cols.length === 0) return;
+  vals.push(artisanId);
+
+  // INSERT-or-UPDATE : si l'artisan n'a pas encore de ligne (race avec le
+  // seed initial), on cree avec les valeurs par defaut + les overrides.
+  const [updateRes] = await pool.execute(
+    `UPDATE subscriptions SET ${cols.join(', ')} WHERE artisan_id = ?`,
+    vals
+  ) as any;
+
+  if (updateRes.affectedRows === 0) {
+    // Ligne absente -> on insere avec defaults trial 30j + overrides.
+    const insertCols = ['artisan_id'];
+    const insertVals: any[] = [artisanId];
+    for (const [key, val] of Object.entries(data)) {
+      if (val === undefined) continue;
+      const sqlCol = SUB_COL_MAP[key as keyof UpdateSubscriptionInput];
+      if (!sqlCol) continue;
+      insertCols.push(sqlCol);
+      insertVals.push(val instanceof Date ? val : val);
+    }
+    const placeholders = insertVals.map(() => '?').join(', ');
+    await pool.execute(
+      `INSERT IGNORE INTO subscriptions (${insertCols.join(', ')}) VALUES (${placeholders})`,
+      insertVals
+    );
+  }
+}
+
+export async function getSubscriptionByCustomerId(customerId: string): Promise<SubscriptionRow | null> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT * FROM subscriptions WHERE stripe_customer_id = ? LIMIT 1',
+      [customerId]
+    ) as any;
+    return rowToSubscription((rows as any[])[0]);
+  } catch {
+    return null;
+  }
+}
+
+// ---- Devices ----
+
+export interface DeviceRow {
+  id: number;
+  userId: number;
+  artisanId: number;
+  deviceFingerprint: string;
+  deviceType: string;
+  browser: string | null;
+  os: string | null;
+  lastIp: string | null;
+  lastActiveAt: Date | null;
+  createdAt: Date | null;
+}
+
+function rowToDevice(r: any): DeviceRow {
+  return {
+    id: Number(r.id),
+    userId: Number(r.user_id),
+    artisanId: Number(r.artisan_id),
+    deviceFingerprint: String(r.device_fingerprint),
+    deviceType: String(r.device_type || 'desktop'),
+    browser: r.browser ?? null,
+    os: r.os ?? null,
+    lastIp: r.last_ip ?? null,
+    lastActiveAt: r.last_active_at ? new Date(r.last_active_at) : null,
+    createdAt: r.created_at ? new Date(r.created_at) : null,
+  };
+}
+
+export async function getDevices(userId: number): Promise<DeviceRow[]> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT * FROM devices WHERE user_id = ? ORDER BY last_active_at DESC',
+      [userId]
+    ) as any;
+    return (rows as any[]).map(rowToDevice);
+  } catch {
+    return [];
+  }
+}
+
+export async function getDevice(userId: number, fingerprint: string): Promise<DeviceRow | null> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT * FROM devices WHERE user_id = ? AND device_fingerprint = ? LIMIT 1',
+      [userId, fingerprint]
+    ) as any;
+    const r = (rows as any[])[0];
+    return r ? rowToDevice(r) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function registerDevice(params: {
+  userId: number;
+  artisanId: number;
+  fingerprint: string;
+  deviceType: string;
+  browser: string;
+  os: string;
+  ip: string;
+}): Promise<void> {
+  try {
+    const pool = await ensurePool();
+    await pool.execute(
+      `INSERT INTO devices
+         (user_id, artisan_id, device_fingerprint, device_type, browser, os, last_ip)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         device_type = VALUES(device_type),
+         browser = VALUES(browser),
+         os = VALUES(os),
+         last_ip = VALUES(last_ip),
+         last_active_at = CURRENT_TIMESTAMP`,
+      [
+        params.userId,
+        params.artisanId,
+        params.fingerprint,
+        params.deviceType,
+        params.browser,
+        params.os,
+        params.ip,
+      ]
+    );
+  } catch (e: any) {
+    // On ne bloque jamais la requete utilisateur sur un fail d'enregistrement
+    // device. On loggue et on continue.
+    console.warn('[registerDevice] failed:', e?.message || e);
+  }
+}
+
+export async function countActiveDevices(userId: number): Promise<number> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT COUNT(DISTINCT device_fingerprint) AS cnt FROM devices WHERE user_id = ?',
+      [userId]
+    ) as any;
+    return Number((rows as any[])[0]?.cnt || 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function deleteDevice(deviceId: number, userId: number): Promise<void> {
+  const pool = await ensurePool();
+  await pool.execute('DELETE FROM devices WHERE id = ? AND user_id = ?', [deviceId, userId]);
+}
+
+export async function deleteOtherDevices(userId: number, currentFingerprint: string): Promise<number> {
+  try {
+    const pool = await ensurePool();
+    const [r] = await pool.execute(
+      'DELETE FROM devices WHERE user_id = ? AND device_fingerprint != ?',
+      [userId, currentFingerprint]
+    ) as any;
+    return Number(r.affectedRows || 0);
+  } catch {
+    return 0;
+  }
+}
+
+// ---- Sessions ----
+
+export interface SessionRow {
+  id: number;
+  userId: number;
+  artisanId: number;
+  sessionToken: string;
+  deviceFingerprint: string | null;
+  ip: string | null;
+  startedAt: Date | null;
+  lastActiveAt: Date | null;
+  expiresAt: Date | null;
+}
+
+function rowToSession(r: any): SessionRow {
+  return {
+    id: Number(r.id),
+    userId: Number(r.user_id),
+    artisanId: Number(r.artisan_id),
+    sessionToken: String(r.session_token),
+    deviceFingerprint: r.device_fingerprint ?? null,
+    ip: r.ip ?? null,
+    startedAt: r.started_at ? new Date(r.started_at) : null,
+    lastActiveAt: r.last_active_at ? new Date(r.last_active_at) : null,
+    expiresAt: r.expires_at ? new Date(r.expires_at) : null,
+  };
+}
+
+export async function getActiveSessions(userId: number): Promise<SessionRow[]> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT * FROM active_sessions WHERE user_id = ? AND expires_at > NOW() ORDER BY last_active_at DESC',
+      [userId]
+    ) as any;
+    return (rows as any[]).map(rowToSession);
+  } catch {
+    return [];
+  }
+}
+
+export async function countActiveSessions(userId: number): Promise<number> {
+  try {
+    const pool = await ensurePool();
+    const [rows] = await pool.execute(
+      'SELECT COUNT(*) AS cnt FROM active_sessions WHERE user_id = ? AND expires_at > NOW()',
+      [userId]
+    ) as any;
+    return Number((rows as any[])[0]?.cnt || 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function createSession(params: {
+  userId: number;
+  artisanId: number;
+  token: string;
+  fingerprint: string | null;
+  ip: string | null;
+  ttlDays?: number;
+}): Promise<void> {
+  try {
+    const pool = await ensurePool();
+    const ttl = params.ttlDays || 7;
+    await pool.execute(
+      `INSERT INTO active_sessions
+         (user_id, artisan_id, session_token, device_fingerprint, ip, expires_at)
+       VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))
+       ON DUPLICATE KEY UPDATE last_active_at = CURRENT_TIMESTAMP, expires_at = DATE_ADD(NOW(), INTERVAL ? DAY)`,
+      [params.userId, params.artisanId, params.token, params.fingerprint, params.ip, ttl, ttl]
+    );
+  } catch (e: any) {
+    console.warn('[createSession] failed:', e?.message || e);
+  }
+}
+
+export async function deleteOldestSession(userId: number): Promise<void> {
+  try {
+    const pool = await ensurePool();
+    // MySQL ne supporte pas DELETE ... ORDER BY LIMIT dans toutes les
+    // configurations. On selectionne d'abord l'id, puis on delete.
+    const [rows] = await pool.execute(
+      `SELECT id FROM active_sessions WHERE user_id = ? AND expires_at > NOW()
+       ORDER BY last_active_at ASC LIMIT 1`,
+      [userId]
+    ) as any;
+    const oldId = (rows as any[])[0]?.id;
+    if (oldId) {
+      await pool.execute('DELETE FROM active_sessions WHERE id = ?', [oldId]);
+    }
+  } catch (e: any) {
+    console.warn('[deleteOldestSession] failed:', e?.message || e);
+  }
+}
+
+export async function cleanExpiredSessions(): Promise<number> {
+  try {
+    const pool = await ensurePool();
+    const [r] = await pool.execute(
+      'DELETE FROM active_sessions WHERE expires_at < NOW()'
+    ) as any;
+    return Number(r.affectedRows || 0);
+  } catch {
+    return 0;
+  }
+}
+
+// Map plan -> limites par defaut (utilise par webhook + middleware quand on
+// veut deriver les bonnes valeurs sans hardcoder dans Stripe metadata).
+export const PLAN_LIMITS: Record<string, { maxUsers: number; maxDevices: number; maxSessions: number }> = {
+  trial:      { maxUsers: 1,  maxDevices: 3, maxSessions: 2 },
+  essentiel:  { maxUsers: 1,  maxDevices: 3, maxSessions: 2 },
+  pro:        { maxUsers: 3,  maxDevices: 3, maxSessions: 3 },
+  entreprise: { maxUsers: 10, maxDevices: 3, maxSessions: 4 },
+  expired:    { maxUsers: 0,  maxDevices: 0, maxSessions: 0 },
+};
