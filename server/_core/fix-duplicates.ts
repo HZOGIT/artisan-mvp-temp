@@ -904,6 +904,125 @@ async function fixDuplicates() {
       console.log("[Demo] Force entreprise :", e?.message || e);
     }
 
+    // ========================================================================
+    // T1 — Migrations abonnements / appareils / sessions
+    // Idempotent : tout passe par CREATE IF NOT EXISTS / try-catch, donc
+    // sans risque sur redeploiement.
+    // ========================================================================
+    try {
+      // --- 1A. Table subscriptions ---
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL UNIQUE,
+          stripe_customer_id VARCHAR(100),
+          stripe_subscription_id VARCHAR(100),
+          stripe_price_id VARCHAR(100),
+          plan VARCHAR(20) NOT NULL DEFAULT 'trial',
+          status VARCHAR(20) NOT NULL DEFAULT 'trialing',
+          trial_ends_at TIMESTAMP NULL,
+          current_period_start TIMESTAMP NULL,
+          current_period_end TIMESTAMP NULL,
+          cancel_at_period_end BOOLEAN DEFAULT FALSE,
+          max_users INT NOT NULL DEFAULT 1,
+          max_devices_per_user INT NOT NULL DEFAULT 3,
+          max_concurrent_sessions INT NOT NULL DEFAULT 2,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_subscriptions_artisan_id (artisan_id),
+          INDEX idx_subscriptions_status (status),
+          INDEX idx_subscriptions_trial_ends_at (trial_ends_at)
+        )
+      `);
+      console.log('[Subscriptions] Table OK');
+
+      // --- 1B. Table devices ---
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS devices (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          user_id INT NOT NULL,
+          artisan_id INT NOT NULL,
+          device_fingerprint VARCHAR(255) NOT NULL,
+          device_type ENUM('desktop','mobile','tablet') DEFAULT 'desktop',
+          browser VARCHAR(100),
+          os VARCHAR(100),
+          last_ip VARCHAR(45),
+          last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_user_device (user_id, device_fingerprint),
+          INDEX idx_devices_user_id (user_id),
+          INDEX idx_devices_artisan_id (artisan_id)
+        )
+      `);
+      console.log('[Devices] Table OK');
+
+      // --- 1C. Table active_sessions ---
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS active_sessions (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          user_id INT NOT NULL,
+          artisan_id INT NOT NULL,
+          session_token VARCHAR(255) NOT NULL UNIQUE,
+          device_fingerprint VARCHAR(255),
+          ip VARCHAR(45),
+          started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP NOT NULL,
+          INDEX idx_sessions_user_id (user_id),
+          INDEX idx_sessions_artisan_id (artisan_id),
+          INDEX idx_sessions_expires_at (expires_at)
+        )
+      `);
+      console.log('[Sessions] Table OK');
+
+      // --- 1D. Colonnes additionnelles sur artisans ---
+      // MySQL < 8.0.29 ne supporte pas ADD COLUMN IF NOT EXISTS. On utilise
+      // un try/catch defensif sur chaque colonne pour rester compatible.
+      for (const col of [
+        { name: 'trial_ends_at', ddl: 'ADD COLUMN trial_ends_at TIMESTAMP NULL DEFAULT NULL' },
+        { name: 'subscription_status', ddl: "ADD COLUMN subscription_status VARCHAR(20) DEFAULT 'trial'" },
+      ]) {
+        try {
+          await pool.execute(`ALTER TABLE artisans ${col.ddl}`);
+          console.log(`[Artisans] Colonne ${col.name} ajoutee`);
+        } catch (e: any) {
+          if (e?.code === 'ER_DUP_FIELDNAME' || e?.message?.includes('Duplicate column')) {
+            // deja la, ok
+          } else {
+            console.log(`[Artisans] ${col.name} :`, e?.message);
+          }
+        }
+      }
+
+      // --- 1E. Seed initial subscriptions ---
+      // Artisan 1 (demo) : plan entreprise actif, essai 30j, max 10 users.
+      await pool.execute(
+        `INSERT IGNORE INTO subscriptions
+           (artisan_id, plan, status, trial_ends_at,
+            max_users, max_devices_per_user, max_concurrent_sessions)
+         SELECT id, 'entreprise', 'active',
+                DATE_ADD(NOW(), INTERVAL 30 DAY),
+                10, 3, 4
+         FROM artisans
+         WHERE id = 1`
+      );
+
+      // Tous les autres artisans : essai gratuit 30j, plan trial.
+      const [seedOthers] = await pool.execute(
+        `INSERT IGNORE INTO subscriptions
+           (artisan_id, plan, status, trial_ends_at,
+            max_users, max_devices_per_user, max_concurrent_sessions)
+         SELECT id, 'trial', 'trialing',
+                DATE_ADD(NOW(), INTERVAL 30 DAY),
+                1, 3, 2
+         FROM artisans
+         WHERE id != 1`
+      ) as any;
+      console.log(`[Subscriptions] Seed initial : ${seedOthers.affectedRows} artisan(s) ajoute(s)`);
+    } catch (e: any) {
+      console.log('[Subscriptions] Migration :', e?.message || e);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
