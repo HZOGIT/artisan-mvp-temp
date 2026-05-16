@@ -1084,7 +1084,7 @@ function PricingSection() {
             Des tarifs simples et transparents
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-600">
-            14 jours d'essai gratuit sur toutes les offres — Sans engagement.
+            30 jours d'essai gratuit sur toutes les offres — Sans engagement.
           </p>
         </div>
 
@@ -1129,7 +1129,7 @@ function PricingSection() {
 
         <p className="mt-10 text-center text-sm text-slate-600 inline-flex flex-wrap items-center justify-center gap-x-6 gap-y-2 w-full">
           <span className="inline-flex items-center gap-1.5">
-            <Check className="h-4 w-4 text-green-600" /> 14 jours gratuits
+            <Check className="h-4 w-4 text-green-600" /> 30 jours gratuits
           </span>
           <span className="inline-flex items-center gap-1.5">
             <Check className="h-4 w-4 text-green-600" /> Sans carte bancaire
@@ -1329,7 +1329,7 @@ const faqItems = [
   {
     question: "Comment fonctionne l'essai gratuit ?",
     answer:
-      "L'essai gratuit dure 14 jours avec accès complet à l'offre Pro. Aucune carte bancaire n'est requise. À la fin de l'essai, vous choisissez l'offre qui vous convient — ou rien du tout.",
+      "L'essai gratuit dure 30 jours avec accès complet à toutes les fonctionnalités. Aucune carte bancaire n'est requise. À la fin de l'essai, vous choisissez l'offre qui vous convient — ou rien du tout.",
   },
   {
     question: "Mes données sont-elles sécurisées ?",
@@ -1438,7 +1438,7 @@ function FinalCTASection() {
           Rejoignez <span className="bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">500+ professionnels</span> qui ont digitalisé leur activité
         </h2>
         <p className="mt-5 text-lg text-slate-300 max-w-2xl mx-auto">
-          14 jours gratuits · sans engagement · sans carte bancaire.
+          30 jours gratuits · sans engagement · sans carte bancaire.
         </p>
 
         <div className="mt-10 relative inline-block">

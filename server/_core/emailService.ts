@@ -442,6 +442,32 @@ export function buildPaymentFailedEmail(params: { appUrl: string }): { subject: 
   };
 }
 
+/** Email decouverte J+3 apres inscription. */
+export function buildDiscoveryJ3Email(params: {
+  firstName?: string | null;
+  appUrl: string;
+}): { subject: string; body: string } {
+  const greet = params.firstName ? `Bonjour ${escapeHtml(params.firstName)},` : "Bonjour,";
+  return {
+    subject: "Comment se passe votre decouverte d'Operioz ?",
+    body: baseTemplate({
+      title: "3 jours avec Operioz — ca se passe bien ?",
+      body: `<p style="margin:0 0 16px 0;">${greet}</p>
+        <p style="margin:0 0 16px 0;">Vous avez cree votre compte Operioz il y a 3 jours, et nous esperons que tout se passe bien pour vous.</p>
+        <p style="margin:0 0 8px 0;"><strong>Voici 3 choses que vous pouvez faire des maintenant pour gagner du temps :</strong></p>
+        <ul style="margin:0 0 16px 20px;padding:0;">
+          <li><strong>Creer votre premier devis</strong> avec MonAssistant IA — une description vocale suffit.</li>
+          <li><strong>Importer vos clients</strong> depuis Excel ou votre ancien logiciel (EBP, Sage, Ciel...).</li>
+          <li><strong>Configurer le paiement en ligne</strong> pour vos factures — 0 frais d'installation.</li>
+        </ul>
+        <p style="margin:0 0 16px 0;">Une question ? Repondez simplement a cet email, notre equipe lit tout.</p>`,
+      ctaLabel: "Acceder a mon espace",
+      ctaUrl: `${params.appUrl}/dashboard`,
+      footer: "Vous avez encore 27 jours d'essai gratuit. Sans engagement, sans carte bancaire.",
+    }),
+  };
+}
+
 export function buildSubscriptionCanceledEmail(params: {
   endsAt?: Date | null;
   appUrl: string;

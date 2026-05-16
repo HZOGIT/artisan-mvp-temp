@@ -57,7 +57,9 @@ export default function Onboarding() {
   const [metierKey, setMetierKey] = useState<string | null>(null);
   const [metierAutre, setMetierAutre] = useState("");
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
-  const [skipReady, setSkipReady] = useState(false);
+  // Skip bouton dispo immediatement (avant : delai 30s qui frustrait
+  // les utilisateurs voulant explorer le dashboard tout de suite).
+  const [skipReady, setSkipReady] = useState(true);
 
   const { data: modules } = trpc.modules.list.useQuery();
   const utils = trpc.useUtils();
@@ -79,11 +81,7 @@ export default function Onboarding() {
     },
   });
 
-  useEffect(() => {
-    if (step !== 1) return;
-    const t = setTimeout(() => setSkipReady(true), SKIP_DELAY_S * 1000);
-    return () => clearTimeout(t);
-  }, [step]);
+  // Skip bouton dispo des l'arrivee sur la page (cf. setSkipReady(true) plus haut).
 
   useEffect(() => {
     if (!metierKey || !modules) return;

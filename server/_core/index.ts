@@ -1146,6 +1146,33 @@ async function startServer() {
       } catch (e: any) {
         console.warn("[Scheduler] J-1:", e?.message || e);
       }
+
+      // 5) Email decouverte J+3 apres inscription : recommandations pour
+      //    bien demarrer (devis IA, import clients, paiement en ligne).
+      try {
+        const { buildDiscoveryJ3Email } = await import("./emailService");
+        const pool = db.getPool();
+        if (pool) {
+          const [rows] = await pool.execute(`
+            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
+            FROM artisans a
+            JOIN users u ON u.id = a.userId
+            WHERE DATE(u.createdAt) = DATE(DATE_SUB(NOW(), INTERVAL 3 DAY))
+          `) as any;
+          for (const row of rows as any[]) {
+            if (!row.email) continue;
+            const { subject, body } = buildDiscoveryJ3Email({
+              firstName: row.prenom, appUrl,
+            });
+            await sendEmail({ to: row.email, subject, body });
+          }
+          if ((rows as any[]).length > 0) {
+            console.log(`[Scheduler] ${(rows as any[]).length} email(s) decouverte J+3 envoye(s)`);
+          }
+        }
+      } catch (e: any) {
+        console.warn("[Scheduler] J+3:", e?.message || e);
+      }
     } catch (e: any) {
       console.error("[Scheduler] erreur generale:", e?.message || e);
     }
