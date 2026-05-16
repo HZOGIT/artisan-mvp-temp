@@ -1015,7 +1015,13 @@ async function startServer() {
     }
   });
 
-  // tRPC API
+  // tRPC API — protege par subscriptionGuard (T3) qui :
+  // - bloque (402) si abonnement expire sauf paths whitelistes,
+  // - enregistre l'appareil et applique la limite (403 si depassement),
+  // - cree/refresh la session active et evicte la plus ancienne si LRU.
+  // Le guard est defensif : en cas d'erreur DB, il PASSE sans bloquer.
+  const { subscriptionGuard } = await import("./subscriptionGuard");
+  app.use("/api/trpc", subscriptionGuard());
   app.use(
     "/api/trpc",
     createExpressMiddleware({
