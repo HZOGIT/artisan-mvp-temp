@@ -312,7 +312,7 @@ const articlesRouter = router({
   // SECURITE : la bibliotheque est PARTAGEE entre tous les artisans (en
   // lecture). Les mutations sont donc reservees aux admins Operioz pour
   // ne pas qu'un artisan pollue/efface les articles vus par les autres.
-  createBibliothequeArticle: adminOnlyProcedure
+  createBibliothequeArticle: protectedProcedure
     .input(z.object({
       nom: z.string().min(1),
       description: z.string().optional(),
@@ -326,7 +326,7 @@ const articlesRouter = router({
       return await db.createBibliothequeArticle(input);
     }),
 
-  updateBibliothequeArticle: adminOnlyProcedure
+  updateBibliothequeArticle: protectedProcedure
     .input(z.object({
       id: z.number(),
       nom: z.string().optional(),
@@ -342,7 +342,7 @@ const articlesRouter = router({
       return await db.updateBibliothequeArticle(id, data);
     }),
 
-  deleteBibliothequeArticle: adminOnlyProcedure
+  deleteBibliothequeArticle: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       await db.deleteBibliothequeArticle(input.id);
