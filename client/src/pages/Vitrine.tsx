@@ -633,7 +633,7 @@ export default function Vitrine() {
             <span>Propulsé par <span className="font-semibold text-white">Operioz</span></span>
           </div>
           <a
-            href="https://artisan.cheminov.com"
+            href="https://www.operioz.com"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors"

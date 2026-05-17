@@ -29,7 +29,7 @@ const sections: Section[] = [
       {
         title: "Se connecter",
         content: [
-          "Rendez-vous sur artisan.cheminov.com et cliquez sur « Se connecter ». Saisissez votre adresse email et votre mot de passe. Vous arrivez directement sur le tableau de bord.",
+          "Rendez-vous sur www.operioz.com et cliquez sur « Se connecter ». Saisissez votre adresse email et votre mot de passe. Vous arrivez directement sur le tableau de bord.",
         ],
       },
       {

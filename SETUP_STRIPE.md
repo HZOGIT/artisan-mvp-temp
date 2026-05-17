@@ -21,7 +21,7 @@ EMAIL_FROM=Operioz <noreply@operioz.com>
 
 **URL publique de l'app** (utilisée pour les success/cancel URLs Stripe + CTA d'emails) :
 ```
-APP_URL=https://artisan.cheminov.com
+APP_URL=https://www.operioz.com
 ```
 
 **Price IDs des 3 plans × 2 intervals** (créés dans Stripe Dashboard, voir §2) :
@@ -79,7 +79,7 @@ Lors du checkout, Operioz envoie `quantity = N` à Stripe — donc le prix unita
 
 ## 3. Webhook Stripe
 
-**Endpoint** : `https://artisan.cheminov.com/api/stripe/webhook`
+**Endpoint** : `https://www.operioz.com/api/stripe/webhook`
 
 **Méthode** : POST, secret de signature dans `STRIPE_WEBHOOK_SECRET`.
 

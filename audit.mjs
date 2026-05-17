@@ -1,6 +1,6 @@
 import mysql from 'mysql2/promise';
 
-const BASE = 'https://artisan.cheminov.com';
+const BASE = 'https://www.operioz.com';
 const TOKEN = process.argv[2];
 const COOKIE = `token=${TOKEN}`;
 

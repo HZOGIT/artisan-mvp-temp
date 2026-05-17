@@ -274,7 +274,7 @@ async function handleSubscriptionDeleted(sub: any) {
           title: 'Votre abonnement Operioz est resilie',
           body: `Votre abonnement a ete resilie comme demande. Vos donnees sont conservees pendant 30 jours, vous pouvez reprendre la ou vous en etiez en vous reabonnant.`,
           ctaLabel: 'Renouveler mon abonnement',
-          ctaUrl: `${process.env.APP_URL || 'https://artisan.cheminov.com'}/parametres?tab=abonnement`,
+          ctaUrl: `${process.env.APP_URL || 'https://www.operioz.com'}/parametres?tab=abonnement`,
         }),
       });
     }
@@ -302,7 +302,7 @@ async function handleTrialWillEnd(sub: any) {
           title: 'Plus que 3 jours d’essai gratuit',
           body: `Votre periode d’essai Operioz se termine bientot. Choisissez votre plan pour continuer a beneficier de toutes les fonctionnalites sans interruption. Vos donnees sont conservees.`,
           ctaLabel: 'Choisir mon plan',
-          ctaUrl: `${process.env.APP_URL || 'https://artisan.cheminov.com'}/parametres?tab=abonnement`,
+          ctaUrl: `${process.env.APP_URL || 'https://www.operioz.com'}/parametres?tab=abonnement`,
         }),
       });
     }
@@ -354,7 +354,7 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
           title: 'Paiement confirme',
           body: `Merci ! Votre abonnement Operioz est actif. Prochain renouvellement le ${sub.current_period_end ? new Date(sub.current_period_end * 1000).toLocaleDateString('fr-FR') : '—'}.`,
           ctaLabel: 'Acceder a mon espace',
-          ctaUrl: `${process.env.APP_URL || 'https://artisan.cheminov.com'}/dashboard`,
+          ctaUrl: `${process.env.APP_URL || 'https://www.operioz.com'}/dashboard`,
         }),
       });
     }
@@ -386,7 +386,7 @@ async function handleInvoicePaymentFailed(invoice: any) {
           title: 'Echec de paiement',
           body: `Le paiement de votre abonnement Operioz n’a pas pu etre effectue. Merci de mettre a jour votre moyen de paiement sous 7 jours pour eviter une suspension du service.`,
           ctaLabel: 'Mettre a jour ma carte',
-          ctaUrl: `${process.env.APP_URL || 'https://artisan.cheminov.com'}/parametres?tab=abonnement`,
+          ctaUrl: `${process.env.APP_URL || 'https://www.operioz.com'}/parametres?tab=abonnement`,
         }),
       });
     }

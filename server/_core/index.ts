@@ -1067,7 +1067,7 @@ async function startServer() {
     try {
       const db = await import("../db");
       const { sendEmail, buildTrialEndingJ3Email, buildTrialEndingJ1Email } = await import("./emailService");
-      const appUrl = process.env.APP_URL || "https://artisan.cheminov.com";
+      const appUrl = process.env.APP_URL || "https://www.operioz.com";
 
       // 1) Nettoyage des sessions expirees.
       const cleaned = await db.cleanExpiredSessions();

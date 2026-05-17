@@ -106,7 +106,7 @@ export function generateGuidePDF() {
   doc.text(`Version 1.0 — ${today}`, W / 2, 145, { align: "center" });
 
   doc.setFontSize(10);
-  doc.text("artisan.cheminov.com", W / 2, 250, { align: "center" });
+  doc.text("www.operioz.com", W / 2, 250, { align: "center" });
 
   // ========== SOMMAIRE ==========
   addPage();
@@ -138,7 +138,7 @@ export function generateGuidePDF() {
   heading1("1. Premiers pas");
 
   heading2("Se connecter");
-  paragraph("Rendez-vous sur artisan.cheminov.com et cliquez sur « Se connecter ». Saisissez votre adresse email et votre mot de passe. Vous arrivez directement sur le tableau de bord.");
+  paragraph("Rendez-vous sur www.operioz.com et cliquez sur « Se connecter ». Saisissez votre adresse email et votre mot de passe. Vous arrivez directement sur le tableau de bord.");
 
   heading2("Le tableau de bord");
   paragraph("Le tableau de bord est votre page d'accueil. Vous y trouvez en un coup d'œil :");

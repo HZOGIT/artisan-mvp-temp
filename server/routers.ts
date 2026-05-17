@@ -2321,7 +2321,7 @@ const signatureRouter = router({
       const client = await db.getClientById(devisData.clientId);
       if (client?.email) {
         const { sendEmail } = await import('./_core/emailService');
-        const signatureUrl = `https://artisan.cheminov.com/devis-public/${token}`;
+        const signatureUrl = `https://www.operioz.com/devis-public/${token}`;
         const artisanName = artisan.nomEntreprise || 'Votre artisan';
         const clientName = `${client.prenom || ''} ${client.nom || ''}`.trim() || 'Client';
         const totalTTC = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(parseFloat(devisData.totalTTC as any) || 0);
@@ -3320,7 +3320,7 @@ const commandesFournisseursRouter = router({
 
       // Send email via Resend
       const resendKey = process.env.RESEND_API_KEY;
-      const emailFrom = process.env.EMAIL_FROM || 'Operioz <noreply@artisan.cheminov.com>';
+      const emailFrom = process.env.EMAIL_FROM || 'Operioz <noreply@operioz.com>';
       if (!resendKey) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Service email non configuré" });
       }
@@ -3392,7 +3392,7 @@ const clientPortalRouter = router({
         expiresAt,
       });
 
-      const origin = ctx.req.headers.origin || 'https://artisan.cheminov.com';
+      const origin = ctx.req.headers.origin || 'https://www.operioz.com';
       const portalUrl = `${origin}/portail/${token}`;
 
       // Envoyer l'email au client
@@ -4256,7 +4256,7 @@ const chatRouter = router({
         if (client?.email) {
           const portalAccess = await db.getPortalAccessByClientId(conv.clientId, artisan.id);
           const portalLink = portalAccess?.token
-            ? `https://artisan.cheminov.com/portail/${portalAccess.token}`
+            ? `https://www.operioz.com/portail/${portalAccess.token}`
             : null;
           await sendEmail({
             to: client.email,
@@ -7809,7 +7809,7 @@ const subscriptionRouter = router({
         }
       }
 
-      const appUrl = process.env.APP_URL || 'https://artisan.cheminov.com';
+      const appUrl = process.env.APP_URL || 'https://www.operioz.com';
 
       const session = await stripeClient.checkout.sessions.create({
         customer: customerId,
@@ -7844,7 +7844,7 @@ const subscriptionRouter = router({
 
     const { stripe } = await import('./stripe/stripeService');
     const stripeClient = stripe();
-    const appUrl = process.env.APP_URL || 'https://artisan.cheminov.com';
+    const appUrl = process.env.APP_URL || 'https://www.operioz.com';
 
     const session = await stripeClient.billingPortal.sessions.create({
       customer: sub.stripeCustomerId,
@@ -8000,7 +8000,7 @@ export const appRouter = router({system: systemRouter,
             <li>Créez votre premier devis avec MonAssistant IA</li>
           </ol>
           <p style="margin:24px 0;text-align:center;">
-            <a href="https://artisan.cheminov.com/dashboard" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
+            <a href="https://www.operioz.com/dashboard" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
               Accéder à mon espace →
             </a>
           </p>

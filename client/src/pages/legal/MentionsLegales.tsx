@@ -5,7 +5,7 @@ export default function MentionsLegales() {
     <LegalLayout title="Mentions légales" lastUpdated="2026-05-17">
       <h2>Éditeur du site</h2>
       <p>
-        Le site Operioz (accessible à l'adresse <a href="https://artisan.cheminov.com">https://artisan.cheminov.com</a>)
+        Le site Operioz (accessible à l'adresse <a href="https://www.operioz.com">https://www.operioz.com</a>)
         est édité par&nbsp;:
       </p>
       <ul>
