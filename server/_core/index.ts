@@ -285,6 +285,43 @@ async function startServer() {
   });
 
   // ============================================================
+  // TEMPORAIRE — Test SDK Anthropic + ANTHROPIC_API_KEY. A retirer.
+  // ============================================================
+  app.get('/api/test-anthropic', async (_req, res) => {
+    try {
+      const hasKey = !!process.env.ANTHROPIC_API_KEY;
+      const Anthropic = (await import('@anthropic-ai/sdk')).default;
+      const client = new Anthropic();
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 64,
+        messages: [{ role: 'user', content: 'Reponds exactement: pong' }],
+      });
+      const text = response.content
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('')
+        .trim();
+      res.json({
+        success: true,
+        anthropicApiKeyPresent: hasKey,
+        model: response.model,
+        stopReason: response.stop_reason,
+        replyText: text,
+        usage: response.usage,
+      });
+    } catch (e: any) {
+      res.status(500).json({
+        success: false,
+        anthropicApiKeyPresent: !!process.env.ANTHROPIC_API_KEY,
+        message: e?.message || String(e),
+        name: e?.name,
+        status: e?.status,
+      });
+    }
+  });
+
+  // ============================================================
   // API Articles - recherche bibliothèque
   // ============================================================
   app.get('/api/articles/search', async (req, res) => {
