@@ -53,6 +53,29 @@ import {
   suiviChantier, SuiviChantier, InsertSuiviChantier,
   permissionsUtilisateur, PermissionUtilisateur, InsertPermissionUtilisateur,
   auditLog, AuditLog, InsertAuditLog,
+  vehicules, Vehicule, InsertVehicule,
+  historiqueKilometrage, HistoriqueKilometrage, InsertHistoriqueKilometrage,
+  entretiensVehicules, EntretienVehicule, InsertEntretienVehicule,
+  assurancesVehicules, AssuranceVehicule, InsertAssuranceVehicule,
+  conges, Conge, InsertConge,
+  soldesConges, SoldeConge, InsertSoldeConge,
+  badges, Badge, InsertBadge,
+  badgesTechniciens, BadgeTechnicien, InsertBadgeTechnicien,
+  objectifsTechniciens, ObjectifTechnicien, InsertObjectifTechnicien,
+  classementTechniciens, ClassementTechnicien, InsertClassementTechnicien,
+  devisOptions, DevisOption, InsertDevisOption,
+  devisOptionsLignes, DevisOptionLigne, InsertDevisOptionLigne,
+  analysesPhotosChantier, AnalysePhotoChantier, InsertAnalysePhotoChantier,
+  photosAnalyse, PhotoAnalyse, InsertPhotoAnalyse,
+  resultatsAnalyseIA, ResultatAnalyseIA, InsertResultatAnalyseIA,
+  suggestionsArticlesIA, SuggestionArticleIA, InsertSuggestionArticleIA,
+  configurationsComptables, ConfigurationComptable, InsertConfigurationComptable,
+  exportsComptables, ExportComptable, InsertExportComptable,
+  pushSubscriptions, PushSubscription, InsertPushSubscription,
+  historiqueNotificationsPush, HistoriqueNotificationPush, InsertHistoriqueNotificationPush,
+  preferencesNotifications, PreferenceNotification, InsertPreferenceNotification,
+  configAlertesPrevisions, ConfigAlertePrevision, InsertConfigAlertePrevision,
+  historiqueAlertesPrevisions, HistoriqueAlertePrevision, InsertHistoriqueAlertePrevision,
 } from "../drizzle/schema";
 
 // ============================================================================
@@ -4125,4 +4148,214 @@ export async function getPhotosByInterventionMobileId(
     [mobileId]
   );
   return (rows as any[]) || [];
+}
+
+// ============================================================================
+// VEHICULES (flotte, kilometrage, entretiens, assurances) - Drizzle ORM
+// ============================================================================
+
+export async function getVehiculesByArtisan(artisanId: number): Promise<Vehicule[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(vehicules).where(eq(vehicules.artisanId, artisanId)).orderBy(desc(vehicules.createdAt));
+}
+
+export async function getVehiculeById(id: number): Promise<Vehicule | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(vehicules).where(eq(vehicules.id, id)).limit(1);
+  return r[0];
+}
+
+export async function createVehicule(data: InsertVehicule): Promise<Vehicule | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(vehicules).values(data);
+  const r = await dbi.select().from(vehicules)
+    .where(and(eq(vehicules.artisanId, data.artisanId), eq(vehicules.immatriculation, data.immatriculation)))
+    .orderBy(desc(vehicules.id)).limit(1);
+  return r[0];
+}
+
+export async function updateVehicule(id: number, data: Partial<InsertVehicule>): Promise<Vehicule | undefined> {
+  const dbi = await getDb();
+  await dbi.update(vehicules).set(data).where(eq(vehicules.id, id));
+  return getVehiculeById(id);
+}
+
+export async function deleteVehicule(id: number): Promise<void> {
+  const dbi = await getDb();
+  // Cascade : retirer historique / entretiens / assurances avant le vehicule.
+  await dbi.delete(historiqueKilometrage).where(eq(historiqueKilometrage.vehiculeId, id));
+  await dbi.delete(entretiensVehicules).where(eq(entretiensVehicules.vehiculeId, id));
+  await dbi.delete(assurancesVehicules).where(eq(assurancesVehicules.vehiculeId, id));
+  await dbi.delete(vehicules).where(eq(vehicules.id, id));
+}
+
+export async function addHistoriqueKilometrage(
+  data: InsertHistoriqueKilometrage
+): Promise<HistoriqueKilometrage | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(historiqueKilometrage).values(data);
+  // Met a jour le kilometrage actuel du vehicule s'il est superieur.
+  const veh = await getVehiculeById(data.vehiculeId);
+  if (veh && (veh.kilometrageActuel || 0) < data.kilometrage) {
+    await dbi.update(vehicules)
+      .set({ kilometrageActuel: data.kilometrage })
+      .where(eq(vehicules.id, data.vehiculeId));
+  }
+  const r = await dbi.select().from(historiqueKilometrage)
+    .where(eq(historiqueKilometrage.vehiculeId, data.vehiculeId))
+    .orderBy(desc(historiqueKilometrage.id)).limit(1);
+  return r[0];
+}
+
+export async function getHistoriqueKilometrageByVehicule(
+  vehiculeId: number
+): Promise<HistoriqueKilometrage[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(historiqueKilometrage)
+    .where(eq(historiqueKilometrage.vehiculeId, vehiculeId))
+    .orderBy(desc(historiqueKilometrage.dateReleve));
+}
+
+export async function createEntretienVehicule(
+  data: InsertEntretienVehicule
+): Promise<EntretienVehicule | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(entretiensVehicules).values(data);
+  const r = await dbi.select().from(entretiensVehicules)
+    .where(eq(entretiensVehicules.vehiculeId, data.vehiculeId))
+    .orderBy(desc(entretiensVehicules.id)).limit(1);
+  return r[0];
+}
+
+export async function getEntretiensByVehicule(
+  vehiculeId: number
+): Promise<EntretienVehicule[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(entretiensVehicules)
+    .where(eq(entretiensVehicules.vehiculeId, vehiculeId))
+    .orderBy(desc(entretiensVehicules.dateEntretien));
+}
+
+export async function getEntretiensAVenir(artisanId: number): Promise<any[]> {
+  // Entretiens dont la prochaine date est dans les 60 jours, pour les
+  // vehicules de l'artisan. Jointure manuelle car prochainEntretienDate
+  // peut etre null (on filtre).
+  const dbi = await getDb();
+  const today = new Date();
+  const horizon = new Date();
+  horizon.setDate(horizon.getDate() + 60);
+  const horizonStr = horizon.toISOString().slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+  return await dbi.select({
+    id: entretiensVehicules.id,
+    vehiculeId: entretiensVehicules.vehiculeId,
+    type: entretiensVehicules.type,
+    prochainEntretienDate: entretiensVehicules.prochainEntretienDate,
+    prochainEntretienKm: entretiensVehicules.prochainEntretienKm,
+    immatriculation: vehicules.immatriculation,
+    marque: vehicules.marque,
+    modele: vehicules.modele,
+  })
+    .from(entretiensVehicules)
+    .innerJoin(vehicules, eq(vehicules.id, entretiensVehicules.vehiculeId))
+    .where(and(
+      eq(vehicules.artisanId, artisanId),
+      gte(entretiensVehicules.prochainEntretienDate, todayStr),
+      lte(entretiensVehicules.prochainEntretienDate, horizonStr),
+    ))
+    .orderBy(asc(entretiensVehicules.prochainEntretienDate));
+}
+
+export async function createAssuranceVehicule(
+  data: InsertAssuranceVehicule
+): Promise<AssuranceVehicule | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(assurancesVehicules).values(data);
+  const r = await dbi.select().from(assurancesVehicules)
+    .where(eq(assurancesVehicules.vehiculeId, data.vehiculeId))
+    .orderBy(desc(assurancesVehicules.id)).limit(1);
+  return r[0];
+}
+
+export async function getAssurancesByVehicule(
+  vehiculeId: number
+): Promise<AssuranceVehicule[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(assurancesVehicules)
+    .where(eq(assurancesVehicules.vehiculeId, vehiculeId))
+    .orderBy(desc(assurancesVehicules.dateFin));
+}
+
+export async function getAssurancesExpirant(
+  artisanId: number,
+  daysAhead: number = 30
+): Promise<any[]> {
+  // Assurances dont dateFin est dans <daysAhead> jours, pour les
+  // vehicules de l'artisan.
+  const dbi = await getDb();
+  const today = new Date();
+  const horizon = new Date();
+  horizon.setDate(horizon.getDate() + daysAhead);
+  return await dbi.select({
+    id: assurancesVehicules.id,
+    vehiculeId: assurancesVehicules.vehiculeId,
+    compagnie: assurancesVehicules.compagnie,
+    numeroContrat: assurancesVehicules.numeroContrat,
+    dateFin: assurancesVehicules.dateFin,
+    immatriculation: vehicules.immatriculation,
+    marque: vehicules.marque,
+    modele: vehicules.modele,
+  })
+    .from(assurancesVehicules)
+    .innerJoin(vehicules, eq(vehicules.id, assurancesVehicules.vehiculeId))
+    .where(and(
+      eq(vehicules.artisanId, artisanId),
+      gte(assurancesVehicules.dateFin, today.toISOString().slice(0, 10)),
+      lte(assurancesVehicules.dateFin, horizon.toISOString().slice(0, 10)),
+    ))
+    .orderBy(asc(assurancesVehicules.dateFin));
+}
+
+export async function getStatistiquesFlotte(artisanId: number): Promise<{
+  nbVehicules: number;
+  nbActifs: number;
+  nbEnMaintenance: number;
+  kmTotalFlotte: number;
+  coutEntretienAnneeEnCours: number;
+  assurancesAExpirer: number;
+}> {
+  const dbi = await getDb();
+  const vehs = await dbi.select().from(vehicules).where(eq(vehicules.artisanId, artisanId));
+  const nbVehicules = vehs.length;
+  const nbActifs = vehs.filter((v) => v.statut === "actif").length;
+  const nbEnMaintenance = vehs.filter((v) => v.statut === "en_maintenance").length;
+  const kmTotalFlotte = vehs.reduce((s, v) => s + (v.kilometrageActuel || 0), 0);
+
+  // Cout entretiens annee courante
+  const yearStart = `${new Date().getFullYear()}-01-01`;
+  const yearEnd = `${new Date().getFullYear()}-12-31`;
+  const vehiculeIds = vehs.map((v) => v.id);
+  let coutEntretienAnneeEnCours = 0;
+  if (vehiculeIds.length > 0) {
+    const ents = await dbi.select().from(entretiensVehicules)
+      .where(and(
+        inArray(entretiensVehicules.vehiculeId, vehiculeIds),
+        gte(entretiensVehicules.dateEntretien, yearStart),
+        lte(entretiensVehicules.dateEntretien, yearEnd),
+      ));
+    coutEntretienAnneeEnCours = ents.reduce(
+      (s, e) => s + Number(e.cout || 0),
+      0
+    );
+  }
+
+  const assurances = await getAssurancesExpirant(artisanId, 60);
+  return {
+    nbVehicules,
+    nbActifs,
+    nbEnMaintenance,
+    kmTotalFlotte,
+    coutEntretienAnneeEnCours,
+    assurancesAExpirer: assurances.length,
+  };
 }
