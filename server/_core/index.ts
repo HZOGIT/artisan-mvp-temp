@@ -285,24 +285,6 @@ async function startServer() {
   });
 
   // ============================================================
-  // TEMPORAIRE — Test d'envoi email Resend. A retirer apres validation.
-  // ============================================================
-  app.get('/api/test-email', async (_req, res) => {
-    try {
-      const { sendEmail } = await import('./emailService');
-      const result = await sendEmail({
-        to: 'support@operioz.com',
-        subject: 'Test email Operioz ✅',
-        body: `<p>Cet email confirme que Resend est correctement configure sur operioz.com.</p>
-<p>Date : ${new Date().toISOString()}</p>`,
-      });
-      res.json(result);
-    } catch (e: any) {
-      res.status(500).json({ success: false, message: e?.message || String(e) });
-    }
-  });
-
-  // ============================================================
   // API Articles - recherche bibliothèque
   // ============================================================
   app.get('/api/articles/search', async (req, res) => {
