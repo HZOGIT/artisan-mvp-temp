@@ -69,6 +69,7 @@ import {
   photosAnalyse, PhotoAnalyse, InsertPhotoAnalyse,
   resultatsAnalyseIA, ResultatAnalyseIA, InsertResultatAnalyseIA,
   suggestionsArticlesIA, SuggestionArticleIA, InsertSuggestionArticleIA,
+  devisGenereIA, DevisGenereIA, InsertDevisGenereIA,
   configurationsComptables, ConfigurationComptable, InsertConfigurationComptable,
   exportsComptables, ExportComptable, InsertExportComptable,
   pushSubscriptions, PushSubscription, InsertPushSubscription,
@@ -4887,4 +4888,210 @@ export async function convertirOptionEnDevis(optionId: number): Promise<void> {
   }).where(eq(devis.id, opt.devisId));
   // Marque l'option comme selectionnee.
   await selectDevisOption(optionId);
+}
+
+// ============================================================================
+// ANALYSE PHOTOS IA (analyses_photos_chantier + photos + resultats +
+// suggestions + devis_genere_ia) - Drizzle ORM
+// ============================================================================
+
+export async function getAnalysesPhotosByArtisan(
+  artisanId: number
+): Promise<AnalysePhotoChantier[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(analysesPhotosChantier)
+    .where(eq(analysesPhotosChantier.artisanId, artisanId))
+    .orderBy(desc(analysesPhotosChantier.createdAt));
+}
+
+export async function getAnalysePhotoById(
+  id: number
+): Promise<AnalysePhotoChantier | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(analysesPhotosChantier)
+    .where(eq(analysesPhotosChantier.id, id)).limit(1);
+  return r[0];
+}
+
+export async function createAnalysePhoto(
+  data: InsertAnalysePhotoChantier
+): Promise<AnalysePhotoChantier | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(analysesPhotosChantier).values(data);
+  const r = await dbi.select().from(analysesPhotosChantier)
+    .where(eq(analysesPhotosChantier.artisanId, data.artisanId))
+    .orderBy(desc(analysesPhotosChantier.id)).limit(1);
+  return r[0];
+}
+
+export async function updateAnalysePhoto(
+  id: number,
+  data: Partial<InsertAnalysePhotoChantier>
+): Promise<AnalysePhotoChantier | undefined> {
+  const dbi = await getDb();
+  await dbi.update(analysesPhotosChantier).set(data).where(eq(analysesPhotosChantier.id, id));
+  return getAnalysePhotoById(id);
+}
+
+export async function addPhotoToAnalyse(
+  data: InsertPhotoAnalyse
+): Promise<PhotoAnalyse | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(photosAnalyse).values(data);
+  const r = await dbi.select().from(photosAnalyse)
+    .where(eq(photosAnalyse.analyseId, data.analyseId))
+    .orderBy(desc(photosAnalyse.id)).limit(1);
+  return r[0];
+}
+
+export async function getPhotosByAnalyse(analyseId: number): Promise<PhotoAnalyse[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(photosAnalyse)
+    .where(eq(photosAnalyse.analyseId, analyseId))
+    .orderBy(asc(photosAnalyse.ordre));
+}
+
+export async function getResultatsAnalyse(analyseId: number): Promise<ResultatAnalyseIA[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(resultatsAnalyseIA)
+    .where(eq(resultatsAnalyseIA.analyseId, analyseId))
+    .orderBy(desc(resultatsAnalyseIA.confiance));
+}
+
+export async function saveResultatAnalyseIA(
+  data: InsertResultatAnalyseIA
+): Promise<ResultatAnalyseIA | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(resultatsAnalyseIA).values(data);
+  const r = await dbi.select().from(resultatsAnalyseIA)
+    .where(eq(resultatsAnalyseIA.analyseId, data.analyseId))
+    .orderBy(desc(resultatsAnalyseIA.id)).limit(1);
+  return r[0];
+}
+
+export async function getSuggestionsByResultat(
+  resultatId: number
+): Promise<SuggestionArticleIA[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(suggestionsArticlesIA)
+    .where(eq(suggestionsArticlesIA.resultatId, resultatId))
+    .orderBy(desc(suggestionsArticlesIA.confiance));
+}
+
+export async function saveSuggestionArticleIA(
+  data: InsertSuggestionArticleIA
+): Promise<SuggestionArticleIA | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(suggestionsArticlesIA).values(data);
+  const r = await dbi.select().from(suggestionsArticlesIA)
+    .where(eq(suggestionsArticlesIA.resultatId, data.resultatId))
+    .orderBy(desc(suggestionsArticlesIA.id)).limit(1);
+  return r[0];
+}
+
+export async function updateSuggestionArticle(
+  id: number,
+  data: Partial<InsertSuggestionArticleIA>
+): Promise<SuggestionArticleIA | undefined> {
+  const dbi = await getDb();
+  await dbi.update(suggestionsArticlesIA).set(data).where(eq(suggestionsArticlesIA.id, id));
+  const r = await dbi.select().from(suggestionsArticlesIA).where(eq(suggestionsArticlesIA.id, id)).limit(1);
+  return r[0];
+}
+
+export async function getDevisGenereByAnalyse(
+  analyseId: number
+): Promise<DevisGenereIA | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(devisGenereIA)
+    .where(eq(devisGenereIA.analyseId, analyseId)).limit(1);
+  return r[0];
+}
+
+export async function creerDevisDepuisAnalyseIA(params: {
+  analyseId: number;
+  artisanId: number;
+  clientId: number;
+  suggestionIds?: number[];
+}): Promise<{ devisId: number; montantEstime: number } | null> {
+  // Cree un nouveau devis a partir des suggestions selectionnees
+  // de l'analyse, puis enregistre le lien analyse -> devis.
+  const dbi = await getDb();
+  const analyse = await getAnalysePhotoById(params.analyseId);
+  if (!analyse) return null;
+
+  // Recupere les resultats et leurs suggestions selectionnees.
+  const resultats = await getResultatsAnalyse(params.analyseId);
+  const lignes: Array<{ designation: string; quantite: number; unite: string; prixUnitaireHT: number; tauxTVA: number }> = [];
+  for (const r of resultats) {
+    const suggestions = await getSuggestionsByResultat(r.id);
+    for (const s of suggestions) {
+      if (params.suggestionIds && !params.suggestionIds.includes(s.id)) continue;
+      if (!s.selectionne) continue;
+      lignes.push({
+        designation: s.nomArticle,
+        quantite: Number(s.quantiteSuggeree || 1),
+        unite: s.unite || "u",
+        prixUnitaireHT: Number(s.prixEstime || 0),
+        tauxTVA: 20,
+      });
+    }
+  }
+
+  if (lignes.length === 0) return null;
+
+  // Calcul totaux.
+  let totalHT = 0;
+  let totalTVA = 0;
+  for (const l of lignes) {
+    const ht = l.quantite * l.prixUnitaireHT;
+    totalHT += ht;
+    totalTVA += ht * (l.tauxTVA / 100);
+  }
+  const totalTTC = totalHT + totalTVA;
+
+  // Genere numero devis simple via le compteur de l'artisan.
+  const numero = `IA-${Date.now().toString().slice(-8)}`;
+  await dbi.insert(devis).values({
+    artisanId: params.artisanId,
+    clientId: params.clientId,
+    numero,
+    statut: "brouillon",
+    objet: analyse.titre || "Devis depuis analyse photos IA",
+    totalHT: totalHT.toFixed(2),
+    totalTVA: totalTVA.toFixed(2),
+    totalTTC: totalTTC.toFixed(2),
+  });
+  const created = await dbi.select().from(devis)
+    .where(and(eq(devis.artisanId, params.artisanId), eq(devis.numero, numero)))
+    .limit(1);
+  const newDevis = created[0];
+  if (!newDevis) return null;
+
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i];
+    const ht = l.quantite * l.prixUnitaireHT;
+    await dbi.insert(devisLignes).values({
+      devisId: newDevis.id,
+      ordre: i,
+      designation: l.designation,
+      quantite: l.quantite.toFixed(2),
+      unite: l.unite,
+      prixUnitaireHT: l.prixUnitaireHT.toFixed(2),
+      tauxTVA: l.tauxTVA.toFixed(2),
+      montantHT: ht.toFixed(2),
+      montantTVA: (ht * l.tauxTVA / 100).toFixed(2),
+      montantTTC: (ht + ht * l.tauxTVA / 100).toFixed(2),
+    });
+  }
+
+  // Lien analyse -> devis (upsert-like via DELETE + INSERT).
+  await dbi.delete(devisGenereIA).where(eq(devisGenereIA.analyseId, params.analyseId));
+  await dbi.insert(devisGenereIA).values({
+    analyseId: params.analyseId,
+    devisId: newDevis.id,
+    montantEstime: totalTTC.toFixed(2),
+  });
+
+  return { devisId: newDevis.id, montantEstime: totalTTC };
 }
