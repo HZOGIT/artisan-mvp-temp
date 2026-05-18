@@ -236,13 +236,14 @@ export default function InterventionsMobile() {
                     </div>
                   )}
 
-                  {/* Actions */}
+                  {/* Actions — boutons en taille default + min-h 44 pour
+                       respecter la touch zone Apple HIG sur mobile. */}
                   <div className="flex flex-wrap gap-2 pt-2">
                     {/* Navigation */}
                     {intervention.adresse && (
                       <Button
                         variant="outline"
-                        size="sm"
+                        className="min-h-[44px] flex-1 sm:flex-none"
                         onClick={() => intervention.adresse && openMaps(intervention.adresse)}
                       >
                         <Navigation className="h-4 w-4 mr-2" />
@@ -254,7 +255,7 @@ export default function InterventionsMobile() {
                     {intervention.client?.telephone && (
                       <Button
                         variant="outline"
-                        size="sm"
+                        className="min-h-[44px] flex-1 sm:flex-none"
                         onClick={() => intervention.client?.telephone && callClient(intervention.client.telephone)}
                       >
                         <Phone className="h-4 w-4 mr-2" />
@@ -265,7 +266,7 @@ export default function InterventionsMobile() {
                     {/* Démarrer l'intervention */}
                     {intervention.statut === "planifiee" && (
                       <Button
-                        size="sm"
+                        className="min-h-[44px] flex-1 sm:flex-none"
                         onClick={() => handleStart(intervention)}
                         disabled={startMutation.isPending}
                       >
@@ -281,7 +282,7 @@ export default function InterventionsMobile() {
                     {/* Terminer l'intervention */}
                     {intervention.statut === "en_cours" && (
                       <Button
-                        size="sm"
+                        className="min-h-[44px] flex-1 sm:flex-none"
                         onClick={() => {
                           setSelectedIntervention(intervention);
                           setIsSignatureDialogOpen(true);
@@ -354,10 +355,18 @@ export default function InterventionsMobile() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsSignatureDialogOpen(false)}>
+              <Button
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={() => setIsSignatureDialogOpen(false)}
+              >
                 Annuler
               </Button>
-              <Button onClick={handleEnd} disabled={endMutation.isPending}>
+              <Button
+                className="min-h-[44px]"
+                onClick={handleEnd}
+                disabled={endMutation.isPending}
+              >
                 {endMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Valider
               </Button>

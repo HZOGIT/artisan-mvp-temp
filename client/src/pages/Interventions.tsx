@@ -368,7 +368,7 @@ export default function Interventions() {
           <Button
             variant="ghost"
             size="sm"
-            className="ml-auto h-7 px-2 text-blue-900 hover:bg-blue-100"
+            className="ml-auto h-9 px-3 min-h-[36px] text-blue-900 hover:bg-blue-100"
             onClick={() => setLocation("/interventions")}
           >
             Réinitialiser
