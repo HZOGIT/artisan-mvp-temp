@@ -1082,6 +1082,23 @@ async function fixDuplicates() {
         )
       `);
       console.log('[PhotosInterventions] Table OK');
+
+      // Alignement : commandes_fournisseurs.numero etait declaree
+      // VARCHAR(20) alors que devis/factures.numero = VARCHAR(50). Un
+      // generateur de numero un peu plus long (CMD-{prefix}-{ts}) peut
+      // alors fail silencieusement avec ER_DATA_TOO_LONG. Aligne sur 50.
+      try {
+        await pool.execute(
+          `ALTER TABLE commandes_fournisseurs MODIFY COLUMN numero VARCHAR(50) NULL`
+        );
+        console.log('[CommandesFournisseurs] numero widened to VARCHAR(50)');
+      } catch (e: any) {
+        // Si la colonne fait deja 50+ ou si l'ALTER echoue pour autre
+        // raison non-bloquante, on ignore.
+        if (!/already|same/i.test(e?.message || '')) {
+          console.log('[CommandesFournisseurs] ALTER numero :', e?.message);
+        }
+      }
     } catch (e: any) {
       console.log('[CustomTables] Migration :', e?.message || e);
     }
