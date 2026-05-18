@@ -34,6 +34,7 @@ import {
   Calendar,
   CalendarDays,
   CalendarOff,
+  Car,
   ChevronRight,
   ClipboardList,
   CheckCircle,
@@ -250,6 +251,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: HardHat, label: "Chantiers", path: "/chantiers" },
       { icon: Route, label: "Planification", path: "/planification" },
       { icon: Truck, label: "Véhicules", path: "/vehicules" },
+      { icon: Car, label: "Flotte", path: "/flotte" },
     ],
   },
   {
@@ -336,6 +338,7 @@ const pathPermissionMap: Record<string, string> = {
   "/tableau-bord-sync-comptable": "comptabilite.voir",
   "/performances-fournisseurs": "articles.voir",
   "/vehicules": "interventions.voir",
+  "/flotte": "interventions.voir",
   "/badges": "techniciens.voir",
   "/alertes-previsions": "comptabilite.voir",
   "/conges": "techniciens.voir",
@@ -376,6 +379,7 @@ const MODULE_TO_LABELS: Record<string, string[]> = {
   comptabilite: ["Comptabilité", "Rapports", "Prévisions CA", "Alertes prévisions"],
   assistant_ia: ["MonAssistant"],
   vehicules: ["Véhicules", "Flotte"],
+  // (déjà couvert plus haut — labels "Véhicules" et "Flotte")
   conges: ["Congés"],
   badges: ["Badges", "Classement"],
 };
