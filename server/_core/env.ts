@@ -16,13 +16,7 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   VITE_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  
-  // Manus API - OPTIONNEL
-  BUILT_IN_FORGE_API_URL: z.string().optional(),
-  BUILT_IN_FORGE_API_KEY: z.string().optional(),
-  VITE_FRONTEND_FORGE_API_KEY: z.string().optional(),
-  VITE_FRONTEND_FORGE_API_URL: z.string().optional(),
-  
+
   // Owner Info - OPTIONNEL
   OWNER_OPEN_ID: z.string().optional(),
   OWNER_NAME: z.string().optional(),
@@ -112,11 +106,7 @@ export const ENV = {
   stripeSecretKey: getEnv().STRIPE_SECRET_KEY,
   stripeWebhookSecret: getEnv().STRIPE_WEBHOOK_SECRET,
   // Note: VITE_STRIPE_PUBLISHABLE_KEY est OK d'exposer (clé publique)
-  
-  // Manus API
-  forgeApiUrl: getEnv().BUILT_IN_FORGE_API_URL,
-  forgeApiKey: getEnv().BUILT_IN_FORGE_API_KEY,
-  
+
   // Owner Info
   ownerOpenId: getEnv().OWNER_OPEN_ID,
   ownerName: getEnv().OWNER_NAME,
