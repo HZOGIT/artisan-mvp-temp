@@ -8095,7 +8095,7 @@ export const appRouter = router({system: systemRouter,
         // recuperer pour la comptabilite).
         await db.updateUser(ctx.user.id, {
           actif: false,
-          email: `deleted_${ctx.user.id}_${Date.now()}@operioz.fr`,
+          email: `deleted_${ctx.user.id}_${Date.now()}@operioz.com`,
         } as any);
         clearAuthCookie(ctx.res);
         return { success: true };

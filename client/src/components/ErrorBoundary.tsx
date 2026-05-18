@@ -76,8 +76,8 @@ class ErrorBoundary extends Component<Props, State> {
 
             <p className="mt-8 text-xs text-slate-500">
               Si le problème persiste, contactez{" "}
-              <a href="mailto:support@operioz.fr" className="text-blue-600 hover:underline">
-                support@operioz.fr
+              <a href="mailto:support@operioz.com" className="text-blue-600 hover:underline">
+                support@operioz.com
               </a>
             </p>
           </div>

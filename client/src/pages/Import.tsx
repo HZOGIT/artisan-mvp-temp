@@ -844,7 +844,7 @@ export default function ImportPage() {
         </div>
         <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
           <Database className="h-3 w-3" />
-          En cas de problème, contactez notre support à <span className="font-medium">support@operioz.fr</span>.
+          En cas de problème, contactez notre support à <span className="font-medium">support@operioz.com</span>.
         </p>
       </section>
     </div>
