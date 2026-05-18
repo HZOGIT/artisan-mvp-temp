@@ -59,6 +59,7 @@ import {
   RefreshCw,
   Receipt,
   Route,
+  ScanLine,
   Search,
   Settings,
   ShoppingCart,
@@ -198,7 +199,10 @@ const NAV_GROUPS: NavGroup[] = [
     title: "MonAssistant",
     icon: Sparkles,
     color: "violet",
-    items: [{ icon: Sparkles, label: "MonAssistant", path: "/assistant" }],
+    items: [
+      { icon: Sparkles, label: "MonAssistant", path: "/assistant" },
+      { icon: ScanLine, label: "Analyse photos IA", path: "/analyses-photos" },
+    ],
   },
   {
     id: "dashboard",
@@ -346,6 +350,7 @@ const pathPermissionMap: Record<string, string> = {
   "/conges": "techniciens.voir",
   "/devis-options": "devis.voir",
   "/classement": "techniciens.voir",
+  "/analyses-photos": "devis.creer",
   "/modules": "",
   "/onboarding": "",
   "/import": "",
@@ -380,7 +385,7 @@ const MODULE_TO_LABELS: Record<string, string[]> = {
   stocks: ["Stocks", "Articles"],
   commandes: ["Commandes", "Fournisseurs", "Rapport Commande"],
   comptabilite: ["Comptabilité", "Rapports", "Prévisions CA", "Alertes prévisions"],
-  assistant_ia: ["MonAssistant"],
+  assistant_ia: ["MonAssistant", "Analyse photos IA"],
   vehicules: ["Véhicules", "Flotte"],
   // (déjà couvert plus haut — labels "Véhicules" et "Flotte")
   conges: ["Congés"],

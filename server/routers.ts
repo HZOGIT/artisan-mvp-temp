@@ -6375,10 +6375,22 @@ const devisIARouter = router({
 
       // Appel direct au SDK Anthropic (claude-sonnet-4 multimodal).
       // Le SDK lit ANTHROPIC_API_KEY automatiquement.
-      const imageBlocks = photos.map(p => ({
-        type: "image" as const,
-        source: { type: "url" as const, url: p.url },
-      }));
+      // Supporte les 2 formes d'image acceptees par Anthropic :
+      // - URL HTTP(S) publique  -> source: { type: 'url', url }
+      // - Data URL (upload local b64) -> source: { type: 'base64', ... }
+      const imageBlocks = photos.map((p: any) => {
+        const m = String(p.url || "").match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
+        if (m) {
+          return {
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: m[1] as any, data: m[2] },
+          };
+        }
+        return {
+          type: "image" as const,
+          source: { type: "url" as const, url: p.url },
+        };
+      });
 
       const systemPrompt = `Tu es un expert en bâtiment et travaux. Analyse les photos fournies et identifie les travaux nécessaires.
 Pour chaque type de travaux détecté, fournis :
@@ -6490,7 +6502,11 @@ Réponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autou
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
-      return await db.creerDevisDepuisAnalyseIA(input.analyseId, input.clientId, artisan.id);
+      return await db.creerDevisDepuisAnalyseIA({
+        analyseId: input.analyseId,
+        clientId: input.clientId,
+        artisanId: artisan.id,
+      });
     }),
 });
 
