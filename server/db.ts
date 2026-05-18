@@ -5429,3 +5429,138 @@ export async function markNotificationPushAsRead(id: number): Promise<void> {
     .set({ statut: "lu", dateLecture: new Date() })
     .where(eq(historiqueNotificationsPush.id, id));
 }
+
+// ============================================================================
+// PREVISIONS CA + ALERTES ECARTS (config + historique alertes) - Drizzle ORM
+// ============================================================================
+
+export async function getConfigAlertePrevision(
+  artisanId: number
+): Promise<ConfigAlertePrevision | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(configAlertesPrevisions)
+    .where(eq(configAlertesPrevisions.artisanId, artisanId)).limit(1);
+  return r[0];
+}
+
+export async function saveConfigAlertePrevision(
+  data: InsertConfigAlertePrevision
+): Promise<ConfigAlertePrevision | undefined> {
+  // Upsert sur artisanId (cle unique dans le schema).
+  const pool = getPool();
+  if (!pool) return undefined;
+  const keys = Object.keys(data);
+  const cols = keys.join(", ");
+  const placeholders = keys.map(() => "?").join(", ");
+  const updates = keys.filter((k) => k !== "artisanId").map((k) => `${k} = VALUES(${k})`).join(", ");
+  const values = keys.map((k) => (data as any)[k]);
+  await pool.execute(
+    `INSERT INTO config_alertes_previsions (${cols}) VALUES (${placeholders})
+     ON DUPLICATE KEY UPDATE ${updates || "updatedAt = CURRENT_TIMESTAMP"}`,
+    values
+  );
+  return getConfigAlertePrevision(data.artisanId);
+}
+
+export async function getHistoriqueAlertesPrevisions(
+  artisanId: number
+): Promise<HistoriqueAlertePrevision[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(historiqueAlertesPrevisions)
+    .where(eq(historiqueAlertesPrevisions.artisanId, artisanId))
+    .orderBy(desc(historiqueAlertesPrevisions.dateEnvoi))
+    .limit(100);
+}
+
+export async function verifierEcartsEtEnvoyerAlertes(
+  artisanId: number
+): Promise<HistoriqueAlertePrevision[]> {
+  // Compare CA previsionnel vs realise pour le mois courant. Si l'ecart
+  // depasse le seuil configure, enregistre une alerte. Le canal d'envoi
+  // reel (email/sms) est externe a ce helper — on enregistre juste la
+  // ligne d'historique.
+  const config = await getConfigAlertePrevision(artisanId);
+  if (!config || !config.actif) return [];
+
+  const dbi = await getDb();
+  const now = new Date();
+  const mois = now.getMonth() + 1;
+  const annee = now.getFullYear();
+
+  // CA previsionnel pour ce mois (depuis previsions_ca).
+  const prevRows = await dbi.select().from(previsionsCA)
+    .where(and(
+      eq(previsionsCA.artisanId, artisanId),
+      eq(previsionsCA.mois, mois),
+      eq(previsionsCA.annee, annee),
+    )).limit(1);
+  const prev = prevRows[0];
+  if (!prev) return [];
+  const caPrev = Number(prev.caPrevisionnel || 0);
+  if (caPrev <= 0) return [];
+
+  // CA realise pour le mois (factures payees).
+  const pool = getPool();
+  if (!pool) return [];
+  const debutMois = new Date(annee, mois - 1, 1).toISOString().slice(0, 10);
+  const finMois = new Date(annee, mois, 0).toISOString().slice(0, 10);
+  const [rRows]: any = await pool.execute(
+    `SELECT COALESCE(SUM(totalTTC), 0) AS ca
+       FROM factures
+      WHERE artisanId = ? AND statut = 'payee'
+        AND dateFacture BETWEEN ? AND ?`,
+    [artisanId, debutMois, finMois]
+  );
+  const caReel = Number(rRows[0]?.ca || 0);
+
+  // Calcul ecart en %.
+  const ecart = ((caReel - caPrev) / caPrev) * 100;
+  const seuilPos = Number(config.seuilAlertePositif || 10);
+  const seuilNeg = Number(config.seuilAlerteNegatif || 10);
+
+  const nouvellesAlertes: HistoriqueAlertePrevision[] = [];
+  let typeAlerte: "depassement_positif" | "depassement_negatif" | null = null;
+  if (ecart >= seuilPos) typeAlerte = "depassement_positif";
+  else if (ecart <= -seuilNeg) typeAlerte = "depassement_negatif";
+  if (!typeAlerte) return [];
+
+  // Verifier si une alerte du meme type a deja ete envoyee ce mois pour
+  // eviter le spam.
+  const [existsRows]: any = await pool.execute(
+    `SELECT id FROM historique_alertes_previsions
+      WHERE artisanId = ? AND mois = ? AND annee = ? AND typeAlerte = ?
+      LIMIT 1`,
+    [artisanId, mois, annee, typeAlerte]
+  );
+  if ((existsRows as any[]).length > 0) return [];
+
+  const canal: "email" | "sms" | "les_deux" =
+    config.alerteEmail && config.alerteSms ? "les_deux" :
+    config.alerteEmail ? "email" :
+    config.alerteSms ? "sms" : "email";
+  const message = typeAlerte === "depassement_positif"
+    ? `Bonne nouvelle : votre CA realise (${caReel.toFixed(0)} EUR) depasse de ${ecart.toFixed(1)}% le previsionnel (${caPrev.toFixed(0)} EUR) pour ${mois}/${annee}.`
+    : `Attention : votre CA realise (${caReel.toFixed(0)} EUR) est inferieur de ${Math.abs(ecart).toFixed(1)}% au previsionnel (${caPrev.toFixed(0)} EUR) pour ${mois}/${annee}.`;
+
+  await dbi.insert(historiqueAlertesPrevisions).values({
+    artisanId,
+    mois,
+    annee,
+    typeAlerte,
+    caPrevisionnel: caPrev.toFixed(2),
+    caRealise: caReel.toFixed(2),
+    ecartPourcentage: ecart.toFixed(2),
+    canalEnvoi: canal,
+    statut: "envoye",
+    message,
+  });
+  const lastRows = await dbi.select().from(historiqueAlertesPrevisions)
+    .where(and(
+      eq(historiqueAlertesPrevisions.artisanId, artisanId),
+      eq(historiqueAlertesPrevisions.mois, mois),
+      eq(historiqueAlertesPrevisions.annee, annee),
+      eq(historiqueAlertesPrevisions.typeAlerte, typeAlerte),
+    )).orderBy(desc(historiqueAlertesPrevisions.id)).limit(1);
+  if (lastRows[0]) nouvellesAlertes.push(lastRows[0]);
+  return nouvellesAlertes;
+}
