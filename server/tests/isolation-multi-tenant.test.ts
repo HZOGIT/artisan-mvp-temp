@@ -75,12 +75,11 @@ async function callTRPC(
  * Authentifie un artisan et récupère son cookie de session
  */
 async function authenticateArtisan(email: string): Promise<string> {
-  // Note: Dans un vrai test, il faudrait implémenter l'authentification OAuth
-  // Pour l'instant, on simule avec un cookie de session
+  // Note: Dans un vrai test, il faudrait implémenter l'authentification
+  // email/password ; pour l'instant on simule avec un cookie de session.
   console.log(`🔐 Authentification de ${email}...`);
-  
-  // TODO: Implémenter l'authentification OAuth Manus
-  // Pour le moment, retourner un cookie simulé
+
+  // TODO: Implémenter l'authentification email/password pour le test E2E.
   return `session_${email.split('@')[0]}`;
 }
 

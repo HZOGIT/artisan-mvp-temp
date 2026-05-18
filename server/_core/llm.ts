@@ -1,4 +1,3 @@
-import { ENV } from "./env";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -209,14 +208,20 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+// URL d'un endpoint LLM compatible OpenAI Chat Completions (ex: Anthropic
+// via proxy, OpenAI direct, OpenRouter…). Pas de fallback hardcode :
+// si LLM_API_URL n'est pas defini, l'invocation throw explicitement.
+const resolveApiUrl = () => {
+  const base = process.env.LLM_API_URL?.trim();
+  if (!base) {
+    throw new Error("LLM_API_URL is not configured");
+  }
+  return `${base.replace(/\/$/, "")}/v1/chat/completions`;
+};
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+  if (!process.env.LLM_API_KEY) {
+    throw new Error("LLM_API_KEY is not configured");
   }
 };
 
@@ -316,7 +321,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${process.env.LLM_API_KEY}`,
     },
     body: JSON.stringify(payload),
   });
