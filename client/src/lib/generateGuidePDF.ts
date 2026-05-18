@@ -1,7 +1,46 @@
 import jsPDF from "jspdf";
 
-export function generateGuidePDF() {
+// Charge un .ttf depuis l'API serveur et le convertit en base64 pour jsPDF.
+// (jsPDF.addFileToVFS attend un binaryString/base64, pas un ArrayBuffer.)
+async function loadFontBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Police ${url} introuvable (${res.status})`);
+  const buf = await res.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  // Chunking pour eviter le RangeError sur String.fromCharCode.apply avec
+  // de gros fichiers (~280 KB par TTF).
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(i, i + CHUNK))
+    );
+  }
+  return btoa(binary);
+}
+
+export async function generateGuidePDF() {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  // Charge Roboto (regular + bold) servies par /api/fonts/. jsPDF par
+  // defaut (helvetica) ne supporte pas les accents francais.
+  try {
+    const [regB64, boldB64] = await Promise.all([
+      loadFontBase64("/api/fonts/roboto-regular.ttf"),
+      loadFontBase64("/api/fonts/roboto-bold.ttf"),
+    ]);
+    doc.addFileToVFS("Roboto-Regular.ttf", regB64);
+    doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+    doc.addFileToVFS("Roboto-Bold.ttf", boldB64);
+    doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+    doc.setFont("Roboto", "normal");
+  } catch (e) {
+    // Fallback silencieux : si les fonts ne sont pas joignables, on
+    // reste sur helvetica (accents possiblement remplaces par '?').
+    console.warn("[generateGuidePDF] fonts Roboto non chargees, fallback helvetica", e);
+  }
+
   const W = 210;
   const margin = 20;
   const contentW = W - margin * 2;
@@ -22,7 +61,7 @@ export function generateGuidePDF() {
     checkSpace(18);
     setColor(blue);
     doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Roboto", "bold");
     doc.text(text, margin, y);
     y += 4;
     doc.setDrawColor(blue[0], blue[1], blue[2]);
@@ -35,7 +74,7 @@ export function generateGuidePDF() {
     checkSpace(14);
     setColor(dark);
     doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Roboto", "bold");
     doc.text(text, margin, y);
     y += 8;
   }
@@ -44,7 +83,7 @@ export function generateGuidePDF() {
     checkSpace(10);
     setColor(dark);
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     const lines = doc.splitTextToSize(text, contentW);
     for (const line of lines) {
       checkSpace(6);
@@ -58,7 +97,7 @@ export function generateGuidePDF() {
     checkSpace(8);
     setColor(dark);
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     doc.text("•", margin + 2, y);
     const lines = doc.splitTextToSize(text, contentW - 8);
     for (let i = 0; i < lines.length; i++) {
@@ -78,9 +117,9 @@ export function generateGuidePDF() {
     doc.roundedRect(margin, y - 4, contentW, h, 2, 2, "FD");
     setColor(blue);
     doc.setFontSize(9);
-    doc.setFont("helvetica", "bolditalic");
+    doc.setFont("Roboto", "bold");
     doc.text("Conseil :", margin + 4, y + 1);
-    doc.setFont("helvetica", "italic");
+    doc.setFont("Roboto", "normal");
     setColor(dark);
     for (let i = 0; i < lines.length; i++) {
       doc.text(lines[i], margin + 4, y + 1 + (i > 0 ? 5 * i : 0));
@@ -94,11 +133,11 @@ export function generateGuidePDF() {
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(36);
-  doc.setFont("helvetica", "bold");
+  doc.setFont("Roboto", "bold");
   doc.text("Operioz", W / 2, 100, { align: "center" });
 
   doc.setFontSize(20);
-  doc.setFont("helvetica", "normal");
+  doc.setFont("Roboto", "normal");
   doc.text("Guide Utilisateur", W / 2, 120, { align: "center" });
 
   doc.setFontSize(12);
@@ -128,7 +167,7 @@ export function generateGuidePDF() {
   for (const item of sommaire) {
     setColor(dark);
     doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Roboto", "normal");
     doc.text(item, margin + 5, y);
     y += 9;
   }

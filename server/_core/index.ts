@@ -285,6 +285,33 @@ async function startServer() {
   });
 
   // ============================================================
+  // Fonts Roboto exposees pour la generation PDF cote client (guide
+  // utilisateur). Permet a jsPDF dans le browser de fetch la police et
+  // d'afficher les accents francais correctement (l'alternative serait
+  // d'inliner 1+ MB de base64 dans le bundle client, indesirable).
+  // ============================================================
+  app.get('/api/fonts/:name', async (req, res) => {
+    const name = String(req.params.name || '').toLowerCase();
+    try {
+      const { ROBOTO_REGULAR, ROBOTO_BOLD } = await import('./fonts');
+      let b64: string | null = null;
+      if (name === 'roboto-regular.ttf') b64 = ROBOTO_REGULAR;
+      else if (name === 'roboto-bold.ttf') b64 = ROBOTO_BOLD;
+      if (!b64) {
+        res.status(404).json({ error: 'font_not_found' });
+        return;
+      }
+      const buf = Buffer.from(b64, 'base64');
+      res.setHeader('Content-Type', 'font/ttf');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Content-Length', String(buf.length));
+      res.send(buf);
+    } catch (e: any) {
+      res.status(500).json({ error: 'font_load_failed', message: e?.message });
+    }
+  });
+
+  // ============================================================
   // API Articles - recherche bibliothèque
   // ============================================================
   app.get('/api/articles/search', async (req, res) => {
