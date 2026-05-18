@@ -285,6 +285,34 @@ async function startServer() {
   });
 
   // ============================================================
+  // TEMPORAIRE — Suite de tests beta (3 artisans + 10 tests + cleanup).
+  // A retirer apres validation. Protege par un token simple dans l'URL.
+  // ============================================================
+  app.get('/api/internal/run-beta-test', async (req, res) => {
+    if (req.query.token !== 'beta-2026-temp') {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    try {
+      const { getPool } = await import('../db');
+      const pool = getPool();
+      if (!pool) {
+        res.status(500).json({ error: 'pool not initialized' });
+        return;
+      }
+      const { runBetaTest } = await import('./_betaTestRunner');
+      const report = await runBetaTest(pool);
+      res.json(report);
+    } catch (e: any) {
+      res.status(500).json({
+        error: 'beta_test_failed',
+        message: e?.message || String(e),
+        stack: e?.stack?.split('\n').slice(0, 8),
+      });
+    }
+  });
+
+  // ============================================================
   // API Articles - recherche bibliothèque
   // ============================================================
   app.get('/api/articles/search', async (req, res) => {
