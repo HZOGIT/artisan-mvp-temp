@@ -4359,3 +4359,151 @@ export async function getStatistiquesFlotte(artisanId: number): Promise<{
     assurancesAExpirer: assurances.length,
   };
 }
+
+// ============================================================================
+// CONGES (demandes + soldes) - Drizzle ORM
+// ============================================================================
+
+export async function getCongesByArtisan(
+  artisanId: number,
+  statut?: string
+): Promise<Conge[]> {
+  const dbi = await getDb();
+  const conditions = [eq(conges.artisanId, artisanId)];
+  if (statut) conditions.push(eq(conges.statut, statut as any));
+  return await dbi.select().from(conges)
+    .where(and(...conditions))
+    .orderBy(desc(conges.dateDebut));
+}
+
+export async function getCongesEnAttente(artisanId: number): Promise<Conge[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(conges)
+    .where(and(eq(conges.artisanId, artisanId), eq(conges.statut, "en_attente")))
+    .orderBy(asc(conges.dateDebut));
+}
+
+export async function getCongesByTechnicien(technicienId: number): Promise<Conge[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(conges)
+    .where(eq(conges.technicienId, technicienId))
+    .orderBy(desc(conges.dateDebut));
+}
+
+export async function getCongesParPeriode(
+  artisanId: number,
+  dateDebut: string,
+  dateFin: string
+): Promise<Conge[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(conges)
+    .where(and(
+      eq(conges.artisanId, artisanId),
+      lte(conges.dateDebut, dateFin),
+      gte(conges.dateFin, dateDebut),
+    ))
+    .orderBy(asc(conges.dateDebut));
+}
+
+export async function getCongeById(id: number): Promise<Conge | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(conges).where(eq(conges.id, id)).limit(1);
+  return r[0];
+}
+
+export async function createConge(data: InsertConge): Promise<Conge | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(conges).values(data);
+  const r = await dbi.select().from(conges)
+    .where(and(
+      eq(conges.technicienId, data.technicienId),
+      eq(conges.dateDebut, data.dateDebut),
+    ))
+    .orderBy(desc(conges.id)).limit(1);
+  return r[0];
+}
+
+export async function deleteConge(id: number): Promise<void> {
+  const dbi = await getDb();
+  await dbi.delete(conges).where(eq(conges.id, id));
+}
+
+export async function updateCongeStatut(
+  id: number,
+  statut: "en_attente" | "approuve" | "refuse" | "annule",
+  validePar?: number,
+  commentaire?: string
+): Promise<Conge | undefined> {
+  const dbi = await getDb();
+  await dbi.update(conges).set({
+    statut,
+    dateValidation: new Date(),
+    validePar: validePar || null,
+    commentaireValidation: commentaire || null,
+  }).where(eq(conges.id, id));
+  return getCongeById(id);
+}
+
+export async function getSoldesConges(
+  technicienId: number,
+  annee: number
+): Promise<SoldeConge[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(soldesConges)
+    .where(and(eq(soldesConges.technicienId, technicienId), eq(soldesConges.annee, annee)));
+}
+
+export async function initSoldeConges(
+  data: InsertSoldeConge
+): Promise<SoldeConge | undefined> {
+  const dbi = await getDb();
+  // INSERT ... ON DUPLICATE KEY UPDATE via raw SQL pour gerer la clef
+  // composite (technicien, type, annee) eventuellement existante.
+  const pool = getPool();
+  if (pool) {
+    await pool.execute(
+      `INSERT INTO soldes_conges
+        (technicienId, artisanId, type, annee, soldeInitial, soldeRestant, joursAcquis, joursPris)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE soldeInitial = VALUES(soldeInitial),
+                               soldeRestant = VALUES(soldeRestant),
+                               joursAcquis = VALUES(joursAcquis),
+                               joursPris = VALUES(joursPris)`,
+      [
+        data.technicienId,
+        data.artisanId,
+        data.type,
+        data.annee,
+        data.soldeInitial ?? "0.00",
+        data.soldeRestant ?? "0.00",
+        data.joursAcquis ?? "0.00",
+        data.joursPris ?? "0.00",
+      ]
+    );
+  }
+  const r = await dbi.select().from(soldesConges)
+    .where(and(
+      eq(soldesConges.technicienId, data.technicienId),
+      eq(soldesConges.type, data.type),
+      eq(soldesConges.annee, data.annee),
+    )).limit(1);
+  return r[0];
+}
+
+export async function updateSoldeConges(
+  technicienId: number,
+  type: "conge_paye" | "rtt",
+  annee: number,
+  joursPrisDelta: number
+): Promise<void> {
+  // Decremente le solde restant et incremente joursPris.
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(
+    `UPDATE soldes_conges
+        SET joursPris = joursPris + ?,
+            soldeRestant = GREATEST(0, soldeRestant - ?)
+      WHERE technicienId = ? AND type = ? AND annee = ?`,
+    [joursPrisDelta, joursPrisDelta, technicienId, type, annee]
+  );
+}
