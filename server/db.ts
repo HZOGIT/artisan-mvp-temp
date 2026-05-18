@@ -4731,3 +4731,160 @@ export async function createObjectifTechnicien(
     )).orderBy(desc(objectifsTechniciens.id)).limit(1);
   return r[0];
 }
+
+// ============================================================================
+// DEVIS OPTIONS (variantes de devis : Standard / Premium / Eco) - Drizzle ORM
+// ============================================================================
+
+export async function getDevisOptionsByDevisId(devisId: number): Promise<DevisOption[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(devisOptions)
+    .where(eq(devisOptions.devisId, devisId))
+    .orderBy(asc(devisOptions.ordre));
+}
+
+export async function getDevisOptionById(id: number): Promise<DevisOption | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(devisOptions).where(eq(devisOptions.id, id)).limit(1);
+  return r[0];
+}
+
+export async function createDevisOption(data: InsertDevisOption): Promise<DevisOption | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(devisOptions).values(data);
+  const r = await dbi.select().from(devisOptions)
+    .where(and(eq(devisOptions.devisId, data.devisId), eq(devisOptions.nom, data.nom)))
+    .orderBy(desc(devisOptions.id)).limit(1);
+  return r[0];
+}
+
+export async function updateDevisOption(
+  id: number,
+  data: Partial<InsertDevisOption>
+): Promise<DevisOption | undefined> {
+  const dbi = await getDb();
+  await dbi.update(devisOptions).set(data).where(eq(devisOptions.id, id));
+  return getDevisOptionById(id);
+}
+
+export async function deleteDevisOption(id: number): Promise<void> {
+  const dbi = await getDb();
+  await dbi.delete(devisOptionsLignes).where(eq(devisOptionsLignes.optionId, id));
+  await dbi.delete(devisOptions).where(eq(devisOptions.id, id));
+}
+
+export async function selectDevisOption(optionId: number): Promise<DevisOption | undefined> {
+  // Une seule option selectionnee par devis : reset les autres puis set
+  // celle-ci. Le devisId est recupere depuis l'option.
+  const dbi = await getDb();
+  const opt = await getDevisOptionById(optionId);
+  if (!opt) return undefined;
+  await dbi.update(devisOptions)
+    .set({ selectionnee: false })
+    .where(eq(devisOptions.devisId, opt.devisId));
+  await dbi.update(devisOptions)
+    .set({ selectionnee: true, dateSelection: new Date() })
+    .where(eq(devisOptions.id, optionId));
+  return getDevisOptionById(optionId);
+}
+
+export async function getDevisOptionLignesByOptionId(
+  optionId: number
+): Promise<DevisOptionLigne[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(devisOptionsLignes)
+    .where(eq(devisOptionsLignes.optionId, optionId))
+    .orderBy(asc(devisOptionsLignes.ordre));
+}
+
+export async function createDevisOptionLigne(
+  data: InsertDevisOptionLigne
+): Promise<DevisOptionLigne | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(devisOptionsLignes).values(data);
+  const r = await dbi.select().from(devisOptionsLignes)
+    .where(eq(devisOptionsLignes.optionId, data.optionId))
+    .orderBy(desc(devisOptionsLignes.id)).limit(1);
+  return r[0];
+}
+
+export async function updateDevisOptionLigne(
+  id: number,
+  data: Partial<InsertDevisOptionLigne>
+): Promise<DevisOptionLigne | undefined> {
+  const dbi = await getDb();
+  await dbi.update(devisOptionsLignes).set(data).where(eq(devisOptionsLignes.id, id));
+  const r = await dbi.select().from(devisOptionsLignes).where(eq(devisOptionsLignes.id, id)).limit(1);
+  return r[0];
+}
+
+export async function deleteDevisOptionLigne(id: number): Promise<void> {
+  const dbi = await getDb();
+  await dbi.delete(devisOptionsLignes).where(eq(devisOptionsLignes.id, id));
+}
+
+export async function recalculerTotauxOption(optionId: number): Promise<void> {
+  const dbi = await getDb();
+  const lignes = await getDevisOptionLignesByOptionId(optionId);
+  let totalHT = 0;
+  let totalTVA = 0;
+  for (const l of lignes) {
+    const qte = Number(l.quantite || 0);
+    const pu = Number(l.prixUnitaireHT || 0);
+    const remise = Number(l.remise || 0);
+    const tva = Number(l.tauxTVA || 0);
+    const ht = qte * pu * (1 - remise / 100);
+    const tvaMontant = ht * (tva / 100);
+    totalHT += ht;
+    totalTVA += tvaMontant;
+    // Met aussi a jour les montants par ligne (utile pour l'UI).
+    await dbi.update(devisOptionsLignes).set({
+      montantHT: ht.toFixed(2),
+      montantTVA: tvaMontant.toFixed(2),
+      montantTTC: (ht + tvaMontant).toFixed(2),
+    }).where(eq(devisOptionsLignes.id, l.id));
+  }
+  const totalTTC = totalHT + totalTVA;
+  await dbi.update(devisOptions).set({
+    totalHT: totalHT.toFixed(2),
+    totalTVA: totalTVA.toFixed(2),
+    totalTTC: totalTTC.toFixed(2),
+  }).where(eq(devisOptions.id, optionId));
+}
+
+export async function convertirOptionEnDevis(optionId: number): Promise<void> {
+  // Replace les lignes du devis parent par les lignes de cette option,
+  // recalcule les totaux du devis. L'option choisie devient les lignes
+  // officielles du devis.
+  const dbi = await getDb();
+  const opt = await getDevisOptionById(optionId);
+  if (!opt) return;
+  const lignesOpt = await getDevisOptionLignesByOptionId(optionId);
+
+  // Purge lignes existantes du devis parent.
+  await dbi.delete(devisLignes).where(eq(devisLignes.devisId, opt.devisId));
+  // Copie les lignes de l'option dans devis_lignes.
+  for (const l of lignesOpt) {
+    await dbi.insert(devisLignes).values({
+      devisId: opt.devisId,
+      ordre: l.ordre || 0,
+      designation: l.designation,
+      description: l.description,
+      quantite: l.quantite,
+      unite: l.unite,
+      prixUnitaireHT: l.prixUnitaireHT,
+      tauxTVA: l.tauxTVA,
+      montantHT: l.montantHT,
+      montantTVA: l.montantTVA,
+      montantTTC: l.montantTTC,
+    });
+  }
+  // Met a jour les totaux du devis.
+  await dbi.update(devis).set({
+    totalHT: opt.totalHT,
+    totalTVA: opt.totalTVA,
+    totalTTC: opt.totalTTC,
+  }).where(eq(devis.id, opt.devisId));
+  // Marque l'option comme selectionnee.
+  await selectDevisOption(optionId);
+}
