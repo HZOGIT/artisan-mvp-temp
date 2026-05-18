@@ -365,6 +365,9 @@ const MODULE_TO_LABELS: Record<string, string[]> = {
   commandes: ["Commandes", "Fournisseurs", "Rapport Commande"],
   comptabilite: ["Comptabilité", "Rapports", "Prévisions CA"],
   assistant_ia: ["MonAssistant"],
+  vehicules: ["Véhicules", "Flotte"],
+  conges: ["Congés"],
+  badges: ["Badges", "Classement"],
 };
 
 const ALWAYS_VISIBLE_LABELS = new Set([

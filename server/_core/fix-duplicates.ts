@@ -810,7 +810,7 @@ async function fixDuplicates() {
       }
       console.log('[Modules] Colonnes artisans OK');
 
-      // 3) Seed catalogue 15 modules (INSERT IGNORE = idempotent)
+      // 3) Seed catalogue 18 modules (INSERT IGNORE = idempotent)
       const seedModules: Array<[string, string, string, string, string, string, number, number]> = [
         ['devis', 'Devis', 'Créez et envoyez des devis professionnels', 'FileText', 'commercial', 'essentiel', 1, 1],
         ['factures', 'Factures', 'Facturez vos clients et suivez les paiements', 'Receipt', 'commercial', 'essentiel', 1, 2],
@@ -827,6 +827,9 @@ async function fixDuplicates() {
         ['commandes', 'Commandes fournisseurs', 'Créez des bons de commande', 'ShoppingCart', 'gestion', 'pro', 1, 13],
         ['comptabilite', 'Comptabilité', 'Export FEC et rapports financiers', 'Calculator', 'gestion', 'essentiel', 1, 14],
         ['assistant_ia', 'Assistant IA', 'MonAssistant votre IA intégrée', 'Sparkles', 'ia', 'pro', 1, 15],
+        ['vehicules', 'Véhicules & Flotte', 'Gérez vos véhicules, entretiens et assurances', 'Truck', 'terrain', 'pro', 0, 16],
+        ['conges', 'Congés & Absences', 'Gérez les congés et absences de votre équipe', 'CalendarOff', 'gestion', 'pro', 0, 17],
+        ['badges', 'Badges & Classement', 'Motivez vos techniciens avec un système de scores', 'Trophy', 'gestion', 'entreprise', 0, 18],
       ];
       for (const m of seedModules) {
         await pool.execute(
