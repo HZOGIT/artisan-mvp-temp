@@ -51,6 +51,7 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Medal,
   MessageCircle,
   MoreHorizontal,
   Package,
@@ -271,6 +272,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Bell, label: "Alertes prévisions", path: "/alertes-previsions" },
       { icon: CalendarOff, label: "Congés", path: "/conges" },
       { icon: Trophy, label: "Badges", path: "/badges" },
+      { icon: Medal, label: "Classement", path: "/classement" },
     ],
   },
   {
@@ -343,6 +345,7 @@ const pathPermissionMap: Record<string, string> = {
   "/alertes-previsions": "comptabilite.voir",
   "/conges": "techniciens.voir",
   "/devis-options": "devis.voir",
+  "/classement": "techniciens.voir",
   "/modules": "",
   "/onboarding": "",
   "/import": "",

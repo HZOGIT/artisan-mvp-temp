@@ -87,6 +87,7 @@ const ImportPage = lazy(() => import("./pages/Import"));
 const Support = lazy(() => import("./pages/Support"));
 const DevisOptions = lazy(() => import("./pages/DevisOptions"));
 const Flotte = lazy(() => import("./pages/Flotte"));
+const Classement = lazy(() => import("./pages/Classement"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 const CGV = lazy(() => import("./pages/legal/CGV"));
@@ -173,6 +174,7 @@ function AuthenticatedRoutes() {
           <Route path="/alertes-previsions" component={AlertesPrevisions} />
           <Route path="/devis-options" component={DevisOptions} />
           <Route path="/flotte" component={Flotte} />
+          <Route path="/classement" component={Classement} />
           <Route path="/chantiers" component={Chantiers} />
           <Route path="/integrations-comptables" component={IntegrationsComptables} />
           <Route path="/devis-ia" component={DevisIA} />
