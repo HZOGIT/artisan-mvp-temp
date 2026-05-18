@@ -1050,7 +1050,7 @@ const plans = [
   },
   {
     name: "Entreprise",
-    monthly: 79,
+    monthly: 89,
     tagline: "Pour les équipes et multi-métiers",
     popular: false,
     cta: "Choisir Entreprise",

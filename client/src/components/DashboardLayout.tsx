@@ -33,6 +33,7 @@ import {
   Calculator,
   Calendar,
   CalendarDays,
+  CalendarOff,
   ChevronRight,
   ClipboardList,
   CheckCircle,
@@ -42,6 +43,7 @@ import {
   HardHat,
   HelpCircle,
   Info,
+  Layers,
   LayoutDashboard,
   LayoutGrid,
   LineChart,
@@ -60,6 +62,8 @@ import {
   ShoppingCart,
   Sparkles,
   Star,
+  Trophy,
+  Truck,
   Upload,
   User,
   Users,
@@ -212,6 +216,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { icon: FileText, label: "Devis", path: "/devis" },
       { icon: FileText, label: "Nouveau devis", path: "/devis/nouveau" },
+      { icon: Layers, label: "Variantes devis", path: "/devis-options" },
       { icon: Receipt, label: "Factures", path: "/factures" },
       { icon: ClipboardList, label: "Contrats", path: "/contrats" },
       { icon: RefreshCw, label: "Relances", path: "/relances" },
@@ -244,6 +249,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: MapPin, label: "Géolocalisation", path: "/geolocalisation" },
       { icon: HardHat, label: "Chantiers", path: "/chantiers" },
       { icon: Route, label: "Planification", path: "/planification" },
+      { icon: Truck, label: "Véhicules", path: "/vehicules" },
     ],
   },
   {
@@ -260,6 +266,9 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: FileText, label: "Rapports", path: "/rapports" },
       { icon: Calculator, label: "Comptabilité", path: "/comptabilite" },
       { icon: LineChart, label: "Prévisions CA", path: "/previsions" },
+      { icon: Bell, label: "Alertes prévisions", path: "/alertes-previsions" },
+      { icon: CalendarOff, label: "Congés", path: "/conges" },
+      { icon: Trophy, label: "Badges", path: "/badges" },
     ],
   },
   {
@@ -330,6 +339,7 @@ const pathPermissionMap: Record<string, string> = {
   "/badges": "techniciens.voir",
   "/alertes-previsions": "comptabilite.voir",
   "/conges": "techniciens.voir",
+  "/devis-options": "devis.voir",
   "/modules": "",
   "/onboarding": "",
   "/import": "",
@@ -351,7 +361,7 @@ function filterGroupByPermissions(group: NavGroup, permissions: string[]): NavGr
 // Sidebar adaptative selon les modules actifs de l'artisan
 // ============================================================================
 const MODULE_TO_LABELS: Record<string, string[]> = {
-  devis: ["Devis", "Nouveau devis"],
+  devis: ["Devis", "Nouveau devis", "Variantes devis"],
   factures: ["Factures"],
   contrats: ["Contrats"],
   relances: ["Relances"],
@@ -363,7 +373,7 @@ const MODULE_TO_LABELS: Record<string, string[]> = {
   geolocalisation: ["Géolocalisation", "Techniciens"],
   stocks: ["Stocks", "Articles"],
   commandes: ["Commandes", "Fournisseurs", "Rapport Commande"],
-  comptabilite: ["Comptabilité", "Rapports", "Prévisions CA"],
+  comptabilite: ["Comptabilité", "Rapports", "Prévisions CA", "Alertes prévisions"],
   assistant_ia: ["MonAssistant"],
   vehicules: ["Véhicules", "Flotte"],
   conges: ["Congés"],
