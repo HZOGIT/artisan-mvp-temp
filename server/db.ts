@@ -3848,3 +3848,281 @@ export const PLAN_LIMITS: Record<string, { maxUsers: number; maxDevices: number;
   entreprise: { maxUsers: 10, maxDevices: 3, maxSessions: 4 },
   expired:    { maxUsers: 0,  maxDevices: 0, maxSessions: 0 },
 };
+
+// ============================================================================
+// COULEURS CALENDRIER (table couleurs_interventions, raw SQL)
+// Stocke la couleur custom de chaque intervention pour l'affichage calendrier.
+// Cle composite (artisanId, interventionId) -> filtre naturel cross-tenant.
+// ============================================================================
+
+export async function getCouleursCalendrier(
+  artisanId: number
+): Promise<Record<number, string>> {
+  const pool = getPool();
+  if (!pool) return {};
+  try {
+    const [rows] = await pool.execute(
+      `SELECT interventionId, couleur FROM couleurs_interventions WHERE artisanId = ?`,
+      [artisanId]
+    );
+    const out: Record<number, string> = {};
+    for (const r of rows as any[]) {
+      out[r.interventionId] = r.couleur;
+    }
+    return out;
+  } catch (e: any) {
+    console.warn("[getCouleursCalendrier]", e?.message || e);
+    return {};
+  }
+}
+
+export async function setCouleurIntervention(
+  artisanId: number,
+  interventionId: number,
+  couleur: string
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  // INSERT ... ON DUPLICATE KEY UPDATE : idempotent.
+  await pool.execute(
+    `INSERT INTO couleurs_interventions (artisanId, interventionId, couleur)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE couleur = VALUES(couleur)`,
+    [artisanId, interventionId, couleur]
+  );
+}
+
+export async function deleteCouleurIntervention(
+  artisanId: number,
+  interventionId: number
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(
+    `DELETE FROM couleurs_interventions WHERE artisanId = ? AND interventionId = ?`,
+    [artisanId, interventionId]
+  );
+}
+
+export async function setCouleursMultiples(
+  artisanId: number,
+  couleurs: Record<number, string>
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  const entries = Object.entries(couleurs);
+  if (entries.length === 0) return;
+  // Batch via 1 seul INSERT multi-rows + ON DUPLICATE KEY UPDATE.
+  const placeholders = entries.map(() => "(?, ?, ?)").join(", ");
+  const values: any[] = [];
+  for (const [k, v] of entries) {
+    values.push(artisanId, parseInt(k, 10), v);
+  }
+  await pool.execute(
+    `INSERT INTO couleurs_interventions (artisanId, interventionId, couleur)
+     VALUES ${placeholders}
+     ON DUPLICATE KEY UPDATE couleur = VALUES(couleur)`,
+    values
+  );
+}
+
+// ============================================================================
+// INTERVENTIONS MOBILE (table interventions_mobile, raw SQL)
+// Donnees terrain ajoutees par le technicien : heures arrivee/depart, geoloc,
+// notes, signature client. 1 record par intervention (uq interventionId).
+// ============================================================================
+
+type InterventionMobileRow = {
+  id: number;
+  interventionId: number;
+  artisanId: number;
+  latitude: string | null;
+  longitude: string | null;
+  heureArrivee: Date | null;
+  heureDepart: Date | null;
+  notesIntervention: string | null;
+  signatureClient: string | null;
+  signatureDate: Date | null;
+  syncStatus: string | null;
+  lastSyncAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export async function getInterventionMobileByInterventionId(
+  interventionId: number
+): Promise<InterventionMobileRow | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  try {
+    const [rows] = await pool.execute(
+      `SELECT id, interventionId, artisanId, latitude, longitude,
+              heureArrivee, heureDepart, notesIntervention,
+              signatureClient, signatureDate, syncStatus, lastSyncAt,
+              createdAt, updatedAt
+         FROM interventions_mobile
+        WHERE interventionId = ?
+        LIMIT 1`,
+      [interventionId]
+    );
+    const r = (rows as any[])[0];
+    return r || null;
+  } catch (e: any) {
+    console.warn("[getInterventionMobileByInterventionId]", e?.message || e);
+    return null;
+  }
+}
+
+type InterventionMobileWritable = Partial<{
+  heureArrivee: Date | null;
+  heureDepart: Date | null;
+  latitude: string | null;
+  longitude: string | null;
+  notesIntervention: string | null;
+  signatureClient: string | null;
+  signatureDate: Date | null;
+  syncStatus: string | null;
+  lastSyncAt: Date | null;
+}>;
+
+export async function createInterventionMobile(
+  data: { interventionId: number; artisanId: number } & InterventionMobileWritable
+): Promise<InterventionMobileRow | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const cols = ["interventionId", "artisanId"];
+  const vals: any[] = [data.interventionId, data.artisanId];
+  for (const k of [
+    "heureArrivee",
+    "heureDepart",
+    "latitude",
+    "longitude",
+    "notesIntervention",
+    "signatureClient",
+    "signatureDate",
+    "syncStatus",
+    "lastSyncAt",
+  ] as const) {
+    if (data[k] !== undefined) {
+      cols.push(k);
+      vals.push(data[k]);
+    }
+  }
+  const placeholders = cols.map(() => "?").join(", ");
+  const [r]: any = await pool.execute(
+    `INSERT INTO interventions_mobile (${cols.join(", ")}) VALUES (${placeholders})`,
+    vals
+  );
+  const insertId = r?.insertId;
+  if (!insertId) return null;
+  // Lecture du record cree pour retour standardise.
+  const [rows] = await pool.execute(
+    `SELECT id, interventionId, artisanId, latitude, longitude,
+            heureArrivee, heureDepart, notesIntervention,
+            signatureClient, signatureDate, syncStatus, lastSyncAt,
+            createdAt, updatedAt
+       FROM interventions_mobile WHERE id = ? LIMIT 1`,
+    [insertId]
+  );
+  return (rows as any[])[0] || null;
+}
+
+export async function updateInterventionMobile(
+  mobileId: number,
+  data: InterventionMobileWritable
+): Promise<InterventionMobileRow | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const sets: string[] = [];
+  const vals: any[] = [];
+  for (const k of [
+    "heureArrivee",
+    "heureDepart",
+    "latitude",
+    "longitude",
+    "notesIntervention",
+    "signatureClient",
+    "signatureDate",
+    "syncStatus",
+    "lastSyncAt",
+  ] as const) {
+    if (data[k] !== undefined) {
+      sets.push(`${k} = ?`);
+      vals.push(data[k]);
+    }
+  }
+  if (sets.length === 0) {
+    // Rien a mettre a jour : juste relire le record.
+    const [rows] = await pool.execute(
+      `SELECT id, interventionId, artisanId, latitude, longitude,
+              heureArrivee, heureDepart, notesIntervention,
+              signatureClient, signatureDate, syncStatus, lastSyncAt,
+              createdAt, updatedAt
+         FROM interventions_mobile WHERE id = ? LIMIT 1`,
+      [mobileId]
+    );
+    return (rows as any[])[0] || null;
+  }
+  vals.push(mobileId);
+  await pool.execute(
+    `UPDATE interventions_mobile SET ${sets.join(", ")} WHERE id = ?`,
+    vals
+  );
+  const [rows] = await pool.execute(
+    `SELECT id, interventionId, artisanId, latitude, longitude,
+            heureArrivee, heureDepart, notesIntervention,
+            signatureClient, signatureDate, syncStatus, lastSyncAt,
+            createdAt, updatedAt
+       FROM interventions_mobile WHERE id = ? LIMIT 1`,
+    [mobileId]
+  );
+  return (rows as any[])[0] || null;
+}
+
+// ============================================================================
+// PHOTOS INTERVENTIONS (table photos_interventions, raw SQL)
+// Photos prises avant / pendant / apres l'intervention par le technicien.
+// ============================================================================
+
+export async function createPhotoIntervention(data: {
+  interventionMobileId: number;
+  url: string;
+  description?: string | null;
+  type?: "avant" | "pendant" | "apres";
+}): Promise<{ id: number; url: string; description: string | null; type: string } | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const [r]: any = await pool.execute(
+    `INSERT INTO photos_interventions (interventionMobileId, url, description, type)
+     VALUES (?, ?, ?, ?)`,
+    [
+      data.interventionMobileId,
+      data.url,
+      data.description ?? null,
+      data.type ?? "pendant",
+    ]
+  );
+  const insertId = r?.insertId;
+  if (!insertId) return null;
+  const [rows] = await pool.execute(
+    `SELECT id, url, description, type, takenAt, createdAt
+       FROM photos_interventions WHERE id = ? LIMIT 1`,
+    [insertId]
+  );
+  return (rows as any[])[0] || null;
+}
+
+export async function getPhotosByInterventionMobileId(
+  mobileId: number
+): Promise<Array<{ id: number; url: string; description: string | null; type: string }>> {
+  const pool = getPool();
+  if (!pool) return [];
+  const [rows] = await pool.execute(
+    `SELECT id, url, description, type, takenAt, createdAt
+       FROM photos_interventions
+      WHERE interventionMobileId = ?
+      ORDER BY takenAt DESC`,
+    [mobileId]
+  );
+  return (rows as any[]) || [];
+}

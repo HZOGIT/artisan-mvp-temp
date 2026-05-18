@@ -1023,6 +1023,69 @@ async function fixDuplicates() {
       console.log('[Subscriptions] Migration :', e?.message || e);
     }
 
+    // ========================================================================
+    // Tables custom hors schema.ts (raw SQL idempotent)
+    // ========================================================================
+    try {
+      // couleurs_interventions : custom couleur par intervention pour
+      // le calendrier (consommee par getCouleursCalendrier &
+      // setCouleur/setCouleursMultiples/deleteCouleurIntervention).
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS couleurs_interventions (
+          artisanId INT NOT NULL,
+          interventionId INT NOT NULL,
+          couleur VARCHAR(20) NOT NULL,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (artisanId, interventionId),
+          INDEX idx_couleurs_artisan (artisanId)
+        )
+      `);
+      console.log('[CouleursInterventions] Table OK');
+
+      // interventions_mobile + photos_interventions : declares dans
+      // drizzle/schema.ts mais comme on n'utilise pas drizzle-kit push en
+      // prod, on cree defensivement via CREATE IF NOT EXISTS pour eviter
+      // que les endpoints mobile crashent au premier appel.
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS interventions_mobile (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          interventionId INT NOT NULL,
+          artisanId INT NOT NULL,
+          latitude DECIMAL(10,7) NULL,
+          longitude DECIMAL(10,7) NULL,
+          heureArrivee TIMESTAMP NULL,
+          heureDepart TIMESTAMP NULL,
+          notesIntervention TEXT NULL,
+          signatureClient TEXT NULL,
+          signatureDate TIMESTAMP NULL,
+          syncStatus ENUM('synced','pending','error') DEFAULT 'synced',
+          lastSyncAt TIMESTAMP NULL,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_intervention_mobile (interventionId),
+          INDEX idx_intervention_mobile_artisan (artisanId)
+        )
+      `);
+      console.log('[InterventionsMobile] Table OK');
+
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS photos_interventions (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          interventionMobileId INT NOT NULL,
+          url VARCHAR(500) NOT NULL,
+          description VARCHAR(255) NULL,
+          type ENUM('avant','pendant','apres') DEFAULT 'pendant',
+          takenAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_photos_intervention_mobile (interventionMobileId)
+        )
+      `);
+      console.log('[PhotosInterventions] Table OK');
+    } catch (e: any) {
+      console.log('[CustomTables] Migration :', e?.message || e);
+    }
+
     console.log('[FixDuplicates] Done.');
   } catch (e) {
     console.error('[FixDuplicates] Error:', e);
