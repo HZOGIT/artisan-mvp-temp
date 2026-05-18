@@ -8,11 +8,9 @@ const envSchema = z.object({
   // Database - OPTIONNEL (temporairement pour debug)
   DATABASE_URL: z.string().optional(),
   
-  // Auth - OPTIONNEL (temporairement pour debug)
-  JWT_SECRET: z.string().optional(),
+  // Auth — JWT_SECRET requis (min 32 chars) pour signer les sessions
+  JWT_SECRET: z.string().min(32, "JWT_SECRET doit faire au moins 32 caracteres"),
   VITE_APP_ID: z.string().optional(),
-  OAUTH_SERVER_URL: z.string().optional(),
-  VITE_OAUTH_PORTAL_URL: z.string().optional(),
   
   // Stripe - OPTIONNEL (temporairement pour debug)
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -109,8 +107,6 @@ export const ENV = {
   // Auth
   cookieSecret: getEnv().JWT_SECRET,
   appId: getEnv().VITE_APP_ID,
-  oAuthServerUrl: getEnv().OAUTH_SERVER_URL,
-  oAuthPortalUrl: getEnv().VITE_OAUTH_PORTAL_URL,
   
   // Stripe - ⚠️ SECRETS - NE JAMAIS EXPOSER AU CLIENT
   stripeSecretKey: getEnv().STRIPE_SECRET_KEY,

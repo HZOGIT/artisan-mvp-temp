@@ -41,7 +41,7 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
 
   try {
     const emailOptions: Parameters<typeof resend.emails.send>[0] = {
-      from: ENV.emailFrom || "Operioz <onboarding@resend.dev>",
+      from: ENV.emailFrom || "Operioz <noreply@operioz.com>",
       to,
       subject,
       html: body,

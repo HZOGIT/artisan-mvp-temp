@@ -10,6 +10,13 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 
+// JWT_SECRET requis pour la signature des cookies de session. Throw au boot
+// si manquant pour eviter qu'on signe avec un secret par defaut en prod.
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET manquant ! Definir la variable d'environnement (min 32 caracteres).");
+}
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -419,7 +426,7 @@ async function startServer() {
       // Verify JWT from cookie
       const token = req.cookies?.token;
       if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret');
+      const secret = new TextEncoder().encode(JWT_SECRET);
       let payload: any;
       try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
 
@@ -451,7 +458,7 @@ async function startServer() {
 
       const token = req.cookies?.token;
       if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret');
+      const secret = new TextEncoder().encode(JWT_SECRET);
       let payload: any;
       try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
 
@@ -485,7 +492,7 @@ async function startServer() {
     const { jwtVerify } = await import('jose');
     const token = req.cookies?.token;
     if (!token) { res.status(401).json({ error: 'Non authentifié' }); return null; }
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret');
+    const secret = new TextEncoder().encode(JWT_SECRET);
     let payload: any;
     try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return null; }
     const artisan = await getArtisanByUserId(payload.userId);

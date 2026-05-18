@@ -29,11 +29,12 @@ export default defineConfig(({ mode }) => {
       outDir: path.resolve(import.meta.dirname, "dist/public"),
       emptyOutDir: true,
     },
-    // 🔑 FORCE l'injection de la clé Clerk
+    // Cle publique Clerk : injectee uniquement depuis l'env, jamais hardcodee.
+    // Si VITE_CLERK_PUBLISHABLE_KEY n'est pas defini, l'app demarrera sans
+    // Clerk configure et Clerk levera une erreur explicite cote runtime.
     define: {
       'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(
-        env.VITE_CLERK_PUBLISHABLE_KEY || 
-        'pk_test_ZGVjaWRpbmctcmVwdGlsZS0zNi5jbGVyay5hY2NvdW50cy5kZXYk'
+        env.VITE_CLERK_PUBLISHABLE_KEY || ''
       )
     },
     server: {

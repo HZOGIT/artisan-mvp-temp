@@ -5,7 +5,10 @@ import { users, permissionsUtilisateur } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { ALL_PERMISSIONS } from "../../shared/permissions";
 
-const JWT_SECRET = process.env.JWT_SECRET || "monartisan-dev-secret-2026";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET manquant ! Definir la variable d'environnement (min 32 caracteres).");
+}
 const SECRET_KEY = new TextEncoder().encode(JWT_SECRET);
 const COOKIE_NAME = "token";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
