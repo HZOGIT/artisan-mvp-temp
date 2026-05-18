@@ -5339,3 +5339,93 @@ export async function retrySyncItem(exportId: number): Promise<ExportComptable |
   // l'etat puisque le contenu n'est pas re-genere par cette fonction).
   return updateExportComptable(exportId, { statut: "termine", erreur: null });
 }
+
+// ============================================================================
+// NOTIFICATIONS PUSH PWA (subscriptions + preferences + historique) - Drizzle
+// ============================================================================
+
+export async function savePushSubscription(
+  data: InsertPushSubscription
+): Promise<PushSubscription | undefined> {
+  // Upsert sur (technicienId, endpoint) : reactive ou recree.
+  const pool = getPool();
+  if (!pool) return undefined;
+  await pool.execute(
+    `INSERT INTO push_subscriptions
+       (technicienId, endpoint, p256dh, auth, userAgent, actif)
+     VALUES (?, ?, ?, ?, ?, TRUE)
+     ON DUPLICATE KEY UPDATE p256dh = VALUES(p256dh),
+                             auth = VALUES(auth),
+                             userAgent = VALUES(userAgent),
+                             actif = TRUE,
+                             updatedAt = CURRENT_TIMESTAMP`,
+    [data.technicienId, data.endpoint, data.p256dh, data.auth, data.userAgent || null]
+  );
+  const dbi = await getDb();
+  const r = await dbi.select().from(pushSubscriptions)
+    .where(and(eq(pushSubscriptions.technicienId, data.technicienId)))
+    .orderBy(desc(pushSubscriptions.id)).limit(1);
+  return r[0];
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  const dbi = await getDb();
+  // Soft-delete : marque actif=false plutot que DELETE (utile pour
+  // debug + reactivation rapide).
+  await dbi.update(pushSubscriptions)
+    .set({ actif: false })
+    .where(eq(pushSubscriptions.endpoint, endpoint));
+}
+
+export async function getPreferencesNotifications(
+  technicienId: number
+): Promise<PreferenceNotification | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(preferencesNotifications)
+    .where(eq(preferencesNotifications.technicienId, technicienId)).limit(1);
+  return r[0];
+}
+
+export async function savePreferencesNotifications(
+  data: InsertPreferenceNotification
+): Promise<PreferenceNotification | undefined> {
+  // Upsert sur technicienId (pas explicitement UNIQUE dans le schema,
+  // donc on fait SELECT + UPDATE/INSERT).
+  const existing = await getPreferencesNotifications(data.technicienId);
+  const dbi = await getDb();
+  if (existing) {
+    await dbi.update(preferencesNotifications).set(data).where(eq(preferencesNotifications.id, existing.id));
+  } else {
+    await dbi.insert(preferencesNotifications).values(data);
+  }
+  return getPreferencesNotifications(data.technicienId);
+}
+
+export async function createHistoriqueNotificationPush(
+  data: InsertHistoriqueNotificationPush
+): Promise<HistoriqueNotificationPush | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(historiqueNotificationsPush).values(data);
+  const r = await dbi.select().from(historiqueNotificationsPush)
+    .where(eq(historiqueNotificationsPush.technicienId, data.technicienId))
+    .orderBy(desc(historiqueNotificationsPush.id)).limit(1);
+  return r[0];
+}
+
+export async function getHistoriqueNotificationsPush(
+  technicienId: number,
+  limit: number = 50
+): Promise<HistoriqueNotificationPush[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(historiqueNotificationsPush)
+    .where(eq(historiqueNotificationsPush.technicienId, technicienId))
+    .orderBy(desc(historiqueNotificationsPush.dateEnvoi))
+    .limit(limit);
+}
+
+export async function markNotificationPushAsRead(id: number): Promise<void> {
+  const dbi = await getDb();
+  await dbi.update(historiqueNotificationsPush)
+    .set({ statut: "lu", dateLecture: new Date() })
+    .where(eq(historiqueNotificationsPush.id, id));
+}
