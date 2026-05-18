@@ -6452,23 +6452,30 @@ Réponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autou
 
         if (resultat) {
           // Sauvegarder les suggestions d'articles
-          for (const article of travail.articles) {
-            // Chercher si l'article existe dans la bibliothèque
-            const articlesExistants = await db.getBibliothequeArticles();
-            const articleMatch = articlesExistants.find(a => 
-              a.designation.toLowerCase().includes(article.nom.toLowerCase()) ||
-              article.nom.toLowerCase().includes(a.designation.toLowerCase())
-            );
+          // (Fetch biblio une seule fois hors de la boucle pour eviter le
+          // SELECT N+1, et utiliser le champ 'nom' qui est celui de la
+          // table bibliotheque_articles — l'ancien code lisait a.designation
+          // qui est undefined sur ce type et crashait toute la mutation.)
+          const articlesExistants = await db.getBibliothequeArticles();
+          for (const article of travail.articles || []) {
+            const nomIA = String(article?.nom || '').toLowerCase();
+            const articleMatch = nomIA
+              ? articlesExistants.find((a: any) => {
+                  const nomBiblio = String(a?.nom || a?.designation || '').toLowerCase();
+                  if (!nomBiblio) return false;
+                  return nomBiblio.includes(nomIA) || nomIA.includes(nomBiblio);
+                })
+              : undefined;
 
             await db.saveSuggestionArticleIA({
               resultatId: resultat.id,
               articleId: articleMatch?.id,
-              nomArticle: article.nom,
-              description: article.description || '',
-              quantiteSuggeree: article.quantite.toString(),
-              unite: article.unite,
-              prixEstime: article.prixEstime.toString(),
-              confiance: travail.confiance.toString(),
+              nomArticle: article?.nom || '',
+              description: article?.description || '',
+              quantiteSuggeree: String(article?.quantite ?? '1'),
+              unite: article?.unite || 'unité',
+              prixEstime: String(article?.prixEstime ?? '0'),
+              confiance: String(travail?.confiance ?? '0'),
             });
           }
         }

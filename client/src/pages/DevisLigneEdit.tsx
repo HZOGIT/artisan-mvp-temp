@@ -62,11 +62,21 @@ export default function DevisLigneEdit() {
     
     return articles.filter((article: any) =>
       matchSearch(article.reference, searchQuery) ||
-      matchSearch(article.designation, searchQuery) ||
+      matchSearch(article.nom ?? article.designation, searchQuery) ||
       matchSearch(article.description, searchQuery) ||
-      matchSearch(article.categorie, searchQuery)
+      matchSearch(article.categorie, searchQuery) ||
+      matchSearch(article.sous_categorie, searchQuery)
     ).slice(0, 100);
   }, [articles, searchQuery]);
+
+  // Helpers de mapping : la bibliotheque (trpc.articles.getBibliotheque)
+  // retourne des bibliotheque_articles (nom, prix_base, unite, categorie,
+  // sous_categorie) alors qu'un articles_artisan utilise (designation,
+  // prixUnitaireHT, reference). On les unifie ici pour que la page
+  // fonctionne quel que soit le type d'article remonte.
+  const getDesignation = (a: any): string => a?.nom ?? a?.designation ?? "";
+  const getPrix = (a: any): string => String(a?.prix_base ?? a?.prixUnitaireHT ?? "");
+  const getRef = (a: any): string => a?.reference ?? a?.sous_categorie ?? "";
 
   // Grouper les articles par catégorie
   const groupedArticles = useMemo(() => {
@@ -96,17 +106,18 @@ export default function DevisLigneEdit() {
     const article = articles?.find((a: any) => a.id === parseInt(articleId));
     if (article) {
       setSelectedArticleId(articleId);
+      const designation = getDesignation(article);
       setFormData({
-        reference: article.reference || "",
-        designation: article.designation || "",
+        reference: getRef(article),
+        designation,
         description: article.description || "",
         quantite: "1",
         unite: article.unite || "unité",
-        prixUnitaireHT: String(article.prixUnitaireHT || ""),
+        prixUnitaireHT: getPrix(article),
         tauxTVA: "20",
       });
       setIsDialogOpen(false);
-      toast.success(`Article "${article.designation}" sélectionné`);
+      toast.success(`Article "${designation}" sélectionné`);
     }
   };
 
@@ -192,9 +203,9 @@ export default function DevisLigneEdit() {
             >
               {selectedArticle ? (
                 <div className="flex flex-col items-start text-left">
-                  <span className="font-medium">{selectedArticle.designation}</span>
+                  <span className="font-medium">{getDesignation(selectedArticle)}</span>
                   <span className="text-xs text-muted-foreground">
-                    {selectedArticle.reference} - {formatCurrency(selectedArticle.prixUnitaireHT)}
+                    {getRef(selectedArticle)} - {formatCurrency(getPrix(selectedArticle))}
                   </span>
                 </div>
               ) : (
@@ -208,7 +219,7 @@ export default function DevisLigneEdit() {
             {selectedArticle && (
               <div className="mt-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
                 <p className="text-sm text-green-700 dark:text-green-300">
-                  ✓ Article sélectionné : <strong>{selectedArticle.designation}</strong> - Les champs ci-dessous ont été pré-remplis automatiquement.
+                  ✓ Article sélectionné : <strong>{getDesignation(selectedArticle)}</strong> - Les champs ci-dessous ont été pré-remplis automatiquement.
                 </p>
               </div>
             )}
@@ -289,15 +300,15 @@ export default function DevisLigneEdit() {
                                   {selectedArticleId === String(article.id) && (
                                     <Check className="h-4 w-4 text-primary" />
                                   )}
-                                  <span className="font-medium">{article.designation}</span>
+                                  <span className="font-medium">{getDesignation(article)}</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                  <span>{article.reference}</span>
+                                  <span>{getRef(article)}</span>
                                   {article.unite && <span>• {article.unite}</span>}
                                 </div>
                               </div>
                               <span className="text-sm font-semibold text-primary">
-                                {formatCurrency(article.prixUnitaireHT)}
+                                {formatCurrency(getPrix(article))}
                               </span>
                             </div>
                           </button>
