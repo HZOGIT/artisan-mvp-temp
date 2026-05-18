@@ -4507,3 +4507,227 @@ export async function updateSoldeConges(
     [joursPrisDelta, joursPrisDelta, technicienId, type, annee]
   );
 }
+
+// ============================================================================
+// BADGES + CLASSEMENT TECHNICIENS (gamification) - Drizzle ORM
+// ============================================================================
+
+export async function getBadgesByArtisan(artisanId: number): Promise<Badge[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(badges)
+    .where(eq(badges.artisanId, artisanId))
+    .orderBy(asc(badges.categorie), asc(badges.seuil));
+}
+
+export async function createBadge(data: InsertBadge): Promise<Badge | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(badges).values(data);
+  const r = await dbi.select().from(badges)
+    .where(and(eq(badges.artisanId, data.artisanId), eq(badges.code, data.code)))
+    .orderBy(desc(badges.id)).limit(1);
+  return r[0];
+}
+
+export async function updateBadge(id: number, data: Partial<InsertBadge>): Promise<Badge | undefined> {
+  const dbi = await getDb();
+  await dbi.update(badges).set(data).where(eq(badges.id, id));
+  const r = await dbi.select().from(badges).where(eq(badges.id, id)).limit(1);
+  return r[0];
+}
+
+export async function deleteBadge(id: number): Promise<void> {
+  const dbi = await getDb();
+  await dbi.delete(badgesTechniciens).where(eq(badgesTechniciens.badgeId, id));
+  await dbi.delete(badges).where(eq(badges.id, id));
+}
+
+export async function getBadgesTechnicien(technicienId: number): Promise<any[]> {
+  const dbi = await getDb();
+  return await dbi.select({
+    id: badgesTechniciens.id,
+    badgeId: badgesTechniciens.badgeId,
+    dateObtention: badgesTechniciens.dateObtention,
+    valeurAtteinte: badgesTechniciens.valeurAtteinte,
+    badgeCode: badges.code,
+    badgeNom: badges.nom,
+    badgeIcone: badges.icone,
+    badgeCouleur: badges.couleur,
+    badgeCategorie: badges.categorie,
+    badgePoints: badges.points,
+  })
+    .from(badgesTechniciens)
+    .innerJoin(badges, eq(badges.id, badgesTechniciens.badgeId))
+    .where(eq(badgesTechniciens.technicienId, technicienId))
+    .orderBy(desc(badgesTechniciens.dateObtention));
+}
+
+export async function attribuerBadge(
+  technicienId: number,
+  badgeId: number,
+  valeurAtteinte?: number
+): Promise<BadgeTechnicien | undefined> {
+  const dbi = await getDb();
+  // Si deja attribue, ne pas dupliquer.
+  const existing = await dbi.select().from(badgesTechniciens)
+    .where(and(eq(badgesTechniciens.technicienId, technicienId), eq(badgesTechniciens.badgeId, badgeId)))
+    .limit(1);
+  if (existing[0]) return existing[0];
+  await dbi.insert(badgesTechniciens).values({
+    technicienId,
+    badgeId,
+    valeurAtteinte: valeurAtteinte ?? null,
+  });
+  const r = await dbi.select().from(badgesTechniciens)
+    .where(and(eq(badgesTechniciens.technicienId, technicienId), eq(badgesTechniciens.badgeId, badgeId)))
+    .limit(1);
+  return r[0];
+}
+
+export async function verifierEtAttribuerBadges(
+  technicienId: number,
+  artisanId: number
+): Promise<BadgeTechnicien[]> {
+  // Verifie les seuils (interventions, avis, ca, anciennete) et attribue
+  // les badges atteints. Retourne la liste des badges nouvellement
+  // obtenus dans ce passage.
+  const dbi = await getDb();
+  const pool = getPool();
+  if (!pool) return [];
+
+  // Calculs statistiques pour ce technicien chez cet artisan.
+  const [intRows]: any = await pool.execute(
+    `SELECT COUNT(*) AS n FROM interventions
+      WHERE technicienId = ? AND artisanId = ? AND statut = 'terminee'`,
+    [technicienId, artisanId]
+  );
+  const nbInterventions = Number(intRows[0]?.n || 0);
+
+  // Avis positifs (note >= 4) — on tolere l'absence de la table.
+  let nbAvisPositifs = 0;
+  try {
+    const [aRows]: any = await pool.execute(
+      `SELECT COUNT(*) AS n FROM avis_clients
+        WHERE artisanId = ? AND note >= 4`,
+      [artisanId]
+    );
+    nbAvisPositifs = Number(aRows[0]?.n || 0);
+  } catch {
+    /* table absente */
+  }
+
+  // Liste des badges definis chez cet artisan.
+  const allBadges = await dbi.select().from(badges)
+    .where(and(eq(badges.artisanId, artisanId), eq(badges.actif, true)));
+
+  const obtenus: BadgeTechnicien[] = [];
+  for (const b of allBadges) {
+    const seuil = b.seuil || 0;
+    let valeur = 0;
+    if (b.categorie === "interventions") valeur = nbInterventions;
+    else if (b.categorie === "avis") valeur = nbAvisPositifs;
+    if (valeur >= seuil && seuil > 0) {
+      const bt = await attribuerBadge(technicienId, b.id, valeur);
+      if (bt && !obtenus.find((x) => x.badgeId === bt.badgeId)) {
+        obtenus.push(bt);
+      }
+    }
+  }
+  return obtenus;
+}
+
+export async function getClassementTechniciens(
+  artisanId: number,
+  periode: "semaine" | "mois" | "trimestre" | "annee"
+): Promise<ClassementTechnicien[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(classementTechniciens)
+    .where(and(eq(classementTechniciens.artisanId, artisanId), eq(classementTechniciens.periode, periode)))
+    .orderBy(asc(classementTechniciens.rang));
+}
+
+export async function calculerClassement(
+  artisanId: number,
+  periode: "semaine" | "mois" | "trimestre" | "annee"
+): Promise<ClassementTechnicien[]> {
+  // Calcule le classement pour la periode courante et l'enregistre.
+  const pool = getPool();
+  if (!pool) return [];
+  const today = new Date();
+  let dateDebut: Date;
+  const dateFin = today;
+  if (periode === "semaine") {
+    dateDebut = new Date(today);
+    dateDebut.setDate(today.getDate() - 7);
+  } else if (periode === "mois") {
+    dateDebut = new Date(today.getFullYear(), today.getMonth(), 1);
+  } else if (periode === "trimestre") {
+    const q = Math.floor(today.getMonth() / 3) * 3;
+    dateDebut = new Date(today.getFullYear(), q, 1);
+  } else {
+    dateDebut = new Date(today.getFullYear(), 0, 1);
+  }
+  const dStr = dateDebut.toISOString().slice(0, 10);
+  const fStr = dateFin.toISOString().slice(0, 10);
+
+  // Agreger par technicien : nb interventions terminees + CA factures
+  // payees attache aux interventions de ce technicien.
+  const [rows]: any = await pool.execute(
+    `SELECT i.technicienId AS technicienId,
+            COUNT(*) AS interventions,
+            COALESCE(SUM(f.totalTTC), 0) AS ca
+       FROM interventions i
+       LEFT JOIN factures f
+         ON f.id = i.factureId AND f.statut = 'payee'
+      WHERE i.artisanId = ?
+        AND i.statut = 'terminee'
+        AND i.technicienId IS NOT NULL
+        AND i.dateDebut BETWEEN ? AND ?
+      GROUP BY i.technicienId
+      ORDER BY interventions DESC, ca DESC`,
+    [artisanId, dStr, fStr]
+  );
+
+  // Insert classements (purge prealable pour ce couple artisan+periode).
+  await pool.execute(
+    `DELETE FROM classement_techniciens
+      WHERE artisanId = ? AND periode = ? AND dateDebut = ?`,
+    [artisanId, periode, dStr]
+  );
+  let rang = 1;
+  for (const r of rows as any[]) {
+    const points = Number(r.interventions) * 10 + Math.floor(Number(r.ca) / 100);
+    await pool.execute(
+      `INSERT INTO classement_techniciens
+         (technicienId, artisanId, periode, dateDebut, dateFin, rang,
+          pointsTotal, interventions, ca)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [r.technicienId, artisanId, periode, dStr, fStr, rang, points, r.interventions, r.ca]
+    );
+    rang++;
+  }
+  return getClassementTechniciens(artisanId, periode);
+}
+
+export async function getObjectifsTechnicien(
+  technicienId: number,
+  annee: number
+): Promise<ObjectifTechnicien[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(objectifsTechniciens)
+    .where(and(eq(objectifsTechniciens.technicienId, technicienId), eq(objectifsTechniciens.annee, annee)))
+    .orderBy(asc(objectifsTechniciens.mois));
+}
+
+export async function createObjectifTechnicien(
+  data: InsertObjectifTechnicien
+): Promise<ObjectifTechnicien | undefined> {
+  const dbi = await getDb();
+  await dbi.insert(objectifsTechniciens).values(data);
+  const r = await dbi.select().from(objectifsTechniciens)
+    .where(and(
+      eq(objectifsTechniciens.technicienId, data.technicienId),
+      eq(objectifsTechniciens.mois, data.mois),
+      eq(objectifsTechniciens.annee, data.annee),
+    )).orderBy(desc(objectifsTechniciens.id)).limit(1);
+  return r[0];
+}
