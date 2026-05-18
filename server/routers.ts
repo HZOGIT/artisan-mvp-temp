@@ -6373,110 +6373,59 @@ const devisIARouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune photo à analyser" });
       }
 
-      // Importer le LLM pour l'analyse
-      const { invokeLLM } = await import("./_core/llm");
-
-      // Préparer les images pour l'analyse
-      const imageContents = photos.map(p => ({
-        type: "image_url" as const,
-        image_url: { url: p.url, detail: "high" as const }
+      // Appel direct au SDK Anthropic (claude-sonnet-4 multimodal).
+      // Le SDK lit ANTHROPIC_API_KEY automatiquement.
+      const imageBlocks = photos.map(p => ({
+        type: "image" as const,
+        source: { type: "url" as const, url: p.url },
       }));
 
-      // Appeler l'IA pour analyser les photos
-      const response = await invokeLLM({
+      const systemPrompt = `Tu es un expert en bâtiment et travaux. Analyse les photos fournies et identifie les travaux nécessaires.
+Pour chaque type de travaux détecté, fournis :
+- Le type (ex: plomberie, électricité, peinture)
+- Une description détaillée
+- Le niveau d'urgence (faible | moyenne | haute | critique)
+- Un score de confiance 0-100
+- La liste des articles/matériaux nécessaires (nom, description, quantité, unité, prixEstime)
+
+Réponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour) au format :
+{"travaux":[{"type":"string","description":"string","urgence":"faible|moyenne|haute|critique","confiance":0,"articles":[{"nom":"string","description":"string","quantite":0,"unite":"string","prixEstime":0}]}]}`;
+
+      const client = new Anthropic();
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4000,
+        temperature: 0.3,
+        system: systemPrompt,
         messages: [
-          {
-            role: "system",
-            content: `Tu es un expert en bâtiment et travaux. Analyse les photos fournies et identifie les travaux nécessaires.
-            Pour chaque type de travaux détecté, fournis:
-            - Le type de travaux (ex: plomberie, électricité, peinture, etc.)
-            - Une description détaillée des travaux à réaliser
-            - Le niveau d'urgence (faible, moyenne, haute, critique)
-            - Une liste d'articles/matériaux nécessaires avec quantités estimées et prix approximatifs
-            
-            Réponds en JSON avec le format:
-            {
-              "travaux": [
-                {
-                  "type": "string",
-                  "description": "string",
-                  "urgence": "faible|moyenne|haute|critique",
-                  "confiance": 0-100,
-                  "articles": [
-                    {
-                      "nom": "string",
-                      "description": "string",
-                      "quantite": number,
-                      "unite": "string",
-                      "prixEstime": number
-                    }
-                  ]
-                }
-              ]
-            }`
-          },
           {
             role: "user",
             content: [
-              { type: "text", text: "Analyse ces photos de chantier et identifie les travaux nécessaires:" },
-              ...imageContents
-            ]
-          }
+              ...imageBlocks,
+              { type: "text", text: "Analyse ces photos de chantier et identifie les travaux nécessaires." },
+            ],
+          },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "analyse_chantier",
-            strict: true,
-            schema: {
-              type: "object",
-              properties: {
-                travaux: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      type: { type: "string" },
-                      description: { type: "string" },
-                      urgence: { type: "string", enum: ["faible", "moyenne", "haute", "critique"] },
-                      confiance: { type: "number" },
-                      articles: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            nom: { type: "string" },
-                            description: { type: "string" },
-                            quantite: { type: "number" },
-                            unite: { type: "string" },
-                            prixEstime: { type: "number" }
-                          },
-                          required: ["nom", "quantite", "unite", "prixEstime"],
-                          additionalProperties: false
-                        }
-                      }
-                    },
-                    required: ["type", "description", "urgence", "confiance", "articles"],
-                    additionalProperties: false
-                  }
-                }
-              },
-              required: ["travaux"],
-              additionalProperties: false
-            }
-          }
-        }
       });
 
-      // Parser la réponse
-      const rawContent = response.choices[0]?.message?.content;
-      const content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
-      if (!content) {
+      const text = response.content.filter(b => b.type === 'text').map(b => (b as any).text).join('');
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
         await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erreur lors de l'analyse IA" });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Reponse IA non parsable" });
       }
 
-      const analyseResult = JSON.parse(content);
+      let analyseResult: any;
+      try {
+        analyseResult = JSON.parse(jsonMatch[0]);
+      } catch {
+        await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "JSON IA invalide" });
+      }
+      if (!Array.isArray(analyseResult?.travaux)) {
+        await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Format de reponse IA inattendu" });
+      }
 
       // Sauvegarder les résultats
       for (const travail of analyseResult.travaux) {
