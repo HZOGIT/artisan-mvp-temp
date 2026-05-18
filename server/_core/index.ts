@@ -285,6 +285,107 @@ async function startServer() {
   });
 
   // ============================================================
+  // TEMPORAIRE — Test d'INSERT direct dans commandes_fournisseurs +
+  // lignes_commandes_fournisseurs pour confirmer l'alignement schema/DB.
+  // A retirer apres validation.
+  // ============================================================
+  app.get('/api/internal/test-commande-fournisseur', async (req, res) => {
+    if (req.query.token !== 'cmd-test-2026') {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    const trace: any[] = [];
+    try {
+      const { getPool } = await import('../db');
+      const pool = getPool();
+      if (!pool) {
+        res.status(500).json({ error: 'pool not initialized' });
+        return;
+      }
+      const sentinel = `CMDTEST-${Date.now()}`;
+      // Verifier qu'on a un artisan 1 + creer fournisseur jetable
+      try {
+        const [a]: any = await pool.execute(`SELECT id FROM artisans WHERE id = 1`);
+        trace.push({ step: 'artisan1_exists', ok: a.length === 1 });
+      } catch (e: any) { trace.push({ step: 'artisan1_check', error: e.message, code: e.code }); }
+
+      // INSERT fournisseur
+      let fournisseurId: number | null = null;
+      try {
+        const [r]: any = await pool.execute(
+          `INSERT INTO fournisseurs (artisanId, nom, email, ville)
+           VALUES (1, ?, ?, 'Test')`,
+          [`Fournisseur ${sentinel}`, `${sentinel}@test-operioz.com`]
+        );
+        fournisseurId = r.insertId;
+        trace.push({ step: 'fournisseur_insert', ok: true, fournisseurId });
+      } catch (e: any) {
+        trace.push({ step: 'fournisseur_insert', error: e.message, code: e.code, sqlState: e.sqlState });
+      }
+
+      // INSERT commande
+      let commandeId: number | null = null;
+      if (fournisseurId) {
+        try {
+          const [r]: any = await pool.execute(
+            `INSERT INTO commandes_fournisseurs
+             (artisanId, fournisseurId, numero, statut, totalHT, totalTVA, totalTTC, montantTotal, dateCommande)
+             VALUES (1, ?, ?, 'brouillon', '500.00', '100.00', '600.00', '600.00', NOW())`,
+            [fournisseurId, sentinel]
+          );
+          commandeId = r.insertId;
+          trace.push({ step: 'commande_insert', ok: true, commandeId });
+        } catch (e: any) {
+          trace.push({ step: 'commande_insert', error: e.message, code: e.code, sqlState: e.sqlState });
+        }
+      }
+
+      // INSERT ligne commande
+      if (commandeId) {
+        try {
+          const [r]: any = await pool.execute(
+            `INSERT INTO lignes_commandes_fournisseurs
+             (commandeId, designation, quantite, unite, prixUnitaire, tauxTVA, montantTotal)
+             VALUES (?, 'Ligne test', '2.00', 'u', '250.00', '20.00', '500.00')`,
+            [commandeId]
+          );
+          trace.push({ step: 'ligne_insert', ok: true, ligneId: r.insertId });
+        } catch (e: any) {
+          trace.push({ step: 'ligne_insert', error: e.message, code: e.code, sqlState: e.sqlState });
+        }
+      }
+
+      // SELECT pour verif
+      if (commandeId) {
+        try {
+          const [r]: any = await pool.execute(
+            `SELECT c.id, c.numero, c.statut, c.totalTTC, c.dateCommande, c.dateLivraisonPrevue,
+                    (SELECT COUNT(*) FROM lignes_commandes_fournisseurs WHERE commandeId = c.id) AS lignesCount
+               FROM commandes_fournisseurs c WHERE c.id = ?`,
+            [commandeId]
+          );
+          trace.push({ step: 'select_check', row: r[0] });
+        } catch (e: any) { trace.push({ step: 'select_check', error: e.message, code: e.code }); }
+      }
+
+      // Cleanup
+      if (commandeId) {
+        try { await pool.execute(`DELETE FROM lignes_commandes_fournisseurs WHERE commandeId = ?`, [commandeId]); } catch {}
+        try { await pool.execute(`DELETE FROM commandes_fournisseurs WHERE id = ?`, [commandeId]); } catch {}
+      }
+      if (fournisseurId) {
+        try { await pool.execute(`DELETE FROM fournisseurs WHERE id = ?`, [fournisseurId]); } catch {}
+      }
+      trace.push({ step: 'cleanup', ok: true });
+
+      const ok = trace.every((t) => !t.error);
+      res.json({ ok, trace });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, fatal: e?.message, trace });
+    }
+  });
+
+  // ============================================================
   // API Articles - recherche bibliothèque
   // ============================================================
   app.get('/api/articles/search', async (req, res) => {
