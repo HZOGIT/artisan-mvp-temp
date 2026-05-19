@@ -55,6 +55,18 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+// Defense en profondeur : ne JAMAIS afficher un toast contenant un payload
+// base64 brut (ce qui generait l'affichage 'long base64 a droite de l'ecran').
+// On strip toute data: URL et on tronque a 240 caracteres.
+function safeErrorMsg(e: any, fallback = "Erreur"): string {
+  let msg = String(e?.message || e || fallback);
+  msg = msg.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, "[image]");
+  // Long base64 isole sans prefixe data:
+  msg = msg.replace(/[A-Za-z0-9+/=]{200,}/g, "[…]");
+  if (msg.length > 240) msg = msg.slice(0, 240) + "…";
+  return msg;
+}
+
 export default function AnalysesPhotos() {
   const [, setLocation] = useLocation();
   const [titre, setTitre] = useState("");
@@ -84,7 +96,7 @@ export default function AnalysesPhotos() {
       if (devis?.devisId) setLocation(`/devis/${devis.devisId}`);
       else setLocation("/devis");
     },
-    onError: (e) => toast.error(e.message || "Échec de la génération du devis"),
+    onError: (e) => toast.error(safeErrorMsg(e, "Échec de la génération du devis")),
   });
 
   function handleSelectFiles(list: FileList | null) {
@@ -146,7 +158,7 @@ export default function AnalysesPhotos() {
       setTitre("");
       setDescription("");
     } catch (e: any) {
-      toast.error(e?.message || "Erreur pendant l'analyse");
+      toast.error(safeErrorMsg(e, "Erreur pendant l'analyse"));
     } finally {
       setIsAnalyzing(false);
     }

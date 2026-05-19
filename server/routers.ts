@@ -6365,11 +6365,22 @@ const devisIARouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
 
+      // Sanitizer global : enleve toute data: URL et tronque a 200 chars pour
+      // qu'aucune erreur remontee au frontend ne contienne le payload base64
+      // de l'image (qui faisait apparaitre 'long base64' dans les toasts).
+      const sanitizeErr = (e: any): string => {
+        let msg = String(e?.message || e || 'Erreur inconnue');
+        msg = msg.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, '[image]');
+        if (msg.length > 200) msg = msg.slice(0, 200) + '…';
+        return msg;
+      };
+
       // Mettre à jour le statut
       await db.updateAnalysePhoto(input.analyseId, { statut: 'en_cours' });
 
       const photos = await db.getPhotosByAnalyse(input.analyseId);
       if (photos.length === 0) {
+        await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
         throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune photo à analyser" });
       }
 
@@ -6403,25 +6414,45 @@ Pour chaque type de travaux détecté, fournis :
 Réponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour) au format :
 {"travaux":[{"type":"string","description":"string","urgence":"faible|moyenne|haute|critique","confiance":0,"articles":[{"nom":"string","description":"string","quantite":0,"unite":"string","prixEstime":0}]}]}`;
 
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4000,
-        temperature: 0.3,
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: [
-              ...imageBlocks,
-              { type: "text", text: "Analyse ces photos de chantier et identifie les travaux nécessaires." },
-            ],
-          },
-        ],
-      });
+      // Appel Anthropic dans try/catch pour ne JAMAIS laisser remonter
+      // le payload d'image base64 dans la stack d'erreur tRPC.
+      let responseText = '';
+      try {
+        const client = new Anthropic();
+        const response = await client.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4000,
+          temperature: 0.3,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: [
+                ...imageBlocks,
+                { type: "text", text: "Analyse ces photos de chantier et identifie les travaux nécessaires." },
+              ],
+            },
+          ],
+        });
+        responseText = response.content
+          .filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text)
+          .join('');
+      } catch (e: any) {
+        console.warn('[analyserPhotos] Anthropic call failed:', e?.status, e?.name);
+        await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Appel IA echoue : ${sanitizeErr(e)}`,
+        });
+      }
 
-      const text = response.content.filter(b => b.type === 'text').map(b => (b as any).text).join('');
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      // Parse JSON robuste : supporte markdown wrap ```json ... ```
+      // et eventuels prefixes/suffixes en texte naturel.
+      let cleaned = responseText.trim();
+      const codeFence = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      if (codeFence) cleaned = codeFence[1].trim();
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Reponse IA non parsable" });
@@ -6430,13 +6461,13 @@ Réponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autou
       let analyseResult: any;
       try {
         analyseResult = JSON.parse(jsonMatch[0]);
-      } catch {
+      } catch (e: any) {
         await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "JSON IA invalide" });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `JSON IA invalide : ${sanitizeErr(e)}` });
       }
       if (!Array.isArray(analyseResult?.travaux)) {
         await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Format de reponse IA inattendu" });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Format de reponse IA inattendu (champ 'travaux' absent)" });
       }
 
       // Sauvegarder les résultats
@@ -6484,7 +6515,10 @@ Réponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autou
       // Mettre à jour le statut
       await db.updateAnalysePhoto(input.analyseId, { statut: 'termine' });
 
-      return { success: true, nombreTravaux: analyseResult.travaux.length };
+      return {
+        success: true,
+        nombreTravaux: Array.isArray(analyseResult.travaux) ? analyseResult.travaux.length : 0,
+      };
     }),
 
   updateSuggestion: protectedProcedure
