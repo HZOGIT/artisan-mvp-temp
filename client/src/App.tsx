@@ -95,6 +95,7 @@ const NotesFrais = lazy(() => import("./pages/NotesFrais"));
 const TableauBordDepenses = lazy(() => import("./pages/TableauBordDepenses"));
 const ImportReleveDepenses = lazy(() => import("./pages/ImportReleve"));
 const BudgetsDepenses = lazy(() => import("./pages/BudgetsDepenses"));
+const ReglesDepenses = lazy(() => import("./pages/ReglesDepenses"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 const CGV = lazy(() => import("./pages/legal/CGV"));
@@ -189,6 +190,7 @@ function AuthenticatedRoutes() {
           <Route path="/tableau-bord-depenses" component={TableauBordDepenses} />
           <Route path="/import-releve" component={ImportReleveDepenses} />
           <Route path="/budgets-depenses" component={BudgetsDepenses} />
+          <Route path="/regles-depenses" component={ReglesDepenses} />
           <Route path="/chantiers" component={Chantiers} />
           <Route path="/integrations-comptables" component={IntegrationsComptables} />
           <Route path="/devis-ia" component={DevisIA} />

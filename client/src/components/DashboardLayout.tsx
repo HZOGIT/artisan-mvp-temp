@@ -49,6 +49,7 @@ import {
   PiggyBank,
   BarChart3,
   Wallet,
+  Wand2,
   LayoutGrid,
   LineChart,
   LogOut,
@@ -293,6 +294,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: PiggyBank, label: "Budgets", path: "/budgets-depenses" },
       { icon: Upload, label: "Import relevé", path: "/import-releve" },
       { icon: BarChart3, label: "Tableau de bord", path: "/tableau-bord-depenses" },
+      { icon: Wand2, label: "Règles auto", path: "/regles-depenses" },
     ],
   },
   {
@@ -373,6 +375,7 @@ const pathPermissionMap: Record<string, string> = {
   "/budgets-depenses": "comptabilite.voir",
   "/import-releve": "comptabilite.voir",
   "/tableau-bord-depenses": "comptabilite.voir",
+  "/regles-depenses": "comptabilite.voir",
   "/modules": "",
   "/onboarding": "",
   "/import": "",
@@ -408,7 +411,7 @@ const MODULE_TO_LABELS: Record<string, string[]> = {
   commandes: ["Commandes", "Fournisseurs", "Rapport Commande"],
   comptabilite: ["Comptabilité", "Rapports", "Prévisions CA", "Alertes prévisions"],
   assistant_ia: ["MonAssistant", "Analyse photos IA"],
-  depenses: ["Dépenses", "Notes de frais", "Import relevé", "Tableau de bord"],
+  depenses: ["Dépenses", "Notes de frais", "Import relevé", "Tableau de bord", "Règles auto"],
   budgets: ["Budgets"],
   vehicules: ["Véhicules", "Flotte"],
   // (déjà couvert plus haut — labels "Véhicules" et "Flotte")
