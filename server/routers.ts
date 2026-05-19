@@ -7964,7 +7964,531 @@ const supportRouter = router({
     }),
 });
 
+// ============================================================================
+// DEPENSES ROUTER — module Notes de frais Expensya-like
+// ============================================================================
+const depensesRouter = router({
+  // === Liste & CRUD dépenses ===
+  list: protectedProcedure
+    .input(z.object({
+      categorie: z.string().optional(),
+      statut: z.string().optional(),
+      dateDebut: z.string().optional(),
+      dateFin: z.string().optional(),
+      userId: z.number().optional(),
+      clientId: z.number().optional(),
+      search: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getDepensesByArtisan(artisan.id, input || {});
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      return await db.getDepenseById(input.id, artisan.id);
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      dateDepense: z.string(),
+      fournisseur: z.string().optional(),
+      categorie: z.string(),
+      sousCategorie: z.string().optional(),
+      description: z.string().optional(),
+      montantHt: z.number(),
+      tauxTva: z.number().default(20),
+      modePaiement: z.string().default("carte"),
+      statut: z.string().optional(),
+      remboursable: z.boolean().default(true),
+      chantierId: z.number().optional(),
+      interventionId: z.number().optional(),
+      clientId: z.number().optional(),
+      notes: z.string().optional(),
+      justificatifUrl: z.string().optional(),
+      justificatifNom: z.string().optional(),
+      tvaDeductible: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      const numero = await db.getNextDepenseNumero(artisan.id);
+      const montantTva = +(input.montantHt * (input.tauxTva / 100)).toFixed(2);
+      const montantTtc = +(input.montantHt + montantTva).toFixed(2);
+      return await db.createDepense({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        numero,
+        ...input,
+        montantTva,
+        montantTtc,
+      });
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      data: z.record(z.any()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      return await db.updateDepense(input.id, artisan.id, input.data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.deleteDepense(input.id, artisan.id);
+      return { success: true };
+    }),
+
+  // === Statistiques mois courant ===
+  stats: protectedProcedure
+    .input(z.object({ mois: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      return await db.getDepensesStats(artisan.id, input?.mois);
+    }),
+
+  // === Analyse OCR par Claude vision ===
+  analyserJustificatif: protectedProcedure
+    .input(z.object({
+      imageBase64: z.string(),
+      depenseId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!checkRateLimit(artisan.id)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+      }
+
+      // Detecter le format data URL et extraire le base64 brut.
+      const dataMatch = input.imageBase64.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
+      const mediaType = (dataMatch?.[1] || "image/jpeg") as any;
+      const base64Data = dataMatch ? dataMatch[2] : input.imageBase64;
+
+      try {
+        const client = new Anthropic();
+        const response = await client.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: mediaType, data: base64Data },
+              },
+              {
+                type: "text",
+                text: `Analyse cette facture / note de frais. Extrais les informations en JSON :
+{"fournisseur":"nom","date":"YYYY-MM-DD","montantHT":0,"tauxTVA":20,"montantTTC":0,"categorie":"materiaux|carburant|outillage|repas|deplacement|telephone|sous-traitance|assurance|loyer|formation|bancaire|autre","description":"description courte","numeroFacture":"numero si visible"}
+Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
+              },
+            ],
+          }],
+        });
+        const text = response.content
+          .filter((b: any) => b.type === "text")
+          .map((b: any) => b.text)
+          .join("");
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const data = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+        if (input.depenseId) {
+          await db.markDepenseOcrTraite(input.depenseId, data);
+        }
+        return { success: true, data };
+      } catch (e: any) {
+        const msg = String(e?.message || e).replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, "[image]").slice(0, 200);
+        return { success: false, data: {}, error: `OCR IA echouee : ${msg}` };
+      }
+    }),
+
+  // === Catégories ===
+  getCategories: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getCategoriesDepenses(artisan.id);
+  }),
+
+  createCategorie: protectedProcedure
+    .input(z.object({
+      nom: z.string(),
+      couleur: z.string().optional(),
+      icone: z.string().optional(),
+      compteComptable: z.string().optional(),
+      plafondMensuel: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      return await db.createCategorieDepense({ ...input, artisanId: artisan.id });
+    }),
+
+  updateCategorie: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nom: z.string().optional(),
+      couleur: z.string().optional(),
+      icone: z.string().optional(),
+      compteComptable: z.string().optional(),
+      plafondMensuel: z.number().optional(),
+      actif: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      const { id, ...data } = input;
+      await db.updateCategorieDepense(id, artisan.id, data);
+      return { success: true };
+    }),
+
+  deleteCategorie: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.deleteCategorieDepense(input.id, artisan.id);
+      return { success: true };
+    }),
+
+  // === Notes de frais ===
+  listNotesFrais: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getNotesFrais(artisan.id);
+  }),
+
+  getNoteFraisById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      return await db.getNoteFraisById(input.id, artisan.id);
+    }),
+
+  createNoteFrais: protectedProcedure
+    .input(z.object({
+      titre: z.string(),
+      periodeDebut: z.string(),
+      periodeFin: z.string(),
+      depenseIds: z.array(z.number()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      const numero = await db.getNextNoteFraisNumero(artisan.id);
+      const note = await db.createNoteFrais({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        numero,
+        titre: input.titre,
+        periodeDebut: input.periodeDebut,
+        periodeFin: input.periodeFin,
+      });
+      if (note && input.depenseIds?.length) {
+        for (const did of input.depenseIds) {
+          await db.addDepenseToNoteFrais(note.id, did, artisan.id);
+        }
+        await db.calculerTotalNoteFrais(note.id, artisan.id);
+      }
+      return note;
+    }),
+
+  addDepenseToNoteFrais: protectedProcedure
+    .input(z.object({ noteId: z.number(), depenseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.addDepenseToNoteFrais(input.noteId, input.depenseId, artisan.id);
+      await db.calculerTotalNoteFrais(input.noteId, artisan.id);
+      return { success: true };
+    }),
+
+  removeDepenseFromNoteFrais: protectedProcedure
+    .input(z.object({ noteId: z.number(), depenseId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.removeDepenseFromNoteFrais(input.noteId, input.depenseId);
+      await db.calculerTotalNoteFrais(input.noteId, artisan.id);
+      return { success: true };
+    }),
+
+  soumettreNoteFrais: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      return await db.soumettreNoteFrais(input.id, artisan.id);
+    }),
+
+  approuverNoteFrais: protectedProcedure
+    .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      return await db.approuverNoteFrais(input.id, artisan.id, input.commentaire);
+    }),
+
+  rejeterNoteFrais: protectedProcedure
+    .input(z.object({ id: z.number(), commentaire: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      return await db.rejeterNoteFrais(input.id, artisan.id, input.commentaire);
+    }),
+
+  payerNoteFrais: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      return await db.payerNoteFrais(input.id, artisan.id);
+    }),
+
+  // === Budgets ===
+  getBudgets: protectedProcedure
+    .input(z.object({ mois: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.calculerBudgetsRealises(artisan.id, input.mois);
+    }),
+
+  setBudget: protectedProcedure
+    .input(z.object({
+      categorie: z.string(),
+      mois: z.string(),
+      budget: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      await db.upsertBudget(artisan.id, input.categorie, input.mois, input.budget);
+      return { success: true };
+    }),
+
+  copierBudgetsMois: protectedProcedure
+    .input(z.object({ moisSource: z.string(), moisCible: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      const pool = (db as any).getPool();
+      if (pool) {
+        await pool.execute(
+          `INSERT INTO budgets_categories (artisan_id, categorie, mois, budget)
+           SELECT artisan_id, categorie, ?, budget
+             FROM budgets_categories
+            WHERE artisan_id = ? AND mois = ?
+           ON DUPLICATE KEY UPDATE budget = VALUES(budget)`,
+          [input.moisCible, artisan.id, input.moisSource]
+        );
+      }
+      return { success: true };
+    }),
+
+  // === Import relevé bancaire ===
+  importReleve: protectedProcedure
+    .input(z.object({
+      nomFichier: z.string(),
+      contenuCsv: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      // Parser CSV simple : ligne 1 = header, separateur ; ou , detecte auto.
+      const lignes = input.contenuCsv.split(/\r?\n/).filter((l) => l.trim());
+      if (lignes.length < 2) {
+        return { releveId: 0, nbImportees: 0, message: "CSV vide ou invalide" };
+      }
+      const sep = (lignes[0].match(/;/g)?.length || 0) > (lignes[0].match(/,/g)?.length || 0) ? ";" : ",";
+      const transactions: any[] = [];
+      for (let i = 1; i < lignes.length; i++) {
+        const cols = lignes[i].split(sep).map((c) => c.trim().replace(/^"|"$/g, ""));
+        if (cols.length < 3) continue;
+        // Heuristique : date = col 0, libelle = col 1, montant = col 2 ou 2+3 (debit/credit)
+        const dateRaw = cols[0];
+        const libelle = cols[1] || "";
+        // Date au format DD/MM/YYYY -> YYYY-MM-DD
+        let dateIso = dateRaw;
+        const fr = dateRaw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (fr) dateIso = `${fr[3]}-${fr[2]}-${fr[1]}`;
+        // Montant : col 2 si present, sinon col 3-col 2 (debit/credit cols)
+        let montant = parseFloat((cols[2] || "0").replace(",", ".").replace(/\s/g, ""));
+        if (isNaN(montant) || montant === 0) {
+          const debit = parseFloat((cols[2] || "0").replace(",", ".").replace(/\s/g, ""));
+          const credit = parseFloat((cols[3] || "0").replace(",", ".").replace(/\s/g, ""));
+          montant = !isNaN(credit) && credit > 0 ? credit : -Math.abs(debit || 0);
+        }
+        if (!dateIso || isNaN(montant) || !libelle) continue;
+        transactions.push({
+          dateTransaction: dateIso,
+          libelle,
+          montant,
+          typeTransaction: montant < 0 ? "debit" : "credit",
+        });
+      }
+      return await db.importReleve(artisan.id, input.nomFichier, transactions);
+    }),
+
+  getTransactionsBancaires: protectedProcedure
+    .input(z.object({ releveId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getTransactionsBancaires(artisan.id, input?.releveId);
+    }),
+
+  // Convertir une transaction bancaire en depense
+  convertirTransaction: protectedProcedure
+    .input(z.object({
+      transactionId: z.number(),
+      categorie: z.string(),
+      fournisseur: z.string().optional(),
+      description: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      // Lire la transaction.
+      const trxs = await db.getTransactionsBancaires(artisan.id);
+      const t = trxs.find((x: any) => x.id === input.transactionId);
+      if (!t) throw new TRPCError({ code: "NOT_FOUND" });
+      const numero = await db.getNextDepenseNumero(artisan.id);
+      const montantTtc = Number(t.montant || 0);
+      const tauxTva = 20;
+      const montantHt = +(montantTtc / (1 + tauxTva / 100)).toFixed(2);
+      const montantTva = +(montantTtc - montantHt).toFixed(2);
+      const dep = await db.createDepense({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        numero,
+        dateDepense: String(t.date_transaction).slice(0, 10),
+        fournisseur: input.fournisseur || String(t.libelle || "").slice(0, 200),
+        categorie: input.categorie,
+        description: input.description || String(t.libelle || "").slice(0, 200),
+        montantHt,
+        tauxTva,
+        montantTva,
+        montantTtc,
+        modePaiement: "carte",
+        statut: "brouillon",
+      });
+      if (dep) await db.lierTransactionDepense(input.transactionId, dep.id, artisan.id);
+      return dep;
+    }),
+
+  ignorerTransaction: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      await db.ignorerTransaction(input.id, artisan.id);
+      return { success: true };
+    }),
+
+  // === Export FEC achats ===
+  exportFecAchats: protectedProcedure
+    .input(z.object({ dateDebut: z.string(), dateFin: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      const contenu = await db.exportDepensesFEC(artisan.id, input.dateDebut, input.dateFin);
+      return { contenu };
+    }),
+
+  // === Indemnités kilométriques (T10B) ===
+  creerIndemniteKm: protectedProcedure
+    .input(z.object({
+      dateDepense: z.string(),
+      kilometres: z.number(),
+      tarifKm: z.number().default(0.529),
+      motif: z.string().optional(),
+      chantierId: z.number().optional(),
+      clientId: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      const numero = await db.getNextDepenseNumero(artisan.id);
+      // Indemnites km : sans TVA recuperable (regime fiscal forfait).
+      const montant = +(input.kilometres * input.tarifKm).toFixed(2);
+      return await db.createDepense({
+        artisanId: artisan.id,
+        userId: ctx.user.id,
+        numero,
+        dateDepense: input.dateDepense,
+        fournisseur: "Indemnités kilométriques",
+        categorie: "Déplacement & Transport",
+        description: `${input.kilometres} km${input.motif ? ` — ${input.motif}` : ""} @ ${input.tarifKm} EUR/km`,
+        montantHt: montant,
+        tauxTva: 0,
+        montantTva: 0,
+        montantTtc: montant,
+        modePaiement: "carte",
+        tvaDeductible: false,
+        remboursable: true,
+        chantierId: input.chantierId,
+        clientId: input.clientId,
+      });
+    }),
+
+  // === Règles de catégorisation auto (T10C) ===
+  getRegles: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const pool = (db as any).getPool();
+    if (!pool) return [];
+    const [rows]: any = await pool.execute(
+      `SELECT * FROM regles_categorisation WHERE artisan_id = ? AND actif = TRUE ORDER BY id DESC`,
+      [artisan.id]
+    );
+    return rows as any[];
+  }),
+
+  createRegle: protectedProcedure
+    .input(z.object({ motifLibelle: z.string(), categorie: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      let artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      const pool = (db as any).getPool();
+      if (pool) {
+        await pool.execute(
+          `INSERT INTO regles_categorisation (artisan_id, motif_libelle, categorie) VALUES (?, ?, ?)`,
+          [artisan.id, input.motifLibelle, input.categorie]
+        );
+      }
+      return { success: true };
+    }),
+
+  deleteRegle: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      const pool = (db as any).getPool();
+      if (pool) {
+        await pool.execute(
+          `UPDATE regles_categorisation SET actif = FALSE WHERE id = ? AND artisan_id = ?`,
+          [input.id, artisan.id]
+        );
+      }
+      return { success: true };
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
+  depenses: depensesRouter,
   search: searchRouter,
   subscription: subscriptionRouter,
   devices: devicesRouter,

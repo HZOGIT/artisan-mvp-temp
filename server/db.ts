@@ -5564,3 +5564,727 @@ export async function verifierEcartsEtEnvoyerAlertes(
   if (lastRows[0]) nouvellesAlertes.push(lastRows[0]);
   return nouvellesAlertes;
 }
+
+// ============================================================================
+// DEPENSES & NOTES DE FRAIS (raw SQL - tables custom hors schema.ts)
+// ============================================================================
+
+export async function getNextDepenseNumero(artisanId: number): Promise<string> {
+  const pool = getPool();
+  if (!pool) return "DEP-00001";
+  const [rows]: any = await pool.execute(
+    "SELECT numero FROM depenses WHERE artisan_id = ? ORDER BY id DESC LIMIT 1",
+    [artisanId]
+  );
+  const last = (rows as any[])[0]?.numero || "";
+  const m = last.match(/-(\d+)$/);
+  const n = m ? parseInt(m[1], 10) + 1 : 1;
+  return `DEP-${String(n).padStart(5, "0")}`;
+}
+
+export async function getNextNoteFraisNumero(artisanId: number): Promise<string> {
+  const pool = getPool();
+  if (!pool) return "NDF-00001";
+  const [rows]: any = await pool.execute(
+    "SELECT numero FROM notes_de_frais WHERE artisan_id = ? ORDER BY id DESC LIMIT 1",
+    [artisanId]
+  );
+  const last = (rows as any[])[0]?.numero || "";
+  const m = last.match(/-(\d+)$/);
+  const n = m ? parseInt(m[1], 10) + 1 : 1;
+  return `NDF-${String(n).padStart(5, "0")}`;
+}
+
+type DepenseFilters = {
+  categorie?: string;
+  statut?: string;
+  dateDebut?: string;
+  dateFin?: string;
+  userId?: number;
+  clientId?: number;
+  search?: string;
+};
+
+export async function getDepensesByArtisan(
+  artisanId: number,
+  filters: DepenseFilters = {}
+): Promise<any[]> {
+  const pool = getPool();
+  if (!pool) return [];
+  const conds: string[] = ["artisan_id = ?"];
+  const params: any[] = [artisanId];
+  if (filters.categorie) { conds.push("categorie = ?"); params.push(filters.categorie); }
+  if (filters.statut) { conds.push("statut = ?"); params.push(filters.statut); }
+  if (filters.dateDebut) { conds.push("date_depense >= ?"); params.push(filters.dateDebut); }
+  if (filters.dateFin) { conds.push("date_depense <= ?"); params.push(filters.dateFin); }
+  if (filters.userId) { conds.push("user_id = ?"); params.push(filters.userId); }
+  if (filters.clientId) { conds.push("client_id = ?"); params.push(filters.clientId); }
+  if (filters.search) {
+    conds.push("(fournisseur LIKE ? OR description LIKE ? OR numero LIKE ?)");
+    const q = `%${filters.search}%`;
+    params.push(q, q, q);
+  }
+  const [rows]: any = await pool.execute(
+    `SELECT * FROM depenses WHERE ${conds.join(" AND ")} ORDER BY date_depense DESC, id DESC LIMIT 500`,
+    params
+  );
+  return rows as any[];
+}
+
+export async function getDepenseById(id: number, artisanId: number): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const [rows]: any = await pool.execute(
+    "SELECT * FROM depenses WHERE id = ? AND artisan_id = ? LIMIT 1",
+    [id, artisanId]
+  );
+  return (rows as any[])[0] || null;
+}
+
+export async function createDepense(data: {
+  artisanId: number;
+  userId: number;
+  numero: string;
+  dateDepense: string;
+  fournisseur?: string | null;
+  categorie: string;
+  sousCategorie?: string | null;
+  description?: string | null;
+  montantHt: number;
+  tauxTva: number;
+  montantTva: number;
+  montantTtc: number;
+  modePaiement?: string;
+  statut?: string;
+  remboursable?: boolean;
+  chantierId?: number | null;
+  interventionId?: number | null;
+  clientId?: number | null;
+  notes?: string | null;
+  justificatifUrl?: string | null;
+  justificatifNom?: string | null;
+  tvaDeductible?: boolean;
+}): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const [r]: any = await pool.execute(
+    `INSERT INTO depenses
+       (artisan_id, user_id, numero, date_depense, fournisseur, categorie,
+        sous_categorie, description, montant_ht, taux_tva, montant_tva,
+        montant_ttc, mode_paiement, statut, remboursable, chantier_id,
+        intervention_id, client_id, notes, justificatif_url,
+        justificatif_nom, tva_deductible)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      data.artisanId, data.userId, data.numero, data.dateDepense,
+      data.fournisseur || null, data.categorie, data.sousCategorie || null,
+      data.description || null, data.montantHt, data.tauxTva, data.montantTva,
+      data.montantTtc, data.modePaiement || "carte", data.statut || "brouillon",
+      data.remboursable ?? true, data.chantierId || null,
+      data.interventionId || null, data.clientId || null, data.notes || null,
+      data.justificatifUrl || null, data.justificatifNom || null,
+      data.tvaDeductible ?? true,
+    ]
+  );
+  if (!r?.insertId) return null;
+  return getDepenseById(r.insertId, data.artisanId);
+}
+
+const DEPENSE_FIELD_MAP: Record<string, string> = {
+  dateDepense: "date_depense", fournisseur: "fournisseur", categorie: "categorie",
+  sousCategorie: "sous_categorie", description: "description",
+  montantHt: "montant_ht", tauxTva: "taux_tva", montantTva: "montant_tva",
+  montantTtc: "montant_ttc", modePaiement: "mode_paiement", statut: "statut",
+  remboursable: "remboursable", rembourse: "rembourse",
+  dateRemboursement: "date_remboursement", chantierId: "chantier_id",
+  interventionId: "intervention_id", clientId: "client_id", notes: "notes",
+  justificatifUrl: "justificatif_url", justificatifNom: "justificatif_nom",
+  ocrBrut: "ocr_brut", ocrTraite: "ocr_traite",
+  recurrente: "recurrente", frequenceRecurrence: "frequence_recurrence",
+  prochaineOccurrence: "prochaine_occurrence", tvaDeductible: "tva_deductible",
+};
+
+export async function updateDepense(
+  id: number,
+  artisanId: number,
+  data: Record<string, any>
+): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const sets: string[] = [];
+  const vals: any[] = [];
+  for (const [key, val] of Object.entries(data)) {
+    const col = DEPENSE_FIELD_MAP[key];
+    if (!col) continue;
+    sets.push(`${col} = ?`);
+    vals.push(val);
+  }
+  if (sets.length > 0) {
+    // Recalcul TVA/TTC si HT ou taux changent.
+    vals.push(id, artisanId);
+    await pool.execute(
+      `UPDATE depenses SET ${sets.join(", ")} WHERE id = ? AND artisan_id = ?`,
+      vals
+    );
+  }
+  // Recalcul TVA/TTC si montant_ht ou taux_tva ont change.
+  if ("montantHt" in data || "tauxTva" in data) {
+    const dep = await getDepenseById(id, artisanId);
+    if (dep) {
+      const ht = Number(dep.montant_ht || 0);
+      const tx = Number(dep.taux_tva || 0);
+      const tva = +(ht * tx / 100).toFixed(2);
+      const ttc = +(ht + tva).toFixed(2);
+      await pool.execute(
+        `UPDATE depenses SET montant_tva = ?, montant_ttc = ? WHERE id = ? AND artisan_id = ?`,
+        [tva, ttc, id, artisanId]
+      );
+    }
+  }
+  return getDepenseById(id, artisanId);
+}
+
+export async function deleteDepense(id: number, artisanId: number): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(`DELETE FROM notes_frais_depenses WHERE depense_id = ?`, [id]);
+  await pool.execute(`DELETE FROM depenses WHERE id = ? AND artisan_id = ?`, [id, artisanId]);
+}
+
+export async function markDepenseOcrTraite(id: number, ocrData: any): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(
+    `UPDATE depenses SET ocr_brut = ?, ocr_traite = TRUE WHERE id = ?`,
+    [JSON.stringify(ocrData || {}).slice(0, 5000), id]
+  );
+}
+
+export async function getDepensesStats(
+  artisanId: number,
+  mois?: string
+): Promise<any> {
+  const pool = getPool();
+  if (!pool) return null;
+  const m = mois || new Date().toISOString().slice(0, 7);
+  const debutMois = `${m}-01`;
+  const [y, mo] = m.split("-").map(Number);
+  const finMois = new Date(y, mo, 0).toISOString().slice(0, 10);
+  const moisPrec = new Date(y, mo - 2, 1).toISOString().slice(0, 7);
+  const debutPrec = `${moisPrec}-01`;
+  const finPrec = new Date(y, mo - 1, 0).toISOString().slice(0, 10);
+  const anneeDebut = `${y}-01-01`;
+  const anneeFin = `${y}-12-31`;
+
+  const [totMois]: any = await pool.execute(
+    `SELECT COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb,
+            COALESCE(SUM(CASE WHEN remboursable = TRUE AND rembourse = FALSE THEN montant_ttc ELSE 0 END), 0) AS aRembourser,
+            COALESCE(SUM(CASE WHEN tva_deductible = TRUE THEN montant_tva ELSE 0 END), 0) AS tvaRecup
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
+    [artisanId, debutMois, finMois]
+  );
+  const [totPrec]: any = await pool.execute(
+    `SELECT COALESCE(SUM(montant_ttc), 0) AS total
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
+    [artisanId, debutPrec, finPrec]
+  );
+  const [totAnnee]: any = await pool.execute(
+    `SELECT COALESCE(SUM(montant_ttc), 0) AS total
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
+    [artisanId, anneeDebut, anneeFin]
+  );
+  const [parCategorie]: any = await pool.execute(
+    `SELECT categorie, COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
+      GROUP BY categorie
+      ORDER BY total DESC`,
+    [artisanId, debutMois, finMois]
+  );
+  const [topDepenses]: any = await pool.execute(
+    `SELECT id, numero, fournisseur, categorie, montant_ttc, date_depense
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
+      ORDER BY montant_ttc DESC
+      LIMIT 5`,
+    [artisanId, debutMois, finMois]
+  );
+  const [topFournisseurs]: any = await pool.execute(
+    `SELECT fournisseur, COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ? AND fournisseur IS NOT NULL AND fournisseur <> ''
+      GROUP BY fournisseur
+      ORDER BY total DESC
+      LIMIT 3`,
+    [artisanId, debutMois, finMois]
+  );
+  const [parMois]: any = await pool.execute(
+    `SELECT DATE_FORMAT(date_depense, '%Y-%m') AS mois,
+            COALESCE(SUM(montant_ttc), 0) AS total
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense >= DATE_SUB(?, INTERVAL 5 MONTH)
+      GROUP BY DATE_FORMAT(date_depense, '%Y-%m')
+      ORDER BY mois ASC`,
+    [artisanId, debutMois]
+  );
+
+  const totalM = Number(totMois[0]?.total || 0);
+  const totalP = Number(totPrec[0]?.total || 0);
+  const variation = totalP > 0 ? ((totalM - totalP) / totalP) * 100 : null;
+
+  return {
+    mois: m,
+    totalMois: totalM,
+    nbDepensesMois: Number(totMois[0]?.nb || 0),
+    aRembourser: Number(totMois[0]?.aRembourser || 0),
+    tvaRecuperable: Number(totMois[0]?.tvaRecup || 0),
+    totalMoisPrecedent: totalP,
+    variation,
+    totalAnnee: Number(totAnnee[0]?.total || 0),
+    parCategorie: parCategorie as any[],
+    topDepenses: topDepenses as any[],
+    topFournisseurs: topFournisseurs as any[],
+    parMois: parMois as any[],
+  };
+}
+
+// === Catégories ===
+
+export async function getCategoriesDepenses(artisanId: number): Promise<any[]> {
+  const pool = getPool();
+  if (!pool) return [];
+  const [rows]: any = await pool.execute(
+    `SELECT * FROM categories_depenses WHERE artisan_id = ? AND actif = TRUE ORDER BY ordre ASC, id ASC`,
+    [artisanId]
+  );
+  return rows as any[];
+}
+
+export async function createCategorieDepense(data: {
+  artisanId: number;
+  nom: string;
+  couleur?: string;
+  icone?: string;
+  compteComptable?: string;
+  plafondMensuel?: number;
+}): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const [r]: any = await pool.execute(
+    `INSERT IGNORE INTO categories_depenses
+       (artisan_id, nom, couleur, icone, compte_comptable, plafond_mensuel)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.artisanId, data.nom, data.couleur || "#6366f1", data.icone || "Receipt",
+     data.compteComptable || null, data.plafondMensuel || null]
+  );
+  const [rows]: any = await pool.execute(
+    `SELECT * FROM categories_depenses WHERE artisan_id = ? AND nom = ? LIMIT 1`,
+    [data.artisanId, data.nom]
+  );
+  return (rows as any[])[0] || null;
+}
+
+export async function updateCategorieDepense(
+  id: number,
+  artisanId: number,
+  data: { nom?: string; couleur?: string; icone?: string; compteComptable?: string; plafondMensuel?: number; actif?: boolean }
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  const sets: string[] = [];
+  const vals: any[] = [];
+  if (data.nom !== undefined) { sets.push("nom = ?"); vals.push(data.nom); }
+  if (data.couleur !== undefined) { sets.push("couleur = ?"); vals.push(data.couleur); }
+  if (data.icone !== undefined) { sets.push("icone = ?"); vals.push(data.icone); }
+  if (data.compteComptable !== undefined) { sets.push("compte_comptable = ?"); vals.push(data.compteComptable); }
+  if (data.plafondMensuel !== undefined) { sets.push("plafond_mensuel = ?"); vals.push(data.plafondMensuel); }
+  if (data.actif !== undefined) { sets.push("actif = ?"); vals.push(data.actif); }
+  if (sets.length === 0) return;
+  vals.push(id, artisanId);
+  await pool.execute(
+    `UPDATE categories_depenses SET ${sets.join(", ")} WHERE id = ? AND artisan_id = ?`,
+    vals
+  );
+}
+
+export async function deleteCategorieDepense(id: number, artisanId: number): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  // Soft-delete : marque actif=FALSE pour preserver l'historique des depenses.
+  await pool.execute(
+    `UPDATE categories_depenses SET actif = FALSE WHERE id = ? AND artisan_id = ?`,
+    [id, artisanId]
+  );
+}
+
+// === Notes de frais ===
+
+export async function getNotesFrais(artisanId: number, userId?: number): Promise<any[]> {
+  const pool = getPool();
+  if (!pool) return [];
+  const conds = ["artisan_id = ?"];
+  const params: any[] = [artisanId];
+  if (userId) { conds.push("user_id = ?"); params.push(userId); }
+  const [rows]: any = await pool.execute(
+    `SELECT n.*,
+            (SELECT COUNT(*) FROM notes_frais_depenses WHERE note_id = n.id) AS nb_depenses
+       FROM notes_de_frais n
+      WHERE ${conds.join(" AND ")}
+      ORDER BY n.created_at DESC`,
+    params
+  );
+  return rows as any[];
+}
+
+export async function getNoteFraisById(id: number, artisanId: number): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const [rows]: any = await pool.execute(
+    `SELECT * FROM notes_de_frais WHERE id = ? AND artisan_id = ? LIMIT 1`,
+    [id, artisanId]
+  );
+  const note = (rows as any[])[0];
+  if (!note) return null;
+  const [deps]: any = await pool.execute(
+    `SELECT d.* FROM depenses d
+        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
+      WHERE nfd.note_id = ?
+      ORDER BY d.date_depense DESC`,
+    [id]
+  );
+  return { ...note, depenses: deps };
+}
+
+export async function createNoteFrais(data: {
+  artisanId: number;
+  userId: number;
+  numero: string;
+  titre: string;
+  periodeDebut: string;
+  periodeFin: string;
+}): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  const [r]: any = await pool.execute(
+    `INSERT INTO notes_de_frais
+       (artisan_id, user_id, numero, titre, periode_debut, periode_fin)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [data.artisanId, data.userId, data.numero, data.titre, data.periodeDebut, data.periodeFin]
+  );
+  if (!r?.insertId) return null;
+  return getNoteFraisById(r.insertId, data.artisanId);
+}
+
+export async function addDepenseToNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  // Verifier que la depense appartient bien a l'artisan.
+  const [own]: any = await pool.execute(
+    `SELECT id FROM depenses WHERE id = ? AND artisan_id = ?`,
+    [depenseId, artisanId]
+  );
+  if ((own as any[]).length === 0) return;
+  await pool.execute(
+    `INSERT IGNORE INTO notes_frais_depenses (note_id, depense_id) VALUES (?, ?)`,
+    [noteId, depenseId]
+  );
+}
+
+export async function removeDepenseFromNoteFrais(noteId: number, depenseId: number): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(
+    `DELETE FROM notes_frais_depenses WHERE note_id = ? AND depense_id = ?`,
+    [noteId, depenseId]
+  );
+}
+
+export async function calculerTotalNoteFrais(noteId: number, artisanId: number): Promise<number> {
+  const pool = getPool();
+  if (!pool) return 0;
+  const [rows]: any = await pool.execute(
+    `SELECT COALESCE(SUM(d.montant_ttc), 0) AS total
+       FROM depenses d
+       INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
+      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
+    [noteId, artisanId]
+  );
+  const total = Number((rows as any[])[0]?.total || 0);
+  await pool.execute(
+    `UPDATE notes_de_frais SET montant_total = ? WHERE id = ? AND artisan_id = ?`,
+    [total, noteId, artisanId]
+  );
+  return total;
+}
+
+export async function soumettreNoteFrais(id: number, artisanId: number): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  await calculerTotalNoteFrais(id, artisanId);
+  await pool.execute(
+    `UPDATE notes_de_frais SET statut = 'soumise', date_soumission = CURDATE() WHERE id = ? AND artisan_id = ?`,
+    [id, artisanId]
+  );
+  // Marquer toutes les depenses associees en 'soumise'.
+  await pool.execute(
+    `UPDATE depenses d
+        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
+        SET d.statut = 'soumise'
+      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
+    [id, artisanId]
+  );
+  return getNoteFraisById(id, artisanId);
+}
+
+export async function approuverNoteFrais(id: number, artisanId: number, commentaire?: string): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  await pool.execute(
+    `UPDATE notes_de_frais SET statut = 'approuvee', date_approbation = CURDATE(), commentaire_approbateur = ?
+      WHERE id = ? AND artisan_id = ?`,
+    [commentaire || null, id, artisanId]
+  );
+  await pool.execute(
+    `UPDATE depenses d
+        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
+        SET d.statut = 'approuvee'
+      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
+    [id, artisanId]
+  );
+  return getNoteFraisById(id, artisanId);
+}
+
+export async function rejeterNoteFrais(id: number, artisanId: number, commentaire: string): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  await pool.execute(
+    `UPDATE notes_de_frais SET statut = 'rejetee', commentaire_approbateur = ?
+      WHERE id = ? AND artisan_id = ?`,
+    [commentaire, id, artisanId]
+  );
+  await pool.execute(
+    `UPDATE depenses d
+        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
+        SET d.statut = 'rejetee'
+      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
+    [id, artisanId]
+  );
+  return getNoteFraisById(id, artisanId);
+}
+
+export async function payerNoteFrais(id: number, artisanId: number): Promise<any | null> {
+  const pool = getPool();
+  if (!pool) return null;
+  await pool.execute(
+    `UPDATE notes_de_frais SET statut = 'payee', date_paiement = CURDATE() WHERE id = ? AND artisan_id = ?`,
+    [id, artisanId]
+  );
+  await pool.execute(
+    `UPDATE depenses d
+        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
+        SET d.statut = 'remboursee', d.rembourse = TRUE, d.date_remboursement = CURDATE()
+      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
+    [id, artisanId]
+  );
+  return getNoteFraisById(id, artisanId);
+}
+
+// === Budgets ===
+
+export async function calculerBudgetsRealises(artisanId: number, mois: string): Promise<any[]> {
+  const pool = getPool();
+  if (!pool) return [];
+  // Realise du mois par categorie.
+  const debutMois = `${mois}-01`;
+  const [y, m] = mois.split("-").map(Number);
+  const finMois = new Date(y, m, 0).toISOString().slice(0, 10);
+  const [realises]: any = await pool.execute(
+    `SELECT categorie, COALESCE(SUM(montant_ttc), 0) AS reel
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
+      GROUP BY categorie`,
+    [artisanId, debutMois, finMois]
+  );
+  const reelMap = new Map<string, number>();
+  for (const r of realises as any[]) reelMap.set(r.categorie, Number(r.reel));
+
+  const [budgets]: any = await pool.execute(
+    `SELECT categorie, budget FROM budgets_categories
+      WHERE artisan_id = ? AND mois = ?`,
+    [artisanId, mois]
+  );
+  const budgetMap = new Map<string, number>();
+  for (const b of budgets as any[]) budgetMap.set(b.categorie, Number(b.budget));
+
+  const cats = await getCategoriesDepenses(artisanId);
+  return cats.map((c: any) => {
+    const reel = reelMap.get(c.nom) || 0;
+    const budget = budgetMap.get(c.nom) || 0;
+    const pct = budget > 0 ? Math.round((reel / budget) * 100) : 0;
+    return {
+      categorie: c.nom, couleur: c.couleur, icone: c.icone,
+      budget, reel, ecart: budget - reel, pct,
+    };
+  });
+}
+
+export async function upsertBudget(
+  artisanId: number,
+  categorie: string,
+  mois: string,
+  budget: number
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(
+    `INSERT INTO budgets_categories (artisan_id, categorie, mois, budget)
+     VALUES (?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE budget = VALUES(budget)`,
+    [artisanId, categorie, mois, budget]
+  );
+}
+
+// === Relevés bancaires ===
+
+export async function importReleve(
+  artisanId: number,
+  nomFichier: string,
+  transactions: Array<{ dateTransaction: string; libelle: string; montant: number; typeTransaction: string }>
+): Promise<{ releveId: number; nbImportees: number }> {
+  const pool = getPool();
+  if (!pool) return { releveId: 0, nbImportees: 0 };
+  const [rRel]: any = await pool.execute(
+    `INSERT INTO releves_bancaires (artisan_id, nom_fichier, nb_transactions, statut)
+     VALUES (?, ?, ?, 'en_cours')`,
+    [artisanId, nomFichier, transactions.length]
+  );
+  const releveId = rRel?.insertId || 0;
+  let nbImportees = 0;
+  for (const t of transactions) {
+    // Detection categorie suggeree via regles_categorisation.
+    let categorieSuggeree: string | null = null;
+    try {
+      const [regles]: any = await pool.execute(
+        `SELECT motif_libelle, categorie FROM regles_categorisation
+          WHERE artisan_id = ? AND actif = TRUE`,
+        [artisanId]
+      );
+      const lib = String(t.libelle || "").toUpperCase();
+      for (const r of regles as any[]) {
+        if (lib.includes(String(r.motif_libelle).toUpperCase())) {
+          categorieSuggeree = r.categorie;
+          break;
+        }
+      }
+    } catch {
+      /* ok */
+    }
+    try {
+      await pool.execute(
+        `INSERT INTO transactions_bancaires
+           (artisan_id, releve_id, date_transaction, libelle, montant,
+            type_transaction, categorie_suggeree)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          artisanId, releveId, t.dateTransaction, t.libelle,
+          Math.abs(t.montant), t.typeTransaction, categorieSuggeree,
+        ]
+      );
+      nbImportees++;
+    } catch {
+      /* ok ligne suivante */
+    }
+  }
+  await pool.execute(
+    `UPDATE releves_bancaires SET nb_importees = ?, statut = 'termine' WHERE id = ?`,
+    [nbImportees, releveId]
+  );
+  return { releveId, nbImportees };
+}
+
+export async function getTransactionsBancaires(artisanId: number, releveId?: number): Promise<any[]> {
+  const pool = getPool();
+  if (!pool) return [];
+  const conds = ["artisan_id = ?", "ignoree = FALSE"];
+  const params: any[] = [artisanId];
+  if (releveId) { conds.push("releve_id = ?"); params.push(releveId); }
+  const [rows]: any = await pool.execute(
+    `SELECT * FROM transactions_bancaires WHERE ${conds.join(" AND ")}
+      ORDER BY date_transaction DESC, id DESC LIMIT 500`,
+    params
+  );
+  return rows as any[];
+}
+
+export async function lierTransactionDepense(
+  transactionId: number,
+  depenseId: number,
+  artisanId: number
+): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(
+    `UPDATE transactions_bancaires SET depense_id = ?
+      WHERE id = ? AND artisan_id = ?`,
+    [depenseId, transactionId, artisanId]
+  );
+}
+
+export async function ignorerTransaction(id: number, artisanId: number): Promise<void> {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.execute(
+    `UPDATE transactions_bancaires SET ignoree = TRUE
+      WHERE id = ? AND artisan_id = ?`,
+    [id, artisanId]
+  );
+}
+
+// === Export FEC achats ===
+
+export async function exportDepensesFEC(
+  artisanId: number,
+  dateDebut: string,
+  dateFin: string
+): Promise<string> {
+  const pool = getPool();
+  if (!pool) return "";
+  const config = await getConfigurationComptable(artisanId);
+  const compteAchats = config?.compteAchats || "607000";
+  const compteTVA = config?.compteTVADeductible || "445660";
+  const compteFournisseurs = config?.compteFournisseurs || "401000";
+  const journal = config?.journalAchats || "AC";
+
+  const [rows]: any = await pool.execute(
+    `SELECT id, numero, date_depense, fournisseur, montant_ht, montant_tva,
+            montant_ttc, description
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
+        AND tva_deductible = TRUE
+      ORDER BY date_depense ASC, id ASC`,
+    [artisanId, dateDebut, dateFin]
+  );
+
+  const header = [
+    "JournalCode", "JournalLib", "EcritureNum", "EcritureDate", "CompteNum",
+    "CompteLib", "CompAuxNum", "CompAuxLib", "PieceRef", "PieceDate",
+    "EcritureLib", "Debit", "Credit", "EcritureLet", "DateLet",
+    "ValidDate", "Montantdevise", "Idevise",
+  ].join("\t");
+  const lines = [header];
+  let num = 1;
+  const fec = (val: any) => Number(val || 0).toFixed(2).replace(".", ",");
+
+  for (const d of rows as any[]) {
+    const dateF = new Date(d.date_depense).toISOString().slice(0, 10).replace(/-/g, "");
+    const lib = `Achat ${d.numero} ${d.fournisseur || ""}`.trim();
+    lines.push([journal, "Achats", num, dateF, compteAchats, "Achats", "", "", d.numero, dateF, lib, fec(d.montant_ht), "0,00", "", "", "", "", ""].join("\t"));
+    lines.push([journal, "Achats", num, dateF, compteTVA, "TVA deductible", "", "", d.numero, dateF, lib, fec(d.montant_tva), "0,00", "", "", "", "", ""].join("\t"));
+    lines.push([journal, "Achats", num, dateF, compteFournisseurs, "Fournisseurs", "", "", d.numero, dateF, lib, "0,00", fec(d.montant_ttc), "", "", "", "", ""].join("\t"));
+    num++;
+  }
+  return lines.join("\n");
+}
