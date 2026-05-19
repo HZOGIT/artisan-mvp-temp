@@ -4,15 +4,24 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Receipt, Plus, Search, Filter, Upload, Download, TrendingUp, TrendingDown,
-  FileText, Trash2, Eye, AlertCircle, Paperclip,
+  FileText, Trash2, Eye, AlertCircle, Paperclip, Car,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+
+const TARIF_KM_DEFAULT = 0.529; // Bareme fiscal voiture <= 5 CV, <= 5000 km/an
+
+function eur2(n: number) {
+  return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
 
 function eur(n: number | string | null | undefined) {
   const v = typeof n === "string" ? parseFloat(n) : Number(n || 0);
@@ -37,6 +46,7 @@ export default function Depenses() {
   const [categorie, setCategorie] = useState<string>("toutes");
   const [statut, setStatut] = useState<string>("tous");
   const [search, setSearch] = useState("");
+  const [isKmOpen, setIsKmOpen] = useState(false);
 
   const filters = useMemo(() => {
     const [y, m] = mois.split("-").map(Number);
@@ -103,6 +113,13 @@ export default function Depenses() {
               onChange={(e) => setMois(e.target.value)}
               className="w-[160px]"
             />
+            <Button
+              variant="outline"
+              onClick={() => setIsKmOpen(true)}
+              className="min-h-[44px] sm:min-h-0"
+            >
+              <Car className="h-4 w-4 mr-2" /> Ajouter des km
+            </Button>
             <Button asChild className="min-h-[44px] sm:min-h-0">
               <Link to="/depenses/nouvelle">
                 <Plus className="h-4 w-4 mr-2" /> Ajouter
@@ -352,6 +369,195 @@ export default function Depenses() {
       >
         <Plus className="h-6 w-6" />
       </Link>
+
+      <IndemniteKmDialog
+        open={isKmOpen}
+        onOpenChange={setIsKmOpen}
+        onSuccess={() => {
+          refetch();
+          setIsKmOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+// ============================================================================
+// Dialog Indemnités kilométriques — barème fiscal 0.529 €/km par défaut.
+// Appelle trpc.depenses.creerIndemniteKm qui cree une depense
+// 'Indemnites kilometriques' (categorie Deplacement, sans TVA).
+// ============================================================================
+function IndemniteKmDialog({
+  open, onOpenChange, onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [form, setForm] = useState({
+    dateDepense: new Date().toISOString().slice(0, 10),
+    depart: "",
+    arrivee: "",
+    kilometres: "",
+    tarifKm: String(TARIF_KM_DEFAULT),
+    motif: "",
+    clientId: undefined as number | undefined,
+  });
+
+  const { data: clients } = trpc.clients.list.useQuery();
+
+  const km = parseFloat(form.kilometres || "0");
+  const tarif = parseFloat(form.tarifKm || String(TARIF_KM_DEFAULT));
+  const montant = +(km * tarif).toFixed(2);
+
+  const creerMut = trpc.depenses.creerIndemniteKm.useMutation({
+    onSuccess: () => {
+      toast.success(`Indemnité kilométrique de ${eur2(montant)} créée`);
+      setForm({
+        dateDepense: new Date().toISOString().slice(0, 10),
+        depart: "", arrivee: "", kilometres: "",
+        tarifKm: String(TARIF_KM_DEFAULT), motif: "", clientId: undefined,
+      });
+      onSuccess();
+    },
+    onError: (e) => toast.error(e.message || "Erreur"),
+  });
+
+  const trajetMotif = useMemo(() => {
+    const parts: string[] = [];
+    if (form.depart || form.arrivee) parts.push(`${form.depart || "?"} → ${form.arrivee || "?"}`);
+    if (form.motif) parts.push(form.motif);
+    return parts.join(" — ") || "Trajet professionnel";
+  }, [form.depart, form.arrivee, form.motif]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Car className="h-5 w-5 text-blue-600" /> Indemnités kilométriques
+          </DialogTitle>
+          <DialogDescription>
+            Calcul automatique au barème fiscal {TARIF_KM_DEFAULT.toFixed(3).replace(".", ",")} €/km.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <Label>Date</Label>
+            <Input
+              type="date"
+              value={form.dateDepense}
+              onChange={(e) => setForm({ ...form, dateDepense: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label>Départ</Label>
+              <Input
+                value={form.depart}
+                onChange={(e) => setForm({ ...form, depart: e.target.value })}
+                placeholder="Lyon"
+              />
+            </div>
+            <div>
+              <Label>Arrivée</Label>
+              <Input
+                value={form.arrivee}
+                onChange={(e) => setForm({ ...form, arrivee: e.target.value })}
+                placeholder="Villeurbanne"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label>Kilomètres *</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.kilometres}
+                onChange={(e) => setForm({ ...form, kilometres: e.target.value })}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <Label>Tarif €/km</Label>
+              <Input
+                type="number"
+                step="0.001"
+                value={form.tarifKm}
+                onChange={(e) => setForm({ ...form, tarifKm: e.target.value })}
+              />
+            </div>
+          </div>
+          <div>
+            <Label>Motif (optionnel)</Label>
+            <Textarea
+              value={form.motif}
+              onChange={(e) => setForm({ ...form, motif: e.target.value })}
+              rows={2}
+              placeholder="Intervention chez M. Dupont"
+            />
+          </div>
+          <div>
+            <Label>Client (optionnel)</Label>
+            <Select
+              value={form.clientId ? String(form.clientId) : "none"}
+              onValueChange={(v) =>
+                setForm({ ...form, clientId: v === "none" ? undefined : parseInt(v, 10) })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Aucun" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Aucun</SelectItem>
+                {(clients || []).map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.prenom ? `${c.prenom} ` : ""}{c.nom}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200">
+            <div className="text-sm">
+              {km > 0 ? (
+                <>
+                  <span className="font-medium">{km} km</span>
+                  {" × "}
+                  <span className="font-medium">{tarif.toFixed(3).replace(".", ",")} €/km</span>
+                </>
+              ) : (
+                <span className="text-muted-foreground">Saisis les kilomètres</span>
+              )}
+            </div>
+            <div className="text-xl font-bold text-blue-700">{eur2(montant)}</div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
+          <Button
+            onClick={() => {
+              if (!km || km <= 0) {
+                toast.error("Saisis un nombre de kilomètres");
+                return;
+              }
+              creerMut.mutate({
+                dateDepense: form.dateDepense,
+                kilometres: km,
+                tarifKm: tarif,
+                motif: trajetMotif,
+                clientId: form.clientId,
+              });
+            }}
+            disabled={creerMut.isPending || !km}
+          >
+            Créer la dépense
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
