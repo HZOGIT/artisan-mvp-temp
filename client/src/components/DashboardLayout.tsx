@@ -497,6 +497,17 @@ const RAIL_COLORS: Record<NavGroup["color"], { iconActive: string; bgActive: str
     ring: "ring-slate-500/30",
     hover: "hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800",
   },
+  // Couleur 'purple' utilisee par le groupe Finance & Depenses (T9).
+  // L'absence de cet objet faisait planter l'app entiere : RAIL_COLORS['purple']
+  // etait undefined, l'acces a styles.iconActive throw TypeError, et
+  // l'ErrorBoundary affichait 'Oups ! Une erreur est survenue' sur TOUTES
+  // les pages auth (DashboardLayout enrobe tout).
+  purple: {
+    iconActive: "text-purple-500",
+    bgActive: "bg-purple-100 dark:bg-purple-900/30",
+    ring: "ring-purple-500/30",
+    hover: "hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20",
+  },
 };
 
 // ============================================================================
