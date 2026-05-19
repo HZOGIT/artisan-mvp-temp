@@ -940,6 +940,215 @@ async function fixDuplicates() {
         console.log("[Schema] interventions_mobile.signatureClient ALTER :", e?.message);
       }
 
+      // ========================================================================
+      // Module DEPENSES & Notes de frais (T1 mission Expensya-like)
+      // 7 tables custom + seed categories par defaut + 2 modules dans le
+      // catalogue. Tout dans un try local qui catch en silence pour ne
+      // jamais bloquer le boot.
+      // ========================================================================
+      try {
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS depenses (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL,
+          user_id INT NOT NULL,
+          numero VARCHAR(20) NOT NULL,
+          date_depense DATE NOT NULL,
+          fournisseur VARCHAR(255),
+          categorie VARCHAR(50) NOT NULL,
+          sous_categorie VARCHAR(100),
+          description TEXT,
+          montant_ht DECIMAL(10,2) NOT NULL DEFAULT 0,
+          taux_tva DECIMAL(5,2) DEFAULT 20,
+          montant_tva DECIMAL(10,2) DEFAULT 0,
+          montant_ttc DECIMAL(10,2) NOT NULL DEFAULT 0,
+          mode_paiement ENUM('carte','especes','virement','cheque','prelevement') DEFAULT 'carte',
+          statut ENUM('brouillon','soumise','approuvee','rejetee','remboursee') DEFAULT 'brouillon',
+          remboursable BOOLEAN DEFAULT TRUE,
+          rembourse BOOLEAN DEFAULT FALSE,
+          date_remboursement DATE,
+          chantier_id INT,
+          intervention_id INT,
+          client_id INT,
+          notes TEXT,
+          justificatif_url MEDIUMTEXT,
+          justificatif_nom VARCHAR(255),
+          ocr_brut TEXT,
+          ocr_traite BOOLEAN DEFAULT FALSE,
+          recurrente BOOLEAN DEFAULT FALSE,
+          frequence_recurrence ENUM('mensuelle','trimestrielle','annuelle'),
+          prochaine_occurrence DATE,
+          tva_deductible BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_depenses_artisan (artisan_id),
+          INDEX idx_depenses_date (date_depense),
+          INDEX idx_depenses_statut (statut)
+        )
+      `);
+      console.log('[Depenses] Table depenses OK');
+
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS categories_depenses (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL,
+          nom VARCHAR(100) NOT NULL,
+          couleur VARCHAR(20) DEFAULT '#6366f1',
+          icone VARCHAR(50) DEFAULT 'Receipt',
+          compte_comptable VARCHAR(10),
+          deductible_tva BOOLEAN DEFAULT TRUE,
+          deductible_ir BOOLEAN DEFAULT TRUE,
+          plafond_mensuel DECIMAL(10,2),
+          actif BOOLEAN DEFAULT TRUE,
+          ordre INT DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_cat_artisan_nom (artisan_id, nom),
+          INDEX idx_cat_depenses_artisan (artisan_id)
+        )
+      `);
+      console.log('[Depenses] Table categories_depenses OK');
+
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS notes_de_frais (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL,
+          user_id INT NOT NULL,
+          numero VARCHAR(20) NOT NULL,
+          titre VARCHAR(255) NOT NULL,
+          periode_debut DATE NOT NULL,
+          periode_fin DATE NOT NULL,
+          statut ENUM('brouillon','soumise','approuvee','rejetee','payee') DEFAULT 'brouillon',
+          montant_total DECIMAL(10,2) DEFAULT 0,
+          montant_rembourse DECIMAL(10,2) DEFAULT 0,
+          date_soumission DATE,
+          date_approbation DATE,
+          date_paiement DATE,
+          commentaire_approbateur TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_ndf_artisan (artisan_id),
+          INDEX idx_ndf_user (user_id),
+          INDEX idx_ndf_statut (statut)
+        )
+      `);
+      console.log('[Depenses] Table notes_de_frais OK');
+
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS notes_frais_depenses (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          note_id INT NOT NULL,
+          depense_id INT NOT NULL,
+          UNIQUE KEY uq_note_depense (note_id, depense_id),
+          INDEX idx_nfd_note (note_id),
+          INDEX idx_nfd_depense (depense_id)
+        )
+      `);
+      console.log('[Depenses] Table notes_frais_depenses OK');
+
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS budgets_categories (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL,
+          categorie VARCHAR(50) NOT NULL,
+          mois VARCHAR(7) NOT NULL,
+          budget DECIMAL(10,2) DEFAULT 0,
+          depense_reelle DECIMAL(10,2) DEFAULT 0,
+          UNIQUE KEY uq_budget_mois (artisan_id, categorie, mois)
+        )
+      `);
+      console.log('[Depenses] Table budgets_categories OK');
+
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS releves_bancaires (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL,
+          nom_fichier VARCHAR(255) NOT NULL,
+          date_import TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          nb_transactions INT DEFAULT 0,
+          nb_importees INT DEFAULT 0,
+          statut ENUM('en_cours','termine','erreur') DEFAULT 'en_cours'
+        )
+      `);
+      console.log('[Depenses] Table releves_bancaires OK');
+
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS transactions_bancaires (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL,
+          releve_id INT,
+          date_transaction DATE NOT NULL,
+          libelle TEXT NOT NULL,
+          montant DECIMAL(10,2) NOT NULL,
+          type_transaction ENUM('debit','credit') NOT NULL,
+          categorie_suggeree VARCHAR(50),
+          depense_id INT,
+          ignoree BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_trx_artisan (artisan_id),
+          INDEX idx_trx_releve (releve_id)
+        )
+      `);
+      console.log('[Depenses] Table transactions_bancaires OK');
+
+      // Regles de categorisation auto (T10C)
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS regles_categorisation (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          artisan_id INT NOT NULL,
+          motif_libelle VARCHAR(255) NOT NULL,
+          categorie VARCHAR(50) NOT NULL,
+          actif BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_regles_artisan (artisan_id)
+        )
+      `);
+      console.log('[Depenses] Table regles_categorisation OK');
+
+      // Seed catégories par defaut pour l'artisan demo id=1.
+      // INSERT IGNORE evite les doublons en cas de redeploiement.
+      const categoriesDefaut: Array<[number, string, string, string, string, number]> = [
+        [1, 'Matériaux & Fournitures', '#ef4444', 'Package', '601000', 1],
+        [1, 'Carburant', '#f97316', 'Fuel', '606100', 2],
+        [1, 'Outillage & Équipement', '#eab308', 'Wrench', '615000', 3],
+        [1, 'Repas & Restauration', '#22c55e', 'UtensilsCrossed', '625100', 4],
+        [1, 'Déplacement & Transport', '#3b82f6', 'Car', '625000', 5],
+        [1, 'Téléphone & Internet', '#8b5cf6', 'Smartphone', '626000', 6],
+        [1, 'Sous-traitance', '#ec4899', 'Users', '604000', 7],
+        [1, 'Assurances', '#14b8a6', 'Shield', '616000', 8],
+        [1, 'Loyer & Charges', '#f59e0b', 'Building', '613000', 9],
+        [1, 'Formation & Documentation', '#6366f1', 'BookOpen', '623000', 10],
+        [1, 'Frais bancaires', '#64748b', 'CreditCard', '627000', 11],
+        [1, 'Autres frais', '#94a3b8', 'MoreHorizontal', '628000', 12],
+      ];
+      for (const c of categoriesDefaut) {
+        await pool.execute(
+          `INSERT IGNORE INTO categories_depenses
+             (artisan_id, nom, couleur, icone, compte_comptable, ordre)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          c
+        );
+      }
+      console.log(`[Depenses] Seed ${categoriesDefaut.length} categories defaut artisan 1`);
+
+      // 2 nouveaux modules dans le catalogue (depenses + budgets).
+      // INSERT IGNORE idempotent + auto-activation pour l'artisan 1.
+      await pool.execute(
+        `INSERT IGNORE INTO modules (slug, label, description, icon, categorie, plan_minimum, actif_par_defaut, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['depenses', 'Dépenses & Notes de frais', 'Gérez vos dépenses, notes de frais et budgets', 'Receipt', 'gestion', 'essentiel', 1, 19]
+      );
+      await pool.execute(
+        `INSERT IGNORE INTO modules (slug, label, description, icon, categorie, plan_minimum, actif_par_defaut, ordre) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['budgets', 'Budgets', 'Contrôlez vos dépenses par catégorie', 'PiggyBank', 'gestion', 'pro', 0, 20]
+      );
+      await pool.execute(
+        `INSERT INTO artisan_modules (artisan_id, module_slug, actif)
+         VALUES (1, 'depenses', TRUE), (1, 'budgets', TRUE)
+         ON DUPLICATE KEY UPDATE actif = TRUE`
+      );
+      console.log('[Depenses] Modules depenses + budgets actives pour artisan 1');
+      } catch (e: any) {
+        console.log('[Depenses] Migration non-bloquante :', e?.message || e);
+      }
+
       const [pRows] = await pool.execute("SELECT plan FROM artisans WHERE id = 1") as any;
       const [cRows] = await pool.execute(
         "SELECT COUNT(*) AS cnt FROM artisan_modules WHERE artisan_id = 1 AND actif = TRUE"
