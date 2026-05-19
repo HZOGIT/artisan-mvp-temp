@@ -912,6 +912,34 @@ async function fixDuplicates() {
         console.log("[Demo] reset notifications :", e?.message);
       }
 
+      // Elargissement colonnes TEXT susceptibles de recevoir des data
+      // URLs base64 (photos JPG iPhone -> facile 2 a 3 MB). TEXT MySQL
+      // est plafonne a 65 535 octets, ce qui generait des erreurs
+      // 'Data too long for column' lors de l'upload, et MySQL renvoyait
+      // un message 'Failed query: insert into photos_analyse ... [image]'
+      // (la valeur etait tronquee dans le log driver, d'ou la confusion
+      // qui faisait penser que '[image]' etait litteralement inserte).
+      //
+      // Fix : MEDIUMTEXT (~16 MB) ce qui couvre largement le cas iPhone
+      // WhatsApp. ALTER idempotent : MySQL accepte de re-modifier une
+      // colonne deja en MEDIUMTEXT (no-op).
+      try {
+        await pool.execute(
+          "ALTER TABLE photos_analyse MODIFY COLUMN url MEDIUMTEXT NOT NULL"
+        );
+        console.log("[Schema] photos_analyse.url -> MEDIUMTEXT");
+      } catch (e: any) {
+        console.log("[Schema] photos_analyse.url ALTER :", e?.message);
+      }
+      try {
+        await pool.execute(
+          "ALTER TABLE interventions_mobile MODIFY COLUMN signatureClient MEDIUMTEXT NULL"
+        );
+        console.log("[Schema] interventions_mobile.signatureClient -> MEDIUMTEXT");
+      } catch (e: any) {
+        console.log("[Schema] interventions_mobile.signatureClient ALTER :", e?.message);
+      }
+
       const [pRows] = await pool.execute("SELECT plan FROM artisans WHERE id = 1") as any;
       const [cRows] = await pool.execute(
         "SELECT COUNT(*) AS cnt FROM artisan_modules WHERE artisan_id = 1 AND actif = TRUE"
