@@ -732,16 +732,22 @@ const devisRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
 
-      // Créer un nouveau devis avec les mêmes informations
+      // Créer un nouveau devis avec les mêmes informations.
+      // Signature : createDevis(artisanId, data) — 2 args positionnels,
+      // PAS un seul objet. L'ancien code passait un objet unique, donc
+      // artisanId recevait l'objet et data devenait undefined -> INSERT
+      // pete sur les colonnes NOT NULL.
       const numero = await db.getNextDevisNumber(artisan.id);
-      const newDevis = await db.createDevis({
-        artisanId: artisan.id,
+      const dateValidite = new Date();
+      dateValidite.setDate(dateValidite.getDate() + 30);
+      const newDevis = await db.createDevis(artisan.id, {
         clientId: devis.clientId,
         numero,
         objet: devis.objet ? `${devis.objet} (copie)` : "(copie)",
         conditionsPaiement: devis.conditionsPaiement || undefined,
         notes: devis.notes || undefined,
         statut: "brouillon",
+        dateValidite,
       });
 
       // Copier les lignes du devis original
@@ -749,6 +755,7 @@ const devisRouter = router({
       for (const ligne of lignes) {
         await db.createLigneDevis({
           devisId: newDevis.id,
+          ordre: ligne.ordre ?? 0,
           reference: ligne.reference || undefined,
           designation: ligne.designation,
           description: ligne.description || undefined,
