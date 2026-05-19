@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen, Layers, Star, Check, ArrowRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -121,6 +122,52 @@ export default function DevisDetail() {
   const [emailMessage, setEmailMessage] = useState("");
   const [attachPdf, setAttachPdf] = useState(true);
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
+
+  // === Variantes (devis_options) ===
+  const [isNewVarianteOpen, setIsNewVarianteOpen] = useState(false);
+  const [newVarianteForm, setNewVarianteForm] = useState({
+    nom: "",
+    description: "",
+    recommandee: false,
+  });
+
+  const { data: variantes, refetch: refetchVariantes } = trpc.devisOptions.getByDevisId.useQuery(
+    { devisId: parseInt(id || "0") },
+    { enabled: !!id }
+  );
+
+  const createVarianteMutation = trpc.devisOptions.create.useMutation({
+    onSuccess: () => {
+      refetchVariantes();
+      setIsNewVarianteOpen(false);
+      setNewVarianteForm({ nom: "", description: "", recommandee: false });
+      toast.success("Variante créée");
+    },
+    onError: (e) => toast.error(e.message || "Erreur création variante"),
+  });
+
+  const selectVarianteMutation = trpc.devisOptions.select.useMutation({
+    onSuccess: () => {
+      refetchVariantes();
+      toast.success("Variante sélectionnée");
+    },
+  });
+
+  const deleteVarianteMutation = trpc.devisOptions.delete.useMutation({
+    onSuccess: () => {
+      refetchVariantes();
+      toast.success("Variante supprimée");
+    },
+  });
+
+  const convertirVarianteMutation = trpc.devisOptions.convertirEnDevis.useMutation({
+    onSuccess: () => {
+      utils.devis.getById.invalidate({ id: parseInt(id || "0") });
+      refetchVariantes();
+      toast.success("Variante convertie en lignes officielles du devis");
+    },
+    onError: (e) => toast.error(e.message || "Erreur conversion"),
+  });
 
   const requestSignatureMutation = trpc.signature.createSignatureLink.useMutation({
     onSuccess: () => {
@@ -496,6 +543,21 @@ export default function DevisDetail() {
         </Card>
       )}
 
+      {/* Onglets Lignes / Variantes */}
+      <Tabs defaultValue="lignes" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="lignes" className="min-h-[44px] sm:min-h-0">
+            <FileText className="h-4 w-4 mr-2" />
+            Lignes ({devis.lignes?.length ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="variantes" className="min-h-[44px] sm:min-h-0">
+            <Layers className="h-4 w-4 mr-2" />
+            Variantes ({variantes?.length ?? 0})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="lignes" className="mt-4">
+
       {/* Lines */}
       <Card>
         <CardHeader>
@@ -574,6 +636,191 @@ export default function DevisDetail() {
           )}
         </CardContent>
       </Card>
+
+        </TabsContent>
+
+        {/* ============================== */}
+        {/* Onglet VARIANTES               */}
+        {/* ============================== */}
+        <TabsContent value="variantes" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Layers className="h-5 w-5 text-blue-600" />
+                    Variantes de ce devis
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Proposez plusieurs options tarifaires à votre client (Standard, Premium, Éco…)
+                  </p>
+                </div>
+                <Button onClick={() => setIsNewVarianteOpen(true)} className="min-h-[44px] sm:min-h-0">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter une variante
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!variantes || variantes.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Layers className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                  <p>Aucune variante pour ce devis.</p>
+                  <p className="text-xs mt-1">
+                    Créez 2 ou 3 options chiffrées différemment pour laisser le choix au client.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {variantes.map((v: any) => (
+                    <Card
+                      key={v.id}
+                      className={
+                        v.selectionnee
+                          ? "border-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/10"
+                          : v.recommandee
+                          ? "border-amber-300"
+                          : ""
+                      }
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-base">{v.nom}</CardTitle>
+                          <div className="flex gap-1 flex-shrink-0">
+                            {v.recommandee && (
+                              <Badge className="bg-amber-100 text-amber-800 border border-amber-300">
+                                <Star className="h-3 w-3 mr-0.5" /> Reco.
+                              </Badge>
+                            )}
+                            {v.selectionnee && (
+                              <Badge className="bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <Check className="h-3 w-3 mr-0.5" /> Choisie
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {v.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                            {v.description}
+                          </p>
+                        )}
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="text-2xl font-bold text-primary">
+                          {formatCurrency(v.totalTTC)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          HT&nbsp;: {formatCurrency(v.totalHT)} · TVA&nbsp;: {formatCurrency(v.totalTVA)}
+                        </div>
+                        <div className="flex flex-wrap gap-1 pt-2">
+                          {!v.selectionnee && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => selectVarianteMutation.mutate({ optionId: v.id })}
+                              disabled={selectVarianteMutation.isPending}
+                            >
+                              <Check className="h-3 w-3 mr-1" /> Sélectionner
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`Convertir "${v.nom}" en lignes officielles du devis ? Les lignes actuelles seront remplacées.`)) {
+                                convertirVarianteMutation.mutate({ optionId: v.id });
+                              }
+                            }}
+                            disabled={convertirVarianteMutation.isPending}
+                          >
+                            <ArrowRight className="h-3 w-3 mr-1" /> Convertir
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => {
+                              if (confirm(`Supprimer la variante "${v.nom}" ?`)) {
+                                deleteVarianteMutation.mutate({ id: v.id });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Dialog : nouvelle variante */}
+          <Dialog open={isNewVarianteOpen} onOpenChange={setIsNewVarianteOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Nouvelle variante</DialogTitle>
+                <DialogDescription>
+                  Donnez-lui un nom (ex&nbsp;: <em>Option Premium</em>) puis ajoutez ses lignes ensuite.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <div>
+                  <Label htmlFor="variante-nom">Nom *</Label>
+                  <Input
+                    id="variante-nom"
+                    value={newVarianteForm.nom}
+                    onChange={(e) => setNewVarianteForm({ ...newVarianteForm, nom: e.target.value })}
+                    placeholder="Option Standard / Premium / Éco"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="variante-description">Description (optionnel)</Label>
+                  <Textarea
+                    id="variante-description"
+                    rows={2}
+                    value={newVarianteForm.description}
+                    onChange={(e) => setNewVarianteForm({ ...newVarianteForm, description: e.target.value })}
+                    placeholder="Quels matériaux, quel niveau de finition…"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newVarianteForm.recommandee}
+                    onChange={(e) => setNewVarianteForm({ ...newVarianteForm, recommandee: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  Marquer comme recommandée
+                </label>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsNewVarianteOpen(false)}>
+                  Annuler
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!newVarianteForm.nom.trim()) {
+                      toast.error("Le nom est obligatoire");
+                      return;
+                    }
+                    createVarianteMutation.mutate({
+                      devisId: parseInt(id || "0"),
+                      nom: newVarianteForm.nom,
+                      description: newVarianteForm.description || undefined,
+                      recommandee: newVarianteForm.recommandee,
+                    });
+                  }}
+                  disabled={createVarianteMutation.isPending}
+                >
+                  {createVarianteMutation.isPending ? "Création…" : "Créer la variante"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog pour ajouter une ligne */}
       <Dialog open={isAddLineDialogOpen} onOpenChange={setIsAddLineDialogOpen}>
