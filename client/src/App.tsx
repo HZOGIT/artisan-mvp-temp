@@ -89,6 +89,12 @@ const DevisOptions = lazy(() => import("./pages/DevisOptions"));
 const Flotte = lazy(() => import("./pages/Flotte"));
 const Classement = lazy(() => import("./pages/Classement"));
 const AnalysesPhotos = lazy(() => import("./pages/AnalysesPhotos"));
+const Depenses = lazy(() => import("./pages/Depenses"));
+const NouvelleDepense = lazy(() => import("./pages/NouvelleDepense"));
+const NotesFrais = lazy(() => import("./pages/NotesFrais"));
+const TableauBordDepenses = lazy(() => import("./pages/TableauBordDepenses"));
+const ImportReleveDepenses = lazy(() => import("./pages/ImportReleve"));
+const BudgetsDepenses = lazy(() => import("./pages/BudgetsDepenses"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 const CGV = lazy(() => import("./pages/legal/CGV"));
@@ -177,6 +183,12 @@ function AuthenticatedRoutes() {
           <Route path="/flotte" component={Flotte} />
           <Route path="/classement" component={Classement} />
           <Route path="/analyses-photos" component={AnalysesPhotos} />
+          <Route path="/depenses" component={Depenses} />
+          <Route path="/depenses/nouvelle" component={NouvelleDepense} />
+          <Route path="/notes-de-frais" component={NotesFrais} />
+          <Route path="/tableau-bord-depenses" component={TableauBordDepenses} />
+          <Route path="/import-releve" component={ImportReleveDepenses} />
+          <Route path="/budgets-depenses" component={BudgetsDepenses} />
           <Route path="/chantiers" component={Chantiers} />
           <Route path="/integrations-comptables" component={IntegrationsComptables} />
           <Route path="/devis-ia" component={DevisIA} />

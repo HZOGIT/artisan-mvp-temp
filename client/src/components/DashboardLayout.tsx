@@ -46,6 +46,9 @@ import {
   Info,
   Layers,
   LayoutDashboard,
+  PiggyBank,
+  BarChart3,
+  Wallet,
   LayoutGrid,
   LineChart,
   LogOut,
@@ -189,7 +192,7 @@ interface NavGroup {
   title: string;
   icon: LucideIcon;
   /** Couleur dominante du groupe (utilisée pour le surlignage). */
-  color: "violet" | "blue" | "emerald" | "orange" | "rose" | "cyan" | "slate";
+  color: "violet" | "blue" | "emerald" | "orange" | "rose" | "cyan" | "slate" | "purple";
   items: MenuItem[];
 }
 
@@ -280,6 +283,19 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: "finance",
+    title: "Finance & Dépenses",
+    icon: Wallet,
+    color: "purple",
+    items: [
+      { icon: Receipt, label: "Dépenses", path: "/depenses" },
+      { icon: FileText, label: "Notes de frais", path: "/notes-de-frais" },
+      { icon: PiggyBank, label: "Budgets", path: "/budgets-depenses" },
+      { icon: Upload, label: "Import relevé", path: "/import-releve" },
+      { icon: BarChart3, label: "Tableau de bord", path: "/tableau-bord-depenses" },
+    ],
+  },
+  {
     id: "parametres",
     title: "Paramètres",
     icon: Settings,
@@ -351,6 +367,12 @@ const pathPermissionMap: Record<string, string> = {
   "/devis-options": "devis.voir",
   "/classement": "techniciens.voir",
   "/analyses-photos": "devis.creer",
+  "/depenses": "comptabilite.voir",
+  "/depenses/nouvelle": "comptabilite.voir",
+  "/notes-de-frais": "comptabilite.voir",
+  "/budgets-depenses": "comptabilite.voir",
+  "/import-releve": "comptabilite.voir",
+  "/tableau-bord-depenses": "comptabilite.voir",
   "/modules": "",
   "/onboarding": "",
   "/import": "",
@@ -386,6 +408,8 @@ const MODULE_TO_LABELS: Record<string, string[]> = {
   commandes: ["Commandes", "Fournisseurs", "Rapport Commande"],
   comptabilite: ["Comptabilité", "Rapports", "Prévisions CA", "Alertes prévisions"],
   assistant_ia: ["MonAssistant", "Analyse photos IA"],
+  depenses: ["Dépenses", "Notes de frais", "Import relevé", "Tableau de bord"],
+  budgets: ["Budgets"],
   vehicules: ["Véhicules", "Flotte"],
   // (déjà couvert plus haut — labels "Véhicules" et "Flotte")
   conges: ["Congés"],
