@@ -1207,6 +1207,85 @@ async function startServer() {
       } catch (e: any) {
         console.warn("[Scheduler] J+3:", e?.message || e);
       }
+
+      // 6) Depenses recurrentes : pour chaque depense flaggee recurrente
+      //    dont prochaine_occurrence <= aujourd'hui, on cree une copie a
+      //    la date du jour et on incrémente prochaine_occurrence selon
+      //    la frequence (mensuelle / trimestrielle / annuelle).
+      //    Idempotent : si le scheduler tourne plusieurs fois le meme
+      //    jour, l'update de prochaine_occurrence empeche les doublons.
+      try {
+        const pool = db.getPool();
+        if (pool) {
+          const [rows] = await pool.execute(`
+            SELECT id, artisan_id, user_id, fournisseur, categorie, sous_categorie,
+                   description, montant_ht, taux_tva, montant_tva, montant_ttc,
+                   mode_paiement, remboursable, chantier_id, intervention_id,
+                   client_id, notes, tva_deductible, frequence_recurrence,
+                   prochaine_occurrence
+              FROM depenses
+             WHERE recurrente = TRUE
+               AND prochaine_occurrence IS NOT NULL
+               AND prochaine_occurrence <= CURDATE()
+             LIMIT 50
+          `) as any;
+          let nbCreated = 0;
+          for (const d of rows as any[]) {
+            try {
+              // Generer un nouveau numero DEP-XXXXX.
+              const numero = await db.getNextDepenseNumero(d.artisan_id);
+              await pool.execute(
+                `INSERT INTO depenses
+                   (artisan_id, user_id, numero, date_depense, fournisseur,
+                    categorie, sous_categorie, description, montant_ht, taux_tva,
+                    montant_tva, montant_ttc, mode_paiement, statut, remboursable,
+                    chantier_id, intervention_id, client_id, notes, tva_deductible,
+                    recurrente)
+                 VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', ?, ?, ?, ?, ?, ?, FALSE)`,
+                [
+                  d.artisan_id, d.user_id, numero, d.fournisseur, d.categorie,
+                  d.sous_categorie, d.description, d.montant_ht, d.taux_tva,
+                  d.montant_tva, d.montant_ttc, d.mode_paiement, d.remboursable,
+                  d.chantier_id, d.intervention_id, d.client_id, d.notes,
+                  d.tva_deductible,
+                ]
+              );
+              // Avance prochaine_occurrence selon la frequence.
+              const interval =
+                d.frequence_recurrence === "hebdomadaire" ? "INTERVAL 7 DAY" :
+                d.frequence_recurrence === "trimestrielle" ? "INTERVAL 3 MONTH" :
+                d.frequence_recurrence === "annuelle" ? "INTERVAL 1 YEAR" :
+                "INTERVAL 1 MONTH"; // mensuelle par defaut
+              await pool.execute(
+                `UPDATE depenses
+                    SET prochaine_occurrence = DATE_ADD(prochaine_occurrence, ${interval})
+                  WHERE id = ?`,
+                [d.id]
+              );
+              // Notification a l'artisan.
+              try {
+                await pool.execute(
+                  `INSERT INTO notifications (artisanId, type, titre, message, lien, lu)
+                   VALUES (?, 'info', ?, ?, '/depenses', 0)`,
+                  [
+                    d.artisan_id,
+                    `Dépense récurrente créée : ${d.fournisseur || d.categorie}`,
+                    `${numero} — ${Number(d.montant_ttc).toLocaleString("fr-FR")} EUR — créée automatiquement aujourd'hui.`,
+                  ]
+                );
+              } catch {/* table notifications absente : ok */}
+              nbCreated++;
+            } catch (errIn: any) {
+              console.warn(`[Scheduler] depense recurrente ${d.id} :`, errIn?.message);
+            }
+          }
+          if (nbCreated > 0) {
+            console.log(`[Scheduler] ${nbCreated} depense(s) recurrente(s) creee(s)`);
+          }
+        }
+      } catch (e: any) {
+        console.warn("[Scheduler] depenses recurrentes:", e?.message || e);
+      }
     } catch (e: any) {
       console.error("[Scheduler] erreur generale:", e?.message || e);
     }

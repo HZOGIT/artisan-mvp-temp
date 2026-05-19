@@ -72,7 +72,21 @@ export default function NouvelleDepense() {
     notes: "",
     chantierId: undefined as number | undefined,
     clientId: undefined as number | undefined,
+    recurrente: false,
+    frequenceRecurrence: "mensuelle" as "hebdomadaire" | "mensuelle" | "trimestrielle" | "annuelle",
   });
+
+  // Date de prochaine occurrence calculee a partir de la date de la depense
+  // et de la frequence choisie (defaut +1 mois).
+  const prochaineOccurrence = (() => {
+    if (!form.recurrente || !form.dateDepense) return "";
+    const d = new Date(form.dateDepense);
+    if (form.frequenceRecurrence === "hebdomadaire") d.setDate(d.getDate() + 7);
+    else if (form.frequenceRecurrence === "trimestrielle") d.setMonth(d.getMonth() + 3);
+    else if (form.frequenceRecurrence === "annuelle") d.setFullYear(d.getFullYear() + 1);
+    else d.setMonth(d.getMonth() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
 
   const { data: categories } = trpc.depenses.getCategories.useQuery();
   const { data: clients } = trpc.clients.list.useQuery();
@@ -177,6 +191,9 @@ export default function NouvelleDepense() {
       clientId: form.clientId,
       justificatifUrl: photoDataUrl || undefined,
       justificatifNom: photo?.name || undefined,
+      recurrente: form.recurrente,
+      frequenceRecurrence: form.recurrente ? form.frequenceRecurrence : undefined,
+      prochaineOccurrence: form.recurrente ? prochaineOccurrence : undefined,
     };
   }
 
@@ -470,6 +487,52 @@ export default function NouvelleDepense() {
               placeholder="Optionnel"
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Récurrence</CardTitle>
+          <CardDescription>
+            Pour les dépenses qui reviennent à intervalle régulier (loyer, abonnements…).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="rec" className="cursor-pointer">Dépense récurrente</Label>
+            <Switch
+              id="rec"
+              checked={form.recurrente}
+              onCheckedChange={(v) => setField("recurrente", v)}
+            />
+          </div>
+          {form.recurrente && (
+            <>
+              <div>
+                <Label>Fréquence</Label>
+                <Select
+                  value={form.frequenceRecurrence}
+                  onValueChange={(v) => setField("frequenceRecurrence", v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hebdomadaire">Hebdomadaire</SelectItem>
+                    <SelectItem value="mensuelle">Mensuelle</SelectItem>
+                    <SelectItem value="trimestrielle">Trimestrielle</SelectItem>
+                    <SelectItem value="annuelle">Annuelle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 text-sm">
+                <Sparkles className="h-4 w-4 inline mr-1 text-blue-600" />
+                Cette dépense sera créée automatiquement le{" "}
+                <strong>{prochaineOccurrence && new Date(prochaineOccurrence).toLocaleDateString("fr-FR")}</strong>,
+                puis selon la fréquence choisie. Le scheduler quotidien s'occupe du reste.
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

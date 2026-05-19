@@ -8012,6 +8012,9 @@ const depensesRouter = router({
       justificatifUrl: z.string().optional(),
       justificatifNom: z.string().optional(),
       tvaDeductible: z.boolean().default(true),
+      recurrente: z.boolean().optional(),
+      frequenceRecurrence: z.enum(["hebdomadaire", "mensuelle", "trimestrielle", "annuelle"]).optional(),
+      prochaineOccurrence: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -8019,7 +8022,7 @@ const depensesRouter = router({
       const numero = await db.getNextDepenseNumero(artisan.id);
       const montantTva = +(input.montantHt * (input.tauxTva / 100)).toFixed(2);
       const montantTtc = +(input.montantHt + montantTva).toFixed(2);
-      return await db.createDepense({
+      const dep = await db.createDepense({
         artisanId: artisan.id,
         userId: ctx.user.id,
         numero,
@@ -8027,6 +8030,16 @@ const depensesRouter = router({
         montantTva,
         montantTtc,
       });
+      // Si recurrente, met a jour les champs recurrence apres l'insert
+      // (createDepense ne les supporte pas dans sa signature).
+      if (dep && input.recurrente && input.frequenceRecurrence) {
+        await db.updateDepense(dep.id, artisan.id, {
+          recurrente: true,
+          frequenceRecurrence: input.frequenceRecurrence,
+          prochaineOccurrence: input.prochaineOccurrence || null,
+        });
+      }
+      return dep;
     }),
 
   update: protectedProcedure
