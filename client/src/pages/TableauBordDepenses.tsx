@@ -11,8 +11,10 @@ import {
 } from "recharts";
 import {
   BarChart3, TrendingUp, TrendingDown, AlertTriangle, Receipt,
-  ArrowRight, Sparkles, AlertCircle, Wallet,
+  ArrowRight, Sparkles, AlertCircle, Wallet, FileDown,
 } from "lucide-react";
+import { generateRapportDepensesPDF } from "@/lib/generateRapportDepensesPDF";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -27,6 +29,44 @@ export default function TableauBordDepenses() {
   const { data: stats } = trpc.depenses.stats.useQuery({ mois });
   const { data: budgets } = trpc.depenses.getBudgets.useQuery({ mois });
   const { data: categories } = trpc.depenses.getCategories.useQuery();
+  const { data: artisan } = trpc.artisan.getProfile.useQuery();
+
+  const [pdfBusy, setPdfBusy] = useState(false);
+  async function genererRapportPDF() {
+    if (!stats) {
+      toast.error("Les statistiques ne sont pas encore chargées");
+      return;
+    }
+    setPdfBusy(true);
+    try {
+      await generateRapportDepensesPDF({
+        mois,
+        artisanNom: artisan?.nomEntreprise || "Operioz",
+        stats: {
+          totalMois: Number(stats.totalMois || 0),
+          totalAnnee: Number(stats.totalAnnee || 0),
+          tvaRecuperable: Number(stats.tvaRecuperable || 0),
+          aRembourser: Number(stats.aRembourser || 0),
+          nbDepensesMois: Number(stats.nbDepensesMois || 0),
+          variation: stats.variation,
+          parCategorie: stats.parCategorie as any,
+          topDepenses: stats.topDepenses as any,
+        },
+        budgets: (budgets || []).map((b: any) => ({
+          categorie: b.categorie,
+          budget: Number(b.budget || 0),
+          reel: Number(b.reel || 0),
+          ecart: Number(b.ecart || 0),
+          pct: Number(b.pct || 0),
+        })),
+      });
+      toast.success("Rapport PDF téléchargé");
+    } catch (e: any) {
+      toast.error(e?.message || "Erreur génération PDF");
+    } finally {
+      setPdfBusy(false);
+    }
+  }
 
   // Donut data : par categorie avec couleur de la categorie.
   const donutData = useMemo(() => {
@@ -82,7 +122,18 @@ export default function TableauBordDepenses() {
             {format(new Date(mois + "-01"), "MMMM yyyy", { locale: fr })}
           </p>
         </div>
-        <Input type="month" value={mois} onChange={(e) => setMois(e.target.value)} className="w-[160px]" />
+        <div className="flex flex-wrap gap-2">
+          <Input type="month" value={mois} onChange={(e) => setMois(e.target.value)} className="w-[160px]" />
+          <Button
+            onClick={genererRapportPDF}
+            disabled={pdfBusy}
+            variant="outline"
+            className="min-h-[44px] sm:min-h-0"
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            {pdfBusy ? "Génération…" : "Rapport PDF"}
+          </Button>
+        </div>
       </div>
 
       {/* KPIs */}
