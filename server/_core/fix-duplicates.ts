@@ -898,6 +898,20 @@ async function fixDuplicates() {
         "UPDATE artisans SET onboarding_completed = TRUE WHERE id = 1"
       );
 
+      // Reset notifications demo : passe tout en 'lu = TRUE' pour
+      // l'artisan demo afin de ne pas afficher 53+ notifications de test
+      // qui s'accumulent dans le badge rouge de la cloche. Idempotent.
+      try {
+        const [notifReset] = await pool.execute(
+          "UPDATE notifications SET lu = TRUE WHERE artisanId = 1 AND lu = FALSE"
+        ) as any;
+        if (notifReset?.affectedRows > 0) {
+          console.log(`[Demo] ${notifReset.affectedRows} notifications marquees comme lues`);
+        }
+      } catch (e: any) {
+        console.log("[Demo] reset notifications :", e?.message);
+      }
+
       const [pRows] = await pool.execute("SELECT plan FROM artisans WHERE id = 1") as any;
       const [cRows] = await pool.execute(
         "SELECT COUNT(*) AS cnt FROM artisan_modules WHERE artisan_id = 1 AND actif = TRUE"
