@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Search, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Search, X, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface LigneDevis {
@@ -261,6 +261,25 @@ export default function DevisNouveauPage() {
           <p className="text-gray-600">Créer un nouveau devis</p>
         </div>
       </div>
+
+      {/* Generation IA — encart violet en haut du formulaire */}
+      <GenerationIASection
+        onApply={(data) => {
+          if (data.objet) setObjet(data.objet);
+          if (Array.isArray(data.lignes) && data.lignes.length > 0) {
+            setLignes(
+              data.lignes.map((l: any, i: number) => ({
+                id: `ia-${Date.now()}-${i}`,
+                description: l.designation || "",
+                quantite: Number(l.quantite) || 1,
+                prixUnitaireHT: Number(l.prixUnitaire) || 0,
+                tauxTVA: Number(l.tauxTva) || 20,
+                unite: l.unite || "u",
+              }))
+            );
+          }
+        }}
+      />
 
       {/* Formulaire */}
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg border">
@@ -571,6 +590,187 @@ export default function DevisNouveauPage() {
           </Button>
         </div>
       </form>
+    </div>
+  );
+}
+
+// ============================================================================
+// Section 'Generer avec l'IA' : textarea description + surface + budget,
+// bouton qui declenche trpc.devis.genererLignesIA, puis affichage des
+// lignes pre-remplies avec total estime et bouton 'Appliquer'.
+// L'utilisateur peut encore editer chaque ligne dans le formulaire
+// normal avant de soumettre le devis final.
+// ============================================================================
+function GenerationIASection({ onApply }: { onApply: (data: any) => void }) {
+  const [open, setOpen] = useState(false);
+  const [description, setDescription] = useState("");
+  const [surface, setSurface] = useState("");
+  const [budget, setBudget] = useState("");
+  const [preview, setPreview] = useState<any | null>(null);
+
+  const genererMut = trpc.devis.genererLignesIA.useMutation({
+    onSuccess: (data) => {
+      setPreview(data);
+      toast.success(`${data.lignes?.length || 0} ligne(s) générée(s) par l'IA`);
+    },
+    onError: (e) => toast.error(e.message || "Erreur génération IA"),
+  });
+
+  const total = useMemo(() => {
+    if (!preview?.lignes) return { ht: 0, ttc: 0 };
+    let ht = 0;
+    let ttc = 0;
+    for (const l of preview.lignes) {
+      const sht = Number(l.quantite || 0) * Number(l.prixUnitaire || 0);
+      ht += sht;
+      ttc += sht * (1 + Number(l.tauxTva || 0) / 100);
+    }
+    return { ht, ttc };
+  }, [preview]);
+
+  return (
+    <div className="border-2 border-violet-300 rounded-lg overflow-hidden bg-gradient-to-br from-violet-50 to-white">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-violet-50/50 transition-colors"
+      >
+        <span className="flex items-center gap-2 font-medium text-violet-900">
+          <Sparkles className="h-5 w-5 text-violet-600" />
+          Générer avec l'IA
+        </span>
+        {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3">
+          <div>
+            <Label className="text-xs">Décrivez les travaux</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="Ex : Rénovation complète SDB 8m², douche italienne + carrelage mural et sol grès cérame"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Surface (m²)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={surface}
+                onChange={(e) => setSurface(e.target.value)}
+                placeholder="—"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Budget client (€)</Label>
+              <Input
+                type="number"
+                step="50"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                placeholder="—"
+              />
+            </div>
+          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              if (description.trim().length < 5) {
+                toast.error("Décris les travaux (min 5 caractères)");
+                return;
+              }
+              setPreview(null);
+              genererMut.mutate({
+                description,
+                surface: surface ? parseFloat(surface) : undefined,
+                budget: budget ? parseFloat(budget) : undefined,
+              });
+            }}
+            disabled={genererMut.isPending}
+            className="w-full min-h-[44px] bg-violet-600 hover:bg-violet-700"
+          >
+            {genererMut.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Génération en cours…
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" /> Générer les lignes
+              </>
+            )}
+          </Button>
+
+          {preview && Array.isArray(preview.lignes) && preview.lignes.length > 0 && (
+            <div className="space-y-2 pt-3 border-t border-violet-200">
+              {preview.dureeEstimee && (
+                <p className="text-xs text-violet-700">
+                  ⏱️ Durée estimée : {preview.dureeEstimee}
+                </p>
+              )}
+              {preview.objet && (
+                <p className="text-xs text-violet-700">
+                  📌 Objet : <strong>{preview.objet}</strong>
+                </p>
+              )}
+              <div className="border rounded-lg overflow-hidden bg-white">
+                <table className="w-full text-xs">
+                  <thead className="bg-violet-50 border-b">
+                    <tr>
+                      <th className="text-left p-2">Désignation</th>
+                      <th className="text-right p-2 whitespace-nowrap">Qté</th>
+                      <th className="p-2 whitespace-nowrap">Unité</th>
+                      <th className="text-right p-2 whitespace-nowrap">PU HT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.lignes.map((l: any, i: number) => (
+                      <tr key={i} className="border-b last:border-b-0">
+                        <td className="p-2 truncate max-w-[200px]">{l.designation}</td>
+                        <td className="text-right p-2 whitespace-nowrap">{l.quantite}</td>
+                        <td className="p-2 whitespace-nowrap">{l.unite}</td>
+                        <td className="text-right p-2 whitespace-nowrap font-medium">
+                          {formatCurrency(l.prixUnitaire)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span>Total estimé HT : {formatCurrency(total.ht)}</span>
+                <span className="text-violet-700">TTC : {formatCurrency(total.ttc)}</span>
+              </div>
+              {preview.conseilsArtisan && (
+                <div className="text-xs text-violet-800 bg-violet-50 p-2 rounded">
+                  💡 <strong>Conseil IA :</strong> {preview.conseilsArtisan}
+                </div>
+              )}
+              {preview.notes && (
+                <div className="text-xs text-muted-foreground p-2 rounded bg-slate-50">
+                  📝 {preview.notes}
+                </div>
+              )}
+              <Button
+                type="button"
+                onClick={() => {
+                  onApply(preview);
+                  setOpen(false);
+                  setPreview(null);
+                  setDescription("");
+                  setSurface("");
+                  setBudget("");
+                  toast.success("Lignes IA appliquées au devis");
+                }}
+                className="w-full min-h-[44px]"
+              >
+                Appliquer ces lignes au devis →
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

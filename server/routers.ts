@@ -444,6 +444,70 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
 // DEVIS ROUTER
 // ============================================================================
 const devisRouter = router({
+  // === Generation IA des lignes de devis depuis une description (T3) ===
+  // L'artisan decrit un chantier en texte libre (+ surface/budget
+  // optionnels) ; l'IA renvoie objet + lignes pre-remplies + conseils
+  // adapte au metier. Pas de persistance auto : retourne le brouillon,
+  // l'utilisateur valide ensuite avant la creation effective du devis.
+  genererLignesIA: protectedProcedure
+    .input(z.object({
+      description: z.string().min(5),
+      surface: z.number().optional(),
+      budget: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!checkRateLimit(artisan.id)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+      }
+      const metier = metierFromArtisan(artisan);
+      const contexteMetier = getContexteMetier(metier);
+
+      const userPrompt = `Chantier décrit : "${input.description}"
+${input.surface ? `Surface : ${input.surface} m²` : ""}
+${input.budget ? `Budget client : ${input.budget} €` : ""}
+
+Genere les lignes detaillees d'un devis professionnel.
+Inclure main d'oeuvre ET fournitures. Prix realistes marche francais 2024.
+
+Reponds UNIQUEMENT en JSON pur (pas de markdown) :
+{"objet":"objet court","dureeEstimee":"X jours","lignes":[{"designation":"description","quantite":1,"unite":"u|m|m²|h|forfait","prixUnitaire":0,"tauxTva":10,"type":"fourniture|main_oeuvre|forfait"}],"notes":"remarques","conseilsArtisan":"conseils"}`;
+
+      try {
+        const client = new Anthropic();
+        const response = await client.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2500,
+          temperature: 0.3,
+          system: contexteMetier,
+          messages: [{ role: "user", content: userPrompt }],
+        });
+        const text = response.content
+          .filter((b: any) => b.type === "text")
+          .map((b: any) => b.text)
+          .join("");
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return { lignes: [], objet: input.description.slice(0, 80) };
+        }
+        const data = JSON.parse(jsonMatch[0]);
+        return {
+          objet: data.objet || input.description.slice(0, 80),
+          dureeEstimee: data.dureeEstimee || null,
+          lignes: Array.isArray(data.lignes) ? data.lignes : [],
+          notes: data.notes || null,
+          conseilsArtisan: data.conseilsArtisan || null,
+        };
+      } catch (e: any) {
+        console.warn("[genererLignesIA]", sanitizeIaError(e));
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Generation IA echouee : ${sanitizeIaError(e)}`,
+        });
+      }
+    }),
+
   list: devisVoirProcedure
     .input(z.object({ search: z.string().optional() }).optional())
     .query(async ({ ctx, input }) => {
