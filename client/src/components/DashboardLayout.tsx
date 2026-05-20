@@ -993,7 +993,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             )}
           </button>
           {filteredGroups.map((group) => {
-            const styles = RAIL_COLORS[group.color];
+            const styles = RAIL_COLORS[group.color] ?? RAIL_COLORS.blue;
             const isActive = activeGroup?.id === group.id;
             const isOpen = openGroupId === group.id;
             const Icon = group.icon;
@@ -1071,7 +1071,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {(() => {
               const group = filteredGroups.find((g) => g.id === openGroupId);
               if (!group) return null;
-              const styles = RAIL_COLORS[group.color];
+              const styles = RAIL_COLORS[group.color] ?? RAIL_COLORS.blue;
               const GroupIcon = group.icon;
               return (
                 <motion.aside
@@ -1297,7 +1297,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
                 <div className="p-2 space-y-1">
                   {filteredGroups.map((group) => {
-                    const styles = RAIL_COLORS[group.color];
+                    const styles = RAIL_COLORS[group.color] ?? RAIL_COLORS.blue;
                     const GroupIcon = group.icon;
                     const isOpen = openMobileGroups.has(group.id);
                     return (
