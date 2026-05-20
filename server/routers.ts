@@ -14,6 +14,24 @@ import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputS
 import { ROLE_TEMPLATES, ALL_PERMISSIONS } from "../shared/permissions";
 import Anthropic from "@anthropic-ai/sdk";
 import { buildSystemPrompt } from "./_core/assistantContext";
+import { getContexteMetier } from "./_core/contexteMetier";
+
+// Helper local : extrait le metier de l'artisan a partir de plusieurs
+// sources possibles (champ libre metier custom > specialite enum schema).
+function metierFromArtisan(artisan: any): string | null {
+  if (!artisan) return null;
+  return artisan.metier || artisan.specialite || null;
+}
+
+// Helper local : sanitize les messages d'erreur IA pour ne JAMAIS
+// remonter de data: URLs base64 (cf. bug iPhone analyse photos T5).
+function sanitizeIaError(e: any, fallback = "Erreur IA"): string {
+  let msg = String(e?.message || e || fallback);
+  msg = msg.replace(/data:[^;]+;base64,[A-Za-z0-9+/=]+/g, "[image]");
+  msg = msg.replace(/[A-Za-z0-9+/=]{200,}/g, "[…]");
+  if (msg.length > 200) msg = msg.slice(0, 200) + "…";
+  return msg;
+}
 
 // Rate limiter for AI endpoints
 const rateLimitMap = new Map<number, { count: number; resetTime: number }>();
@@ -250,7 +268,55 @@ const articlesRouter = router({
     .query(async ({ input }) => {
       return await db.searchArticles(input.query, input.metier);
     }),
-  
+
+  // === Suggestions IA d'articles (T2) ===
+  // Quand l'artisan cherche un article qui n'est pas dans sa biblio,
+  // l'IA propose 5 articles realistes avec prix marche 2024, adaptes
+  // au metier de l'artisan (contexte specialise injecte en prompt).
+  suggererArticlesIA: protectedProcedure
+    .input(z.object({
+      query: z.string().min(2),
+      contexte: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      if (!checkRateLimit(artisan.id)) return [];
+      const metier = metierFromArtisan(artisan);
+      const contexteMetier = getContexteMetier(metier);
+
+      try {
+        const client = new Anthropic();
+        const response = await client.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          temperature: 0.4,
+          system: contexteMetier,
+          messages: [{
+            role: "user",
+            content: `L'artisan cherche : "${input.query}"
+Contexte : ${input.contexte || "creation de devis"}.
+
+Propose 5 articles pertinents pour un artisan ${metier || "du bâtiment"} en France avec prix realistes marche 2024.
+
+Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
+{"articles":[{"designation":"nom","reference":"REF-XXX","unite":"u|m|m²|ml|kg|L|h","prixUnitaire":0,"description":"courte","categorie":"cat"}]}`,
+          }],
+        });
+        const text = response.content
+          .filter((b: any) => b.type === "text")
+          .map((b: any) => b.text)
+          .join("");
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return [];
+        const data = JSON.parse(jsonMatch[0]);
+        return Array.isArray(data?.articles) ? data.articles : [];
+      } catch (e: any) {
+        console.warn("[suggererArticlesIA]", sanitizeIaError(e));
+        return [];
+      }
+    }),
+
   getArtisanArticles: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];

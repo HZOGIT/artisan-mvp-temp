@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Save, Package, Check, Search, X } from "lucide-react";
+import { ArrowLeft, Save, Package, Check, Search, X, Sparkles, Plus } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
@@ -54,6 +54,22 @@ export default function DevisLigneEdit() {
   );
 
   const { data: articles, isLoading: articlesLoading } = trpc.articles.getBibliotheque.useQuery({});
+  // Suggestions IA : declenchees uniquement si la recherche locale ne
+  // ramene pas assez de resultats. Le contexte 'creation de devis' est
+  // explicite pour que l'IA propose des items relevants.
+  const [iaEnabled, setIaEnabled] = useState(false);
+  const { data: suggestionsIA, isFetching: iaLoading } =
+    trpc.articles.suggererArticlesIA.useQuery(
+      { query: searchQuery, contexte: "creation de devis" },
+      { enabled: iaEnabled && searchQuery.length >= 3, staleTime: 60_000 }
+    );
+
+  const createArticleArtisanMut = trpc.articles.createArtisanArticle.useMutation({
+    onSuccess: () => {
+      toast.success("Article ajouté à votre bibliothèque");
+      utils.articles.getBibliotheque.invalidate();
+    },
+  });
 
   // Filtrer les articles en fonction de la recherche
   const filteredArticles = useMemo(() => {
@@ -266,12 +282,26 @@ export default function DevisLigneEdit() {
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
-              ) : filteredArticles.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? (
-                    <>Aucun article trouvé pour "{searchQuery}"</>
-                  ) : (
-                    <>Aucun article disponible</>
+              ) : filteredArticles.length === 0 && !iaEnabled ? (
+                <div className="text-center py-8 text-muted-foreground space-y-3">
+                  <div>
+                    {searchQuery ? (
+                      <>Aucun article trouvé pour "{searchQuery}"</>
+                    ) : (
+                      <>Aucun article disponible</>
+                    )}
+                  </div>
+                  {searchQuery.length >= 3 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIaEnabled(true)}
+                      className="border-violet-300 text-violet-700 hover:bg-violet-50"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Demander à l'IA des suggestions
+                    </Button>
                   )}
                 </div>
               ) : (
@@ -316,6 +346,101 @@ export default function DevisLigneEdit() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Suggestions IA — declenchees seulement quand l'utilisateur
+                  clique 'Demander à l'IA' OU quand la recherche locale a
+                  peu de resultats et qu'il a deja active le mode IA. */}
+              {iaEnabled && searchQuery.length >= 3 && (
+                <div className="mt-4 pt-4 border-t-2 border-violet-200">
+                  <h4 className="text-sm font-semibold text-violet-700 mb-2 flex items-center gap-1">
+                    <Sparkles className="h-4 w-4" /> Suggestions IA
+                  </h4>
+                  {iaLoading ? (
+                    <div className="text-xs text-muted-foreground py-2">Recherche IA en cours…</div>
+                  ) : !suggestionsIA || suggestionsIA.length === 0 ? (
+                    <div className="text-xs text-muted-foreground py-2">
+                      Aucune suggestion IA pour le moment.
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {(suggestionsIA as any[]).map((sug: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="p-3 rounded-lg border border-violet-200 bg-violet-50/40"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">{sug.designation}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {sug.reference} {sug.unite && `• ${sug.unite}`}
+                                {sug.description && <> — {sug.description}</>}
+                              </div>
+                              <div className="text-xs font-semibold text-violet-700 mt-0.5">
+                                {formatCurrency(sug.prixUnitaire)}
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="default"
+                                onClick={() => {
+                                  setFormData({
+                                    reference: sug.reference || "",
+                                    designation: sug.designation || "",
+                                    description: sug.description || "",
+                                    quantite: "1",
+                                    unite: sug.unite || "unité",
+                                    prixUnitaireHT: String(sug.prixUnitaire ?? ""),
+                                    tauxTVA: "20",
+                                  });
+                                  setIsDialogOpen(false);
+                                  toast.success("Suggestion IA appliquée");
+                                }}
+                              >
+                                Utiliser
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  createArticleArtisanMut.mutate({
+                                    reference: sug.reference || `IA-${Date.now()}`,
+                                    designation: sug.designation || "",
+                                    description: sug.description,
+                                    unite: sug.unite || "unité",
+                                    prixUnitaireHT: String(sug.prixUnitaire ?? "0"),
+                                    categorie: sug.categorie,
+                                  });
+                                }}
+                              >
+                                <Plus className="h-3 w-3 mr-1" /> Bibliothèque
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bouton pour activer l'IA même quand il y a des résultats locaux */}
+              {!iaEnabled && filteredArticles.length > 0 && searchQuery.length >= 3 && (
+                <div className="mt-3 text-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIaEnabled(true)}
+                    className="text-violet-700 hover:bg-violet-50 text-xs"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Demander d'autres suggestions à l'IA
+                  </Button>
                 </div>
               )}
             </ScrollArea>
