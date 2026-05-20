@@ -6540,15 +6540,41 @@ const devisIARouter = router({
         };
       });
 
-      const systemPrompt = `Tu es un expert en bâtiment et travaux. Analyse les photos fournies et identifie les travaux nécessaires.
-Pour chaque type de travaux détecté, fournis :
-- Le type (ex: plomberie, électricité, peinture)
-- Une description détaillée
+      // T4 : prompt specialise par metier — l'IA devient un expert
+      // carreleur/plombier/paysagiste/etc. au lieu d'un generaliste, ce
+      // qui donne des quantites + prix + marques plus realistes.
+      const metierArtisan = metierFromArtisan(artisan);
+      const contexteMetier = getContexteMetier(metierArtisan);
+
+      const PROMPTS_METIER: Record<string, string> = {
+        carreleur: "Analyse cette photo comme un expert carreleur. Calcule la surface a carreler visible. Identifie le type de support (mur/sol/humide). Propose le carrelage adapte. Calcule les quantites (carrelage + colle + joint + pertes 15%). Liste tous les materiaux avec prix realistes.",
+        paysagiste: "Analyse ce jardin/espace exterieur. Estime la surface totale visible. Identifie la vegetation existante. Propose un plan d'amenagement adapte. Liste les plantes recommandees avec quantites. Calcule le volume de terre/mulch necessaire.",
+        cuisiniste: "Analyse cette cuisine. Estime les dimensions (lineaire des murs). Identifie le type d'agencement actuel. Propose 2-3 options de renovation. Liste meubles, plan de travail, electromenager recommandes.",
+        macon: "Analyse cette surface/structure. Calcule les volumes/surfaces visibles. Identifie les travaux necessaires. Calcule les quantites de materiaux : beton, parpaings, enduit, isolation. Estime la main d'oeuvre.",
+        peintre: "Analyse cette piece/surface a peindre. Calcule la surface totale (murs + plafond). Deduis les ouvertures. Identifie l'etat (preparation necessaire ?). Calcule les quantites de peinture (rendement 8-12m²/L, 2 couches).",
+        plombier: "Analyse cette installation plomberie/sanitaire. Identifie les equipements visibles. Repere les problemes potentiels. Liste les travaux a effectuer. Propose les equipements de remplacement avec marques (Grohe, Hansgrohe…) et prix marche.",
+        electricien: "Analyse cette installation electrique. Identifie tableau, prises, eclairage, conformite NF C 15-100. Liste les travaux de mise aux normes. Propose les materiels avec marques (Legrand, Schneider, Hager) et prix marche.",
+        menuisier: "Analyse cette ouvrage bois/menuiserie. Mesure les dimensions visibles. Identifie le type de bois et l'etat. Propose les travaux + bois adapte avec prix marche.",
+        chauffagiste: "Analyse cette installation chauffage/climatisation. Identifie l'equipement existant. Calcule les deperditions visibles. Propose la solution adaptee (PAC, chaudiere, radiateurs) avec marques + prix.",
+        terrassier: "Analyse cette zone de terrassement. Estime volumes a deplacer en m³. Identifie l'acces engins, les reseaux. Propose le materiel necessaire + prix.",
+      };
+
+      const promptSpecialise = metierArtisan && PROMPTS_METIER[String(metierArtisan).toLowerCase()]
+        ? PROMPTS_METIER[String(metierArtisan).toLowerCase()]
+        : "Analyse les photos fournies et identifie les travaux necessaires.";
+
+      const systemPrompt = `${contexteMetier}
+
+${promptSpecialise}
+
+Pour chaque type de travaux detecte, fournis :
+- Le type (ex: plomberie, electricite, peinture)
+- Une description detaillee
 - Le niveau d'urgence (faible | moyenne | haute | critique)
 - Un score de confiance 0-100
-- La liste des articles/matériaux nécessaires (nom, description, quantité, unité, prixEstime)
+- La liste des articles/materiaux necessaires (nom, description, quantite, unite, prixEstime EN EUROS TTC marche francais 2024)
 
-Réponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour) au format :
+Reponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour) :
 {"travaux":[{"type":"string","description":"string","urgence":"faible|moyenne|haute|critique","confiance":0,"articles":[{"nom":"string","description":"string","quantite":0,"unite":"string","prixEstime":0}]}]}`;
 
       // Appel Anthropic dans try/catch pour ne JAMAIS laisser remonter

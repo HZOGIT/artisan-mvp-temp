@@ -81,6 +81,8 @@ export default function AnalysesPhotos() {
 
   const { data: clients } = trpc.clients.list.useQuery();
   const { data: interventions } = trpc.interventions.list.useQuery();
+  const { data: artisanProfile } = trpc.artisan.getProfile.useQuery();
+  const metier = (artisanProfile?.metier || artisanProfile?.specialite || "").trim();
   const { data: historique, refetch: refetchHistorique } = trpc.devisIA.list.useQuery();
   const { data: analyseDetail, refetch: refetchDetail } = trpc.devisIA.getById.useQuery(
     { id: analyseEnCoursId || 0 },
@@ -195,6 +197,11 @@ export default function AnalysesPhotos() {
         <p className="text-muted-foreground mt-1">
           Prends une photo d'un problème, l'IA identifie les travaux et propose un devis.
         </p>
+        {metier && (
+          <Badge className="mt-2 bg-violet-100 text-violet-800 border border-violet-200">
+            🎯 Analyse optimisée pour : {metier.charAt(0).toUpperCase() + metier.slice(1)}
+          </Badge>
+        )}
       </div>
 
       {/* SECTION 1 — Nouvelle analyse */}
