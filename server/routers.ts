@@ -444,6 +444,76 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
 // DEVIS ROUTER
 // ============================================================================
 const devisRouter = router({
+  // === Conseiller IA Dashboard (T7) — 3 conseils du jour ===
+  // Genere 3 conseils personnalises bases sur les devis en attente,
+  // factures impayees, stocks, periode de l'annee, et metier. Cache
+  // 4h cote client (staleTime) pour eviter de bruler le quota Claude.
+  conseilsIA: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return { conseils: [] };
+    if (!checkRateLimit(artisan.id)) return { conseils: [] };
+
+    const metier = metierFromArtisan(artisan);
+    const contexteMetier = getContexteMetier(metier);
+
+    // Stats minimales pour personnaliser le prompt.
+    let nbDevisEnAttente = 0;
+    let nbFacturesImpayees = 0;
+    let montantImpayees = 0;
+    let nbStocksBas = 0;
+    try {
+      const stats = await db.getDashboardStats(artisan.id);
+      nbDevisEnAttente = stats?.devisEnCours || 0;
+      nbFacturesImpayees = stats?.facturesImpayees?.count || 0;
+      montantImpayees = Number(stats?.facturesImpayees?.total || 0);
+      const stocksBas = await db.getLowStockItems(artisan.id);
+      nbStocksBas = stocksBas.length;
+    } catch {/* ok */}
+
+    const moisLabel = new Date().toLocaleDateString("fr-FR", { month: "long" });
+
+    try {
+      const client = new Anthropic();
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 800,
+        temperature: 0.6,
+        system: contexteMetier,
+        messages: [{
+          role: "user",
+          content: `Tu es le conseiller IA d'Operioz pour ${artisan.nomEntreprise || "cet artisan"} (${metier || "batiment"}).
+
+Etat actuel :
+- ${nbDevisEnAttente} devis en attente de reponse
+- ${nbFacturesImpayees} factures impayees (${montantImpayees.toFixed(0)} EUR)
+- ${nbStocksBas} articles en stock bas
+- Mois en cours : ${moisLabel}
+
+Donne 3 conseils personnalises ET actionnables (pas de generalites). Chaque conseil a un titre court, un message en 1-2 phrases, une action concrete avec un lien interne d'Operioz, et un icone emoji.
+
+Liens disponibles : /devis, /factures, /relances, /clients, /interventions, /stocks, /tableau-bord-depenses, /alertes-previsions, /depenses, /budgets-depenses.
+
+Reponds UNIQUEMENT en JSON pur :
+{"conseils":[{"icone":"💡","titre":"court","message":"phrase","actionLabel":"texte bouton","actionLien":"/devis"}]}`,
+        }],
+      });
+      const text = response.content
+        .filter((b: any) => b.type === "text")
+        .map((b: any) => b.text)
+        .join("");
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return { conseils: [] };
+      const data = JSON.parse(jsonMatch[0]);
+      return {
+        conseils: Array.isArray(data.conseils) ? data.conseils.slice(0, 3) : [],
+        genereLe: new Date().toISOString(),
+      };
+    } catch (e: any) {
+      console.warn("[conseilsIA]", sanitizeIaError(e));
+      return { conseils: [] };
+    }
+  }),
+
   // === Generation IA des lignes de devis depuis une description (T3) ===
   // L'artisan decrit un chantier en texte libre (+ surface/budget
   // optionnels) ; l'IA renvoie objet + lignes pre-remplies + conseils

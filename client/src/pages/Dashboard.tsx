@@ -27,6 +27,7 @@ import {
   CustomizePanel,
   type CustomizableWidget,
 } from "@/components/dashboard/CustomizePanel";
+import { ConseillerIAWidget } from "@/components/ConseillerIAWidget";
 import { RevenueChartWidget } from "@/components/dashboard/widgets/RevenueChart";
 import { DevisRepartitionWidget } from "@/components/dashboard/widgets/DevisRepartition";
 import { TopClientsWidget } from "@/components/dashboard/widgets/TopClients";
@@ -569,6 +570,8 @@ export default function Dashboard() {
       />
 
       <AlertsBar alerts={dashboardAlerts} onNavigate={(path) => setLocation(path)} />
+
+      <ConseillerIAWidget />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statCards.map((card, i) => (
