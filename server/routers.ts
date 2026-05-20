@@ -95,27 +95,47 @@ const artisanRouter = router({
       codeAPE: z.string().optional(),
       logo: z.string().optional(),
       slug: z.string().optional(),
+      // T9 : metier libre (12 valeurs cote UI) hors enum drizzle, persiste raw SQL.
+      metier: z.string().max(50).optional(),
     }))
    .mutation(async ({ ctx, input }) => {
       let artisan = await db.getArtisanByUserId(ctx.user.id);
 
-      // Si le profil n'existe pas, le créer
+      // T9 : metier hors schema.ts, persiste via raw SQL.
+      const metierVal = (input as any).metier;
+      const drizzleInput: any = { ...input };
+      delete drizzleInput.metier;
+
+      const persistMetier = async (id: number) => {
+        if (typeof metierVal !== "string") return;
+        try {
+          await pool.execute(`UPDATE artisans SET metier = ? WHERE id = ?`, [metierVal.trim() || null, id]);
+        } catch (e: any) { console.warn("[updateProfile] metier persist:", String(e?.message || e)); }
+      };
+
       if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id, ...input });
+        artisan = await db.createArtisan({ userId: ctx.user.id, ...drizzleInput });
+        if (artisan) {
+          await persistMetier(artisan.id);
+          if (typeof metierVal === "string") (artisan as any).metier = metierVal.trim() || null;
+        }
         return artisan;
       }
 
-      // Sanitize slug if provided
-      if (input.slug) {
-        const slug = input.slug.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 200);
+      if (drizzleInput.slug) {
+        const slug = String(drizzleInput.slug).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 200);
         if (!slug) throw new TRPCError({ code: "BAD_REQUEST", message: "Slug invalide" });
         const available = await db.isSlugAvailable(slug, artisan.id);
         if (!available) throw new TRPCError({ code: "CONFLICT", message: "Ce slug est deja utilise" });
-        (input as any).slug = slug;
+        drizzleInput.slug = slug;
       }
 
-      // Sinon, le mettre à jour
-      return await db.updateArtisan(artisan.id, input);
+      artisan = await db.updateArtisan(artisan.id, drizzleInput);
+      if (artisan) {
+        await persistMetier(artisan.id);
+        if (typeof metierVal === "string") (artisan as any).metier = metierVal.trim() || null;
+      }
+      return artisan;
     }),
 });
 

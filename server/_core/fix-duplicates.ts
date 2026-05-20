@@ -678,6 +678,21 @@ async function fixDuplicates() {
       console.log('[FixDuplicates] artisans.logo widen:', e.message || e);
     }
 
+    // T9 IA contextuelle : ajout colonne metier sur artisans. Permet de
+    // selectionner le contexte IA specialise (12 metiers vs 4 specialites
+    // enum existantes). Stocke en VARCHAR libre, lu par metierFromArtisan
+    // cote routers. Idempotent.
+    try {
+      await pool.execute(`ALTER TABLE artisans ADD COLUMN metier VARCHAR(50) DEFAULT NULL`);
+      console.log('[FixDuplicates] Added metier column to artisans');
+    } catch (e: any) {
+      if (e.code === 'ER_DUP_FIELDNAME' || e.message?.includes('Duplicate column name')) {
+        // OK deja la
+      } else {
+        console.log('[FixDuplicates] artisans.metier add:', e.message || e);
+      }
+    }
+
     // ========================================================================
     // Migrate commandes_fournisseurs: add new columns + fix statut enum
     // ========================================================================

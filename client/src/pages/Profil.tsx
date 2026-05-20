@@ -19,6 +19,24 @@ import { toast } from "sonner";
 type Specialite = "plomberie" | "electricite" | "chauffage" | "multi-services";
 const SPECIALITES: Specialite[] = ["plomberie", "electricite", "chauffage", "multi-services"];
 
+// T9 : 12 metiers du contexte IA specialise (alignes avec server/_core/contexteMetier.ts).
+// Permet a l'artisan de selectionner le metier exact qui alimentera tous les
+// agents IA (assistant, suggestions articles, analyse photos, conseils dashboard).
+const METIERS_IA: { key: string; label: string }[] = [
+  { key: "plombier", label: "Plombier" },
+  { key: "electricien", label: "Electricien" },
+  { key: "chauffagiste", label: "Chauffagiste" },
+  { key: "paysagiste", label: "Paysagiste" },
+  { key: "cuisiniste", label: "Cuisiniste" },
+  { key: "carreleur", label: "Carreleur" },
+  { key: "menuisier", label: "Menuisier" },
+  { key: "macon", label: "Macon" },
+  { key: "peintre", label: "Peintre" },
+  { key: "terrassier", label: "Terrassier" },
+  { key: "domotique", label: "Domotique" },
+  { key: "autre", label: "Autre" },
+];
+
 export default function Profil() {
   const [formData, setFormData] = useState<{
     nomEntreprise: string;
@@ -26,6 +44,7 @@ export default function Profil() {
     numeroTVA: string;
     codeAPE: string;
     specialite: Specialite;
+    metier: string;
     telephone: string;
     email: string;
     adresse: string;
@@ -39,6 +58,7 @@ export default function Profil() {
     numeroTVA: "",
     codeAPE: "",
     specialite: "plomberie",
+    metier: "",
     telephone: "",
     email: "",
     adresse: "",
@@ -74,6 +94,7 @@ export default function Profil() {
         numeroTVA: (artisan as any).numeroTVA || "",
         codeAPE: (artisan as any).codeAPE || "",
         specialite,
+        metier: ((artisan as any).metier as string | null | undefined) || "",
         telephone: artisan.telephone || "",
         email: artisan.email || "",
         adresse: artisan.adresse || "",
@@ -177,6 +198,32 @@ export default function Profil() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* T9 : metier IA detaille. Determine quel contexte specialise est
+                injecte dans tous les prompts IA (devis, photos, assistant). */}
+            <div className="space-y-2 rounded-lg border border-violet-200 bg-violet-50 p-3">
+              <Label className="flex items-center gap-2">
+                <span className="text-violet-700">🎯</span>
+                <span>Métier détaillé (pour l'IA spécialisée)</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Personnalise les prix, normes, vocabulaire et conseils générés par toutes les IA d'Operioz.
+              </p>
+              <Select
+                value={formData.metier || "__none__"}
+                onValueChange={(v) => setFormData({ ...formData, metier: v === "__none__" ? "" : v })}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Non précisé" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Non précisé</SelectItem>
+                  {METIERS_IA.map((m) => (
+                    <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="tauxTVA">Taux de TVA par défaut (%)</Label>
