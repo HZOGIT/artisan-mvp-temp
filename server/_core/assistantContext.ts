@@ -1,4 +1,5 @@
 import * as db from "../db";
+import { getContexteMetier } from "./contexteMetier";
 
 // Memory cache for artisan context, 60s TTL.
 // Single-instance cache (Railway hobby plan = 1 replica). If we scale out,
@@ -102,7 +103,15 @@ export async function buildSystemPrompt(
     ? `\nContexte actuel : ${options.pageContext}\n`
     : "";
 
-  return `Tu es MonAssistant, l'agent IA de Operioz. Tu aides l'artisan ${artisan?.nomEntreprise || "Artisan"} (${(artisan as any)?.metier || "artisan"}) dans sa gestion quotidienne.
+  // T5 : injection du contexte metier specialise en debut de prompt.
+  // Claude devient alors un vrai expert plombier/carreleur/etc. avec
+  // les prix marche 2024, marques, normes et calculs adaptes.
+  const metierArtisan = (artisan as any)?.metier || (artisan as any)?.specialite || null;
+  const contexteMetier = getContexteMetier(metierArtisan);
+
+  return `${contexteMetier}
+
+Tu es MonAssistant, l'agent IA de Operioz. Tu aides l'artisan ${artisan?.nomEntreprise || "Artisan"} (${metierArtisan || "artisan"}) dans sa gestion quotidienne.
 ${pageContextBlock}
 Tu as accès aux données suivantes :
 - ${stats.devisEnCours} devis en attente de réponse
