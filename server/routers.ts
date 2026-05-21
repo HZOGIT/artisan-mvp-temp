@@ -3300,6 +3300,153 @@ const modelesEmailRouter = router({
 // COMMANDES FOURNISSEURS ROUTER
 // ============================================================================
 const commandesFournisseursRouter = router({
+  // T8 : liste les devis acceptes pour le selecteur "Generer depuis un devis"
+  // dans le formulaire de commande fournisseur. Retourne id/numero/objet/total
+  // + nom client pour l'affichage.
+  listDevisAcceptes: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const all = await db.getDevisByArtisanId(artisan.id);
+    const acceptes = all.filter((d: any) => d.statut === "accepte");
+    const result: Array<{ id: number; numero: string; objet: string; clientNom: string; totalTTC: number; dateDevis: string }> = [];
+    for (const d of acceptes) {
+      let clientNom = "Client";
+      try {
+        const c = await db.getClientById(d.clientId);
+        if (c) clientNom = c.nom + (c.prenom ? " " + c.prenom : "");
+      } catch {/* ignore */}
+      result.push({
+        id: d.id,
+        numero: d.numero,
+        objet: (d.objet as string) || "",
+        clientNom,
+        totalTTC: Number(d.totalTTC || 0),
+        dateDevis: d.dateDevis ? new Date(d.dateDevis as any).toISOString() : "",
+      });
+    }
+    return result;
+  }),
+
+  // T8 : Generation IA d'une commande fournisseur depuis un devis accepte.
+  // Analyse les lignes du devis, ajuste selon le stock courant et propose
+  // les articles a commander (fournitures uniquement, exclut la main d'oeuvre).
+  // Ne cree PAS la commande : retourne juste les lignes pre-remplies.
+  genererDepuisDevisIA: protectedProcedure
+    .input(z.object({ devisId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!checkRateLimit(artisan.id)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite IA atteinte" });
+      }
+
+      const devis = await db.getDevisById(input.devisId);
+      if (!devis || devis.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devis introuvable" });
+      }
+      if (devis.statut !== "accepte") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le devis doit etre accepte" });
+      }
+
+      const lignesDevis = await db.getLignesDevisByDevisId(devis.id);
+      if (lignesDevis.length === 0) {
+        return { lignes: [], notes: "Devis sans ligne." };
+      }
+
+      // Charge le stock pour l'ajustement quantitatif.
+      let stocks: any[] = [];
+      try { stocks = await db.getStocksByArtisanId(artisan.id); } catch {/* ok */}
+      const stockIndex = new Map<string, { quantite: number; designation: string; articleId: number | null }>();
+      for (const s of stocks) {
+        const key = (s.designation || "").toLowerCase().trim();
+        if (key) {
+          stockIndex.set(key, {
+            quantite: Number(s.quantiteEnStock || 0),
+            designation: s.designation,
+            articleId: s.articleType === "artisan" ? s.articleId : null,
+          });
+        }
+      }
+
+      // Charge les articles artisans pour le matching articleId.
+      let articlesArtisan: any[] = [];
+      try { articlesArtisan = await db.getArticlesArtisan(artisan.id); } catch {/* ok */}
+
+      const metier = metierFromArtisan(artisan);
+      const contexteMetier = getContexteMetier(metier);
+
+      const lignesPourPrompt = lignesDevis.map((l: any) => ({
+        designation: l.designation,
+        quantite: Number(l.quantite || 1),
+        unite: l.unite || "u",
+        prix: Number(l.prixUnitaireHT || 0),
+      }));
+      const stockPourPrompt = Array.from(stockIndex.entries()).map(([_, v]) => ({
+        designation: v.designation, enStock: v.quantite,
+      }));
+
+      const userPrompt = `Devis "${devis.objet || devis.numero}" — lignes :
+${JSON.stringify(lignesPourPrompt, null, 2)}
+
+Stock actuel disponible (peut etre vide) :
+${JSON.stringify(stockPourPrompt, null, 2)}
+
+Tache : a partir des lignes du devis, deduis la liste des MATERIAUX et FOURNITURES a commander au fournisseur. Exclus strictement la main d'oeuvre et les forfaits intellectuels. Pour chaque fourniture, propose une quantite a commander adaptee aux quantites du devis et au stock disponible. Si une fourniture est deja en stock en quantite suffisante, RETIRE-LA de la liste ou reduis la quantite a 0. Estime le prixUnitaire HT marche francais 2024.
+
+Reponds UNIQUEMENT en JSON pur :
+{"lignes":[{"designation":"texte","reference":"","quantite":1,"unite":"u|m|m2|kg|ml","prixUnitaire":0,"tauxTVA":20}],"notes":"remarques optionnelles"}`;
+
+      try {
+        const client = new Anthropic();
+        const response = await client.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2500,
+          temperature: 0.3,
+          system: contexteMetier,
+          messages: [{ role: "user", content: userPrompt }],
+        });
+        const text = response.content
+          .filter((b: any) => b.type === "text")
+          .map((b: any) => b.text)
+          .join("");
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return { lignes: [], notes: "" };
+        const data = JSON.parse(jsonMatch[0]);
+
+        // Matche les designations IA contre les articles artisans pour
+        // pre-remplir articleId quand possible.
+        const norm = (s: string) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+        const ligneOut = (Array.isArray(data.lignes) ? data.lignes : [])
+          .filter((l: any) => Number(l.quantite) > 0)
+          .map((l: any) => {
+            const dnorm = norm(l.designation);
+            const match = articlesArtisan.find((a: any) => norm(a.designation) === dnorm)
+              || articlesArtisan.find((a: any) => norm(a.designation).includes(dnorm) || dnorm.includes(norm(a.designation)));
+            return {
+              articleId: match ? match.id : null,
+              designation: String(l.designation || "").slice(0, 500),
+              reference: match?.reference || String(l.reference || ""),
+              quantite: Math.max(0.01, Number(l.quantite) || 1),
+              unite: String(l.unite || "u").slice(0, 20),
+              prixUnitaire: Number(l.prixUnitaire) || 0,
+              tauxTVA: Number(l.tauxTVA) || 20,
+            };
+          });
+
+        return {
+          lignes: ligneOut,
+          notes: typeof data.notes === "string" ? data.notes.slice(0, 500) : "",
+          devisNumero: devis.numero,
+        };
+      } catch (e: any) {
+        console.warn("[genererDepuisDevisIA]", sanitizeIaError(e));
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Generation IA echouee : ${sanitizeIaError(e)}`,
+        });
+      }
+    }),
+
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];

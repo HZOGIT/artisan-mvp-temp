@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash2, Search, Loader2, Send, Save } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, Loader2, Send, Save, Sparkles, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { matchSearch } from "@/lib/normalize";
 
@@ -53,6 +53,40 @@ export default function CommandeFournisseurForm() {
   const { data: fournisseurs } = trpc.fournisseurs.list.useQuery();
   const { data: artisanArticles } = trpc.articles.getArtisanArticles.useQuery();
   const utils = trpc.useUtils();
+
+  // T8 : generation IA depuis devis accepte
+  const [iaSectionOpen, setIaSectionOpen] = useState(false);
+  const [selectedDevisId, setSelectedDevisId] = useState<number | null>(null);
+  const { data: devisAcceptes } = trpc.commandesFournisseurs.listDevisAcceptes.useQuery(
+    undefined,
+    { enabled: iaSectionOpen, staleTime: 60 * 1000 }
+  );
+  const genererIA = trpc.commandesFournisseurs.genererDepuisDevisIA.useMutation({
+    onSuccess: (data) => {
+      if (!data.lignes || data.lignes.length === 0) {
+        toast.info("L'IA n'a identifie aucune fourniture a commander (devis sans materiel ?)");
+        return;
+      }
+      const nouvellesLignes: LigneCommande[] = data.lignes.map((l: any, idx: number) => ({
+        id: `${Date.now()}-${idx}`,
+        articleId: l.articleId ?? null,
+        designation: l.designation,
+        reference: l.reference || "",
+        quantite: Number(l.quantite) || 1,
+        unite: l.unite || "u",
+        prixUnitaire: Number(l.prixUnitaire) || undefined,
+        tauxTVA: Number(l.tauxTVA) || 20,
+      }));
+      setLignes((prev) => [...prev, ...nouvellesLignes]);
+      if (data.notes && !notes) setNotes(data.notes);
+      toast.success(`${nouvellesLignes.length} ligne(s) generee(s) depuis le devis ${data.devisNumero}`);
+      setIaSectionOpen(false);
+      setSelectedDevisId(null);
+    },
+    onError: (e: any) => {
+      toast.error(e?.message || "Erreur generation IA");
+    },
+  });
 
   // Load existing commande in edit mode
   const { data: existingCommande } = trpc.commandesFournisseurs.getById.useQuery(
@@ -350,6 +384,62 @@ export default function CommandeFournisseurForm() {
             />
           </div>
         </CardContent>
+      </Card>
+
+      {/* T8 — Generation IA depuis devis accepte */}
+      <Card className="border-violet-200 bg-gradient-to-br from-violet-50/60 to-white">
+        <CardHeader className="cursor-pointer" onClick={() => setIaSectionOpen((v) => !v)}>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-4 w-4 text-violet-600" />
+              <span>Générer depuis un devis accepté</span>
+              <span className="text-xs font-normal text-muted-foreground">(IA)</span>
+            </CardTitle>
+            <ChevronDown className={`h-4 w-4 transition-transform ${iaSectionOpen ? "rotate-180" : ""}`} />
+          </div>
+        </CardHeader>
+        {iaSectionOpen && (
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              L'IA analyse les lignes du devis, ignore la main d'œuvre, ajuste les quantités selon votre stock actuel et propose les fournitures à commander.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select
+                value={selectedDevisId ? String(selectedDevisId) : ""}
+                onValueChange={(v) => setSelectedDevisId(v ? Number(v) : null)}
+              >
+                <SelectTrigger className="flex-1 bg-white">
+                  <SelectValue placeholder={
+                    devisAcceptes === undefined ? "Chargement…" :
+                    devisAcceptes.length === 0 ? "Aucun devis accepté" :
+                    "Sélectionner un devis accepté…"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {(devisAcceptes || []).map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>
+                      {d.numero} — {d.clientNom} ({formatCurrency(d.totalTTC)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => selectedDevisId && genererIA.mutate({ devisId: selectedDevisId })}
+                disabled={!selectedDevisId || genererIA.isPending}
+                className="bg-violet-600 hover:bg-violet-700"
+              >
+                {genererIA.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Génération…</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-2" /> Générer les lignes</>
+                )}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Les lignes sont ajoutées à votre commande — vous pouvez les éditer avant validation.
+            </p>
+          </CardContent>
+        )}
       </Card>
 
       {/* Lines section */}
