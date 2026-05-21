@@ -3952,6 +3952,144 @@ const clientPortalRouter = router({
       return { success: true };
     }),
 
+  // T6 : portail client intelligent. Le client decrit son besoin en texte
+  // libre. L'IA (contexte metier de l'artisan) structure la demande en
+  // JSON (titre, type travaux, urgence, fourchette prix, questions de
+  // precision). L'artisan recoit une notification + un email. Le client
+  // recoit en retour la structuration pour confirmation avant traitement.
+  soumettreDemandeIA: publicProcedure
+    .input(z.object({
+      token: z.string(),
+      description: z.string().min(10).max(2000),
+    }))
+    .mutation(async ({ input }) => {
+      const access = await db.getClientPortalAccessByToken(input.token);
+      if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      const client = await db.getClientById(access.clientId);
+      const artisan = await db.getArtisanById(access.artisanId);
+      if (!client || !artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Données introuvables" });
+
+      // Rate-limit cote artisan : evite qu'un portail abuse de l'API IA.
+      if (!checkRateLimit(artisan.id)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes, reessayez plus tard" });
+      }
+
+      // Lit le metier hors-schema (colonne ajoutee via fix-duplicates).
+      let metier: string | null = null;
+      try {
+        const [rows] = await pool.execute(`SELECT metier FROM artisans WHERE id = ?`, [artisan.id]);
+        const r: any = Array.isArray(rows) ? rows[0] : null;
+        metier = r?.metier || (artisan as any).specialite || null;
+      } catch {
+        metier = (artisan as any).specialite || null;
+      }
+      const contexteMetier = getContexteMetier(metier);
+
+      const clientName = `${client.prenom || ''} ${client.nom}`.trim();
+
+      let structured: {
+        titre: string;
+        descriptionReformulee: string;
+        typeTravaux: string;
+        urgence: "faible" | "normale" | "urgente";
+        estimationMin: number | null;
+        estimationMax: number | null;
+        questions: string[];
+      } = {
+        titre: input.description.slice(0, 60),
+        descriptionReformulee: input.description,
+        typeTravaux: "Non determine",
+        urgence: "normale",
+        estimationMin: null,
+        estimationMax: null,
+        questions: [],
+      };
+
+      try {
+        const aClient = new Anthropic();
+        const response = await aClient.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1200,
+          temperature: 0.4,
+          system: contexteMetier,
+          messages: [{
+            role: "user",
+            content: `Un client (${clientName}) decrit son besoin sur le portail :
+"""
+${input.description}
+"""
+
+Tache : structure cette demande pour l'artisan. Donne un titre court, reformule clairement, identifie le type de travaux, estime l'urgence (faible/normale/urgente), donne une fourchette de prix realiste marche francais 2024 (estimation_min et estimation_max en euros TTC) et propose 2 a 3 questions de precision a poser au client pour pouvoir chiffrer.
+
+Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
+{"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}`,
+          }],
+        });
+        const text = response.content
+          .filter((b: any) => b.type === "text")
+          .map((b: any) => b.text)
+          .join("");
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const data = JSON.parse(jsonMatch[0]);
+          structured = {
+            titre: String(data.titre || structured.titre).slice(0, 120),
+            descriptionReformulee: String(data.description_reformulee || input.description).slice(0, 1500),
+            typeTravaux: String(data.type_travaux || "Non determine").slice(0, 80),
+            urgence: ["faible", "normale", "urgente"].includes(data.urgence) ? data.urgence : "normale",
+            estimationMin: Number.isFinite(Number(data.estimation_min)) ? Number(data.estimation_min) : null,
+            estimationMax: Number.isFinite(Number(data.estimation_max)) ? Number(data.estimation_max) : null,
+            questions: Array.isArray(data.questions) ? data.questions.slice(0, 5).map((q: any) => String(q).slice(0, 200)) : [],
+          };
+        }
+      } catch (e: any) {
+        console.warn("[soumettreDemandeIA]", sanitizeIaError(e));
+        // On continue avec structured par defaut : l'artisan recevra
+        // au moins le texte brut du client.
+      }
+
+      const fourchette = structured.estimationMin && structured.estimationMax
+        ? `${structured.estimationMin}-${structured.estimationMax} €`
+        : "à chiffrer";
+      const urgenceLabel = structured.urgence === "urgente" ? "Urgente" : structured.urgence === "faible" ? "Faible" : "Normale";
+
+      // Notification artisan (in-app, in best-effort)
+      try {
+        await db.createNotification({
+          artisanId: artisan.id,
+          type: "info",
+          titre: `Nouvelle demande : ${structured.titre}`,
+          message: `${clientName} — ${structured.typeTravaux} — Devis estime : ${fourchette} (${urgenceLabel})`,
+          lien: "/clients",
+        });
+      } catch (e) { console.error("[soumettreDemandeIA] notif:", e); }
+
+      // Email artisan (best-effort)
+      if (artisan.email) {
+        try {
+          const questionsHtml = structured.questions.length
+            ? `<p style="margin-top:16px;"><strong>Questions a poser au client :</strong></p><ul>${structured.questions.map(q => `<li>${q}</li>`).join("")}</ul>`
+            : "";
+          await sendEmail({
+            to: artisan.email,
+            subject: `Nouvelle demande portail : ${structured.titre}`,
+            body: `<p>Nouvelle demande de <strong>${clientName}</strong> (${client.email || "pas d'email"} - ${client.telephone || "pas de tel"}) via le portail client.</p>
+<p><strong>Type :</strong> ${structured.typeTravaux} &nbsp;|&nbsp; <strong>Urgence :</strong> ${urgenceLabel} &nbsp;|&nbsp; <strong>Devis estime :</strong> ${fourchette}</p>
+<p><strong>Description reformulee par l'IA :</strong></p>
+<blockquote style="border-left:3px solid #8b5cf6;padding:12px;margin:16px 0;background:#f8fafc;">${structured.descriptionReformulee}</blockquote>
+<p><strong>Texte original du client :</strong></p>
+<blockquote style="border-left:3px solid #cbd5e1;padding:12px;margin:16px 0;background:#f8fafc;color:#475569;">${input.description}</blockquote>
+${questionsHtml}`,
+          });
+        } catch (e) { console.error("[soumettreDemandeIA] email:", e); }
+      }
+
+      return {
+        success: true,
+        structured,
+      };
+    }),
+
   // Statut du portail pour un client (protégé — côté artisan)
   getStatus: protectedProcedure
     .input(z.object({ clientId: z.number() }))

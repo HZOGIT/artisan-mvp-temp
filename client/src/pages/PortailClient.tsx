@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock, CalendarDays, ArrowRight, HardHat, CheckCircle2, CreditCard } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Download, ExternalLink, Send, Loader2, CheckCircle, MapPin, Phone, Mail, MessageCircle, ArrowLeft, Clock, CalendarDays, ArrowRight, HardHat, CheckCircle2, CreditCard, Sparkles } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -20,6 +20,34 @@ export default function PortailClient() {
   const [activeTab, setActiveTab] = useState("devis");
   const [modificationMessage, setModificationMessage] = useState("");
   const [modificationSent, setModificationSent] = useState(false);
+
+  // T6 : nouvelle demande IA
+  const [demandeText, setDemandeText] = useState("");
+  const [demandeStructured, setDemandeStructured] = useState<{
+    titre: string;
+    descriptionReformulee: string;
+    typeTravaux: string;
+    urgence: "faible" | "normale" | "urgente";
+    estimationMin: number | null;
+    estimationMax: number | null;
+    questions: string[];
+  } | null>(null);
+  const soumettreDemandeIA = trpc.clientPortal.soumettreDemandeIA.useMutation({
+    onSuccess: (data) => {
+      setDemandeStructured(data.structured);
+      setDemandeText("");
+      toast.success("Votre demande a été transmise à l'artisan");
+    },
+    onError: (e: any) => {
+      toast.error(e?.message || "Erreur lors de l'envoi de la demande");
+    },
+  });
+  const EXEMPLES_DEMANDE = [
+    "Rénover ma salle de bain",
+    "Refaire mon jardin",
+    "Problème de plomberie",
+    "Installation électrique",
+  ];
 
   const { data: accessData, isLoading: accessLoading } = trpc.clientPortal.verifyAccess.useQuery(
     { token: token || "" },
@@ -307,7 +335,11 @@ export default function PortailClient() {
       {/* Main Content */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-7 mb-6">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-8 mb-6">
+            <TabsTrigger value="demande" className="flex items-center gap-1.5 text-xs sm:text-sm">
+              <Sparkles className="h-4 w-4 text-violet-600" />
+              <span className="hidden sm:inline">Nouvelle </span>Demande
+            </TabsTrigger>
             <TabsTrigger value="devis" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <FileText className="h-4 w-4" />
               <span className="hidden sm:inline">Mes </span>Devis
@@ -346,6 +378,101 @@ export default function PortailClient() {
               <span className="hidden sm:inline">Mes </span>Infos
             </TabsTrigger>
           </TabsList>
+
+          {/* T6 — Nouvelle demande IA */}
+          <TabsContent value="demande">
+            <Card className="border-violet-200 bg-gradient-to-br from-violet-50/50 to-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-violet-600" />
+                  Décrivez votre projet en quelques mots
+                </CardTitle>
+                <CardDescription>
+                  L'artisan recevra votre demande structurée par notre assistant intelligent avec une estimation tarifaire.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {EXEMPLES_DEMANDE.map((ex) => (
+                    <button
+                      key={ex}
+                      type="button"
+                      onClick={() => setDemandeText(ex)}
+                      className="text-xs px-3 py-1.5 rounded-full border border-violet-200 bg-white hover:bg-violet-100 text-violet-700 transition-colors"
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
+                <Textarea
+                  value={demandeText}
+                  onChange={(e) => setDemandeText(e.target.value)}
+                  placeholder="Ex : Ma chaudière fait du bruit depuis quelques jours, j'ai aussi un radiateur qui ne chauffe plus dans la chambre…"
+                  rows={5}
+                  className="bg-white"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    {demandeText.length} / 2000 caractères (min. 10)
+                  </span>
+                  <Button
+                    onClick={() => soumettreDemandeIA.mutate({ token: token || "", description: demandeText.trim() })}
+                    disabled={demandeText.trim().length < 10 || soumettreDemandeIA.isPending}
+                    className="bg-violet-600 hover:bg-violet-700"
+                  >
+                    {soumettreDemandeIA.isPending ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Envoi…</>
+                    ) : (
+                      <><Send className="h-4 w-4 mr-2" /> Envoyer ma demande</>
+                    )}
+                  </Button>
+                </div>
+
+                {demandeStructured && (
+                  <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-emerald-900">Demande envoyée à l'artisan</p>
+                        <p className="text-xs text-emerald-700">Voici comment votre demande lui a été présentée :</p>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-md p-3 space-y-2 text-sm">
+                      <div><span className="font-semibold">Titre :</span> {demandeStructured.titre}</div>
+                      <div><span className="font-semibold">Type de travaux :</span> {demandeStructured.typeTravaux}</div>
+                      <div>
+                        <span className="font-semibold">Urgence :</span>{" "}
+                        <Badge variant={demandeStructured.urgence === "urgente" ? "destructive" : "secondary"}>
+                          {demandeStructured.urgence}
+                        </Badge>
+                      </div>
+                      {demandeStructured.estimationMin !== null && demandeStructured.estimationMax !== null && (
+                        <div>
+                          <span className="font-semibold">Estimation indicative :</span>{" "}
+                          <span className="text-violet-700 font-semibold">
+                            {demandeStructured.estimationMin}€ – {demandeStructured.estimationMax}€
+                          </span>
+                          <span className="text-xs text-muted-foreground ml-2">(à confirmer par l'artisan)</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-semibold">Description reformulée :</span>
+                        <p className="mt-1 text-gray-700">{demandeStructured.descriptionReformulee}</p>
+                      </div>
+                      {demandeStructured.questions.length > 0 && (
+                        <div>
+                          <span className="font-semibold">Questions que l'artisan pourra vous poser :</span>
+                          <ul className="mt-1 list-disc list-inside text-gray-700">
+                            {demandeStructured.questions.map((q, i) => <li key={i}>{q}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Devis Tab */}
           <TabsContent value="devis">
