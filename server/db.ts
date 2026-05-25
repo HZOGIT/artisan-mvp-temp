@@ -236,6 +236,32 @@ export async function createArtisan(data: InsertArtisan): Promise<Artisan> {
   return result[0];
 }
 
+// Garantit l'unicite : 1 ligne artisans par userId. A utiliser PARTOUT a la
+// place du couple getArtisanByUserId + createArtisan a la volee, qui pouvait
+// creer plusieurs lignes pour le meme userId (race condition entre requetes
+// concurrentes au premier login). La contrainte UNIQUE(userId) ajoutee par
+// fix-duplicates protege en derniere ligne : ER_DUP_ENTRY -> on relit.
+export async function getOrCreateArtisan(
+  userId: number,
+  data?: Partial<Omit<InsertArtisan, "userId">>,
+): Promise<Artisan> {
+  const existing = await getArtisanByUserId(userId);
+  if (existing) return existing;
+  try {
+    return await createArtisan({ userId, ...(data ?? {}) } as InsertArtisan);
+  } catch (e: any) {
+    const isDup =
+      e?.code === "ER_DUP_ENTRY" ||
+      /Duplicate entry/i.test(String(e?.message ?? "")) ||
+      e?.errno === 1062;
+    if (isDup) {
+      const refetched = await getArtisanByUserId(userId);
+      if (refetched) return refetched;
+    }
+    throw e;
+  }
+}
+
 export async function updateArtisan(id: number, data: Partial<InsertArtisan>): Promise<Artisan | undefined> {
   const db = await getDb();
   await db.update(artisans).set(data).where(eq(artisans.id, id));

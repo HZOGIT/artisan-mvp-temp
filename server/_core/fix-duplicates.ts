@@ -13,6 +13,143 @@ async function fixDuplicates() {
   const pool = mysql.createPool({ uri: url, charset: 'utf8mb4' });
 
   try {
+    // ========================================================================
+    // ARTISAN DEDUP : fusionne les doublons artisans crees par les anciens
+    // appels `createArtisan({ userId })` a la volee dans routers.ts. Doit
+    // tourner AVANT la renumerotation devis/factures pour que la
+    // renumerotation existante regle les collisions UNIQUE(artisanId, numero)
+    // creees par la fusion. Bloc entierement defensif + idempotent.
+    // ========================================================================
+    try {
+      const [dupArtisanRows] = await pool.execute(
+        `SELECT userId, MIN(id) AS keeper, GROUP_CONCAT(id ORDER BY id) AS ids, COUNT(*) AS cnt
+         FROM artisans WHERE userId IS NOT NULL GROUP BY userId HAVING cnt > 1`
+      ) as any;
+
+      console.log(`[ArtisanDedup] ${dupArtisanRows.length} userId(s) ont plusieurs lignes artisans`);
+
+      if (dupArtisanRows.length > 0) {
+        // Decouvre dynamiquement toutes les tables qui ont une colonne
+        // artisanId (camelCase, declaree dans drizzle/schema.ts) ou
+        // artisan_id (snake_case, declaree en raw SQL plus bas dans ce
+        // fichier : modules, subscriptions, depenses, etc.). On exclut la
+        // table artisans elle-meme.
+        const [colRows] = await pool.execute(
+          `SELECT TABLE_NAME, COLUMN_NAME
+             FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND COLUMN_NAME IN ('artisanId', 'artisan_id')
+              AND TABLE_NAME <> 'artisans'`
+        ) as any;
+        const childCols: Array<{ table: string; column: string }> = (colRows as any[]).map((r: any) => ({
+          table: r.TABLE_NAME, column: r.COLUMN_NAME,
+        }));
+        console.log(`[ArtisanDedup] ${childCols.length} colonne(s) enfant decouverte(s) :`,
+          childCols.map(c => `${c.table}.${c.column}`).join(', '));
+
+        // Helper : pour 1 dupe -> keeper sur 1 table, tente l'UPDATE bulk
+        // puis fallback row-by-row en cas de collision UNIQUE.
+        async function moveTableData(table: string, col: string, keeper: number, dupe: number) {
+          try {
+            const [res] = await pool.execute(
+              `UPDATE \`${table}\` SET \`${col}\` = ? WHERE \`${col}\` = ?`,
+              [keeper, dupe]
+            ) as any;
+            if (res.affectedRows > 0) {
+              console.log(`[ArtisanDedup] ${table}.${col} : ${res.affectedRows} ligne(s) ${dupe}->${keeper}`);
+            }
+          } catch (e: any) {
+            const isDup = e?.code === 'ER_DUP_ENTRY' || /Duplicate entry/i.test(String(e?.message ?? ''));
+            if (!isDup) { console.log(`[ArtisanDedup] ${table}.${col} ERR :`, e?.message || e); return; }
+
+            // Trouve la PK simple si elle existe, sinon abandonne le row-by-row
+            const [pkRows] = await pool.execute(
+              `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+                  AND COLUMN_KEY = 'PRI'`,
+              [table]
+            ) as any;
+            if ((pkRows as any[]).length === 1) {
+              const pk = (pkRows[0] as any).COLUMN_NAME;
+              const [dupRows] = await pool.execute(
+                `SELECT \`${pk}\` AS pk FROM \`${table}\` WHERE \`${col}\` = ?`, [dupe]
+              ) as any;
+              let moved = 0, deleted = 0;
+              for (const r of (dupRows as any[])) {
+                try {
+                  await pool.execute(`UPDATE \`${table}\` SET \`${col}\` = ? WHERE \`${pk}\` = ?`, [keeper, r.pk]);
+                  moved++;
+                } catch (e2: any) {
+                  const isDup2 = e2?.code === 'ER_DUP_ENTRY' || /Duplicate entry/i.test(String(e2?.message ?? ''));
+                  if (isDup2) {
+                    await pool.execute(`DELETE FROM \`${table}\` WHERE \`${pk}\` = ?`, [r.pk]);
+                    deleted++;
+                  } else { console.log(`[ArtisanDedup] ${table}.${col} row err :`, e2?.message); }
+                }
+              }
+              console.log(`[ArtisanDedup] ${table}.${col} : ${moved} deplace(s), ${deleted} supprime(s) (collisions)`);
+            } else {
+              // PK composite : on ne peut pas merger ligne par ligne sans
+              // ambiguite. On supprime les lignes du dupe (le keeper garde
+              // les siennes, source de verite).
+              const [delRes] = await pool.execute(
+                `DELETE FROM \`${table}\` WHERE \`${col}\` = ?`, [dupe]
+              ) as any;
+              console.log(`[ArtisanDedup] ${table}.${col} : PK composite, ${delRes.affectedRows} ligne(s) du dupe supprimee(s)`);
+            }
+          }
+        }
+
+        for (const row of (dupArtisanRows as any[])) {
+          const userId = row.userId;
+          const keeper: number = row.keeper;
+          const allIds: number[] = String(row.ids).split(',').map(Number);
+          const dupes = allIds.filter(id => id !== keeper);
+          console.log(`[ArtisanDedup] userId=${userId} keeper=${keeper} dupes=[${dupes.join(',')}]`);
+
+          for (const dupe of dupes) {
+            // 1) Reaffecte les colonnes enfant
+            for (const c of childCols) {
+              await moveTableData(c.table, c.column, keeper, dupe);
+            }
+            // 2) Supprime la ligne artisan dupliquee
+            try {
+              const [delRes] = await pool.execute(
+                `DELETE FROM artisans WHERE id = ?`, [dupe]
+              ) as any;
+              console.log(`[ArtisanDedup] artisans id=${dupe} supprime (${delRes.affectedRows} ligne)`);
+            } catch (e: any) {
+              console.log(`[ArtisanDedup] DELETE artisans id=${dupe} :`, e?.message || e);
+            }
+          }
+        }
+        console.log(`[ArtisanDedup] Fusion terminee pour ${dupArtisanRows.length} userId(s)`);
+      }
+
+      // 3) Ajoute la contrainte UNIQUE(userId) sur artisans. Idempotent :
+      // on catch ER_DUP_KEYNAME (index deja present). Si la contrainte
+      // echoue avec ER_DUP_ENTRY, c'est qu'il reste des doublons -> on logue
+      // sans bloquer.
+      try {
+        await pool.execute(
+          `ALTER TABLE artisans ADD UNIQUE INDEX uq_artisans_userId (userId)`
+        );
+        console.log('[ArtisanDedup] UNIQUE INDEX uq_artisans_userId ajoute');
+      } catch (e: any) {
+        if (e?.code === 'ER_DUP_KEYNAME' || /Duplicate key name/i.test(String(e?.message ?? ''))) {
+          console.log('[ArtisanDedup] UNIQUE INDEX uq_artisans_userId deja present');
+        } else if (e?.code === 'ER_DUP_ENTRY' || /Duplicate entry/i.test(String(e?.message ?? ''))) {
+          console.error('[ArtisanDedup] ECHEC UNIQUE : doublons restants sur artisans.userId :', e?.message);
+        } else {
+          console.log('[ArtisanDedup] UNIQUE INDEX :', e?.message || e);
+        }
+      }
+    } catch (e: any) {
+      console.error('[ArtisanDedup] Bloc non-bloquant :', e?.message || e);
+      // Ne JAMAIS throw : le serveur doit pouvoir demarrer meme si la
+      // fusion echoue partiellement (les autres migrations doivent suivre).
+    }
+
     // Find duplicate devis numbers per artisan
     const [dups] = await pool.execute(
       `SELECT artisanId, numero, GROUP_CONCAT(id ORDER BY id) as ids, COUNT(*) as cnt

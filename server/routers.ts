@@ -76,7 +76,7 @@ const artisanRouter = router({
       if (existing) {
         throw new TRPCError({ code: "CONFLICT", message: "Profil artisan déjà existant" });
       }
-      return await db.createArtisan({ userId: ctx.user.id, ...input });
+      return await db.getOrCreateArtisan(ctx.user.id, input);
     }),
   
   updateProfile: protectedProcedure
@@ -114,7 +114,7 @@ const artisanRouter = router({
       };
 
       if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id, ...drizzleInput });
+        artisan = await db.getOrCreateArtisan(ctx.user.id, drizzleInput);
         if (artisan) {
           await persistMetier(artisan.id);
           if (typeof metierVal === "string") (artisan as any).metier = metierVal.trim() || null;
@@ -168,10 +168,7 @@ const clientsRouter = router({
   create: protectedProcedure
     .input(ClientInputSchema)
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       // Utiliser la version sécurisée
       return await dbSecure.createClientSecure(artisan.id, input);
     }),
@@ -235,10 +232,7 @@ const clientsRouter = router({
       }))
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       
       let imported = 0;
       let skipped = 0;
@@ -353,10 +347,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
       categorie: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createArticleArtisan({ artisanId: artisan.id, ...input });
     }),
   
@@ -648,10 +639,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       dateValidite: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       // Vérifier que le client appartient à l'artisan
       const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
       if (!client) {
@@ -1299,10 +1287,7 @@ const facturesRouter = router({
       dateEcheance: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       // Vérifier que le client appartient à l'artisan
       const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
       if (!client) {
@@ -1901,10 +1886,7 @@ const interventionsRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       // Vérifier que le client appartient à l'artisan
       const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
       if (!client) {
@@ -3233,10 +3215,7 @@ const modelesEmailRouter = router({
       isDefault: z.boolean().optional()
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createModeleEmail({
         artisanId: artisan.id,
         ...input
@@ -3500,10 +3479,7 @@ Reponds UNIQUEMENT en JSON pur :
       }))
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
 
       // Generate numero CMD-XXXXX
       const numero = await db.getNextCommandeNumero(artisan.id);
@@ -4342,10 +4318,7 @@ const contratsRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const reference = await db.getNextContratNumber(artisan.id);
 
       const dateDebut = new Date(input.dateDebut);
@@ -5724,10 +5697,7 @@ const rapportsRouter = router({
       graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createRapportPersonnalise({
         artisanId: artisan.id,
         ...input,
@@ -5862,18 +5832,12 @@ const congesRouter = router({
   list: protectedProcedure
     .input(z.object({ statut: z.string().optional() }))
     .query(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.getCongesByArtisan(artisan.id, input.statut);
     }),
 
   enAttente: protectedProcedure.query(async ({ ctx }) => {
-    let artisan = await db.getArtisanByUserId(ctx.user.id);
-    if (!artisan) {
-      artisan = await db.createArtisan({ userId: ctx.user.id });
-    }
+    let artisan = await db.getOrCreateArtisan(ctx.user.id);
     return await db.getCongesEnAttente(artisan.id);
   }),
 
@@ -5886,10 +5850,7 @@ const congesRouter = router({
   byPeriode: protectedProcedure
     .input(z.object({ dateDebut: z.string(), dateFin: z.string() }))
     .query(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.getCongesParPeriode(artisan.id, input.dateDebut, input.dateFin);
     }),
 
@@ -5904,10 +5865,7 @@ const congesRouter = router({
       motif: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createConge({
         ...input,
         artisanId: artisan.id,
@@ -5970,10 +5928,7 @@ const congesRouter = router({
       soldeInitial: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.initSoldeConges({
         ...input,
         artisanId: artisan.id,
@@ -5989,18 +5944,12 @@ const previsionsRouter = router({
   getHistorique: protectedProcedure
     .input(z.object({ nombreMois: z.number().default(24) }))
     .query(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.getHistoriqueCA(artisan.id, input.nombreMois);
     }),
 
   calculerHistorique: protectedProcedure.mutation(async ({ ctx }) => {
-    let artisan = await db.getArtisanByUserId(ctx.user.id);
-    if (!artisan) {
-      artisan = await db.createArtisan({ userId: ctx.user.id });
-    }
+    let artisan = await db.getOrCreateArtisan(ctx.user.id);
     await db.calculerHistoriqueCAMensuel(artisan.id);
     return { success: true };
   }),
@@ -6015,20 +5964,14 @@ const previsionsRouter = router({
       panierMoyen: z.string().default("0"),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.seedHistoriqueCA(artisan.id, input);
     }),
 
   getPrevisions: protectedProcedure
     .input(z.object({ annee: z.number().optional() }).optional())
     .query(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const annee = input?.annee || new Date().getFullYear();
       return await db.getPrevisionsCA(artisan.id, annee);
     }),
@@ -6036,10 +5979,7 @@ const previsionsRouter = router({
   calculer: protectedProcedure
     .input(z.object({ methode: z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite"]).default("moyenne_mobile") }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       // D'abord mettre à jour l'historique
       await db.calculerHistoriqueCAMensuel(artisan.id);
       // Puis calculer les prévisions
@@ -6049,10 +5989,7 @@ const previsionsRouter = router({
   getComparaison: protectedProcedure
     .input(z.object({ annee: z.number() }))
     .query(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.getComparaisonPrevisionsRealise(artisan.id, input.annee);
     }),
 
@@ -6063,10 +6000,7 @@ const previsionsRouter = router({
       caPrevisionnel: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.savePrevisionCA({
         artisanId: artisan.id,
         mois: input.mois,
@@ -6080,10 +6014,7 @@ const previsionsRouter = router({
   getHistoriqueCA: protectedProcedure
     .input(z.object({ nombreMois: z.number().default(24) }).optional())
     .query(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.getHistoriqueCA(artisan.id, input?.nombreMois || 24);
     }),
 });
@@ -6093,10 +6024,7 @@ const previsionsRouter = router({
 // ============================================================================
 const vehiculesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    let artisan = await db.getArtisanByUserId(ctx.user.id);
-    if (!artisan) {
-      artisan = await db.createArtisan({ userId: ctx.user.id });
-    }
+    let artisan = await db.getOrCreateArtisan(ctx.user.id);
     return await db.getVehiculesByArtisan(artisan.id);
   }),
 
@@ -6120,10 +6048,7 @@ const vehiculesRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createVehicule({
         artisanId: artisan.id,
         ...input,
@@ -6251,10 +6176,7 @@ const vehiculesRouter = router({
 // ============================================================================
 const badgesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    let artisan = await db.getArtisanByUserId(ctx.user.id);
-    if (!artisan) {
-      artisan = await db.createArtisan({ userId: ctx.user.id });
-    }
+    let artisan = await db.getOrCreateArtisan(ctx.user.id);
     return await db.getBadgesByArtisan(artisan.id);
   }),
 
@@ -6271,10 +6193,7 @@ const badgesRouter = router({
       points: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createBadge({ artisanId: artisan.id, ...input });
     }),
 
@@ -6356,10 +6275,7 @@ const badgesRouter = router({
       objectifAvisPositifs: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createObjectifTechnicien({ artisanId: artisan.id, ...input });
     }),
 });
@@ -6410,10 +6326,7 @@ const chantiersRouter = router({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createChantier({
         artisanId: artisan.id,
         ...input,
@@ -6692,10 +6605,7 @@ const integrationsComptablesRouter = router({
       actif: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.saveConfigurationComptable({ artisanId: artisan.id, ...input });
     }),
 
@@ -6713,10 +6623,7 @@ const integrationsComptablesRouter = router({
       dateFin: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
 
       const dateDebut = new Date(input.dateDebut);
       const dateFin = new Date(input.dateFin);
@@ -6762,10 +6669,7 @@ const integrationsComptablesRouter = router({
       notifierSucces: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.saveSyncConfigComptable({ artisanId: artisan.id, ...input });
     }),
 
@@ -6851,10 +6755,7 @@ const devisIARouter = router({
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createAnalysePhoto({ artisanId: artisan.id, ...input });
     }),
 
@@ -7111,10 +7012,7 @@ const alertesPrevisionsRouter = router({
       actif: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) {
-        artisan = await db.createArtisan({ userId: ctx.user.id });
-      }
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.saveConfigAlertePrevision({ artisanId: artisan.id, ...input });
     }),
 
@@ -8548,8 +8446,7 @@ const depensesRouter = router({
       prochaineOccurrence: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const numero = await db.getNextDepenseNumero(artisan.id);
       const montantTva = +(input.montantHt * (input.tauxTva / 100)).toFixed(2);
       const montantTtc = +(input.montantHt + montantTva).toFixed(2);
@@ -8673,8 +8570,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       plafondMensuel: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createCategorieDepense({ ...input, artisanId: artisan.id });
     }),
 
@@ -8728,8 +8624,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       depenseIds: z.array(z.number()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const numero = await db.getNextNoteFraisNumero(artisan.id);
       const note = await db.createNoteFrais({
         artisanId: artisan.id,
@@ -8816,8 +8711,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       budget: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       await db.upsertBudget(artisan.id, input.categorie, input.mois, input.budget);
       return { success: true };
     }),
@@ -8902,8 +8796,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       description: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       // Lire la transaction.
       const trxs = await db.getTransactionsBancaires(artisan.id);
       const t = trxs.find((x: any) => x.id === input.transactionId);
@@ -8962,8 +8855,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       clientId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const numero = await db.getNextDepenseNumero(artisan.id);
       // Indemnites km : sans TVA recuperable (regime fiscal forfait).
       const montant = +(input.kilometres * input.tarifKm).toFixed(2);
@@ -9003,8 +8895,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
   createRegle: protectedProcedure
     .input(z.object({ motifLibelle: z.string(), categorie: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) artisan = await db.createArtisan({ userId: ctx.user.id });
+      let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const pool = (db as any).getPool();
       if (pool) {
         await pool.execute(
