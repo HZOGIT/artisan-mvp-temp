@@ -1071,7 +1071,7 @@ async function startServer() {
     serveStatic(app);
   }
 
-  // En production (Railway, Vercel, …), on DOIT listen exactement sur
+  // En production (Railway, …), on DOIT listen exactement sur
   // process.env.PORT et sur 0.0.0.0. Tenter de "trouver un autre port"
   // si l'attribué est busy fait que le proxy route vers du vide → l'app
   // apparait DOWN ("Application failed to respond"). En dev local, on
