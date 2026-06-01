@@ -10,15 +10,13 @@ const envSchema = z.object({
   
   // Auth — JWT_SECRET requis (min 32 chars) pour signer les sessions
   JWT_SECRET: z.string().min(32, "JWT_SECRET doit faire au moins 32 caracteres"),
-  VITE_APP_ID: z.string().optional(),
-  
+
   // Stripe - OPTIONNEL (temporairement pour debug)
   STRIPE_SECRET_KEY: z.string().optional(),
   VITE_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
   // Owner Info - OPTIONNEL
-  OWNER_OPEN_ID: z.string().optional(),
   OWNER_NAME: z.string().optional(),
   
   // Email (Resend)
@@ -100,15 +98,13 @@ export const ENV = {
   
   // Auth
   cookieSecret: getEnv().JWT_SECRET,
-  appId: getEnv().VITE_APP_ID,
-  
+
   // Stripe - ⚠️ SECRETS - NE JAMAIS EXPOSER AU CLIENT
   stripeSecretKey: getEnv().STRIPE_SECRET_KEY,
   stripeWebhookSecret: getEnv().STRIPE_WEBHOOK_SECRET,
   // Note: VITE_STRIPE_PUBLISHABLE_KEY est OK d'exposer (clé publique)
 
   // Owner Info
-  ownerOpenId: getEnv().OWNER_OPEN_ID,
   ownerName: getEnv().OWNER_NAME,
   
   // Environment
