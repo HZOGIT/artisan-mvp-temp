@@ -96,7 +96,7 @@ async function startServer() {
           const [existingRdv] = await rdvPool.execute('SELECT COUNT(*) as cnt FROM rdv_en_ligne WHERE artisanId = 1');
           if ((existingRdv as any)[0].cnt === 0) {
             await rdvPool.execute(
-              `INSERT INTO rdv_en_ligne (artisanId, clientId, titre, description, dateProposee, dureeEstimee, statut, urgence, createdAt, updatedAt) VALUES
+              `INSERT INTO rdv_en_ligne (artisanId, clientId, titre, description, dateProposee, dureeEstimee, statut_rdv, urgence_rdv, createdAt, updatedAt) VALUES
               (1, 2, 'Fuite robinet cuisine', 'Le robinet de la cuisine fuit depuis 2 jours, goutte a goutte permanent. Marque Grohe.', '2026-02-24 10:00:00', 60, 'en_attente', 'normale', NOW(), NOW()),
               (1, 5, 'Panne chauffe-eau', 'Le chauffe-eau ne produit plus d''eau chaude depuis ce matin. Modele Atlantic 200L.', '2026-02-25 14:00:00', 60, 'en_attente', 'urgente', NOW(), NOW())`
             );
