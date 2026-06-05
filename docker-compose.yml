@@ -1,0 +1,46 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: artisan_mvp
+      MYSQL_USER: ${MYSQL_USER:-artisan_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-artisan_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    image: node:22-slim
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp
+    env_file:
+      - .env.local
+    command: >
+      sh -c "npm install -g pnpm@10.4.1 --silent &&
+             pnpm install --frozen-lockfile &&
+             pnpm exec drizzle-kit migrate &&
+             pnpm dev"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  app_node_modules:

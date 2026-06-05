@@ -1,4 +1,4 @@
-import type { Tool } from "@anthropic-ai/sdk/resources/messages";
+import { Type, type FunctionDeclaration } from '@google/genai';
 import * as db from "../db";
 import {
   sendEmail,
@@ -9,16 +9,16 @@ import {
 // Tool definitions exposées à Claude (function calling)
 // ============================================================================
 
-export const AGENT_TOOLS: Tool[] = [
+export const AGENT_TOOLS: FunctionDeclaration[] = [
   {
     name: "chercher_client",
     description:
       "Recherche un client par nom, prénom, entreprise ou email. Insensible à la casse et aux accents. Accepte une requête multi-mots (ex: 'Michel dad' trouve DAD Michel) : matche TOUS les mots dans n'importe quel ordre, et tombe en mode partiel scoré si aucun match strict. Retourne jusqu'à 5 résultats. À utiliser AVANT toute action liée à un client si tu n'as pas son ID.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
         nom: {
-          type: "string",
+          type: Type.STRING,
           description: "Mots à chercher (nom, prénom, entreprise, email). Peut contenir plusieurs mots séparés par des espaces.",
         },
       },
@@ -29,29 +29,29 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_devis",
     description:
       "Crée un nouveau devis en brouillon pour un client avec ses lignes. Retourne le numéro et l'ID du devis créé. Calcule automatiquement les totaux HT/TVA/TTC.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number", description: "ID du client (obtenu via chercher_client)" },
-        objet: { type: "string", description: "Objet/titre du devis" },
+        clientId: { type: Type.NUMBER, description: "ID du client (obtenu via chercher_client)" },
+        objet: { type: Type.STRING, description: "Objet/titre du devis" },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           description: "Lignes du devis avec leurs montants",
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string", description: "Ex: u, h, m, m², forfait" },
-              prixUnitaireHT: { type: "number" },
-              tauxTVA: { type: "number", description: "En pourcentage, ex: 20" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING, description: "Ex: u, h, m, m², forfait" },
+              prixUnitaireHT: { type: Type.NUMBER },
+              tauxTVA: { type: Type.NUMBER, description: "En pourcentage, ex: 20" },
             },
             required: ["designation", "quantite", "prixUnitaireHT"],
           },
         },
-        notes: { type: "string", description: "Notes ou conditions particulières (optionnel)" },
+        notes: { type: Type.STRING, description: "Notes ou conditions particulières (optionnel)" },
         validiteDays: {
-          type: "number",
+          type: Type.NUMBER,
           description: "Nombre de jours de validité du devis (défaut: 30)",
         },
       },
@@ -62,12 +62,12 @@ export const AGENT_TOOLS: Tool[] = [
     name: "envoyer_devis",
     description:
       "Envoie un devis existant par email au client. Le PDF est généré et joint automatiquement. Le statut du devis passe à 'envoye'.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        devisId: { type: "number" },
+        devisId: { type: Type.NUMBER },
         messagePersonnalise: {
-          type: "string",
+          type: Type.STRING,
           description: "Message libre ajouté au corps de l'email (optionnel)",
         },
       },
@@ -78,26 +78,26 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_et_envoyer_devis",
     description:
       "Crée un devis ET l'envoie immédiatement par email au client. Combine creer_devis et envoyer_devis en une seule action.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number" },
-        objet: { type: "string" },
+        clientId: { type: Type.NUMBER },
+        objet: { type: Type.STRING },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string" },
-              prixUnitaireHT: { type: "number" },
-              tauxTVA: { type: "number" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING },
+              prixUnitaireHT: { type: Type.NUMBER },
+              tauxTVA: { type: Type.NUMBER },
             },
             required: ["designation", "quantite", "prixUnitaireHT"],
           },
         },
-        messageEmail: { type: "string", description: "Message personnalisé pour l'email (optionnel)" },
+        messageEmail: { type: Type.STRING, description: "Message personnalisé pour l'email (optionnel)" },
       },
       required: ["clientId", "objet", "lignes"],
     },
@@ -106,23 +106,23 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_facture",
     description:
       "Crée une facture pour un client. Si devisId est fourni, la facture est créée à partir du devis (recopie clientId, lignes, totaux). Sinon, crée la facture avec les lignes fournies.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number", description: "Requis si pas de devisId" },
-        devisId: { type: "number", description: "ID du devis source (optionnel)" },
-        objet: { type: "string" },
+        clientId: { type: Type.NUMBER, description: "Requis si pas de devisId" },
+        devisId: { type: Type.NUMBER, description: "ID du devis source (optionnel)" },
+        objet: { type: Type.STRING },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           description: "Requis si pas de devisId",
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string" },
-              prixUnitaireHT: { type: "number" },
-              tauxTVA: { type: "number" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING },
+              prixUnitaireHT: { type: Type.NUMBER },
+              tauxTVA: { type: Type.NUMBER },
             },
             required: ["designation", "quantite", "prixUnitaireHT"],
           },
@@ -134,11 +134,11 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "envoyer_facture",
     description: "Envoie une facture par email au client avec son PDF en pièce jointe.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        factureId: { type: "number" },
-        messagePersonnalise: { type: "string" },
+        factureId: { type: Type.NUMBER },
+        messagePersonnalise: { type: Type.STRING },
       },
       required: ["factureId"],
     },
@@ -147,11 +147,11 @@ export const AGENT_TOOLS: Tool[] = [
     name: "envoyer_relance",
     description:
       "Envoie une relance pour une facture impayée. Utilise un message de rappel adapté avec le nombre de jours de retard.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        factureId: { type: "number" },
-        messagePersonnalise: { type: "string" },
+        factureId: { type: Type.NUMBER },
+        messagePersonnalise: { type: Type.STRING },
       },
       required: ["factureId"],
     },
@@ -160,20 +160,20 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_intervention",
     description:
       "Planifie une intervention dans le calendrier. Les dates doivent être au format ISO 8601 (ex: 2026-05-13T08:00:00). Le titre doit décrire la nature du travail (ex: 'Débouchage WC', 'Réparation fuite', 'Entretien chaudière') — pas un libellé générique. L'adresse est facultative : si non fournie, l'adresse postale du client est utilisée automatiquement.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number" },
+        clientId: { type: Type.NUMBER },
         titre: {
-          type: "string",
+          type: Type.STRING,
           description:
             "Nature du travail à effectuer, déduite de la demande de l'artisan. Exemples : 'Débouchage WC', 'Réparation fuite cuisine', 'Entretien chaudière annuel', 'Installation chauffe-eau'. Utilise 'Intervention' uniquement si aucun détail n'a été donné.",
         },
-        description: { type: "string", description: "Notes ou détails complémentaires (optionnel)." },
-        dateDebut: { type: "string", description: "Date/heure ISO 8601" },
-        dateFin: { type: "string", description: "Date/heure ISO 8601" },
+        description: { type: Type.STRING, description: "Notes ou détails complémentaires (optionnel)." },
+        dateDebut: { type: Type.STRING, description: "Date/heure ISO 8601" },
+        dateFin: { type: Type.STRING, description: "Date/heure ISO 8601" },
         adresse: {
-          type: "string",
+          type: Type.STRING,
           description:
             "Adresse de l'intervention (optionnel). Si vide, l'adresse postale du client est utilisée automatiquement.",
         },
@@ -185,13 +185,13 @@ export const AGENT_TOOLS: Tool[] = [
     name: "lister_factures_impayees",
     description:
       "Liste toutes les factures non payées (statut envoyée ou en retard). Retourne id, numéro, client, montantTTC, date échéance, jours de retard.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
   },
   {
     name: "lister_devis_en_attente",
     description:
       "Liste les devis envoyés en attente de réponse du client (statut envoye). Retourne id, numéro, client, montantTTC, date du devis.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
   },
 
   // ── Stocks & commandes fournisseurs ────────────────────────────────────
@@ -199,31 +199,31 @@ export const AGENT_TOOLS: Tool[] = [
     name: "verifier_stocks",
     description:
       "Vérifie tous les niveaux de stock. Retourne la liste des articles avec leur quantité, seuil d'alerte et statut (rupture | alerte | ok), ainsi qu'un récapitulatif des articles à réapprovisionner.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
   },
   {
     name: "creer_commande_fournisseur",
     description:
       "Crée un bon de commande fournisseur en brouillon pour réapprovisionner des articles. Retourne le numéro et l'id de la commande créée.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        fournisseurId: { type: "number", description: "ID du fournisseur (obtenu via chercher_fournisseur ou lister_fournisseurs)" },
+        fournisseurId: { type: Type.NUMBER, description: "ID du fournisseur (obtenu via chercher_fournisseur ou lister_fournisseurs)" },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string" },
-              prixUnitaireHT: { type: "number" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING },
+              prixUnitaireHT: { type: Type.NUMBER },
             },
             required: ["designation", "quantite"],
           },
         },
-        notes: { type: "string" },
-        delaiLivraison: { type: "string", description: "Texte libre, ex: '2 semaines'" },
+        notes: { type: Type.STRING },
+        delaiLivraison: { type: Type.STRING, description: "Texte libre, ex: '2 semaines'" },
       },
       required: ["fournisseurId", "lignes"],
     },
@@ -231,11 +231,11 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "envoyer_commande_fournisseur",
     description: "Envoie un bon de commande par email au fournisseur avec le PDF en pièce jointe.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        commandeId: { type: "number" },
-        messagePersonnalise: { type: "string" },
+        commandeId: { type: Type.NUMBER },
+        messagePersonnalise: { type: Type.STRING },
       },
       required: ["commandeId"],
     },
@@ -246,10 +246,10 @@ export const AGENT_TOOLS: Tool[] = [
     name: "lister_clients",
     description:
       "Liste les clients de l'artisan. Filtre optionnel par substring sur le nom/prénom/entreprise. Limite à 50 résultats.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        filtre: { type: "string", description: "Texte de filtrage (optionnel)" },
+        filtre: { type: Type.STRING, description: "Texte de filtrage (optionnel)" },
       },
     },
   },
@@ -257,17 +257,17 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_client",
     description:
       "Crée un nouveau client dans la base. Retourne l'id et le nom du client créé.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        nom: { type: "string" },
-        prenom: { type: "string" },
-        email: { type: "string" },
-        telephone: { type: "string" },
-        adresse: { type: "string" },
-        ville: { type: "string" },
-        codePostal: { type: "string" },
-        type: { type: "string", enum: ["particulier", "professionnel"] },
+        nom: { type: Type.STRING },
+        prenom: { type: Type.STRING },
+        email: { type: Type.STRING },
+        telephone: { type: Type.STRING },
+        adresse: { type: Type.STRING },
+        ville: { type: Type.STRING },
+        codePostal: { type: Type.STRING },
+        type: { type: Type.STRING },
       },
       required: ["nom"],
     },
@@ -278,12 +278,11 @@ export const AGENT_TOOLS: Tool[] = [
     name: "get_statistiques",
     description:
       "Récupère les statistiques complètes de l'activité : CA du mois, CA de l'année, nombre de clients, devis en cours, factures impayées, interventions à venir, articles en rupture.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
         periode: {
-          type: "string",
-          enum: ["jour", "semaine", "mois", "annee"],
+          type: Type.STRING,
           description: "Optionnel — par défaut renvoie un récapitulatif complet incluant mois et année.",
         },
       },
@@ -294,15 +293,15 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "lister_fournisseurs",
     description: "Liste tous les fournisseurs enregistrés avec leurs coordonnées.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
   },
   {
     name: "chercher_fournisseur",
     description: "Recherche un fournisseur par nom. Insensible à la casse, retourne jusqu'à 5 résultats.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        nom: { type: "string" },
+        nom: { type: Type.STRING },
       },
       required: ["nom"],
     },
@@ -313,12 +312,12 @@ export const AGENT_TOOLS: Tool[] = [
     name: "lister_interventions",
     description:
       "Liste les interventions planifiées. Filtres optionnels par statut, dateDebut (>=), dateFin (<=).",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        statut: { type: "string", enum: ["planifiee", "en_cours", "terminee", "annulee"] },
-        dateDebut: { type: "string", description: "ISO 8601" },
-        dateFin: { type: "string", description: "ISO 8601" },
+        statut: { type: Type.STRING, description: "planifiee | en_cours | terminee | annulee" },
+        dateDebut: { type: Type.STRING, description: "ISO 8601" },
+        dateFin: { type: Type.STRING, description: "ISO 8601" },
       },
     },
   },
@@ -326,15 +325,15 @@ export const AGENT_TOOLS: Tool[] = [
     name: "modifier_intervention",
     description:
       "Modifie une intervention existante. Seuls les champs fournis sont mis à jour.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        interventionId: { type: "number" },
-        titre: { type: "string" },
-        dateDebut: { type: "string" },
-        dateFin: { type: "string" },
-        statut: { type: "string", enum: ["planifiee", "en_cours", "terminee", "annulee"] },
-        notes: { type: "string" },
+        interventionId: { type: Type.NUMBER },
+        titre: { type: Type.STRING },
+        dateDebut: { type: Type.STRING },
+        dateFin: { type: Type.STRING },
+        statut: { type: Type.STRING, description: "planifiee | en_cours | terminee | annulee" },
+        notes: { type: Type.STRING },
       },
       required: ["interventionId"],
     },
@@ -345,35 +344,20 @@ export const AGENT_TOOLS: Tool[] = [
     name: "naviguer_vers",
     description:
       "Redirige l'artisan vers une page de l'application avec un filtre optionnel pour afficher des données spécifiques. À appeler APRÈS avoir listé des données pour que l'artisan puisse voir tous les résultats filtrés dans la page concernée. Le résumé court reste affiché dans le panneau de chat.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
         page: {
-          type: "string",
-          enum: ["/factures", "/devis", "/clients", "/interventions", "/stocks", "/commandes"],
-          description: "Page de destination",
+          type: Type.STRING,
+          description: "Page de destination : /factures, /devis, /clients, /interventions, /stocks, /commandes",
         },
         filtre: {
-          type: "string",
-          enum: [
-            "impayees",
-            "en_retard",
-            "brouillon",
-            "envoye",
-            "envoyee",
-            "accepte",
-            "refuse",
-            "planifiee",
-            "en_cours",
-            "terminee",
-            "rupture",
-            "alerte",
-          ],
+          type: Type.STRING,
           description:
             "Filtre à appliquer sur la page. Valeurs valides selon la page : factures → impayees, en_retard, brouillon ; devis → brouillon, envoye, accepte, refuse ; interventions → planifiee, en_cours, terminee ; stocks → rupture, alerte ; commandes → brouillon, envoyee.",
         },
         message: {
-          type: "string",
+          type: Type.STRING,
           description: "Message court affiché à l'artisan pour confirmer la navigation (optionnel).",
         },
       },

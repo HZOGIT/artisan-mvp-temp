@@ -12,7 +12,6 @@ import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, gene
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
 import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
 import { ROLE_TEMPLATES, ALL_PERMISSIONS } from "../shared/permissions";
-import Anthropic from "@anthropic-ai/sdk";
 import { buildSystemPrompt } from "./_core/assistantContext";
 import { getContexteMetier } from "./_core/contexteMetier";
 
@@ -300,27 +299,20 @@ const articlesRouter = router({
       const contexteMetier = getContexteMetier(metier);
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          temperature: 0.4,
-          system: contexteMetier,
-          messages: [{
-            role: "user",
-            content: `L'artisan cherche : "${input.query}"
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: `L'artisan cherche : "${input.query}"
 Contexte : ${input.contexte || "creation de devis"}.
 
 Propose 5 articles pertinents pour un artisan ${metier || "du bâtiment"} en France avec prix realistes marche 2024.
 
 Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
-{"articles":[{"designation":"nom","reference":"REF-XXX","unite":"u|m|m²|ml|kg|L|h","prixUnitaire":0,"description":"courte","categorie":"cat"}]}`,
-          }],
+{"articles":[{"designation":"nom","reference":"REF-XXX","unite":"u|m|m²|ml|kg|L|h","prixUnitaire":0,"description":"courte","categorie":"cat"}]}` }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return [];
         const data = JSON.parse(jsonMatch[0]);
@@ -484,15 +476,11 @@ const devisRouter = router({
     const moisLabel = new Date().toLocaleDateString("fr-FR", { month: "long" });
 
     try {
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 800,
-        temperature: 0.6,
-        system: contexteMetier,
-        messages: [{
-          role: "user",
-          content: `Tu es le conseiller IA d'Operioz pour ${artisan.nomEntreprise || "cet artisan"} (${metier || "batiment"}).
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const response = await ai.models.generateContent({
+        model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: `Tu es le conseiller IA d'Operioz pour ${artisan.nomEntreprise || "cet artisan"} (${metier || "batiment"}).
 
 Etat actuel :
 - ${nbDevisEnAttente} devis en attente de reponse
@@ -505,13 +493,10 @@ Donne 3 conseils personnalises ET actionnables (pas de generalites). Chaque cons
 Liens disponibles : /devis, /factures, /relances, /clients, /interventions, /stocks, /tableau-bord-depenses, /alertes-previsions, /depenses, /budgets-depenses.
 
 Reponds UNIQUEMENT en JSON pur :
-{"conseils":[{"icone":"💡","titre":"court","message":"phrase","actionLabel":"texte bouton","actionLien":"/devis"}]}`,
-        }],
+{"conseils":[{"icone":"💡","titre":"court","message":"phrase","actionLabel":"texte bouton","actionLien":"/devis"}]}` }] }],
+        config: { systemInstruction: contexteMetier, temperature: 0.6, maxOutputTokens: 800 },
       });
-      const text = response.content
-        .filter((b: any) => b.type === "text")
-        .map((b: any) => b.text)
-        .join("");
+      const text = response.text || '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return { conseils: [] };
       const data = JSON.parse(jsonMatch[0]);
@@ -556,18 +541,14 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 {"objet":"objet court","dureeEstimee":"X jours","lignes":[{"designation":"description","quantite":1,"unite":"u|m|m²|h|forfait","prixUnitaire":0,"tauxTva":10,"type":"fourniture|main_oeuvre|forfait"}],"notes":"remarques","conseilsArtisan":"conseils"}`;
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2500,
-          temperature: 0.3,
-          system: contexteMetier,
-          messages: [{ role: "user", content: userPrompt }],
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.3, maxOutputTokens: 2500 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
           return { lignes: [], objet: input.description.slice(0, 80) };
@@ -3376,18 +3357,14 @@ Reponds UNIQUEMENT en JSON pur :
 {"lignes":[{"designation":"texte","reference":"","quantite":1,"unite":"u|m|m2|kg|ml","prixUnitaire":0,"tauxTVA":20}],"notes":"remarques optionnelles"}`;
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2500,
-          temperature: 0.3,
-          system: contexteMetier,
-          messages: [{ role: "user", content: userPrompt }],
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.3, maxOutputTokens: 2500 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return { lignes: [], notes: "" };
         const data = JSON.parse(jsonMatch[0]);
@@ -3982,15 +3959,11 @@ const clientPortalRouter = router({
       };
 
       try {
-        const aClient = new Anthropic();
-        const response = await aClient.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1200,
-          temperature: 0.4,
-          system: contexteMetier,
-          messages: [{
-            role: "user",
-            content: `Un client (${clientName}) decrit son besoin sur le portail :
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: `Un client (${clientName}) decrit son besoin sur le portail :
 """
 ${input.description}
 """
@@ -3998,13 +3971,10 @@ ${input.description}
 Tache : structure cette demande pour l'artisan. Donne un titre court, reformule clairement, identifie le type de travaux, estime l'urgence (faible/normale/urgente), donne une fourchette de prix realiste marche francais 2024 (estimation_min et estimation_max en euros TTC) et propose 2 a 3 questions de precision a poser au client pour pouvoir chiffrer.
 
 Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
-{"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}`,
-          }],
+{"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}` }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.4, maxOutputTokens: 1200 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const data = JSON.parse(jsonMatch[0]);
@@ -6797,23 +6767,16 @@ const devisIARouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune photo à analyser" });
       }
 
-      // Appel direct au SDK Anthropic (claude-sonnet-4 multimodal).
-      // Le SDK lit ANTHROPIC_API_KEY automatiquement.
-      // Supporte les 2 formes d'image acceptees par Anthropic :
-      // - URL HTTP(S) publique  -> source: { type: 'url', url }
-      // - Data URL (upload local b64) -> source: { type: 'base64', ... }
+      // Build image parts for Gemini multimodal.
+      // Supporte les 2 formes d'image :
+      // - Data URL (base64) -> inlineData
+      // - URL HTTP(S) publique -> fileData
       const imageBlocks = photos.map((p: any) => {
         const m = String(p.url || "").match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
         if (m) {
-          return {
-            type: "image" as const,
-            source: { type: "base64" as const, media_type: m[1] as any, data: m[2] },
-          };
+          return { inlineData: { mimeType: m[1], data: m[2] } };
         }
-        return {
-          type: "image" as const,
-          source: { type: "url" as const, url: p.url },
-        };
+        return { fileData: { mimeType: 'image/jpeg', fileUri: p.url } };
       });
 
       // T4 : prompt specialise par metier — l'IA devient un expert
@@ -6853,32 +6816,23 @@ Pour chaque type de travaux detecte, fournis :
 Reponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour) :
 {"travaux":[{"type":"string","description":"string","urgence":"faible|moyenne|haute|critique","confiance":0,"articles":[{"nom":"string","description":"string","quantite":0,"unite":"string","prixEstime":0}]}]}`;
 
-      // Appel Anthropic dans try/catch pour ne JAMAIS laisser remonter
+      // Appel Gemini multimodal dans try/catch pour ne JAMAIS laisser remonter
       // le payload d'image base64 dans la stack d'erreur tRPC.
       let responseText = '';
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4000,
-          temperature: 0.3,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: [
-                ...imageBlocks,
-                { type: "text", text: "Analyse ces photos de chantier et identifie les travaux nécessaires." },
-              ],
-            },
-          ],
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [
+            ...imageBlocks,
+            { text: "Analyse ces photos de chantier et identifie les travaux nécessaires." },
+          ] }],
+          config: { systemInstruction: systemPrompt, temperature: 0.3, maxOutputTokens: 4000 },
         });
-        responseText = response.content
-          .filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text)
-          .join('');
+        responseText = response.text || '';
       } catch (e: any) {
-        console.warn('[analyserPhotos] Anthropic call failed:', e?.status, e?.name);
+        console.warn('[analyserPhotos] Gemini call failed:', e?.status, e?.name);
         await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -7040,16 +6994,16 @@ const assistantRouter = router({
       if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
       if (!checkRateLimit(artisan.id)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite de 30 requêtes/heure atteinte" });
 
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const model = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
       const systemPrompt = await buildSystemPrompt(artisan.id);
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        temperature: 0.7,
-        system: systemPrompt,
-        messages: [{ role: "user", content: input.message }],
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts: [{ text: input.message }] }],
+        config: { systemInstruction: systemPrompt, maxOutputTokens: 2000, temperature: 0.7 },
       });
-      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      const text = response.text || '';
       return { response: text };
     }),
 
@@ -7065,17 +7019,20 @@ const assistantRouter = router({
       const catalogue = [...articles.map(a => `${a.designation || a.nom} - ${a.prixUnitaireHT || a.prixBase}€/${a.unite}`),
         ...biblio.slice(0, 50).map((a: any) => `${a.nom} - ${a.prix_base}€/${a.unite}`)].join('\n');
 
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        temperature: 0.3,
-        system: `Tu es un assistant spécialisé dans la génération de devis pour artisans. Tu dois générer des lignes de devis au format JSON.
+      const { GoogleGenAI: GenAI2 } = await import('@google/genai');
+      const ai2 = new GenAI2({ apiKey: process.env.GEMINI_API_KEY! });
+      const response = await ai2.models.generateContent({
+        model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: `Génère les lignes de devis pour : ${input.description}` }] }],
+        config: {
+          systemInstruction: `Tu es un assistant spécialisé dans la génération de devis pour artisans. Tu dois générer des lignes de devis au format JSON.
 Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un tableau JSON (pas de texte autour) au format :
 [{"designation":"...","quantite":1,"unite":"u","prixUnitaireHT":0,"tauxTVA":20}]`,
-        messages: [{ role: "user", content: `Génère les lignes de devis pour : ${input.description}` }],
+          temperature: 0.3,
+          maxOutputTokens: 2000,
+        },
       });
-      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      const text = response.text || '';
       try {
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         const lignes = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
@@ -7101,15 +7058,18 @@ Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un 
     if (devisARelancer.length === 0) return [];
 
     const liste = devisARelancer.map(d => `- Devis ${d.numero} (${d.objet || 'sans objet'}) : ${d.totalTTC}€ TTC, envoyé il y a ${d.jours} jours à ${d.client}`).join('\n');
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      temperature: 0.7,
-      system: `Tu es un assistant qui génère des emails de relance professionnels et personnalisés pour un artisan. Pour chaque devis, génère un email court et cordial. Réponds en JSON : [{"numero":"...","objet":"...","email":{"sujet":"...","corps":"..."}}]`,
-      messages: [{ role: "user", content: `Génère des emails de relance pour ces devis :\n${liste}` }],
+    const { GoogleGenAI: GenAI3 } = await import('@google/genai');
+    const ai3 = new GenAI3({ apiKey: process.env.GEMINI_API_KEY! });
+    const response = await ai3.models.generateContent({
+      model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: `Génère des emails de relance pour ces devis :\n${liste}` }] }],
+      config: {
+        systemInstruction: `Tu es un assistant qui génère des emails de relance professionnels et personnalisés pour un artisan. Pour chaque devis, génère un email court et cordial. Réponds en JSON : [{"numero":"...","objet":"...","email":{"sujet":"...","corps":"..."}}]`,
+        temperature: 0.7,
+        maxOutputTokens: 2000,
+      },
     });
-    const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    const text = response.text || '';
     try {
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
@@ -7134,15 +7094,18 @@ Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un 
       const detailLignes = lignes.map(l => `- ${l.designation}: ${l.quantite} ${l.unite} x ${l.prixUnitaireHT}€ HT (TVA ${l.tauxTVA}%)`).join('\n');
       const prixRef = articles.slice(0, 30).map(a => `${a.designation || a.nom}: ${a.prixUnitaireHT || a.prixBase}€/${a.unite}`).join('\n');
 
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        temperature: 0.5,
-        system: `Tu es un expert en analyse de rentabilité pour artisans. Analyse ce devis, compare les prix aux tarifs habituels, estime la marge, et donne des recommandations concrètes. Réponds en français avec du markdown.`,
-        messages: [{ role: "user", content: `Analyse ce devis :\nDevis ${devisData.numero} pour ${cl ? `${cl.prenom || ''} ${cl.nom}`.trim() : 'client'}\nTotal HT: ${devisData.totalHT}€ | Total TTC: ${devisData.totalTTC}€\n\nLignes :\n${detailLignes}\n\nTarifs habituels de l'artisan :\n${prixRef || 'Non disponibles'}` }],
+      const { GoogleGenAI: GenAI4 } = await import('@google/genai');
+      const ai4 = new GenAI4({ apiKey: process.env.GEMINI_API_KEY! });
+      const response = await ai4.models.generateContent({
+        model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: `Analyse ce devis :\nDevis ${devisData.numero} pour ${cl ? `${cl.prenom || ''} ${cl.nom}`.trim() : 'client'}\nTotal HT: ${devisData.totalHT}€ | Total TTC: ${devisData.totalTTC}€\n\nLignes :\n${detailLignes}\n\nTarifs habituels de l'artisan :\n${prixRef || 'Non disponibles'}` }] }],
+        config: {
+          systemInstruction: `Tu es un expert en analyse de rentabilité pour artisans. Analyse ce devis, compare les prix aux tarifs habituels, estime la marge, et donne des recommandations concrètes. Réponds en français avec du markdown.`,
+          temperature: 0.5,
+          maxOutputTokens: 2000,
+        },
       });
-      return { analyse: response.content.filter(b => b.type === 'text').map(b => b.text).join('') };
+      return { analyse: response.text || '' };
     }),
 
   predictionTresorerie: protectedProcedure.query(async ({ ctx }) => {
@@ -7157,16 +7120,36 @@ Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un 
     const facturesImpayees = factures.filter(f => f.statut !== 'payee' && f.statut !== 'annulee').map(f => `FAC ${f.numero}: ${f.totalTTC}€ (${f.statut}) échéance ${f.dateEcheance || 'non définie'}`).join('\n');
     const devisAcceptes = devisList.filter(d => d.statut === 'accepte').map(d => `DEV ${d.numero}: ${d.totalTTC}€`).join('\n');
 
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      temperature: 0.5,
-      system: `Tu es un expert en gestion de trésorerie pour artisans. Analyse les données financières et prédit les entrées/sorties sur les 3 prochains mois. Donne des alertes si tension de trésorerie. Réponds en français avec du markdown.`,
-      messages: [{ role: "user", content: `Données financières :\n\nFactures payées récentes :\n${facturesPayees || 'Aucune'}\n\nFactures impayées :\n${facturesImpayees || 'Aucune'}\n\nDevis acceptés (à facturer) :\n${devisAcceptes || 'Aucun'}` }],
+    const { GoogleGenAI: GenAI5 } = await import('@google/genai');
+    const ai5 = new GenAI5({ apiKey: process.env.GEMINI_API_KEY! });
+    const response = await ai5.models.generateContent({
+      model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: `Données financières :\n\nFactures payées récentes :\n${facturesPayees || 'Aucune'}\n\nFactures impayées :\n${facturesImpayees || 'Aucune'}\n\nDevis acceptés (à facturer) :\n${devisAcceptes || 'Aucun'}` }] }],
+      config: {
+        systemInstruction: `Tu es un expert en gestion de trésorerie pour artisans. Analyse les données financières et prédit les entrées/sorties sur les 3 prochains mois. Donne des alertes si tension de trésorerie. Réponds en français avec du markdown.`,
+        temperature: 0.5,
+        maxOutputTokens: 2000,
+      },
     });
-    return { prediction: response.content.filter(b => b.type === 'text').map(b => b.text).join('') };
+    return { prediction: response.text || '' };
   }),
+
+  getThreads: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return db.listAiThreads(artisan.id, 20);
+  }),
+
+  getMessages: protectedProcedure
+    .input(z.object({ threadId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      // Verify thread belongs to artisan
+      const thread = await db.getAiThread(input.threadId, artisan.id);
+      if (!thread) return [];
+      return db.getAiMessages(input.threadId, 100);
+    }),
 });
 
 // ============================================================================
@@ -8518,30 +8501,19 @@ const depensesRouter = router({
       const base64Data = dataMatch ? dataMatch[2] : input.imageBase64;
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: mediaType, data: base64Data },
-              },
-              {
-                type: "text",
-                text: `Analyse cette facture / note de frais. Extrais les informations en JSON :
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [
+            { inlineData: { mimeType: mediaType, data: base64Data } },
+            { text: `Analyse cette facture / note de frais. Extrais les informations en JSON :
 {"fournisseur":"nom","date":"YYYY-MM-DD","montantHT":0,"tauxTVA":20,"montantTTC":0,"categorie":"materiaux|carburant|outillage|repas|deplacement|telephone|sous-traitance|assurance|loyer|formation|bancaire|autre","description":"description courte","numeroFacture":"numero si visible"}
-Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
-              },
-            ],
-          }],
+Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
+          ] }],
+          config: { maxOutputTokens: 1000 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         const data = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
         if (input.depenseId) {

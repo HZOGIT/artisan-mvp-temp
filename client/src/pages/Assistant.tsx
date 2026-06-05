@@ -2,17 +2,16 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
   Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar,
-  Loader2, User, Bot, Mic, MicOff,
+  Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useVoiceSession } from "@/app/useVoiceSession";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -23,11 +22,88 @@ type Message = {
 
 export default function Assistant() {
   const isMobile = useIsMobile();
+  // Optional ?thread=<id> — when set, we load that conversation on mount.
+  const initialThreadId = (() => {
+    if (typeof window === "undefined") return undefined;
+    const raw = new URLSearchParams(window.location.search).get("thread");
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) ? n : undefined;
+  })();
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [threadId, setThreadId] = useState<number | undefined>(initialThreadId);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const loadedThreadRef = useRef(false);
+  // Voice turn tracking: is the last bubble a live (still-growing) user or
+  // assistant message? Lets us update the right bubble across multi-turn speech.
+  const liveUserRef = useRef(false);
+  const liveAsstRef = useRef(false);
+
+  // Load an existing conversation when arriving via /assistant?thread=<id>.
+  const threadQuery = trpc.assistant.getMessages.useQuery(
+    { threadId: initialThreadId as number },
+    { enabled: !!initialThreadId }
+  );
+
+  useEffect(() => {
+    if (loadedThreadRef.current) return;
+    if (threadQuery.data) {
+      loadedThreadRef.current = true;
+      setMessages(
+        (threadQuery.data as any[]).map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.transcript ?? "",
+        }))
+      );
+    }
+  }, [threadQuery.data]);
+
+  const voice = useVoiceSession({
+    threadId,
+    // text = CUMULATIVE user transcript for the current turn (grows word by word).
+    // NB: ref mutation happens OUTSIDE the updater — React may double-invoke the
+    // updater (StrictMode), and impure updaters caused an "last is undefined" crash.
+    onUserTranscript: useCallback((text: string) => {
+      if (!text.trim()) return;
+      const startNew = !liveUserRef.current;
+      liveUserRef.current = true;
+      liveAsstRef.current = false;
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (startNew || !last || last.role !== "user") {
+          return [...prev, { role: "user", content: text }];
+        }
+        // Update the live user bubble with the latest cumulative transcript.
+        const copy = [...prev];
+        copy[copy.length - 1] = { role: "user", content: text };
+        return copy;
+      });
+    }, []),
+    // delta = incremental fragment of the assistant's response.
+    onAssistantDelta: useCallback((delta: string) => {
+      if (!delta) return;
+      const startNew = !liveAsstRef.current;
+      liveAsstRef.current = true;
+      liveUserRef.current = false;
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (startNew || !last || last.role !== "assistant") {
+          return [...prev, { role: "assistant", content: delta }];
+        }
+        const copy = [...prev];
+        copy[copy.length - 1] = { role: "assistant", content: last.content + delta };
+        return copy;
+      });
+    }, []),
+    onTurnComplete: useCallback((_user: string, _assistant: string) => {
+      // End of a turn — next user/assistant fragment starts a fresh bubble.
+      liveUserRef.current = false;
+      liveAsstRef.current = false;
+    }, []),
+  });
 
   // Quick action states
   const [showDevisDialog, setShowDevisDialog] = useState(false);
@@ -109,6 +185,17 @@ export default function Assistant() {
     setInput("");
   };
 
+  const handleVoiceToggle = async () => {
+    if (voice.isVoiceActive) {
+      await voice.stopVoice();
+    } else {
+      // Fresh turn state; bubbles are created on demand as transcripts arrive.
+      liveUserRef.current = false;
+      liveAsstRef.current = false;
+      await voice.startVoice();
+    }
+  };
+
   const handleMicClick = () => {
     // Reclic pendant le compte à rebours : annule l'envoi auto et relance l'écoute
     if (countdown !== null) {
@@ -149,7 +236,7 @@ export default function Assistant() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ message: text.trim(), history }),
+        body: JSON.stringify({ message: text.trim(), history, threadId }),
         signal: controller.signal,
       });
 
@@ -178,6 +265,9 @@ export default function Assistant() {
           if (data === "[DONE]") break;
           try {
             const parsed = JSON.parse(data);
+            if (parsed.threadId && !threadId) {
+              setThreadId(parsed.threadId);
+            }
             if (parsed.content) {
               setMessages((prev) => {
                 const updated = [...prev];
@@ -316,7 +406,7 @@ export default function Assistant() {
   };
 
   return (
-    <div className="h-[calc(100dvh-120px)] flex gap-4 overflow-hidden">
+    <div className="h-[calc(100dvh-190px)] md:h-[calc(100dvh-120px)] flex gap-4 overflow-hidden">
       {/* Chat zone - 70% */}
       <Card className={`${isMobile ? "flex-1" : "flex-[7]"} flex flex-col overflow-hidden`}>
         <CardHeader className="pb-2 border-b shrink-0">
@@ -381,9 +471,13 @@ export default function Assistant() {
                     if (countdown !== null) setCountdown(null);
                     setInput(e.target.value);
                   }}
-                  placeholder={speech.isListening ? "Écoute en cours…" : "Posez votre question..."}
+                  placeholder={
+                    voice.isVoiceActive ? "Mode vocal actif — parlez au micro…" :
+                    speech.isListening ? "Écoute en cours…" : "Posez votre question..."
+                  }
                   className={`flex-1 min-h-[44px] max-h-[120px] resize-none ${
-                    speech.isListening ? "italic text-muted-foreground" : ""
+                    speech.isListening ? "italic text-muted-foreground" :
+                    voice.isVoiceActive ? "italic text-muted-foreground" : ""
                   }`}
                   rows={1}
                   onKeyDown={(e) => {
@@ -392,38 +486,85 @@ export default function Assistant() {
                       handleSubmit(e);
                     }
                   }}
-                  disabled={isStreaming}
+                  disabled={isStreaming || voice.isVoiceActive}
                 />
+                {/* Dictée vocale (Web Speech) — masquée pendant un appel vocal
+                    Gemini Live pour éviter deux icônes micro côte à côte. */}
+                {!voice.isVoiceActive && (
+                  <div className="relative self-end">
+                    {speech.isListening && (
+                      <span
+                        aria-hidden
+                        className="absolute inset-0 rounded-md bg-red-500/40 animate-ping"
+                      />
+                    )}
+                    <Button
+                      type="button"
+                      variant={speech.isListening ? "destructive" : "outline"}
+                      onClick={handleMicClick}
+                      disabled={!speech.isSupported || isStreaming}
+                      className="relative"
+                      aria-label={speech.isListening ? "Arrêter la dictée" : "Dictée vocale"}
+                      title={
+                        !speech.isSupported
+                          ? "Dictée vocale non disponible sur ce navigateur. Utilise Chrome ou Safari."
+                          : speech.isListening
+                          ? "Arrêter la dictée"
+                          : "Dictée vocale"
+                      }
+                    >
+                      {speech.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                )}
+                {voice.isVoiceActive && (
+                  <Button
+                    type="button"
+                    variant={voice.isMuted ? "default" : "outline"}
+                    onClick={voice.toggleMute}
+                    className={`self-end ${voice.isMuted ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}`}
+                    aria-label={voice.isMuted ? "Réactiver le micro" : "Couper le micro (envoyer un silence pour déclencher la réponse)"}
+                    title={voice.isMuted ? "Micro coupé — réactiver pour parler" : "Couper le micro → déclenche la réponse de Gemini"}
+                  >
+                    {voice.isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  </Button>
+                )}
                 <div className="relative self-end">
-                  {speech.isListening && (
-                    <span
-                      aria-hidden
-                      className="absolute inset-0 rounded-md bg-red-500/40 animate-ping"
-                    />
+                  {voice.isVoiceActive && (
+                    <span aria-hidden className="absolute inset-0 rounded-md bg-emerald-500/40 animate-ping" />
                   )}
                   <Button
                     type="button"
-                    variant={speech.isListening ? "destructive" : "outline"}
-                    onClick={handleMicClick}
-                    disabled={!speech.isSupported || isStreaming}
-                    className="relative"
-                    aria-label={speech.isListening ? "Arrêter la dictée" : "Dictée vocale"}
-                    title={
-                      !speech.isSupported
-                        ? "Dictée vocale non disponible sur ce navigateur. Utilise Chrome ou Safari."
-                        : speech.isListening
-                        ? "Arrêter la dictée"
-                        : "Dictée vocale"
-                    }
+                    variant={voice.isVoiceActive ? "default" : "outline"}
+                    onClick={handleVoiceToggle}
+                    disabled={isStreaming}
+                    className={`relative ${voice.isVoiceActive ? "bg-emerald-600 hover:bg-emerald-700" : ""}`}
+                    aria-label={voice.isVoiceActive ? "Couper le mode vocal" : "Mode vocal Gemini Live"}
+                    title={voice.isVoiceActive ? "Couper le mode vocal" : "Mode vocal (Gemini Live)"}
                   >
-                    {speech.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    {voice.isVoiceActive ? <PhoneOff className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
                   </Button>
                 </div>
-                <Button type="submit" disabled={!input.trim() || isStreaming} className="self-end">
+                <Button type="submit" disabled={!input.trim() || isStreaming || voice.isVoiceActive} className="self-end">
                   {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
               </div>
-              {speech.isListening && (
+              {voice.isVoiceActive && (
+                <div className="flex items-center gap-1.5 px-1">
+                  <Radio className={`h-3 w-3 ${voice.isMuted ? 'text-amber-500' : 'text-emerald-500'} animate-pulse`} />
+                  <p className={`text-[11px] font-medium ${voice.isMuted ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {voice.isMuted && 'Micro coupé (silence envoyé) — Gemini va répondre…'}
+                    {!voice.isMuted && voice.voiceState === 'connecting' && 'Connexion en cours…'}
+                    {!voice.isMuted && voice.voiceState === 'listening' && 'Écoute — parlez, puis coupez le micro 🎤 pour la réponse'}
+                    {!voice.isMuted && voice.voiceState === 'speaking' && 'Gemini répond…'}
+                    {!voice.isMuted && voice.voiceState === 'error' && `Erreur vocale${voice.error ? ': ' + voice.error : ''}`}
+                  </p>
+                </div>
+              )}
+              {voice.error && !voice.isVoiceActive && (
+                <p className="text-[11px] text-red-500 px-1">{voice.error}</p>
+              )}
+              {speech.isListening && !voice.isVoiceActive && (
                 <p className="text-[11px] text-red-500 font-medium px-1">
                   Écoute en cours… (arrêt auto après 5 s de silence)
                 </p>

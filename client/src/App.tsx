@@ -69,6 +69,7 @@ const Chantiers = lazy(() => import("./pages/Chantiers"));
 const IntegrationsComptables = lazy(() => import("./pages/IntegrationsComptables"));
 const DevisIA = lazy(() => import("./pages/DevisIA"));
 const Assistant = lazy(() => import("./pages/Assistant"));
+const AssistantConversations = lazy(() => import("./pages/AssistantConversations"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const RdvEnLigne = lazy(() => import("./pages/RdvEnLigne"));
 const Vitrine = lazy(() => import("./pages/Vitrine"));
@@ -119,6 +120,7 @@ const ONBOARDING_BYPASS = new Set([
   "/profil",
   "/parametres",
   "/assistant",
+  "/assistant/conversations",
   "/notifications",
 ]);
 
@@ -206,6 +208,7 @@ function AuthenticatedRoutes() {
           <Route path="/rapport-commande" component={RapportCommande} />
           <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
           <Route path="/portail-gestion" component={PortailGestion} />
+          <Route path="/assistant/conversations" component={AssistantConversations} />
           <Route path="/assistant" component={Assistant} />
           <Route path="/notifications" component={Notifications} />
           <Route path="/rdv-en-ligne" component={RdvEnLigne} />

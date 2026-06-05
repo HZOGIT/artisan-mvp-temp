@@ -1642,3 +1642,33 @@ export const auditLog = mysqlTable("audit_log", {
 
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = typeof auditLog.$inferInsert;
+
+// ============================================================================
+// AI CHAT — threads and messages (text + voice, shared store)
+// ============================================================================
+export const aiThreads = mysqlTable("ai_threads", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  mode: varchar("mode", { length: 50 }).notNull().default("general"),
+  parcoursId: varchar("parcoursId", { length: 255 }),
+  title: text("title").notNull(),
+  lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AiThread = typeof aiThreads.$inferSelect;
+export type InsertAiThread = typeof aiThreads.$inferInsert;
+
+export const aiMessages = mysqlTable("ai_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  threadId: int("threadId").notNull(),
+  role: varchar("role", { length: 20 }).notNull(), // 'user' | 'assistant'
+  transcript: text("transcript").notNull(),
+  attachments: json("attachments"),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AiMessage = typeof aiMessages.$inferSelect;
+export type InsertAiMessage = typeof aiMessages.$inferInsert;

@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: 3000,
-      allowedHosts: ["localhost", "127.0.0.1"],
+      allowedHosts: ["localhost", "127.0.0.1", "dev.operioz.com"],
       fs: {
         strict: true,
         deny: ["**/.*"],

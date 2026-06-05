@@ -43,6 +43,7 @@ import {
   Globe,
   HardHat,
   HelpCircle,
+  History,
   Info,
   Layers,
   LayoutDashboard,
@@ -205,6 +206,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "violet",
     items: [
       { icon: Sparkles, label: "MonAssistant", path: "/assistant" },
+      { icon: History, label: "Mes conversations", path: "/assistant/conversations" },
       { icon: ScanLine, label: "Analyse photos IA", path: "/analyses-photos" },
     ],
   },

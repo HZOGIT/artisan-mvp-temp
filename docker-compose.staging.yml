@@ -1,0 +1,66 @@
+# Staging stack — isolated from dev (separate project, DB volume, network).
+# Runs the PRODUCTION build (pnpm build + pnpm start), public via the
+# artisan-staging Cloudflare tunnel (NO Cloudflare Access).
+#
+# Usage (from the staging worktree, see Taskfile `staging:*`):
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
+name: artisan-staging
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-stagingroot}
+      MYSQL_DATABASE: artisan_mvp
+      MYSQL_USER: ${MYSQL_USER:-artisan_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-artisan_password}
+    ports:
+      # Exposed on a DIFFERENT host port than dev (3306) for debugging.
+      - "3307:3306"
+    volumes:
+      - mysql_staging_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-stagingroot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    image: node:22-slim
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - app_staging_node_modules:/app/node_modules
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp
+    env_file:
+      - .env.staging
+    # Production build: install → build the bundle → migrate → run dist/.
+    command: >
+      sh -c "npm install -g pnpm@10.4.1 --silent &&
+             pnpm install --frozen-lockfile &&
+             pnpm build &&
+             pnpm exec drizzle-kit migrate &&
+             pnpm start"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # The artisan-staging tunnel routes staging.operioz.com -> http://app:3000
+    # (configured in Terraform, cloudflare-managed). cloudflared reaches the app
+    # by its compose service name over the shared network — no host ports.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN_STAGING}
+    depends_on:
+      - app
+
+volumes:
+  mysql_staging_data:
+  app_staging_node_modules:

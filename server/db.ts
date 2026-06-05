@@ -1653,35 +1653,35 @@ export async function deleteModeleDevis(id: number): Promise<void> {
 // EXPORTS
 // ============================================================================
 
-export { User, InsertUser } from "../drizzle/schema";
-export { Artisan, InsertArtisan } from "../drizzle/schema";
-export { Client, InsertClient } from "../drizzle/schema";
-export { BibliothequeArticle, InsertBibliothequeArticle } from "../drizzle/schema";
-export { ArticleArtisan, InsertArticleArtisan } from "../drizzle/schema";
-export { Devis, InsertDevis } from "../drizzle/schema";
-export { DevisLigne, InsertDevisLigne } from "../drizzle/schema";
-export { Facture, InsertFacture } from "../drizzle/schema";
-export { FactureLigne, InsertFactureLigne } from "../drizzle/schema";
-export { Intervention, InsertIntervention } from "../drizzle/schema";
-export { Notification, InsertNotification } from "../drizzle/schema";
-export { ParametresArtisan, InsertParametresArtisan } from "../drizzle/schema";
-export { SignatureDevis, InsertSignatureDevis } from "../drizzle/schema";
-export { Stock, InsertStock } from "../drizzle/schema";
-export { MouvementStock, InsertMouvementStock } from "../drizzle/schema";
-export { Fournisseur, InsertFournisseur } from "../drizzle/schema";
-export { ArticleFournisseur, InsertArticleFournisseur } from "../drizzle/schema";
-export { SmsVerification, InsertSmsVerification } from "../drizzle/schema";
-export { RelanceDevis, InsertRelanceDevis } from "../drizzle/schema";
-export { ModeleEmail, InsertModeleEmail } from "../drizzle/schema";
-export { CommandeFournisseur, InsertCommandeFournisseur } from "../drizzle/schema";
-export { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../drizzle/schema";
-export { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
-export { ModeleDevis, InsertModeleDevis } from "../drizzle/schema";
-export { ModeleDevisLigne, InsertModeleDevisLigne } from "../drizzle/schema";
-export { AvisClient, InsertAvisClient } from "../drizzle/schema";
-export { DemandeAvis, InsertDemandeAvis } from "../drizzle/schema";
-export { Technicien } from "../drizzle/schema";
-export { PositionTechnicien } from "../drizzle/schema";
+export type { User, InsertUser } from "../drizzle/schema";
+export type { Artisan, InsertArtisan } from "../drizzle/schema";
+export type { Client, InsertClient } from "../drizzle/schema";
+export type { BibliothequeArticle, InsertBibliothequeArticle } from "../drizzle/schema";
+export type { ArticleArtisan, InsertArticleArtisan } from "../drizzle/schema";
+export type { Devis, InsertDevis } from "../drizzle/schema";
+export type { DevisLigne, InsertDevisLigne } from "../drizzle/schema";
+export type { Facture, InsertFacture } from "../drizzle/schema";
+export type { FactureLigne, InsertFactureLigne } from "../drizzle/schema";
+export type { Intervention, InsertIntervention } from "../drizzle/schema";
+export type { Notification, InsertNotification } from "../drizzle/schema";
+export type { ParametresArtisan, InsertParametresArtisan } from "../drizzle/schema";
+export type { SignatureDevis, InsertSignatureDevis } from "../drizzle/schema";
+export type { Stock, InsertStock } from "../drizzle/schema";
+export type { MouvementStock, InsertMouvementStock } from "../drizzle/schema";
+export type { Fournisseur, InsertFournisseur } from "../drizzle/schema";
+export type { ArticleFournisseur, InsertArticleFournisseur } from "../drizzle/schema";
+export type { SmsVerification, InsertSmsVerification } from "../drizzle/schema";
+export type { RelanceDevis, InsertRelanceDevis } from "../drizzle/schema";
+export type { ModeleEmail, InsertModeleEmail } from "../drizzle/schema";
+export type { CommandeFournisseur, InsertCommandeFournisseur } from "../drizzle/schema";
+export type { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../drizzle/schema";
+export type { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
+export type { ModeleDevis, InsertModeleDevis } from "../drizzle/schema";
+export type { ModeleDevisLigne, InsertModeleDevisLigne } from "../drizzle/schema";
+export type { AvisClient, InsertAvisClient } from "../drizzle/schema";
+export type { DemandeAvis, InsertDemandeAvis } from "../drizzle/schema";
+export type { Technicien } from "../drizzle/schema";
+export type { PositionTechnicien } from "../drizzle/schema";
 
 // ============================================================================
 // AVIS CLIENTS
@@ -6313,4 +6313,62 @@ export async function exportDepensesFEC(
     num++;
   }
   return lines.join("\n");
+}
+
+// ============================================================================
+// AI CHAT — threads and messages
+// ============================================================================
+
+export async function getOrCreateAiThread(artisanId: number, firstMessage: string): Promise<number> {
+  const pool = await ensurePool();
+  const title = firstMessage.slice(0, 80) + (firstMessage.length > 80 ? '…' : '');
+  const [result] = await pool.execute(
+    'INSERT INTO ai_threads (artisanId, mode, title, lastMessageAt) VALUES (?, ?, ?, NOW())',
+    [artisanId, 'general', title]
+  ) as any;
+  return result.insertId;
+}
+
+export async function getAiThread(threadId: number, artisanId: number): Promise<any> {
+  const pool = await ensurePool();
+  const [rows] = await pool.execute(
+    'SELECT * FROM ai_threads WHERE id = ? AND artisanId = ? LIMIT 1',
+    [threadId, artisanId]
+  ) as any;
+  return (rows as any[])[0] || null;
+}
+
+export async function listAiThreads(artisanId: number, limit = 20): Promise<any[]> {
+  const pool = await ensurePool();
+  // NB: mysql2 prepared statements reject `LIMIT ?` ("Incorrect arguments to
+  // mysqld_stmt_execute"). limit is a controlled int, so inline it safely.
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit) || 20));
+  const [rows] = await pool.execute(
+    `SELECT * FROM ai_threads WHERE artisanId = ? ORDER BY lastMessageAt DESC LIMIT ${safeLimit}`,
+    [artisanId]
+  ) as any;
+  return rows as any[];
+}
+
+export async function insertAiMessage(threadId: number, role: 'user' | 'assistant', transcript: string, metadata?: any): Promise<void> {
+  const pool = await ensurePool();
+  await pool.execute(
+    'INSERT INTO ai_messages (threadId, role, transcript, metadata) VALUES (?, ?, ?, ?)',
+    [threadId, role, transcript, metadata ? JSON.stringify(metadata) : null]
+  );
+  await pool.execute(
+    'UPDATE ai_threads SET lastMessageAt = NOW() WHERE id = ?',
+    [threadId]
+  );
+}
+
+export async function getAiMessages(threadId: number, limit = 50): Promise<any[]> {
+  const pool = await ensurePool();
+  // Same mysql2 `LIMIT ?` limitation as listAiThreads — inline the int.
+  const safeLimit = Math.max(1, Math.min(500, Math.floor(limit) || 50));
+  const [rows] = await pool.execute(
+    `SELECT * FROM ai_messages WHERE threadId = ? ORDER BY createdAt ASC LIMIT ${safeLimit}`,
+    [threadId]
+  ) as any;
+  return rows as any[];
 }

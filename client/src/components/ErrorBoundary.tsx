@@ -24,6 +24,18 @@ class ErrorBoundary extends Component<Props, State> {
     // Pour la prod, on logue dans la console — le stack trace n'est PAS
     // expose a l'utilisateur final (UI user-friendly, voir render()).
     console.error("[App ErrorBoundary]", error, info);
+    // DEV: ship the crash to the server so it's visible in the logs (mobile
+    // debugging — no devtools). sendBeacon survives the unmount.
+    try {
+      const payload = JSON.stringify({
+        events: [
+          `ErrorBoundary: ${error?.message}`,
+          `stack: ${(error?.stack || "").split("\n").slice(0, 5).join(" | ")}`,
+          `componentStack: ${(info?.componentStack || "").split("\n").slice(0, 4).join(" | ")}`,
+        ],
+      });
+      navigator.sendBeacon?.("/api/voice/debug", new Blob([payload], { type: "application/json" }));
+    } catch { /* ignore */ }
   }
 
   render() {

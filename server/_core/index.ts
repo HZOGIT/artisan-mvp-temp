@@ -924,107 +924,133 @@ async function startServer() {
       const user = await getUserFromRequest(req);
       if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
 
-      const { getArtisanByUserId } = await import('../db');
+      const { getArtisanByUserId, getOrCreateAiThread, insertAiMessage } = await import('../db');
       const artisan = await getArtisanByUserId(user.id);
       if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
 
-      const { message, history, pageContext } = req.body;
+      const { message, history, pageContext, threadId: clientThreadId } = req.body;
       if (!message) { res.status(400).json({ error: 'Message requis' }); return; }
 
-      // System prompt centralisé (cache TTL 60s, factorisé avec les quick actions tRPC)
       const { buildSystemPrompt } = await import('./assistantContext');
       const systemPrompt = await buildSystemPrompt(artisan.id, {
         pageContext: typeof pageContext === 'string' ? pageContext : undefined,
       });
 
-      // Build messages array with history (typé large pour accepter les tool_use/tool_result blocks)
-      const messages: any[] = [];
+      // Build Gemini contents array from history
+      const contents: any[] = [];
       if (Array.isArray(history)) {
         for (const h of history.slice(-10)) {
-          if (h?.role && h?.content) messages.push({ role: h.role, content: h.content });
+          if (h?.role && h?.content) {
+            contents.push({
+              role: h.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: String(h.content) }],
+            });
+          }
         }
       }
-      messages.push({ role: 'user', content: message });
+      contents.push({ role: 'user', parts: [{ text: message }] });
 
-      // Set SSE headers
+      // SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
 
-      const Anthropic = (await import('@anthropic-ai/sdk')).default;
-      const anthropic = new Anthropic();
-      const { AGENT_TOOLS, executeTool } = await import('./assistantTools');
+      const { GoogleGenAI } = await import('@google/genai');
+      const { AGENT_TOOLS, executeTool, TOOL_INVALIDATIONS } = await import('./assistantTools');
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const model = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 
       let aborted = false;
       req.on('close', () => { aborted = true; });
 
-      // Boucle agentique : on stream le texte au fur et à mesure, et si Claude
-      // demande un outil on l'exécute puis on relance un tour. Max 10 tours pour
-      // permettre des chaînes d'actions (ex: vérifier stocks → identifier
-      // ruptures → chercher fournisseur → créer commande → envoyer).
+      // Create/get thread for persistence
+      let threadId: number = clientThreadId || 0;
+      if (!threadId) {
+        try { threadId = await getOrCreateAiThread(artisan.id, message); } catch { threadId = 0; }
+      }
+      if (threadId) res.write(`data: ${JSON.stringify({ threadId })}\n\n`);
+
       const MAX_TURNS = 10;
-      let currentStream: any = null;
+      let fullAssistantText = '';
+      let usageMetadata: any = null;
 
       try {
         for (let turn = 0; turn < MAX_TURNS && !aborted; turn++) {
-          currentStream = anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 2000,
-            temperature: 0.7,
-            system: systemPrompt,
-            tools: AGENT_TOOLS,
-            messages,
+          const stream = await ai.models.generateContentStream({
+            model,
+            contents,
+            config: {
+              systemInstruction: systemPrompt,
+              tools: [{ functionDeclarations: AGENT_TOOLS }],
+              maxOutputTokens: 2000,
+              temperature: 0.7,
+            },
           });
 
-          currentStream.on('text', (text: string) => {
-            if (!aborted) res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
-          });
+          let textBuffer = '';
+          const functionCalls: any[] = [];
 
-          const finalMessage = await currentStream.finalMessage();
-
-          if (finalMessage.stop_reason !== 'tool_use') break;
-
-          const toolUses = (finalMessage.content as any[]).filter(b => b.type === 'tool_use');
-          if (toolUses.length === 0) break;
-
-          // Ajoute la réponse complète de l'assistant (texte + tool_use blocks) à l'historique
-          messages.push({ role: 'assistant', content: finalMessage.content });
-
-          // Exécute chaque outil et construit les tool_result
-          const { TOOL_INVALIDATIONS } = await import('./assistantTools');
-          const toolResults: any[] = [];
-          for (const tu of toolUses) {
+          for await (const chunk of stream) {
             if (aborted) break;
-            res.write(`data: ${JSON.stringify({ toolUse: tu.name })}\n\n`);
-            const result = await executeTool(tu.name, tu.input, { artisanId: artisan.id });
-            // L'outil naviguer_vers déclenche un event SSE spécial pour
-            // que le client redirige l'artisan vers la page concernée.
-            if (tu.name === 'naviguer_vers' && result.ok) {
-              const nav = (result.data as any)?.navigate;
-              if (nav?.page) {
-                res.write(`data: ${JSON.stringify({ navigate: nav.page, filtre: nav.filtre, message: nav.message })}\n\n`);
+            // In @google/genai v1.x, iterate parts directly. `chunk.text` is a
+            // getter (not a method) and throws/ warns when functionCall parts
+            // are present — so we extract text + functionCalls from parts.
+            const parts = chunk.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (typeof part.text === 'string' && part.text) {
+                textBuffer += part.text;
+                fullAssistantText += part.text;
+                res.write(`data: ${JSON.stringify({ content: part.text })}\n\n`);
               }
+              if (part.functionCall) functionCalls.push(part.functionCall);
             }
-            // Si l'outil a modifié des données, on émet un event invalidate
-            // pour que le client rafraîchisse le cache tRPC concerné.
-            if (result.ok) {
-              const keys = TOOL_INVALIDATIONS[tu.name];
-              if (keys && keys.length > 0) {
-                res.write(`data: ${JSON.stringify({ invalidate: keys })}\n\n`);
-              }
-            }
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: tu.id,
-              content: JSON.stringify(result),
-              is_error: !result.ok,
-            });
+            if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
           }
 
-          if (toolResults.length === 0) break;
-          messages.push({ role: 'user', content: toolResults });
+          // Assemble model turn
+          const modelParts: any[] = [];
+          if (textBuffer) modelParts.push({ text: textBuffer });
+          functionCalls.forEach(fc => modelParts.push({ functionCall: fc }));
+          if (modelParts.length > 0) contents.push({ role: 'model', parts: modelParts });
+
+          if (functionCalls.length === 0) break;
+
+          // Execute tools
+          const toolResultParts: any[] = [];
+          for (const fc of functionCalls) {
+            if (aborted) break;
+            res.write(`data: ${JSON.stringify({ toolUse: fc.name })}\n\n`);
+            const result = await executeTool(fc.name, fc.args || {}, { artisanId: artisan.id });
+
+            if (fc.name === 'naviguer_vers' && result.ok) {
+              const nav = (result.data as any)?.navigate;
+              if (nav?.page) res.write(`data: ${JSON.stringify({ navigate: nav.page, filtre: nav.filtre, message: nav.message })}\n\n`);
+            }
+            if (result.ok) {
+              const keys = TOOL_INVALIDATIONS[fc.name];
+              if (keys?.length) res.write(`data: ${JSON.stringify({ invalidate: keys })}\n\n`);
+            }
+            toolResultParts.push({ functionResponse: { name: fc.name, response: result } });
+          }
+          if (toolResultParts.length > 0) contents.push({ role: 'user', parts: toolResultParts });
+          if (toolResultParts.length === 0) break;
+        }
+
+        // Persist messages to DB
+        if (threadId && !aborted) {
+          try {
+            await insertAiMessage(threadId, 'user', message);
+            if (fullAssistantText) {
+              await insertAiMessage(threadId, 'assistant', fullAssistantText, {
+                model, usageMetadata,
+              });
+            }
+          } catch (e: any) {
+            console.warn('[Assistant] Persist error:', e?.message);
+          }
         }
 
         if (!aborted) {
@@ -1037,16 +1063,119 @@ async function startServer() {
           res.write(`data: ${JSON.stringify({ error: 'Erreur de génération' })}\n\n`);
           res.end();
         }
-      } finally {
-        if (currentStream && typeof currentStream.abort === 'function' && aborted) {
-          try { currentStream.abort(); } catch { /* noop */ }
-        }
       }
     } catch (error) {
       console.error('[Assistant] Error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Erreur serveur' });
+      if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
+
+  // Voice debug sink — the browser POSTs its voice-session diagnostics here so
+  // we can see them in the server logs (the Live WS itself is browser↔Google
+  // and never touches us). Dev aid; fire-and-forget from the client.
+  app.post('/api/voice/debug', (req, res) => {
+    try {
+      const { events } = req.body || {};
+      if (Array.isArray(events)) {
+        for (const e of events) {
+          console.log(`[VoiceDebug] ${typeof e === 'string' ? e : JSON.stringify(e)}`);
+        }
+      } else if (req.body?.msg) {
+        console.log(`[VoiceDebug] ${req.body.msg}`);
       }
+    } catch { /* ignore */ }
+    res.json({ ok: true });
+  });
+
+  // Voice token endpoint — mints ephemeral Gemini token for Live WebSocket
+  app.post('/api/voice/token', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
+
+      const { getArtisanByUserId, getAiMessages } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      const { threadId } = req.body;
+
+      // Build the system instruction: artisan business context + recent
+      // conversation history (so voice mode is seamless with the text chat).
+      const { buildSystemPrompt } = await import('./assistantContext');
+      let systemText = await buildSystemPrompt(artisan.id);
+
+      if (threadId) {
+        try {
+          const msgs = await getAiMessages(Number(threadId), 20);
+          if (msgs.length > 0) {
+            const histLines = msgs
+              .map((m: any) => `${m.role === 'assistant' ? 'Assistant' : 'Artisan'}: ${m.transcript}`)
+              .join('\n');
+            systemText += `\n\n--- Historique récent de la conversation ---\n${histLines}`;
+          }
+        } catch { /* history optional */ }
+      }
+
+      // Expiry: token valid 30 min, session must start within 1 min
+      const now = new Date();
+      const expireTime = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+      const newSessionExpireTime = new Date(now.getTime() + 60 * 1000).toISOString();
+
+      const liveModel = process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-latest';
+      const apiKey = process.env.GEMINI_API_KEY!;
+
+      // Ephemeral token endpoint is v1alpha/auth_tokens with a FLAT snake_case
+      // body (the @google/genai SDK and v1beta paths do not expose this).
+      // response_modalities must be a SINGLE modality for Live — we use AUDIO
+      // and enable input/output transcription to get synchronized TEXT
+      // (seamless voice + text).
+      const body: any = {
+        uses: 1,
+        expire_time: expireTime,
+        new_session_expire_time: newSessionExpireTime,
+        bidi_generate_content_setup: {
+          model: `models/${liveModel}`,
+          generation_config: {
+            response_modalities: ['AUDIO'],
+            speech_config: {
+              voice_config: { prebuilt_voice_config: { voice_name: 'Aoede' } },
+            },
+          },
+          system_instruction: { parts: [{ text: systemText }] },
+          input_audio_transcription: {},
+          output_audio_transcription: {},
+        },
+      };
+
+      const tokenRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.text();
+        console.error('[VoiceToken] Gemini error:', tokenRes.status, err);
+        res.status(502).json({ error: 'Impossible de créer le token vocal' });
+        return;
+      }
+
+      const tokenData = await tokenRes.json();
+      const token = tokenData?.name || tokenData?.token;
+
+      res.json({
+        token,
+        wsUrl: `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained`,
+        model: liveModel,
+        expiresAt: expireTime,
+      });
+    } catch (error) {
+      console.error('[VoiceToken] Error:', error);
+      res.status(500).json({ error: 'Erreur serveur' });
     }
   });
 
