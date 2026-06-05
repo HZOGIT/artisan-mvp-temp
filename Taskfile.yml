@@ -131,13 +131,17 @@ tasks:
     cmds:
       - ./run.sh output
 
-  # ─── STAGING (public, prod build, deploys the `staging` branch) ────────────
-  # Staging lives in a separate git worktree so dev (this dir, main) is untouched.
+  # ─── STAGING (public, prod build) ──────────────────────────────────────────
+  # We develop ON the `staging` branch (this working dir = dev env, live).
+  # staging.operioz.com is a separate worktree that builds a snapshot of
+  # origin/staging, redeployed ONLY on demand (task staging:deploy).
+  # The worktree uses a DETACHED checkout so it never conflicts with the
+  # `staging` branch checked out here.
   staging:bootstrap:
-    desc: One-time — create the `staging` branch + worktree and copy .env.staging
+    desc: One-time — create the staging worktree (detached on origin/staging) + env
     cmds:
-      - git rev-parse --verify staging >/dev/null 2>&1 || git branch staging
-      - test -d {{.STAGING_DIR}} || git worktree add {{.STAGING_DIR}} staging
+      - git fetch origin staging
+      - test -d {{.STAGING_DIR}} || git worktree add --detach {{.STAGING_DIR}} origin/staging
       - cp -n .env.staging {{.STAGING_DIR}}/.env.staging || true
       - echo "Staging worktree ready at {{.STAGING_DIR}}"
 
@@ -149,10 +153,11 @@ tasks:
       - '{{.STAGING_COMPOSE}} ps'
 
   staging:deploy:
-    desc: Pull latest `staging` branch and rebuild + restart the app
+    desc: Deploy origin/staging to staging.operioz.com (fetch + rebuild + restart)
     dir: '{{.STAGING_DIR}}'
     cmds:
-      - git pull --ff-only origin staging
+      - git fetch origin staging
+      - git checkout --detach origin/staging
       - '{{.STAGING_COMPOSE}} up -d --build --force-recreate app'
       - '{{.STAGING_COMPOSE}} ps'
 
