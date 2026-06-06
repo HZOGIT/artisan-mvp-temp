@@ -1094,11 +1094,16 @@ async function startServer() {
       const user = await getUserFromRequest(req);
       if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
 
-      const { getArtisanByUserId, getAiMessages } = await import('../db');
+      const { getArtisanByUserId, getAiMessages, getOrCreateAiThread } = await import('../db');
       const artisan = await getArtisanByUserId(user.id);
       if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
 
-      const { threadId } = req.body;
+      // Ensure a thread exists so voice turns can be persisted (browser↔Google
+      // voice never hits our server, so the client posts turns to /voice/persist).
+      let threadId = req.body?.threadId ? Number(req.body.threadId) : 0;
+      if (!threadId) {
+        try { threadId = await getOrCreateAiThread(artisan.id, 'Conversation vocale'); } catch { threadId = 0; }
+      }
 
       // Build the system instruction: artisan business context + recent
       // conversation history (so voice mode is seamless with the text chat).
@@ -1172,9 +1177,40 @@ async function startServer() {
         wsUrl: `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained`,
         model: liveModel,
         expiresAt: expireTime,
+        threadId: threadId || undefined,
       });
     } catch (error) {
       console.error('[VoiceToken] Error:', error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
+
+  // Persist a completed VOICE turn (user + assistant transcripts) to the thread.
+  // The Gemini Live session is browser↔Google, so the client posts each turn here.
+  app.post('/api/voice/persist', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
+
+      const { getArtisanByUserId, getAiThread, insertAiMessage } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      const threadId = Number(req.body?.threadId);
+      const userText = typeof req.body?.userTranscript === 'string' ? req.body.userTranscript.trim() : '';
+      const assistantText = typeof req.body?.assistantTranscript === 'string' ? req.body.assistantTranscript.trim() : '';
+      if (!threadId || (!userText && !assistantText)) { res.status(400).json({ error: 'threadId + transcript requis' }); return; }
+
+      // Verify the thread belongs to this artisan.
+      const thread = await getAiThread(threadId, artisan.id);
+      if (!thread) { res.status(404).json({ error: 'Thread introuvable' }); return; }
+
+      if (userText) await insertAiMessage(threadId, 'user', userText, { source: 'voice' });
+      if (assistantText) await insertAiMessage(threadId, 'assistant', assistantText, { source: 'voice' });
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('[VoicePersist] Error:', error);
       res.status(500).json({ error: 'Erreur serveur' });
     }
   });

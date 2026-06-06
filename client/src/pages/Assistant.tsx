@@ -63,6 +63,11 @@ export default function Assistant() {
 
   const voice = useVoiceSession({
     threadId,
+    // The voice session may create a thread (if started before any text) — adopt
+    // it so text messages and the conversations list share the same thread.
+    onThreadId: useCallback((id: number) => {
+      setThreadId(prev => prev ?? id);
+    }, []),
     // text = CUMULATIVE user transcript for the current turn (grows word by word).
     // NB: ref mutation happens OUTSIDE the updater — React may double-invoke the
     // updater (StrictMode), and impure updaters caused an "last is undefined" crash.

@@ -8,6 +8,8 @@ export interface UseVoiceSessionOptions {
   onUserTranscript?: (text: string, isFinal: boolean) => void;
   onAssistantDelta?: (delta: string) => void;
   onTurnComplete?: (user: string, assistant: string, metadata?: any) => void;
+  /** Called with the thread id the voice session uses (created if needed). */
+  onThreadId?: (threadId: number) => void;
 }
 
 export interface UseVoiceSessionReturn {
@@ -26,6 +28,8 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const sessionRef = useRef<GeminiLiveVoiceSession | null>(null);
+  // The thread voice turns are persisted to (created by /voice/token if absent).
+  const threadIdRef = useRef<number | undefined>(options.threadId);
 
   const stopVoice = useCallback(async () => {
     if (sessionRef.current) {
@@ -63,8 +67,15 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
         throw new Error(err.error || 'Impossible de démarrer la session vocale');
       }
 
-      const { token, wsUrl, model } = await res.json();
-      vlog(`token received (model=${model}) — opening Live WS`);
+      const { token, wsUrl, model, threadId } = await res.json();
+      vlog(`token received (model=${model}, threadId=${threadId}) — opening Live WS`);
+
+      // Adopt the thread id (created server-side if we started without one) so
+      // voice turns persist and text/voice share the same conversation.
+      if (threadId) {
+        threadIdRef.current = Number(threadId);
+        options.onThreadId?.(Number(threadId));
+      }
 
       const session = new GeminiLiveVoiceSession();
       sessionRef.current = session;
@@ -76,7 +87,21 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
           onStateChange: (s) => { vlog(`state → ${s}`); setVoiceState(s); },
           onUserTranscript: (t, f) => { vlog(`USER transcript: "${t}"`); (options.onUserTranscript || (() => {}))(t, f); },
           onAssistantDelta: options.onAssistantDelta || (() => {}),
-          onTurnComplete: (u, a, m) => { vlog(`turnComplete user="${u}" assistant="${a}"`); (options.onTurnComplete || (() => {}))(u, a, m); },
+          onTurnComplete: (u, a, m) => {
+            vlog(`turnComplete user="${u}" assistant="${a}"`);
+            // Persist this voice turn — the Live session never touches our server.
+            const tid = threadIdRef.current;
+            if (tid && ((u && u.trim()) || (a && a.trim()))) {
+              fetch('/api/voice/persist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ threadId: tid, userTranscript: u, assistantTranscript: a }),
+                keepalive: true,
+              }).then(r => vlog(`/voice/persist → ${r.status}`)).catch(e => vlog(`persist failed: ${e?.message}`));
+            }
+            (options.onTurnComplete || (() => {}))(u, a, m);
+          },
           onInterrupted: () => { vlog('interrupted (barge-in)'); },
           onError: (err) => {
             vlog(`❌ session error: ${err.message}`);
@@ -90,7 +115,13 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
       setError(err.message || 'Erreur vocale');
       setVoiceState('error');
     }
-  }, [options.threadId, options.onUserTranscript, options.onAssistantDelta, options.onTurnComplete, stopVoice]);
+  }, [options.threadId, options.onUserTranscript, options.onAssistantDelta, options.onTurnComplete, options.onThreadId, stopVoice]);
+
+  // Keep the persist target in sync if the thread id changes elsewhere (e.g. a
+  // text message created the thread before voice started).
+  useEffect(() => {
+    if (options.threadId) threadIdRef.current = options.threadId;
+  }, [options.threadId]);
 
   const toggleVoice = useCallback(async () => {
     if (voiceState === 'idle' || voiceState === 'error') {
