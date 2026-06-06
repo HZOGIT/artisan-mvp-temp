@@ -976,6 +976,7 @@ async function startServer() {
       const MAX_TURNS = 10;
       let fullAssistantText = '';
       let usageMetadata: any = null;
+      const collectedToolCalls: Array<{ name: string; args: any; ok: boolean; error?: string }> = [];
 
       try {
         for (let turn = 0; turn < MAX_TURNS && !aborted; turn++) {
@@ -1022,8 +1023,11 @@ async function startServer() {
           const toolResultParts: any[] = [];
           for (const fc of functionCalls) {
             if (aborted) break;
-            res.write(`data: ${JSON.stringify({ toolUse: fc.name })}\n\n`);
+            res.write(`data: ${JSON.stringify({ toolStart: { name: fc.name, args: fc.args || {} } })}\n\n`);
             const result = await executeTool(fc.name, fc.args || {}, { artisanId: artisan.id });
+            const toolError = result.ok ? undefined : (typeof result === 'object' && 'error' in result ? String((result as any).error) : 'Erreur');
+            res.write(`data: ${JSON.stringify({ toolEnd: { name: fc.name, ok: result.ok, error: toolError } })}\n\n`);
+            collectedToolCalls.push({ name: fc.name, args: fc.args || {}, ok: result.ok, error: toolError });
 
             if (fc.name === 'naviguer_vers' && result.ok) {
               const nav = (result.data as any)?.navigate;
@@ -1045,7 +1049,9 @@ async function startServer() {
             await insertAiMessage(threadId, 'user', message);
             if (fullAssistantText) {
               await insertAiMessage(threadId, 'assistant', fullAssistantText, {
-                model, usageMetadata,
+                model,
+                usageMetadata,
+                toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined,
               });
             }
           } catch (e: any) {
