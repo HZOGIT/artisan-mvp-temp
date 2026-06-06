@@ -96,7 +96,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ threadId: tid, userTranscript: u, assistantTranscript: a }),
+                body: JSON.stringify({ threadId: tid, userTranscript: u, assistantTranscript: a, usageMetadata: m }),
                 keepalive: true,
               }).then(r => vlog(`/voice/persist → ${r.status}`)).catch(e => vlog(`persist failed: ${e?.message}`));
             }

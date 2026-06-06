@@ -6350,11 +6350,23 @@ export async function listAiThreads(artisanId: number, limit = 20): Promise<any[
   return rows as any[];
 }
 
-export async function insertAiMessage(threadId: number, role: 'user' | 'assistant', transcript: string, metadata?: any): Promise<void> {
+export async function insertAiMessage(
+  threadId: number,
+  role: 'user' | 'assistant',
+  transcript: string,
+  metadata?: any,
+  pricingMetadata?: any,
+): Promise<void> {
   const pool = await ensurePool();
   await pool.execute(
-    'INSERT INTO ai_messages (threadId, role, transcript, metadata) VALUES (?, ?, ?, ?)',
-    [threadId, role, transcript, metadata ? JSON.stringify(metadata) : null]
+    'INSERT INTO ai_messages (threadId, role, transcript, metadata, pricingMetadata) VALUES (?, ?, ?, ?, ?)',
+    [
+      threadId,
+      role,
+      transcript,
+      metadata ? JSON.stringify(metadata) : null,
+      pricingMetadata ? JSON.stringify(pricingMetadata) : null,
+    ]
   );
   await pool.execute(
     'UPDATE ai_threads SET lastMessageAt = NOW() WHERE id = ?',

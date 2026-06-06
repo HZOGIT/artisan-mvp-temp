@@ -1667,6 +1667,7 @@ export const aiMessages = mysqlTable("ai_messages", {
   transcript: text("transcript").notNull(),
   attachments: json("attachments"),
   metadata: json("metadata"),
+  pricingMetadata: json("pricingMetadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

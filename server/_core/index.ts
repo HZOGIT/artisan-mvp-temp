@@ -1048,11 +1048,13 @@ async function startServer() {
           try {
             await insertAiMessage(threadId, 'user', message);
             if (fullAssistantText) {
-              await insertAiMessage(threadId, 'assistant', fullAssistantText, {
-                model,
-                usageMetadata,
-                toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined,
-              });
+              await insertAiMessage(
+                threadId,
+                'assistant',
+                fullAssistantText,
+                { model, toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined },
+                usageMetadata ?? undefined,
+              );
             }
           } catch (e: any) {
             console.warn('[Assistant] Persist error:', e?.message);
@@ -1220,6 +1222,7 @@ RÈGLES STRICTES sur les outils :
       const threadId = Number(req.body?.threadId);
       const userText = typeof req.body?.userTranscript === 'string' ? req.body.userTranscript.trim() : '';
       const assistantText = typeof req.body?.assistantTranscript === 'string' ? req.body.assistantTranscript.trim() : '';
+      const usageMeta = req.body?.usageMetadata ?? undefined;
       if (!threadId || (!userText && !assistantText)) { res.status(400).json({ error: 'threadId + transcript requis' }); return; }
 
       // Verify the thread belongs to this artisan.
@@ -1227,7 +1230,7 @@ RÈGLES STRICTES sur les outils :
       if (!thread) { res.status(404).json({ error: 'Thread introuvable' }); return; }
 
       if (userText) await insertAiMessage(threadId, 'user', userText, { source: 'voice' });
-      if (assistantText) await insertAiMessage(threadId, 'assistant', assistantText, { source: 'voice' });
+      if (assistantText) await insertAiMessage(threadId, 'assistant', assistantText, { source: 'voice' }, usageMeta);
       res.json({ ok: true });
     } catch (error) {
       console.error('[VoicePersist] Error:', error);
