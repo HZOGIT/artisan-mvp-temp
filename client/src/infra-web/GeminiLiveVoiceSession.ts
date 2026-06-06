@@ -17,6 +17,8 @@ export class GeminiLiveVoiceSession implements VoiceSession {
   // Resolves once the server acknowledges our setup message.
   private _onSetupComplete: (() => void) | null = null;
   private _sentChunks = 0;
+  // AbortController for the currently running tool call — cancelled on barge-in.
+  private _toolAbort: AbortController | null = null;
   // When muted, we stream clean digital silence instead of the mic — this is a
   // reliable way to force the model's end-of-turn detection so it responds.
   private _muted = false;
@@ -154,7 +156,17 @@ export class GeminiLiveVoiceSession implements VoiceSession {
 
     // The model wants to call a tool — execute it server-side and reply.
     if (msg.toolCall) {
-      void this._handleToolCall(msg.toolCall);
+      this._toolAbort?.abort();
+      this._toolAbort = new AbortController();
+      void this._handleToolCall(msg.toolCall, this._toolAbort.signal);
+      return;
+    }
+
+    // Gemini cancelled the pending tool call (barge-in mid-execution).
+    if (msg.toolCallCancellation) {
+      vlog(`← toolCallCancellation — aborting pending tool`);
+      this._toolAbort?.abort();
+      this._toolAbort = null;
       return;
     }
 
@@ -230,11 +242,15 @@ export class GeminiLiveVoiceSession implements VoiceSession {
 
   // Execute each requested function on our server (DB-backed) and send the
   // results back to Gemini so it can continue the spoken response.
-  private async _handleToolCall(toolCall: any): Promise<void> {
+  private async _handleToolCall(toolCall: any, signal: AbortSignal): Promise<void> {
     const calls: any[] = toolCall?.functionCalls || [];
-    if (calls.length === 0) return;
+    if (calls.length === 0) {
+      vlog(`🔧 toolCall with empty functionCalls — ignored`);
+      return;
+    }
     const functionResponses: any[] = [];
     for (const fc of calls) {
+      if (signal.aborted) { vlog(`🔧 ${fc.name} skipped (aborted)`); return; }
       vlog(`🔧 toolCall ${fc.name}(${JSON.stringify(fc.args || {})})`);
       let response: any;
       try {
@@ -243,19 +259,27 @@ export class GeminiLiveVoiceSession implements VoiceSession {
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ name: fc.name, args: fc.args || {} }),
+          signal: AbortSignal.any
+            ? AbortSignal.any([signal, AbortSignal.timeout(10000)])
+            : signal,
         });
+        if (signal.aborted) { vlog(`🔧 ${fc.name} aborted after fetch`); return; }
         const data = await r.json();
         response = data?.result ?? { ok: false, error: 'no result' };
         vlog(`🔧 ${fc.name} → ${JSON.stringify(response).slice(0, 120)}`);
       } catch (e: any) {
+        if (signal.aborted) { vlog(`🔧 ${fc.name} aborted`); return; }
         response = { ok: false, error: e?.message || 'tool error' };
         vlog(`🔧 ${fc.name} FAILED: ${e?.message}`);
       }
       functionResponses.push({ id: fc.id, name: fc.name, response });
     }
+    if (signal.aborted) { vlog(`🔧 toolResponse skipped (aborted)`); return; }
     if (this._ws?.readyState === WebSocket.OPEN) {
       this._ws.send(JSON.stringify({ toolResponse: { functionResponses } }));
       vlog(`🔧 sent ${functionResponses.length} toolResponse(s)`);
+    } else {
+      vlog(`🔧 toolResponse NOT sent — WS closed (state=${this._ws?.readyState})`);
     }
   }
 
