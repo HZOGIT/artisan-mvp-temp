@@ -39,7 +39,42 @@ ON DUPLICATE KEY UPDATE
   max_devices_per_user = 999,
   max_concurrent_sessions = 999;
 
-SELECT u.id, u.email, u.role, u.actif, a.nomEntreprise, s.status as sub_status, s.trial_ends_at
+-- Seed permissions for the artisan role (all permissions except utilisateurs.gerer)
+INSERT INTO permissions_utilisateur (userId, permission, autorise)
+SELECT @userId, p, 1 FROM (
+  SELECT 'dashboard.voir'        AS p UNION ALL
+  SELECT 'statistiques.voir'     UNION ALL
+  SELECT 'devis.voir'            UNION ALL
+  SELECT 'devis.creer'           UNION ALL
+  SELECT 'devis.supprimer'       UNION ALL
+  SELECT 'factures.voir'         UNION ALL
+  SELECT 'factures.creer'        UNION ALL
+  SELECT 'factures.supprimer'    UNION ALL
+  SELECT 'contrats.voir'         UNION ALL
+  SELECT 'contrats.gerer'        UNION ALL
+  SELECT 'relances.voir'         UNION ALL
+  SELECT 'clients.voir'          UNION ALL
+  SELECT 'clients.gerer'         UNION ALL
+  SELECT 'chat.voir'             UNION ALL
+  SELECT 'portail.gerer'         UNION ALL
+  SELECT 'rdv.gerer'             UNION ALL
+  SELECT 'interventions.voir'    UNION ALL
+  SELECT 'interventions.gerer'   UNION ALL
+  SELECT 'calendrier.voir'       UNION ALL
+  SELECT 'chantiers.voir'        UNION ALL
+  SELECT 'chantiers.gerer'       UNION ALL
+  SELECT 'techniciens.voir'      UNION ALL
+  SELECT 'geolocalisation.voir'  UNION ALL
+  SELECT 'articles.voir'         UNION ALL
+  SELECT 'comptabilite.voir'     UNION ALL
+  SELECT 'exports.voir'          UNION ALL
+  SELECT 'parametres.voir'       UNION ALL
+  SELECT 'vitrine.gerer'
+) perms
+ON DUPLICATE KEY UPDATE autorise = 1;
+
+SELECT u.id, u.email, u.role, u.actif, a.nomEntreprise, s.status as sub_status, s.trial_ends_at,
+       (SELECT COUNT(*) FROM permissions_utilisateur WHERE userId = u.id) as nb_permissions
 FROM users u
 JOIN artisans a ON a.userId = u.id
 LEFT JOIN subscriptions s ON s.artisan_id = a.id
