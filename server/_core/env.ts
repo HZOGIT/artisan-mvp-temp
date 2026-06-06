@@ -16,6 +16,20 @@ const envSchema = z.object({
   VITE_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
+  // Stripe Billing - IDs des prix d'abonnement (OPE-11). Optionnels : si
+  // absents, le checkout renvoie PRECONDITION_FAILED au lieu de planter au
+  // demarrage. A renseigner en staging/prod (cf. .env.staging).
+  STRIPE_PRICE_ESSENTIEL_MONTH: z.string().optional(),
+  STRIPE_PRICE_ESSENTIEL_YEAR: z.string().optional(),
+  STRIPE_PRICE_PRO_MONTH: z.string().optional(),
+  STRIPE_PRICE_PRO_YEAR: z.string().optional(),
+  STRIPE_PRICE_ENTREPRISE_MONTH: z.string().optional(),
+  STRIPE_PRICE_ENTREPRISE_YEAR: z.string().optional(),
+  STRIPE_PRICE_EXTRA_USER_PRO_MONTH: z.string().optional(),
+  STRIPE_PRICE_EXTRA_USER_PRO_YEAR: z.string().optional(),
+  STRIPE_PRICE_EXTRA_USER_ENT_MONTH: z.string().optional(),
+  STRIPE_PRICE_EXTRA_USER_ENT_YEAR: z.string().optional(),
+
   // Owner Info - OPTIONNEL
   OWNER_NAME: z.string().optional(),
   

@@ -3,6 +3,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, adminOnlyProcedure, router, devisVoirProcedure, devisCreerProcedure, devisSupprimerProcedure, facturesVoirProcedure, facturesCreerProcedure, facturesSupprimerProcedure, comptaVoirProcedure, utilisateursGererProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { createHash, randomBytes } from "crypto";
 import * as db from "./db";
 import * as dbSecure from "./db-secure";
 import { createUserWithPassword, authenticateUser, hashPassword } from "./_core/auth";
@@ -8916,6 +8917,12 @@ export const appRouter = router({system: systemRouter,
       .mutation(async ({ input, ctx }) => {
         try {
           const user = await createUserWithPassword(input.email, input.password, input.name);
+
+          // OPE-7 : provisionner le compte (artisan + subscription d'essai +
+          // permissions proprietaire). Sans ca, l'app est inutilisable apres
+          // inscription (FORBIDDEN/NOT_FOUND partout, checkout impossible).
+          await db.bootstrapArtisanAccount(user.id);
+
           const token = await createToken({ id: user.id, email: user.email });
           setAuthCookie(ctx.res, token, ctx.req);
 
@@ -8983,6 +8990,22 @@ export const appRouter = router({system: systemRouter,
         if (!user) {
           throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid email or password' });
         }
+        // OPE-7 : auto-reparation des comptes crees avant le fix (artisan /
+        // subscription / permissions manquants). Idempotent et best-effort :
+        // ne seed que ce qui manque, ne bloque jamais le login.
+        // IMPORTANT : on ne provisionne QUE les proprietaires. Un collaborateur
+        // (secretaire/technicien) a toujours users.artisanId renseigne vers
+        // l'entreprise du proprietaire ; bootstrapper lui creerait a tort sa
+        // propre entreprise + toutes les permissions. Donc on ne declenche que
+        // si artisanId est null (= proprietaire dont le signup a echoue).
+        try {
+          const dbUser = await db.getUserById(user.id);
+          if (dbUser && !dbUser.artisanId) {
+            await db.bootstrapArtisanAccount(user.id);
+          }
+        } catch (e: any) {
+          console.error('[Signin] bootstrap self-heal failed (non-blocking):', e?.message);
+        }
         const token = await createToken({ id: user.id, email: user.email });
         setAuthCookie(ctx.res, token, ctx.req);
         return { success: true, user };
@@ -9023,6 +9046,97 @@ export const appRouter = router({system: systemRouter,
         }
         const hashed = await hashPassword(input.newPassword);
         await db.updateUser(ctx.user.id, { password: hashed });
+        return { success: true };
+      }),
+
+    /**
+     * OPE-8 — Demande de reinitialisation du mot de passe.
+     * Genere un token aleatoire (envoye par email), stocke uniquement son
+     * hash SHA-256 + expiry 1h. Reponse TOUJOURS identique (success) pour ne
+     * pas reveler si l'email existe (anti-enumeration).
+     */
+    forgotPassword: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await db.getUserByEmail(input.email);
+        // On ne traite que les comptes actifs disposant d'un mot de passe
+        // (les comptes OAuth-only n'ont pas de password a reinitialiser).
+        if (user && user.actif !== false && user.password) {
+          const rawToken = randomBytes(32).toString('hex');
+          const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+          const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1h
+          await db.updateUser(user.id, {
+            resetToken: tokenHash,
+            resetTokenExpiry: expiry,
+          } as any);
+
+          const origin = (ctx.req.headers.origin as string)
+            || process.env.APP_URL || 'https://www.operioz.com';
+          const resetUrl = `${origin}/reset-password?token=${rawToken}`;
+          try {
+            await sendEmail({
+              to: input.email,
+              subject: 'Réinitialisation de votre mot de passe Operioz',
+              body: `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#2563eb;padding:28px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Réinitialisation du mot de passe</h1>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <p style="margin:0 0 16px 0;font-size:15px;color:#374151;line-height:1.6;">Bonjour,</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">
+            Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau. Ce lien est valable <strong>1 heure</strong>.
+          </p>
+          <p style="margin:0 0 24px 0;text-align:center;">
+            <a href="${resetUrl}" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
+              Réinitialiser mon mot de passe →
+            </a>
+          </p>
+          <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+            Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe restera inchangé.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">© ${new Date().getFullYear()} Operioz</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`,
+            });
+          } catch (mailErr) {
+            console.error('[ForgotPassword] Email failed (non-blocking):', mailErr);
+          }
+        }
+        // Reponse constante : ne jamais reveler l'existence de l'email.
+        return { success: true };
+      }),
+
+    /**
+     * OPE-8 — Applique le nouveau mot de passe a partir d'un token valide.
+     * Hash le token recu, cherche un user dont le hash correspond et dont
+     * l'expiry est dans le futur, met a jour le password et invalide le token.
+     */
+    resetPassword: publicProcedure
+      .input(z.object({
+        token: z.string().min(1),
+        newPassword: z.string().min(6, 'Le mot de passe doit faire au moins 6 caractères'),
+      }))
+      .mutation(async ({ input }) => {
+        const tokenHash = createHash('sha256').update(input.token).digest('hex');
+        const user = await db.getUserByValidResetToken(tokenHash);
+        if (!user) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Lien invalide ou expiré. Veuillez refaire une demande.' });
+        }
+        const hashed = await hashPassword(input.newPassword);
+        await db.updateUser(user.id, {
+          password: hashed,
+          resetToken: null,
+          resetTokenExpiry: null,
+        } as any);
         return { success: true };
       }),
 

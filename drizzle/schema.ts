@@ -14,6 +14,10 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["admin", "artisan", "secretaire", "technicien"]).default("artisan").notNull(),
   artisanId: int("artisanId"),
   actif: boolean("actif").default(true).notNull(),
+  // Reset mot de passe (OPE-8). On stocke le SHA-256 du token (jamais le token
+  // en clair) + sa date d'expiration. NULL quand aucun reset en cours.
+  resetToken: varchar("resetToken", { length: 64 }),
+  resetTokenExpiry: timestamp("resetTokenExpiry"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

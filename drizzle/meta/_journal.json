@@ -15,6 +15,13 @@
       "when": 1780757382334,
       "tag": "0001_dear_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1780760894193,
+      "tag": "0002_fancy_fat_cobra",
+      "breakpoints": true
     }
   ]
 }

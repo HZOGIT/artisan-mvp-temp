@@ -78,6 +78,7 @@ import {
   configAlertesPrevisions, ConfigAlertePrevision, InsertConfigAlertePrevision,
   historiqueAlertesPrevisions, HistoriqueAlertePrevision, InsertHistoriqueAlertePrevision,
 } from "../drizzle/schema";
+import { ALL_PERMISSIONS } from "../shared/permissions";
 
 // ============================================================================
 // DATABASE CONNECTION
@@ -188,6 +189,19 @@ export async function updateUser(id: number, data: Partial<InsertUser>): Promise
   const db = await getDb();
   await db.update(users).set(data).where(eq(users.id, id));
   return getUserById(id);
+}
+
+// OPE-8 : recupere l'utilisateur dont le token de reset (hash SHA-256) est
+// valide et non expire. Retourne undefined si aucun match / expire.
+export async function getUserByValidResetToken(tokenHash: string): Promise<User | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(users)
+    .where(and(
+      eq(users.resetToken, tokenHash),
+      gte(users.resetTokenExpiry, new Date()),
+    ))
+    .limit(1);
+  return result[0];
 }
 
 // ============================================================================
@@ -3338,6 +3352,64 @@ export async function setUserPermissions(userId: number, permissions: string[], 
       permissions.map(p => ({ userId, permission: p, autorise: true }))
     );
   }
+}
+
+// ============================================================================
+// BOOTSTRAP COMPTE ARTISAN (OPE-7)
+// ----------------------------------------------------------------------------
+// A l'inscription (auth.signup), le user etait cree seul : ni artisan, ni
+// subscription, ni permissions. Resultat : 100% des endpoints metier en
+// FORBIDDEN/NOT_FOUND et le checkout d'abonnement (ctx.user.artisanId null)
+// impossible. Cette fonction provisionne tout ce qu'un compte proprietaire
+// doit avoir, de facon IDEMPOTENTE (ne re-seed que ce qui manque) pour
+// pouvoir aussi reparer un compte existant au prochain signin.
+// ============================================================================
+export async function bootstrapArtisanAccount(
+  userId: number,
+  opts?: { nomEntreprise?: string | null },
+): Promise<Artisan> {
+  // 1. Ligne artisans (idempotent via getOrCreateArtisan / UNIQUE(userId)).
+  const artisan = await getOrCreateArtisan(
+    userId,
+    opts?.nomEntreprise ? { nomEntreprise: opts.nomEntreprise } : undefined,
+  );
+
+  // 2. Lier le proprietaire a sa propre entreprise. Requis par :
+  //    - subscriptionRouter (ctx.user.artisanId) -> sinon checkout impossible
+  //    - setUserPermissions (verifie users.artisanId === artisanId)
+  const u = await getUserById(userId);
+  if (u && u.artisanId !== artisan.id) {
+    await updateUser(userId, { artisanId: artisan.id } as any);
+  }
+
+  // 3. Subscription d'essai (14 jours), seulement si absente.
+  try {
+    const existingSub = await getSubscription(artisan.id);
+    if (!existingSub) {
+      const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      await updateSubscription(artisan.id, {
+        plan: 'trial',
+        status: 'trialing',
+        trialEndsAt,
+        maxUsers: 1,
+      });
+    }
+  } catch (e: any) {
+    console.error('[Bootstrap] Subscription seed failed (non-blocking):', e?.message);
+  }
+
+  // 4. Permissions du proprietaire = TOUTES (y compris utilisateurs.gerer
+  //    pour pouvoir inviter des collaborateurs). Seulement si aucune presente.
+  try {
+    const existingPerms = await getUserPermissions(userId);
+    if (existingPerms.length === 0) {
+      await setUserPermissions(userId, [...ALL_PERMISSIONS], artisan.id);
+    }
+  } catch (e: any) {
+    console.error('[Bootstrap] Permission seed failed (non-blocking):', e?.message);
+  }
+
+  return artisan;
 }
 
 // ============================================================================

@@ -13,6 +13,8 @@ import { trpc } from "./lib/trpc";
 import Home from "./pages/Home";
 import SignInPage from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
@@ -240,6 +242,8 @@ function Router() {
         <Route path="/signin" component={SignInPage} />
         <Route path="/sign-in" component={SignInPage} />
         <Route path="/signup" component={SignUp} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/mentions-legales" component={PageEnConstruction} />
         <Route path="/cgv" component={PageEnConstruction} />
         <Route path="/confidentialite" component={PageEnConstruction} />
