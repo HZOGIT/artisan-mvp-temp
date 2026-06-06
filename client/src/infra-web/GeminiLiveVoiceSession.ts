@@ -152,6 +152,12 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       return;
     }
 
+    // The model wants to call a tool — execute it server-side and reply.
+    if (msg.toolCall) {
+      void this._handleToolCall(msg.toolCall);
+      return;
+    }
+
     this._recvCount++;
     const topKeys = Object.keys(msg).join(',');
     if (msg.serverContent) {
@@ -220,9 +226,36 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       this.setState('listening');
     }
 
-    // Go-ahead (server ready to receive audio)
-    if (msg.setupComplete || msg.toolCall) {
-      // tool calls not handled in v1
+  }
+
+  // Execute each requested function on our server (DB-backed) and send the
+  // results back to Gemini so it can continue the spoken response.
+  private async _handleToolCall(toolCall: any): Promise<void> {
+    const calls: any[] = toolCall?.functionCalls || [];
+    if (calls.length === 0) return;
+    const functionResponses: any[] = [];
+    for (const fc of calls) {
+      vlog(`🔧 toolCall ${fc.name}(${JSON.stringify(fc.args || {})})`);
+      let response: any;
+      try {
+        const r = await fetch('/api/voice/tool', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name: fc.name, args: fc.args || {} }),
+        });
+        const data = await r.json();
+        response = data?.result ?? { ok: false, error: 'no result' };
+        vlog(`🔧 ${fc.name} → ${JSON.stringify(response).slice(0, 120)}`);
+      } catch (e: any) {
+        response = { ok: false, error: e?.message || 'tool error' };
+        vlog(`🔧 ${fc.name} FAILED: ${e?.message}`);
+      }
+      functionResponses.push({ id: fc.id, name: fc.name, response });
+    }
+    if (this._ws?.readyState === WebSocket.OPEN) {
+      this._ws.send(JSON.stringify({ toolResponse: { functionResponses } }));
+      vlog(`🔧 sent ${functionResponses.length} toolResponse(s)`);
     }
   }
 

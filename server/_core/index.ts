@@ -1122,6 +1122,19 @@ async function startServer() {
         } catch { /* history optional */ }
       }
 
+      // Tools: list them in the prompt AND declare them in the setup so the model
+      // calls them for real instead of hallucinating ("Tool call: …", "un instant…").
+      const { AGENT_TOOLS } = await import('./assistantTools');
+      const toolList = (AGENT_TOOLS as any[]).map((t) => `- ${t.name} : ${t.description}`).join('\n');
+      systemText += `\n\n--- OUTILS DISPONIBLES (fonctions que tu peux APPELER) ---
+${toolList}
+
+RÈGLES STRICTES sur les outils :
+- Quand une demande nécessite une de ces actions, APPELLE réellement la fonction correspondante. N'écris/ne prononce JAMAIS "Tool call:" ou le nom de la fonction en texte.
+- N'invente JAMAIS un résultat, un client, un devis, un montant ou une donnée. Ne prétends pas avoir fait une action sans appeler l'outil.
+- N'annonce pas "je cherche" / "un instant" pour ensuite attendre : appelle l'outil immédiatement, son résultat te reviendra et tu répondras ensuite.
+- Si AUCUNE fonction ne couvre la demande, dis-le franchement plutôt que d'inventer, et propose éventuellement de repasser en mode texte.`;
+
       // Expiry: token valid 30 min, session must start within 1 min
       const now = new Date();
       const expireTime = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
@@ -1150,6 +1163,7 @@ async function startServer() {
           system_instruction: { parts: [{ text: systemText }] },
           input_audio_transcription: {},
           output_audio_transcription: {},
+          tools: [{ function_declarations: AGENT_TOOLS }],
         },
       };
 
@@ -1212,6 +1226,31 @@ async function startServer() {
     } catch (error) {
       console.error('[VoicePersist] Error:', error);
       res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
+
+  // Execute a tool requested by the voice Live session. The browser receives the
+  // Gemini `toolCall`, calls this (with DB-backed artisan context), and sends the
+  // result back to Gemini as a toolResponse.
+  app.post('/api/voice/tool', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
+
+      const { getArtisanByUserId } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      const { name, args } = req.body || {};
+      if (!name || typeof name !== 'string') { res.status(400).json({ error: 'name requis' }); return; }
+
+      const { executeTool } = await import('./assistantTools');
+      const result = await executeTool(name, args || {}, { artisanId: artisan.id });
+      res.json({ result });
+    } catch (error: any) {
+      console.error('[VoiceTool] Error:', error?.message);
+      res.json({ result: { ok: false, error: 'Erreur exécution outil' } });
     }
   });
 
