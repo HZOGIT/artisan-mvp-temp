@@ -145,16 +145,11 @@ export default function Parametres() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   // Lecture du tab actif depuis l'URL (?tab=abonnement pour deep link
   // depuis le banner ou le webhook de checkout success).
+  // IMPORTANT : ces hooks (useSearch/useLocation/useState/useEffect) doivent
+  // rester AVANT tout `return` conditionnel (ex. isLoading) — sinon le nombre
+  // de hooks varie entre les rendus → React error #310 (Rules of Hooks).
   const search = useSearch();
   const [, navigate] = useLocation();
   const initialTab = new URLSearchParams(search).get("tab") === "abonnement" ? "abonnement" : "general";
@@ -172,6 +167,14 @@ export default function Parametres() {
       navigate("/parametres?tab=abonnement", { replace: true });
     }
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
