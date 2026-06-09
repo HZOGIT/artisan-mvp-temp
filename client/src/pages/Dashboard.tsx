@@ -552,6 +552,30 @@ export default function Dashboard() {
             Ouvrir
           </Button>
         </div>
+
+        {/* Personnaliser le dashboard — dispo des le demarrage (pas seulement
+            en STATE 3). Meme panneau que l'etat confirme. */}
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" size="sm" onClick={() => setCustomizeOpen(true)}>
+            <Settings2 className="h-3.5 w-3.5 mr-2" />
+            Personnaliser le dashboard
+          </Button>
+        </div>
+        <CustomizePanel
+          isOpen={customizeOpen}
+          onClose={() => setCustomizeOpen(false)}
+          widgets={widgetDefs.map((w) => ({
+            id: w.id,
+            label: w.label,
+            description: w.description,
+          }))}
+          hiddenIds={hidden}
+          onToggle={handleToggleHidden}
+          onReset={() => {
+            handleReset();
+            setCustomizeOpen(false);
+          }}
+        />
       </div>
     );
   }
