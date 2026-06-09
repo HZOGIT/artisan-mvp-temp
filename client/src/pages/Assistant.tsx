@@ -30,18 +30,32 @@ export default function Assistant({ embedded = false }: { embedded?: boolean } =
   // (colonne chat unique, pleine hauteur du conteneur) — meme composant que
   // la page /assistant, pas de duplication (DRY).
   const compact = embedded || isMobile;
+  const THREAD_LS_KEY = "operioz.assistant.thread";
   // Optional ?thread=<id> — when set, we load that conversation on mount.
+  // En mode embedded (drawer), on reprend le thread persiste pour que la
+  // conversation CONTINUE apres une navigation declenchee par l'assistant.
   const initialThreadId = (() => {
     if (typeof window === "undefined") return undefined;
     const raw = new URLSearchParams(window.location.search).get("thread");
     const n = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(n) ? n : undefined;
+    if (Number.isFinite(n)) return n;
+    if (embedded) {
+      const saved = parseInt(window.localStorage.getItem(THREAD_LS_KEY) || "", 10);
+      if (Number.isFinite(saved)) return saved;
+    }
+    return undefined;
   })();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [threadId, setThreadId] = useState<number | undefined>(initialThreadId);
+
+  // Persiste le thread courant : permet au side-chat de le reprendre apres une
+  // navigation (le composant /assistant est demonte mais le drawer reprend ici).
+  useEffect(() => {
+    try { if (threadId) window.localStorage.setItem(THREAD_LS_KEY, String(threadId)); } catch { /* ignore */ }
+  }, [threadId]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadedThreadRef = useRef(false);
@@ -302,6 +316,9 @@ export default function Assistant({ embedded = false }: { embedded?: boolean } =
                 ? `${parsed.navigate}?filtre=${encodeURIComponent(filtre)}`
                 : parsed.navigate;
               setLocation(target);
+              // Rouvre le side-chat sur la nouvelle page (le drawer reprend le
+              // thread persiste -> la conversation continue sans coupure).
+              try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ }
             }
             if (Array.isArray(parsed.invalidate) && parsed.invalidate.length > 0) {
               for (const key of parsed.invalidate) {
