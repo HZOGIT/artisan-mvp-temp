@@ -404,7 +404,7 @@ export type ToolResult =
   | { ok: true; data: unknown }
   | { ok: false; error: string };
 
-const PUBLIC_BASE_URL = "https://www.operioz.com";
+const PUBLIC_BASE_URL = process.env.APP_URL || "https://www.operioz.com";
 
 /**
  * Construit le corps HTML d'un email de devis avec lien de signature électronique.

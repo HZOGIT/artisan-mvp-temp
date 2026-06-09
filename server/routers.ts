@@ -2512,7 +2512,7 @@ const signatureRouter = router({
       const client = await db.getClientById(devisData.clientId);
       if (client?.email) {
         const { sendEmail } = await import('./_core/emailService');
-        const signatureUrl = `https://www.operioz.com/devis-public/${token}`;
+        const signatureUrl = `${process.env.APP_URL || 'https://www.operioz.com'}/devis-public/${token}`;
         const artisanName = artisan.nomEntreprise || 'Votre artisan';
         const clientName = `${client.prenom || ''} ${client.nom || ''}`.trim() || 'Client';
         const totalTTC = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(parseFloat(devisData.totalTTC as any) || 0);
@@ -3720,7 +3720,7 @@ const clientPortalRouter = router({
         expiresAt,
       });
 
-      const origin = ctx.req.headers.origin || 'https://www.operioz.com';
+      const origin = process.env.APP_URL || ctx.req.headers.origin || 'https://www.operioz.com';
       const portalUrl = `${origin}/portail/${token}`;
 
       // Envoyer l'email au client
@@ -4712,7 +4712,7 @@ const chatRouter = router({
         if (client?.email) {
           const portalAccess = await db.getPortalAccessByClientId(conv.clientId, artisan.id);
           const portalLink = portalAccess?.token
-            ? `https://www.operioz.com/portail/${portalAccess.token}`
+            ? `${process.env.APP_URL || 'https://www.operioz.com'}/portail/${portalAccess.token}`
             : null;
           await sendEmail({
             to: client.email,
@@ -8951,7 +8951,7 @@ export const appRouter = router({system: systemRouter,
             <li>Créez votre premier devis avec MonAssistant IA</li>
           </ol>
           <p style="margin:24px 0;text-align:center;">
-            <a href="https://www.operioz.com/dashboard" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
+            <a href="${process.env.APP_URL || 'https://www.operioz.com'}/dashboard" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
               Accéder à mon espace →
             </a>
           </p>
