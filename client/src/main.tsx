@@ -12,30 +12,24 @@ import superjson from 'superjson'
 // Vite emet 'vite:preloadError'. On recharge la page UNE fois pour recuperer
 // l'index.html frais (qui pointe vers les nouveaux hashes). Garde anti-boucle
 // via sessionStorage. Couvre le cas d'un onglet reste ouvert pendant un deploy.
+// STRICTEMENT une seule fois par session (flag persistant, jamais efface) et
+// UNIQUEMENT sur vite:preloadError (un vrai echec d'import dynamique). On NE
+// recharge PAS si sessionStorage est indisponible — sinon risque de boucle
+// infinie ("charge en boucle"). On a retire le filet 'unhandledrejection' (trop
+// large) et le handler 'load' qui effacait le flag (re-autorisait la boucle).
 const RELOAD_FLAG = 'operioz:chunk-reloaded'
 function reloadOnceForStaleChunk() {
   try {
     if (sessionStorage.getItem(RELOAD_FLAG)) return
     sessionStorage.setItem(RELOAD_FLAG, String(Date.now()))
-    window.location.reload()
   } catch {
-    window.location.reload()
+    return // pas de storage fiable -> on ne recharge pas (anti-boucle)
   }
+  window.location.reload()
 }
 window.addEventListener('vite:preloadError', (e) => {
   e.preventDefault()
   reloadOnceForStaleChunk()
-})
-// Filet supplementaire : certains echecs d'import remontent en 'unhandledrejection'.
-window.addEventListener('unhandledrejection', (e) => {
-  const msg = String((e?.reason && (e.reason.message || e.reason)) || '')
-  if (/dynamically imported module|Importing a module script failed|Failed to fetch dynamically/i.test(msg)) {
-    reloadOnceForStaleChunk()
-  }
-})
-// Au chargement reussi, on libere le flag pour autoriser un futur reload.
-window.addEventListener('load', () => {
-  try { sessionStorage.removeItem(RELOAD_FLAG) } catch {}
 })
 
 const queryClient = new QueryClient({
