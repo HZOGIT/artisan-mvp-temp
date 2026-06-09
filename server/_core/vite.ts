@@ -61,20 +61,33 @@ export function serveStatic(app: Express) {
     );
   }
 
-  // Serve static files from dist/public with aggressive caching
+  // Serve static files from dist/public.
+  // IMPORTANT : index.html ne doit JAMAIS etre mis en cache par le navigateur,
+  // sinon apres un deploiement le client garde un index.html perime qui pointe
+  // vers d'anciens hashes de chunks (Modules-XXXX.js) supprimes => 404 +
+  // "error loading dynamically imported module". Les assets hashes (/assets)
+  // restent en cache long car immuables par leur hash.
   app.use(express.static(distPath, {
     maxAge: '1d',
     etag: false,
+    index: false, // ne pas auto-servir index.html (cache 1j) pour '/'
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+    },
   }));
 
-  // Serve assets explicitly with long cache
+  // Serve assets explicitly with long cache (immuables : hash dans le nom)
   app.use('/assets', express.static(path.resolve(distPath, 'assets'), {
     maxAge: '1y',
     etag: false,
+    immutable: true,
   }));
 
-  // Fall through to index.html for SPA routing
+  // Fall through to index.html for SPA routing — toujours frais (no-cache)
   app.use("*", (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
