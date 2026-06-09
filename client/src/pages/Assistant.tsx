@@ -11,6 +11,8 @@ import {
   Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { useVoiceSession } from "@/app/useVoiceSession";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
@@ -22,6 +24,8 @@ type Message = {
 
 export default function Assistant({ embedded = false }: { embedded?: boolean } = {}) {
   const isMobile = useIsMobile();
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   // En mode "embedded" (drawer sidebar) on force la mise en page compacte
   // (colonne chat unique, pleine hauteur du conteneur) — meme composant que
   // la page /assistant, pas de duplication (DRY).
@@ -289,6 +293,25 @@ export default function Assistant({ embedded = false }: { embedded?: boolean } =
             }
             if (parsed.error) {
               toast.error(parsed.error);
+            }
+            // Outils "frontend" de l'assistant (meme protocole que useAssistantStream) :
+            // naviguer_vers => change de page avec ?filtre=, invalidate => refresh des donnees.
+            if (typeof parsed.navigate === "string" && parsed.navigate.length > 0) {
+              const filtre = typeof parsed.filtre === "string" ? parsed.filtre : undefined;
+              const target = filtre
+                ? `${parsed.navigate}?filtre=${encodeURIComponent(filtre)}`
+                : parsed.navigate;
+              setLocation(target);
+            }
+            if (Array.isArray(parsed.invalidate) && parsed.invalidate.length > 0) {
+              for (const key of parsed.invalidate) {
+                if (typeof key !== "string") continue;
+                queryClient.invalidateQueries({
+                  predicate: (q) =>
+                    Array.isArray(q.queryKey) &&
+                    q.queryKey.some((k) => typeof k === "string" && k.includes(key)),
+                });
+              }
             }
           } catch {
             // ignore parse errors
