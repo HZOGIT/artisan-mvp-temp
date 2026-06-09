@@ -1471,6 +1471,15 @@ const facturesRouter = router({
         datePaiement: new Date(input.datePaiement),
         statut: "payee",
       });
+      // OPE-52 : générer les écritures comptables (411 Client / 706 Ventes /
+      // 44571 TVA collectée) pour que Balance / Grand Livre / Journal des ventes
+      // affichent la facture. Idempotent (delete-then-insert par factureId).
+      // En try/catch : un échec de génération ne doit jamais casser le paiement.
+      try {
+        await db.genererEcrituresFacture(input.id);
+      } catch (e: any) {
+        console.error(`[Compta] genererEcrituresFacture(${input.id}) failed:`, e?.message);
+      }
       await db.createAuditLog({
         artisanId: artisan.id,
         userId: ctx.user.id,
