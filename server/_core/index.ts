@@ -976,6 +976,7 @@ async function startServer() {
       const MAX_TURNS = 10;
       let fullAssistantText = '';
       let usageMetadata: any = null;
+      let emptyRetries = 0; // Gemini renvoie parfois un candidat vide -> on retente
       const collectedToolCalls: Array<{ name: string; args: any; ok: boolean; error?: string }> = [];
 
       try {
@@ -1017,7 +1018,17 @@ async function startServer() {
           functionCalls.forEach(fc => modelParts.push({ functionCall: fc }));
           if (modelParts.length > 0) contents.push({ role: 'model', parts: modelParts });
 
-          if (functionCalls.length === 0) break;
+          if (functionCalls.length === 0) {
+            // Candidat Gemini vide (ni texte ni tool) sur ce tour : on retente
+            // le meme tour quelques fois avant d'abandonner, sinon l'utilisateur
+            // recoit une reponse totalement vide.
+            if (!textBuffer && !fullAssistantText && collectedToolCalls.length === 0 && emptyRetries < 2) {
+              emptyRetries++;
+              turn--;
+              continue;
+            }
+            break;
+          }
 
           // Execute tools
           const toolResultParts: any[] = [];
@@ -1059,6 +1070,12 @@ async function startServer() {
           } catch (e: any) {
             console.warn('[Assistant] Persist error:', e?.message);
           }
+        }
+
+        // Filet anti-réponse-vide : si Gemini n'a produit NI texte NI action
+        // visible, on renvoie un message plutôt qu'un chat muet.
+        if (!aborted && !fullAssistantText && collectedToolCalls.length === 0) {
+          res.write(`data: ${JSON.stringify({ content: "Je n'ai pas réussi à traiter ta demande. Peux-tu la reformuler ?" })}\n\n`);
         }
 
         if (!aborted) {
