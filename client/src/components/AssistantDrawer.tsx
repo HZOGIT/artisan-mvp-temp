@@ -10,6 +10,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Switch } from "./ui/switch";
 import { AIChatBox, type Message } from "./AIChatBox";
+import Assistant from "@/pages/Assistant";
 
 const AUTO_SEND_STORAGE_KEY = "operioz.assistant.autoSend";
 
@@ -326,82 +327,12 @@ export function AssistantDrawer({
           </div>
         </div>
 
-        {/* Chat */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          <AIChatBox
-            messages={messages}
-            onSendMessage={onSendMessage}
-            isLoading={waitingFirstChunk}
-            placeholder={langEntry.placeholder}
-            emptyStateMessage={langEntry.emptyState}
-            height="100%"
-            suggestedPrompts={suggestedPrompts}
-            enableVoice
-            voiceLang={voiceLang}
-            autoSend={autoSend}
-            className="border-0 shadow-none rounded-none flex-1"
-          />
-        </div>
-
-        {/* Footer — sélecteur de langue + envoi auto + bouton effacer */}
-        <div className="flex flex-wrap items-center justify-between gap-2 p-3 border-t shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-muted-foreground hover:text-foreground gap-1.5"
-                aria-label="Changer la langue de MonAssistant"
-              >
-                <Globe className="h-3.5 w-3.5" />
-                <span className="text-base leading-none">{langEntry.flag}</span>
-                <span className="text-xs hidden sm:inline">{langEntry.label.split(" — ")[0]}</span>
-                <ChevronDown className="h-3 w-3 opacity-60" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              {VOICE_LANGS.map((l) => (
-                <DropdownMenuItem
-                  key={l.code}
-                  onClick={() => setVoiceLang(l.code)}
-                  className={l.code === voiceLang ? "bg-accent" : ""}
-                >
-                  <span className="text-base mr-2 leading-none">{l.flag}</span>
-                  <span className="text-sm">{l.label}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-                <Switch
-                  checked={autoSend}
-                  onCheckedChange={setAutoSend}
-                  aria-label="Envoi automatique après silence"
-                />
-                <span className="hidden sm:inline">Envoi auto</span>
-              </label>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {autoSend
-                ? "Envoi automatique 5 s après la fin de la dictée"
-                : "Pas d'envoi automatique — clique Envoyer ou appuie sur Entrée"}
-            </TooltipContent>
-          </Tooltip>
-
-          {messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-muted-foreground hover:text-foreground"
-              onClick={onClear}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              <span className="text-xs">Effacer</span>
-            </Button>
-          )}
+        {/* Assistant complet — MEME composant que la page /assistant (DRY),
+            avec micro Gemini Live (vraie conversation vocale) + dictee. Monte
+            uniquement quand le panneau est ouvert pour ne pas demarrer la
+            session vocale en arriere-plan. */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-3 pb-3">
+          {isOpen ? <Assistant embedded /> : null}
         </div>
       </aside>
     </>

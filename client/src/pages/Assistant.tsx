@@ -20,8 +20,12 @@ type Message = {
   content: string;
 };
 
-export default function Assistant() {
+export default function Assistant({ embedded = false }: { embedded?: boolean } = {}) {
   const isMobile = useIsMobile();
+  // En mode "embedded" (drawer sidebar) on force la mise en page compacte
+  // (colonne chat unique, pleine hauteur du conteneur) — meme composant que
+  // la page /assistant, pas de duplication (DRY).
+  const compact = embedded || isMobile;
   // Optional ?thread=<id> — when set, we load that conversation on mount.
   const initialThreadId = (() => {
     if (typeof window === "undefined") return undefined;
@@ -411,9 +415,9 @@ export default function Assistant() {
   };
 
   return (
-    <div className="h-[calc(100dvh-190px)] md:h-[calc(100dvh-120px)] flex gap-4 overflow-hidden">
+    <div className={`${embedded ? "h-full" : "h-[calc(100dvh-190px)] md:h-[calc(100dvh-120px)]"} flex gap-4 overflow-hidden`}>
       {/* Chat zone - 70% */}
-      <Card className={`${isMobile ? "flex-1" : "flex-[7]"} flex flex-col overflow-hidden`}>
+      <Card className={`${compact ? "flex-1" : "flex-[7]"} flex flex-col overflow-hidden`}>
         <CardHeader className="pb-2 border-b shrink-0">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="h-5 w-5 text-amber-500" />
@@ -594,7 +598,7 @@ export default function Assistant() {
       </Card>
 
       {/* Quick actions - 30% */}
-      {!isMobile && (
+      {!compact && (
         <div className="flex-[3] flex flex-col gap-3">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider px-1">
             Actions rapides
