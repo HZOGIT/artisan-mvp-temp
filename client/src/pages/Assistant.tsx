@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import {
   Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar,
-  Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio,
+  Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -436,6 +436,17 @@ export default function Assistant({ embedded = false }: { embedded?: boolean } =
     sendMessage("Fais-moi un résumé de ma journée : interventions prévues, devis en attente, factures impayées, et les actions prioritaires.");
   };
 
+  // Démarre une nouvelle conversation (nouveau thread) : vide les messages, oublie
+  // le thread courant (état + localStorage) et annule un éventuel stream en cours.
+  const newThread = useCallback(() => {
+    try { abortRef.current?.abort(); } catch { /* ignore */ }
+    setIsStreaming(false);
+    setMessages([]);
+    setThreadId(undefined);
+    setInput("");
+    try { window.localStorage.removeItem(THREAD_LS_KEY); } catch { /* ignore */ }
+  }, []);
+
   const quickActions = [
     { icon: FileText, label: "Générer un devis", color: "text-blue-500", onClick: () => setShowDevisDialog(true) },
     { icon: RefreshCw, label: "Suggestions relance", color: "text-orange-500", onClick: handleSuggestRelances },
@@ -459,10 +470,23 @@ export default function Assistant({ embedded = false }: { embedded?: boolean } =
       {/* Chat zone - 70% */}
       <Card className={`${compact ? "flex-1" : "flex-[7]"} flex flex-col overflow-hidden`}>
         <CardHeader className="pb-2 border-b shrink-0">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            MonAssistant
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="h-5 w-5 text-amber-500" />
+              MonAssistant
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={newThread}
+              title="Nouvelle conversation"
+              aria-label="Nouvelle conversation"
+              className="gap-1.5 h-8"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs">Nouveau</span>
+            </Button>
+          </div>
           <p className="text-sm text-muted-foreground">Assistant IA pour votre gestion quotidienne</p>
         </CardHeader>
 
