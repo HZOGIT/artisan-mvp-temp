@@ -1392,7 +1392,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         hidden={isAssistantPage || isAssistantOpen}
       />
       <AssistantDrawer
-        isOpen={isAssistantOpen}
+        isOpen={isAssistantOpen && !isAssistantPage}
         onClose={() => setIsAssistantOpen(false)}
         messages={assistant.messages}
         isStreaming={assistant.isStreaming}
