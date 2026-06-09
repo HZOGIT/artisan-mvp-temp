@@ -5,9 +5,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js",
-    "fix-duplicates": "node dist/fix-duplicates.js",
+    "build": "vite build && esbuild server/_core/index.ts server/_core/fix-duplicates.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:server": "esbuild server/_core/index.ts server/_core/fix-duplicates.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "node dist/fix-duplicates.js && NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",

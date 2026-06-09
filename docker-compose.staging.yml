@@ -40,11 +40,13 @@ services:
       DATABASE_URL: mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp
     env_file:
       - .env.staging
-    # Production build: install → build the bundle → migrate → run dist/.
+    # Staging : le FRONT est servi par Cloudflare Pages, donc on NE build PAS le
+    # client (vite) ici — uniquement le serveur (build:server = esbuild, ~5s au
+    # lieu de ~1min). install → build serveur → migrate → run.
     command: >
       sh -c "npm install -g pnpm@10.4.1 --silent &&
              pnpm install --frozen-lockfile &&
-             pnpm build &&
+             pnpm build:server &&
              pnpm exec drizzle-kit migrate &&
              pnpm start"
     depends_on:
