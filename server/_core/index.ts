@@ -994,9 +994,12 @@ async function startServer() {
 
           let textBuffer = '';
           const functionCalls: any[] = [];
+          let lastFinishReason: string | undefined;
 
           for await (const chunk of stream) {
             if (aborted) break;
+            const fr = chunk.candidates?.[0]?.finishReason;
+            if (fr) lastFinishReason = fr;
             // In @google/genai v1.x, iterate parts directly. `chunk.text` is a
             // getter (not a method) and throws/ warns when functionCall parts
             // are present — so we extract text + functionCalls from parts.
@@ -1019,6 +1022,7 @@ async function startServer() {
           if (modelParts.length > 0) contents.push({ role: 'model', parts: modelParts });
 
           if (functionCalls.length === 0) {
+            if (!textBuffer) console.warn(`[Assistant] tour vide — finishReason=${lastFinishReason} promptLen=${systemPrompt.length}`);
             // Candidat Gemini vide (ni texte ni tool) sur ce tour : on retente
             // le meme tour quelques fois avant d'abandonner, sinon l'utilisateur
             // recoit une reponse totalement vide.
