@@ -434,6 +434,20 @@ async function startServer() {
 
   app.get('/api/articles/categories', async (req, res) => {
     try {
+      // OPE-24 — endpoint public interrogeant la DB : rate-limit par IP (anti-scraping/DoS),
+      // même seau partagé que /api/articles/search (catalogue de référence public).
+      const ip = String(
+        (req.headers['cf-connecting-ip'] as string)
+        || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+        || req.socket?.remoteAddress || 'unknown'
+      );
+      const nowRl = Date.now();
+      const hitRl = articleSearchHits.get(ip);
+      if (!hitRl || hitRl.resetAt <= nowRl) {
+        articleSearchHits.set(ip, { count: 1, resetAt: nowRl + 60_000 });
+      } else if (++hitRl.count > 120) {
+        return res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' });
+      }
       const metier = req.query.metier as string;
       if (!metier) {
         return res.status(400).json({ error: 'Parameter metier is required' });
