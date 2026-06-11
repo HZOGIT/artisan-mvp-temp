@@ -3,7 +3,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, adminOnlyProcedure, router, devisVoirProcedure, devisCreerProcedure, devisSupprimerProcedure, facturesVoirProcedure, facturesCreerProcedure, facturesSupprimerProcedure, comptaVoirProcedure, utilisateursGererProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomInt } from "crypto";
 import * as db from "./db";
 import * as dbSecure from "./db-secure";
 import { createUserWithPassword, authenticateUser, hashPassword } from "./_core/auth";
@@ -2767,8 +2767,8 @@ const signatureRouter = router({
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes de code. Réessayez dans quelques minutes." });
       }
 
-      // Générer un code à 6 chiffres
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      // Générer un code à 6 chiffres (OPE-18 — RNG crypto-sûr, non prévisible)
+      const code = randomInt(100000, 1000000).toString();
       
       // Expiration dans 10 minutes
       const expiresAt = new Date();
@@ -7997,7 +7997,8 @@ const utilisateursRouter = router({
       const existing = await db.getUserByEmail(input.email);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "Cet email est déjà utilisé" });
 
-      const tempPassword = Math.random().toString(36).slice(-10);
+      // OPE-18 — mot de passe temporaire généré avec un RNG crypto-sûr (10 car. alphanum.)
+      const tempPassword = Array.from(randomBytes(10), (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
       const passwordHash = await hashPassword(tempPassword);
 
       const newUser = await db.createCollaborator({
