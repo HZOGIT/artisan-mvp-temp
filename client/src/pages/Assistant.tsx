@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVoiceSession } from "@/app/useVoiceSession";
+import { Streamdown } from "streamdown";
 import { useIsMobile } from "@/hooks/useMobile";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -455,16 +456,6 @@ export default function Assistant({ embedded = false }: { embedded?: boolean } =
     { icon: Calendar, label: "Résumé du jour", color: "text-amber-500", onClick: handleResumeDuJour },
   ];
 
-  // Simple markdown-like rendering
-  const renderContent = (content: string | undefined | null) => {
-    if (!content) return "";
-    return (content || "")
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-sm">$1</code>')
-      .replace(/\n/g, '<br/>');
-  };
-
   return (
     <div className={`${embedded ? "h-full" : "h-[calc(100dvh-190px)] md:h-[calc(100dvh-120px)]"} flex gap-4 overflow-hidden`}>
       {/* Chat zone - 70% */}
@@ -513,10 +504,9 @@ export default function Assistant({ embedded = false }: { embedded?: boolean } =
                       : "bg-muted"
                   }`}>
                     {msg.role === "assistant" ? (
-                      <div
-                        className="text-sm prose-sm"
-                        dangerouslySetInnerHTML={{ __html: renderContent(msg.content || "") }}
-                      />
+                      <div className="text-sm prose-sm">
+                        <Streamdown>{msg.content || ""}</Streamdown>
+                      </div>
                     ) : (
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     )}
