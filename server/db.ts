@@ -843,10 +843,15 @@ export async function deleteIntervention(id: number): Promise<void> {
 // NOTIFICATIONS
 // ============================================================================
 
-export async function getNotificationsByArtisanId(artisanId: number): Promise<Notification[]> {
+export async function getNotificationsByArtisanId(artisanId: number, includeArchived = false): Promise<Notification[]> {
   const db = await getDb();
+  const conds = [eq(notifications.artisanId, artisanId)];
+  // includeArchived=false (défaut) : on exclut les archivées (comportement historique).
+  // includeArchived=true : la vue « archivées » du front fonctionne enfin (param était
+  // passé par le routeur mais ignoré faute d'argument dans cette fonction).
+  if (!includeArchived) conds.push(eq(notifications.archived, false));
   return await db.select().from(notifications)
-    .where(and(eq(notifications.artisanId, artisanId), eq(notifications.archived, false)))
+    .where(and(...conds))
     .orderBy(desc(notifications.createdAt));
 }
 
