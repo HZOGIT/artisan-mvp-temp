@@ -3186,14 +3186,16 @@ const fournisseursRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      nom: z.string(),
-      contact: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes alignées sur les colonnes de `fournisseurs` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      nom: z.string().max(255),
+      contact: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      adresse: z.string().max(500).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -3206,14 +3208,14 @@ const fournisseursRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      contact: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      notes: z.string().optional(),
+      nom: z.string().max(255).optional(),
+      contact: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      adresse: z.string().max(500).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
