@@ -5946,6 +5946,12 @@ const congesRouter = router({
     .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const conge = await db.getCongeById(input.id);
+      // SECURITE (OPE-45) : le congé doit appartenir au tenant appelant (sinon
+      // approbation cross-tenant). conges.artisanId est NOT NULL.
+      const congeArtisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !congeArtisan || conge.artisanId !== congeArtisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
       // Garde d'idempotence : ne décompter le solde QUE lors de la transition vers
       // "approuve". Sans ce garde, une ré-approbation (double-clic / re-jeu) re-décompte
       // le solde (updateSoldeConges est additif) -> jours de congé perdus pour le salarié.
@@ -5969,6 +5975,12 @@ const congesRouter = router({
   refuser: protectedProcedure
     .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-45) : ownership du congé avant refus.
+      const conge = await db.getCongeById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !artisan || conge.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
       return await db.updateCongeStatut(input.id, 'refuse', ctx.user.id, input.commentaire);
     }),
 
@@ -5976,6 +5988,11 @@ const congesRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const conge = await db.getCongeById(input.id);
+      // SECURITE (OPE-45) : ownership du congé avant annulation.
+      const congeArtisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !congeArtisan || conge.artisanId !== congeArtisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
       // Recréditer le solde si on annule un congé APPROUVÉ (qui avait décompté le solde).
       // Le garde statut === 'approuve' évite tout recrédit sur un congé non décompté
       // (en_attente/refuse) et tout double-recrédit (après annulation, statut = 'annule').
@@ -5992,8 +6009,13 @@ const congesRouter = router({
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const conge = await db.getCongeById(input.id);
+      // SECURITE (OPE-45) : ownership du congé avant hard-delete.
+      const congeArtisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !congeArtisan || conge.artisanId !== congeArtisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
       // Recréditer le solde si on supprime un congé APPROUVÉ (même logique qu'annuler).
       if (conge && conge.statut === 'approuve' && (conge.type === 'conge_paye' || conge.type === 'rtt')) {
         const debut = new Date(conge.dateDebut);
