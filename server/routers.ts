@@ -6866,15 +6866,17 @@ const chantiersRouter = router({
   createSuivi: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
-      titre: z.string(),
-      description: z.string().optional(),
+      // Bornes texte alignées sur `suivi_chantier` (titre VARCHAR 255 ; description/
+      // commentaire TEXT) — évite qu'un titre surdimensionné fasse échouer l'insert.
+      titre: z.string().max(255),
+      description: z.string().max(5000).optional(),
       statut: z.enum(["a_faire", "en_cours", "termine"]).optional(),
       pourcentage: z.number().min(0).max(100).optional(),
       ordre: z.number().optional(),
       visibleClient: z.boolean().optional(),
       dateDebut: z.string().optional(),
       dateFin: z.string().optional(),
-      commentaire: z.string().optional(),
+      commentaire: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertChantierOwner(input.chantierId, ctx.user.id);
