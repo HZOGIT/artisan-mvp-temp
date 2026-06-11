@@ -29,6 +29,10 @@ process.on("uncaughtException", (err: Error) => {
   console.error("[uncaughtException]", err?.stack || err?.message || err);
 });
 
+// OPE-24 — rate-limit en mémoire pour l'endpoint public /api/voice/debug
+// (crash-reporting via sendBeacon). Borne le flood de logs par IP.
+const voiceDebugHits = new Map<string, { count: number; resetAt: number }>();
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -1116,13 +1120,33 @@ async function startServer() {
   // and never touches us). Dev aid; fire-and-forget from the client.
   app.post('/api/voice/debug', (req, res) => {
     try {
+      // OPE-24 — endpoint public (crash-reporting sendBeacon, sans auth).
+      // 1) rate-limit par IP (CF-Connecting-IP de confiance derriere Cloudflare)
+      //    → borne le flood de logs ; throttle SILENCIEUX pour ne pas casser les
+      //    clients legitimes. 2) sanitisation anti log-injection (CRLF/control).
+      const ip = String(
+        (req.headers['cf-connecting-ip'] as string)
+        || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+        || req.socket?.remoteAddress || 'unknown'
+      );
+      const now = Date.now();
+      const hit = voiceDebugHits.get(ip);
+      if (!hit || hit.resetAt <= now) {
+        voiceDebugHits.set(ip, { count: 1, resetAt: now + 60_000 });
+      } else if (++hit.count > 30) {
+        return res.json({ ok: true });
+      }
+      const sanitize = (v: any) =>
+        String(typeof v === 'string' ? v : JSON.stringify(v))
+          .replace(/[\r\n\x00-\x1f]/g, ' ')
+          .slice(0, 500);
       const { events } = req.body || {};
       if (Array.isArray(events)) {
-        for (const e of events) {
-          console.log(`[VoiceDebug] ${typeof e === 'string' ? e : JSON.stringify(e)}`);
+        for (const e of events.slice(0, 20)) {
+          console.log(`[VoiceDebug] ${sanitize(e)}`);
         }
       } else if (req.body?.msg) {
-        console.log(`[VoiceDebug] ${req.body.msg}`);
+        console.log(`[VoiceDebug] ${sanitize(req.body.msg)}`);
       }
     } catch { /* ignore */ }
     res.json({ ok: true });
