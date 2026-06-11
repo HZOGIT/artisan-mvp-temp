@@ -1587,8 +1587,10 @@ const facturesRouter = router({
       // En try/catch : un échec de génération ne doit jamais casser le paiement.
       try {
         await db.genererEcrituresFacture(input.id);
+        // Écritures d'encaissement (journal Banque : 512 / 411 lettré) au paiement.
+        await db.genererEcrituresEncaissement(input.id);
       } catch (e: any) {
-        console.error(`[Compta] genererEcrituresFacture(${input.id}) failed:`, e?.message);
+        console.error(`[Compta] génération écritures (${input.id}) failed:`, e?.message);
       }
       await db.createAuditLog({
         artisanId: artisan.id,
@@ -5634,36 +5636,52 @@ const comptabiliteRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) return { lines: [], totalFactures: 0, siret: '' };
+      if (!artisan) return { lines: [], totalFactures: 0, siret: '', conformite: null };
 
-      const allFactures = await db.getFacturesByArtisanId(artisan.id);
       const dateFin = new Date(input.dateFin);
       dateFin.setHours(23, 59, 59, 999);
-      const factures = allFactures.filter(f => {
-        const d = new Date(f.dateFacture);
-        return d >= input.dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
+      // Aperçu = mêmes données que le fichier téléchargé (générateur FEC unique).
+      const { content, conformite } = await db.genererFEC(artisan.id, input.dateDebut, dateFin);
+      const rows = content.split('\n').filter((r) => r.length > 0);
+      const header = (rows[0] || '').split('\t');
+      const col = (name: string) => header.indexOf(name);
+      const lines = rows.slice(1, 16).map((r) => {
+        const c = r.split('\t');
+        return {
+          ecritureNum: c[col('EcritureNum')] || '',
+          ecritureDate: c[col('EcritureDate')] || '',
+          compteNum: c[col('CompteNum')] || '',
+          compteLib: c[col('CompteLib')] || '',
+          pieceRef: c[col('PieceRef')] || '',
+          ecritureLib: c[col('EcritureLib')] || '',
+          debit: c[col('Debit')] || '0,00',
+          credit: c[col('Credit')] || '0,00',
+        };
       });
+      return { lines, totalFactures: conformite.nbEcritures, siret: artisan.siret || '', conformite };
+    }),
 
-      const lines: { ecritureNum: string; ecritureDate: string; compteNum: string; compteLib: string; pieceRef: string; ecritureLib: string; debit: string; credit: string }[] = [];
-      let num = 1;
-      for (const facture of factures.slice(0, 10)) { // Limit preview to 10 factures
-        const client = await db.getClientById(facture.clientId);
-        const clientNom = client?.nom || 'Client';
-        const ecritureDate = new Date(facture.dateFacture).toISOString().slice(0, 10).replace(/-/g, '');
-        const numStr = String(num).padStart(6, '0');
-        const ttc = parseFloat(facture.totalTTC?.toString() || '0');
-        const ht = parseFloat(facture.totalHT?.toString() || '0');
-        const tva = parseFloat(facture.totalTVA?.toString() || '0');
+  // Contrôle de conformité FEC (pour badge UI) — sans télécharger le fichier.
+  getFecConformite: comptaVoirProcedure
+    .input(z.object({ dateDebut: z.date(), dateFin: z.date() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      const dateFin = new Date(input.dateFin);
+      dateFin.setHours(23, 59, 59, 999);
+      const { conformite } = await db.genererFEC(artisan.id, input.dateDebut, dateFin);
+      return conformite;
+    }),
 
-        lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '411000', compteLib: 'Clients', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: ttc.toFixed(2).replace('.', ','), credit: '0,00' });
-        lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '701000', compteLib: 'Ventes', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: '0,00', credit: ht.toFixed(2).replace('.', ',') });
-        if (tva > 0) {
-          lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '445710', compteLib: 'TVA collectée', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: '0,00', credit: tva.toFixed(2).replace('.', ',') });
-        }
-        num++;
-      }
-
-      return { lines, totalFactures: factures.length, siret: artisan.siret || '' };
+  // Déclaration TVA détaillée (CA3) : base imposable + TVA par taux.
+  getDeclarationTVADetail: comptaVoirProcedure
+    .input(z.object({ dateDebut: z.date(), dateFin: z.date() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { parTaux: [], tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
+      const dateFin = new Date(input.dateFin);
+      dateFin.setHours(23, 59, 59, 999);
+      return await db.getDeclarationTVADetail(artisan.id, input.dateDebut, dateFin);
     }),
 });
 

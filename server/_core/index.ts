@@ -607,53 +607,27 @@ async function startServer() {
       const artisan = await authFromCookie(req, res);
       if (!artisan) return;
 
-      const { getFacturesByArtisanId, getClientById } = await import('../db');
+      const { genererFEC } = await import('../db');
       const dateDebut = req.query.dateDebut ? new Date(req.query.dateDebut as string) : new Date(new Date().getFullYear(), 0, 1);
       const dateFin = req.query.dateFin ? new Date(req.query.dateFin as string) : new Date();
       dateFin.setHours(23, 59, 59, 999);
 
-      const allFactures = await getFacturesByArtisanId(artisan.id);
-      const factures = allFactures.filter(f => {
-        const d = new Date(f.dateFacture);
-        return d >= dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
-      });
+      // Generateur FEC unique, conforme (18 colonnes, equilibre, journaux VE/AC/BQ).
+      const { content, conformite } = await genererFEC(artisan.id, dateDebut, dateFin);
 
-      // FEC header
-      const header = 'JournalCode|JournalLib|EcritureNum|EcritureDate|CompteNum|CompteLib|CompAuxNum|CompAuxLib|PieceRef|PieceDate|EcritureLib|Debit|Credit|EcritureLet|DateLet|ValidDate|Montantdevise|Idevise';
-      const lines: string[] = [header];
+      // FEC : SIREN (9 chiffres) + "FEC" + date de cloture (YYYYMMDD).
+      const siren = (artisan.siret || '000000000').replace(/\D/g, '').slice(0, 9).padEnd(9, '0');
+      const filename = `${siren}FEC${fecDate(dateFin)}.txt`;
 
-      let ecritureNum = 1;
-      for (const facture of factures) {
-        const client = await getClientById(facture.clientId);
-        const clientNom = client?.nom || 'Client';
-        const clientNum = `C${String(facture.clientId).padStart(5, '0')}`;
-        const ecritureDate = fecDate(facture.dateFacture);
-        const pieceRef = facture.numero;
-        const ecritureLib = `Facture ${facture.numero} - ${clientNom}`;
-        const ttc = parseFloat(facture.totalTTC?.toString() || '0');
-        const ht = parseFloat(facture.totalHT?.toString() || '0');
-        const tva = parseFloat(facture.totalTVA?.toString() || '0');
-        const validDate = fecDate(facture.dateFacture);
-        const num = String(ecritureNum).padStart(6, '0');
-
-        // Ligne 1: Débit 411000 (Clients) TTC
-        lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|411000|Clients|${clientNum}|${clientNom}|${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(ttc)}|${fecAmount(0)}||||EUR`);
-        // Ligne 2: Crédit 701000 (Ventes) HT
-        lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|701000|Ventes de produits finis||${clientNom}|${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(0)}|${fecAmount(ht)}||||EUR`);
-        // Ligne 3: Crédit 445710 (TVA collectée) TVA
-        if (tva > 0) {
-          lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|445710|TVA collectée|||${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(0)}|${fecAmount(tva)}||||EUR`);
-        }
-        ecritureNum++;
-      }
-
-      const content = lines.join('\n');
-      const siret = (artisan.siret || '00000000000000').replace(/\s/g, '');
-      const filename = `${siret}FEC${fecDate(dateFin)}.txt`;
-
+      // En-tetes informatifs de conformite (consultables par le front pour le badge).
+      res.setHeader('X-FEC-Equilibre', conformite.equilibre ? '1' : '0');
+      res.setHeader('X-FEC-Debit', String(conformite.totalDebit));
+      res.setHeader('X-FEC-Credit', String(conformite.totalCredit));
+      res.setHeader('X-FEC-Lignes', String(conformite.nbLignes));
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(content);
+      // BOM UTF-8 : aide les outils comptables (DGFiP Test Compta Demat) a detecter l'encodage.
+      res.send('﻿' + content);
     } catch (error) {
       console.error('[Compta] FEC error:', error);
       res.status(500).json({ error: 'Erreur lors de la génération du FEC' });

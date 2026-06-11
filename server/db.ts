@@ -2655,8 +2655,45 @@ export async function getRapportTVA(artisanId: number, dateDebut: Date, dateFin:
   return { tvaCollectee, tvaDeductible, tvaNette: tvaCollectee - tvaDeductible };
 }
 
+// Déclaration TVA détaillée (type CA3) : base HT et TVA collectée ventilées par
+// taux (depuis les lignes de factures non brouillon/annulées), + TVA déductible.
+export async function getDeclarationTVADetail(
+  artisanId: number, dateDebut: Date, dateFin: Date,
+): Promise<{ parTaux: { taux: number; baseHT: number; tvaCollectee: number }[]; tvaCollectee: number; tvaDeductible: number; tvaNette: number }> {
+  const pool = getPool();
+  if (!pool) return { parTaux: [], tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
+  const dStr = dateDebut.toISOString().slice(0, 10);
+  const fStr = dateFin.toISOString().slice(0, 10);
+  // Base + TVA collectée par taux, depuis les lignes de factures émises.
+  const [rows]: any = await pool.execute(
+    `SELECT fl.tauxTVA AS taux, SUM(fl.montantHT) AS baseHT, SUM(fl.montantTVA) AS tva
+       FROM factures_lignes fl
+       JOIN factures f ON f.id = fl.factureId
+      WHERE f.artisanId = ? AND DATE(f.dateFacture) BETWEEN ? AND ?
+        AND f.statut IN ('validee','envoyee','payee','en_retard')
+      GROUP BY fl.tauxTVA
+      ORDER BY fl.tauxTVA DESC`,
+    [artisanId, dStr, fStr]
+  );
+  const parTaux = (rows as any[]).map((r) => ({
+    taux: Number(r.taux || 0),
+    baseHT: Math.round(Number(r.baseHT || 0) * 100) / 100,
+    tvaCollectee: Math.round(Number(r.tva || 0) * 100) / 100,
+  }));
+  const tvaCollectee = Math.round(parTaux.reduce((s, t) => s + t.tvaCollectee, 0) * 100) / 100;
+  // TVA déductible depuis les dépenses déductibles.
+  const [ded]: any = await pool.execute(
+    `SELECT COALESCE(SUM(montant_tva),0) AS tva FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ? AND tva_deductible = TRUE`,
+    [artisanId, dStr, fStr]
+  );
+  const tvaDeductible = Math.round(Number((ded as any[])[0]?.tva || 0) * 100) / 100;
+  return { parTaux, tvaCollectee, tvaDeductible, tvaNette: Math.round((tvaCollectee - tvaDeductible) * 100) / 100 };
+}
+
 export async function genererEcrituresFacture(factureId: number): Promise<any> {
   const db = await getDb();
+  if (!db) throw new Error("Base de données indisponible");
   const [facture] = await db.select().from(factures).where(eq(factures.id, factureId)).limit(1);
   if (!facture) throw new Error("Facture non trouvée");
 
@@ -2669,22 +2706,77 @@ export async function genererEcrituresFacture(factureId: number): Promise<any> {
   // Delete existing entries for this invoice
   await db.delete(ecrituresComptables).where(eq(ecrituresComptables.factureId, factureId));
 
+  const lib = `Facture ${pieceRef}`;
   const entries = [
-    // Débit 411 - Client
-    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: `Facture ${pieceRef}`, pieceRef, debit: String(totalTTC), credit: '0.00', factureId },
-    // Crédit 706 - Ventes
-    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '706000', libelleCompte: 'Prestations de services', libelle: `Facture ${pieceRef}`, pieceRef, debit: '0.00', credit: String(totalHT), factureId },
+    // Débit 411 - Client (TTC)
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: lib, pieceRef, debit: String(totalTTC), credit: '0.00', factureId },
+    // Crédit 706 - Ventes de prestations (HT)
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '706000', libelleCompte: 'Prestations de services', libelle: lib, pieceRef, debit: '0.00', credit: String(totalHT), factureId },
   ];
 
   if (totalTVA > 0) {
-    // Crédit 44571 - TVA collectée
-    entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '445710', libelleCompte: 'TVA collectée', libelle: `Facture ${pieceRef}`, pieceRef, debit: '0.00', credit: String(totalTVA), factureId });
+    // TVA collectée ventilée par taux (445711=20% / 445712=10% / 445713=5,5%),
+    // depuis les lignes de facture. Repli sur le total si lignes indisponibles.
+    const lignes = await db.select({ tauxTVA: facturesLignes.tauxTVA, montantTVA: facturesLignes.montantTVA })
+      .from(facturesLignes).where(eq(facturesLignes.factureId, factureId));
+    const parTaux = new Map<string, { compte: string; lib: string; montant: number }>();
+    let sommeLignes = 0;
+    for (const l of lignes) {
+      const m = parseFloat(String(l.montantTVA || '0'));
+      if (m <= 0) continue;
+      sommeLignes += m;
+      const t = compteTvaCollectee(parseFloat(String(l.tauxTVA || '20')));
+      const cur = parTaux.get(t.compte) || { compte: t.compte, lib: t.lib, montant: 0 };
+      cur.montant += m;
+      parTaux.set(t.compte, cur);
+    }
+    if (parTaux.size > 0 && Math.abs(sommeLignes - totalTVA) < 0.02) {
+      for (const t of Array.from(parTaux.values())) {
+        entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: t.compte, libelleCompte: t.lib, libelle: lib, pieceRef, debit: '0.00', credit: t.montant.toFixed(2), factureId });
+      }
+    } else {
+      entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '445711', libelleCompte: 'TVA collectée', libelle: lib, pieceRef, debit: '0.00', credit: String(totalTVA), factureId });
+    }
   }
 
   for (const entry of entries) {
     await db.insert(ecrituresComptables).values(entry);
   }
 
+  return { success: true, nombreEcritures: entries.length };
+}
+
+// Ecritures d'encaissement (journal BANQUE) lors du reglement d'une facture :
+// Debit 512 (Banque) / Credit 411 (Clients), lettre avec l'ecriture de vente.
+// Idempotent : on purge d'abord les ecritures BQ existantes de la facture.
+export async function genererEcrituresEncaissement(factureId: number): Promise<{ success: boolean; nombreEcritures: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Base de données indisponible");
+  const [facture] = await db.select().from(factures).where(eq(factures.id, factureId)).limit(1);
+  if (!facture) throw new Error("Facture non trouvée");
+
+  // Purge des ecritures de banque precedentes de cette facture (idempotence).
+  await db.delete(ecrituresComptables).where(and(
+    eq(ecrituresComptables.factureId, factureId),
+    eq(ecrituresComptables.journal, 'BQ'),
+  ));
+
+  if (facture.statut !== 'payee') return { success: true, nombreEcritures: 0 };
+
+  const dateEcriture = facture.datePaiement || facture.dateFacture || new Date();
+  const ttc = parseFloat(String(facture.totalTTC || '0'));
+  if (ttc <= 0) return { success: true, nombreEcritures: 0 };
+  const pieceRef = facture.numero || `F-${factureId}`;
+  const lib = `Règlement ${pieceRef}`;
+  const lettre = `VL${factureId}`;
+
+  const entries = [
+    { artisanId: facture.artisanId, dateEcriture, journal: 'BQ' as const, numeroCompte: '512000', libelleCompte: 'Banque', libelle: lib, pieceRef, debit: ttc.toFixed(2), credit: '0.00', factureId, lettrage: lettre },
+    { artisanId: facture.artisanId, dateEcriture, journal: 'BQ' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: lib, pieceRef, debit: '0.00', credit: ttc.toFixed(2), factureId, lettrage: lettre },
+  ];
+  for (const entry of entries) {
+    await db.insert(ecrituresComptables).values(entry);
+  }
   return { success: true, nombreEcritures: entries.length };
 }
 
@@ -5309,6 +5401,220 @@ export async function updateExportComptable(
 function fecAmount(val: string | number | null | undefined): string {
   const n = typeof val === "string" ? parseFloat(val) : Number(val || 0);
   return n.toFixed(2).replace(".", ",");
+}
+
+// ============================================================================
+// FEC — Fichier des Ecritures Comptables (arrete du 29 juillet 2013, DGFiP)
+// Generateur unique, conforme 18 colonnes, equilibre par construction.
+// Couvre 3 journaux : VENTES (factures), ACHATS (depenses), BANQUE (encaissements).
+// ============================================================================
+export interface FecConformite {
+  nbEcritures: number;       // nombre d'ecritures (groupes equilibres)
+  nbLignes: number;          // nombre de lignes de detail (hors entete)
+  totalDebit: number;
+  totalCredit: number;
+  ecart: number;             // totalDebit - totalCredit (doit etre 0)
+  equilibre: boolean;
+  erreurs: string[];         // controles de conformite non passes
+  comptesUtilises: string[];
+}
+
+export interface FecResultat {
+  content: string;
+  conformite: FecConformite;
+}
+
+// Compte de TVA collectee selon le taux (PCG francais).
+function compteTvaCollectee(taux: number): { compte: string; lib: string } {
+  if (taux >= 19.5) return { compte: "445711", lib: "TVA collectee 20%" };
+  if (taux >= 9.5) return { compte: "445712", lib: "TVA collectee 10%" };
+  if (taux >= 5) return { compte: "445713", lib: "TVA collectee 5,5%" };
+  if (taux >= 2) return { compte: "445714", lib: "TVA collectee 2,1%" };
+  return { compte: "445711", lib: "TVA collectee" };
+}
+
+// Compte de charge (classe 6) selon la categorie de depense (PCG).
+function compteChargeDepense(categorie: string | null | undefined): { compte: string; lib: string } {
+  const c = (categorie || "").toLowerCase();
+  if (/(materiau|fournitur|consommable)/.test(c)) return { compte: "601000", lib: "Achats de matieres premieres" };
+  if (/(sous.?trait)/.test(c)) return { compte: "604000", lib: "Sous-traitance" };
+  if (/(carburant|essence|gazole|diesel)/.test(c)) return { compte: "606100", lib: "Carburants" };
+  if (/(outil)/.test(c)) return { compte: "615000", lib: "Entretien, reparations, outillage" };
+  if (/(loyer|location)/.test(c)) return { compte: "613000", lib: "Locations" };
+  if (/(assurance)/.test(c)) return { compte: "616000", lib: "Primes d'assurance" };
+  if (/(telephone|internet|telecom)/.test(c)) return { compte: "626000", lib: "Frais postaux et telecom" };
+  if (/(formation)/.test(c)) return { compte: "623000", lib: "Formation" };
+  if (/(bancaire|banque|commission)/.test(c)) return { compte: "627000", lib: "Services bancaires" };
+  if (/(repas|restaurant|deplacement|hotel|peage)/.test(c)) return { compte: "625100", lib: "Voyages et deplacements" };
+  return { compte: "607000", lib: "Achats" };
+}
+
+export async function genererFEC(
+  artisanId: number,
+  dateDebut: Date,
+  dateFin: Date,
+): Promise<FecResultat> {
+  const vide: FecConformite = { nbEcritures: 0, nbLignes: 0, totalDebit: 0, totalCredit: 0, ecart: 0, equilibre: true, erreurs: [], comptesUtilises: [] };
+  const pool = getPool();
+  if (!pool) return { content: "", conformite: { ...vide, erreurs: ["Base de donnees indisponible"] } };
+
+  const config = await getConfigurationComptable(artisanId);
+  const cVentes = config?.compteVentes || "706000";
+  const cClients = config?.compteClients || "411000";
+  const cTvaDed = config?.compteTVADeductible || "445660";
+  const cFourn = config?.compteFournisseurs || "401000";
+  const cBanque = config?.compteBanque || "512000";
+  const jVE = (config?.journalVentes || "VE").slice(0, 3);
+  const jAC = (config?.journalAchats || "AC").slice(0, 3);
+  const jBQ = (config?.journalBanque || "BQ").slice(0, 3);
+
+  const SEP = "\t";
+  const clean = (v: any) => String(v ?? "").replace(/[\t\r\n]+/g, " ").trim();
+  const amt = (v: any) => Number(v || 0).toFixed(2).replace(".", ",");
+  const ymd = (d: any) => {
+    const dt = new Date(d);
+    return `${dt.getFullYear()}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+  };
+
+  const header = [
+    "JournalCode", "JournalLib", "EcritureNum", "EcritureDate", "CompteNum",
+    "CompteLib", "CompAuxNum", "CompAuxLib", "PieceRef", "PieceDate",
+    "EcritureLib", "Debit", "Credit", "EcritureLet", "DateLet",
+    "ValidDate", "Montantdevise", "Idevise",
+  ];
+  const lines: string[] = [header.join(SEP)];
+  let totalDebit = 0, totalCredit = 0, nbEcritures = 0;
+  const comptes = new Set<string>();
+
+  type Line = {
+    journal: string; journalLib: string; num: number; date: any;
+    compte: string; compteLib: string; auxNum?: string; auxLib?: string;
+    piece: string; pieceDate: any; lib: string; debit?: number; credit?: number;
+    lettre?: string; dateLet?: any; valid: any;
+  };
+  const push = (f: Line) => {
+    // 18 colonnes ; Montantdevise/Idevise vides (operations en EUR domestiques).
+    const row = [
+      clean(f.journal), clean(f.journalLib), String(f.num), ymd(f.date),
+      clean(f.compte), clean(f.compteLib), clean(f.auxNum || ""), clean(f.auxLib || ""),
+      clean(f.piece), ymd(f.pieceDate), clean(f.lib),
+      amt(f.debit), amt(f.credit), clean(f.lettre || ""), f.dateLet ? ymd(f.dateLet) : "",
+      ymd(f.valid), "", "",
+    ];
+    if (row.length !== 18) throw new Error("FEC: ligne non conforme (18 colonnes attendues)");
+    lines.push(row.join(SEP));
+    totalDebit += Number(f.debit || 0);
+    totalCredit += Number(f.credit || 0);
+    comptes.add(f.compte);
+  };
+
+  const dStr = dateDebut.toISOString().slice(0, 10);
+  const fStr = dateFin.toISOString().slice(0, 10);
+  let num = 0;
+
+  // ---- 1) JOURNAL DES VENTES (VE) : 1 ecriture equilibree par facture ----
+  const [facts]: any = await pool.execute(
+    `SELECT f.id, f.numero, f.dateFacture, f.totalHT, f.totalTVA, f.totalTTC,
+            f.statut, f.datePaiement, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
+       FROM factures f LEFT JOIN clients c ON c.id = f.clientId
+      WHERE f.artisanId = ? AND DATE(f.dateFacture) BETWEEN ? AND ?
+        AND f.statut IN ('validee','envoyee','payee','en_retard')
+      ORDER BY f.dateFacture ASC, f.id ASC`,
+    [artisanId, dStr, fStr]
+  );
+  for (const f of facts as any[]) {
+    num++;
+    const auxNum = `C${String(f.clientId).padStart(5, "0")}`;
+    const auxLib = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client ${f.clientId}`;
+    const piece = f.numero || `F-${f.id}`;
+    const lib = `Facture ${piece}`;
+    const ht = Number(f.totalHT || 0), tva = Number(f.totalTVA || 0), ttc = Number(f.totalTTC || 0);
+    // Lettrage si reglee : meme code sur le 411 (debit VE) et le 411 (credit BQ).
+    const paid = f.statut === "payee" && f.datePaiement;
+    const lettre = paid ? `VL${f.id}` : "";
+    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: f.dateFacture, lib, debit: ttc, credit: 0, lettre, dateLet: paid ? f.datePaiement : undefined, valid: f.dateFacture });
+    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cVentes, compteLib: "Ventes de prestations", piece, pieceDate: f.dateFacture, lib, debit: 0, credit: ht, valid: f.dateFacture });
+    if (tva > 0) {
+      // TVA ventilee par taux depuis les lignes de facture (445711/712/713...).
+      const [lignes]: any = await pool.execute(
+        `SELECT tauxTVA, SUM(montantTVA) AS tva FROM factures_lignes WHERE factureId = ? GROUP BY tauxTVA HAVING SUM(montantTVA) > 0`,
+        [f.id]
+      );
+      const rows = (lignes as any[]) || [];
+      const sommeLignes = rows.reduce((s, l) => s + Number(l.tva || 0), 0);
+      if (rows.length > 0 && Math.abs(sommeLignes - tva) < 0.02) {
+        for (const l of rows) {
+          const t = compteTvaCollectee(Number(l.tauxTVA || 20));
+          push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: t.compte, compteLib: t.lib, piece, pieceDate: f.dateFacture, lib, debit: 0, credit: Number(l.tva), valid: f.dateFacture });
+        }
+      } else {
+        // Repli : pas de lignes exploitables -> TVA agregee sur le compte configure.
+        const t = compteTvaCollectee(20);
+        push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: config?.compteTVACollectee || t.compte, compteLib: "TVA collectee", piece, pieceDate: f.dateFacture, lib, debit: 0, credit: tva, valid: f.dateFacture });
+      }
+    }
+    nbEcritures++;
+  }
+
+  // ---- 2) JOURNAL DES ACHATS (AC) : depenses deductibles ----
+  const [deps]: any = await pool.execute(
+    `SELECT id, numero, date_depense, fournisseur, categorie, montant_ht, montant_tva, montant_ttc
+       FROM depenses
+      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
+      ORDER BY date_depense ASC, id ASC`,
+    [artisanId, dStr, fStr]
+  );
+  for (const d of deps as any[]) {
+    num++;
+    const piece = d.numero || `D-${d.id}`;
+    const lib = `Achat ${piece}${d.fournisseur ? " - " + d.fournisseur : ""}`;
+    const ht = Number(d.montant_ht || 0), tvaD = Number(d.montant_tva || 0), ttc = Number(d.montant_ttc || 0);
+    const charge = compteChargeDepense(d.categorie);
+    push({ journal: jAC, journalLib: "Journal des achats", num, date: d.date_depense, compte: charge.compte, compteLib: charge.lib, piece, pieceDate: d.date_depense, lib, debit: ht, credit: 0, valid: d.date_depense });
+    if (tvaD > 0) push({ journal: jAC, journalLib: "Journal des achats", num, date: d.date_depense, compte: cTvaDed, compteLib: "TVA deductible", piece, pieceDate: d.date_depense, lib, debit: tvaD, credit: 0, valid: d.date_depense });
+    push({ journal: jAC, journalLib: "Journal des achats", num, date: d.date_depense, compte: cFourn, compteLib: "Fournisseurs", auxNum: d.fournisseur ? `F${String(d.id).padStart(5, "0")}` : "", auxLib: d.fournisseur || "", piece, pieceDate: d.date_depense, lib, debit: 0, credit: ttc, valid: d.date_depense });
+    nbEcritures++;
+  }
+
+  // ---- 3) JOURNAL DE BANQUE (BQ) : encaissements (factures reglees) ----
+  const [pays]: any = await pool.execute(
+    `SELECT f.id, f.numero, f.datePaiement, f.totalTTC, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
+       FROM factures f LEFT JOIN clients c ON c.id = f.clientId
+      WHERE f.artisanId = ? AND f.statut = 'payee' AND f.datePaiement IS NOT NULL
+        AND DATE(f.datePaiement) BETWEEN ? AND ?
+      ORDER BY f.datePaiement ASC, f.id ASC`,
+    [artisanId, dStr, fStr]
+  );
+  for (const p of pays as any[]) {
+    num++;
+    const auxNum = `C${String(p.clientId).padStart(5, "0")}`;
+    const auxLib = `${p.clientPrenom || ""} ${p.clientNom || ""}`.trim() || `Client ${p.clientId}`;
+    const piece = p.numero || `F-${p.id}`;
+    const lib = `Reglement ${piece}`;
+    const ttc = Number(p.totalTTC || 0);
+    const lettre = `VL${p.id}`;
+    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cBanque, compteLib: "Banque", piece, pieceDate: p.datePaiement, lib, debit: ttc, credit: 0, valid: p.datePaiement });
+    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: p.datePaiement, lib, debit: 0, credit: ttc, lettre, dateLet: p.datePaiement, valid: p.datePaiement });
+    nbEcritures++;
+  }
+
+  // ---- Controles de conformite ----
+  const erreurs: string[] = [];
+  totalDebit = Math.round(totalDebit * 100) / 100;
+  totalCredit = Math.round(totalCredit * 100) / 100;
+  const ecart = Math.round((totalDebit - totalCredit) * 100) / 100;
+  const equilibre = Math.abs(ecart) < 0.01;
+  if (!equilibre) erreurs.push(`Desequilibre debit/credit : ${ecart.toFixed(2)} EUR`);
+  for (const cpt of Array.from(comptes)) {
+    if (!/^[0-9]{3,}$/.test(cpt)) erreurs.push(`Compte PCG invalide : "${cpt}"`);
+  }
+  if (lines.length <= 1) erreurs.push("Aucune ecriture sur la periode");
+
+  const conformite: FecConformite = {
+    nbEcritures, nbLignes: lines.length - 1, totalDebit, totalCredit, ecart, equilibre, erreurs,
+    comptesUtilises: Array.from(comptes).sort(),
+  };
+  return { content: lines.join("\n"), conformite };
 }
 
 export async function genererExportFEC(
