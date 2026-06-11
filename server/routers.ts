@@ -9144,7 +9144,9 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
 
   // === Budgets ===
   getBudgets: protectedProcedure
-    .input(z.object({ mois: z.string() }))
+    // mois = colonne VARCHAR(7), le front envoie toujours "YYYY-MM" (toISOString().slice(0,7)).
+    // La regex est behavior-preserving et évite un ER_DATA_TOO_LONG / une valeur incohérente (OPE-24).
+    .input(z.object({ mois: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)") }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -9153,8 +9155,8 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
 
   setBudget: protectedProcedure
     .input(z.object({
-      categorie: z.string(),
-      mois: z.string(),
+      categorie: z.string().max(100),
+      mois: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
       budget: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -9164,7 +9166,10 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
     }),
 
   copierBudgetsMois: protectedProcedure
-    .input(z.object({ moisSource: z.string(), moisCible: z.string() }))
+    .input(z.object({
+      moisSource: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
+      moisCible: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
+    }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
