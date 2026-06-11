@@ -6118,6 +6118,19 @@ const previsionsRouter = router({
 // ============================================================================
 // VEHICULES ROUTER
 // ============================================================================
+// SECURITE (OPE-47) : vérifie que le véhicule appartient au tenant appelant. Les
+// helpers DB (getVehiculeById/update/delete + sous-ressources kilométrage/entretien/
+// assurance) ne scopent que par id -> sans cette garde, IDOR cross-tenant (lecture,
+// écriture, suppression en cascade).
+async function assertVehiculeOwner(vehiculeId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const veh = artisan ? await db.getVehiculeById(vehiculeId) : null;
+  if (!veh || !artisan || (veh as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Véhicule non trouvé" });
+  }
+  return { veh, artisan };
+}
+
 const vehiculesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -6126,7 +6139,8 @@ const vehiculesRouter = router({
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.id, ctx.user.id);
       return await db.getVehiculeById(input.id);
     }),
 
@@ -6165,14 +6179,16 @@ const vehiculesRouter = router({
       statut: z.enum(["actif", "en_maintenance", "hors_service", "vendu"]).optional(),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.id, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateVehicule(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.id, ctx.user.id);
       return await db.deleteVehicule(input.id);
     }),
 
@@ -6184,7 +6200,8 @@ const vehiculesRouter = router({
       motif: z.string().optional(),
       technicienId: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.addHistoriqueKilometrage({
         ...input,
         dateReleve: new Date(input.dateReleve),
@@ -6193,7 +6210,8 @@ const vehiculesRouter = router({
 
   getHistoriqueKilometrage: protectedProcedure
     .input(z.object({ vehiculeId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.getHistoriqueKilometrageByVehicule(input.vehiculeId);
     }),
 
@@ -6209,7 +6227,8 @@ const vehiculesRouter = router({
       prochainEntretienKm: z.number().optional(),
       prochainEntretienDate: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.createEntretienVehicule({
         ...input,
         dateEntretien: new Date(input.dateEntretien),
@@ -6219,7 +6238,8 @@ const vehiculesRouter = router({
 
   getEntretiens: protectedProcedure
     .input(z.object({ vehiculeId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.getEntretiensByVehicule(input.vehiculeId);
     }),
 
@@ -6240,7 +6260,8 @@ const vehiculesRouter = router({
       primeAnnuelle: z.string().optional(),
       franchise: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.createAssuranceVehicule({
         ...input,
         dateDebut: new Date(input.dateDebut),
@@ -6250,7 +6271,8 @@ const vehiculesRouter = router({
 
   getAssurances: protectedProcedure
     .input(z.object({ vehiculeId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.getAssurancesByVehicule(input.vehiculeId);
     }),
 
