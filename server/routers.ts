@@ -2095,14 +2095,14 @@ const notificationsRouter = router({
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      const all = await db.getNotificationsByArtisanId(artisan.id, input?.includeArchived || false);
-      let filtered = all;
-      if (input?.nonLuesUniquement) {
-        filtered = all.filter((n: any) => !n.lu);
-      }
       const page = input?.page || 1;
       const limit = input?.limit || 50;
-      return filtered.slice((page - 1) * limit, page * limit);
+      // Filtre (nonLues) + pagination poussés en SQL (cf. getNotificationsByArtisanId).
+      return await db.getNotificationsByArtisanId(artisan.id, input?.includeArchived || false, {
+        nonLuesUniquement: input?.nonLuesUniquement || false,
+        limit,
+        offset: (page - 1) * limit,
+      });
     }),
   
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {

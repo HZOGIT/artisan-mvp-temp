@@ -843,16 +843,26 @@ export async function deleteIntervention(id: number): Promise<void> {
 // NOTIFICATIONS
 // ============================================================================
 
-export async function getNotificationsByArtisanId(artisanId: number, includeArchived = false): Promise<Notification[]> {
+export async function getNotificationsByArtisanId(
+  artisanId: number,
+  includeArchived = false,
+  opts?: { nonLuesUniquement?: boolean; limit?: number; offset?: number },
+): Promise<Notification[]> {
   const db = await getDb();
   const conds = [eq(notifications.artisanId, artisanId)];
   // includeArchived=false (défaut) : on exclut les archivées (comportement historique).
-  // includeArchived=true : la vue « archivées » du front fonctionne enfin (param était
-  // passé par le routeur mais ignoré faute d'argument dans cette fonction).
+  // includeArchived=true : la vue « archivées » du front fonctionne enfin.
   if (!includeArchived) conds.push(eq(notifications.archived, false));
-  return await db.select().from(notifications)
+  // Filtre + pagination poussés en SQL (au lieu de tout ramener en mémoire puis
+  // filtrer/slicer côté Node) — cet endpoint est listé fréquemment.
+  if (opts?.nonLuesUniquement) conds.push(eq(notifications.lu, false));
+  const query = db.select().from(notifications)
     .where(and(...conds))
     .orderBy(desc(notifications.createdAt));
+  if (opts?.limit != null) {
+    return await query.limit(opts.limit).offset(opts.offset ?? 0);
+  }
+  return await query;
 }
 
 export async function getUnreadNotificationsCount(artisanId: number): Promise<number> {
