@@ -6314,7 +6314,8 @@ const badgesRouter = router({
 
   getBadgesTechnicien: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.getBadgesTechnicien(input.technicienId);
     }),
 
@@ -6324,15 +6325,15 @@ const badgesRouter = router({
       badgeId: z.number(),
       valeurAtteinte: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.attribuerBadge(input.technicienId, input.badgeId, input.valeurAtteinte);
     }),
 
   verifierBadges: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) return [];
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.verifierEtAttribuerBadges(input.technicienId, artisan.id);
     }),
 
@@ -6354,7 +6355,8 @@ const badgesRouter = router({
 
   getObjectifsTechnicien: protectedProcedure
     .input(z.object({ technicienId: z.number(), annee: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.getObjectifsTechnicien(input.technicienId, input.annee);
     }),
 
@@ -6368,7 +6370,8 @@ const badgesRouter = router({
       objectifAvisPositifs: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-31 : le technicien ciblé doit appartenir au tenant appelant.
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.createObjectifTechnicien({ artisanId: artisan.id, ...input });
     }),
 });
