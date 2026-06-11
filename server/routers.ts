@@ -1522,13 +1522,16 @@ const facturesRouter = router({
   addLigne: protectedProcedure
     .input(z.object({
       factureId: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().min(1),
-      description: z.string().optional(),
-      quantite: z.string().default("1"),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      tauxTVA: z.string().default("20.00"),
+      // Bornes texte alignées sur `factures_lignes` (reference 50, designation 500,
+      // unite 20) — symétrique des lignes de devis ; évite qu'une désignation
+      // surdimensionnée fasse échouer l'ajout (erreur/troncature MySQL strict).
+      reference: z.string().max(50).optional(),
+      designation: z.string().min(1).max(500),
+      description: z.string().max(5000).optional(),
+      quantite: z.string().max(20).default("1"),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20),
+      tauxTVA: z.string().max(10).default("20.00"),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : ownership de la facture + check brouillon (conformite fiscale).
