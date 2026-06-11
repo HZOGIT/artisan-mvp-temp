@@ -47,6 +47,25 @@ function checkRateLimit(artisanId: number): boolean {
   return true;
 }
 
+// Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
+// Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
+// pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
+function isValidIban(value: string | undefined | null): boolean {
+  if (!value) return true;
+  const s = value.replace(/\s+/g, "").toUpperCase();
+  if (s === "") return true;
+  if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(s)) return false;
+  // Déplace les 4 premiers caractères en fin, convertit lettres -> chiffres (A=10..Z=35).
+  const rearranged = s.slice(4) + s.slice(0, 4);
+  const numeric = rearranged.replace(/[A-Z]/g, (c) => (c.charCodeAt(0) - 55).toString());
+  // MOD-97 par blocs pour rester dans les bornes des nombres JS.
+  let remainder = 0;
+  for (let i = 0; i < numeric.length; i += 7) {
+    remainder = Number(String(remainder) + numeric.slice(i, i + 7)) % 97;
+  }
+  return remainder === 1;
+}
+
 // buildSystemPrompt déplacé dans ./_core/assistantContext.ts pour être partagé
 // entre la route SSE /api/assistant/stream et les quick actions ci-dessous.
 
@@ -91,7 +110,7 @@ const artisanRouter = router({
       specialite: z.enum(["plomberie", "electricite", "chauffage", "multi-services"]).optional(),
       tauxTVA: z.string().optional(),
       numeroTVA: z.string().optional(),
-      iban: z.string().optional(),
+      iban: z.string().optional().refine(isValidIban, { message: "IBAN invalide (format ou clé de contrôle)" }),
       codeAPE: z.string().optional(),
       logo: z.string().optional(),
       slug: z.string().optional(),
