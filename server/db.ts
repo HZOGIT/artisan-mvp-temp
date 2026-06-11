@@ -5514,6 +5514,13 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
     .where(eq(pushSubscriptions.endpoint, endpoint));
 }
 
+export async function getPushSubscriptionByEndpoint(endpoint: string): Promise<PushSubscription | undefined> {
+  const dbi = await getDb();
+  if (!dbi) return undefined;
+  const r = await dbi.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)).limit(1);
+  return r[0];
+}
+
 export async function getPreferencesNotifications(
   technicienId: number
 ): Promise<PreferenceNotification | undefined> {
@@ -5558,6 +5565,13 @@ export async function getHistoriqueNotificationsPush(
     .where(eq(historiqueNotificationsPush.technicienId, technicienId))
     .orderBy(desc(historiqueNotificationsPush.dateEnvoi))
     .limit(limit);
+}
+
+export async function getHistoriqueNotificationPushById(id: number): Promise<HistoriqueNotificationPush | undefined> {
+  const dbi = await getDb();
+  if (!dbi) return undefined;
+  const r = await dbi.select().from(historiqueNotificationsPush).where(eq(historiqueNotificationsPush.id, id)).limit(1);
+  return r[0];
 }
 
 export async function markNotificationPushAsRead(id: number): Promise<void> {

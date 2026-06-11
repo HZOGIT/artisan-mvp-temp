@@ -5904,7 +5904,12 @@ const notificationsPushRouter = router({
 
   unsubscribe: protectedProcedure
     .input(z.object({ endpoint: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-31) : ne désactiver l'abonnement que s'il appartient à un
+      // technicien du tenant appelant (résolution endpoint -> technicienId).
+      const sub = await db.getPushSubscriptionByEndpoint(input.endpoint);
+      if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Abonnement non trouvé" });
+      await assertTechnicienOwner(sub.technicienId, ctx.user.id);
       await db.deletePushSubscription(input.endpoint);
       return { success: true };
     }),
@@ -5942,7 +5947,12 @@ const notificationsPushRouter = router({
 
   markAsRead: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-31) : l'entrée d'historique doit appartenir à un technicien
+      // du tenant appelant (résolution id -> technicienId).
+      const entry = await db.getHistoriqueNotificationPushById(input.id);
+      if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: "Notification non trouvée" });
+      await assertTechnicienOwner(entry.technicienId, ctx.user.id);
       await db.markNotificationPushAsRead(input.id);
       return { success: true };
     }),
