@@ -83,6 +83,24 @@ function checkSmsVerifyRate(key: string): boolean {
   return true;
 }
 
+// Anti-flood des emails de réinitialisation de mot de passe (par adresse) : sans
+// borne, `forgotPassword` (public) permet d'inonder la boîte d'une victime + de
+// gonfler les coûts Resend. Fenêtre généreuse : un utilisateur légitime demande 1-2
+// réinitialisations. La réponse reste constante (anti-énumération) : au-delà du seuil
+// on court-circuite *silencieusement* l'envoi, sans changer la sortie.
+const passwordResetRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkPasswordResetRate(key: string): boolean {
+  const now = Date.now();
+  const entry = passwordResetRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    passwordResetRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 3) return false;
+  entry.count++;
+  return true;
+}
+
 // Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
 // Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
 // pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
@@ -9404,6 +9422,11 @@ export const appRouter = router({system: systemRouter,
     forgotPassword: publicProcedure
       .input(z.object({ email: z.string().email() }))
       .mutation(async ({ ctx, input }) => {
+        // Anti-flood par adresse (réponse constante préservée : on retourne le même
+        // success sans envoyer au-delà du seuil). Ne révèle pas l'existence du compte.
+        if (!checkPasswordResetRate(input.email.toLowerCase().trim())) {
+          return { success: true };
+        }
         const user = await db.getUserByEmail(input.email);
         // On ne traite que les comptes actifs disposant d'un mot de passe
         // (les comptes OAuth-only n'ont pas de password a reinitialiser).
