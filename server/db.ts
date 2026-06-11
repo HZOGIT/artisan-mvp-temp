@@ -852,13 +852,15 @@ export async function getNotificationsByArtisanId(artisanId: number): Promise<No
 
 export async function getUnreadNotificationsCount(artisanId: number): Promise<number> {
   const db = await getDb();
-  const result = await db.select().from(notifications)
+  // Perf : COUNT(*) cote SQL au lieu de ramener toutes les lignes non-lues en
+  // memoire Node puis .length (cet endpoint est pollé toutes les 30s).
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(notifications)
     .where(and(
       eq(notifications.artisanId, artisanId),
       eq(notifications.lu, false),
       eq(notifications.archived, false)
     ));
-  return result.length;
+  return Number(result[0]?.count ?? 0);
 }
 
 export async function createNotification(data: InsertNotification): Promise<Notification> {
