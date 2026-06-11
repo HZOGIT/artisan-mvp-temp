@@ -1060,7 +1060,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
         subject: `Relance - Devis n°${devisData.numero}`,
         body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2c3e50;">Relance - Devis n°${devisData.numero}</h2>
-          <p style="white-space: pre-line;">${messageRelance}</p>
+          <p>${safeHtml(messageRelance)}</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
           <p style="color: #7f8c8d; font-size: 12px;">
             ${artisan.nomEntreprise || ''}<br>
@@ -1138,7 +1138,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
           subject: `Relance - Devis n°${d.numero}`,
           body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2c3e50;">Relance - Devis n°${d.numero}</h2>
-            <p style="white-space: pre-line;">${messageRelance}</p>
+            <p>${safeHtml(messageRelance)}</p>
           </div>`
         });
 
@@ -4750,7 +4750,7 @@ const chatRouter = router({
               <p>Bonjour ${client.prenom || client.nom},</p>
               <p><strong>${artisan.nomEntreprise || 'Votre artisan'}</strong> vous a envoyé un message :</p>
               <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:15px 0;border-left:4px solid #2980b9">
-                <p style="margin:0">${input.contenu.substring(0, 300)}${input.contenu.length > 300 ? '...' : ''}</p>
+                <p style="margin:0">${safeHtml(input.contenu.substring(0, 300))}${input.contenu.length > 300 ? '...' : ''}</p>
               </div>
               ${portalLink ? `<p><a href="${portalLink}" style="background:#2980b9;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;display:inline-block">Répondre sur le portail</a></p>` : ''}
               <p style="color:#999;font-size:12px">Cet email a été envoyé automatiquement.</p>
@@ -7422,7 +7422,7 @@ const rdvRouter = router({
         await sendEmail({
           to: client.email,
           subject: `${artisanName} — RDV non disponible`,
-          body: `<p>Bonjour ${clientName},</p><p>Votre demande de rendez-vous <strong>${rdv.titre}</strong> n'a malheureusement pas pu etre acceptee.</p><p><strong>Motif :</strong> ${input.motif}</p><p>N'hesitez pas a proposer un autre creneau.</p><p>Cordialement,<br/>${artisanName}</p>`,
+          body: `<p>Bonjour ${safeHtml(clientName)},</p><p>Votre demande de rendez-vous <strong>${safeHtml(rdv.titre)}</strong> n'a malheureusement pas pu etre acceptee.</p><p><strong>Motif :</strong> ${safeHtml(input.motif)}</p><p>N'hesitez pas a proposer un autre creneau.</p><p>Cordialement,<br/>${safeHtml(artisanName)}</p>`,
         });
       }
 
@@ -7639,7 +7639,7 @@ const utilisateursRouter = router({
           subject: `Invitation à rejoindre ${artisan.nomEntreprise || 'Operioz'}`,
           body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:20px;">
             <h2 style="color:#4F46E5;">Bienvenue sur Operioz !</h2>
-            <p>Vous avez été invité(e) à rejoindre <strong>${artisan.nomEntreprise || 'l\'entreprise'}</strong> en tant que <strong>${roleFr[input.role] || input.role}</strong>.</p>
+            <p>Vous avez été invité(e) à rejoindre <strong>${safeHtml(artisan.nomEntreprise || 'l\'entreprise')}</strong> en tant que <strong>${roleFr[input.role] || input.role}</strong>.</p>
             <p>Vos identifiants de connexion :</p>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
               <p style="margin:4px 0;"><strong>Email :</strong> ${input.email}</p>
