@@ -875,6 +875,12 @@ async function startServer() {
       if (facture.statut === 'payee') {
         return res.status(400).json({ error: 'Cette facture est déjà payée' });
       }
+      // OPE-67 : une facture brouillon/annulée ne doit pas être encaissable (le garde
+      // d'UI est contournable par POST direct). Blocklist conservatrice : on bloque les
+      // 2 cas non ambigus, sans toucher envoyee/validee/en_retard (pas de régression).
+      if (facture.statut === 'brouillon' || facture.statut === 'annulee') {
+        return res.status(400).json({ error: "Cette facture n'est pas payable en ligne" });
+      }
 
       const client = await getClientById(access.clientId);
       const artisan = await getArtisanById(access.artisanId);

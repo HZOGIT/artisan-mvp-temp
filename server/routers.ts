@@ -1646,6 +1646,10 @@ const facturesRouter = router({
       if (!artisan || facture.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // OPE-67 : ne pas générer de lien de paiement pour une facture brouillon/annulée/payée.
+      if (facture.statut === 'brouillon' || facture.statut === 'annulee' || facture.statut === 'payee') {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cette facture n'est pas payable (brouillon, annulée ou déjà payée)" });
+      }
       const client = await db.getClientById(facture.clientId);
       if (!client) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
