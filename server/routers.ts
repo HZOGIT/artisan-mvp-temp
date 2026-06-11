@@ -3961,7 +3961,7 @@ const clientPortalRouter = router({
       await sendEmail({
         to: artisan.email,
         subject: `Demande de modification — ${clientName}`,
-        body: `<p>Le client <strong>${clientName}</strong> (${client.email || 'pas d\'email'}) demande une modification de ses informations via le portail client :</p><blockquote style="border-left:3px solid #2563eb;padding:12px;margin:16px 0;background:#f8fafc;">${input.message}</blockquote>`,
+        body: `<p>Le client <strong>${safeHtml(clientName)}</strong> (${safeHtml(client.email || 'pas d\'email')}) demande une modification de ses informations via le portail client :</p><blockquote style="border-left:3px solid #2563eb;padding:12px;margin:16px 0;background:#f8fafc;">${safeHtml(input.message)}</blockquote>`,
       });
       return { success: true };
     }),
@@ -4075,17 +4075,17 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
       if (artisan.email) {
         try {
           const questionsHtml = structured.questions.length
-            ? `<p style="margin-top:16px;"><strong>Questions a poser au client :</strong></p><ul>${structured.questions.map(q => `<li>${q}</li>`).join("")}</ul>`
+            ? `<p style="margin-top:16px;"><strong>Questions a poser au client :</strong></p><ul>${structured.questions.map(q => `<li>${safeHtml(q)}</li>`).join("")}</ul>`
             : "";
           await sendEmail({
             to: artisan.email,
             subject: `Nouvelle demande portail : ${structured.titre}`,
-            body: `<p>Nouvelle demande de <strong>${clientName}</strong> (${client.email || "pas d'email"} - ${client.telephone || "pas de tel"}) via le portail client.</p>
-<p><strong>Type :</strong> ${structured.typeTravaux} &nbsp;|&nbsp; <strong>Urgence :</strong> ${urgenceLabel} &nbsp;|&nbsp; <strong>Devis estime :</strong> ${fourchette}</p>
+            body: `<p>Nouvelle demande de <strong>${safeHtml(clientName)}</strong> (${safeHtml(client.email || "pas d'email")} - ${safeHtml(client.telephone || "pas de tel")}) via le portail client.</p>
+<p><strong>Type :</strong> ${safeHtml(structured.typeTravaux)} &nbsp;|&nbsp; <strong>Urgence :</strong> ${urgenceLabel} &nbsp;|&nbsp; <strong>Devis estime :</strong> ${fourchette}</p>
 <p><strong>Description reformulee par l'IA :</strong></p>
-<blockquote style="border-left:3px solid #8b5cf6;padding:12px;margin:16px 0;background:#f8fafc;">${structured.descriptionReformulee}</blockquote>
+<blockquote style="border-left:3px solid #8b5cf6;padding:12px;margin:16px 0;background:#f8fafc;">${safeHtml(structured.descriptionReformulee)}</blockquote>
 <p><strong>Texte original du client :</strong></p>
-<blockquote style="border-left:3px solid #cbd5e1;padding:12px;margin:16px 0;background:#f8fafc;color:#475569;">${input.description}</blockquote>
+<blockquote style="border-left:3px solid #cbd5e1;padding:12px;margin:16px 0;background:#f8fafc;color:#475569;">${safeHtml(input.description)}</blockquote>
 ${questionsHtml}`,
           });
         } catch (e) { console.error("[soumettreDemandeIA] email:", e); }
