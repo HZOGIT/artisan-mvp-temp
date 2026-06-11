@@ -101,6 +101,24 @@ function checkPasswordResetRate(key: string): boolean {
   return true;
 }
 
+// Anti-flood du formulaire de contact public de la vitrine (par IP) : sans borne,
+// `submitContact` (public, sans token) permet d'inonder la boîte de l'artisan +
+// de gonfler les coûts Resend. Fenêtre généreuse (5 msg / 15 min par IP) : un
+// visiteur légitime envoie 1 message ; seul l'abus depuis une même IP est borné
+// (des visiteurs distincts ne se bloquent pas mutuellement).
+const publicContactRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkPublicContactRate(key: string): boolean {
+  const now = Date.now();
+  const entry = publicContactRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    publicContactRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
 // Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
 // Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
 // pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
@@ -7862,9 +7880,21 @@ const vitrineRouter = router({
       telephone: z.string().max(30).optional(),
       message: z.string().min(10).max(5000),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const artisan = await db.getArtisanBySlug(input.slug);
       if (!artisan || !artisan.email) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouve" });
+
+      // OPE-36 — anti-flood par IP (5 msg / 15 min) : borne l'inondation de la boîte
+      // artisan + les coûts Resend depuis un même émetteur (l'injection HTML est déjà
+      // traitée via safeHtml ci-dessous). Un visiteur légitime (1 message) n'est pas affecté.
+      const contactIp = String(
+        (ctx.req?.headers?.['cf-connecting-ip'] as string)
+        || ((ctx.req?.headers?.['x-forwarded-for'] as string) || '').split(',')[0].trim()
+        || ctx.req?.socket?.remoteAddress || 'unknown'
+      );
+      if (!checkPublicContactRate(contactIp)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de messages envoyés. Réessayez dans quelques minutes." });
+      }
 
       await sendEmail({
         to: artisan.email,
