@@ -2557,11 +2557,11 @@ const signatureRouter = router({
 <tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 <tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-<h1 style="margin:0;color:#ffffff;font-size:22px;">${artisanName}</h1>
+<h1 style="margin:0;color:#ffffff;font-size:22px;">${safeHtml(artisanName)}</h1>
 </td></tr>
 <tr><td style="padding:36px 40px 16px 40px;">
-<p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;">Bonjour ${clientName},</p>
-<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Vous avez reçu le devis <strong>${devisData.numero}</strong>${devisData.objet ? ` pour <em>${devisData.objet}</em>` : ''} d'un montant de <strong>${totalTTC}</strong>.</p>
+<p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;">Bonjour ${safeHtml(clientName)},</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Vous avez reçu le devis <strong>${devisData.numero}</strong>${devisData.objet ? ` pour <em>${safeHtml(devisData.objet)}</em>` : ''} d'un montant de <strong>${totalTTC}</strong>.</p>
 <p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Cliquez sur le bouton ci-dessous pour consulter le devis et le signer électroniquement :</p>
 </td></tr>
 <tr><td style="padding:0 40px 28px 40px;text-align:center;">
@@ -3797,10 +3797,10 @@ const clientPortalRouter = router({
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
         <tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${artisanName}</h1>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${safeHtml(artisanName)}</h1>
         </td></tr>
         <tr><td style="padding:36px 40px 16px 40px;">
-          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
+          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${safeHtml(clientName)},</p>
           <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Vous pouvez désormais consulter vos devis, factures et interventions depuis votre espace client en ligne.</p>
         </td></tr>
         <tr><td style="padding:0 40px 28px 40px;text-align:center;">
@@ -5118,7 +5118,7 @@ const avisRouter = router({
         to: client.email,
         subject: `Votre avis sur notre intervention - ${artisan.nomEntreprise || 'Artisan'}`,
         body: `
-          <h2>Bonjour ${client.nom},</h2>
+          <h2>Bonjour ${safeHtml(client.nom)},</h2>
           <p>Suite à notre intervention du ${new Date(intervention.dateDebut).toLocaleDateString('fr-FR')}, nous aimerions connaître votre avis.</p>
           <p>Votre retour est précieux et nous aide à améliorer nos services.</p>
           <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
@@ -5174,7 +5174,7 @@ const avisRouter = router({
         to: client.email,
         subject: `Votre avis nous intéresse - ${artisan.nomEntreprise || 'Artisan'}`,
         body: `
-          <h2>Bonjour ${client.nom},</h2>
+          <h2>Bonjour ${safeHtml(client.nom)},</h2>
           <p>Nous espérons que vous êtes satisfait de nos services.</p>
           <p>Votre avis est précieux et nous aide à améliorer nos prestations. Pourriez-vous prendre quelques instants pour nous laisser un retour ?</p>
           <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
@@ -7460,7 +7460,7 @@ const rdvRouter = router({
         await sendEmail({
           to: client.email,
           subject: `${artisanName} — Votre RDV est confirme`,
-          body: `<p>Bonjour ${clientName},</p><p>Votre rendez-vous <strong>${rdv.titre}</strong> du <strong>${dateStr}</strong> a ete confirme.</p><p>Cordialement,<br/>${artisanName}</p>`,
+          body: `<p>Bonjour ${safeHtml(clientName)},</p><p>Votre rendez-vous <strong>${safeHtml(rdv.titre)}</strong> du <strong>${dateStr}</strong> a ete confirme.</p><p>Cordialement,<br/>${safeHtml(artisanName)}</p>`,
         });
       }
 
@@ -7527,7 +7527,7 @@ const rdvRouter = router({
         await sendEmail({
           to: client.email,
           subject: `${artisanName} — Nouveau creneau propose`,
-          body: `<p>Bonjour ${clientName},</p><p>Le creneau initialement demande n'est pas disponible. Un nouveau creneau vous est propose :</p><p><strong>${newDateStr}</strong></p><p>Connectez-vous a votre espace client pour confirmer.</p><p>Cordialement,<br/>${artisanName}</p>`,
+          body: `<p>Bonjour ${safeHtml(clientName)},</p><p>Le creneau initialement demande n'est pas disponible. Un nouveau creneau vous est propose :</p><p><strong>${newDateStr}</strong></p><p>Connectez-vous a votre espace client pour confirmer.</p><p>Cordialement,<br/>${safeHtml(artisanName)}</p>`,
         });
       }
 
