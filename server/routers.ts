@@ -5801,6 +5801,20 @@ const rapportsRouter = router({
 // ============================================================================
 // NOTIFICATIONS PUSH ROUTER
 // ============================================================================
+// SECURITE (OPE-31) : vérifie que le technicien ciblé appartient bien au tenant de
+// l'appelant. Les helpers DB ne scopent que par technicienId -> sans cette garde,
+// un artisan peut cibler les techniciens d'un autre tenant (push hijack, lecture
+// historique/congés). Pattern déjà utilisé dans techniciensRouter.
+async function assertTechnicienOwnership(technicienId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+  const tech = await db.getTechnicienById(technicienId);
+  if (!tech || tech.artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Technicien introuvable" });
+  }
+  return { artisan, tech };
+}
+
 const notificationsPushRouter = router({
   subscribe: protectedProcedure
     .input(z.object({
@@ -5810,7 +5824,8 @@ const notificationsPushRouter = router({
       auth: z.string(),
       userAgent: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.savePushSubscription(input);
     }),
 
@@ -5823,7 +5838,8 @@ const notificationsPushRouter = router({
 
   getPreferences: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.getPreferencesNotifications(input.technicienId);
     }),
 
@@ -5839,13 +5855,15 @@ const notificationsPushRouter = router({
       heureDebutNotif: z.string().optional(),
       heureFinNotif: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.savePreferencesNotifications(input);
     }),
 
   getHistorique: protectedProcedure
     .input(z.object({ technicienId: z.number(), limit: z.number().default(50) }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.getHistoriqueNotificationsPush(input.technicienId, input.limit);
     }),
 
@@ -5866,7 +5884,8 @@ const notificationsPushRouter = router({
       referenceId: z.number().optional(),
       referenceType: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       // Enregistrer dans l'historique
       return await db.createHistoriqueNotificationPush(input);
     }),
@@ -5890,7 +5909,9 @@ const congesRouter = router({
 
   byTechnicien: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // SECURITE (OPE-31) : congés (dont arrêts maladie) = données salariés sensibles.
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.getCongesByTechnicien(input.technicienId);
     }),
 
