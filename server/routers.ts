@@ -1400,9 +1400,11 @@ const facturesRouter = router({
   create: facturesCreerProcedure
     .input(z.object({
       clientId: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes raisonnables (champs TEXT) : borne le stockage + 400 clair au lieu d'un
+      // 500 au-delà de la capacité TEXT. Defense-in-depth, idem devis (OPE-24).
+      objet: z.string().max(500).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateEcheance: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1441,9 +1443,9 @@ const facturesRouter = router({
   update: facturesCreerProcedure
     .input(z.object({
       id: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      objet: z.string().max(500).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateEcheance: z.string().optional(),
       statut: z.enum(["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]).optional(),
       montantPaye: z.string().optional(),
