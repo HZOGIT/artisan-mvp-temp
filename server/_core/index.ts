@@ -164,8 +164,10 @@ async function startServer() {
       const { handleStripeWebhook } = await import('../stripe/webhookHandler');
       return handleStripeWebhook(req, res);
     } catch (error: any) {
+      // Détail loggué côté serveur ; ne pas l'exposer au caller (endpoint public
+      // non authentifié — pas de fuite de message d'erreur interne).
       console.error('[Stripe Webhook] Route error:', error);
-      res.status(500).json({ error: 'Webhook route error', detail: error.message });
+      res.status(500).json({ error: 'Webhook route error' });
     }
   });
 
