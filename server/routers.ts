@@ -317,8 +317,8 @@ const articlesRouter = router({
   // au metier de l'artisan (contexte specialise injecte en prompt).
   suggererArticlesIA: protectedProcedure
     .input(z.object({
-      query: z.string().min(2),
-      contexte: z.string().optional(),
+      query: z.string().min(2).max(200),
+      contexte: z.string().max(2000).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -546,7 +546,7 @@ Reponds UNIQUEMENT en JSON pur :
   // l'utilisateur valide ensuite avant la creation effective du devis.
   genererLignesIA: protectedProcedure
     .input(z.object({
-      description: z.string().min(5),
+      description: z.string().min(5).max(5000),
       surface: z.number().optional(),
       budget: z.number().optional(),
     }))
