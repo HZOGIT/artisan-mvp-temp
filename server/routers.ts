@@ -248,11 +248,11 @@ const clientsRouter = router({
         codePostal: z.string().optional(),
         ville: z.string().optional(),
         notes: z.string().optional(),
-      }))
+      })).max(5000, "Import limité à 5000 clients par envoi"),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
-      
+
       let imported = 0;
       let skipped = 0;
       
@@ -8777,8 +8777,8 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
   // === Import relevé bancaire ===
   importReleve: protectedProcedure
     .input(z.object({
-      nomFichier: z.string(),
-      contenuCsv: z.string(),
+      nomFichier: z.string().max(255),
+      contenuCsv: z.string().max(5_000_000, "Fichier trop volumineux (max ~5 Mo)"),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -8787,6 +8787,11 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
       const lignes = input.contenuCsv.split(/\r?\n/).filter((l) => l.trim());
       if (lignes.length < 2) {
         return { releveId: 0, nbImportees: 0, message: "CSV vide ou invalide" };
+      }
+      // Borne le nombre de lignes parsées/insérées (anti-DoS) — erreur claire plutôt
+      // que troncature silencieuse. Un relevé bancaire légitime reste très en deçà.
+      if (lignes.length - 1 > 5000) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Relevé trop volumineux (max 5000 lignes par import)" });
       }
       const sep = (lignes[0].match(/;/g)?.length || 0) > (lignes[0].match(/,/g)?.length || 0) ? ";" : ",";
       const transactions: any[] = [];
