@@ -924,12 +924,10 @@ async function startServer() {
         raw: error?.raw?.message,
         stack: error?.stack?.split('\n').slice(0, 5),
       }));
-      const detail = error?.message?.includes('STRIPE_SECRET_KEY is not configured')
-        ? 'Clé Stripe non configurée. Ajoutez STRIPE_SECRET_KEY dans les variables d\'environnement Railway.'
-        : error?.type === 'StripeAuthenticationError'
-        ? 'Clé Stripe invalide ou manquante'
-        : error?.message || 'Erreur inconnue';
-      res.status(500).json({ error: 'Erreur lors de la création de la session de paiement', detail });
+      // Endpoint atteint par le client du portail (semi-public) : message générique,
+      // sans exposer les détails Stripe/config internes (clé, Railway, message brut).
+      // Le détail complet reste loggué côté serveur ci-dessus.
+      res.status(500).json({ error: 'Le paiement en ligne est momentanément indisponible. Veuillez réessayer plus tard ou contacter votre artisan.' });
     }
   });
 
