@@ -3946,7 +3946,7 @@ const clientPortalRouter = router({
 
   // Demander une modification d'infos (public avec token)
   demanderModification: publicProcedure
-    .input(z.object({ token: z.string(), message: z.string().min(1) }))
+    .input(z.object({ token: z.string(), message: z.string().min(1).max(5000) }))
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) {
@@ -4229,10 +4229,10 @@ ${questionsHtml}`,
   demanderRdv: publicProcedure
     .input(z.object({
       token: z.string(),
-      titre: z.string().min(1),
-      description: z.string().optional(),
+      titre: z.string().min(1).max(200),
+      description: z.string().max(5000).optional(),
       urgence: z.enum(["normale", "urgente", "tres_urgente"]).default("normale"),
-      dateProposee: z.string(),
+      dateProposee: z.string().max(40),
     }))
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
@@ -7606,11 +7606,11 @@ const vitrineRouter = router({
 
   submitContact: publicProcedure
     .input(z.object({
-      slug: z.string().min(1),
-      nom: z.string().min(1),
-      email: z.string().email(),
-      telephone: z.string().optional(),
-      message: z.string().min(10),
+      slug: z.string().min(1).max(200),
+      nom: z.string().min(1).max(200),
+      email: z.string().email().max(320),
+      telephone: z.string().max(30).optional(),
+      message: z.string().min(10).max(5000),
     }))
     .mutation(async ({ input }) => {
       const artisan = await db.getArtisanBySlug(input.slug);
