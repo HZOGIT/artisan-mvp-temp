@@ -6,7 +6,9 @@ vars:
   DB_USER: '{{.MYSQL_USER | default "artisan_user"}}'
   DB_PASS: '{{.MYSQL_PASSWORD | default "artisan_password"}}'
   DB_NAME: artisan_mvp
-  STAGING_DIR: /home/developer/artisan-staging
+  # Consolidé : on développe directement sur la branche `staging` dans ce dépôt
+  # (plus de worktree séparé). Le déploiement rebuild le conteneur depuis ce checkout.
+  STAGING_DIR: /home/developer/artisan-mvp-temp
   STAGING_COMPOSE: docker compose -f docker-compose.staging.yml --env-file .env.staging
 
 env:
@@ -138,12 +140,9 @@ tasks:
   # The worktree uses a DETACHED checkout so it never conflicts with the
   # `staging` branch checked out here.
   staging:bootstrap:
-    desc: One-time — create the staging worktree (detached on origin/staging) + env
+    desc: "(obsolète) Le worktree séparé a été consolidé — on développe sur `staging` ici."
     cmds:
-      - git fetch origin staging
-      - test -d {{.STAGING_DIR}} || git worktree add --detach {{.STAGING_DIR}} origin/staging
-      - cp -n .env.staging {{.STAGING_DIR}}/.env.staging || true
-      - echo "Staging worktree ready at {{.STAGING_DIR}}"
+      - echo "Worktree consolidé. Develop on branch 'staging' in this repo, then 'task staging:deploy'."
 
   staging:up:
     desc: Start the staging stack (mysql + prod app + cloudflared)
@@ -153,11 +152,9 @@ tasks:
       - '{{.STAGING_COMPOSE}} ps'
 
   staging:deploy:
-    desc: Deploy origin/staging to staging.operioz.com (fetch + rebuild + restart)
+    desc: Deploy the local `staging` branch to staging.operioz.com (rebuild + restart app)
     dir: '{{.STAGING_DIR}}'
     cmds:
-      - git fetch origin staging
-      - git checkout --detach origin/staging
       - '{{.STAGING_COMPOSE}} up -d --build --force-recreate app'
       - '{{.STAGING_COMPOSE}} ps'
 
