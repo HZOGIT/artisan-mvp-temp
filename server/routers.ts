@@ -2013,12 +2013,14 @@ const interventionsRouter = router({
   create: protectedProcedure
     .input(z.object({
       clientId: z.number(),
-      titre: z.string().min(1),
-      description: z.string().optional(),
+      // Bornes alignées sur les colonnes `interventions` (titre VARCHAR(255)) : évite
+      // un ER_DATA_TOO_LONG (500) sur un titre trop long ; TEXT borné en defense-in-depth.
+      titre: z.string().min(1).max(255),
+      description: z.string().max(5000).optional(),
       dateDebut: z.string(),
       dateFin: z.string().optional(),
-      adresse: z.string().optional(),
-      notes: z.string().optional(),
+      adresse: z.string().max(500).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -2043,12 +2045,12 @@ const interventionsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      titre: z.string().optional(),
-      description: z.string().optional(),
+      titre: z.string().max(255).optional(),
+      description: z.string().max(5000).optional(),
       dateDebut: z.string().optional(),
       dateFin: z.string().optional(),
-      adresse: z.string().optional(),
-      notes: z.string().optional(),
+      adresse: z.string().max(500).optional(),
+      notes: z.string().max(5000).optional(),
       statut: z.enum(["planifiee", "en_cours", "terminee", "annulee"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
