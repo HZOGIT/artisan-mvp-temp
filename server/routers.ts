@@ -5516,7 +5516,14 @@ const comptabiliteRouter = router({
 
   genererEcrituresFacture: comptaVoirProcedure
     .input(z.object({ factureId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-38) : la facture doit appartenir au tenant appelant (sinon
+      // génération/écrasement d'écritures comptables cross-tenant).
+      const artisan = ctx.user ? await db.getArtisanByUserId(ctx.user.id) : null;
+      const facture = artisan ? await db.getFactureById(input.factureId) : null;
+      if (!artisan || !facture || facture.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+      }
       return await db.genererEcrituresFacture(input.factureId);
     }),
 
