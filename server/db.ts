@@ -2791,15 +2791,34 @@ export async function initPlanComptable(artisanId: number): Promise<void> {
   const existing = await db.select().from(planComptable).where(eq(planComptable.artisanId, artisanId)).limit(1);
   if (existing.length > 0) return;
 
+  // PCG aligné sur TOUS les comptes que le FEC/les écritures émettent réellement
+  // (OPE-139) — sinon des comptes apparaissent dans le FEC sans exister dans le plan.
   const comptesParDefaut = [
+    // Classe 4 — Tiers
+    { numeroCompte: '401000', libelle: 'Fournisseurs', classe: 4, type: 'passif' as const },
     { numeroCompte: '411000', libelle: 'Clients', classe: 4, type: 'actif' as const },
     { numeroCompte: '445660', libelle: 'TVA déductible', classe: 4, type: 'actif' as const },
     { numeroCompte: '445710', libelle: 'TVA collectée', classe: 4, type: 'passif' as const },
+    { numeroCompte: '445711', libelle: 'TVA collectée 20%', classe: 4, type: 'passif' as const },
+    { numeroCompte: '445712', libelle: 'TVA collectée 10%', classe: 4, type: 'passif' as const },
+    { numeroCompte: '445713', libelle: 'TVA collectée 5,5%', classe: 4, type: 'passif' as const },
+    // Classe 5 — Financiers
     { numeroCompte: '512000', libelle: 'Banque', classe: 5, type: 'actif' as const },
     { numeroCompte: '530000', libelle: 'Caisse', classe: 5, type: 'actif' as const },
+    // Classe 6 — Charges (alignées sur les catégories de dépense)
+    { numeroCompte: '601000', libelle: 'Achats de matières premières', classe: 6, type: 'charge' as const },
+    { numeroCompte: '604000', libelle: 'Achats de sous-traitance', classe: 6, type: 'charge' as const },
+    { numeroCompte: '606100', libelle: 'Carburants', classe: 6, type: 'charge' as const },
     { numeroCompte: '607000', libelle: 'Achats de marchandises', classe: 6, type: 'charge' as const },
+    { numeroCompte: '613000', libelle: 'Locations', classe: 6, type: 'charge' as const },
     { numeroCompte: '615000', libelle: 'Entretien et réparations', classe: 6, type: 'charge' as const },
+    { numeroCompte: '616000', libelle: 'Primes d\'assurance', classe: 6, type: 'charge' as const },
+    { numeroCompte: '623000', libelle: 'Formation', classe: 6, type: 'charge' as const },
     { numeroCompte: '625000', libelle: 'Déplacements', classe: 6, type: 'charge' as const },
+    { numeroCompte: '625100', libelle: 'Voyages et déplacements', classe: 6, type: 'charge' as const },
+    { numeroCompte: '626000', libelle: 'Frais postaux et télécom', classe: 6, type: 'charge' as const },
+    { numeroCompte: '627000', libelle: 'Services bancaires', classe: 6, type: 'charge' as const },
+    // Classe 7 — Produits
     { numeroCompte: '706000', libelle: 'Prestations de services', classe: 7, type: 'produit' as const },
     { numeroCompte: '707000', libelle: 'Ventes de marchandises', classe: 7, type: 'produit' as const },
   ];
