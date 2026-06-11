@@ -246,14 +246,17 @@ const clientsRouter = router({
   importFromExcel: protectedProcedure
     .input(z.object({
       clients: z.array(z.object({
-        nom: z.string(),
-        prenom: z.string().optional(),
-        email: z.string().email().optional(),
-        telephone: z.string().optional(),
-        adresse: z.string().optional(),
-        codePostal: z.string().optional(),
-        ville: z.string().optional(),
-        notes: z.string().optional(),
+        // OPE-24 — bornes raisonnables par champ (defense-in-depth) : avec le cap
+        // de 5000 lignes, elles bornent la charge mémoire d'un import sans rejeter
+        // aucune donnée client légitime (comportement inchangé pour les imports réels).
+        nom: z.string().max(200),
+        prenom: z.string().max(200).optional(),
+        email: z.string().email().max(320).optional(),
+        telephone: z.string().max(40).optional(),
+        adresse: z.string().max(500).optional(),
+        codePostal: z.string().max(20).optional(),
+        ville: z.string().max(200).optional(),
+        notes: z.string().max(5000).optional(),
       })).max(5000, "Import limité à 5000 clients par envoi"),
     }))
     .mutation(async ({ ctx, input }) => {
