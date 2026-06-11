@@ -238,6 +238,43 @@ async function startServer() {
     }
     next();
   });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Rate limit dédié aux endpoints de reset de mot de passe
+  // (auth.forgotPassword / auth.resetPassword). Bucket SÉPARÉ de signin/signup
+  // pour ne pas pénaliser une récupération légitime après quelques échecs de
+  // login. Borne l'email-bombing (forgotPassword était hors rate-limit — cf.
+  // OPE-76 / OPE-24) + le flood de tentatives de token. IP via CF-Connecting-IP
+  // (non falsifiable) comme le middleware ci-dessus (OPE-80).
+  // ─────────────────────────────────────────────────────────────────
+  const pwdResetAttempts = new Map<string, { count: number; resetAt: number }>();
+  const PWD_RESET_MAX = 5;
+  const PWD_RESET_WINDOW_MS = 15 * 60 * 1000;
+  app.use('/api/trpc', (req, res, next) => {
+    const path = req.path || '';
+    const isReset = path.includes('auth.forgotPassword') || path.includes('auth.resetPassword');
+    if (!isReset) return next();
+    const ip = (req.headers['cf-connecting-ip'] as string)?.trim()
+      || (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+      || req.socket.remoteAddress
+      || 'unknown';
+    const now = Date.now();
+    let entry = pwdResetAttempts.get(ip);
+    if (!entry || entry.resetAt <= now) {
+      entry = { count: 1, resetAt: now + PWD_RESET_WINDOW_MS };
+      pwdResetAttempts.set(ip, entry);
+      return next();
+    }
+    entry.count++;
+    if (entry.count > PWD_RESET_MAX) {
+      const retryAfterS = Math.ceil((entry.resetAt - now) / 1000);
+      res.setHeader('Retry-After', retryAfterS);
+      return res.status(429).json({
+        error: { message: 'Trop de demandes. Réessayez dans quelques minutes.', code: 'TOO_MANY_REQUESTS' },
+      });
+    }
+    next();
+  });
   console.log('OK cookieParser() charge');
 
   // ============================================================
