@@ -1084,10 +1084,10 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
           <p>${safeHtml(messageRelance)}</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
           <p style="color: #7f8c8d; font-size: 12px;">
-            ${artisan.nomEntreprise || ''}<br>
-            ${artisan.adresse || ''}<br>
-            ${artisan.codePostal || ''} ${artisan.ville || ''}<br>
-            ${artisan.telephone || ''}
+            ${safeHtml(artisan.nomEntreprise || '')}<br>
+            ${safeHtml(artisan.adresse || '')}<br>
+            ${safeHtml(artisan.codePostal || '')} ${safeHtml(artisan.ville || '')}<br>
+            ${safeHtml(artisan.telephone || '')}
           </p>
         </div>`
       });
@@ -4810,8 +4810,8 @@ const chatRouter = router({
             subject: `Nouveau message de ${artisan.nomEntreprise || 'votre artisan'}`,
             body: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
               <h2 style="color:#2980b9">Nouveau message</h2>
-              <p>Bonjour ${client.prenom || client.nom},</p>
-              <p><strong>${artisan.nomEntreprise || 'Votre artisan'}</strong> vous a envoyé un message :</p>
+              <p>Bonjour ${safeHtml(client.prenom || client.nom)},</p>
+              <p><strong>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</strong> vous a envoyé un message :</p>
               <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:15px 0;border-left:4px solid #2980b9">
                 <p style="margin:0">${safeHtml(input.contenu.substring(0, 300))}${input.contenu.length > 300 ? '...' : ''}</p>
               </div>
@@ -8643,7 +8643,7 @@ const supportRouter = router({
       const body = `<html><body style="font-family:Arial,sans-serif;color:#1f2937;">
         <h2 style="color:#2563eb;">Nouveau message support (${subjectLabel})</h2>
         <table cellpadding="6" style="border-collapse:collapse;">
-          <tr><td><strong>De :</strong></td><td>${input.nom} &lt;${input.email}&gt;</td></tr>
+          <tr><td><strong>De :</strong></td><td>${safeHtml(input.nom)} &lt;${safeHtml(input.email)}&gt;</td></tr>
           <tr><td><strong>User ID :</strong></td><td>${ctx.user.id} (artisanId ${ctx.user.artisanId ?? "—"})</td></tr>
           <tr><td><strong>Sujet :</strong></td><td>${subjectLabel}</td></tr>
         </table>
