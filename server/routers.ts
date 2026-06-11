@@ -6649,17 +6649,19 @@ const chantiersRouter = router({
   create: protectedProcedure
     .input(z.object({
       clientId: z.number(),
-      reference: z.string(),
-      nom: z.string(),
-      description: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
+      // Bornes texte alignées sur les colonnes de `chantiers` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      reference: z.string().max(50),
+      nom: z.string().max(255),
+      description: z.string().max(2000).optional(),
+      adresse: z.string().max(500).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
       dateDebut: z.string().optional(),
       dateFinPrevue: z.string().optional(),
       budgetPrevisionnel: z.string().optional(),
       priorite: z.enum(["basse", "normale", "haute", "urgente"]).optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -6674,13 +6676,13 @@ const chantiersRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
+      nom: z.string().max(255).optional(),
+      description: z.string().max(2000).optional(),
       statut: z.enum(["planifie", "en_cours", "en_pause", "termine", "annule"]).optional(),
       avancement: z.number().optional(),
       dateFinReelle: z.string().optional(),
       budgetRealise: z.string().optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertChantierOwner(input.id, ctx.user.id);
