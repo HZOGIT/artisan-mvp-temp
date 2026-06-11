@@ -98,15 +98,15 @@ export function generateDevisEmailContent(params: {
         <!-- Header -->
         <tr>
           <td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${artisanName}</h1>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${escapeHtml(artisanName)}</h1>
           </td>
         </tr>
 
         <!-- Body -->
         <tr>
           <td style="padding:36px 40px 16px 40px;">
-            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
-            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${devisNumero}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${devisObjet}&nbsp;&raquo;</em>` : ''}.</p>
+            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${escapeHtml(clientName)},</p>
+            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${escapeHtml(devisNumero)}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${escapeHtml(devisObjet)}&nbsp;&raquo;</em>` : ''}.</p>
           </td>
         </tr>
 
@@ -119,7 +119,7 @@ export function generateDevisEmailContent(params: {
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro du devis</td>
-                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${devisNumero}</td>
+                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${escapeHtml(devisNumero)}</td>
                     </tr>
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Montant TTC</td>
@@ -141,7 +141,7 @@ export function generateDevisEmailContent(params: {
           <td style="padding:0 40px 36px 40px;">
             <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Pour accepter ce devis, vous pouvez nous contacter par retour d'email ou par téléphone.</p>
             <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
-            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
+            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${escapeHtml(artisanName)}</p>
           </td>
         </tr>
 
@@ -187,15 +187,15 @@ export function generateFactureEmailContent(params: {
         <!-- Header -->
         <tr>
           <td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${artisanName}</h1>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${escapeHtml(artisanName)}</h1>
           </td>
         </tr>
 
         <!-- Body -->
         <tr>
           <td style="padding:36px 40px 16px 40px;">
-            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
-            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint la facture <strong>${factureNumero}</strong>${factureObjet ? ` concernant <em>&laquo;&nbsp;${factureObjet}&nbsp;&raquo;</em>` : ''}.</p>
+            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${escapeHtml(clientName)},</p>
+            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint la facture <strong>${escapeHtml(factureNumero)}</strong>${factureObjet ? ` concernant <em>&laquo;&nbsp;${escapeHtml(factureObjet)}&nbsp;&raquo;</em>` : ''}.</p>
           </td>
         </tr>
 
@@ -208,7 +208,7 @@ export function generateFactureEmailContent(params: {
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro de facture</td>
-                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${factureNumero}</td>
+                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${escapeHtml(factureNumero)}</td>
                     </tr>
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Montant TTC</td>
@@ -230,7 +230,7 @@ export function generateFactureEmailContent(params: {
           <td style="padding:0 40px 36px 40px;">
             <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Nous vous remercions de procéder au règlement dans les meilleurs délais.</p>
             <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
-            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
+            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${escapeHtml(artisanName)}</p>
           </td>
         </tr>
 
