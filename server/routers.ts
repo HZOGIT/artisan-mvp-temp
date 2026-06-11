@@ -430,27 +430,29 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   
   createArtisanArticle: protectedProcedure
     .input(z.object({
-      reference: z.string().min(1),
-      designation: z.string().min(1),
-      description: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      categorie: z.string().optional(),
+      // Bornes alignées sur les colonnes de `articles_artisan` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      reference: z.string().min(1).max(50),
+      designation: z.string().min(1).max(500),
+      description: z.string().max(5000).optional(),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20),
+      categorie: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createArticleArtisan({ artisanId: artisan.id, ...input });
     }),
-  
+
   updateArtisanArticle: protectedProcedure
     .input(z.object({
       id: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().optional(),
-      description: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string().optional(),
-      categorie: z.string().optional(),
+      reference: z.string().max(50).optional(),
+      designation: z.string().max(500).optional(),
+      description: z.string().max(5000).optional(),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20).optional(),
+      categorie: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : verifier que l'article appartient bien a cet artisan.
