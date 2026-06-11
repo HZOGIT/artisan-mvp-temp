@@ -5260,7 +5260,10 @@ const avisRouter = router({
       });
       
       // Envoyer l'email
-      const baseUrl = ctx.req.headers.origin || 'http://localhost:3000';
+      // OPE-76 (même classe) — le lien d'avis vient d'une source de confiance
+      // (APP_URL), pas du header Origin (contrôlable). Corrige aussi le repli erroné
+      // sur http://localhost:3000. Pour une requête légitime, Origin == APP_URL.
+      const baseUrl = process.env.APP_URL || 'https://www.operioz.com';
       const lienAvis = `${baseUrl}/avis/${token}`;
       
       await sendEmail({
@@ -5316,7 +5319,10 @@ const avisRouter = router({
         expiresAt,
       });
 
-      const baseUrl = ctx.req.headers.origin || 'http://localhost:3000';
+      // OPE-76 (même classe) — le lien d'avis vient d'une source de confiance
+      // (APP_URL), pas du header Origin (contrôlable). Corrige aussi le repli erroné
+      // sur http://localhost:3000. Pour une requête légitime, Origin == APP_URL.
+      const baseUrl = process.env.APP_URL || 'https://www.operioz.com';
       const lienAvis = `${baseUrl}/avis/${token}`;
 
       await sendEmail({
