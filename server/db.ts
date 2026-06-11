@@ -2698,31 +2698,37 @@ export async function genererEcrituresFacture(factureId: number): Promise<any> {
   if (!facture) throw new Error("Facture non trouvée");
 
   const dateEcriture = facture.dateFacture || new Date();
-  const totalHT = parseFloat(String(facture.totalHT || '0'));
-  const totalTVA = parseFloat(String(facture.totalTVA || '0'));
-  const totalTTC = parseFloat(String(facture.totalTTC || '0'));
+  // OPE-136 — un avoir (note de credit) stocke des montants NEGATIFS ; on enregistre
+  // l'ecriture en INVERSANT le sens des comptes, en valeur absolue (jamais de negatif,
+  // coherent avec le FEC). Facture : 411 debit / 706 credit / 445 credit.
+  // Avoir : 411 credit / 706 debit / 445 debit.
+  const isAvoir = facture.typeDocument === 'avoir' || parseFloat(String(facture.totalTTC || '0')) < 0;
+  const totalHT = Math.abs(parseFloat(String(facture.totalHT || '0')));
+  const totalTVA = Math.abs(parseFloat(String(facture.totalTVA || '0')));
+  const totalTTC = Math.abs(parseFloat(String(facture.totalTTC || '0')));
   const pieceRef = facture.numero || `F-${factureId}`;
 
   // Delete existing entries for this invoice
   await db.delete(ecrituresComptables).where(eq(ecrituresComptables.factureId, factureId));
 
-  const lib = `Facture ${pieceRef}`;
+  const lib = `${isAvoir ? 'Avoir' : 'Facture'} ${pieceRef}`;
   const entries = [
-    // Débit 411 - Client (TTC)
-    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: lib, pieceRef, debit: String(totalTTC), credit: '0.00', factureId },
-    // Crédit 706 - Ventes de prestations (HT)
-    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '706000', libelleCompte: 'Prestations de services', libelle: lib, pieceRef, debit: '0.00', credit: String(totalHT), factureId },
+    // 411 - Client (TTC) : debit pour une facture, credit pour un avoir
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: lib, pieceRef, debit: isAvoir ? '0.00' : totalTTC.toFixed(2), credit: isAvoir ? totalTTC.toFixed(2) : '0.00', factureId },
+    // 706 - Ventes de prestations (HT) : credit pour une facture, debit pour un avoir
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '706000', libelleCompte: 'Prestations de services', libelle: lib, pieceRef, debit: isAvoir ? totalHT.toFixed(2) : '0.00', credit: isAvoir ? '0.00' : totalHT.toFixed(2), factureId },
   ];
 
   if (totalTVA > 0) {
     // TVA collectée ventilée par taux (445711=20% / 445712=10% / 445713=5,5%),
     // depuis les lignes de facture. Repli sur le total si lignes indisponibles.
+    // Les lignes d'avoir sont negatives : on prend la valeur absolue.
     const lignes = await db.select({ tauxTVA: facturesLignes.tauxTVA, montantTVA: facturesLignes.montantTVA })
       .from(facturesLignes).where(eq(facturesLignes.factureId, factureId));
     const parTaux = new Map<string, { compte: string; lib: string; montant: number }>();
     let sommeLignes = 0;
     for (const l of lignes) {
-      const m = parseFloat(String(l.montantTVA || '0'));
+      const m = Math.abs(parseFloat(String(l.montantTVA || '0')));
       if (m <= 0) continue;
       sommeLignes += m;
       const t = compteTvaCollectee(parseFloat(String(l.tauxTVA || '20')));
@@ -2732,10 +2738,10 @@ export async function genererEcrituresFacture(factureId: number): Promise<any> {
     }
     if (parTaux.size > 0 && Math.abs(sommeLignes - totalTVA) < 0.02) {
       for (const t of Array.from(parTaux.values())) {
-        entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: t.compte, libelleCompte: t.lib, libelle: lib, pieceRef, debit: '0.00', credit: t.montant.toFixed(2), factureId });
+        entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: t.compte, libelleCompte: t.lib, libelle: lib, pieceRef, debit: isAvoir ? t.montant.toFixed(2) : '0.00', credit: isAvoir ? '0.00' : t.montant.toFixed(2), factureId });
       }
     } else {
-      entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '445711', libelleCompte: 'TVA collectée', libelle: lib, pieceRef, debit: '0.00', credit: String(totalTVA), factureId });
+      entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '445711', libelleCompte: 'TVA collectée', libelle: lib, pieceRef, debit: isAvoir ? totalTVA.toFixed(2) : '0.00', credit: isAvoir ? '0.00' : totalTVA.toFixed(2), factureId });
     }
   }
 
@@ -5534,7 +5540,7 @@ export async function genererFEC(
   // ---- 1) JOURNAL DES VENTES (VE) : 1 ecriture equilibree par facture ----
   const [facts]: any = await pool.execute(
     `SELECT f.id, f.numero, f.dateFacture, f.totalHT, f.totalTVA, f.totalTTC,
-            f.statut, f.datePaiement, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
+            f.statut, f.datePaiement, f.typeDocument, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
        FROM factures f LEFT JOIN clients c ON c.id = f.clientId
       WHERE f.artisanId = ? AND DATE(f.dateFacture) BETWEEN ? AND ?
         AND f.statut IN ('validee','envoyee','payee','en_retard')
@@ -5545,31 +5551,43 @@ export async function genererFEC(
     num++;
     const auxNum = `C${String(f.clientId).padStart(5, "0")}`;
     const auxLib = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client ${f.clientId}`;
+    // OPE-136 — un avoir (note de credit) stocke des montants NEGATIFS. Le FEC
+    // (arrete 29/07/2013) interdit les montants negatifs : une note de credit
+    // s'enregistre en INVERSANT le sens des comptes, en valeur absolue. Une facture
+    // normale : 411 debit TTC / 706 credit HT / 445 credit TVA. Un avoir : on inverse
+    // (411 credit / 706 debit / 445 debit), montants en |valeur absolue|.
+    const isAvoir = f.typeDocument === "avoir" || Number(f.totalTTC || 0) < 0;
     const piece = f.numero || `F-${f.id}`;
-    const lib = `Facture ${piece}`;
-    const ht = Number(f.totalHT || 0), tva = Number(f.totalTVA || 0), ttc = Number(f.totalTTC || 0);
+    const lib = `${isAvoir ? "Avoir" : "Facture"} ${piece}`;
+    const ht = Math.abs(Number(f.totalHT || 0)), tva = Math.abs(Number(f.totalTVA || 0)), ttc = Math.abs(Number(f.totalTTC || 0));
     // Lettrage si reglee : meme code sur le 411 (debit VE) et le 411 (credit BQ).
     const paid = f.statut === "payee" && f.datePaiement;
     const lettre = paid ? `VL${f.id}` : "";
-    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: f.dateFacture, lib, debit: ttc, credit: 0, lettre, dateLet: paid ? f.datePaiement : undefined, valid: f.dateFacture });
-    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cVentes, compteLib: "Ventes de prestations", piece, pieceDate: f.dateFacture, lib, debit: 0, credit: ht, valid: f.dateFacture });
+    // Sens des comptes selon facture vs avoir (jamais de montant negatif).
+    const clientDebit = isAvoir ? 0 : ttc, clientCredit = isAvoir ? ttc : 0;
+    const venteDebit = isAvoir ? ht : 0, venteCredit = isAvoir ? 0 : ht;
+    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: f.dateFacture, lib, debit: clientDebit, credit: clientCredit, lettre, dateLet: paid ? f.datePaiement : undefined, valid: f.dateFacture });
+    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cVentes, compteLib: "Ventes de prestations", piece, pieceDate: f.dateFacture, lib, debit: venteDebit, credit: venteCredit, valid: f.dateFacture });
     if (tva > 0) {
       // TVA ventilee par taux depuis les lignes de facture (445711/712/713...).
+      // Les lignes d'avoir ont des montants negatifs : on filtre sur SUM <> 0 et on
+      // prend la valeur absolue, en inversant le sens (debit pour un avoir).
       const [lignes]: any = await pool.execute(
-        `SELECT tauxTVA, SUM(montantTVA) AS tva FROM factures_lignes WHERE factureId = ? GROUP BY tauxTVA HAVING SUM(montantTVA) > 0`,
+        `SELECT tauxTVA, SUM(montantTVA) AS tva FROM factures_lignes WHERE factureId = ? GROUP BY tauxTVA HAVING ABS(SUM(montantTVA)) > 0`,
         [f.id]
       );
       const rows = (lignes as any[]) || [];
-      const sommeLignes = rows.reduce((s, l) => s + Number(l.tva || 0), 0);
+      const sommeLignes = rows.reduce((s, l) => s + Math.abs(Number(l.tva || 0)), 0);
       if (rows.length > 0 && Math.abs(sommeLignes - tva) < 0.02) {
         for (const l of rows) {
           const t = compteTvaCollectee(Number(l.tauxTVA || 20));
-          push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: t.compte, compteLib: t.lib, piece, pieceDate: f.dateFacture, lib, debit: 0, credit: Number(l.tva), valid: f.dateFacture });
+          const mtva = Math.abs(Number(l.tva));
+          push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: t.compte, compteLib: t.lib, piece, pieceDate: f.dateFacture, lib, debit: isAvoir ? mtva : 0, credit: isAvoir ? 0 : mtva, valid: f.dateFacture });
         }
       } else {
         // Repli : pas de lignes exploitables -> TVA agregee sur le compte configure.
         const t = compteTvaCollectee(20);
-        push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: config?.compteTVACollectee || t.compte, compteLib: "TVA collectee", piece, pieceDate: f.dateFacture, lib, debit: 0, credit: tva, valid: f.dateFacture });
+        push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: config?.compteTVACollectee || t.compte, compteLib: "TVA collectee", piece, pieceDate: f.dateFacture, lib, debit: isAvoir ? tva : 0, credit: isAvoir ? 0 : tva, valid: f.dateFacture });
       }
     }
     nbEcritures++;
@@ -5597,7 +5615,7 @@ export async function genererFEC(
 
   // ---- 3) JOURNAL DE BANQUE (BQ) : encaissements (factures reglees) ----
   const [pays]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.datePaiement, f.totalTTC, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
+    `SELECT f.id, f.numero, f.datePaiement, f.totalTTC, f.typeDocument, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
        FROM factures f LEFT JOIN clients c ON c.id = f.clientId
       WHERE f.artisanId = ? AND f.statut = 'payee' AND f.datePaiement IS NOT NULL
         AND DATE(f.datePaiement) BETWEEN ? AND ?
@@ -5609,11 +5627,14 @@ export async function genererFEC(
     const auxNum = `C${String(p.clientId).padStart(5, "0")}`;
     const auxLib = `${p.clientPrenom || ""} ${p.clientNom || ""}`.trim() || `Client ${p.clientId}`;
     const piece = p.numero || `F-${p.id}`;
-    const lib = `Reglement ${piece}`;
-    const ttc = Number(p.totalTTC || 0);
+    // OPE-136 — un avoir rembourse est un decaissement (banque au credit) ; on inverse
+    // le sens en valeur absolue, jamais de montant negatif au FEC.
+    const isAvoir = p.typeDocument === "avoir" || Number(p.totalTTC || 0) < 0;
+    const lib = `${isAvoir ? "Remboursement" : "Reglement"} ${piece}`;
+    const ttc = Math.abs(Number(p.totalTTC || 0));
     const lettre = `VL${p.id}`;
-    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cBanque, compteLib: "Banque", piece, pieceDate: p.datePaiement, lib, debit: ttc, credit: 0, valid: p.datePaiement });
-    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: p.datePaiement, lib, debit: 0, credit: ttc, lettre, dateLet: p.datePaiement, valid: p.datePaiement });
+    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cBanque, compteLib: "Banque", piece, pieceDate: p.datePaiement, lib, debit: isAvoir ? 0 : ttc, credit: isAvoir ? ttc : 0, valid: p.datePaiement });
+    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: p.datePaiement, lib, debit: isAvoir ? ttc : 0, credit: isAvoir ? 0 : ttc, lettre, dateLet: p.datePaiement, valid: p.datePaiement });
     nbEcritures++;
   }
 
