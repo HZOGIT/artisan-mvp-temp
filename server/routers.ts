@@ -5885,7 +5885,10 @@ const congesRouter = router({
     .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const conge = await db.getCongeById(input.id);
-      if (conge) {
+      // Garde d'idempotence : ne décompter le solde QUE lors de la transition vers
+      // "approuve". Sans ce garde, une ré-approbation (double-clic / re-jeu) re-décompte
+      // le solde (updateSoldeConges est additif) -> jours de congé perdus pour le salarié.
+      if (conge && conge.statut !== 'approuve') {
         // Calculer le nombre de jours
         const debut = new Date(conge.dateDebut);
         const fin = new Date(conge.dateFin);
@@ -5893,7 +5896,7 @@ const congesRouter = router({
         let jours = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
         if (conge.demiJourneeDebut) jours -= 0.5;
         if (conge.demiJourneeFin) jours -= 0.5;
-        
+
         // Mettre à jour le solde si c'est un congé payé ou RTT
         if (conge.type === 'conge_paye' || conge.type === 'rtt') {
           await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), jours);
