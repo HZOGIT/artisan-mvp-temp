@@ -8673,6 +8673,14 @@ const depensesRouter = router({
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
       }
 
+      // SECURITE (OPE-91) : si depenseId fourni, vérifier qu'elle appartient au tenant
+      // AVANT l'OCR (évite un appel Gemini gaspillé + l'écriture cross-tenant de
+      // markDepenseOcrTraite, qui ne scopait que par id).
+      if (input.depenseId) {
+        const dep = await db.getDepenseById(input.depenseId, artisan.id);
+        if (!dep) throw new TRPCError({ code: "NOT_FOUND", message: "Dépense non trouvée" });
+      }
+
       // Detecter le format data URL et extraire le base64 brut.
       const dataMatch = input.imageBase64.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
       const mediaType = (dataMatch?.[1] || "image/jpeg") as any;
@@ -8695,7 +8703,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         const data = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
         if (input.depenseId) {
-          await db.markDepenseOcrTraite(input.depenseId, data);
+          await db.markDepenseOcrTraite(input.depenseId, artisan.id, data);
         }
         return { success: true, data };
       } catch (e: any) {

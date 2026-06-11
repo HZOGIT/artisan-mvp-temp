@@ -5888,12 +5888,13 @@ export async function deleteDepense(id: number, artisanId: number): Promise<void
   await pool.execute(`DELETE FROM depenses WHERE id = ? AND artisan_id = ?`, [id, artisanId]);
 }
 
-export async function markDepenseOcrTraite(id: number, ocrData: any): Promise<void> {
+export async function markDepenseOcrTraite(id: number, artisanId: number, ocrData: any): Promise<void> {
   const pool = getPool();
   if (!pool) return;
+  // OPE-91 : scope par artisan_id pour éviter l'écriture cross-tenant.
   await pool.execute(
-    `UPDATE depenses SET ocr_brut = ?, ocr_traite = TRUE WHERE id = ?`,
-    [JSON.stringify(ocrData || {}).slice(0, 5000), id]
+    `UPDATE depenses SET ocr_brut = ?, ocr_traite = TRUE WHERE id = ? AND artisan_id = ?`,
+    [JSON.stringify(ocrData || {}).slice(0, 5000), id, artisanId]
   );
 }
 
