@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, FileText, Calculator, TrendingUp, TrendingDown, Euro, FileDown, FileSpreadsheet, Eye, FileCode } from "lucide-react";
+import { Download, FileText, Calculator, TrendingUp, TrendingDown, Euro, FileDown, FileSpreadsheet, Eye, FileCode, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -41,6 +41,13 @@ export default function Comptabilite() {
     dateDebut: new Date(dateDebut),
     dateFin: new Date(dateFin),
   });
+
+  const { data: tvaDetail } = trpc.comptabilite.getDeclarationTVADetail.useQuery({
+    dateDebut: new Date(dateDebut),
+    dateFin: new Date(dateFin),
+  });
+
+  const conf = fecPreview?.conformite;
 
   const formatMontant = (montant: number | string | null) => {
     const num = typeof montant === 'string' ? parseFloat(montant) : (montant || 0);
@@ -104,12 +111,44 @@ export default function Comptabilite() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Comptabilité</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Comptabilité &amp; Exports</h1>
             <p className="text-muted-foreground mt-1">
-              Grand livre, balance et rapports comptables
+              Exportez vos données comptables aux formats FEC, Excel et PDF conformes aux normes françaises
             </p>
           </div>
         </div>
+
+        {/* Bandeau de conformité FEC */}
+        {conf && (
+          <Card className={conf.equilibre && conf.erreurs.length === 0 ? "border-green-500/40 bg-green-500/5" : "border-red-500/40 bg-red-500/5"}>
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                {conf.equilibre && conf.erreurs.length === 0 ? (
+                  <Badge className="bg-green-600 hover:bg-green-600 gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Conforme FEC</Badge>
+                ) : (
+                  <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Déséquilibre détecté</Badge>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">{conf.nbEcritures}</strong> écriture(s) · <strong className="text-foreground">{conf.nbLignes}</strong> ligne(s)
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  Débit total : <strong className="text-foreground">{formatMontant(conf.totalDebit)}</strong>
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  Crédit total : <strong className="text-foreground">{formatMontant(conf.totalCredit)}</strong>
+                </span>
+                <span className="text-sm">
+                  {conf.equilibre ? <span className="text-green-600 font-medium">✅ Équilibré</span> : <span className="text-red-600 font-medium">⚠️ Écart {formatMontant(conf.ecart)}</span>}
+                </span>
+              </div>
+              {conf.erreurs.length > 0 && (
+                <ul className="mt-3 text-sm text-red-600 list-disc list-inside">
+                  {conf.erreurs.map((e: string, i: number) => <li key={i}>{e}</li>)}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filtres de période */}
         <Card>
@@ -141,6 +180,18 @@ export default function Comptabilite() {
                   }}
                 >
                   Ce mois
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const now = new Date();
+                    const q = Math.floor(now.getMonth() / 3);
+                    setDateDebut(format(new Date(now.getFullYear(), q * 3, 1), "yyyy-MM-dd"));
+                    setDateFin(format(new Date(now.getFullYear(), q * 3 + 3, 0), "yyyy-MM-dd"));
+                  }}
+                >
+                  Ce trimestre
                 </Button>
                 <Button
                   variant="outline"
@@ -193,6 +244,52 @@ export default function Comptabilite() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Déclaration TVA (CA3) — base et TVA collectée par taux */}
+        {tvaDetail && tvaDetail.parTaux.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calculator className="h-4 w-4" /> Déclaration TVA prévisionnelle (CA3)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Taux</TableHead>
+                    <TableHead className="text-right">Base imposable HT</TableHead>
+                    <TableHead className="text-right">TVA collectée</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tvaDetail.parTaux.map((t: any) => (
+                    <TableRow key={t.taux}>
+                      <TableCell className="font-medium">{t.taux} %</TableCell>
+                      <TableCell className="text-right">{formatMontant(t.baseHT)}</TableCell>
+                      <TableCell className="text-right">{formatMontant(t.tvaCollectee)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="border-t-2">
+                    <TableCell className="font-semibold">TVA collectée</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right font-semibold text-green-600">{formatMontant(tvaDetail.tvaCollectee)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-semibold">TVA déductible</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right font-semibold text-red-600">- {formatMontant(tvaDetail.tvaDeductible)}</TableCell>
+                  </TableRow>
+                  <TableRow className="bg-muted/40">
+                    <TableCell className="font-bold">TVA à payer</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right font-bold">{formatMontant(tvaDetail.tvaNette)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Onglets */}
         <Tabs defaultValue="balance" className="space-y-4">
