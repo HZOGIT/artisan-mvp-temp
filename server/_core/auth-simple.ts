@@ -132,7 +132,11 @@ export async function getUserFromRequest(req: Request) {
       email: user.email || "",
       name: user.name || null,
       prenom: user.prenom || null,
-      role: user.role || "admin",
+      // Défaut au MOINDRE PRIVILÈGE (jamais "admin") si le rôle est absent.
+      // En pratique no-op : users.role est `enum NOT NULL default "artisan"`, donc
+      // toujours renseigné — mais on supprime le footgun d'escalade si le schéma
+      // évoluait ou si un user était construit sans rôle. (Cf. audit transport/auth.)
+      role: user.role || "technicien",
       artisanId: user.artisanId || null,
       actif: user.actif,
       permissions,
