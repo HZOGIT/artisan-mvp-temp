@@ -8953,10 +8953,13 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
 
   createCategorie: protectedProcedure
     .input(z.object({
-      nom: z.string(),
-      couleur: z.string().optional(),
-      icone: z.string().optional(),
-      compteComptable: z.string().optional(),
+      // Bornes alignées sur `categories_depenses` (nom 100, icone 50, compte 10) +
+      // validation du format couleur #RRGGBB (rendue en `style backgroundColor`,
+      // defense-in-depth ; behavior-preserving : le sélecteur envoie du #RRGGBB).
+      nom: z.string().max(100),
+      couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      icone: z.string().max(50).optional(),
+      compteComptable: z.string().max(10).optional(),
       plafondMensuel: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -8967,10 +8970,10 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
   updateCategorie: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      couleur: z.string().optional(),
-      icone: z.string().optional(),
-      compteComptable: z.string().optional(),
+      nom: z.string().max(100).optional(),
+      couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      icone: z.string().max(50).optional(),
+      compteComptable: z.string().max(10).optional(),
       plafondMensuel: z.number().optional(),
       actif: z.boolean().optional(),
     }))
