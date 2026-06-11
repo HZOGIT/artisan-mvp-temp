@@ -263,8 +263,8 @@ async function startServer() {
       await updateArtisan(artisan.id, { logo: base64 });
       res.json({ success: true, logoUrl: base64 });
     } catch (error: any) {
-      // Surface the actual error: hiding it as a generic 500 is what kept
-      // ER_DATA_TOO_LONG invisible for so long.
+      // Détail loggué côté serveur (debug) — JAMAIS renvoyé au client (fuite de
+      // sqlMessage/schéma interne). On mappe les cas connus vers un message convivial.
       console.error('[Upload Logo] Error:', {
         message: error?.message,
         code: error?.code,
@@ -274,11 +274,10 @@ async function startServer() {
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'Fichier trop volumineux (max 2MB)' });
       }
-      res.status(500).json({
-        error: 'Erreur serveur',
-        detail: error?.sqlMessage || error?.message || String(error),
-        code: error?.code,
-      });
+      if (error.code === 'ER_DATA_TOO_LONG') {
+        return res.status(400).json({ error: 'Image trop volumineuse après encodage. Réduisez la taille ou la résolution du logo.' });
+      }
+      res.status(500).json({ error: 'Erreur serveur' });
     }
   });
 
