@@ -8018,9 +8018,11 @@ const utilisateursRouter = router({
 
   invite: utilisateursGererProcedure
     .input(z.object({
-      email: z.string().email(),
-      nom: z.string().min(1),
-      prenom: z.string().optional(),
+      email: z.string().email().max(320),
+      // Bornes alignées sur les colonnes `users` (prenom VARCHAR(255)) : évite une
+      // entrée surdimensionnée -> ER_DATA_TOO_LONG (500) au lieu d'un 400 propre.
+      nom: z.string().min(1).max(255),
+      prenom: z.string().max(255).optional(),
       role: z.enum(["artisan", "secretaire", "technicien"]),
     }))
     .mutation(async ({ ctx, input }) => {
