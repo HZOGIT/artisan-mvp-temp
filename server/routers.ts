@@ -8813,10 +8813,13 @@ const depensesRouter = router({
   create: protectedProcedure
     .input(z.object({
       dateDepense: z.string(),
-      fournisseur: z.string().optional(),
-      categorie: z.string(),
-      sousCategorie: z.string().optional(),
-      description: z.string().optional(),
+      // Bornes texte alignées sur les colonnes de `depenses` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      // Montants (number) et justificatifUrl (MEDIUMTEXT base64) non touchés.
+      fournisseur: z.string().max(255).optional(),
+      categorie: z.string().max(50),
+      sousCategorie: z.string().max(100).optional(),
+      description: z.string().max(2000).optional(),
       montantHt: z.number(),
       tauxTva: z.number().default(20),
       modePaiement: z.string().default("carte"),
@@ -8825,9 +8828,9 @@ const depensesRouter = router({
       chantierId: z.number().optional(),
       interventionId: z.number().optional(),
       clientId: z.number().optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
       justificatifUrl: z.string().optional(),
-      justificatifNom: z.string().optional(),
+      justificatifNom: z.string().max(255).optional(),
       tvaDeductible: z.boolean().default(true),
       recurrente: z.boolean().optional(),
       frequenceRecurrence: z.enum(["hebdomadaire", "mensuelle", "trimestrielle", "annuelle"]).optional(),
