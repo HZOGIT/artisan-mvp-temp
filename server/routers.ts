@@ -3034,8 +3034,8 @@ const parametresRouter = router({
       vitrineZone: z.string().optional(),
       vitrineServices: z.string().optional(),
       vitrineExperience: z.number().optional(),
-      couleurPrincipale: z.string().optional(),
-      couleurSecondaire: z.string().optional(),
+      couleurPrincipale: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      couleurSecondaire: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
       conditionsPaiementDefaut: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
