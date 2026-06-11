@@ -9546,9 +9546,14 @@ export const appRouter = router({system: systemRouter,
             resetTokenExpiry: expiry,
           } as any);
 
-          const origin = (ctx.req.headers.origin as string)
-            || process.env.APP_URL || 'https://www.operioz.com';
-          const resetUrl = `${origin}/reset-password?token=${rawToken}`;
+          // OPE-76 — l'URL de réinitialisation DOIT provenir d'une source de confiance
+          // (APP_URL), jamais du header `Origin` (contrôlable par l'attaquant) : sinon
+          // un reset déclenché pour la victime avec `Origin: attaquant.tld` lui envoie un
+          // lien pointant vers le domaine de l'attaquant AVEC un token valide → vol de
+          // token / prise de contrôle du compte. Pour une requête légitime, Origin ==
+          // APP_URL, donc le lien est identique (comportement préservé).
+          const baseUrl = process.env.APP_URL || 'https://www.operioz.com';
+          const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
           try {
             await sendEmail({
               to: input.email,
