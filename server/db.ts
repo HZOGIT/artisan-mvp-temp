@@ -142,6 +142,14 @@ export async function getDb() {
       keepAliveInitialDelayMs: 0,
     });
 
+    // OPE-82 — Le Pool mysql2 est un EventEmitter : un evenement 'error' sans
+    // listener (coupure DB, PROTOCOL_CONNECTION_LOST, failover) est relancé par
+    // Node → uncaughtException → crash. On l'ecoute pour le rendre non-fatal
+    // (mysql2 reconnecte les connexions du pool a la demande).
+    (_pool as any).on("error", (err: any) => {
+      console.error("[MySQL pool] error (non-fatal):", err?.code, err?.message);
+    });
+
     const connection = await _pool.getConnection();
     await connection.ping();
     connection.release();

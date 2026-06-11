@@ -17,6 +17,18 @@ if (!JWT_SECRET) {
   throw new Error("JWT_SECRET manquant ! Definir la variable d'environnement (min 32 caracteres).");
 }
 
+// OPE-82 — Filet de dernier recours au niveau process. Sans ces handlers, une
+// rejection non gerée ou un evenement 'error' non ecoute (ex. pool MySQL sur
+// coupure DB) termine le process (Node 22) → crash de toute l'instance
+// multi-tenant. On loggue et on NE quitte PAS (la coupure DB est transitoire ;
+// le pool se reconnecte) pour eviter les crash-loops.
+process.on("unhandledRejection", (reason: unknown) => {
+  console.error("[unhandledRejection]", reason);
+});
+process.on("uncaughtException", (err: Error) => {
+  console.error("[uncaughtException]", err?.stack || err?.message || err);
+});
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -1304,6 +1316,16 @@ RÈGLES STRICTES sur les outils :
   } else {
     serveStatic(app);
   }
+
+  // OPE-82 — Middleware d'erreur Express (4 args). Express 4 ne transmet pas
+  // automatiquement les erreurs des handlers async ; ce filet attrape ce qui
+  // remonte (next(err) ou throw sync), loggue, et renvoie un 500 generique
+  // (pas de detail interne expose au client).
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("[express error]", err?.stack || err?.message || err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: "Erreur serveur" });
+  });
 
   // En production (Railway, …), on DOIT listen exactement sur
   // process.env.PORT et sur 0.0.0.0. Tenter de "trouver un autre port"
