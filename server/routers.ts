@@ -49,6 +49,23 @@ export function checkRateLimit(artisanId: number): boolean {
   return true;
 }
 
+// OPE-23 — anti SMS-bombing : borne le nombre d'envois de code de signature par
+// (signature, téléphone). Public + token-gated, mais sans throttle un même lien
+// permettait des envois SMS illimités (coûts Twilio + harcèlement du destinataire).
+// Fenêtre généreuse : un signataire légitime envoie 1 code, éventuellement 1-2 renvois.
+const smsSendRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkSmsSendRate(key: string): boolean {
+  const now = Date.now();
+  const entry = smsSendRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    smsSendRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
 // Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
 // Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
 // pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
@@ -2679,7 +2696,12 @@ const signatureRouter = router({
       if (!isValidPhoneNumber(input.telephone)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Numéro de téléphone invalide" });
       }
-      
+
+      // OPE-23 — throttle anti SMS-bombing (5 envois / 15 min par signature+téléphone).
+      if (!checkSmsSendRate(`${signature.id}:${input.telephone}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes de code. Réessayez dans quelques minutes." });
+      }
+
       // Générer un code à 6 chiffres
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       
