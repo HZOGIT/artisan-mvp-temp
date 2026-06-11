@@ -5131,7 +5131,7 @@ const avisRouter = router({
           <p>Votre retour est précieux et nous aide à améliorer nos services.</p>
           <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
           <p>Ce lien est valable pendant 14 jours.</p>
-          <p>Merci de votre confiance,<br>${artisan.nomEntreprise || 'Votre artisan'}</p>
+          <p>Merci de votre confiance,<br>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</p>
         `,
       });
       
@@ -5187,7 +5187,7 @@ const avisRouter = router({
           <p>Votre avis est précieux et nous aide à améliorer nos prestations. Pourriez-vous prendre quelques instants pour nous laisser un retour ?</p>
           <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
           <p>Ce lien est valable pendant 14 jours.</p>
-          <p>Merci de votre confiance,<br>${artisan.nomEntreprise || 'Votre artisan'}</p>
+          <p>Merci de votre confiance,<br>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</p>
         `,
       });
 
@@ -5242,7 +5242,7 @@ const avisRouter = router({
     .input(z.object({
       token: z.string(),
       note: z.number().min(1).max(5),
-      commentaire: z.string().optional(),
+      commentaire: z.string().max(5000).optional(),
     }))
     .mutation(async ({ input }) => {
       const demande = await db.getDemandeAvisByToken(input.token);
