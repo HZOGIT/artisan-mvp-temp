@@ -3168,19 +3168,21 @@ const parametresRouter = router({
     .input(z.object({
       prefixeDevis: z.string().optional(),
       prefixeFacture: z.string().optional(),
-      mentionsLegales: z.string().optional(),
-      conditionsGenerales: z.string().optional(),
+      // Bornes raisonnables (OPE-24) : vitrineZone est VARCHAR(500) -> .max(500) évite un
+      // ER_DATA_TOO_LONG (500) ; les champs TEXT sont bornés en defense-in-depth.
+      mentionsLegales: z.string().max(5000).optional(),
+      conditionsGenerales: z.string().max(10000).optional(),
       notificationsEmail: z.boolean().optional(),
       rappelDevisJours: z.number().optional(),
       rappelFactureJours: z.number().optional(),
       vitrineActive: z.boolean().optional(),
-      vitrineDescription: z.string().optional(),
-      vitrineZone: z.string().optional(),
-      vitrineServices: z.string().optional(),
+      vitrineDescription: z.string().max(5000).optional(),
+      vitrineZone: z.string().max(500).optional(),
+      vitrineServices: z.string().max(5000).optional(),
       vitrineExperience: z.number().optional(),
       couleurPrincipale: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
       couleurSecondaire: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
-      conditionsPaiementDefaut: z.string().optional(),
+      conditionsPaiementDefaut: z.string().max(2000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
