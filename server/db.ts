@@ -2986,6 +2986,13 @@ export async function getInterventionsContratByContratId(contratId: number): Pro
     .orderBy(desc(interventionsContrat.dateIntervention));
 }
 
+export async function getInterventionContratById(id: number): Promise<InterventionContrat | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(interventionsContrat).where(eq(interventionsContrat.id, id)).limit(1);
+  return result[0];
+}
+
 export async function createInterventionContrat(data: InsertInterventionContrat): Promise<InterventionContrat> {
   const db = await getDb();
   const result = await db.insert(interventionsContrat).values(data);

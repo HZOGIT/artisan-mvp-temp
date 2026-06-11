@@ -4529,6 +4529,14 @@ const contratsRouter = router({
       if (!artisan || contrat.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // SECURITE (OPE-89) : verifier que l'intervention appartient bien au contrat
+      // verifie ci-dessus (le contrat appartient a l'artisan). Sans ce controle,
+      // input.id (intervention) est decouple de input.contratId (parent) -> IDOR
+      // cross-tenant (modification de l'intervention d'un autre tenant).
+      const interventionExistante = await db.getInterventionContratById(input.id);
+      if (!interventionExistante || interventionExistante.contratId !== contrat.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
       const { id, contratId, ...updateData } = input;
       return db.updateInterventionContrat(id, {
         ...updateData,
