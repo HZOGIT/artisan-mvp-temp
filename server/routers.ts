@@ -5914,12 +5914,34 @@ const congesRouter = router({
   annuler: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      const conge = await db.getCongeById(input.id);
+      // Recréditer le solde si on annule un congé APPROUVÉ (qui avait décompté le solde).
+      // Le garde statut === 'approuve' évite tout recrédit sur un congé non décompté
+      // (en_attente/refuse) et tout double-recrédit (après annulation, statut = 'annule').
+      if (conge && conge.statut === 'approuve' && (conge.type === 'conge_paye' || conge.type === 'rtt')) {
+        const debut = new Date(conge.dateDebut);
+        const fin = new Date(conge.dateFin);
+        let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (conge.demiJourneeDebut) jours -= 0.5;
+        if (conge.demiJourneeFin) jours -= 0.5;
+        await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), -jours);
+      }
       return await db.updateCongeStatut(input.id, 'annule', ctx.user.id);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
+      const conge = await db.getCongeById(input.id);
+      // Recréditer le solde si on supprime un congé APPROUVÉ (même logique qu'annuler).
+      if (conge && conge.statut === 'approuve' && (conge.type === 'conge_paye' || conge.type === 'rtt')) {
+        const debut = new Date(conge.dateDebut);
+        const fin = new Date(conge.dateFin);
+        let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (conge.demiJourneeDebut) jours -= 0.5;
+        if (conge.demiJourneeFin) jours -= 0.5;
+        await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), -jours);
+      }
       await db.deleteConge(input.id);
       return { success: true };
     }),
