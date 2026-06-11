@@ -82,15 +82,15 @@ const artisanRouter = router({
   
   createProfile: protectedProcedure
     .input(z.object({
-      siret: z.string().optional(),
-      nomEntreprise: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      telephone: z.string().optional(),
-      email: z.string().email().optional(),
+      siret: z.string().max(20).optional(),
+      nomEntreprise: z.string().max(200).optional(),
+      adresse: z.string().max(300).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      telephone: z.string().max(30).optional(),
+      email: z.string().email().max(320).optional(),
       specialite: z.enum(["plomberie", "electricite", "chauffage", "multi-services"]).optional(),
-      tauxTVA: z.string().optional(),
+      tauxTVA: z.string().max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const existing = await db.getArtisanByUserId(ctx.user.id);
@@ -102,20 +102,24 @@ const artisanRouter = router({
   
   updateProfile: protectedProcedure
     .input(z.object({
-      siret: z.string().optional(),
-      nomEntreprise: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      telephone: z.string().optional(),
-      email: z.string().email().optional(),
+      // Bornes .max() généreuses : aucune valeur légitime ne les approche (champs au
+      // format court) -> behavior-preserving + borne le surface DoS/stockage. `logo`
+      // (data-URI base64) est le vecteur clé : par tRPC il contournerait la limite
+      // multer 2 Mo de /api/upload-logo, d'où ~3 Mo (≈ image 2,2 Mo).
+      siret: z.string().max(20).optional(),
+      nomEntreprise: z.string().max(200).optional(),
+      adresse: z.string().max(300).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      telephone: z.string().max(30).optional(),
+      email: z.string().email().max(320).optional(),
       specialite: z.enum(["plomberie", "electricite", "chauffage", "multi-services"]).optional(),
-      tauxTVA: z.string().optional(),
-      numeroTVA: z.string().optional(),
-      iban: z.string().optional().refine(isValidIban, { message: "IBAN invalide (format ou clé de contrôle)" }),
-      codeAPE: z.string().optional(),
-      logo: z.string().optional(),
-      slug: z.string().optional(),
+      tauxTVA: z.string().max(10).optional(),
+      numeroTVA: z.string().max(20).optional(),
+      iban: z.string().max(40).optional().refine(isValidIban, { message: "IBAN invalide (format ou clé de contrôle)" }),
+      codeAPE: z.string().max(10).optional(),
+      logo: z.string().max(3_000_000).optional(),
+      slug: z.string().max(100).optional(),
       // T9 : metier libre (12 valeurs cote UI) hors enum drizzle, persiste raw SQL.
       metier: z.string().max(50).optional(),
     }))
