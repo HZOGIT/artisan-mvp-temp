@@ -6757,6 +6757,11 @@ const devisIARouter = router({
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
+      // OPE-24 — rate-limit IA (vision multimodale = l'appel le plus coûteux) ;
+      // était le seul endpoint IA sans borne, contrairement à tous ses pairs.
+      if (!checkRateLimit(artisan.id)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+      }
 
       // Sanitizer global : enleve toute data: URL et tronque a 200 chars pour
       // qu'aucune erreur remontee au frontend ne contienne le payload base64
