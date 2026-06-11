@@ -213,7 +213,12 @@ async function startServer() {
     const path = req.path || '';
     const isAuth = path.includes('auth.signin') || path.includes('auth.signup');
     if (!isAuth) return next();
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+    // OPE-80 : prioriser CF-Connecting-IP (posé par Cloudflare en edge, non
+    // falsifiable par le client) plutôt que X-Forwarded-For[0] (que le client peut
+    // préfixer pour usurper une IP et contourner le rate-limit). Fallback XFF/socket
+    // si l'app n'est pas derrière Cloudflare.
+    const ip = (req.headers['cf-connecting-ip'] as string)?.trim()
+      || (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
       || req.socket.remoteAddress
       || 'unknown';
     const now = Date.now();
