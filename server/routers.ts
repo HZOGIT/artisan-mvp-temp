@@ -297,8 +297,8 @@ const articlesRouter = router({
 
   search: publicProcedure
     .input(z.object({
-      query: z.string(),
-      metier: z.string().optional(),
+      query: z.string().max(200),
+      metier: z.string().max(100).optional(),
     }))
     .query(async ({ input }) => {
       return await db.searchArticles(input.query, input.metier);
@@ -2736,9 +2736,9 @@ const signatureRouter = router({
   signDevis: publicProcedure
     .input(z.object({
       token: z.string(),
-      signatureData: z.string(),
-      signataireName: z.string(),
-      signataireEmail: z.string().email(),
+      signatureData: z.string().max(500000), // image base64 d'une signature manuscrite (~500 Ko)
+      signataireName: z.string().max(200),
+      signataireEmail: z.string().email().max(320),
       smsVerified: z.boolean().optional()
     }))
     .mutation(async ({ input, ctx }) => {
@@ -2802,7 +2802,7 @@ const signatureRouter = router({
   refuseDevis: publicProcedure
     .input(z.object({
       token: z.string(),
-      motifRefus: z.string().optional(),
+      motifRefus: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       // Validate token exists first
@@ -4148,7 +4148,7 @@ ${questionsHtml}`,
     }),
 
   sendClientMessage: publicProcedure
-    .input(z.object({ token: z.string(), conversationId: z.number(), contenu: z.string().min(1) }))
+    .input(z.object({ token: z.string(), conversationId: z.number(), contenu: z.string().min(1).max(5000) }))
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
