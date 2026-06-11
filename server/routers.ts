@@ -791,13 +791,16 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   addLigne: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().min(1),
-      description: z.string().optional(),
-      quantite: z.string().default("1"),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      tauxTVA: z.string().default("20.00"),
+      // Bornes texte alignées sur `devis_lignes` (reference 50, designation 500,
+      // unite 20) — évite qu'une désignation surdimensionnée fasse échouer toute
+      // la création de ligne (erreur/troncature MySQL en mode strict).
+      reference: z.string().max(50).optional(),
+      designation: z.string().min(1).max(500),
+      description: z.string().max(5000).optional(),
+      quantite: z.string().max(20).default("1"),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20),
+      tauxTVA: z.string().max(10).default("20.00"),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : verifier l'ownership du devis avant d'ajouter une ligne.
@@ -837,13 +840,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
     .input(z.object({
       id: z.number(),
       devisId: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().optional(),
-      description: z.string().optional(),
-      quantite: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string().optional(),
-      tauxTVA: z.string().optional(),
+      reference: z.string().max(50).optional(),
+      designation: z.string().max(500).optional(),
+      description: z.string().max(5000).optional(),
+      quantite: z.string().max(20).optional(),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20).optional(),
+      tauxTVA: z.string().max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : ownership du devis parent.
