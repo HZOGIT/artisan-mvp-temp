@@ -6974,7 +6974,9 @@ const integrationsComptablesRouter = router({
       // Générer le contenu selon le format
       let contenu = '';
       if (input.formatExport === 'fec') {
-        contenu = await db.genererExportFEC(artisan.id, dateDebut, dateFin);
+        // Générateur FEC unique et conforme (18 colonnes, journaux VE/AC/BQ,
+        // TVA par taux, ValidDate) — même source que /api/comptabilite/fec.
+        contenu = (await db.genererFEC(artisan.id, dateDebut, dateFin)).content;
       } else if (input.formatExport === 'iif') {
         contenu = await db.genererExportIIF(artisan.id, dateDebut, dateFin);
       }
