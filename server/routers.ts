@@ -9,7 +9,7 @@ import * as dbSecure from "./db-secure";
 import { createUserWithPassword, authenticateUser, hashPassword } from "./_core/auth";
 import { createToken, setAuthCookie, clearAuthCookie } from "./_core/auth-simple";
 import { COOKIE_NAME } from "../shared/const";
-import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
+import { sendEmail, safeHtml, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
 import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
 import { ROLE_TEMPLATES, ALL_PERMISSIONS } from "../shared/permissions";
@@ -892,7 +892,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       });
 
       const finalBody = input.customMessage
-        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${input.customMessage.replace(/\n/g, '<br>')}</div></body>`)
+        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${safeHtml(input.customMessage)}</div></body>`)
         : body;
 
       // Générer le PDF si demandé
@@ -1574,7 +1574,7 @@ const facturesRouter = router({
       });
 
       const finalBody = input.customMessage
-        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${input.customMessage.replace(/\n/g, '<br>')}</div></body>`)
+        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${safeHtml(input.customMessage)}</div></body>`)
         : body;
 
       // Générer le PDF si demandé

@@ -327,6 +327,14 @@ function escapeHtml(s: string): string {
   }[c]!));
 }
 
+// Échappement HTML centralisé pour interpolation de texte utilisateur dans les
+// bodies d'email (HTML brut). Échappe d'abord (& < > " ') puis convertit les
+// retours à la ligne en <br> pour préserver la mise en forme. Null-safe.
+export function safeHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return escapeHtml(String(value)).replace(/\r?\n/g, "<br>");
+}
+
 function baseTemplate(opts: {
   headerColor?: string;
   title: string;
