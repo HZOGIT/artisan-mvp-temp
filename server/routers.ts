@@ -5565,16 +5565,41 @@ const comptabiliteRouter = router({
 // ============================================================================
 // DEVIS OPTIONS ROUTER
 // ============================================================================
+// SECURITE (OPE-10) : les options/lignes de devis n'ont pas d'artisanId direct ;
+// l'ownership se dérive via le devis parent (devis.artisanId). Les helpers DB ne
+// scopent que par id -> sans ces gardes, IDOR cross-tenant (lecture/écriture/
+// suppression/conversion des options & lignes d'un autre tenant).
+async function assertDevisOwner(devisId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const devis = artisan ? await db.getDevisById(devisId) : null;
+  if (!artisan || !devis || (devis as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+  }
+  return { devis, artisan };
+}
+
+async function assertOptionOwner(optionId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const option = artisan ? await db.getDevisOptionById(optionId) : null;
+  const devis = option ? await db.getDevisById((option as any).devisId) : null;
+  if (!artisan || !option || !devis || (devis as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Option non trouvée" });
+  }
+  return { option, devis, artisan };
+}
+
 const devisOptionsRouter = router({
   getByDevisId: protectedProcedure
     .input(z.object({ devisId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertDevisOwner(input.devisId, ctx.user.id);
       return await db.getDevisOptionsByDevisId(input.devisId);
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertOptionOwner(input.id, ctx.user.id);
       return await db.getDevisOptionById(input.id);
     }),
 
@@ -5586,7 +5611,8 @@ const devisOptionsRouter = router({
       ordre: z.number().optional(),
       recommandee: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertDevisOwner(input.devisId, ctx.user.id);
       return await db.createDevisOption(input);
     }),
 
@@ -5598,27 +5624,31 @@ const devisOptionsRouter = router({
       ordre: z.number().optional(),
       recommandee: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.id, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateDevisOption(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.id, ctx.user.id);
       await db.deleteDevisOption(input.id);
       return { success: true };
     }),
 
   select: protectedProcedure
     .input(z.object({ optionId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       return await db.selectDevisOption(input.optionId);
     }),
 
   convertirEnDevis: protectedProcedure
     .input(z.object({ optionId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       await db.convertirOptionEnDevis(input.optionId);
       return { success: true };
     }),
@@ -5626,7 +5656,8 @@ const devisOptionsRouter = router({
   // Lignes d'option
   getLignes: protectedProcedure
     .input(z.object({ optionId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       return await db.getDevisOptionLignesByOptionId(input.optionId);
     }),
 
@@ -5643,12 +5674,13 @@ const devisOptionsRouter = router({
       remise: z.string().optional(),
       ordre: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       const quantite = parseFloat(input.quantite || '1');
       const prixUnitaireHT = parseFloat(input.prixUnitaireHT || '0');
       const tauxTVA = parseFloat(input.tauxTVA || '20');
       const remise = parseFloat(input.remise || '0');
-      
+
       const montantHTBrut = quantite * prixUnitaireHT;
       const montantRemise = montantHTBrut * (remise / 100);
       const montantHT = montantHTBrut - montantRemise;
@@ -5679,9 +5711,10 @@ const devisOptionsRouter = router({
       remise: z.string().optional(),
       ordre: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       const { id, optionId, ...data } = input;
-      
+
       if (data.quantite || data.prixUnitaireHT || data.tauxTVA || data.remise) {
         const quantite = parseFloat(data.quantite || '1');
         const prixUnitaireHT = parseFloat(data.prixUnitaireHT || '0');
@@ -5708,7 +5741,8 @@ const devisOptionsRouter = router({
 
   deleteLigne: protectedProcedure
     .input(z.object({ id: z.number(), optionId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       await db.deleteDevisOptionLigne(input.id);
       await db.recalculerTotauxOption(input.optionId);
       return { success: true };
