@@ -3395,11 +3395,13 @@ const modelesEmailRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      nom: z.string(),
+      // Bornes alignées sur `modeles_email` (nom VARCHAR(100), sujet VARCHAR(255)) ;
+      // contenu/variables TEXT bornés en defense-in-depth (OPE-24).
+      nom: z.string().max(100),
       type: z.enum(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]),
-      sujet: z.string(),
-      contenu: z.string(),
-      variables: z.string().optional(),
+      sujet: z.string().max(255),
+      contenu: z.string().max(10000),
+      variables: z.string().max(2000).optional(),
       isDefault: z.boolean().optional()
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3413,11 +3415,11 @@ const modelesEmailRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
+      nom: z.string().max(100).optional(),
       type: z.enum(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]).optional(),
-      sujet: z.string().optional(),
-      contenu: z.string().optional(),
-      variables: z.string().optional(),
+      sujet: z.string().max(255).optional(),
+      contenu: z.string().max(10000).optional(),
+      variables: z.string().max(2000).optional(),
       isDefault: z.boolean().optional()
     }))
     .mutation(async ({ ctx, input }) => {
