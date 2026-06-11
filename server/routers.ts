@@ -8877,6 +8877,12 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
       const trxs = await db.getTransactionsBancaires(artisan.id);
       const t = trxs.find((x: any) => x.id === input.transactionId);
       if (!t) throw new TRPCError({ code: "NOT_FOUND" });
+      // Garde d'idempotence : une transaction déjà liée à une dépense (depense_id)
+      // ne doit pas être re-convertie (double-clic / re-visite) -> évite des dépenses
+      // dupliquées dans les livres (impact FEC/TVA).
+      if (t.depense_id) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Transaction déjà convertie en dépense" });
+      }
       const numero = await db.getNextDepenseNumero(artisan.id);
       const montantTtc = Number(t.montant || 0);
       const tauxTva = 20;
