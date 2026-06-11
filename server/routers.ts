@@ -1302,10 +1302,12 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
     .input(z.object({
       modeleId: z.number(),
       articleId: z.number().optional(),
-      designation: z.string().min(1),
-      description: z.string().optional(),
+      // Bornes texte alignées sur `modeles_devis_lignes` (designation 255, unite 20)
+      // — évite qu'une désignation surdimensionnée fasse échouer l'ajout (MySQL strict).
+      designation: z.string().min(1).max(255),
+      description: z.string().max(5000).optional(),
       quantite: z.number().default(1),
-      unite: z.string().default("unité"),
+      unite: z.string().max(20).default("unité"),
       prixUnitaireHT: z.number().default(0),
       tauxTVA: z.number().default(20),
       remise: z.number().optional(),
