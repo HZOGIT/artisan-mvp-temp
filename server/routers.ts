@@ -6009,7 +6009,9 @@ const congesRouter = router({
 
   getSoldes: protectedProcedure
     .input(z.object({ technicienId: z.number(), annee: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // SECURITE (OPE-31/OPE-45) : solde de congés = donnée RH d'un salarié.
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.getSoldesConges(input.technicienId, input.annee);
     }),
 
@@ -6021,7 +6023,8 @@ const congesRouter = router({
       soldeInitial: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-31/OPE-45 : le technicien doit appartenir au tenant appelant.
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.initSoldeConges({
         ...input,
         artisanId: artisan.id,
