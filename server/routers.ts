@@ -66,6 +66,23 @@ function checkSmsSendRate(key: string): boolean {
   return true;
 }
 
+// OPE-22 — anti brute-force OTP : borne les tentatives de vérification du code de
+// signature par signature. Sans cette garde, un code à 6 chiffres (900K combinaisons,
+// expiration 10 min) est énumérable. Fenêtre généreuse : un signataire légitime saisit
+// le bon code en 1-2 essais ; au-delà de 10 essais/15 min → 429.
+const smsVerifyRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkSmsVerifyRate(key: string): boolean {
+  const now = Date.now();
+  const entry = smsVerifyRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    smsVerifyRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count++;
+  return true;
+}
+
 // Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
 // Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
 // pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
@@ -2750,7 +2767,12 @@ const signatureRouter = router({
       if (!signature) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
       }
-      
+
+      // OPE-22 — throttle anti brute-force OTP (10 tentatives / 15 min par signature).
+      if (!checkSmsVerifyRate(String(signature.id))) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de tentatives. Réessayez dans quelques minutes." });
+      }
+
       const isValid = await db.verifySmsCode(signature.id, input.code);
       
       if (!isValid) {
