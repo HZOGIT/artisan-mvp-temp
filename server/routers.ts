@@ -778,6 +778,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
       }
 
+      // SECURITE (OPE-9) : la ligne doit appartenir au devis vérifié (sinon update
+      // cross-tenant via une ligne d'un autre devis découplée du parent).
+      const lignesOwned = await db.getLignesDevisByDevisId(input.devisId);
+      if (!lignesOwned.some((l) => l.id === input.id)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Ligne non trouvée" });
+      }
+
       const { id, devisId, ...data } = input;
 
       if (data.quantite || data.prixUnitaireHT || data.tauxTVA) {
@@ -813,6 +820,11 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       const devisOwned = artisan ? await db.getDevisById(input.devisId) : null;
       if (!devisOwned || !artisan || devisOwned.artisanId !== artisan.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
+      }
+      // SECURITE (OPE-9) : la ligne doit appartenir au devis vérifié.
+      const lignesOwned = await db.getLignesDevisByDevisId(input.devisId);
+      if (!lignesOwned.some((l) => l.id === input.id)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Ligne non trouvée" });
       }
       await db.deleteLigneDevis(input.id);
       await db.recalculateDevisTotals(input.devisId);
