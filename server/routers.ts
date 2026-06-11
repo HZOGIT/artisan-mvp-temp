@@ -35,7 +35,9 @@ function sanitizeIaError(e: any, fallback = "Erreur IA"): string {
 
 // Rate limiter for AI endpoints
 const rateLimitMap = new Map<number, { count: number; resetTime: number }>();
-function checkRateLimit(artisanId: number): boolean {
+// Exporté pour être réutilisé par les endpoints Express IA (index.ts :
+// /api/assistant/stream, /api/voice/token) -> budget Gemini partagé par tenant.
+export function checkRateLimit(artisanId: number): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(artisanId);
   if (!entry || now > entry.resetTime) {

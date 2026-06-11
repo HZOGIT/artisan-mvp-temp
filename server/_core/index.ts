@@ -6,7 +6,7 @@ import net from "net";
 import cookieParser from "cookie-parser";
 import multer from "multer";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../routers";
+import { appRouter, checkRateLimit } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 
@@ -944,6 +944,13 @@ async function startServer() {
       const artisan = await getArtisanByUserId(user.id);
       if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
 
+      // Rate-limit IA partagé (OPE-24) : borne le burn Gemini par tenant. Chaque
+      // requête peut déclencher jusqu'à MAX_TURNS appels Gemini -> 429 avant tout stream.
+      if (!checkRateLimit(artisan.id)) {
+        res.status(429).json({ error: 'Trop de requêtes. Réessayez dans quelques minutes.' });
+        return;
+      }
+
       const { message, history, pageContext, threadId: clientThreadId } = req.body;
       if (!message) { res.status(400).json({ error: 'Message requis' }); return; }
 
@@ -1162,6 +1169,13 @@ async function startServer() {
       const { getArtisanByUserId, getAiMessages, getOrCreateAiThread } = await import('../db');
       const artisan = await getArtisanByUserId(user.id);
       if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      // Rate-limit IA partagé (OPE-24) : un token vocal ouvre une session Gemini Live
+      // coûteuse -> borne par tenant (budget partagé avec le chat texte / outils IA).
+      if (!checkRateLimit(artisan.id)) {
+        res.status(429).json({ error: 'Trop de requêtes. Réessayez dans quelques minutes.' });
+        return;
+      }
 
       // Ensure a thread exists so voice turns can be persisted (browser↔Google
       // voice never hits our server, so the client posts turns to /voice/persist).
