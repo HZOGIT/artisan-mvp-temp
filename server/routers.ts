@@ -5003,19 +5003,21 @@ const techniciensRouter = router({
   // Créer un technicien
   create: protectedProcedure
     .input(z.object({
-      nom: z.string().min(1),
-      prenom: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      specialite: z.string().optional(),
-      couleur: z.string().optional(),
+      // Bornes alignées sur les colonnes de `techniciens` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      nom: z.string().min(1).max(255),
+      prenom: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      specialite: z.string().max(100).optional(),
+      couleur: z.string().max(7).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
       }
-      
+
       return await db.createTechnicien({
         artisanId: artisan.id,
         ...input,
@@ -5026,14 +5028,14 @@ const techniciensRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().min(1).optional(),
-      prenom: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      specialite: z.string().optional(),
-      couleur: z.string().optional(),
+      nom: z.string().min(1).max(255).optional(),
+      prenom: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      specialite: z.string().max(100).optional(),
+      couleur: z.string().max(7).optional(),
       statut: z.enum(["actif", "inactif", "conge"]).optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
