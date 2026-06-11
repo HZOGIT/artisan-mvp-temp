@@ -3656,10 +3656,10 @@ Reponds UNIQUEMENT en JSON pur :
       lignes: z.array(z.object({
         articleId: z.number().nullable().optional(),
         stockId: z.number().optional(),
-        designation: z.string(),
-        reference: z.string().optional(),
+        designation: z.string().max(255),
+        reference: z.string().max(50).optional(),
         quantite: z.number(),
-        unite: z.string().optional(),
+        unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
         tauxTVA: z.number().optional(),
       }))
@@ -3729,10 +3729,10 @@ Reponds UNIQUEMENT en JSON pur :
       lignes: z.array(z.object({
         articleId: z.number().nullable().optional(),
         stockId: z.number().optional(),
-        designation: z.string(),
-        reference: z.string().optional(),
+        designation: z.string().max(255),
+        reference: z.string().max(50).optional(),
         quantite: z.number(),
-        unite: z.string().optional(),
+        unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
         tauxTVA: z.number().optional(),
       })).optional(),
