@@ -119,6 +119,24 @@ function checkPublicContactRate(key: string): boolean {
   return true;
 }
 
+// Throttle des actions ponctuelles du portail client (demande de modification,
+// demande de RDV) : token-gated mais envoie un email/crée un enregistrement à
+// chaque appel -> un porteur de token (ou un token fuité) pourrait inonder
+// l'artisan. Limite généreuse (un client légitime fait 1-2 demandes), clé par
+// (artisan, client) pour rester stable malgré une rotation de token. (OPE-24)
+const portalActionRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkPortalActionRate(key: string): boolean {
+  const now = Date.now();
+  const entry = portalActionRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    portalActionRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count++;
+  return true;
+}
+
 // Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
 // Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
 // pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
@@ -4072,6 +4090,10 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
+      // OPE-24 — throttle anti-flood (l'endpoint envoie un email à l'artisan).
+      if (!checkPortalActionRate(`${access.artisanId}:${access.clientId}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes. Réessayez dans quelques minutes." });
+      }
       const client = await db.getClientById(access.clientId);
       const artisan = await db.getArtisanById(access.artisanId);
       if (!client || !artisan?.email) {
@@ -4357,6 +4379,11 @@ ${questionsHtml}`,
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acces non autorise" });
+
+      // OPE-24 — throttle anti-flood (crée un RDV + notifie l'artisan à chaque appel).
+      if (!checkPortalActionRate(`${access.artisanId}:${access.clientId}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes. Réessayez dans quelques minutes." });
+      }
 
       const dateProposee = new Date(input.dateProposee);
       const minDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
