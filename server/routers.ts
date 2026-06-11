@@ -2965,14 +2965,17 @@ const stocksRouter = router({
   
   create: protectedProcedure
     .input(z.object({
-      reference: z.string(),
-      designation: z.string(),
-      quantiteEnStock: z.string().optional(),
-      seuilAlerte: z.string().optional(),
-      unite: z.string().optional(),
-      prixAchat: z.string().optional(),
-      emplacement: z.string().optional(),
-      fournisseur: z.string().optional(),
+      // Bornes alignées sur les colonnes VARCHAR de `stocks` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      // Behavior-preserving : une référence/désignation réelle reste sous ces bornes.
+      reference: z.string().max(50),
+      designation: z.string().max(500),
+      quantiteEnStock: z.string().max(20).optional(),
+      seuilAlerte: z.string().max(20).optional(),
+      unite: z.string().max(20).optional(),
+      prixAchat: z.string().max(20).optional(),
+      emplacement: z.string().max(100).optional(),
+      fournisseur: z.string().max(255).optional(),
       articleId: z.number().optional(),
       articleType: z.enum(["bibliotheque", "artisan"]).optional()
     }))
@@ -2987,13 +2990,13 @@ const stocksRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().optional(),
-      seuilAlerte: z.string().optional(),
-      unite: z.string().optional(),
-      prixAchat: z.string().optional(),
-      emplacement: z.string().optional(),
-      fournisseur: z.string().optional()
+      reference: z.string().max(50).optional(),
+      designation: z.string().max(500).optional(),
+      seuilAlerte: z.string().max(20).optional(),
+      unite: z.string().max(20).optional(),
+      prixAchat: z.string().max(20).optional(),
+      emplacement: z.string().max(100).optional(),
+      fournisseur: z.string().max(255).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
