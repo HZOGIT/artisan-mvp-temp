@@ -33,6 +33,10 @@ process.on("uncaughtException", (err: Error) => {
 // (crash-reporting via sendBeacon). Borne le flood de logs par IP.
 const voiceDebugHits = new Map<string, { count: number; resetAt: number }>();
 
+// OPE-24 — rate-limit en mémoire pour /api/articles/search (public, interroge la DB).
+// Borne le scraping/flood non authentifié du catalogue de référence par IP.
+const articleSearchHits = new Map<string, { count: number; resetAt: number }>();
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -375,6 +379,20 @@ async function startServer() {
   // ============================================================
   app.get('/api/articles/search', async (req, res) => {
     try {
+      // OPE-24 — endpoint public interrogeant la DB : rate-limit par IP (anti-scraping/DoS).
+      // Limite généreuse (recherche au clavier) ; 429 au-delà.
+      const ip = String(
+        (req.headers['cf-connecting-ip'] as string)
+        || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+        || req.socket?.remoteAddress || 'unknown'
+      );
+      const nowRl = Date.now();
+      const hitRl = articleSearchHits.get(ip);
+      if (!hitRl || hitRl.resetAt <= nowRl) {
+        articleSearchHits.set(ip, { count: 1, resetAt: nowRl + 60_000 });
+      } else if (++hitRl.count > 120) {
+        return res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' });
+      }
       const q = (req.query.q as string || '').trim();
       if (q.length < 2) {
         return res.json([]);
