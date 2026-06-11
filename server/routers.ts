@@ -6884,6 +6884,19 @@ const integrationsComptablesRouter = router({
 // ============================================================================
 // DEVIS IA ROUTER
 // ============================================================================
+// SECURITE (OPE-30) : analyses_photos_chantier porte un artisanId ; les helpers
+// (getAnalysePhotoById/getPhotosByAnalyse/updateAnalysePhoto/addPhotoToAnalyse) ne
+// scopent que par id -> sans cette garde, IDOR (lecture/écriture/analyse des photos
+// d'un autre tenant).
+async function assertAnalyseOwner(analyseId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const analyse = artisan ? await db.getAnalysePhotoById(analyseId) : null;
+  if (!analyse || !artisan || (analyse as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Analyse non trouvée" });
+  }
+  return { analyse, artisan };
+}
+
 const devisIARouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -6893,9 +6906,8 @@ const devisIARouter = router({
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
-      const analyse = await db.getAnalysePhotoById(input.id);
-      if (!analyse) return null;
+    .query(async ({ ctx, input }) => {
+      const { analyse } = await assertAnalyseOwner(input.id, ctx.user.id);
 
       const photos = await db.getPhotosByAnalyse(input.id);
       const resultats = await db.getResultatsAnalyse(input.id);
@@ -6929,7 +6941,8 @@ const devisIARouter = router({
       description: z.string().optional(),
       ordre: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertAnalyseOwner(input.analyseId, ctx.user.id);
       return await db.addPhotoToAnalyse(input);
     }),
 
@@ -6944,6 +6957,13 @@ const devisIARouter = router({
       // était le seul endpoint IA sans borne, contrairement à tous ses pairs.
       if (!checkRateLimit(artisan.id)) {
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+      }
+
+      // SECURITE (OPE-30) : l'analyse doit appartenir au tenant appelant (sinon
+      // analyse/altération du statut des photos d'un autre tenant).
+      const analyseOwn = await db.getAnalysePhotoById(input.analyseId);
+      if (!analyseOwn || (analyseOwn as any).artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Analyse non trouvée" });
       }
 
       // Sanitizer global : enleve toute data: URL et tronque a 200 chars pour
