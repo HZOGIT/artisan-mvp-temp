@@ -5718,6 +5718,18 @@ const devisOptionsRouter = router({
 // ============================================================================
 // RAPPORTS PERSONNALISABLES ROUTER
 // ============================================================================
+// SECURITE (OPE-46) : les rapports portent un artisanId ; les helpers DB ne scopent
+// que par id -> sans cette garde, IDOR (executer fuit les données du tenant
+// propriétaire du rapport ; getById/update/delete/toggleFavori/historique cross-tenant).
+async function assertRapportOwner(rapportId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const rapport = artisan ? await db.getRapportPersonnaliseById(rapportId) : null;
+  if (!rapport || !artisan || (rapport as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Rapport non trouvé" });
+  }
+  return { rapport, artisan };
+}
+
 const rapportsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -5727,7 +5739,8 @@ const rapportsRouter = router({
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       return await db.getRapportPersonnaliseById(input.id);
     }),
 
@@ -5764,21 +5777,24 @@ const rapportsRouter = router({
       graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
       favori: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateRapportPersonnalise(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       await db.deleteRapportPersonnalise(input.id);
       return { success: true };
     }),
 
   toggleFavori: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       return await db.toggleRapportFavori(input.id);
     }),
 
@@ -5787,13 +5803,17 @@ const rapportsRouter = router({
       rapportId: z.number(),
       parametres: z.record(z.string(), z.unknown()).optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // OPE-46 : sans cette garde, executerRapport exécute la requête scopée sur
+      // rapport.artisanId (le propriétaire = la victime) -> fuite cross-tenant.
+      await assertRapportOwner(input.rapportId, ctx.user.id);
       return await db.executerRapport(input.rapportId, input.parametres);
     }),
 
   historique: protectedProcedure
     .input(z.object({ rapportId: z.number(), limit: z.number().default(10) }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertRapportOwner(input.rapportId, ctx.user.id);
       return await db.getHistoriqueExecutions(input.rapportId, input.limit);
     }),
 });
