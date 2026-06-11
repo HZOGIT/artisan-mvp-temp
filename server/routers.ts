@@ -9357,7 +9357,7 @@ export const appRouter = router({system: systemRouter,
           <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Bienvenue sur Operioz ! 🎉</h1>
         </td></tr>
         <tr><td style="padding:32px 40px;">
-          <p style="margin:0 0 16px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour${input.name ? ` ${input.name}` : ""},</p>
+          <p style="margin:0 0 16px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour${input.name ? ` ${safeHtml(input.name)}` : ""},</p>
           <p style="margin:0 0 16px 0;font-size:15px;color:#374151;line-height:1.6;">
             Votre compte Operioz a été créé avec succès. Vous bénéficiez de 14 jours d'essai gratuit sur toutes les fonctionnalités.
           </p>
