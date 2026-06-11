@@ -733,9 +733,11 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   create: devisCreerProcedure
     .input(z.object({
       clientId: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes raisonnables (champs TEXT) : borne le stockage + erreur 400 claire
+      // au lieu d'un 500 au-delà de la capacité TEXT. Defense-in-depth (OPE-24).
+      objet: z.string().max(500).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateValidite: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -764,9 +766,9 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   update: devisCreerProcedure
     .input(z.object({
       id: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      objet: z.string().max(500).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateValidite: z.string().optional(),
       statut: z.enum(["brouillon", "envoye", "accepte", "refuse", "expire"]).optional(),
     }))
