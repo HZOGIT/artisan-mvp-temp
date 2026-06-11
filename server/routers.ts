@@ -2787,7 +2787,7 @@ const signatureRouter = router({
           await sendEmail({
             to: artisanEmail,
             subject: `Devis ${devisData.numero} accepté et signé`,
-            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${input.signataireName}</strong> (${input.signataireEmail}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${safeHtml(input.signataireName)}</strong> (${safeHtml(input.signataireEmail)}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
           });
         } else {
           console.warn(`[Signature] No email found for artisan id=${devisData.artisanId} — notification email NOT sent`);
@@ -2845,7 +2845,7 @@ const signatureRouter = router({
           await sendEmail({
             to: artisanEmail,
             subject: `Devis ${devisData.numero} refusé par ${clientName}`,
-            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${clientName}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${input.motifRefus}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${safeHtml(clientName)}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${safeHtml(input.motifRefus)}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
           });
         }
       }
