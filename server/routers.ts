@@ -6523,13 +6523,15 @@ const badgesRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      code: z.string(),
-      nom: z.string(),
-      description: z.string().optional(),
-      icone: z.string().optional(),
-      couleur: z.string().optional(),
+      // Bornes alignées sur la table `badges` (code 50, nom 100, icone 50, couleur 20)
+      // — defense-in-depth contre une entrée surdimensionnée (erreur MySQL strict).
+      code: z.string().max(50),
+      nom: z.string().max(100),
+      description: z.string().max(2000).optional(),
+      icone: z.string().max(50).optional(),
+      couleur: z.string().max(20).optional(),
       categorie: z.enum(["interventions", "avis", "ca", "anciennete", "special"]).optional(),
-      condition: z.string().optional(),
+      condition: z.string().max(2000).optional(),
       seuil: z.number().optional(),
       points: z.number().optional(),
     }))
@@ -6541,10 +6543,10 @@ const badgesRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
-      icone: z.string().optional(),
-      couleur: z.string().optional(),
+      nom: z.string().max(100).optional(),
+      description: z.string().max(2000).optional(),
+      icone: z.string().max(50).optional(),
+      couleur: z.string().max(20).optional(),
       seuil: z.number().optional(),
       points: z.number().optional(),
       actif: z.boolean().optional(),
