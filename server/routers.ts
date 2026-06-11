@@ -3137,15 +3137,29 @@ const fournisseursRouter = router({
     }),
 
   // Article-Fournisseur associations
+  // SECURITE (OPE-90) : les associations sont des données tenant-privées (prix d'achat,
+  // références fournisseur). L'ownership se dérive via fournisseurs.artisanId. Sans
+  // contrôle, ces routes étaient des IDOR (lecture prix + write/delete cross-tenant).
   getArticleFournisseurs: protectedProcedure
     .input(z.object({ articleId: z.number() }))
-    .query(async ({ input }) => {
-      return await db.getArticleFournisseurs(input.articleId);
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      // Filtrer aux associations dont le fournisseur appartient à l'artisan.
+      const assocs = await db.getArticleFournisseurs(input.articleId);
+      if (assocs.length === 0) return assocs;
+      const mesFournisseurs = await db.getFournisseursByArtisanId(artisan.id);
+      const mesIds = new Set(mesFournisseurs.map((f) => f.id));
+      return assocs.filter((a) => mesIds.has(a.fournisseurId));
     }),
 
   getFournisseurArticles: protectedProcedure
     .input(z.object({ fournisseurId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const fournisseur = await db.getFournisseurById(input.fournisseurId);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) return [];
       return await db.getFournisseurArticles(input.fournisseurId);
     }),
 
@@ -3157,13 +3171,29 @@ const fournisseursRouter = router({
       prixAchat: z.string().optional(),
       delaiLivraison: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      // Le fournisseur cible doit appartenir à l'artisan appelant.
+      const fournisseur = await db.getFournisseurById(input.fournisseurId);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur non trouvé" });
+      }
       return await db.createArticleFournisseur(input);
     }),
 
   dissociateArticle: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      // Vérifier que l'association cible un fournisseur de l'artisan avant suppression.
+      const assoc = await db.getArticleFournisseurById(input.id);
+      if (!assoc) throw new TRPCError({ code: "NOT_FOUND", message: "Association non trouvée" });
+      const fournisseur = await db.getFournisseurById(assoc.fournisseurId);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Association non trouvée" });
+      }
       await db.deleteArticleFournisseur(input.id);
       return { success: true };
     })});

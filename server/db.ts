@@ -1054,6 +1054,13 @@ export async function getArticleFournisseurs(articleId: number): Promise<Article
   return await db.select().from(articlesFournisseurs).where(eq(articlesFournisseurs.articleId, articleId));
 }
 
+export async function getArticleFournisseurById(id: number): Promise<ArticleFournisseur | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(articlesFournisseurs).where(eq(articlesFournisseurs.id, id)).limit(1);
+  return result[0];
+}
+
 export async function createArticleFournisseur(data: InsertArticleFournisseur): Promise<ArticleFournisseur> {
   const db = await getDb();
   await db.insert(articlesFournisseurs).values(data);
