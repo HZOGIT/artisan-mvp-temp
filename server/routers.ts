@@ -7556,11 +7556,11 @@ const vitrineRouter = router({
         subject: `Nouveau contact via votre vitrine - ${input.nom}`,
         body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:20px;">
           <h2 style="color:#1e40af;">Nouveau message depuis votre page vitrine</h2>
-          <p><strong>Nom :</strong> ${input.nom}</p>
-          <p><strong>Email :</strong> ${input.email}</p>
-          ${input.telephone ? `<p><strong>Telephone :</strong> ${input.telephone}</p>` : ''}
+          <p><strong>Nom :</strong> ${safeHtml(input.nom)}</p>
+          <p><strong>Email :</strong> ${safeHtml(input.email)}</p>
+          ${input.telephone ? `<p><strong>Telephone :</strong> ${safeHtml(input.telephone)}</p>` : ''}
           <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
-          <p style="white-space:pre-wrap;">${input.message}</p>
+          <p>${safeHtml(input.message)}</p>
           <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
           <p style="color:#6b7280;font-size:12px;">Message envoye depuis votre page vitrine Operioz</p>
         </body></html>`,
