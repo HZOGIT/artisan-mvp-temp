@@ -3828,11 +3828,11 @@ Reponds UNIQUEMENT en JSON pur :
         to: fournisseur.email,
         subject: `Bon de commande ${commande.numero || ''} - ${artisan.nomEntreprise || 'Artisan'}`,
         html: `
-          <p>Bonjour ${fournisseur.contact || fournisseur.nom},</p>
-          <p>Veuillez trouver ci-joint notre bon de commande <strong>${commande.numero || ''}</strong>.</p>
-          ${commande.delaiLivraison ? `<p>Délai de livraison souhaité : ${commande.delaiLivraison}</p>` : ''}
-          ${commande.notes ? `<p>Notes : ${commande.notes}</p>` : ''}
-          <p>Cordialement,<br/>${artisan.nomEntreprise || 'Artisan'}</p>
+          <p>Bonjour ${safeHtml(fournisseur.contact || fournisseur.nom)},</p>
+          <p>Veuillez trouver ci-joint notre bon de commande <strong>${safeHtml(commande.numero || '')}</strong>.</p>
+          ${commande.delaiLivraison ? `<p>Délai de livraison souhaité : ${safeHtml(commande.delaiLivraison)}</p>` : ''}
+          ${commande.notes ? `<p>Notes : ${safeHtml(commande.notes)}</p>` : ''}
+          <p>Cordialement,<br/>${safeHtml(artisan.nomEntreprise || 'Artisan')}</p>
         `,
         attachments: [{
           filename: `bon-commande-${commande.numero || commande.id}.pdf`,
