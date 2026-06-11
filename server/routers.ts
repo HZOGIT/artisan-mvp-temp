@@ -1833,10 +1833,10 @@ const facturesRouter = router({
     .input(z.object({
       factureOrigineId: z.number(),
       lignes: z.array(z.object({
-        designation: z.string(),
-        description: z.string().optional(),
+        designation: z.string().max(500),
+        description: z.string().max(5000).optional(),
         quantite: z.string(),
-        unite: z.string().optional(),
+        unite: z.string().max(20).optional(),
         prixUnitaireHT: z.string(),
         tauxTVA: z.string().default("20.00"),
       })),
@@ -5845,10 +5845,10 @@ const devisOptionsRouter = router({
     .input(z.object({
       optionId: z.number(),
       articleId: z.number().optional(),
-      designation: z.string(),
-      description: z.string().optional(),
+      designation: z.string().max(255),
+      description: z.string().max(5000).optional(),
       quantite: z.string().optional(),
-      unite: z.string().optional(),
+      unite: z.string().max(20).optional(),
       prixUnitaireHT: z.string().optional(),
       tauxTVA: z.string().optional(),
       remise: z.string().optional(),
