@@ -560,18 +560,42 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const successColor: RGB = [16, 185, 129];
   const dangerColor: RGB = [239, 68, 68];
 
+  // OPE-165 — un avoir (note de crédit) est un document DISTINCT d'une facture :
+  // titré « AVOIR », rappelant la facture d'origine, sans échéance ni mentions de
+  // pénalité de retard. Parité avec le générateur PDF client (déjà avoir-aware).
+  // typeDocument ∈ { facture, avoir } (défaut « facture ») → comportement inchangé
+  // pour toute facture normale (isAvoir = false).
+  const isAvoir = (facture as any).typeDocument === "avoir";
+  const avoirRed: RGB = [220, 53, 69];
+
   renderHeaderBand(doc, {
     primaryColor: primary,
     artisan,
-    title: "FACTURE",
+    title: isAvoir ? "AVOIR" : "FACTURE",
     number: `N° ${facture.numero}`,
     dateLines: [
       `Date : ${new Date(facture.dateFacture).toLocaleDateString("fr-FR")}`,
-      `Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`,
+      // Un avoir n'a pas d'échéance de règlement : on rappelle la facture d'origine
+      // (l'objet par défaut d'un avoir = « Avoir sur facture {numéro} »).
+      ...(isAvoir
+        ? ((facture as any).objet ? [String((facture as any).objet)] : [])
+        : [`Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`]),
       // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
       ...(facture.referenceClient ? [`Votre réf. : ${facture.referenceClient}`] : []),
     ],
   });
+
+  // OPE-165 — sous-bandeau rouge distinctif pour un avoir, placé dans l'espace
+  // entre le bandeau d'en-tête (y=HEADER_H) et les blocs émetteur/client (y=50).
+  if (isAvoir) {
+    doc.setFillColor(...avoirRed);
+    doc.rect(0, HEADER_H, PAGE_W, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.text("AVOIR — Document d'annulation", PAGE_W / 2, HEADER_H + 5.5, { align: "center" });
+    doc.setTextColor(...TEXT_BODY);
+  }
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
@@ -622,7 +646,12 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   // Statut
   doc.setFont("Roboto", "bold");
   doc.setFontSize(11);
-  if (facture.statut === "payee") {
+  if (isAvoir) {
+    // OPE-165 — un avoir n'a pas de statut de paiement : il vient en déduction
+    // ou remboursement, pas « en attente de paiement ».
+    doc.setTextColor(...primary);
+    doc.text("AVOIR — montant à déduire ou rembourser", MARGIN, totalsStartY + 6);
+  } else if (facture.statut === "payee") {
     doc.setTextColor(...successColor);
     doc.text("FACTURE PAYÉE", MARGIN, totalsStartY + 6);
   } else {
@@ -638,47 +667,65 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_BODY);
 
-  if (a.iban) {
-    doc.setFont("Roboto", "bold");
-    doc.text("Règlement par virement bancaire :", MARGIN, footerY);
-    doc.setFont("Roboto", "normal");
-    doc.text(`IBAN : ${a.iban}`, MARGIN, footerY + 4);
-    footerY += 10;
-  }
+  // OPE-165 — `fy` = ordonnée de la dernière ligne de pied dessinée (avant les
+  // mentions légales émetteur). Un avoir n'appelle aucun règlement : pas d'IBAN,
+  // pas de conditions de paiement, pas de pénalités de retard ni d'escompte.
+  let fy: number;
+  if (isAvoir) {
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    const origineObjet = (facture as any).objet ? String((facture as any).objet) : "la facture d'origine";
+    const avoirNote = doc.splitTextToSize(
+      `${origineObjet}. Le présent avoir vient en déduction d'un règlement ultérieur ou donne lieu à remboursement. Un avoir n'a pas d'échéance de paiement.`,
+      175,
+    ) as string[];
+    const noteLines = avoirNote.slice(0, 3);
+    doc.text(noteLines, MARGIN, footerY);
+    fy = footerY + (noteLines.length - 1) * 4;
+  } else {
+    if (a.iban) {
+      doc.setFont("Roboto", "bold");
+      doc.text("Règlement par virement bancaire :", MARGIN, footerY);
+      doc.setFont("Roboto", "normal");
+      doc.text(`IBAN : ${a.iban}`, MARGIN, footerY + 4);
+      footerY += 10;
+    }
 
-  doc.setFontSize(7);
-  doc.setTextColor(...TEXT_MUTED);
-  // OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
-  // `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
-  const fctr = facture as any;
-  const condRaw = fctr.conditionsPaiement && String(fctr.conditionsPaiement).trim()
-    ? String(fctr.conditionsPaiement).trim()
-    : (facture.dateEcheance
-        ? `Paiement à échéance : ${new Date(facture.dateEcheance).toLocaleDateString("fr-FR")}`
-        : "Paiement à réception.");
-  const condLines = (doc.splitTextToSize(condRaw, 175) as string[]).slice(0, 2);
-  doc.text(condLines, MARGIN, footerY);
-  let fy = footerY + condLines.length * 4;
-  doc.text(
-    "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée,",
-    MARGIN,
-    fy,
-  );
-  doc.text(
-    "ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C. com.).",
-    MARGIN,
-    fy + 4,
-  );
-  // OPE-164 — mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.).
-  doc.text(
-    "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
-    MARGIN,
-    fy + 8,
-  );
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    // OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
+    // `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
+    const fctr = facture as any;
+    const condRaw = fctr.conditionsPaiement && String(fctr.conditionsPaiement).trim()
+      ? String(fctr.conditionsPaiement).trim()
+      : (facture.dateEcheance
+          ? `Paiement à échéance : ${new Date(facture.dateEcheance).toLocaleDateString("fr-FR")}`
+          : "Paiement à réception.");
+    const condLines = (doc.splitTextToSize(condRaw, 175) as string[]).slice(0, 2);
+    doc.text(condLines, MARGIN, footerY);
+    const fyPenalty = footerY + condLines.length * 4;
+    doc.text(
+      "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée,",
+      MARGIN,
+      fyPenalty,
+    );
+    doc.text(
+      "ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C. com.).",
+      MARGIN,
+      fyPenalty + 4,
+    );
+    // OPE-164 — mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.).
+    doc.text(
+      "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
+      MARGIN,
+      fyPenalty + 8,
+    );
+    fy = fyPenalty + 8;
+  }
 
   // OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM).
   const mentions = buildMentionsLegalesEmetteur(artisan);
-  let my = fy + 14;
+  let my = fy + 6;
   for (const m of mentions) {
     doc.text(m, MARGIN, my);
     my += 4;
