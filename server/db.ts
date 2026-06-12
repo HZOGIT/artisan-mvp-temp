@@ -4809,20 +4809,41 @@ export async function initSoldeConges(
 
 export async function updateSoldeConges(
   technicienId: number,
+  artisanId: number,
   type: "conge_paye" | "rtt",
   annee: number,
   joursPrisDelta: number
 ): Promise<void> {
-  // Decremente le solde restant et incremente joursPris.
+  // OPE-178 — l'UPDATE seul PERDAIT silencieusement le décompte si la ligne
+  // (technicien, type, année) n'existait pas (solde non initialisé / changement
+  // d'année). Pas de clé unique sur (technicienId,type,annee) → on ne peut pas
+  // s'appuyer sur ON DUPLICATE KEY ; on fait donc un check-then-act :
+  //  - ligne présente            -> UPDATE (comportement INCHANGÉ).
+  //  - absente + décompte (>0)   -> INSERT (trace le décompte ; solde acquis = 0).
+  //  - absente + recrédit (<=0)  -> no-op (rien n'avait été décompté à recréditer).
   const pool = getPool();
   if (!pool) return;
-  await pool.execute(
-    `UPDATE soldes_conges
-        SET joursPris = joursPris + ?,
-            soldeRestant = GREATEST(0, soldeRestant - ?)
-      WHERE technicienId = ? AND type = ? AND annee = ?`,
-    [joursPrisDelta, joursPrisDelta, technicienId, type, annee]
+  const [rows] = await pool.execute(
+    `SELECT id FROM soldes_conges WHERE technicienId = ? AND type = ? AND annee = ? LIMIT 1`,
+    [technicienId, type, annee]
   );
+  const exists = Array.isArray(rows) && (rows as any[]).length > 0;
+  if (exists) {
+    await pool.execute(
+      `UPDATE soldes_conges
+          SET joursPris = joursPris + ?,
+              soldeRestant = GREATEST(0, soldeRestant - ?)
+        WHERE technicienId = ? AND type = ? AND annee = ?`,
+      [joursPrisDelta, joursPrisDelta, technicienId, type, annee]
+    );
+  } else if (joursPrisDelta > 0) {
+    await pool.execute(
+      `INSERT INTO soldes_conges
+        (technicienId, artisanId, type, annee, soldeInitial, soldeRestant, joursAcquis, joursPris)
+       VALUES (?, ?, ?, ?, '0.00', GREATEST(0, 0 - ?), '0.00', ?)`,
+      [technicienId, artisanId, type, annee, joursPrisDelta, joursPrisDelta]
+    );
+  }
 }
 
 // ============================================================================

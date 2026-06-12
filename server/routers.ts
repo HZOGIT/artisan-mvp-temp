@@ -6340,7 +6340,7 @@ const congesRouter = router({
 
         // Mettre à jour le solde si c'est un congé payé ou RTT
         if (conge.type === 'conge_paye' || conge.type === 'rtt') {
-          await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), jours);
+          await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, new Date().getFullYear(), jours);
         }
       }
       return await db.updateCongeStatut(input.id, 'approuve', ctx.user.id, input.commentaire);
@@ -6376,7 +6376,7 @@ const congesRouter = router({
         let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         if (conge.demiJourneeDebut) jours -= 0.5;
         if (conge.demiJourneeFin) jours -= 0.5;
-        await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), -jours);
+        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, new Date().getFullYear(), -jours);
       }
       return await db.updateCongeStatut(input.id, 'annule', ctx.user.id);
     }),
@@ -6397,7 +6397,7 @@ const congesRouter = router({
         let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         if (conge.demiJourneeDebut) jours -= 0.5;
         if (conge.demiJourneeFin) jours -= 0.5;
-        await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), -jours);
+        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, new Date().getFullYear(), -jours);
       }
       await db.deleteConge(input.id);
       return { success: true };
