@@ -1899,7 +1899,7 @@ const facturesRouter = router({
         unite: z.string().max(20).optional(),
         prixUnitaireHT: z.string(),
         tauxTVA: z.string().default("20.00"),
-      })),
+      })).max(500, "Trop de lignes (max 500 par avoir)"), // OPE-24 — anti-DoS (boucle d'INSERT)
       objet: z.string().optional(),
       notes: z.string().optional(),
     }))
@@ -3814,7 +3814,7 @@ Reponds UNIQUEMENT en JSON pur :
         unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
         tauxTVA: z.number().optional(),
-      }))
+      })).max(500, "Trop de lignes (max 500 par commande)") // OPE-24 — anti-DoS (boucle d'INSERT)
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -3887,7 +3887,7 @@ Reponds UNIQUEMENT en JSON pur :
         unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
         tauxTVA: z.number().optional(),
-      })).optional(),
+      })).max(500, "Trop de lignes (max 500 par commande)").optional(), // OPE-24 — anti-DoS
     }))
     .mutation(async ({ ctx, input }) => {
       const commande = await db.getCommandeFournisseurById(input.id);
@@ -9329,7 +9329,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
       titre: z.string(),
       periodeDebut: z.string(),
       periodeFin: z.string(),
-      depenseIds: z.array(z.number()).optional(),
+      depenseIds: z.array(z.number()).max(1000, "Trop de dépenses (max 1000)").optional(), // OPE-24 — anti-DoS
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
