@@ -7064,6 +7064,9 @@ const vehiculesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-47 (classe IDOR/intégrité) — si un technicien est affecté au véhicule, valider
+      // qu'il appartient au tenant (sinon véhicule pointant un technicien d'un autre tenant).
+      if (input.technicienId != null) await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.createVehicule({
         artisanId: artisan.id,
         ...input,
@@ -7088,6 +7091,8 @@ const vehiculesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertVehiculeOwner(input.id, ctx.user.id);
+      // OPE-47 — réaffectation à un technicien : valider l'appartenance au tenant (non null).
+      if (input.technicienId != null) await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateVehicule(id, data);
     }),
@@ -7109,6 +7114,8 @@ const vehiculesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
+      // OPE-47 — relevé attribué à un technicien : valider l'appartenance au tenant (non null).
+      if (input.technicienId != null) await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       // Garde de validité (classe « date invalide ») : dateReleve est NOT NULL.
       const dateReleve = new Date(input.dateReleve);
       if (isNaN(dateReleve.getTime())) {
