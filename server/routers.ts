@@ -5699,7 +5699,13 @@ const avisRouter = router({
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'email" });
       }
-      
+      // OPE-24 — anti-abus : borne l'envoi de demandes d'avis (crée une demande + email
+      // Resend au client) par artisan ; sans ça un compte authentifié pourrait spammer le
+      // client. Clé dédiée (distincte du bon de commande pour ne pas partager le quota).
+      if (!checkDocumentEmailRate(`avis:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes d'avis envoyées. Réessayez dans quelques minutes." });
+      }
+
       // Générer un token unique
       const token = crypto.randomUUID();
       const expiresAt = new Date();
