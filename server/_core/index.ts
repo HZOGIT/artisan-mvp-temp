@@ -1375,6 +1375,15 @@ RÈGLES STRICTES sur les outils :
       const artisan = await getArtisanByUserId(user.id);
       if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
 
+      // OPE-170 — rate-limit par tenant (bucket IA partagé avec /api/voice/token + assistant
+      // texte). Sans borne, /api/voice/tool exécutait les outils d'envoi (envoyer_facture,
+      // envoyer_devis, envoyer_relance, envoyer_commande_fournisseur...) en boucle directe
+      // -> envoi d'emails non borné (coût Resend + réputation d'expéditeur).
+      if (!checkRateLimit(artisan.id)) {
+        res.status(429).json({ result: { ok: false, error: 'Trop de requêtes. Réessayez dans un instant.' } });
+        return;
+      }
+
       const { name, args } = req.body || {};
       if (!name || typeof name !== 'string') { res.status(400).json({ error: 'name requis' }); return; }
 
