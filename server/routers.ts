@@ -4415,9 +4415,20 @@ ${questionsHtml}`,
       }
 
       const dateProposee = new Date(input.dateProposee);
+      // Date invalide : `NaN < minDate` est toujours faux → sans ce garde, une date
+      // malformée contournerait le contrôle des 24h et serait insérée (colonne notNull).
+      if (isNaN(dateProposee.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date proposée invalide" });
+      }
       const minDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
       if (dateProposee < minDate) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le creneau doit etre au moins 24h a l'avance" });
+      }
+      // Borne supérieure : rejette un futur absurde (année 9999) → pollution de données.
+      // 2 ans dépasse tout créneau d'intervention légitime, aucun RDV réel n'est concerné.
+      const maxDate = new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000);
+      if (dateProposee > maxDate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La date proposée est trop éloignée" });
       }
 
       const rdv = await db.createRdvEnLigne({
