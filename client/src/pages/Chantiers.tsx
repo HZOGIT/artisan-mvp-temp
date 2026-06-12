@@ -85,6 +85,34 @@ export default function Chantiers() {
     onError: (error) => toast.error(error.message),
   });
 
+  // OPE-106 — pointages de main-d'œuvre (heures réalisées) du chantier sélectionné.
+  const { data: pointages } = trpc.chantiers.getPointages.useQuery(
+    { chantierId: selectedChantier! },
+    { enabled: !!selectedChantier }
+  );
+  const { data: techniciensList } = trpc.techniciens.getAll.useQuery();
+  const [pointageForm, setPointageForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    heures: "",
+    technicienId: "",
+    description: "",
+  });
+  const addPointageMutation = trpc.chantiers.addPointage.useMutation({
+    onSuccess: () => {
+      toast.success("Pointage ajouté");
+      utils.chantiers.getPointages.invalidate();
+      setPointageForm({ date: new Date().toISOString().slice(0, 10), heures: "", technicienId: "", description: "" });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const deletePointageMutation = trpc.chantiers.deletePointage.useMutation({
+    onSuccess: () => {
+      toast.success("Pointage supprimé");
+      utils.chantiers.getPointages.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const createMutation = trpc.chantiers.create.useMutation({
     onSuccess: () => {
       toast.success("Chantier créé avec succès");
@@ -417,6 +445,7 @@ export default function Chantiers() {
                   <TabsList className="mb-4">
                     <TabsTrigger value="apercu">Aperçu</TabsTrigger>
                     <TabsTrigger value="phases">Phases</TabsTrigger>
+                    <TabsTrigger value="mainoeuvre">Main-d'œuvre</TabsTrigger>
                     <TabsTrigger value="interventions">Interventions</TabsTrigger>
                     <TabsTrigger value="documents">Documents</TabsTrigger>
                     <TabsTrigger value="suivi">Suivi client</TabsTrigger>
@@ -591,6 +620,123 @@ export default function Chantiers() {
                         Ajouter une phase
                       </Button>
                     </div>
+                  </TabsContent>
+
+                  <TabsContent value="mainoeuvre">
+                    {(() => {
+                      const totalPrevues = (phases || []).reduce(
+                        (s: number, p: any) => s + (parseFloat(p.heuresPrevues) || 0), 0);
+                      const totalPointees = (pointages || []).reduce(
+                        (s: number, p: any) => s + (parseFloat(p.heures) || 0), 0);
+                      const ecart = totalPointees - totalPrevues;
+                      const techNom = (id: number | null) => {
+                        if (!id) return "—";
+                        const t = (techniciensList || []).find((x: any) => x.id === id);
+                        return t ? `${t.prenom || ""} ${t.nom}`.trim() : `#${id}`;
+                      };
+                      return (
+                        <div className="space-y-4">
+                          {/* Synthèse prévu vs réalisé */}
+                          <div className="grid grid-cols-3 gap-4">
+                            <Card><CardContent className="pt-4 text-center">
+                              <p className="text-sm text-muted-foreground">Heures prévues</p>
+                              <p className="text-2xl font-bold">{totalPrevues.toFixed(1)} h</p>
+                            </CardContent></Card>
+                            <Card><CardContent className="pt-4 text-center">
+                              <p className="text-sm text-muted-foreground">Heures pointées</p>
+                              <p className="text-2xl font-bold">{totalPointees.toFixed(1)} h</p>
+                            </CardContent></Card>
+                            <Card><CardContent className="pt-4 text-center">
+                              <p className="text-sm text-muted-foreground">Écart</p>
+                              <p className={`text-2xl font-bold ${ecart > 0 ? "text-red-600" : "text-green-600"}`}>
+                                {ecart > 0 ? "+" : ""}{ecart.toFixed(1)} h
+                              </p>
+                            </CardContent></Card>
+                          </div>
+
+                          {/* Formulaire d'ajout de pointage */}
+                          <form
+                            className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end border rounded-lg p-3"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const heures = parseFloat(pointageForm.heures);
+                              if (!pointageForm.date) { toast.error("Date requise"); return; }
+                              if (!(heures > 0)) { toast.error("Heures invalides"); return; }
+                              addPointageMutation.mutate({
+                                chantierId: selectedChantier!,
+                                date: pointageForm.date,
+                                heures,
+                                technicienId: pointageForm.technicienId ? parseInt(pointageForm.technicienId) : undefined,
+                                description: pointageForm.description || undefined,
+                              });
+                            }}
+                          >
+                            <div>
+                              <Label className="text-xs">Date</Label>
+                              <Input type="date" value={pointageForm.date}
+                                onChange={(e) => setPointageForm({ ...pointageForm, date: e.target.value })} />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Heures</Label>
+                              <Input type="number" step="0.25" min="0" max="24" placeholder="7.5"
+                                value={pointageForm.heures}
+                                onChange={(e) => setPointageForm({ ...pointageForm, heures: e.target.value })} />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Technicien</Label>
+                              <Select value={pointageForm.technicienId || "none"}
+                                onValueChange={(v) => setPointageForm({ ...pointageForm, technicienId: v === "none" ? "" : v })}>
+                                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">—</SelectItem>
+                                  {(techniciensList || []).map((t: any) => (
+                                    <SelectItem key={t.id} value={String(t.id)}>
+                                      {`${t.prenom || ""} ${t.nom}`.trim()}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Description</Label>
+                              <Input value={pointageForm.description}
+                                onChange={(e) => setPointageForm({ ...pointageForm, description: e.target.value })} />
+                            </div>
+                            <Button type="submit" disabled={addPointageMutation.isPending}>
+                              <Plus className="h-4 w-4 mr-1" /> Pointer
+                            </Button>
+                          </form>
+
+                          {/* Liste des pointages */}
+                          {pointages && pointages.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {pointages.map((p: any) => (
+                                <div key={p.id} className="flex items-center justify-between gap-2 border rounded-lg p-2.5 text-sm">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span className="font-semibold w-16">{Number(p.heures).toFixed(2)} h</span>
+                                    <span className="text-muted-foreground">{new Date(p.date).toLocaleDateString("fr-FR")}</span>
+                                    <span>{techNom(p.technicienId)}</span>
+                                    {p.description && <span className="text-muted-foreground truncate">— {p.description}</span>}
+                                  </div>
+                                  <Button variant="ghost" size="icon"
+                                    onClick={() => {
+                                      if (confirm("Supprimer ce pointage ?")) {
+                                        deletePointageMutation.mutate({ chantierId: selectedChantier!, id: p.id });
+                                      }
+                                    }}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              Aucune heure pointée sur ce chantier.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </TabsContent>
 
                   <TabsContent value="interventions">

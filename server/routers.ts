@@ -7194,6 +7194,55 @@ const chantiersRouter = router({
       return await db.getPhasesByChantier(input.chantierId);
     }),
 
+  // ── Pointages de main-d'œuvre (OPE-106) — heures réalisées vs prévues ────────
+  getPointages: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const { artisan } = await assertChantierOwner(input.chantierId, ctx.user.id);
+      return await db.getPointagesByChantier(input.chantierId, artisan.id);
+    }),
+
+  addPointage: protectedProcedure
+    .input(z.object({
+      chantierId: z.number(),
+      phaseId: z.number().optional(),
+      technicienId: z.number().optional(),
+      date: z.string().min(1),
+      heures: z.number().positive().max(24, "Maximum 24 h par pointage"),
+      description: z.string().trim().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { artisan } = await assertChantierOwner(input.chantierId, ctx.user.id);
+      // Garde « date invalide » : date est NOT NULL en base.
+      const d = new Date(input.date);
+      if (isNaN(d.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de pointage invalide" });
+      }
+      // Le technicien fourni doit appartenir au tenant (sinon on l'ignore plutôt que de lier hors tenant).
+      let technicienId: number | null = null;
+      if (input.technicienId) {
+        const tech = await db.getTechnicienById(input.technicienId);
+        technicienId = tech && tech.artisanId === artisan.id ? input.technicienId : null;
+      }
+      return await db.createPointageChantier({
+        artisanId: artisan.id,
+        chantierId: input.chantierId,
+        phaseId: input.phaseId ?? null,
+        technicienId,
+        date: d,
+        heures: input.heures.toFixed(2),
+        description: input.description || null,
+      });
+    }),
+
+  deletePointage: protectedProcedure
+    .input(z.object({ chantierId: z.number(), id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const { artisan } = await assertChantierOwner(input.chantierId, ctx.user.id);
+      await db.deletePointageChantier(input.id, input.chantierId, artisan.id);
+      return { success: true };
+    }),
+
   createPhase: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
@@ -7203,6 +7252,7 @@ const chantiersRouter = router({
       dateDebutPrevue: z.string().optional(),
       dateFinPrevue: z.string().optional(),
       budgetPhase: z.string().optional(),
+      heuresPrevues: z.string().optional(), // OPE-106 — heures de main-d'œuvre prévues
     }))
     .mutation(async ({ ctx, input }) => {
       await assertChantierOwner(input.chantierId, ctx.user.id);
@@ -7222,6 +7272,7 @@ const chantiersRouter = router({
       dateDebutReelle: z.string().optional(),
       dateFinReelle: z.string().optional(),
       coutReel: z.string().optional(),
+      heuresPrevues: z.string().optional(), // OPE-106 — heures de main-d'œuvre prévues
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : on charge la phase pour recuperer son chantierId puis on check.

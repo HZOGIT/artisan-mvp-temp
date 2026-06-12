@@ -38,6 +38,7 @@ import {
   historiqueDeplacements,
   chantiers, Chantier, InsertChantier,
   phasesChantier, PhaseChantier, InsertPhaseChantier,
+  pointagesChantier, PointageChantier, InsertPointageChantier,
   interventionsChantier, InterventionChantier, InsertInterventionChantier,
   documentsChantier, DocumentChantier, InsertDocumentChantier,
   rapportsPersonnalises, RapportPersonnalise, InsertRapportPersonnalise,
@@ -2574,6 +2575,33 @@ export async function deleteChantier(id: number): Promise<void> {
 export async function getPhasesByChantier(chantierId: number): Promise<PhaseChantier[]> {
   const db = await getDb();
   return await db.select().from(phasesChantier).where(eq(phasesChantier.chantierId, chantierId)).orderBy(asc(phasesChantier.ordre));
+}
+
+// ── Pointages de main-d'œuvre sur chantier (OPE-106) ─────────────────────────
+// Toujours scopé `artisanId` ; l'ownership du chantier est vérifié en amont dans
+// le routeur (assertChantierOwner). Tri par date décroissante (récents en tête).
+export async function getPointagesByChantier(chantierId: number, artisanId: number): Promise<PointageChantier[]> {
+  const db = await getDb();
+  return await db.select().from(pointagesChantier)
+    .where(and(eq(pointagesChantier.chantierId, chantierId), eq(pointagesChantier.artisanId, artisanId)))
+    .orderBy(desc(pointagesChantier.date), desc(pointagesChantier.id));
+}
+
+export async function createPointageChantier(data: InsertPointageChantier): Promise<PointageChantier> {
+  const db = await getDb();
+  const [result] = await db.insert(pointagesChantier).values(data);
+  const [created] = await db.select().from(pointagesChantier).where(eq(pointagesChantier.id, result.insertId));
+  return created;
+}
+
+// Suppression scopée (chantier + artisan) — défense en profondeur en plus de l'ownership routeur.
+export async function deletePointageChantier(id: number, chantierId: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(pointagesChantier).where(and(
+    eq(pointagesChantier.id, id),
+    eq(pointagesChantier.chantierId, chantierId),
+    eq(pointagesChantier.artisanId, artisanId),
+  ));
 }
 
 export async function createPhaseChantier(data: any): Promise<PhaseChantier> {

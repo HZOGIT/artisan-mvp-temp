@@ -1465,11 +1465,36 @@ export const phasesChantier = mysqlTable("phases_chantier", {
   avancement: int("avancement").default(0),
   budgetPhase: decimal("budgetPhase", { precision: 10, scale: 2 }),
   coutReel: decimal("coutReel", { precision: 10, scale: 2 }).default("0.00"),
+  // Heures de main-d'œuvre PRÉVUES pour la phase (OPE-106) — additif, nullable.
+  // Comparées aux heures réellement pointées (Σ pointages_chantier de la phase/chantier).
+  heuresPrevues: decimal("heuresPrevues", { precision: 7, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type PhaseChantier = typeof phasesChantier.$inferSelect;
 export type InsertPhaseChantier = typeof phasesChantier.$inferInsert;
+
+// ============================================================================
+// POINTAGES DE MAIN-D'ŒUVRE SUR CHANTIER (OPE-106)
+// ============================================================================
+// Saisie légère des heures réalisées par un technicien sur un chantier (≈ Odoo
+// account.analytic.line / timesheets, version MVP). Comparées aux heures prévues
+// (phases_chantier.heuresPrevues) → pilotage de la main-d'œuvre prévu vs réalisé.
+// Table additive ; aucune donnée existante impactée.
+export const pointagesChantier = mysqlTable("pointages_chantier", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  chantierId: int("chantierId").notNull(),
+  phaseId: int("phaseId"),
+  technicienId: int("technicienId"),
+  date: date("date").notNull(),
+  heures: decimal("heures", { precision: 6, scale: 2 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PointageChantier = typeof pointagesChantier.$inferSelect;
+export type InsertPointageChantier = typeof pointagesChantier.$inferInsert;
 
 // Association interventions-chantiers
 export const interventionsChantier = mysqlTable("interventions_chantier", {
