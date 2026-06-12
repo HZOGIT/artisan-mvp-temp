@@ -1190,6 +1190,9 @@ export const vehicules = mysqlTable("vehicules", {
   modele: varchar("modele", { length: 100 }),
   annee: int("annee"),
   typeCarburant: mysqlEnum("typeCarburant", ["essence", "diesel", "electrique", "hybride", "gpl"]).default("diesel"),
+  // Puissance fiscale (CV) — prérequis du barème kilométrique FR (indemnité = km × tarif,
+  // fonction de la puissance fiscale). Nullable, additif → véhicules existants inchangés (OPE-169).
+  puissanceFiscale: int("puissanceFiscale"),
   kilometrageActuel: int("kilometrageActuel").default(0),
   dateAchat: date("dateAchat"),
   prixAchat: decimal("prixAchat", { precision: 10, scale: 2 }),

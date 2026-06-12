@@ -6716,6 +6716,8 @@ const vehiculesRouter = router({
       modele: z.string().max(100).optional(),
       annee: z.number().optional(),
       typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
+      // OPE-169 — puissance fiscale (CV) pour le barème kilométrique. Bornée 1..99.
+      puissanceFiscale: z.number().int().min(1).max(99).optional(),
       kilometrageActuel: z.number().optional(),
       dateAchat: z.string().optional(),
       prixAchat: z.string().optional(),
@@ -6739,6 +6741,8 @@ const vehiculesRouter = router({
       modele: z.string().max(100).optional(),
       annee: z.number().optional(),
       typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
+      // OPE-169 — puissance fiscale (CV) pour le barème kilométrique. Bornée 1..99.
+      puissanceFiscale: z.number().int().min(1).max(99).nullable().optional(),
       kilometrageActuel: z.number().optional(),
       technicienId: z.number().nullable().optional(),
       statut: z.enum(["actif", "en_maintenance", "hors_service", "vendu"]).optional(),
