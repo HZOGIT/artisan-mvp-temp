@@ -38,6 +38,7 @@ import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesA
 import { TresoreriePrevisionnelleWidget } from "@/components/dashboard/widgets/TresoreriePrevisionnelle";
 import { LivraisonsEnRetardWidget } from "@/components/dashboard/widgets/LivraisonsEnRetard";
 import { ContratsAFacturerWidget } from "@/components/dashboard/widgets/ContratsAFacturer";
+import { StockBasWidget } from "@/components/dashboard/widgets/StockBas";
 
 // ============================================================================
 // Définition des widgets disponibles dans le dashboard
@@ -73,6 +74,12 @@ function useWidgetDefinitions(): WidgetDef[] {
         label: "Contrats à facturer",
         description: "Contrats de maintenance dont l'échéance de facturation est atteinte",
         render: () => <ContratsAFacturerWidget />,
+      },
+      {
+        id: "stockBas",
+        label: "Stock à réapprovisionner",
+        description: "Articles dont la quantité est passée sous le seuil d'alerte",
+        render: () => <StockBasWidget />,
       },
       {
         id: "revenue",
@@ -120,6 +127,7 @@ const DEFAULT_ORDER = [
   "tresoreriePrevisionnelle",
   "livraisonsEnRetard",
   "contratsAFacturer",
+  "stockBas",
   "revenue",
   "devisRepartition",
   "topClients",

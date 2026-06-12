@@ -3253,6 +3253,25 @@ const stocksRouter = router({
     // Utiliser la version sécurisée
     return await dbSecure.getStocksByArtisanIdSecure(artisan.id);
   }),
+
+  // OPE-133 — articles dont le stock est sous le seuil d'alerte (lecture seule, scopé tenant).
+  // Volet « visibilité » : surface le réappro nécessaire (le widget dashboard l'affiche) ;
+  // la génération de commande fournisseur (cœur d'OPE-133) reste à faire. Active
+  // `getLowStockItems` (jusqu'ici sans endpoint). Manque calculé = seuilAlerte − quantité.
+  getLowStock: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const items = await db.getLowStockItems(artisan.id);
+    return items.map((s: any) => {
+      const qte = parseFloat(s.quantiteEnStock || "0");
+      const seuil = parseFloat(s.seuilAlerte || "0");
+      return {
+        ...s,
+        manque: Math.max(0, +(seuil - qte).toFixed(2)),
+        enRupture: qte <= 0,
+      };
+    });
+  }),
   
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
