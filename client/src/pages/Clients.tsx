@@ -19,6 +19,9 @@ interface ClientFormData {
   adresse: string;
   codePostal: string;
   ville: string;
+  adresseFacturation: string;
+  codePostalFacturation: string;
+  villeFacturation: string;
   type: "particulier" | "professionnel";
   raisonSociale: string;
   siret: string;
@@ -34,6 +37,9 @@ const initialFormData: ClientFormData = {
   adresse: "",
   codePostal: "",
   ville: "",
+  adresseFacturation: "",
+  codePostalFacturation: "",
+  villeFacturation: "",
   type: "particulier",
   raisonSociale: "",
   siret: "",
@@ -118,6 +124,9 @@ export function Clients() {
       adresse: client.adresse || "",
       codePostal: client.codePostal || "",
       ville: client.ville || "",
+      adresseFacturation: client.adresseFacturation || "",
+      codePostalFacturation: client.codePostalFacturation || "",
+      villeFacturation: client.villeFacturation || "",
       type: (client.type === "professionnel" ? "professionnel" : "particulier"),
       raisonSociale: client.raisonSociale || "",
       siret: client.siret || "",
@@ -407,6 +416,55 @@ export function Clients() {
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                  </div>
+                </div>
+
+                {/* Adresse de facturation distincte (OPE-93) */}
+                <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                  <p className="text-sm font-medium text-gray-700">
+                    Adresse de facturation <span className="font-normal text-muted-foreground">(si différente — vide = adresse principale)</span>
+                  </p>
+                  <div>
+                    <Label htmlFor="edit-adresseFacturation" className="block text-sm font-medium mb-1">
+                      Adresse de facturation
+                    </Label>
+                    <input
+                      id="edit-adresseFacturation"
+                      type="text"
+                      name="adresseFacturation"
+                      value={formData.adresseFacturation}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="edit-codePostalFacturation" className="block text-sm font-medium mb-1">
+                        CP (facturation)
+                      </Label>
+                      <input
+                        id="edit-codePostalFacturation"
+                        type="text"
+                        name="codePostalFacturation"
+                        value={formData.codePostalFacturation}
+                        onChange={handleInputChange}
+                        maxLength={5}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-villeFacturation" className="block text-sm font-medium mb-1">
+                        Ville (facturation)
+                      </Label>
+                      <input
+                        id="edit-villeFacturation"
+                        type="text"
+                        name="villeFacturation"
+                        value={formData.villeFacturation}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
                 </div>
 

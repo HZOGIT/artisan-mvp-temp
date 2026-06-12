@@ -213,6 +213,10 @@ interface Client {
   adresse?: string | null;
   codePostal?: string | null;
   ville?: string | null;
+  // OPE-93 — adresse de facturation distincte (fallback adresse principale)
+  adresseFacturation?: string | null;
+  codePostalFacturation?: string | null;
+  villeFacturation?: string | null;
   telephone?: string | null;
   email?: string | null;
   // OPE-92 — identité B2B (rappelée sur le document si client professionnel)
@@ -330,12 +334,16 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
   doc.text(clientName, pageWidth - 85, yPos);
   yPos += 5;
 
-  if (client.adresse) {
-    doc.text(client.adresse, pageWidth - 85, yPos);
+  // OPE-93 — adresse de facturation si renseignée (fallback par champ vers principale).
+  const adrFact = client.adresseFacturation || client.adresse;
+  const cpFact = client.codePostalFacturation || client.codePostal;
+  const villeFact = client.villeFacturation || client.ville;
+  if (adrFact) {
+    doc.text(adrFact, pageWidth - 85, yPos);
     yPos += 5;
   }
-  if (client.codePostal || client.ville) {
-    doc.text(`${client.codePostal || ""} ${client.ville || ""}`.trim(), pageWidth - 85, yPos);
+  if (cpFact || villeFact) {
+    doc.text(`${cpFact || ""} ${villeFact || ""}`.trim(), pageWidth - 85, yPos);
     yPos += 5;
   }
   if (client.telephone) {

@@ -80,6 +80,12 @@ export const clients = mysqlTable("clients", {
   adresse: text("adresse"),
   codePostal: varchar("codePostal", { length: 10 }),
   ville: varchar("ville", { length: 100 }),
+  // Adresse de FACTURATION distincte (OPE-93) — optionnelle. Si vide, les documents
+  // facture/devis retombent sur l'adresse principale (= adresse de chantier). Additif,
+  // nullable → comportement inchangé pour les clients existants.
+  adresseFacturation: text("adresseFacturation"),
+  codePostalFacturation: varchar("codePostalFacturation", { length: 10 }),
+  villeFacturation: varchar("villeFacturation", { length: 100 }),
   // Identité B2B (OPE-92) — distinction particulier/professionnel + identifiants
   // légaux du client, requis sur une facture B2B (mentions + TVA intracom).
   // Tous additifs/nullables : un client existant reste « particulier » par défaut.

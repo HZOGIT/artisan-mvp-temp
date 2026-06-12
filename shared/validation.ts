@@ -182,6 +182,16 @@ export const ClientInputSchema = z.object({
     .string()
     .max(100, "La ville est trop longue")
     .optional(),
+  // Adresse de facturation distincte (OPE-93) — optionnelle, fallback adresse principale.
+  adresseFacturation: z
+    .string()
+    .max(255, "L'adresse de facturation est trop longue")
+    .optional(),
+  codePostalFacturation: CodePostalSchema,
+  villeFacturation: z
+    .string()
+    .max(100, "La ville de facturation est trop longue")
+    .optional(),
   // Identité B2B (OPE-92) — additifs, optionnels (un client reste « particulier »).
   type: z.enum(["particulier", "professionnel"]).optional(),
   raisonSociale: z

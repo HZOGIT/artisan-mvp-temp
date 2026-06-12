@@ -263,8 +263,13 @@ function buildClientBlock(client: Client): InfoBlock {
   const isPro = (client as any).type === "professionnel";
   const raisonSociale = (client as any).raisonSociale as string | null | undefined;
   if (isPro && raisonSociale && personName) lines.push(`Contact: ${personName}`);
-  if (client.adresse) lines.push(client.adresse);
-  const cpVille = `${client.codePostal || ""} ${client.ville || ""}`.trim();
+  // OPE-93 — sur une facture/devis on utilise l'adresse de FACTURATION si renseignée
+  // (fallback par champ vers l'adresse principale = adresse de chantier).
+  const adrFact = (client as any).adresseFacturation || client.adresse;
+  const cpFact = (client as any).codePostalFacturation || client.codePostal;
+  const villeFact = (client as any).villeFacturation || client.ville;
+  if (adrFact) lines.push(adrFact);
+  const cpVille = `${cpFact || ""} ${villeFact || ""}`.trim();
   if (cpVille) lines.push(cpVille);
   if (client.telephone) lines.push(`Tél: ${client.telephone}`);
   if (client.email) lines.push(`Email: ${client.email}`);
