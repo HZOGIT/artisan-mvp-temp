@@ -3341,6 +3341,14 @@ export async function updateContrat(id: number, data: Partial<InsertContratMaint
 
 export async function deleteContrat(id: number): Promise<void> {
   const db = await getDb();
+  // OPE-177 — le schéma n'a pas de FK ON DELETE CASCADE : on nettoie manuellement les
+  // enfants PUREMENT opérationnels du contrat, sinon ils restent orphelins (pointant un
+  // contrat supprimé). On NE touche PAS aux factures elles-mêmes :
+  //  - factures_recurrentes = table de LIAISON contrat↔facture (la facture générée reste) ;
+  //  - interventions_contrat = visites de maintenance opérationnelles du contrat.
+  // (Le routeur a déjà vérifié l'ownership artisan du contrat avant cet appel.)
+  await db.delete(facturesRecurrentes).where(eq(facturesRecurrentes.contratId, id));
+  await db.delete(interventionsContrat).where(eq(interventionsContrat.contratId, id));
   await db.delete(contratsMaintenance).where(eq(contratsMaintenance.id, id));
 }
 
