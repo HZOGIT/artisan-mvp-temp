@@ -502,13 +502,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   // ne pas qu'un artisan pollue/efface les articles vus par les autres.
   createBibliothequeArticle: adminOnlyProcedure
     .input(z.object({
-      nom: z.string().min(1),
+      nom: z.string().min(1).max(255),
       description: z.string().optional(),
-      unite: z.string(),
+      unite: z.string().max(50),
       prix_base: z.string(),
-      categorie: z.string(),
-      sous_categorie: z.string(),
-      metier: z.string(),
+      categorie: z.string().max(50),
+      sous_categorie: z.string().max(100),
+      metier: z.string().max(50),
     }))
     .mutation(async ({ input }) => {
       return await db.createBibliothequeArticle(input);
@@ -517,13 +517,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   updateBibliothequeArticle: adminOnlyProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
+      nom: z.string().max(255).optional(),
       description: z.string().optional(),
-      unite: z.string().optional(),
+      unite: z.string().max(50).optional(),
       prix_base: z.string().optional(),
-      categorie: z.string().optional(),
-      sous_categorie: z.string().optional(),
-      metier: z.string().optional(),
+      categorie: z.string().max(50).optional(),
+      sous_categorie: z.string().max(100).optional(),
+      metier: z.string().max(50).optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
@@ -539,13 +539,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
 
   importBibliothequeArticles: protectedProcedure
     .input(z.array(z.object({
-      nom: z.string(),
+      nom: z.string().max(255),
       description: z.string().optional(),
-      unite: z.string(),
+      unite: z.string().max(50),
       prix_base: z.string(),
-      categorie: z.string(),
-      sous_categorie: z.string(),
-      metier: z.string(),
+      categorie: z.string().max(50),
+      sous_categorie: z.string().max(100),
+      metier: z.string().max(50),
     })))
     .mutation(async ({ input }) => {
       let imported = 0;
