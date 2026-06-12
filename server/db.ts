@@ -511,6 +511,18 @@ export async function updateDevis(id: number, data: Partial<InsertDevis>): Promi
 export async function deleteDevis(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(devisLignes).where(eq(devisLignes.devisId, id));
+  // Cascade des enfants PUREMENT opérationnels du devis (aucun document légal) qui
+  // n'étaient pas nettoyés → lignes orphelines (pas de contrainte FK en base) :
+  //  - relances_devis : rappels de relance du devis
+  //  - devis_options (+ devis_options_lignes) : variantes/options proposées
+  // (signatures_devis = valeur probante, hors périmètre — cf. OPE-50 sur la
+  //  suppressibilité d'un devis signé.)
+  const opts = await db.select({ id: devisOptions.id }).from(devisOptions).where(eq(devisOptions.devisId, id));
+  if (opts.length > 0) {
+    await db.delete(devisOptionsLignes).where(inArray(devisOptionsLignes.optionId, opts.map((o) => o.id)));
+  }
+  await db.delete(devisOptions).where(eq(devisOptions.devisId, id));
+  await db.delete(relancesDevis).where(eq(relancesDevis.devisId, id));
   await db.delete(devis).where(eq(devis.id, id));
 }
 
