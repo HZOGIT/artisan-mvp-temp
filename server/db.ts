@@ -1445,6 +1445,22 @@ export async function getCommandesFournisseursByArtisanId(artisanId: number): Pr
     .orderBy(desc(commandesFournisseurs.createdAt));
 }
 
+// OPE-150 — commandes fournisseurs en retard de livraison (lecture seule, scopé tenant).
+// Une commande est « en retard » si elle est encore attendue (envoyée/confirmée/partielle),
+// que sa date de livraison prévue est dépassée, et qu'aucune livraison réelle n'est saisie.
+// (Le filtre `< NOW()` exclut naturellement les `dateLivraisonPrevue` NULL.)
+export async function getCommandesFournisseursEnRetard(artisanId: number): Promise<CommandeFournisseur[]> {
+  const db = await getDb();
+  return await db.select().from(commandesFournisseurs)
+    .where(and(
+      eq(commandesFournisseurs.artisanId, artisanId),
+      inArray(commandesFournisseurs.statut, ["envoyee", "confirmee", "partiellement_livree"]),
+      isNull(commandesFournisseurs.dateLivraisonReelle),
+      lt(commandesFournisseurs.dateLivraisonPrevue, new Date()),
+    ))
+    .orderBy(asc(commandesFournisseurs.dateLivraisonPrevue));
+}
+
 export async function getCommandeFournisseurById(id: number): Promise<CommandeFournisseur | undefined> {
   const db = await getDb();
   const result = await db.select().from(commandesFournisseurs).where(eq(commandesFournisseurs.id, id)).limit(1);

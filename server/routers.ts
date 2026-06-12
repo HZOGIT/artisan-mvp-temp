@@ -3883,6 +3883,30 @@ Reponds UNIQUEMENT en JSON pur :
     }));
   }),
 
+  // OPE-150 — alerte (lecture seule) des commandes en retard de livraison.
+  // Réutilise la donnée existante (dateLivraisonPrevue/Reelle + statut) ; enrichit
+  // avec le nom du fournisseur et le nombre de jours de retard. Aucune écriture,
+  // aucun scheduler/notification automatique (volet « indicateur » de l'alerte).
+  getEnRetard: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const commandes = await db.getCommandesFournisseursEnRetard(artisan.id);
+    const fournisseurIds = [...new Set(commandes.map(c => c.fournisseurId))];
+    const fournisseursMap = new Map<number, string>();
+    for (const fid of fournisseurIds) {
+      const f = await db.getFournisseurById(fid);
+      if (f) fournisseursMap.set(fid, f.nom);
+    }
+    const now = Date.now();
+    return commandes.map(c => ({
+      ...c,
+      fournisseurNom: fournisseursMap.get(c.fournisseurId) || 'Inconnu',
+      joursRetard: c.dateLivraisonPrevue
+        ? Math.max(0, Math.floor((now - new Date(c.dateLivraisonPrevue).getTime()) / 86_400_000))
+        : 0,
+    }));
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
