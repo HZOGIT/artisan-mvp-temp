@@ -22,6 +22,7 @@ interface ClientFormData {
   siret: string;
   numeroTVA: string;
   notes: string;
+  etiquettes: string;
 }
 
 const initialFormData: ClientFormData = {
@@ -40,6 +41,7 @@ const initialFormData: ClientFormData = {
   siret: "",
   numeroTVA: "",
   notes: "",
+  etiquettes: "",
 };
 
 export function ClientsNouveauPage() {
@@ -341,6 +343,23 @@ export function ClientsNouveauPage() {
               </div>
             </div>
           )}
+
+          {/* Étiquettes (OPE-120) */}
+          <div>
+            <Label htmlFor="etiquettes" className="block text-sm font-medium mb-2">
+              Étiquettes
+            </Label>
+            <input
+              id="etiquettes"
+              name="etiquettes"
+              type="text"
+              value={formData.etiquettes}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Ex : VIP, chantier neuf, syndic (séparées par des virgules)"
+            />
+            <p className="text-xs text-gray-500 mt-1">Pour segmenter et retrouver vos clients (recherche par étiquette).</p>
+          </div>
 
           {/* Notes */}
           <div>

@@ -101,6 +101,10 @@ export const clients = mysqlTable("clients", {
   raisonSociale: varchar("raisonSociale", { length: 255 }),
   siret: varchar("siret", { length: 14 }),
   numeroTVA: varchar("numeroTVA", { length: 20 }),
+  // Étiquettes / tags de segmentation (OPE-120) — liste libre séparée par des
+  // virgules (≈ Odoo res.partner.category_id, version simplifiée MVP). Additif,
+  // nullable → comportement inchangé pour les clients existants.
+  etiquettes: varchar("etiquettes", { length: 500 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

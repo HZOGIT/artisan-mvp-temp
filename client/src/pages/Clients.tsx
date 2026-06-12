@@ -27,6 +27,7 @@ interface ClientFormData {
   siret: string;
   numeroTVA: string;
   notes: string;
+  etiquettes: string;
 }
 
 const initialFormData: ClientFormData = {
@@ -45,6 +46,7 @@ const initialFormData: ClientFormData = {
   siret: "",
   numeroTVA: "",
   notes: "",
+  etiquettes: "",
 };
 
 export function Clients() {
@@ -132,6 +134,7 @@ export function Clients() {
       siret: client.siret || "",
       numeroTVA: client.numeroTVA || "",
       notes: client.notes || "",
+      etiquettes: client.etiquettes || "",
     });
     setEditingClientId(client.id);
     setIsEditModalOpen(true);
@@ -170,6 +173,8 @@ export function Clients() {
     matchSearch(client.prenom, searchQuery) ||
     matchSearch(client.email, searchQuery) ||
     matchSearch(client.ville, searchQuery) ||
+    // OPE-120 — recherche/segmentation par étiquette.
+    matchSearch((client as any).etiquettes, searchQuery) ||
     (client.telephone ? client.telephone.includes(searchQuery) : false)
   );
 
@@ -181,9 +186,9 @@ export function Clients() {
       toast.error("Aucun client à exporter");
       return;
     }
-    const headers = ["Nom", "Prénom", "Type", "Raison sociale", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "N° TVA", "Notes"];
+    const headers = ["Nom", "Prénom", "Type", "Raison sociale", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "N° TVA", "Étiquettes", "Notes"];
     const rows = data.map((c: any) => [
-      c.nom, c.prenom, c.type, c.raisonSociale, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.numeroTVA, c.notes,
+      c.nom, c.prenom, c.type, c.raisonSociale, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.numeroTVA, c.etiquettes, c.notes,
     ]);
     exportToCsv(`clients_${csvDateSuffix()}.csv`, headers, rows);
     toast.success(`${data.length} client(s) exporté(s)`);
@@ -256,6 +261,16 @@ export function Clients() {
                         </div>
                       )}
                     </div>
+                    {/* OPE-120 — étiquettes de segmentation */}
+                    {(client as any).etiquettes && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {String((client as any).etiquettes).split(",").map((t: string) => t.trim()).filter(Boolean).map((tag: string, i: number) => (
+                          <span key={i} className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -517,6 +532,22 @@ export function Clients() {
                     </div>
                   </div>
                 )}
+
+                {/* Étiquettes (OPE-120) */}
+                <div>
+                  <Label htmlFor="edit-etiquettes" className="block text-sm font-medium mb-1">
+                    Étiquettes
+                  </Label>
+                  <input
+                    id="edit-etiquettes"
+                    name="etiquettes"
+                    type="text"
+                    value={formData.etiquettes}
+                    onChange={handleInputChange}
+                    placeholder="Ex : VIP, chantier neuf, syndic (séparées par des virgules)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
                 {/* Notes */}
                 <div>

@@ -208,6 +208,11 @@ export const ClientInputSchema = z.object({
     .string()
     .max(1000, "Les notes sont trop longues")
     .optional(),
+  // Étiquettes / tags de segmentation (OPE-120) — liste libre séparée par des virgules.
+  etiquettes: z
+    .string()
+    .max(500, "Les étiquettes sont trop longues")
+    .optional(),
 });
 
 export type ClientInput = z.infer<typeof ClientInputSchema>;

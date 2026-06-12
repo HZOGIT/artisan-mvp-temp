@@ -1,0 +1,1 @@
+ALTER TABLE `clients` ADD `etiquettes` varchar(500);
