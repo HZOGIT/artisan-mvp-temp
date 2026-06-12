@@ -324,7 +324,7 @@ export default function FactureDetail() {
         totalTVA: parseFloat(facture.totalTVA as any) || 0,
         totalTTC: parseFloat(facture.totalTTC as any) || 0,
         montantPaye: parseFloat(facture.montantPaye as any) || 0,
-        conditions: (facture as any).conditions || null,
+        conditions: (facture as any).conditionsPaiement || null,
         isAvoir,
       },
       {

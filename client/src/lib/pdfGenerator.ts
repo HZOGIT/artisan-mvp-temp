@@ -639,7 +639,13 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
-  addFooter(doc, facture.conditions, options?.mentionsLegales);
+  // OPE-164 — conditions réelles + mention d'escompte B2B (L441-9) sur une facture (pas un avoir).
+  const factureConditions = isAvoir
+    ? facture.conditions
+    : [facture.conditions, "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.)."]
+        .filter(Boolean)
+        .join("\n");
+  addFooter(doc, factureConditions, options?.mentionsLegales);
 
   const prefix = isAvoir ? "Avoir" : "Facture";
   doc.save(`${prefix}_${facture.numero}.pdf`);

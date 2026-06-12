@@ -266,7 +266,7 @@ export default function DevisDetail() {
         totalHT: parseFloat(devis.totalHT as any) || 0,
         totalTVA: parseFloat(devis.totalTVA as any) || 0,
         totalTTC: parseFloat(devis.totalTTC as any) || 0,
-        conditions: (devis as any).conditions || null,
+        conditions: (devis as any).conditionsPaiement || null,
       },
       {
         mentionsLegales: parametresData?.mentionsLegales || null,

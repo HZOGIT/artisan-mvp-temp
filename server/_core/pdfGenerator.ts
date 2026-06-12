@@ -648,21 +648,37 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
 
   doc.setFontSize(7);
   doc.setTextColor(...TEXT_MUTED);
-  doc.text("Paiement à 30 jours.", MARGIN, footerY);
+  // OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
+  // `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
+  const fctr = facture as any;
+  const condRaw = fctr.conditionsPaiement && String(fctr.conditionsPaiement).trim()
+    ? String(fctr.conditionsPaiement).trim()
+    : (facture.dateEcheance
+        ? `Paiement à échéance : ${new Date(facture.dateEcheance).toLocaleDateString("fr-FR")}`
+        : "Paiement à réception.");
+  const condLines = (doc.splitTextToSize(condRaw, 175) as string[]).slice(0, 2);
+  doc.text(condLines, MARGIN, footerY);
+  let fy = footerY + condLines.length * 4;
   doc.text(
     "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée,",
     MARGIN,
-    footerY + 4,
+    fy,
   );
   doc.text(
     "ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C. com.).",
     MARGIN,
-    footerY + 8,
+    fy + 4,
+  );
+  // OPE-164 — mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.).
+  doc.text(
+    "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
+    MARGIN,
+    fy + 8,
   );
 
   // OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM).
   const mentions = buildMentionsLegalesEmetteur(artisan);
-  let my = footerY + 14;
+  let my = fy + 14;
   for (const m of mentions) {
     doc.text(m, MARGIN, my);
     my += 4;
