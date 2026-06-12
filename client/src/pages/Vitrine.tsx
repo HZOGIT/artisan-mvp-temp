@@ -19,6 +19,7 @@ import {
   Send,
   Sparkles,
   Star,
+  BadgeCheck,
   TrendingUp,
   Users as UsersIcon,
   Wrench,
@@ -554,8 +555,18 @@ export default function Vitrine() {
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
-                        <p className="font-semibold text-sm text-slate-900">{clientNameShort(a.clientNom)}</p>
-                        <p className="text-[11px] text-slate-500">{relativeDate(a.createdAt)}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-sm text-slate-900">{clientNameShort(a.clientNom)}</p>
+                          {/* OPE-112 — L111-7-2 : avis rattaché à une intervention réelle = vérifié */}
+                          {a.interventionId && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-700">
+                              <BadgeCheck className="h-3.5 w-3.5" /> Vérifié
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          {a.createdAt ? new Date(a.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : relativeDate(a.createdAt)}
+                        </p>
                       </div>
                       <StarRating note={a.note} size="sm" color={theme.hex} />
                     </div>
@@ -574,6 +585,16 @@ export default function Vitrine() {
                     )}
                   </motion.article>
                 ))}
+              </div>
+              {/* OPE-112 — transparence légale des avis (Code de la consommation art. L111-7-2) */}
+              <div className="mt-6 flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-500 leading-relaxed">
+                <BadgeCheck className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                <p>
+                  <span className="font-semibold text-slate-600">Comment nous gérons les avis.</span>{" "}
+                  Chaque avis « Vérifié » provient d'un client ayant bénéficié d'une intervention réelle
+                  (avis recueilli par lien sécurisé, sans contrepartie). Les avis sont publiés après
+                  modération et affichés avec leur date. Aucun avis n'est acheté.
+                </p>
               </div>
             </>
           ) : (
