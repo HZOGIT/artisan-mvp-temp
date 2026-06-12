@@ -301,6 +301,40 @@ export default function Factures() {
         </div>
       )}
 
+      {/* OPE-144 — visibilité de l'encours : total à encaisser (impayé) calculé à la volée
+          depuis la liste déjà chargée. Exclut avoirs / brouillons / payées / annulées ;
+          retire le montant déjà payé. Lecture seule, aucun backend. */}
+      {(() => {
+        const reelles = (facturesList || []).filter((f: any) => f.typeDocument !== "avoir");
+        if (reelles.length === 0) return null;
+        const reste = (f: any) => Math.max(0, (parseFloat(f.totalTTC || "0") || 0) - (parseFloat(f.montantPaye || "0") || 0));
+        const impayees = reelles.filter((f: any) => f.statut === "envoyee" || f.statut === "en_retard" || f.statut === "validee");
+        const totalImpaye = impayees.reduce((s: number, f: any) => s + reste(f), 0);
+        const totalEnRetard = reelles.filter((f: any) => f.statut === "en_retard").reduce((s: number, f: any) => s + reste(f), 0);
+        return (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-sm text-muted-foreground">À encaisser (impayé)</p>
+                <p className="text-2xl font-bold">{formatCurrency(totalImpaye)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-sm text-muted-foreground">Dont en retard</p>
+                <p className="text-2xl font-bold text-orange-600">{formatCurrency(totalEnRetard)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-sm text-muted-foreground">Factures impayées</p>
+                <p className="text-2xl font-bold">{impayees.length}</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
       {/* Search + Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-md">
