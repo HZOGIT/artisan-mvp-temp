@@ -563,6 +563,11 @@ export const commandesFournisseurs = mysqlTable("commandes_fournisseurs", {
   delaiLivraison: varchar("delaiLivraison", { length: 100 }),
   adresseLivraison: text("adresseLivraison"),
   notes: text("notes"),
+  // OPE-101 — suivi de facturation de la commande (a-t-on reçu/saisi la facture du
+  // fournisseur ?) : évite de payer deux fois / d'oublier une facture. Additif, default
+  // 'a_facturer'. `depenseId` = lien optionnel vers la dépense fournisseur correspondante.
+  statutFacturation: mysqlEnum("statutFacturation", ["a_facturer", "facturee"]).default("a_facturer"),
+  depenseId: int("depenseId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

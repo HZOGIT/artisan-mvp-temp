@@ -80,6 +80,19 @@ export default function CommandeFournisseurDetail() {
     updateStatutMutation.mutate({ id: parseInt(id || "0"), statut });
   };
 
+  // OPE-101 — suivi de facturation (facture fournisseur reçue/saisie ?).
+  const setFacturationMutation = trpc.commandesFournisseurs.setStatutFacturation.useMutation({
+    onSuccess: () => {
+      utils.commandesFournisseurs.getById.invalidate({ id: parseInt(id || "0") });
+      utils.commandesFournisseurs.list.invalidate();
+      toast.success("Suivi de facturation mis à jour");
+    },
+    onError: () => toast.error("Erreur lors de la mise à jour du suivi de facturation"),
+  });
+  const handleToggleFacturation = (next: "a_facturer" | "facturee") => {
+    setFacturationMutation.mutate({ id: parseInt(id || "0"), statutFacturation: next });
+  };
+
   // OPE-100 — saisie de la réception (quantité reçue par ligne). État local indexé par ligneId.
   const [recue, setRecue] = useState<Record<number, string>>({});
   const recevoirMutation = trpc.commandesFournisseurs.recevoir.useMutation({
@@ -151,6 +164,9 @@ export default function CommandeFournisseurDetail() {
   // ni clôturée/annulée).
   const receptionActive = ["envoyee", "confirmee", "partiellement_livree"].includes(statut);
   const aDesQuantitesRecues = lignes.some((l: any) => (parseFloat(l.quantiteRecue) || 0) > 0);
+  // OPE-101 — suivi de facturation : pertinent dès qu'une commande est (partiellement) reçue.
+  const statutFacturation = (commande as any).statutFacturation || "a_facturer";
+  const estRecue = ["partiellement_livree", "livree"].includes(statut);
 
   return (
     <div className="space-y-6">
@@ -165,6 +181,12 @@ export default function CommandeFournisseurDetail() {
             <Badge className={statusColors[statut] || "bg-gray-100"}>
               {statusLabels[statut] || statut}
             </Badge>
+            {/* OPE-101 — badge de suivi de facturation (visible dès qu'une commande est reçue) */}
+            {estRecue && (
+              <Badge className={statutFacturation === "facturee" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"}>
+                {statutFacturation === "facturee" ? "Facturée" : "À facturer"}
+              </Badge>
+            )}
           </div>
           {fournisseur && (
             <p className="text-muted-foreground">{fournisseur.nom}</p>
@@ -185,6 +207,16 @@ export default function CommandeFournisseurDetail() {
             <Mail className="h-4 w-4 mr-2" />
             Envoyer
           </Button>
+          {/* OPE-101 — bascule du suivi de facturation (commande reçue) */}
+          {estRecue && (
+            <Button
+              variant="outline"
+              onClick={() => handleToggleFacturation(statutFacturation === "facturee" ? "a_facturer" : "facturee")}
+              disabled={setFacturationMutation.isPending}
+            >
+              {statutFacturation === "facturee" ? "Marquer à facturer" : "Marquer facturée"}
+            </Button>
+          )}
           {possibleNextStatuses.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

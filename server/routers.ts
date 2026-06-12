@@ -4033,6 +4033,34 @@ Reponds UNIQUEMENT en JSON pur :
       return await db.updateCommandeFournisseur(input.id, updateData);
     }),
 
+  // OPE-101 — suivi de facturation : marque une commande comme « facturée » (facture
+  // fournisseur reçue/saisie) ou la repasse « à facturer ». Lien optionnel vers la dépense.
+  setStatutFacturation: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      statutFacturation: z.enum(["a_facturer", "facturee"]),
+      depenseId: z.number().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const updateData: any = { statutFacturation: input.statutFacturation };
+      // Si on fournit un depenseId, on vérifie qu'elle appartient au tenant avant de lier.
+      if (input.depenseId != null) {
+        const dep = await db.getDepenseById(input.depenseId, artisan.id);
+        updateData.depenseId = dep ? input.depenseId : null;
+      } else if (input.statutFacturation === "a_facturer") {
+        updateData.depenseId = null; // on délie en repassant à facturer
+      }
+      return await db.updateCommandeFournisseur(input.id, updateData);
+    }),
+
   // OPE-100 — réception partielle : enregistre la quantité reçue par ligne et DÉRIVE le
   // statut de la commande (confirmee / partiellement_livree / livree). Additif : une
   // commande non réceptionnée garde quantiteRecue=0 et son statut inchangé.
