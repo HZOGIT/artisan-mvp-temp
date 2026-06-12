@@ -4783,6 +4783,12 @@ export async function createBadge(data: InsertBadge): Promise<Badge | undefined>
   return r[0];
 }
 
+export async function getBadgeById(id: number): Promise<Badge | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(badges).where(eq(badges.id, id)).limit(1);
+  return r[0];
+}
+
 export async function updateBadge(id: number, data: Partial<InsertBadge>): Promise<Badge | undefined> {
   const dbi = await getDb();
   await dbi.update(badges).set(data).where(eq(badges.id, id));

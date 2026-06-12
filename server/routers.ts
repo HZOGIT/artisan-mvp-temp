@@ -6558,6 +6558,20 @@ const vehiculesRouter = router({
 // ============================================================================
 // BADGES ET GAMIFICATION ROUTER
 // ============================================================================
+// OPE-47 — appartenance d'un badge au tenant appelant. `update`/`delete`
+// prenaient un id de badge sans vérifier le propriétaire (handler `async ({ input })`
+// sans `ctx`) → un artisan pouvait modifier/supprimer le badge d'un autre tenant
+// (IDOR, cf. audit 2026-06-07-badges-gamification-idor). Même schéma que
+// assertVehiculeOwner : NOT_FOUND si le badge n'appartient pas à l'appelant.
+async function assertBadgeOwner(badgeId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const badge = artisan ? await db.getBadgeById(badgeId) : null;
+  if (!badge || !artisan || (badge as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Badge non trouvé" });
+  }
+  return { badge, artisan };
+}
+
 const badgesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -6594,14 +6608,16 @@ const badgesRouter = router({
       points: z.number().optional(),
       actif: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertBadgeOwner(input.id, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateBadge(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertBadgeOwner(input.id, ctx.user.id);
       return await db.deleteBadge(input.id);
     }),
 
