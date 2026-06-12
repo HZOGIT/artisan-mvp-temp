@@ -58,6 +58,14 @@ export const artisans = mysqlTable("artisans", {
   numeroTVA: varchar("numeroTVA", { length: 20 }),
   iban: varchar("iban", { length: 34 }),
   codeAPE: varchar("codeAPE", { length: 10 }),
+  // Mentions légales émetteur (OPE-151, Code de commerce R123-237) — pour une société :
+  // forme juridique + capital + RCS (ville du greffe ; le n° = SIREN dérivé du SIRET).
+  // numeroRM pour les artisans au Répertoire des Métiers. Tous nullables/additifs →
+  // comportement inchangé pour un EI/micro (SIRET + « EI » suffisent).
+  formeJuridique: mysqlEnum("formeJuridique", ["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"]),
+  capitalSocial: decimal("capitalSocial", { precision: 12, scale: 2 }),
+  villeRCS: varchar("villeRCS", { length: 100 }),
+  numeroRM: varchar("numeroRM", { length: 50 }),
   logo: mediumtext("logo"),
   slug: varchar("slug", { length: 255 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

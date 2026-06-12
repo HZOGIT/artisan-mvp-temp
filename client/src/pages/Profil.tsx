@@ -52,6 +52,10 @@ export default function Profil() {
     ville: string;
     tauxTVA: string;
     iban: string;
+    formeJuridique: string;
+    capitalSocial: string;
+    villeRCS: string;
+    numeroRM: string;
   }>({
     nomEntreprise: "",
     siret: "",
@@ -66,6 +70,10 @@ export default function Profil() {
     ville: "",
     tauxTVA: "20.00",
     iban: "",
+    formeJuridique: "",
+    capitalSocial: "",
+    villeRCS: "",
+    numeroRM: "",
   });
 
   const { data: artisan, isLoading } = trpc.artisan.getProfile.useQuery();
@@ -102,13 +110,25 @@ export default function Profil() {
         ville: artisan.ville || "",
         tauxTVA: artisan.tauxTVA || "20.00",
         iban: (artisan as any).iban || "",
+        formeJuridique: (artisan as any).formeJuridique || "",
+        capitalSocial: (artisan as any).capitalSocial != null ? String((artisan as any).capitalSocial) : "",
+        villeRCS: (artisan as any).villeRCS || "",
+        numeroRM: (artisan as any).numeroRM || "",
       });
     }
   }, [artisan]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateMutation.mutate(formData);
+    // Les champs légaux optionnels vides -> undefined : `formeJuridique` est un enum
+    // (rejette ""), `capitalSocial` mappe sur une colonne decimal (rejette "").
+    updateMutation.mutate({
+      ...formData,
+      formeJuridique: (formData.formeJuridique || undefined) as any,
+      capitalSocial: formData.capitalSocial || undefined,
+      villeRCS: formData.villeRCS || undefined,
+      numeroRM: formData.numeroRM || undefined,
+    });
   };
 
   if (isLoading) {
@@ -179,6 +199,60 @@ export default function Profil() {
                   value={formData.codeAPE}
                   onChange={(e) => setFormData({ ...formData, codeAPE: e.target.value })}
                   placeholder="4322A"
+                />
+              </div>
+              {/* Mentions légales émetteur (OPE-151) — requises sur facture pour une société */}
+              <div className="space-y-2">
+                <Label htmlFor="formeJuridique">Forme juridique</Label>
+                <select
+                  id="formeJuridique"
+                  value={formData.formeJuridique}
+                  onChange={(e) => setFormData({ ...formData, formeJuridique: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Non précisée —</option>
+                  <option value="EI">Entreprise individuelle (EI)</option>
+                  <option value="micro">Micro-entreprise</option>
+                  <option value="EURL">EURL</option>
+                  <option value="SARL">SARL</option>
+                  <option value="SAS">SAS</option>
+                  <option value="SASU">SASU</option>
+                  <option value="SA">SA</option>
+                  <option value="autre">Autre</option>
+                </select>
+              </div>
+              {["EURL", "SARL", "SAS", "SASU", "SA"].includes(formData.formeJuridique) && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="capitalSocial">Capital social (€)</Label>
+                    <Input
+                      id="capitalSocial"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.capitalSocial}
+                      onChange={(e) => setFormData({ ...formData, capitalSocial: e.target.value })}
+                      placeholder="10000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="villeRCS">Ville du greffe (RCS)</Label>
+                    <Input
+                      id="villeRCS"
+                      value={formData.villeRCS}
+                      onChange={(e) => setFormData({ ...formData, villeRCS: e.target.value })}
+                      placeholder="Lyon"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="numeroRM">N° au Répertoire des Métiers (RM)</Label>
+                <Input
+                  id="numeroRM"
+                  value={formData.numeroRM}
+                  onChange={(e) => setFormData({ ...formData, numeroRM: e.target.value })}
+                  placeholder="RM 123456789 (si artisan inscrit au RM)"
                 />
               </div>
               <div className="space-y-2">

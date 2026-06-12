@@ -187,6 +187,21 @@ function renderArtisanBlock(doc: jsPDF, artisan: Artisan, yStart: number): numbe
     doc.text(`SIRET: ${artisan.siret}`, 20, yPos);
     yPos += 5;
   }
+  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné).
+  const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
+  if (artisan.formeJuridique && SOCIETES.includes(artisan.formeJuridique)) {
+    const siren = artisan.siret ? String(artisan.siret).replace(/\D/g, "").slice(0, 9) : "";
+    const cap = artisan.capitalSocial != null && String(artisan.capitalSocial) !== ""
+      ? `au capital de ${Number(artisan.capitalSocial).toLocaleString("fr-FR")} €` : "";
+    const head = [artisan.formeJuridique, cap].filter(Boolean).join(" ");
+    const rcs = artisan.villeRCS && siren ? `RCS ${artisan.villeRCS} ${siren}` : "";
+    const line = [head, rcs].filter(Boolean).join(" — ");
+    if (line) { doc.text(line, 20, yPos); yPos += 5; }
+  }
+  if (artisan.numeroRM) {
+    doc.text(`RM ${artisan.numeroRM}`, 20, yPos);
+    yPos += 5;
+  }
 
   return yPos;
 }
@@ -204,6 +219,11 @@ interface Artisan {
   telephone?: string | null;
   email?: string | null;
   logo?: string | null;
+  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM)
+  formeJuridique?: string | null;
+  capitalSocial?: string | null;
+  villeRCS?: string | null;
+  numeroRM?: string | null;
 }
 
 interface Client {

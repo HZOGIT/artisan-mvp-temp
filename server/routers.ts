@@ -223,6 +223,11 @@ const artisanRouter = router({
       numeroTVA: z.string().max(20).optional(),
       iban: z.string().max(40).optional().refine(isValidIban, { message: "IBAN invalide (format ou clé de contrôle)" }),
       codeAPE: z.string().max(10).optional(),
+      // Mentions légales émetteur (OPE-151) — additifs/optionnels.
+      formeJuridique: z.enum(["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"]).optional(),
+      capitalSocial: z.string().max(20).optional(),
+      villeRCS: z.string().max(100).optional(),
+      numeroRM: z.string().max(50).optional(),
       logo: z.string().max(3_000_000).optional(),
       slug: z.string().max(100).optional(),
       // T9 : metier libre (12 valeurs cote UI) hors enum drizzle, persiste raw SQL.

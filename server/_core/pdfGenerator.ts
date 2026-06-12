@@ -241,6 +241,26 @@ interface InfoBlock {
   lines: string[];     // body lines (address, phone, email, SIRET, ...)
 }
 
+// OPE-151 — mentions légales obligatoires de l'émetteur (Code de commerce R123-237) :
+// pour une société, forme juridique + capital + RCS (ville + SIREN dérivé du SIRET) ;
+// « RM … » si inscrit au Répertoire des Métiers. Rien d'imposé en plus pour un EI/micro.
+function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
+  const a = artisan as any;
+  const lines: string[] = [];
+  const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
+  if (a.formeJuridique && SOCIETES.includes(a.formeJuridique)) {
+    const siren = a.siret ? String(a.siret).replace(/\D/g, "").slice(0, 9) : "";
+    const cap = a.capitalSocial != null && String(a.capitalSocial) !== ""
+      ? `au capital de ${Number(a.capitalSocial).toLocaleString("fr-FR")} €` : "";
+    const head = [a.formeJuridique, cap].filter(Boolean).join(" ");
+    const rcs = a.villeRCS && siren ? `RCS ${a.villeRCS} ${siren}` : "";
+    const line = [head, rcs].filter(Boolean).join(" — ");
+    if (line) lines.push(line);
+  }
+  if (a.numeroRM) lines.push(`Inscrit au Répertoire des Métiers — RM ${a.numeroRM}`);
+  return lines;
+}
+
 function buildArtisanBlock(artisan: Artisan): InfoBlock {
   const a = artisan as any;
   const lines: string[] = [];
@@ -513,6 +533,17 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   doc.text("Conditions de paiement : à réception de la facture.", MARGIN, Math.max(totalsEndY + 12, 280));
   doc.text("Devis valable 30 jours à compter de la date d'émission.", MARGIN, Math.max(totalsEndY + 17, 285));
 
+  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné).
+  const mentions = buildMentionsLegalesEmetteur(artisan);
+  if (mentions.length > 0) {
+    doc.setFontSize(7);
+    let my = Math.max(totalsEndY + 23, 290);
+    for (const m of mentions) {
+      doc.text(m, MARGIN, my);
+      my += 4;
+    }
+  }
+
   return Buffer.from(doc.output("arraybuffer"));
 }
 
@@ -628,6 +659,14 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     MARGIN,
     footerY + 8,
   );
+
+  // OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM).
+  const mentions = buildMentionsLegalesEmetteur(artisan);
+  let my = footerY + 14;
+  for (const m of mentions) {
+    doc.text(m, MARGIN, my);
+    my += 4;
+  }
 
   return Buffer.from(doc.output("arraybuffer"));
 }
