@@ -387,6 +387,34 @@ export default function Stocks() {
           </div>
         </div>
 
+        {/* OPE-105 — KPIs stock : nombre d'articles, valorisation (Σ quantité × prix d'achat)
+            et nombre d'articles bas. Lecture seule, calculé depuis les données déjà chargées. */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Articles en stock</CardDescription>
+              <CardTitle className="text-2xl">{stocks?.length ?? 0}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Valeur du stock</CardDescription>
+              <CardTitle className="text-2xl">
+                {(stocks || []).reduce(
+                  (sum, s) => sum + (parseFloat(s.quantiteEnStock || "0") || 0) * (parseFloat(s.prixAchat || "0") || 0),
+                  0,
+                ).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Articles en stock bas</CardDescription>
+              <CardTitle className="text-2xl text-orange-600">{lowStockItems?.length ?? 0}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
         {/* Alertes de stock bas */}
         {lowStockItems && lowStockItems.length > 0 && (
           <Card className="border-orange-200 bg-orange-50">
