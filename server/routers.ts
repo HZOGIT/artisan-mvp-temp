@@ -2170,7 +2170,10 @@ const interventionsRouter = router({
   setCouleurIntervention: protectedProcedure
     .input(z.object({
       interventionId: z.number(),
-      couleur: z.string(),
+      // Borne alignée sur couleurs_interventions.couleur VARCHAR(20). La valeur est
+      // une classe Tailwind (« bg-blue-500 »), pas un hex → pas de regex #RRGGBB ici
+      // (casserait l'entrée légitime) ; un simple .max() évite l'ER_DATA_TOO_LONG.
+      couleur: z.string().max(20),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
