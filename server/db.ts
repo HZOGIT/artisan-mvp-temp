@@ -2225,6 +2225,12 @@ export async function updateTechnicien(id: number, data: Partial<InsertTechnicie
 
 export async function deleteTechnicien(id: number): Promise<void> {
   const db = await getDb();
+  // OPE-162 — les habilitations/certifications sont des enfants PUREMENT opérationnels
+  // du technicien (suivi de ses certifs, aucune valeur légale/historique propre) : sans
+  // ce nettoyage, supprimer un technicien laisse des lignes habilitations_techniciens
+  // orphelines. (Le reste des références — interventions/congés — relève d'une décision
+  // de rétention distincte, cf. audit 2026-06-08-technicien-hard-delete-orphelins.)
+  await db.delete(habilitationsTechniciens).where(eq(habilitationsTechniciens.technicienId, id));
   await db.delete(techniciens).where(eq(techniciens.id, id));
 }
 
