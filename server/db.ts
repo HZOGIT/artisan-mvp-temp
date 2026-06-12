@@ -620,19 +620,28 @@ export async function getFacturesByClientId(clientId: number): Promise<Facture[]
 }
 
 // OPE-144 — encours client (lecture seule, sans migration). Somme du reste dû
-// (totalTTC − montantPaye) des factures émises non soldées, avec la part échue
-// (statut `en_retard`). Scopé par `artisanId` (sécurité multi-tenant) en plus du
-// `clientId`. Seules les factures `envoyee`/`en_retard` comptent (pas brouillon/
-// validee = pas encore une créance ; pas payee/annulee).
+// (totalTTC − montantPaye) des factures émises non soldées, avec la part échue.
+// Scopé par `artisanId` (sécurité multi-tenant) en plus du `clientId`. Seules les
+// factures `envoyee`/`en_retard` comptent (pas brouillon/validee = pas encore une
+// créance ; pas payee/annulee).
+//
+// La part « échue » est dérivée de `dateEcheance < NOW()` (aligné Odoo
+// `account.move.invoice_date_due` : le retard se calcule depuis la date, sans
+// dépendre d'un statut stocké). En effet le statut `en_retard` n'est jamais
+// positionné automatiquement (cf. OPE-61 : `runScheduler` ne bascule aucune
+// facture) → s'appuyer dessus donnerait un échu toujours nul. On garde malgré
+// tout `statut === 'en_retard'` comme échu (cas d'une bascule manuelle).
 export async function getEncoursClient(clientId: number, artisanId: number): Promise<{ encoursTotal: string; echu: string; nbFacturesImpayees: number }> {
   const db = await getDb();
   const rows = await db.select({
     statut: factures.statut,
     totalTTC: factures.totalTTC,
     montantPaye: factures.montantPaye,
+    dateEcheance: factures.dateEcheance,
   }).from(factures)
     .where(and(eq(factures.clientId, clientId), eq(factures.artisanId, artisanId)));
 
+  const now = Date.now();
   let encoursTotal = 0;
   let echu = 0;
   let nb = 0;
@@ -642,7 +651,9 @@ export async function getEncoursClient(clientId: number, artisanId: number): Pro
     if (reste <= 0) continue;
     encoursTotal += reste;
     nb += 1;
-    if (f.statut === "en_retard") echu += reste;
+    const echeance = f.dateEcheance ? new Date(f.dateEcheance).getTime() : NaN;
+    const estEchue = f.statut === "en_retard" || (!isNaN(echeance) && echeance < now);
+    if (estEchue) echu += reste;
   }
   return { encoursTotal: encoursTotal.toFixed(2), echu: echu.toFixed(2), nbFacturesImpayees: nb };
 }
