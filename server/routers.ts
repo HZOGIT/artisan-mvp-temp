@@ -137,6 +137,24 @@ function checkPortalActionRate(key: string): boolean {
   return true;
 }
 
+// Throttle dédié au chat portail (`sendClientMessage`) : token-gated mais crée un
+// message + une notification artisan à chaque appel -> sans limite, un porteur de
+// token pourrait spammer (flood de notifications). Limite GÉNÉREUSE (30 messages /
+// 5 min ≈ 6/min) — invisible pour un humain, bloque un script. Clé propre pour ne
+// pas partager le budget avec demanderRdv (même paire artisan:client). (OPE-24)
+const chatRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkChatRate(key: string): boolean {
+  const now = Date.now();
+  const entry = chatRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    chatRateMap.set(key, { count: 1, resetTime: now + 5 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 30) return false;
+  entry.count++;
+  return true;
+}
+
 // Throttle du formulaire de support (par utilisateur) : `support.contact` envoie un
 // email à support@operioz.com à chaque appel -> un compte authentifié pourrait
 // inonder la boîte support + gonfler les coûts Resend. Limite généreuse (5 / 15 min
@@ -4514,6 +4532,10 @@ ${questionsHtml}`,
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      // OPE-24 — anti-flood : message + notification artisan à chaque appel.
+      if (!checkChatRate(`${access.artisanId}:${access.clientId}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de messages envoyés. Réessayez dans quelques minutes." });
+      }
       const conv = await db.getConversationById(input.conversationId);
       if (!conv || conv.clientId !== access.clientId || conv.artisanId !== access.artisanId)
         throw new TRPCError({ code: "FORBIDDEN" });
