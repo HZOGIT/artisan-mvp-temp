@@ -6723,6 +6723,14 @@ export async function createNoteFrais(data: {
 export async function addDepenseToNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
   const pool = getPool();
   if (!pool) return;
+  // OPE-182 — vérifier que la NOTE appartient bien à l'artisan (la table de liaison
+  // `notes_frais_depenses` n'a pas d'`artisan_id`) → empêche de lier sa dépense dans
+  // la note d'un autre tenant. Skip silencieux si la note n'est pas la sienne.
+  const [noteOwn]: any = await pool.execute(
+    `SELECT id FROM notes_de_frais WHERE id = ? AND artisan_id = ?`,
+    [noteId, artisanId]
+  );
+  if (!(noteOwn as any[])[0]) return;
   // Verifier que la depense appartient bien a l'artisan + qu'elle est REMBOURSABLE :
   // une note de frais ne regroupe que des avances remboursables au salarié (OPE-179).
   // Skip silencieux (cohérent avec l'échec d'ownership) → une note ne contient jamais
@@ -6740,12 +6748,16 @@ export async function addDepenseToNoteFrais(noteId: number, depenseId: number, a
   );
 }
 
-export async function removeDepenseFromNoteFrais(noteId: number, depenseId: number): Promise<void> {
+export async function removeDepenseFromNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
   const pool = getPool();
   if (!pool) return;
+  // OPE-182 — scoper la suppression du lien à la NOTE de l'artisan (table de liaison
+  // sans `artisan_id`) → empêche un retrait cross-tenant d'une dépense de la note d'autrui.
   await pool.execute(
-    `DELETE FROM notes_frais_depenses WHERE note_id = ? AND depense_id = ?`,
-    [noteId, depenseId]
+    `DELETE nfd FROM notes_frais_depenses nfd
+       INNER JOIN notes_de_frais n ON n.id = nfd.note_id
+      WHERE nfd.note_id = ? AND nfd.depense_id = ? AND n.artisan_id = ?`,
+    [noteId, depenseId, artisanId]
   );
 }
 

@@ -9412,7 +9412,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
-      await db.removeDepenseFromNoteFrais(input.noteId, input.depenseId);
+      await db.removeDepenseFromNoteFrais(input.noteId, input.depenseId, artisan.id);
       await db.calculerTotalNoteFrais(input.noteId, artisan.id);
       return { success: true };
     }),
