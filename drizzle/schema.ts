@@ -121,6 +121,11 @@ export const bibliothequeArticles = mysqlTable("bibliotheque_articles", {
   description: text("description"),
   prix_base: decimal("prix_base", { precision: 10, scale: 2 }).notNull(),
   unite: varchar("unite", { length: 50 }).notNull(),
+  // Taux de TVA par défaut de l'article de bibliothèque (OPE-167) : pré-rempli sur
+  // la ligne de devis/facture à la sélection (symétrique d'articles_artisan.tauxTVA,
+  // consommé par getTauxTVA côté front). Default 20.00 → comportement inchangé pour
+  // les articles existants (additif, non destructif).
+  tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
   duree_moyenne_minutes: int("duree_moyenne_minutes"),
   visible: boolean("visible").default(true),
   created_at: timestamp("created_at").defaultNow(),
