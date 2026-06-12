@@ -4103,9 +4103,40 @@ Reponds UNIQUEMENT en JSON pur :
       // ligneId sont ignorées → pas d'écriture cross-commande).
       const lignesCommande = await db.getLignesCommandeFournisseur(input.id);
       const idsCommande = new Set(lignesCommande.map((l: any) => l.id));
+      // OPE-166 — quantité reçue AVANT cette opération (pour entrer en stock le DELTA).
+      const avantById = new Map<number, { recue: number; stockId: number | null }>(
+        lignesCommande.map((l: any) => [l.id, {
+          recue: parseFloat(String(l.quantiteRecue ?? "0")) || 0,
+          stockId: l.stockId ?? null,
+        }]),
+      );
       for (const r of input.lignes) {
         if (!idsCommande.has(r.ligneId)) continue;
         await db.updateLigneCommandeRecue(r.ligneId, input.id, r.quantiteRecue);
+        // OPE-166 — entrée en stock automatique du DELTA reçu pour les lignes liées à un
+        // article suivi en stock. On n'injecte que la VARIATION (réceptions partielles/
+        // incrémentales gérées : pas de double-comptage du cumul). Best-effort (un échec
+        // stock ne casse pas la réception) + vérif d'appartenance (adjustStock non scopé).
+        const avant = avantById.get(r.ligneId);
+        if (avant?.stockId) {
+          const delta = r.quantiteRecue - avant.recue;
+          if (Math.abs(delta) > 1e-9) {
+            try {
+              const stock = await db.getStockById(avant.stockId);
+              if (stock && (stock as any).artisanId === artisan.id) {
+                await db.adjustStock(
+                  avant.stockId,
+                  Math.abs(delta),
+                  delta > 0 ? "entree" : "sortie",
+                  `Réception commande ${commande.numero || commande.id}`,
+                  String(commande.numero || commande.id),
+                );
+              }
+            } catch (e: any) {
+              console.warn("[recevoir] adjustStock:", e?.message || e);
+            }
+          }
+        }
       }
       // Recalcule le statut depuis les quantités reçues (source de vérité = lignes).
       const apres = await db.getLignesCommandeFournisseur(input.id);
