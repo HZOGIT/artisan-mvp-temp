@@ -6593,10 +6593,13 @@ export async function calculerTotalNoteFrais(noteId: number, artisanId: number):
   const pool = getPool();
   if (!pool) return 0;
   const [rows]: any = await pool.execute(
+    // OPE-179 — ne somme QUE les dépenses remboursables (avances salarié) : une dépense
+    // `remboursable = FALSE` (réglée par l'entreprise) liée à une note ne doit pas gonfler
+    // le montant à rembourser. Aligné sur la stat `getDepensesStats` (filtre déjà remboursable).
     `SELECT COALESCE(SUM(d.montant_ttc), 0) AS total
        FROM depenses d
        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
+      WHERE nfd.note_id = ? AND d.artisan_id = ? AND d.remboursable = TRUE`,
     [noteId, artisanId]
   );
   const total = Number((rows as any[])[0]?.total || 0);
@@ -6670,10 +6673,12 @@ export async function payerNoteFrais(id: number, artisanId: number): Promise<any
     [id, artisanId]
   );
   await pool.execute(
+    // OPE-179 — ne marque « remboursée » QUE les dépenses remboursables (cohérent avec le
+    // total calculé) : une dépense non remboursable liée à la note n'est pas remboursée au salarié.
     `UPDATE depenses d
         INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
         SET d.statut = 'remboursee', d.rembourse = TRUE, d.date_remboursement = CURDATE()
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
+      WHERE nfd.note_id = ? AND d.artisan_id = ? AND d.remboursable = TRUE`,
     [id, artisanId]
   );
   return getNoteFraisById(id, artisanId);
