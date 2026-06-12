@@ -435,6 +435,8 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     dateLines: [
       `Date : ${new Date(devis.dateDevis).toLocaleDateString("fr-FR")}`,
       `Validité : ${devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : "Non définie"}`,
+      // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+      ...(devis.referenceClient ? [`Votre réf. : ${devis.referenceClient}`] : []),
     ],
   });
 
@@ -522,6 +524,8 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     dateLines: [
       `Date : ${new Date(facture.dateFacture).toLocaleDateString("fr-FR")}`,
       `Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`,
+      // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+      ...(facture.referenceClient ? [`Votre réf. : ${facture.referenceClient}`] : []),
     ],
   });
 

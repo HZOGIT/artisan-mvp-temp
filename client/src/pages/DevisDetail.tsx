@@ -261,6 +261,7 @@ export default function DevisDetail() {
         dateValidite: devis.dateValidite,
         statut: devis.statut || "brouillon",
         objet: devis.objet,
+        referenceClient: (devis as any).referenceClient,
         lignes,
         totalHT: parseFloat(devis.totalHT as any) || 0,
         totalTVA: parseFloat(devis.totalTVA as any) || 0,

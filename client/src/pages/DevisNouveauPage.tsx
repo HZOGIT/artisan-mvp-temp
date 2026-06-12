@@ -47,6 +47,7 @@ export default function DevisNouveauPage() {
   const [dateDevis, setDateDevis] = useState(new Date().toISOString().split('T')[0]);
   const [dateExpiration, setDateExpiration] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [objet, setObjet] = useState("");
+  const [referenceClient, setReferenceClient] = useState("");
   const [notes, setNotes] = useState("");
   const [lignes, setLignes] = useState<LigneDevis[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -218,6 +219,7 @@ export default function DevisNouveauPage() {
       const devis = await createMutation.mutateAsync({
         clientId,
         objet: objet || undefined,
+        referenceClient: referenceClient || undefined,
         dateValidite: dateExpiration,
         notes,
       });
@@ -314,6 +316,19 @@ export default function DevisNouveauPage() {
             value={objet}
             onChange={(e) => setObjet(e.target.value)}
             placeholder="Ex: Rénovation salle de bain, Dépannage fuite..."
+          />
+        </div>
+
+        {/* Référence client (B2B) — OPE-158 */}
+        <div>
+          <Label htmlFor="referenceClient" className="block text-sm font-medium mb-2">
+            Référence client / N° de commande
+          </Label>
+          <Input
+            id="referenceClient"
+            value={referenceClient}
+            onChange={(e) => setReferenceClient(e.target.value)}
+            placeholder="Ex: BC-2026-0042 (optionnel, pour les clients pros)"
           />
         </div>
 

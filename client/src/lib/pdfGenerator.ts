@@ -232,6 +232,7 @@ interface DevisData {
   dateValidite?: Date | string | null;
   statut: string;
   objet?: string | null;
+  referenceClient?: string | null;
   lignes: LigneDocument[];
   totalHT: number;
   totalTVA: number;
@@ -245,6 +246,7 @@ interface FactureData {
   dateEcheance?: Date | string | null;
   statut: string;
   objet?: string | null;
+  referenceClient?: string | null;
   lignes: LigneDocument[];
   totalHT: number;
   totalTVA: number;
@@ -339,7 +341,7 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
 
 function addDocumentInfo(
   doc: jsPDF,
-  data: { dateCreation: Date | string; dateValidite?: Date | string | null; dateEcheance?: Date | string | null; statut: string; objet?: string | null },
+  data: { dateCreation: Date | string; dateValidite?: Date | string | null; dateEcheance?: Date | string | null; statut: string; objet?: string | null; referenceClient?: string | null },
   type: "devis" | "facture",
   yStart: number
 ): number {
@@ -372,6 +374,15 @@ function addDocumentInfo(
   doc.text("Statut:", 20, yPos);
   doc.setFont("Roboto", "normal");
   doc.text(getStatutLabel(data.statut, type), 65, yPos);
+
+  // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+  if (data.referenceClient) {
+    yPos += 6;
+    doc.setFont("Roboto", "bold");
+    doc.text("Votre réf.:", 20, yPos);
+    doc.setFont("Roboto", "normal");
+    doc.text(String(data.referenceClient), 65, yPos);
+  }
 
   if (data.objet) {
     yPos += 10;

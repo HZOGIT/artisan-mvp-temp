@@ -56,6 +56,7 @@ export default function Factures() {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [formData, setFormData] = useState({
     objet: "",
+    referenceClient: "",
     conditionsPaiement: "Paiement à réception",
     notes: "",
     dateEcheance: "",
@@ -201,6 +202,15 @@ export default function Factures() {
                     value={formData.objet}
                     onChange={(e) => setFormData({ ...formData, objet: e.target.value })}
                     placeholder="Ex: Travaux de rénovation"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="referenceClient">Référence client / N° de commande</Label>
+                  <Input
+                    id="referenceClient"
+                    value={formData.referenceClient}
+                    onChange={(e) => setFormData({ ...formData, referenceClient: e.target.value })}
+                    placeholder="Ex: BC-2026-0042 (optionnel, pour les clients pros)"
                   />
                 </div>
                 <div className="space-y-2">

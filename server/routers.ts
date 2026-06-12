@@ -738,6 +738,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       // Bornes raisonnables (champs TEXT) : borne le stockage + erreur 400 claire
       // au lieu d'un 500 au-delà de la capacité TEXT. Defense-in-depth (OPE-24).
       objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
       conditionsPaiement: z.string().max(2000).optional(),
       notes: z.string().max(5000).optional(),
       dateValidite: z.string().optional(),
@@ -754,6 +755,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       return await dbSecure.createDevisSecure(artisan.id, input.clientId, {
         numero,
         objet: input.objet,
+        referenceClient: input.referenceClient,
         conditionsPaiement: input.conditionsPaiement,
         notes: input.notes,
         dateValidite: input.dateValidite ? new Date(input.dateValidite) : undefined,
@@ -769,6 +771,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
     .input(z.object({
       id: z.number(),
       objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
       conditionsPaiement: z.string().max(2000).optional(),
       notes: z.string().max(5000).optional(),
       dateValidite: z.string().optional(),
@@ -1405,6 +1408,7 @@ const facturesRouter = router({
       // Bornes raisonnables (champs TEXT) : borne le stockage + 400 clair au lieu d'un
       // 500 au-delà de la capacité TEXT. Defense-in-depth, idem devis (OPE-24).
       objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
       conditionsPaiement: z.string().max(2000).optional(),
       notes: z.string().max(5000).optional(),
       dateEcheance: z.string().optional(),
@@ -1422,6 +1426,7 @@ const facturesRouter = router({
         clientId: input.clientId,
         numero,
         objet: input.objet,
+        referenceClient: input.referenceClient,
         conditionsPaiement: input.conditionsPaiement,
         notes: input.notes,
         dateEcheance: input.dateEcheance ? new Date(input.dateEcheance) : undefined,
@@ -1446,6 +1451,7 @@ const facturesRouter = router({
     .input(z.object({
       id: z.number(),
       objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
       conditionsPaiement: z.string().max(2000).optional(),
       notes: z.string().max(5000).optional(),
       dateEcheance: z.string().optional(),
@@ -1469,7 +1475,7 @@ const facturesRouter = router({
 
       // Si la facture est verrouillée, seul le changement de statut est autorisé (et dans le bon sens)
       if (isLocked) {
-        const hasContentChanges = data.objet !== undefined || data.conditionsPaiement !== undefined || data.notes !== undefined || dateEcheance !== undefined;
+        const hasContentChanges = data.objet !== undefined || data.referenceClient !== undefined || data.conditionsPaiement !== undefined || data.notes !== undefined || dateEcheance !== undefined;
         if (hasContentChanges) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Document fiscal verrouillé — modification interdite. Émettez un avoir pour corriger." });
         }

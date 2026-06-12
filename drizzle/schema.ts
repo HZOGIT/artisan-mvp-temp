@@ -144,6 +144,10 @@ export const devis = mysqlTable("devis", {
   dateValidite: timestamp("dateValidite"),
   statut: mysqlEnum("statut", ["brouillon", "envoye", "accepte", "refuse", "expire"]).default("brouillon"),
   objet: text("objet"),
+  // Référence/N° de commande fourni par le client (B2B : syndic, entreprise,
+  // marché public) — OPE-158. Reportée sur la facture à la conversion et rappelée
+  // sur le PDF pour que le client rapproche la facture de son bon de commande.
+  referenceClient: varchar("referenceClient", { length: 100 }),
   conditionsPaiement: text("conditionsPaiement"),
   notes: text("notes"),
   totalHT: decimal("totalHT", { precision: 10, scale: 2 }).default("0.00"),
@@ -193,6 +197,9 @@ export const factures = mysqlTable("factures", {
   typeDocument: mysqlEnum("typeDocument", ["facture", "avoir"]).default("facture"),
   factureOrigineId: int("factureOrigineId"),
   objet: text("objet"),
+  // Référence/N° de commande du client (B2B) — OPE-158. Reportée depuis le devis
+  // à la conversion ; rappelée sur le PDF (« Votre référence : … »).
+  referenceClient: varchar("referenceClient", { length: 100 }),
   conditionsPaiement: text("conditionsPaiement"),
   notes: text("notes"),
   totalHT: decimal("totalHT", { precision: 10, scale: 2 }).default("0.00"),

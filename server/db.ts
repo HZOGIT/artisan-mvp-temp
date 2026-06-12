@@ -651,6 +651,8 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
     devisId: devisData.id,
     numero,
     objet: devisData.objet,
+    // OPE-158 — report de la référence client (n° de commande) du devis vers la facture.
+    referenceClient: devisData.referenceClient,
     conditionsPaiement: devisData.conditionsPaiement,
     notes: devisData.notes,
     totalHT: devisData.totalHT,

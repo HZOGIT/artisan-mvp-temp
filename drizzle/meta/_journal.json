@@ -29,6 +29,13 @@
       "when": 1781238725875,
       "tag": "0003_nice_catseye",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1781239982030,
+      "tag": "0004_shallow_spectrum",
+      "breakpoints": true
     }
   ]
 }

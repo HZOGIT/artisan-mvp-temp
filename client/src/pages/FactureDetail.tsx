@@ -318,6 +318,7 @@ export default function FactureDetail() {
         dateEcheance: facture.dateEcheance,
         statut: facture.statut || "brouillon",
         objet: facture.objet,
+        referenceClient: (facture as any).referenceClient,
         lignes,
         totalHT: parseFloat(facture.totalHT as any) || 0,
         totalTVA: parseFloat(facture.totalTVA as any) || 0,
