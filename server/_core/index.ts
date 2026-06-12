@@ -546,7 +546,7 @@ async function startServer() {
       if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
       const secret = new TextEncoder().encode(JWT_SECRET);
       let payload: any;
-      try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+      try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
 
       const contrat = await getContratById(parseInt(req.params.id));
       if (!contrat) { res.status(404).json({ error: 'Contrat non trouvé' }); return; }
@@ -578,7 +578,7 @@ async function startServer() {
       if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
       const secret = new TextEncoder().encode(JWT_SECRET);
       let payload: any;
-      try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+      try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
 
       const commande = await getCommandeFournisseurById(parseInt(req.params.id));
       if (!commande) { res.status(404).json({ error: 'Commande non trouvée' }); return; }
@@ -612,7 +612,7 @@ async function startServer() {
     if (!token) { res.status(401).json({ error: 'Non authentifié' }); return null; }
     const secret = new TextEncoder().encode(JWT_SECRET);
     let payload: any;
-    try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return null; }
+    try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return null; }
     const artisan = await getArtisanByUserId(payload.userId);
     if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return null; }
     return artisan;

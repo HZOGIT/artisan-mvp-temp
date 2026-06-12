@@ -35,7 +35,9 @@ export async function verifyToken(
   token: string
 ): Promise<{ userId: number; email: string } | null> {
   try {
-    const verified = await jwtVerify(token, SECRET_KEY);
+    // Épingle l'algorithme (HS256) : defense-in-depth contre toute confusion d'algo /
+    // alg:none. jose limite déjà aux HMAC pour une clé symétrique, on est explicite.
+    const verified = await jwtVerify(token, SECRET_KEY, { algorithms: ["HS256"] });
     return verified.payload as { userId: number; email: string };
   } catch (error) {
     return null;
