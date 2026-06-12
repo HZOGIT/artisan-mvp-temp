@@ -6768,6 +6768,12 @@ const congesRouter = router({
       motif: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // OPE-45 (classe IDOR/intégrité) — valider que le technicien appartient au tenant
+      // appelant AVANT de créer un congé : sinon un artisan peut créer un congé référençant
+      // un technicien d'un autre tenant (intégrité cassée + nom du technicien étranger
+      // potentiellement exposé à l'affichage). Les sœurs (byTechnicien, geoloc, badges…)
+      // valident déjà ; `create` était le trou. NOT_FOUND uniforme si étranger/inexistant.
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
       // Garde de validité des dates (classe « date invalide ») : `new Date("garbage")` ->
       // Invalid Date insérée dans conges.dateDebut/dateFin (NOT NULL) -> 500 MySQL en mode
