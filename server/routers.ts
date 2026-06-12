@@ -3345,8 +3345,12 @@ const parametresRouter = router({
   
   update: protectedProcedure
     .input(z.object({
-      prefixeDevis: z.string().optional(),
-      prefixeFacture: z.string().optional(),
+      // Bornes alignées sur les colonnes `prefixeDevis`/`prefixeFacture` = VARCHAR(10)
+      // (OPE-24) : sans .max, un préfixe > 10 car. -> ER_DATA_TOO_LONG (500) à
+      // l'enregistrement des paramètres, et risque d'overflow du `numero` VARCHAR(50)
+      // (préfixe concaténé). Behavior-preserving : « DEV »/« FAC » (≤ 3 car.) passent.
+      prefixeDevis: z.string().max(10).optional(),
+      prefixeFacture: z.string().max(10).optional(),
       // Bornes raisonnables (OPE-24) : vitrineZone est VARCHAR(500) -> .max(500) évite un
       // ER_DATA_TOO_LONG (500) ; les champs TEXT sont bornés en defense-in-depth.
       mentionsLegales: z.string().max(5000).optional(),
