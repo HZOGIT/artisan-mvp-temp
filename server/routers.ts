@@ -1078,6 +1078,12 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
       }
+      // OPE-24 — anti-abus : borne l'envoi du devis par email (génère un PDF + email
+      // Resend au client). Sans ça, un compte authentifié peut spammer le client et
+      // brûler le quota Resend. Même limiteur que bon de commande/avis (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`devis:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois de devis par email. Réessayez dans quelques minutes." });
+      }
 
       const artisanName = artisan.nomEntreprise || "Votre artisan";
       const clientName = client.prenom ? `${client.prenom} ${client.nom}` : client.nom;
@@ -1796,6 +1802,11 @@ const facturesRouter = router({
       const client = await db.getClientById(facture.clientId);
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+      // OPE-24 — anti-abus : borne l'envoi de la facture par email (génère un PDF + email
+      // Resend au client). Même limiteur que bon de commande/avis (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`facture:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois de facture par email. Réessayez dans quelques minutes." });
       }
 
       const artisanName = artisan.nomEntreprise || "Votre artisan";
