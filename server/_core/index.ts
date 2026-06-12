@@ -1172,6 +1172,11 @@ async function startServer() {
 
           let textBuffer = '';
           const functionCalls: any[] = [];
+          // Gemini 3.x attache un thought_signature aux parts functionCall : il
+          // DOIT être renvoyé tel quel au tour suivant (sinon 400 "Function call
+          // is missing a thought_signature"). On conserve donc les parts BRUTES
+          // pour reconstruire le tour 'model' à l'identique.
+          const functionCallParts: any[] = [];
           let lastFinishReason: string | undefined;
 
           for await (const chunk of stream) {
@@ -1188,15 +1193,19 @@ async function startServer() {
                 fullAssistantText += part.text;
                 res.write(`data: ${JSON.stringify({ content: part.text })}\n\n`);
               }
-              if (part.functionCall) functionCalls.push(part.functionCall);
+              if (part.functionCall) {
+                functionCalls.push(part.functionCall);
+                functionCallParts.push(part); // part brute (incl. thoughtSignature)
+              }
             }
             if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
           }
 
-          // Assemble model turn
+          // Assemble model turn. On renvoie les parts functionCall BRUTES (avec
+          // leur thoughtSignature) — requis par Gemini 3.x au tour suivant.
           const modelParts: any[] = [];
           if (textBuffer) modelParts.push({ text: textBuffer });
-          functionCalls.forEach(fc => modelParts.push({ functionCall: fc }));
+          functionCallParts.forEach(p => modelParts.push(p));
           if (modelParts.length > 0) contents.push({ role: 'model', parts: modelParts });
 
           if (functionCalls.length === 0) {
