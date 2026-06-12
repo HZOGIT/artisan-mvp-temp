@@ -4981,12 +4981,17 @@ const contratsRouter = router({
       if (!artisan || contrat.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // Garde de validité (classe « date invalide ») : dateIntervention est NOT NULL.
+      const dateIntervention = new Date(input.dateIntervention);
+      if (isNaN(dateIntervention.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date d'intervention invalide" });
+      }
       return db.createInterventionContrat({
         contratId: input.contratId,
         artisanId: artisan.id,
         titre: input.titre,
         description: input.description,
-        dateIntervention: new Date(input.dateIntervention),
+        dateIntervention,
         duree: input.duree,
         technicienNom: input.technicienNom,
         notes: input.notes,
@@ -6495,11 +6500,20 @@ const congesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // Garde de validité des dates (classe « date invalide ») : `new Date("garbage")` ->
+      // Invalid Date insérée dans conges.dateDebut/dateFin (NOT NULL) -> 500 MySQL en mode
+      // strict + décompte de solde faussé. On rejette proprement en 400. Behavior-preserving :
+      // une date valide (sélecteur front) passe à l'identique.
+      const dateDebut = new Date(input.dateDebut);
+      const dateFin = new Date(input.dateFin);
+      if (isNaN(dateDebut.getTime()) || isNaN(dateFin.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date invalide" });
+      }
       return await db.createConge({
         ...input,
         artisanId: artisan.id,
-        dateDebut: new Date(input.dateDebut),
-        dateFin: new Date(input.dateFin),
+        dateDebut,
+        dateFin,
       });
     }),
 
@@ -6821,10 +6835,20 @@ const vehiculesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
+      // Garde de validité (classe « date invalide ») : dateEntretien est NOT NULL ;
+      // prochainEntretienDate est optionnelle (gardée seulement si fournie).
+      const dateEntretien = new Date(input.dateEntretien);
+      if (isNaN(dateEntretien.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date d'entretien invalide" });
+      }
+      const prochainEntretienDate = input.prochainEntretienDate ? new Date(input.prochainEntretienDate) : undefined;
+      if (prochainEntretienDate && isNaN(prochainEntretienDate.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de prochain entretien invalide" });
+      }
       return await db.createEntretienVehicule({
         ...input,
-        dateEntretien: new Date(input.dateEntretien),
-        prochainEntretienDate: input.prochainEntretienDate ? new Date(input.prochainEntretienDate) : undefined,
+        dateEntretien,
+        prochainEntretienDate,
       });
     }),
 
@@ -8220,6 +8244,14 @@ const rdvRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "RDV non trouve" });
       }
 
+      // Garde de validité (classe « date invalide ») AVANT toute mutation : dateProposee est
+      // NOT NULL. Sans ce garde et placée ici, on refuserait l'ancien RDV puis on planterait
+      // sur la création du nouveau (état incohérent : RDV refusé sans remplaçant).
+      const nouvelleDate = new Date(input.nouvelleDateProposee);
+      if (isNaN(nouvelleDate.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date proposée invalide" });
+      }
+
       await db.updateRdvStatut(rdv.id, "refuse", {
         motifRefus: "Creneau non disponible — un autre creneau a ete propose",
       });
@@ -8229,7 +8261,7 @@ const rdvRouter = router({
         clientId: rdv.clientId,
         titre: rdv.titre,
         description: rdv.description,
-        dateProposee: new Date(input.nouvelleDateProposee),
+        dateProposee: nouvelleDate,
         dureeEstimee: rdv.dureeEstimee,
         urgence: rdv.urgence || "normale",
       });
