@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, isNull, between, ne } from "drizzle-orm";
+import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, between, ne } from "drizzle-orm";
 import { 
   users, User, InsertUser,
   artisans, Artisan, InsertArtisan,
@@ -959,6 +959,48 @@ export async function getInterventionById(id: number): Promise<Intervention | un
   const db = await getDb();
   const result = await db.select().from(interventions).where(eq(interventions.id, id)).limit(1);
   return result[0];
+}
+
+// OPE-110 — détection (non bloquante) des conflits d'affectation d'un technicien sur
+// une fenêtre [dateDebut, dateFin] : (1) interventions actives qui chevauchent,
+// (2) congés APPROUVÉS qui couvrent la période. Toujours scopé `artisanId`.
+export async function getConflitsTechnicien(
+  artisanId: number,
+  technicienId: number,
+  dateDebut: Date,
+  dateFin: Date,
+  excludeInterventionId?: number,
+): Promise<{
+  interventions: { id: number; titre: string; dateDebut: Date; dateFin: Date | null }[];
+  conges: { id: number; type: string; dateDebut: any; dateFin: any }[];
+}> {
+  const db = await getDb();
+  // Chevauchement : existante.dateDebut < nouvelleFin ET COALESCE(fin, debut) > nouvelleDebut.
+  const conds: any[] = [
+    eq(interventions.artisanId, artisanId),
+    eq(interventions.technicienId, technicienId),
+    inArray(interventions.statut, ["planifiee", "en_cours"] as any),
+    lt(interventions.dateDebut, dateFin),
+    sql`COALESCE(${interventions.dateFin}, ${interventions.dateDebut}) > ${dateDebut}`,
+  ];
+  if (excludeInterventionId) conds.push(ne(interventions.id, excludeInterventionId));
+  const inter = await db.select({
+    id: interventions.id, titre: interventions.titre,
+    dateDebut: interventions.dateDebut, dateFin: interventions.dateFin,
+  }).from(interventions).where(and(...conds)).limit(20);
+
+  // Congés approuvés du technicien recouvrant la période (colonnes `date`, comparaison YMD).
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+  const congesList = await db.select({
+    id: conges.id, type: conges.type, dateDebut: conges.dateDebut, dateFin: conges.dateFin,
+  }).from(conges).where(and(
+    eq(conges.technicienId, technicienId),
+    eq(conges.statut, "approuve" as any),
+    lte(conges.dateDebut, ymd(dateFin)),
+    gte(conges.dateFin, ymd(dateDebut)),
+  )).limit(20);
+
+  return { interventions: inter as any, conges: congesList as any };
 }
 
 export async function getInterventionsByClientId(clientId: number): Promise<Intervention[]> {

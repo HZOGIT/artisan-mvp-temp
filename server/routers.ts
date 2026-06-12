@@ -2268,9 +2268,27 @@ const interventionsRouter = router({
       if (!tech || tech.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Technicien non autorise" });
       }
-      return await db.updateIntervention(input.interventionId, {
+      // OPE-110 — détection NON bloquante des conflits (double-booking + congés approuvés)
+      // sur la fenêtre de l'intervention. L'affectation reste effectuée ; les conflits
+      // éventuels sont renvoyés au front pour avertissement (comportement préservé).
+      const updated = await db.updateIntervention(input.interventionId, {
         technicienId: input.technicienId
       });
+      let conflits: { interventions: any[]; conges: any[] } = { interventions: [], conges: [] };
+      try {
+        const debut = intervention.dateDebut ? new Date(intervention.dateDebut) : null;
+        if (debut && !isNaN(debut.getTime())) {
+          const fin = intervention.dateFin ? new Date(intervention.dateFin) : debut;
+          conflits = await db.getConflitsTechnicien(
+            artisan.id, input.technicienId, debut,
+            isNaN(fin.getTime()) ? debut : fin,
+            input.interventionId,
+          );
+        }
+      } catch (e: any) {
+        console.warn("[assignerTechnicien] détection conflits:", e?.message);
+      }
+      return { ...updated, conflits };
     }),
 
   // Gestion des couleurs personnalisées du calendrier
