@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation, useSearch } from "wouter";
-import { Plus, Search, Receipt, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Receipt, MoreHorizontal, Eye, Pencil, Trash2, Download } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { StatutBadge } from "@/components/StatutBadge";
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
 
 const statusLabels: Record<string, string> = {
   brouillon: "Brouillon",
@@ -154,6 +155,39 @@ export default function Factures() {
   };
   const activeStatusLabel = statusFilter !== "all" ? statusFilterLabel[statusFilter] : null;
 
+  // Export CSV des factures (portabilité RGPD — OPE-175). Exporte la sélection
+  // courante (après filtres type/statut/recherche). Devis a déjà son export Excel.
+  const handleExportCSV = () => {
+    const data = filteredFactures || [];
+    if (data.length === 0) {
+      toast.error("Aucune facture à exporter");
+      return;
+    }
+    const headers = [
+      "Numéro", "Type", "Client", "Objet", "Référence client",
+      "Date", "Échéance", "Montant HT", "TVA", "Montant TTC", "Montant payé", "Statut",
+    ];
+    const rows = data.map((f: any) => {
+      const client: any = clientsMap.get(f.clientId);
+      return [
+        f.numero,
+        f.typeDocument === "avoir" ? "Avoir" : "Facture",
+        client ? `${client.nom || ""} ${client.prenom || ""}`.trim() : "",
+        f.objet,
+        f.referenceClient,
+        f.dateFacture ? format(new Date(f.dateFacture), "dd/MM/yyyy") : "",
+        f.dateEcheance ? format(new Date(f.dateEcheance), "dd/MM/yyyy") : "",
+        parseFloat(f.totalHT || "0").toFixed(2),
+        parseFloat(f.totalTVA || "0").toFixed(2),
+        parseFloat(f.totalTTC || "0").toFixed(2),
+        parseFloat(f.montantPaye || "0").toFixed(2),
+        statusLabels[f.statut] || f.statut,
+      ];
+    });
+    exportToCsv(`factures_${csvDateSuffix()}.csv`, headers, rows);
+    toast.success(`${data.length} facture(s) exportée(s)`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -164,7 +198,12 @@ export default function Factures() {
             Gérez vos factures et avoirs clients
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Exporter (CSV)
+          </Button>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
@@ -242,7 +281,8 @@ export default function Factures() {
               </DialogFooter>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {activeStatusLabel && (

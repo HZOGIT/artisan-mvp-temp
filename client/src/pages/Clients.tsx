@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { matchSearch } from "@/lib/normalize";
+import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
 
 interface ClientFormData {
   nom: string;
@@ -151,6 +152,22 @@ export function Clients() {
     (client.telephone ? client.telephone.includes(searchQuery) : false)
   );
 
+  // Export CSV des clients (portabilité RGPD — OPE-158/OPE-175). Exporte la
+  // sélection courante (après filtre de recherche), sinon l'ensemble.
+  const handleExportCSV = () => {
+    const data = filteredClients;
+    if (!data || data.length === 0) {
+      toast.error("Aucun client à exporter");
+      return;
+    }
+    const headers = ["Nom", "Prénom", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "Notes"];
+    const rows = data.map((c: any) => [
+      c.nom, c.prenom, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.notes,
+    ]);
+    exportToCsv(`clients_${csvDateSuffix()}.csv`, headers, rows);
+    toast.success(`${data.length} client(s) exporté(s)`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -159,10 +176,16 @@ export function Clients() {
           <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground mt-1">Gérez votre base de clients</p>
         </div>
-        <Button onClick={() => navigate('/clients/nouveau')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouveau client
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Exporter (CSV)
+          </Button>
+          <Button onClick={() => navigate('/clients/nouveau')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nouveau client
+          </Button>
+        </div>
       </div>
 
       {/* Barre de recherche */}
