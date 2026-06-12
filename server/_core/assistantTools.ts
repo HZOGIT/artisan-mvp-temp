@@ -3,6 +3,7 @@ import * as db from "../db";
 import {
   sendEmail,
   generateFactureEmailContent,
+  safeHtml,
 } from "./emailService";
 
 // ============================================================================
@@ -432,8 +433,13 @@ function buildDevisSignatureEmailBody(params: {
   dateValidite?: string;
   signatureUrl: string;
 }): { subject: string; body: string } {
-  const { artisanName, clientName, devisNumero, devisObjet, totalTTC, dateValidite, signatureUrl } = params;
-  const subject = `Devis ${devisNumero}${devisObjet ? ` - ${devisObjet}` : ""} de ${artisanName}`;
+  const { artisanName: rawArtisanName, clientName: rawClientName, devisNumero, devisObjet, totalTTC, dateValidite, signatureUrl } = params;
+  const subject = `Devis ${devisNumero}${devisObjet ? ` - ${devisObjet}` : ""} de ${rawArtisanName}`;
+  // OPE-12/36/59 (échappement HTML emails) — les champs user (nom artisan/client, objet)
+  // sont interpolés dans du HTML brut : échapper pour éviter une injection HTML stockée.
+  const artisanName = safeHtml(rawArtisanName);
+  const clientName = safeHtml(rawClientName);
+  const objetHtml = devisObjet ? safeHtml(devisObjet) : "";
   const body = `<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"></head>
@@ -448,7 +454,7 @@ function buildDevisSignatureEmailBody(params: {
 
         <tr><td style="padding:36px 40px 16px 40px;">
           <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
-          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${devisNumero}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${devisObjet}&nbsp;&raquo;</em>` : ""} d'un montant de <strong>${totalTTC}</strong>${dateValidite ? `, valable jusqu'au <strong>${dateValidite}</strong>` : ""}. Vous pouvez le consulter et le signer électroniquement en un clic.</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${devisNumero}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${objetHtml}&nbsp;&raquo;</em>` : ""} d'un montant de <strong>${totalTTC}</strong>${dateValidite ? `, valable jusqu'au <strong>${dateValidite}</strong>` : ""}. Vous pouvez le consulter et le signer électroniquement en un clic.</p>
         </td></tr>
 
         <tr><td style="padding:0 40px 24px 40px;">
@@ -507,8 +513,11 @@ function buildRelanceEmailBody(params: {
   totalTTC: string;
   joursRetard: number;
 }): { subject: string; body: string } {
-  const { artisanName, clientName, factureNumero, totalTTC, joursRetard } = params;
+  const { artisanName: rawArtisanName, clientName: rawClientName, factureNumero, totalTTC, joursRetard } = params;
   const subject = `Rappel : facture ${factureNumero} en attente de règlement`;
+  // OPE-12/36/59 — échappement HTML des champs user dans le corps de l'email.
+  const artisanName = safeHtml(rawArtisanName);
+  const clientName = safeHtml(rawClientName);
   const body = `<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"></head>
