@@ -2896,7 +2896,14 @@ const signatureRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Ce lien de signature a expiré" });
       }
 
-      const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
+      // OPE-80 — IP de signature à valeur probante : prioriser CF-Connecting-IP (posé par
+      // Cloudflare, non falsifiable) plutôt que X-Forwarded-For[0] (que le signataire peut
+      // usurper). On ne garde qu'UNE IP (pas toute la chaîne XFF) — sinon dépassement de
+      // signaturesDevis.ipAddress VARCHAR(45) -> ER_DATA_TOO_LONG (500) à la signature.
+      const ipAddress = (ctx.req.headers['cf-connecting-ip'] as string)?.trim()
+        || (ctx.req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+        || ctx.req.socket?.remoteAddress
+        || 'unknown';
       const userAgent = ctx.req.headers['user-agent'] || 'unknown';
 
       const signature = await db.signDevis(
@@ -2956,7 +2963,14 @@ const signatureRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été traité" });
       }
 
-      const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
+      // OPE-80 — IP de signature à valeur probante : prioriser CF-Connecting-IP (posé par
+      // Cloudflare, non falsifiable) plutôt que X-Forwarded-For[0] (que le signataire peut
+      // usurper). On ne garde qu'UNE IP (pas toute la chaîne XFF) — sinon dépassement de
+      // signaturesDevis.ipAddress VARCHAR(45) -> ER_DATA_TOO_LONG (500) à la signature.
+      const ipAddress = (ctx.req.headers['cf-connecting-ip'] as string)?.trim()
+        || (ctx.req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+        || ctx.req.socket?.remoteAddress
+        || 'unknown';
       const userAgent = ctx.req.headers['user-agent'] || 'unknown';
 
       const signature = await db.refuserDevis(
