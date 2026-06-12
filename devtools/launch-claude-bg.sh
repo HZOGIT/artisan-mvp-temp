@@ -53,16 +53,27 @@ fi
 CMD=("$CLAUDE_BIN" --model "$MODEL" --permission-mode auto \
      --dangerously-skip-permissions --remote-control "$SESSION_NAME")
 
+# Build a properly-quoted command string so spaces/newlines in the prompt
+# are not word-split by the bash -c subshell.
+QUOTED_CMD=$(printf '%q ' "${CMD[@]}")
+
 if [[ -n "${INIT_PROMPT:-}" ]]; then
   if [[ ! -f "$INIT_PROMPT" ]]; then
     echo "ERROR: INIT_PROMPT file not found: $INIT_PROMPT" >&2
     exit 1
   fi
-  CMD+=("$(cat "$INIT_PROMPT")")
+  # Export prompt content so the subshell can reference it via $CLAUDE_INIT_PROMPT
+  # without the outer shell word-splitting its value into the bash -c string.
+  export CLAUDE_INIT_PROMPT
+  CLAUDE_INIT_PROMPT="$(cat "$INIT_PROMPT")"
 fi
 
 echo "Launching Claude session '${SESSION_NAME}' (model: ${MODEL}) in ${WORKDIR}..."
-screen -dmS "$SESSION_NAME" bash -c "cd '$WORKDIR' && exec ${CMD[*]}"
+if [[ -n "${INIT_PROMPT:-}" ]]; then
+  screen -dmS "$SESSION_NAME" bash -c "cd '$WORKDIR' && exec $QUOTED_CMD \"\$CLAUDE_INIT_PROMPT\""
+else
+  screen -dmS "$SESSION_NAME" bash -c "cd '$WORKDIR' && exec $QUOTED_CMD"
+fi
 
 sleep 1
 if screen -ls 2>/dev/null | grep -qE "[0-9]+\.${SESSION_NAME}[[:space:]]"; then
