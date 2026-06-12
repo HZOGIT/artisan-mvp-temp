@@ -1001,6 +1001,10 @@ export async function updateStock(id: number, data: Partial<InsertStock>): Promi
 
 export async function deleteStock(id: number): Promise<void> {
   const db = await getDb();
+  // Cascade : supprimer l'historique de mouvements (opérationnel, sans valeur
+  // légale/comptable) avant l'article -> évite des `mouvements_stock` orphelins
+  // pointant vers un stockId supprimé. Même pattern que deleteChantier/deleteFacture.
+  await db.delete(mouvementsStock).where(eq(mouvementsStock.stockId, id));
   await db.delete(stocks).where(eq(stocks.id, id));
 }
 
