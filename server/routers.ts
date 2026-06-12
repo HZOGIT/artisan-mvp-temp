@@ -2809,15 +2809,52 @@ const signatureRouter = router({
       const client = await db.getClientById(devisData.clientId);
       const lignes = await db.getLignesDevisByDevisId(devisData.id);
 
+      // OPE-146 — options/variantes du devis (Standard/Premium…) que le client peut
+      // CHOISIR avant signature. Chargées avec leurs lignes pour l'affichage portail.
+      const optionsRaw = await db.getDevisOptionsByDevisId(devisData.id);
+      const options = await Promise.all(optionsRaw.map(async (o) => ({
+        ...o,
+        lignes: await db.getDevisOptionLignesByOptionId(o.id),
+      })));
+
       return {
         devis: devisData,
         artisan,
         client,
         lignes,
+        options,
         signature
       };
     }),
-  
+
+  // OPE-146 — le client sélectionne une option/variante du devis depuis le lien de
+  // signature, AVANT de signer. Scopé au devis de la signature + throttlé.
+  selectDevisOption: publicProcedure
+    .input(z.object({ token: z.string(), optionId: z.number() }))
+    .mutation(async ({ input }) => {
+      const signature = await db.getSignatureByToken(input.token);
+      if (!signature) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+      }
+      if (signature.signedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été signé" });
+      }
+      if (new Date() > signature.expiresAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce lien a expiré" });
+      }
+      // L'option doit appartenir AU devis de cette signature (pas une option d'un autre devis).
+      const option = await db.getDevisOptionById(input.optionId);
+      if (!option || option.devisId !== signature.devisId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Option non trouvée" });
+      }
+      // Anti-flood (le porteur du lien pourrait basculer en boucle).
+      if (!checkPortalActionRate(`sig:${signature.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de requêtes. Réessayez dans quelques minutes." });
+      }
+      await db.selectDevisOption(input.optionId);
+      return { success: true, optionId: input.optionId };
+    }),
+
   // Demander l'envoi d'un code SMS pour validation
   requestSmsCode: publicProcedure
     .input(z.object({
