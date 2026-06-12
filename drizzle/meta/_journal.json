@@ -50,6 +50,13 @@
       "when": 1781243371631,
       "tag": "0006_omniscient_christian_walker",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1781244424653,
+      "tag": "0007_dry_kabuki",
+      "breakpoints": true
     }
   ]
 }

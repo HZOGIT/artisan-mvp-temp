@@ -508,6 +508,13 @@ export async function updateDevis(id: number, data: Partial<InsertDevis>): Promi
   return getDevisById(id);
 }
 
+// OPE-152 — marque le devis comme « vu » à la PREMIÈRE consultation client (read-receipt).
+// Idempotent : `WHERE dateVue IS NULL` → ne réécrit jamais la 1ʳᵉ date de vue.
+export async function markDevisVu(id: number): Promise<void> {
+  const db = await getDb();
+  await db.update(devis).set({ dateVue: new Date() }).where(and(eq(devis.id, id), isNull(devis.dateVue)));
+}
+
 export async function deleteDevis(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(devisLignes).where(eq(devisLignes.devisId, id));

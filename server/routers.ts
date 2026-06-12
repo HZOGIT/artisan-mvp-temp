@@ -2763,6 +2763,12 @@ const signatureRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
       }
 
+      // OPE-152 — read-receipt : 1ʳᵉ consultation client du devis. Idempotent (no-op
+      // si déjà vu) et best-effort (n'altère jamais la réponse en cas d'échec).
+      if (!devisData.dateVue) {
+        try { await db.markDevisVu(devisData.id); } catch { /* best-effort */ }
+      }
+
       const artisan = await db.getArtisanById(devisData.artisanId);
       const client = await db.getClientById(devisData.clientId);
       const lignes = await db.getLignesDevisByDevisId(devisData.id);

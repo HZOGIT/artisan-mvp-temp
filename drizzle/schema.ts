@@ -149,6 +149,9 @@ export const devis = mysqlTable("devis", {
   numero: varchar("numero", { length: 50 }).notNull(),
   dateDevis: timestamp("dateDevis").defaultNow().notNull(),
   dateValidite: timestamp("dateValidite"),
+  // Date de PREMIÈRE consultation du devis par le client (portail/signature) — OPE-152.
+  // Nullable, positionnée une seule fois (read-receipt) pour piloter la relance.
+  dateVue: timestamp("dateVue"),
   statut: mysqlEnum("statut", ["brouillon", "envoye", "accepte", "refuse", "expire"]).default("brouillon"),
   objet: text("objet"),
   // Référence/N° de commande fourni par le client (B2B : syndic, entreprise,
