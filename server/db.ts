@@ -2261,6 +2261,16 @@ export async function getTechnicienById(id: number): Promise<Technicien | undefi
   return result;
 }
 
+// OPE-124 — fiche technicien liée à un compte utilisateur (scopée tenant). Base du filtrage
+// « mes interventions » : résout l'utilisateur connecté vers SA ressource de planning.
+export async function getTechnicienByUserId(userId: number, artisanId: number): Promise<Technicien | undefined> {
+  const db = await getDb();
+  const [result] = await db.select().from(techniciens)
+    .where(and(eq(techniciens.userId, userId), eq(techniciens.artisanId, artisanId)))
+    .limit(1);
+  return result;
+}
+
 export async function createTechnicien(data: InsertTechnicien): Promise<Technicien> {
   const db = await getDb();
   const [result] = await db.insert(techniciens).values(data);

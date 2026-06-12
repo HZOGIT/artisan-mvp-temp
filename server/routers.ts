@@ -5306,7 +5306,15 @@ const interventionsMobileRouter = router({
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     
-    const interventionsList = await db.getInterventionsByArtisanId(artisan.id);
+    const allInterventions = await db.getInterventionsByArtisanId(artisan.id);
+    // OPE-124 (data-minimisation RGPD) — un utilisateur de rôle « technicien » LIÉ à une fiche
+    // (techniciens.userId) ne voit que SES interventions assignées (+ PII de SES clients).
+    // Owner/secrétaire, ou technicien non encore lié : vue complète inchangée (behavior-preserving).
+    let interventionsList = allInterventions;
+    if ((ctx.user as any).role === "technicien") {
+      const monTech = await db.getTechnicienByUserId(ctx.user.id, artisan.id);
+      if (monTech) interventionsList = allInterventions.filter((i: any) => i.technicienId === monTech.id);
+    }
     const todayInterventions = interventionsList.filter(i => {
       const date = new Date(i.dateDebut);
       return date >= today && date < tomorrow;
