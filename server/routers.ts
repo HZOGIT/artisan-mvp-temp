@@ -1694,9 +1694,16 @@ const facturesRouter = router({
       if (!artisan || facture.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acces non autorise" });
       }
+      // Garde de validité (classe « date invalide ») : une date de paiement malformée
+      // -> Invalid Date rejetée par MySQL (500) + écritures comptables générées sur une
+      // base incohérente. On rejette proprement AVANT toute écriture.
+      const datePaiement = new Date(input.datePaiement);
+      if (isNaN(datePaiement.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de paiement invalide" });
+      }
       const result = await db.updateFacture(input.id, {
         montantPaye: input.montantPaye,
-        datePaiement: new Date(input.datePaiement),
+        datePaiement,
         statut: "payee",
       });
       // OPE-52 : générer les écritures comptables (411 Client / 706 Ventes /
@@ -6808,9 +6815,14 @@ const vehiculesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
+      // Garde de validité (classe « date invalide ») : dateReleve est NOT NULL.
+      const dateReleve = new Date(input.dateReleve);
+      if (isNaN(dateReleve.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de relevé invalide" });
+      }
       return await db.addHistoriqueKilometrage({
         ...input,
-        dateReleve: new Date(input.dateReleve),
+        dateReleve,
       });
     }),
 
