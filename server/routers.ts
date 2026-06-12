@@ -1879,8 +1879,12 @@ const facturesRouter = router({
       // Générer un token unique pour le paiement
       const tokenPaiement = crypto.randomUUID();
       
-      // Créer la session Stripe
-      const origin = ctx.req.headers.origin || 'http://localhost:3000';
+      // Créer la session Stripe.
+      // OPE-76 (alignement robustesse) : repli sur APP_URL (domaine serveur de confiance)
+      // au lieu de 'http://localhost:3000' si le header Origin est absent — évite des
+      // success_url/cancel_url Stripe pointant vers localhost en production. Le chemin
+      // nominal (Origin présent = navigateur de l'artisan authentifié) est inchangé.
+      const origin = ctx.req.headers.origin || process.env.APP_URL || 'https://www.operioz.com';
       const session = await createCheckoutSession({
         factureId: facture.id,
         numeroFacture: facture.numero,
