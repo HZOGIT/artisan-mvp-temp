@@ -314,6 +314,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
       { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
       { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
+      { icon: History, label: "Historique emails", path: "/historique-emails" },
       { icon: Users, label: "Utilisateurs", path: "/utilisateurs" },
     ],
   },

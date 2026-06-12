@@ -47,6 +47,7 @@ const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
 const SignatureDevis = lazy(() => import("./pages/SignatureDevis"));
 const ModelesEmail = lazy(() => import("./pages/ModelesEmail"));
 const ModelesEmailTransactionnels = lazy(() => import("./pages/ModelesEmailTransactionnels"));
+const HistoriqueEmails = lazy(() => import("./pages/HistoriqueEmails"));
 const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFournisseurs"));
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
@@ -203,6 +204,7 @@ function AuthenticatedRoutes() {
           <Route path="/relances" component={RelancesDevis} />
           <Route path="/modeles-email" component={ModelesEmail} />
           <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
+          <Route path="/historique-emails" component={HistoriqueEmails} />
           <Route path="/commandes/nouvelle" component={CommandeFournisseurForm} />
           <Route path="/commandes/:id/modifier" component={CommandeFournisseurForm} />
           <Route path="/commandes/:id" component={CommandeFournisseurDetail} />
