@@ -455,6 +455,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
       description: z.string().max(5000).optional(),
       unite: z.string().max(20).optional(),
       prixUnitaireHT: z.string().max(20),
+      tauxTVA: z.string().max(10).optional(),
       categorie: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -470,6 +471,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
       description: z.string().max(5000).optional(),
       unite: z.string().max(20).optional(),
       prixUnitaireHT: z.string().max(20).optional(),
+      tauxTVA: z.string().max(10).optional(),
       categorie: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {

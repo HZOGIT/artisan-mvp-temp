@@ -120,6 +120,10 @@ export const articlesArtisan = mysqlTable("articles_artisan", {
   description: text("description"),
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaireHT: decimal("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
+  // Taux de TVA par défaut de l'article (OPE-167) : pré-rempli sur la ligne de
+  // devis/facture à la sélection. Default 20.00 → comportement inchangé pour les
+  // articles existants (additif, non destructif).
+  tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
   categorie: varchar("categorie", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

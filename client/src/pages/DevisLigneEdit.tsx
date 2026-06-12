@@ -93,6 +93,12 @@ export default function DevisLigneEdit() {
   const getDesignation = (a: any): string => a?.nom ?? a?.designation ?? "";
   const getPrix = (a: any): string => String(a?.prix_base ?? a?.prixUnitaireHT ?? "");
   const getRef = (a: any): string => a?.reference ?? a?.sous_categorie ?? "";
+  // OPE-167 : taux de TVA par défaut porté par l'article (articles_artisan).
+  // Fallback "20" si l'article n'en porte pas (biblio globale) → comportement inchangé.
+  const getTauxTVA = (a: any): string => {
+    const t = a?.tauxTVA;
+    return t != null && t !== "" ? String(parseFloat(t)) : "20";
+  };
 
   // Grouper les articles par catégorie
   const groupedArticles = useMemo(() => {
@@ -130,7 +136,7 @@ export default function DevisLigneEdit() {
         quantite: "1",
         unite: article.unite || "unité",
         prixUnitaireHT: getPrix(article),
-        tauxTVA: "20",
+        tauxTVA: getTauxTVA(article),
       });
       setIsDialogOpen(false);
       toast.success(`Article "${designation}" sélectionné`);
