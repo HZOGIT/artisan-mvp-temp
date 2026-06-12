@@ -5118,7 +5118,7 @@ const chatRouter = router({
     }),
 
   sendMessage: protectedProcedure
-    .input(z.object({ conversationId: z.number(), contenu: z.string().min(1) }))
+    .input(z.object({ conversationId: z.number(), contenu: z.string().min(1).max(5000) }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
@@ -5558,7 +5558,7 @@ const avisRouter = router({
   repondre: protectedProcedure
     .input(z.object({
       avisId: z.number(),
-      reponse: z.string().min(1),
+      reponse: z.string().min(1).max(5000),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
