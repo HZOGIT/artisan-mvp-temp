@@ -2205,7 +2205,11 @@ const interventionsRouter = router({
 
   setCouleursMultiples: protectedProcedure
     .input(z.object({
-      couleurs: z.record(z.string(), z.string()),
+      // Bornes alignées sur le endpoint unitaire `setCouleurIntervention` et la colonne
+      // `couleurs_interventions.couleur` VARCHAR(20) : valeur = classe Tailwind (« bg-blue-500 »),
+      // bornée à 20 (sinon ER_DATA_TOO_LONG -> 500). Clés = interventionId numériques (sinon
+      // `parseInt` -> NaN inséré). Comportement inchangé pour les entrées légitimes.
+      couleurs: z.record(z.string().regex(/^\d+$/), z.string().max(20)),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
