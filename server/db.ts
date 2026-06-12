@@ -1209,16 +1209,79 @@ export async function deleteArticleFournisseur(id: number): Promise<void> {
   await db.delete(articlesFournisseurs).where(eq(articlesFournisseurs.id, id));
 }
 
+// OPE-135 — indicateurs de performance fournisseur CALCULÉS depuis les commandes
+// (auparavant données factices 0 / 100 %). Forme alignée sur ce qu'attend la page
+// PerformancesFournisseurs.tsx. Scopé par `artisanId` (la requête commandes filtre
+// sur artisanId → pas de fuite cross-tenant). Aucune migration.
 export async function getPerformancesFournisseurs(artisanId: number): Promise<any[]> {
   const db = await getDb();
   const fournisseursList = await getFournisseursByArtisanId(artisanId);
-  // Simplified performance data
-  return fournisseursList.map(f => ({
-    fournisseur: f,
-    totalCommandes: 0,
-    delaiMoyen: 0,
-    tauxConformite: 100,
-  }));
+  const cmds = await db.select().from(commandesFournisseurs)
+    .where(eq(commandesFournisseurs.artisanId, artisanId));
+
+  const byFournisseur = new Map<number, any[]>();
+  for (const c of cmds) {
+    const arr = byFournisseur.get(c.fournisseurId) || [];
+    arr.push(c);
+    byFournisseur.set(c.fournisseurId, arr);
+  }
+  const now = Date.now();
+  const jour = 86_400_000;
+
+  return fournisseursList.map((f) => {
+    // Commandes « réelles » (hors brouillon).
+    const list = (byFournisseur.get(f.id) || []).filter((c) => c.statut !== "brouillon");
+    const totalCommandes = list.length;
+    const livrees = list.filter((c) => c.statut === "livree");
+    const commandesLivrees = livrees.length;
+
+    // En retard : livrée après l'échéance, OU non livrée/annulée dont l'échéance est dépassée.
+    const commandesEnRetard = list.filter((c) => {
+      const prevu = c.dateLivraisonPrevue ? new Date(c.dateLivraisonPrevue).getTime() : null;
+      if (prevu == null) return false;
+      if (c.statut === "livree") {
+        return c.dateLivraisonReelle ? new Date(c.dateLivraisonReelle).getTime() > prevu : false;
+      }
+      if (c.statut === "annulee") return false;
+      return prevu < now; // en cours et échéance dépassée
+    }).length;
+
+    // Délai moyen de livraison (jours) sur les commandes livrées datées.
+    const livreesDatees = livrees.filter((c) => c.dateLivraisonReelle && c.createdAt);
+    let delaiMoyenLivraison: number | null = null;
+    if (livreesDatees.length > 0) {
+      const somme = livreesDatees.reduce((s, c) => {
+        const d = (new Date(c.dateLivraisonReelle).getTime() - new Date(c.createdAt).getTime()) / jour;
+        return s + Math.max(0, d);
+      }, 0);
+      delaiMoyenLivraison = Math.round(somme / livreesDatees.length);
+    }
+
+    // Taux de fiabilité : % de commandes livrées « à temps » (avec date d'échéance).
+    const livreesAvecPrevu = livrees.filter((c) => c.dateLivraisonPrevue && c.dateLivraisonReelle);
+    let tauxFiabilite = 100;
+    if (livreesAvecPrevu.length > 0) {
+      const aTemps = livreesAvecPrevu.filter(
+        (c) => new Date(c.dateLivraisonReelle).getTime() <= new Date(c.dateLivraisonPrevue).getTime()
+      ).length;
+      tauxFiabilite = Math.round((aTemps / livreesAvecPrevu.length) * 100);
+    }
+
+    const montantTotal = list.reduce(
+      (s, c) => s + (parseFloat(String(c.totalTTC ?? c.montantTotal ?? "0")) || 0),
+      0
+    );
+
+    return {
+      fournisseur: { id: f.id, nom: f.nom, contact: f.contact, email: f.email, telephone: f.telephone },
+      totalCommandes,
+      commandesLivrees,
+      commandesEnRetard,
+      delaiMoyenLivraison,
+      tauxFiabilite,
+      montantTotal,
+    };
+  });
 }
 
 // ============================================================================
