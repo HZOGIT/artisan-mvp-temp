@@ -197,9 +197,46 @@ export default function Vitrine() {
   const ThemeIcon = theme.icon;
   const hasRating = avisStats.total > 0;
 
+  // OPE-113 — données structurées schema.org (rich snippet « étoiles » Google) à partir
+  // des stats d'avis DÉJÀ calculées. `aggregateRating` uniquement s'il existe au moins
+  // 1 avis publié (règle Google : pas de faux agrégat). Adresse au niveau localité
+  // (ville/CP, pas la rue) pour limiter l'exposition. Aucune nouvelle donnée ni backend.
+  const a: any = artisan;
+  const jsonLd: Record<string, any> = {
+    "@context": "https://schema.org",
+    "@type": "HomeAndConstructionBusiness",
+    name: a.nomEntreprise || "Artisan",
+    ...(a.telephone ? { telephone: a.telephone } : {}),
+    ...(a.logo ? { image: a.logo } : {}),
+    ...((a.ville || a.codePostal)
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            ...(a.codePostal ? { postalCode: a.codePostal } : {}),
+            ...(a.ville ? { addressLocality: a.ville } : {}),
+            addressCountry: "FR",
+          },
+        }
+      : {}),
+    ...(typeof window !== "undefined" ? { url: window.location.href } : {}),
+    ...(hasRating
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: avisStats.moyenne,
+            reviewCount: avisStats.total,
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <DocTitle title={`${artisan.nomEntreprise} — ${theme.label} | Operioz`} />
+      {/* OPE-113 — JSON-LD AggregateRating (étoiles Google) injecté depuis avisStats. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* ─────────── NAV FIXE ─────────── */}
       <nav className="fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
