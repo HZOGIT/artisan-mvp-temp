@@ -3086,7 +3086,7 @@ const stocksRouter = router({
       quantite: z.number(),
       type: z.enum(["entree", "sortie", "ajustement"]),
       motif: z.string().optional(),
-      reference: z.string().optional()
+      reference: z.string().max(100).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -3648,9 +3648,9 @@ Reponds UNIQUEMENT en JSON pur :
   create: protectedProcedure
     .input(z.object({
       fournisseurId: z.number(),
-      reference: z.string().optional(),
+      reference: z.string().max(50).optional(),
       dateLivraisonPrevue: z.string().optional(),
-      delaiLivraison: z.string().optional(),
+      delaiLivraison: z.string().max(100).optional(),
       adresseLivraison: z.string().optional(),
       notes: z.string().optional(),
       lignes: z.array(z.object({
@@ -3721,9 +3721,9 @@ Reponds UNIQUEMENT en JSON pur :
     .input(z.object({
       id: z.number(),
       fournisseurId: z.number().optional(),
-      reference: z.string().optional(),
+      reference: z.string().max(50).optional(),
       dateLivraisonPrevue: z.string().nullable().optional(),
-      delaiLivraison: z.string().nullable().optional(),
+      delaiLivraison: z.string().max(100).nullable().optional(),
       adresseLivraison: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
       lignes: z.array(z.object({
