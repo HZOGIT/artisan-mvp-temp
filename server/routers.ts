@@ -137,6 +137,23 @@ function checkPortalActionRate(key: string): boolean {
   return true;
 }
 
+// Throttle du formulaire de support (par utilisateur) : `support.contact` envoie un
+// email à support@operioz.com à chaque appel -> un compte authentifié pourrait
+// inonder la boîte support + gonfler les coûts Resend. Limite généreuse (5 / 15 min
+// par user) : un usage légitime fait 1-2 demandes. (classe rate-limit OPE-24)
+const supportContactRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkSupportContactRate(key: string): boolean {
+  const now = Date.now();
+  const entry = supportContactRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    supportContactRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
 // Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
 // Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
 // pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
@@ -8943,6 +8960,10 @@ const supportRouter = router({
       message: z.string().min(10).max(5000),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Anti-flood : borne l'envoi d'emails support depuis un même compte.
+      if (!checkSupportContactRate(String(ctx.user.id))) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de messages envoyés. Réessayez dans quelques minutes." });
+      }
       const subjectLabels: Record<string, string> = {
         technique: "Probleme technique",
         facturation: "Question facturation",
