@@ -580,16 +580,21 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
       return { success: true };
     }),
 
-  importBibliothequeArticles: protectedProcedure
+  // OPE-181 — admin-only (aligné sur create/update/deleteBibliothequeArticle) : la
+  // bibliothèque est un catalogue GLOBAL servi à tous les tenants, ses écritures sont
+  // réservées aux admins Operioz. Auparavant `protectedProcedure` → un artisan/collaborateur
+  // pouvait polluer le catalogue vu par tous (bypass de l'admin-only du create unitaire) et
+  // déclencher un DoS via un array non borné. + `.max(2000)` (defense-in-depth).
+  importBibliothequeArticles: adminOnlyProcedure
     .input(z.array(z.object({
       nom: z.string().max(255),
-      description: z.string().optional(),
+      description: z.string().max(5000).optional(),
       unite: z.string().max(50),
-      prix_base: z.string(),
+      prix_base: z.string().max(20),
       categorie: z.string().max(50),
       sous_categorie: z.string().max(100),
       metier: z.string().max(50),
-    })))
+    })).max(2000, "Import limité à 2000 articles par envoi"))
     .mutation(async ({ input }) => {
       let imported = 0;
       for (const article of input) {
