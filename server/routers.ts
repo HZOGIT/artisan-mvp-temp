@@ -8375,6 +8375,12 @@ const vitrineRouter = router({
       const artisan = await db.getArtisanBySlug(input.slug);
       if (!artisan || !artisan.email) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouve" });
 
+      // Cohérence avec getBySlug : pas de formulaire de contact pour une vitrine DÉSACTIVÉE
+      // (un slug connu ne doit pas permettre d'inonder un artisan dont la page publique est
+      // éteinte). Behavior-preserving : une vitrine active passe à l'identique.
+      const parametresVitrine = await db.getParametresArtisan(artisan.id);
+      if (!parametresVitrine?.vitrineActive) throw new TRPCError({ code: "NOT_FOUND", message: "Cette vitrine n'est pas active" });
+
       // OPE-36 — anti-flood par IP (5 msg / 15 min) : borne l'inondation de la boîte
       // artisan + les coûts Resend depuis un même émetteur (l'injection HTML est déjà
       // traitée via safeHtml ci-dessous). Un visiteur légitime (1 message) n'est pas affecté.
