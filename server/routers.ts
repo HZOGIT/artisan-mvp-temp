@@ -299,7 +299,24 @@ const clientsRouter = router({
       }
       return client;
     }),
-  
+
+  // OPE-144 — encours impayé d'un client (lecture seule). Sert l'alerte non
+  // bloquante « client à risque » avant d'émettre un nouveau devis/facture.
+  getEncours: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Ownership : le client doit appartenir à l'artisan.
+      const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
+      return await db.getEncoursClient(input.clientId, artisan.id);
+    }),
+
   create: protectedProcedure
     .input(ClientInputSchema)
     .mutation(async ({ ctx, input }) => {

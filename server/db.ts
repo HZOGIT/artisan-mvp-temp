@@ -619,6 +619,34 @@ export async function getFacturesByClientId(clientId: number): Promise<Facture[]
   return await db.select().from(factures).where(eq(factures.clientId, clientId)).orderBy(desc(factures.createdAt));
 }
 
+// OPE-144 — encours client (lecture seule, sans migration). Somme du reste dû
+// (totalTTC − montantPaye) des factures émises non soldées, avec la part échue
+// (statut `en_retard`). Scopé par `artisanId` (sécurité multi-tenant) en plus du
+// `clientId`. Seules les factures `envoyee`/`en_retard` comptent (pas brouillon/
+// validee = pas encore une créance ; pas payee/annulee).
+export async function getEncoursClient(clientId: number, artisanId: number): Promise<{ encoursTotal: string; echu: string; nbFacturesImpayees: number }> {
+  const db = await getDb();
+  const rows = await db.select({
+    statut: factures.statut,
+    totalTTC: factures.totalTTC,
+    montantPaye: factures.montantPaye,
+  }).from(factures)
+    .where(and(eq(factures.clientId, clientId), eq(factures.artisanId, artisanId)));
+
+  let encoursTotal = 0;
+  let echu = 0;
+  let nb = 0;
+  for (const f of rows) {
+    if (f.statut !== "envoyee" && f.statut !== "en_retard") continue;
+    const reste = (parseFloat(String(f.totalTTC ?? "0")) || 0) - (parseFloat(String(f.montantPaye ?? "0")) || 0);
+    if (reste <= 0) continue;
+    encoursTotal += reste;
+    nb += 1;
+    if (f.statut === "en_retard") echu += reste;
+  }
+  return { encoursTotal: encoursTotal.toFixed(2), echu: echu.toFixed(2), nbFacturesImpayees: nb };
+}
+
 export async function getNextFactureNumber(artisanId: number): Promise<string> {
   const db = await getDb();
   const params = await db.select().from(parametresArtisan).where(eq(parametresArtisan.artisanId, artisanId)).limit(1);

@@ -64,6 +64,11 @@ export default function DevisNouveauPage() {
 
   // Requetes tRPC
   const { data: clients = [] } = trpc.clients.list.useQuery();
+  // OPE-144 — encours impayé du client sélectionné (alerte non bloquante avant d'émettre).
+  const { data: encoursClient } = trpc.clients.getEncours.useQuery(
+    { clientId },
+    { enabled: clientId > 0 }
+  );
   const { data: modeles = [] } = trpc.devis.getModeles.useQuery();
   const createMutation = trpc.devis.create.useMutation();
   const addLigneMutation = trpc.devis.addLigne.useMutation();
@@ -304,6 +309,19 @@ export default function DevisNouveauPage() {
               </option>
             ))}
           </select>
+          {/* OPE-144 — alerte non bloquante « client à risque » : impayés en cours */}
+          {clientId > 0 && encoursClient && parseFloat(encoursClient.encoursTotal) > 0 && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <span aria-hidden="true">⚠️</span>
+              <span>
+                Ce client a <strong>{formatCurrency(encoursClient.encoursTotal)}</strong> d'impayés en cours
+                {parseFloat(encoursClient.echu) > 0 && (
+                  <> (dont <strong>{formatCurrency(encoursClient.echu)}</strong> échus)</>
+                )}
+                {" "}sur {encoursClient.nbFacturesImpayees} facture{encoursClient.nbFacturesImpayees > 1 ? "s" : ""}.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Objet */}
