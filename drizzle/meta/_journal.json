@@ -99,6 +99,13 @@
       "when": 1781257754003,
       "tag": "0013_married_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1781260067970,
+      "tag": "0014_amazing_paladin",
+      "breakpoints": true
     }
   ]
 }

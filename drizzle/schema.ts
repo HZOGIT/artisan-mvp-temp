@@ -130,6 +130,10 @@ export const bibliothequeArticles = mysqlTable("bibliotheque_articles", {
   // consommé par getTauxTVA côté front). Default 20.00 → comportement inchangé pour
   // les articles existants (additif, non destructif).
   tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  // Coût / prix de revient de référence (OPE-143, ≈ Odoo product.template.standard_price).
+  // Nullable, purement informatif (sert à afficher la MARGE = prix_base − prixRevient ;
+  // n'affecte AUCUN montant facturé). Additif → articles existants inchangés.
+  prixRevient: decimal("prixRevient", { precision: 10, scale: 2 }),
   duree_moyenne_minutes: int("duree_moyenne_minutes"),
   visible: boolean("visible").default(true),
   created_at: timestamp("created_at").defaultNow(),
