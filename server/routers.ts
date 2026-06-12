@@ -4769,6 +4769,16 @@ const contratsRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+
+      // OPE-25 — vérifier l'ownership du client (IDOR) : sans ce contrôle, un artisan
+      // pouvait créer un contrat sur le `clientId` d'un AUTRE tenant, puis exposer les
+      // données de ce client (email/adresse) via la facture générée. Même pattern que
+      // interventions.create / devis.create. Behavior-preserving : un client légitime passe.
+      const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
+
       const reference = await db.getNextContratNumber(artisan.id);
 
       // Garde de validité des dates : `new Date("garbage")` -> Invalid Date, qui finit
@@ -5580,8 +5590,15 @@ const avisRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
       }
 
+      // Scoper le client au tenant appelant (comme `envoyerDemande`/`chat`) :
+      // sans ce contrôle, un `clientId` d'un autre artisan donnait un message
+      // d'erreur DIFFÉRENT selon que le client existe (oracle d'énumération
+      // cross-tenant). NOT_FOUND uniforme pour « inexistant OU pas à moi ».
       const client = await db.getClientById(input.clientId);
-      if (!client || !client.email) {
+      if (!client || client.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
+      if (!client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'email" });
       }
 
