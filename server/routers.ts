@@ -1293,7 +1293,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
   createModele: protectedProcedure
     .input(z.object({
-      nom: z.string().min(1),
+      nom: z.string().min(1).max(255),
       description: z.string().optional(),
       notes: z.string().optional(),
     }))
