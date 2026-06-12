@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "wouter";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ const statusLabels: Record<string, string> = {
   brouillon: "Brouillon",
   envoyee: "Envoyée",
   confirmee: "Confirmée",
+  partiellement_livree: "Partiellement livrée",
   livree: "Livrée",
   annulee: "Annulée",
 };
@@ -20,6 +22,7 @@ const statusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
   envoyee: "bg-blue-100 text-blue-700",
   confirmee: "bg-orange-100 text-orange-700",
+  partiellement_livree: "bg-amber-100 text-amber-700",
   livree: "bg-green-100 text-green-700",
   annulee: "bg-red-100 text-red-700",
 };
@@ -28,6 +31,7 @@ const nextStatuses: Record<string, string[]> = {
   brouillon: ["envoyee", "annulee"],
   envoyee: ["confirmee", "annulee"],
   confirmee: ["livree", "annulee"],
+  partiellement_livree: ["livree", "annulee"],
   livree: [],
   annulee: [],
 };
@@ -76,6 +80,32 @@ export default function CommandeFournisseurDetail() {
     updateStatutMutation.mutate({ id: parseInt(id || "0"), statut });
   };
 
+  // OPE-100 — saisie de la réception (quantité reçue par ligne). État local indexé par ligneId.
+  const [recue, setRecue] = useState<Record<number, string>>({});
+  const recevoirMutation = trpc.commandesFournisseurs.recevoir.useMutation({
+    onSuccess: () => {
+      utils.commandesFournisseurs.getById.invalidate({ id: parseInt(id || "0") });
+      utils.commandesFournisseurs.list.invalidate();
+      setRecue({});
+      toast.success("Réception enregistrée");
+    },
+    onError: (err) => toast.error(err.message || "Erreur lors de l'enregistrement de la réception"),
+  });
+
+  const handleEnregistrerReception = (lignes: any[]) => {
+    const payload = lignes
+      .filter((l) => l.id != null)
+      .map((l) => ({
+        ligneId: l.id as number,
+        // Valeur saisie si présente, sinon la quantité reçue déjà enregistrée (inchangée).
+        quantiteRecue: recue[l.id] !== undefined
+          ? (parseFloat(recue[l.id]) || 0)
+          : (parseFloat(l.quantiteRecue) || 0),
+      }));
+    if (payload.length === 0) return;
+    recevoirMutation.mutate({ id: parseInt(id || "0"), lignes: payload });
+  };
+
   const handleDelete = () => {
     if (confirm("Supprimer cette commande ?")) {
       deleteMutation.mutate({ id: parseInt(id || "0") });
@@ -117,6 +147,10 @@ export default function CommandeFournisseurDetail() {
   const possibleNextStatuses = nextStatuses[statut] || [];
   const lignes = commande.lignes || [];
   const fournisseur = commande.fournisseur;
+  // OPE-100 — la réception est éditable tant que la commande est en cours (ni brouillon,
+  // ni clôturée/annulée).
+  const receptionActive = ["envoyee", "confirmee", "partiellement_livree"].includes(statut);
+  const aDesQuantitesRecues = lignes.some((l: any) => (parseFloat(l.quantiteRecue) || 0) > 0);
 
   return (
     <div className="space-y-6">
@@ -270,6 +304,9 @@ export default function CommandeFournisseurDetail() {
                   <tr>
                     <th>Désignation</th>
                     <th className="text-center whitespace-nowrap">Quantité</th>
+                    {(receptionActive || aDesQuantitesRecues) && (
+                      <th className="text-center whitespace-nowrap">Reçu</th>
+                    )}
                     <th className="text-center">Unité</th>
                     <th className="text-right whitespace-nowrap">P.U. HT</th>
                     <th className="text-center">TVA</th>
@@ -293,6 +330,22 @@ export default function CommandeFournisseurDetail() {
                           </div>
                         </td>
                         <td className="text-center">{qty}</td>
+                        {(receptionActive || aDesQuantitesRecues) && (
+                          <td className="text-center">
+                            {receptionActive ? (
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={recue[ligne.id] !== undefined ? recue[ligne.id] : String(parseFloat(ligne.quantiteRecue) || 0)}
+                                onChange={(e) => setRecue((prev) => ({ ...prev, [ligne.id]: e.target.value }))}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            ) : (
+                              <span>{parseFloat(ligne.quantiteRecue) || 0}</span>
+                            )}
+                          </td>
+                        )}
                         <td className="text-center">{ligne.unite || "unité"}</td>
                         <td className="text-right">{formatCurrency(pu)}</td>
                         <td className="text-center">{tva}%</td>
@@ -305,6 +358,20 @@ export default function CommandeFournisseurDetail() {
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-8">Aucune ligne dans cette commande</p>
+          )}
+          {receptionActive && lignes.length > 0 && (
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <p className="text-sm text-muted-foreground">
+                Saisissez la quantité reçue par ligne, puis enregistrez la réception.
+              </p>
+              <Button
+                onClick={() => handleEnregistrerReception(lignes)}
+                disabled={recevoirMutation.isPending}
+              >
+                <Package className="h-4 w-4 mr-2" />
+                {recevoirMutation.isPending ? "Enregistrement..." : "Enregistrer la réception"}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

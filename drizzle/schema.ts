@@ -488,7 +488,9 @@ export const commandesFournisseurs = mysqlTable("commandes_fournisseurs", {
   dateCommande: timestamp("dateCommande").defaultNow().notNull(),
   dateLivraisonPrevue: timestamp("dateLivraisonPrevue"),
   dateLivraisonReelle: timestamp("dateLivraisonReelle"),
-  statut: mysqlEnum("statut", ["brouillon", "envoyee", "confirmee", "livree", "annulee"]).default("brouillon"),
+  // `partiellement_livree` (OPE-100) : extension d'enum additive (valeur ajoutée en fin,
+  // non destructive) pour les réceptions partielles. Statut dérivé des quantités reçues.
+  statut: mysqlEnum("statut", ["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]).default("brouillon"),
   montantTotal: decimal("montantTotal", { precision: 10, scale: 2 }),
   totalHT: decimal("totalHT", { precision: 10, scale: 2 }),
   totalTVA: decimal("totalTVA", { precision: 10, scale: 2 }),
@@ -514,6 +516,9 @@ export const lignesCommandesFournisseurs = mysqlTable("lignes_commandes_fourniss
   designation: varchar("designation", { length: 255 }).notNull(),
   reference: varchar("reference", { length: 50 }),
   quantite: decimal("quantite", { precision: 10, scale: 2 }).notNull(),
+  // Quantité effectivement reçue par ligne (réception partielle — OPE-100). Default 0
+  // → comportement inchangé pour les commandes existantes (rien de reçu enregistré).
+  quantiteRecue: decimal("quantiteRecue", { precision: 10, scale: 2 }).default("0.00"),
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaire: decimal("prixUnitaire", { precision: 10, scale: 2 }),
   tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),

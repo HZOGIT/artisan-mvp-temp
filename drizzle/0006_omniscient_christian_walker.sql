@@ -1,0 +1,2 @@
+ALTER TABLE `commandes_fournisseurs` MODIFY COLUMN `statut` enum('brouillon','envoyee','confirmee','partiellement_livree','livree','annulee') DEFAULT 'brouillon';--> statement-breakpoint
+ALTER TABLE `lignes_commandes_fournisseurs` ADD `quantiteRecue` decimal(10,2) DEFAULT '0.00';

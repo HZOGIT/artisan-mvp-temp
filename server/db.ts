@@ -1210,6 +1210,16 @@ export async function deleteLignesCommandeFournisseur(commandeId: number): Promi
   await db.delete(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.commandeId, commandeId));
 }
 
+// OPE-100 — enregistre la quantité reçue d'une ligne. Scopé par `commandeId` (la propriété
+// tenant est vérifiée au niveau routeur sur la commande) pour éviter d'écrire une ligne
+// d'une autre commande.
+export async function updateLigneCommandeRecue(ligneId: number, commandeId: number, quantiteRecue: number): Promise<void> {
+  const db = await getDb();
+  await db.update(lignesCommandesFournisseurs)
+    .set({ quantiteRecue: quantiteRecue.toFixed(2) })
+    .where(and(eq(lignesCommandesFournisseurs.id, ligneId), eq(lignesCommandesFournisseurs.commandeId, commandeId)));
+}
+
 export async function getNextCommandeNumero(artisanId: number): Promise<string> {
   const db = await getDb();
   const result = await db.select({ numero: commandesFournisseurs.numero })

@@ -43,6 +43,13 @@
       "when": 1781242290089,
       "tag": "0005_dear_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1781243371631,
+      "tag": "0006_omniscient_christian_walker",
+      "breakpoints": true
     }
   ]
 }

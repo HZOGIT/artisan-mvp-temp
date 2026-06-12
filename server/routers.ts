@@ -3826,7 +3826,7 @@ Reponds UNIQUEMENT en JSON pur :
   updateStatut: protectedProcedure
     .input(z.object({
       id: z.number(),
-      statut: z.enum(["brouillon", "envoyee", "confirmee", "livree", "annulee"]),
+      statut: z.enum(["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]),
       dateLivraisonReelle: z.string().optional()
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3845,6 +3845,62 @@ Reponds UNIQUEMENT en JSON pur :
       }
 
       return await db.updateCommandeFournisseur(input.id, updateData);
+    }),
+
+  // OPE-100 — réception partielle : enregistre la quantité reçue par ligne et DÉRIVE le
+  // statut de la commande (confirmee / partiellement_livree / livree). Additif : une
+  // commande non réceptionnée garde quantiteRecue=0 et son statut inchangé.
+  recevoir: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      lignes: z.array(z.object({
+        ligneId: z.number(),
+        quantiteRecue: z.number().min(0).max(1_000_000),
+      })).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      // Met à jour la quantité reçue des lignes appartenant À CETTE commande (les autres
+      // ligneId sont ignorées → pas d'écriture cross-commande).
+      const lignesCommande = await db.getLignesCommandeFournisseur(input.id);
+      const idsCommande = new Set(lignesCommande.map((l: any) => l.id));
+      for (const r of input.lignes) {
+        if (!idsCommande.has(r.ligneId)) continue;
+        await db.updateLigneCommandeRecue(r.ligneId, input.id, r.quantiteRecue);
+      }
+      // Recalcule le statut depuis les quantités reçues (source de vérité = lignes).
+      const apres = await db.getLignesCommandeFournisseur(input.id);
+      let totalCommande = 0;
+      let totalRecu = 0;
+      let toutRecu = true;
+      for (const l of apres) {
+        const cmd = parseFloat(String(l.quantite)) || 0;
+        const recu = parseFloat(String((l as any).quantiteRecue)) || 0;
+        totalCommande += cmd;
+        totalRecu += recu;
+        if (recu < cmd) toutRecu = false;
+      }
+      const updateData: any = {};
+      // On ne sort pas d'un état terminal (annulee) ni du brouillon via la réception.
+      if (commande.statut !== "annulee" && commande.statut !== "brouillon") {
+        if (totalCommande > 0 && toutRecu) updateData.statut = "livree";
+        else if (totalRecu > 0) updateData.statut = "partiellement_livree";
+        else updateData.statut = "confirmee";
+      }
+      if (totalRecu > 0 && !commande.dateLivraisonReelle) {
+        updateData.dateLivraisonReelle = new Date();
+      }
+      if (Object.keys(updateData).length > 0) {
+        await db.updateCommandeFournisseur(input.id, updateData);
+      }
+      return { success: true, statut: updateData.statut || commande.statut };
     }),
 
   delete: protectedProcedure
