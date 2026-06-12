@@ -1268,7 +1268,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
       }
-      
+      // OPE-24 — anti-abus : borne l'envoi de relances de devis par email (envoi Resend
+      // au client). Sans ça, un compte authentifié peut spammer le client. Même limiteur
+      // que les autres envois de documents (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`relance:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de relances envoyées. Réessayez dans quelques minutes." });
+      }
+
       // Générer le contenu de l'email de relance
       const messageRelance = input.message || `Bonjour,\n\nNous vous rappelons que le devis n°${devisData.numero} est toujours en attente de votre signature.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n${artisan.nomEntreprise || 'Votre artisan'}`;
       
@@ -1324,7 +1330,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
-      
+      // OPE-24 — anti-abus : borne l'opération de relance en masse (envoie N emails Resend).
+      // Le throttle par devis (joursEntreRelances) peut être contourné via joursEntreRelances=0 ;
+      // cette borne par appel (20 / 15 min / artisan) empêche les envois en masse répétés.
+      if (!checkDocumentEmailRate(`relance-auto:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de relances en masse. Réessayez dans quelques minutes." });
+      }
+
       const joursMinimum = input.joursMinimum || 7;
       const joursEntreRelances = input.joursEntreRelances || 7;
       
