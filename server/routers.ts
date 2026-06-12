@@ -6789,6 +6789,15 @@ const previsionsRouter = router({
       return await db.getPrevisionsCA(artisan.id, annee);
     }),
 
+  // OPE-155 — trésorerie prévisionnelle (flux net par semaine, encaissements − décaissements).
+  getTresoreriePrevisionnelle: protectedProcedure
+    .input(z.object({ semaines: z.number().int().min(1).max(26).default(8) }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { semaines: [], totalEntrees: 0, totalSorties: 0, totalNet: 0 };
+      return await db.getTresoreriePrevisionnelle(artisan.id, input?.semaines ?? 8);
+    }),
+
   calculer: protectedProcedure
     .input(z.object({ methode: z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite"]).default("moyenne_mobile") }))
     .mutation(async ({ ctx, input }) => {

@@ -35,6 +35,7 @@ import { RecentActivityWidget } from "@/components/dashboard/widgets/RecentActiv
 import { UpcomingInterventionsWidget } from "@/components/dashboard/widgets/UpcomingInterventions";
 import { ObjectifsWidget } from "@/components/dashboard/widgets/Objectifs";
 import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesAFaire";
+import { TresoreriePrevisionnelleWidget } from "@/components/dashboard/widgets/TresoreriePrevisionnelle";
 
 // ============================================================================
 // Définition des widgets disponibles dans le dashboard
@@ -52,6 +53,12 @@ function useWidgetDefinitions(): WidgetDef[] {
         label: "À faire (activités & rappels)",
         description: "Vos rappels en retard, du jour et à venir (CRM next-action)",
         render: () => <ActivitesAFaireWidget />,
+      },
+      {
+        id: "tresoreriePrevisionnelle",
+        label: "Trésorerie prévisionnelle",
+        description: "Encaissements − décaissements projetés sur 8 semaines (alerte découvert)",
+        render: () => <TresoreriePrevisionnelleWidget />,
       },
       {
         id: "revenue",
@@ -96,6 +103,7 @@ function useWidgetDefinitions(): WidgetDef[] {
 
 const DEFAULT_ORDER = [
   "activitesAFaire",
+  "tresoreriePrevisionnelle",
   "revenue",
   "devisRepartition",
   "topClients",

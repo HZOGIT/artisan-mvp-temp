@@ -3291,6 +3291,95 @@ export async function getPrevisionsCA(artisanId: number, annee: number): Promise
     .orderBy(asc(previsionsCA.mois));
 }
 
+// OPE-155 — trésorerie prévisionnelle : projette par SEMAINE les ENCAISSEMENTS attendus
+// (factures à encaisser, reste dû, par date d'échéance) − les DÉCAISSEMENTS attendus
+// (dépenses récurrentes, expansées sur la période selon leur fréquence). Lecture seule,
+// scopé `artisanId`, réutilise des données existantes (aucune nouvelle table). Le solde
+// bancaire initial n'est pas intégré (hors MVP) → le « cumulatif » est un flux net relatif.
+export async function getTresoreriePrevisionnelle(
+  artisanId: number,
+  semaines: number,
+): Promise<{
+  semaines: { debut: string; entrees: number; sorties: number; net: number; cumulatif: number }[];
+  totalEntrees: number;
+  totalSorties: number;
+  totalNet: number;
+}> {
+  const db = await getDb();
+  const WEEK_MS = 7 * 24 * 3600 * 1000;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const windowEnd = new Date(start.getTime() + semaines * WEEK_MS);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const buckets = Array.from({ length: semaines }, (_, i) => ({
+    debut: new Date(start.getTime() + i * WEEK_MS),
+    entrees: 0,
+    sorties: 0,
+  }));
+  // Une date passée (en retard / échue) retombe dans la semaine 0 ; hors fenêtre = ignorée.
+  const weekIndex = (d: Date): number => {
+    const diff = d.getTime() - start.getTime();
+    if (diff < 0) return 0;
+    const idx = Math.floor(diff / WEEK_MS);
+    return idx < semaines ? idx : -1;
+  };
+
+  // ── Encaissements attendus : factures à encaisser (reste dû) par date d'échéance ──
+  const creances = await db.select({
+    dateEcheance: factures.dateEcheance, totalTTC: factures.totalTTC, montantPaye: factures.montantPaye,
+  }).from(factures).where(and(
+    eq(factures.artisanId, artisanId),
+    inArray(factures.statut, ["envoyee", "en_retard"] as any),
+  ));
+  for (const f of creances) {
+    if (!f.dateEcheance) continue;
+    const reste = (parseFloat(String(f.totalTTC || "0")) || 0) - (parseFloat(String(f.montantPaye || "0")) || 0);
+    if (reste <= 0) continue;
+    const ech = new Date(f.dateEcheance);
+    if (isNaN(ech.getTime()) || ech >= windowEnd) continue;
+    const idx = weekIndex(ech);
+    if (idx >= 0) buckets[idx].entrees += reste;
+  }
+
+  // ── Décaissements attendus : dépenses récurrentes, expansées selon leur fréquence ──
+  const pool = getPool();
+  if (pool) {
+    const [deps]: any = await pool.execute(
+      `SELECT montant_ttc, frequence_recurrence, prochaine_occurrence
+         FROM depenses
+        WHERE artisan_id = ? AND recurrente = TRUE AND prochaine_occurrence IS NOT NULL`,
+      [artisanId],
+    );
+    const stepMonths: Record<string, number> = { mensuelle: 1, trimestrielle: 3, annuelle: 12 };
+    for (const d of deps as any[]) {
+      const montant = parseFloat(String(d.montant_ttc || "0")) || 0;
+      if (montant <= 0) continue;
+      const step = stepMonths[String(d.frequence_recurrence)] || 0;
+      let occ = new Date(d.prochaine_occurrence);
+      let guard = 0;
+      while (!isNaN(occ.getTime()) && occ < windowEnd && guard++ < 60) {
+        const idx = weekIndex(occ);
+        if (idx >= 0) buckets[idx].sorties += montant;
+        if (step === 0) break; // fréquence inconnue → on ne compte qu'une occurrence
+        occ = new Date(occ); occ.setMonth(occ.getMonth() + step);
+      }
+    }
+  }
+
+  let cumul = 0;
+  let totalEntrees = 0;
+  let totalSorties = 0;
+  const out = buckets.map((b) => {
+    const net = b.entrees - b.sorties;
+    cumul += net;
+    totalEntrees += b.entrees;
+    totalSorties += b.sorties;
+    return { debut: b.debut.toISOString().slice(0, 10), entrees: r2(b.entrees), sorties: r2(b.sorties), net: r2(net), cumulatif: r2(cumul) };
+  });
+  return { semaines: out, totalEntrees: r2(totalEntrees), totalSorties: r2(totalSorties), totalNet: r2(totalEntrees - totalSorties) };
+}
+
 export async function calculerPrevisionsCA(artisanId: number, methode: string): Promise<any> {
   const db = await getDb();
   const historique = await getHistoriqueCA(artisanId, 24);
