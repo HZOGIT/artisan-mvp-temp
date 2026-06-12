@@ -4294,7 +4294,26 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      return await db.getContratsByClientId(access.clientId);
+      // Scoper par artisan (défense en profondeur + corrige l'argument manquant)
+      // et ne renvoyer qu'un sous-ensemble client-safe : on EXCLUT `notes`
+      // (notes internes de l'artisan) comme les autres endpoints du portail.
+      const contrats = await db.getContratsByClientId(access.clientId, access.artisanId);
+      return contrats.map((c) => ({
+        id: c.id,
+        reference: c.reference,
+        titre: c.titre,
+        description: c.description,
+        type: c.type,
+        montantHT: c.montantHT,
+        tauxTVA: c.tauxTVA,
+        periodicite: c.periodicite,
+        dateDebut: c.dateDebut,
+        dateFin: c.dateFin,
+        reconduction: c.reconduction,
+        prochainPassage: c.prochainPassage,
+        conditionsParticulieres: c.conditionsParticulieres,
+        statut: c.statut,
+      }));
     }),
 
   // Récupérer les informations du client (public avec token)
