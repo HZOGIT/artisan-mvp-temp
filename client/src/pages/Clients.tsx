@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { matchSearch } from "@/lib/normalize";
@@ -70,7 +70,38 @@ export function Clients() {
 
   // Queries
   const { data: clients = [], isLoading } = trpc.clients.list.useQuery();
-  
+
+  // OPE-130 — détection de doublons potentiels (lecture seule, calculée depuis la liste
+  // déjà chargée) : même email OU même prénom+nom (normalisés). Purement informatif pour
+  // que l'artisan nettoie manuellement ; la FUSION reste à faire (volet OPE-130).
+  const [dupesDismissed, setDupesDismissed] = useState(false);
+  const duplicateGroups = useMemo(() => {
+    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const push = (m: Map<string, any[]>, k: string, c: any) => {
+      const a = m.get(k); if (a) a.push(c); else m.set(k, [c]);
+    };
+    const byEmail = new Map<string, any[]>();
+    const byName = new Map<string, any[]>();
+    for (const c of clients as any[]) {
+      const email = norm(c.email);
+      if (email) push(byEmail, email, c);
+      const name = `${norm(c.prenom)} ${norm(c.nom)}`.trim();
+      if (name && name !== "") push(byName, name, c);
+    }
+    const groups: { reason: string; clients: any[] }[] = [];
+    const seen = new Set<string>(); // dédoublonne les groupes par ensemble d'ids
+    const addGroup = (reason: string, list: any[]) => {
+      if (list.length < 2) return;
+      const key = list.map((c) => c.id).sort((a, b) => a - b).join(",");
+      if (seen.has(key)) return;
+      seen.add(key);
+      groups.push({ reason, clients: list });
+    };
+    for (const [email, list] of byEmail) addGroup(`même email (${email})`, list);
+    for (const [, list] of byName) addGroup("même nom", list);
+    return groups;
+  }, [clients]);
+
   // Mutations
   const updateMutation = trpc.clients.update.useMutation({
     onSuccess: () => {
@@ -225,6 +256,41 @@ export function Clients() {
           className="pl-10"
         />
       </div>
+
+      {/* OPE-130 — bandeau doublons potentiels (informatif, dismissable) */}
+      {!isLoading && !dupesDismissed && duplicateGroups.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-800">
+                    {duplicateGroups.length} doublon{duplicateGroups.length > 1 ? "s" : ""} potentiel{duplicateGroups.length > 1 ? "s" : ""} détecté{duplicateGroups.length > 1 ? "s" : ""}
+                  </p>
+                  <ul className="mt-1 space-y-1 text-amber-700">
+                    {duplicateGroups.slice(0, 5).map((g, i) => (
+                      <li key={i}>
+                        <span className="text-amber-600">{g.reason}</span>{" : "}
+                        {g.clients
+                          .map((c: any) => `${(c.prenom || "")} ${c.nom}`.trim() + (c.ville ? ` (${c.ville})` : ""))
+                          .join(" · ")}
+                      </li>
+                    ))}
+                    {duplicateGroups.length > 5 && (
+                      <li className="text-amber-600">+ {duplicateGroups.length - 5} autre(s)…</li>
+                    )}
+                  </ul>
+                  <p className="mt-1 text-xs text-amber-600">Vérifiez et nettoyez ces fiches en double pour garder un historique propre.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" className="text-amber-700 hover:text-amber-900" onClick={() => setDupesDismissed(true)}>
+                Masquer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Liste des clients */}
       {isLoading ? (
