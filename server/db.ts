@@ -7,6 +7,7 @@ import {
   clients, Client, InsertClient,
   bibliothequeArticles, BibliothequeArticle, InsertBibliothequeArticle,
   articlesArtisan, ArticleArtisan, InsertArticleArtisan,
+  activites, Activite, InsertActivite,
   devis, Devis, InsertDevis,
   devisLignes, DevisLigne, InsertDevisLigne,
   factures, Facture, InsertFacture,
@@ -482,6 +483,37 @@ export async function updateArticleArtisan(id: number, data: Partial<InsertArtic
 export async function deleteArticleArtisan(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(articlesArtisan).where(eq(articlesArtisan.id, id));
+}
+
+// ── Activités / rappels planifiés — CRM next-action (OPE-121) ─────────────────
+// Toujours scopé par artisanId (multi-tenant). Tri par échéance croissante pour
+// que le widget « À faire » regroupe naturellement en retard / aujourd'hui / à venir.
+export async function getActivitesByArtisanId(artisanId: number): Promise<Activite[]> {
+  const db = await getDb();
+  return await db.select().from(activites)
+    .where(eq(activites.artisanId, artisanId))
+    .orderBy(asc(activites.fait), asc(activites.echeance));
+}
+
+export async function createActivite(data: InsertActivite): Promise<Activite> {
+  const db = await getDb();
+  const [result] = await db.insert(activites).values(data);
+  const [created] = await db.select().from(activites).where(eq(activites.id, result.insertId));
+  return created;
+}
+
+// Bascule fait/à-faire, scopée artisan : positionne faitAt à la complétion, le
+// remet à null si on rouvre l'activité.
+export async function setActiviteFait(id: number, artisanId: number, fait: boolean): Promise<void> {
+  const db = await getDb();
+  await db.update(activites)
+    .set({ fait, faitAt: fait ? new Date() : null })
+    .where(and(eq(activites.id, id), eq(activites.artisanId, artisanId)));
+}
+
+export async function deleteActivite(id: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(activites).where(and(eq(activites.id, id), eq(activites.artisanId, artisanId)));
 }
 
 // ============================================================================

@@ -134,6 +134,13 @@
       "when": 1781281843723,
       "tag": "0018_jazzy_captain_midlands",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1781283416762,
+      "tag": "0019_secret_nighthawk",
+      "breakpoints": true
     }
   ]
 }

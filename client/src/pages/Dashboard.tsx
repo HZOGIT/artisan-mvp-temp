@@ -34,6 +34,7 @@ import { TopClientsWidget } from "@/components/dashboard/widgets/TopClients";
 import { RecentActivityWidget } from "@/components/dashboard/widgets/RecentActivity";
 import { UpcomingInterventionsWidget } from "@/components/dashboard/widgets/UpcomingInterventions";
 import { ObjectifsWidget } from "@/components/dashboard/widgets/Objectifs";
+import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesAFaire";
 
 // ============================================================================
 // Définition des widgets disponibles dans le dashboard
@@ -46,6 +47,12 @@ interface WidgetDef extends CustomizableWidget {
 function useWidgetDefinitions(): WidgetDef[] {
   return useMemo(
     () => [
+      {
+        id: "activitesAFaire",
+        label: "À faire (activités & rappels)",
+        description: "Vos rappels en retard, du jour et à venir (CRM next-action)",
+        render: () => <ActivitesAFaireWidget />,
+      },
       {
         id: "revenue",
         label: "Évolution du CA",
@@ -88,6 +95,7 @@ function useWidgetDefinitions(): WidgetDef[] {
 }
 
 const DEFAULT_ORDER = [
+  "activitesAFaire",
   "revenue",
   "devisRepartition",
   "topClients",

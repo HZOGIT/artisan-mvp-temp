@@ -171,6 +171,31 @@ export type ArticleArtisan = typeof articlesArtisan.$inferSelect;
 export type InsertArticleArtisan = typeof articlesArtisan.$inferInsert;
 
 // ============================================================================
+// ACTIVITES / RAPPELS PLANIFIES — CRM next-action (OPE-121)
+// ============================================================================
+// Activité/rappel manuel générique (≈ Odoo mail.activity) : « rappeler M. X jeudi »,
+// « relancer la facture FA-012 lundi ». Rattachable (de façon souple) à un client/
+// devis/facture/chantier. Table additive ; aucune donnée existante impactée.
+export const activites = mysqlTable("activites", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  type: mysqlEnum("type", ["appel", "email", "rdv", "relance", "autre"]).default("autre").notNull(),
+  titre: varchar("titre", { length: 500 }).notNull(),
+  echeance: date("echeance").notNull(),
+  // Rattachement souple (pas de FK dure) : l'entité reste optionnelle.
+  entiteType: mysqlEnum("entiteType", ["client", "devis", "facture", "chantier", "aucun"]).default("aucun"),
+  entiteId: int("entiteId"),
+  responsableUserId: int("responsableUserId"),
+  fait: boolean("fait").default(false).notNull(),
+  faitAt: timestamp("faitAt"),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Activite = typeof activites.$inferSelect;
+export type InsertActivite = typeof activites.$inferInsert;
+
+// ============================================================================
 // DEVIS (Quotes)
 // ============================================================================
 export const devis = mysqlTable("devis", {

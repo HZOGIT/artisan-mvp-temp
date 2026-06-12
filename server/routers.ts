@@ -9906,7 +9906,68 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
     }),
 });
 
+// ============================================================================
+// ACTIVITES / RAPPELS PLANIFIES — CRM next-action (OPE-121)
+// ============================================================================
+// Activités/rappels manuels génériques. Toutes les procédures sont scopées
+// `artisan.id` (multi-tenant) ; aucune logique financière. Le « state »
+// (en retard / aujourd'hui / à venir) est dérivé côté front à partir de `echeance`.
+const activitesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getActivitesByArtisanId(artisan.id);
+  }),
+
+  create: protectedProcedure
+    .input(z.object({
+      type: z.enum(["appel", "email", "rdv", "relance", "autre"]).default("autre"),
+      titre: z.string().trim().min(1).max(500),
+      echeance: z.string().min(1), // date ISO (YYYY-MM-DD)
+      entiteType: z.enum(["client", "devis", "facture", "chantier", "aucun"]).optional(),
+      entiteId: z.number().int().positive().optional(),
+      note: z.string().max(5000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      // Garde « date invalide » : echeance est NOT NULL en base.
+      const echeance = new Date(input.echeance);
+      if (isNaN(echeance.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Échéance invalide" });
+      }
+      return await db.createActivite({
+        artisanId: artisan.id,
+        type: input.type,
+        titre: input.titre,
+        echeance,
+        entiteType: input.entiteType ?? "aucun",
+        entiteId: input.entiteId ?? null,
+        note: input.note || null,
+      });
+    }),
+
+  toggleFait: protectedProcedure
+    .input(z.object({ id: z.number(), fait: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      await db.setActiviteFait(input.id, artisan.id, input.fait);
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      await db.deleteActivite(input.id, artisan.id);
+      return { success: true };
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
+  activites: activitesRouter,
   depenses: depensesRouter,
   search: searchRouter,
   subscription: subscriptionRouter,
