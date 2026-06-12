@@ -266,6 +266,10 @@ export const factures = mysqlTable("factures", {
   // Référence/N° de commande du client (B2B) — OPE-158. Reportée depuis le devis
   // à la conversion ; rappelée sur le PDF (« Votre référence : … »).
   referenceClient: varchar("referenceClient", { length: 100 }),
+  // SIRET du destinataire figé à l'émission — readiness facturation électronique
+  // 2026 (OPE-122, volet 1). Identifiant de routage PDP, capturé depuis la fiche
+  // client (professionnel) au moment de la création pour valeur probante/immuabilité.
+  siretDestinataire: varchar("siretDestinataire", { length: 14 }),
   conditionsPaiement: text("conditionsPaiement"),
   notes: text("notes"),
   totalHT: decimal("totalHT", { precision: 10, scale: 2 }).default("0.00"),

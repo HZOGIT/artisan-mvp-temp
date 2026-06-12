@@ -169,6 +169,13 @@
       "when": 1781303190778,
       "tag": "0023_special_redwing",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1781307111291,
+      "tag": "0024_chemical_secret_warriors",
+      "breakpoints": true
     }
   ]
 }

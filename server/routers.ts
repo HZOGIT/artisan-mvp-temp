@@ -1549,11 +1549,18 @@ const facturesRouter = router({
         ? new Date(input.dateEcheance)
         : await db.defaultDateEcheance(artisan.id, dateFacture);
       // Utiliser la version sécurisée (créer une fonction si nécessaire)
+      // OPE-122 (volet 1) — readiness facturation électronique 2026 : figer le SIRET
+      // du destinataire à l'émission, depuis la fiche client (uniquement pro avec SIRET).
+      // Valeur probante/immuabilité : le SIRET de routage PDP ne doit pas suivre une
+      // modification ultérieure de la fiche client. Additif, sans effet sur le flux actuel.
+      const siretDestinataire =
+        client.type === "professionnel" && client.siret ? client.siret : undefined;
       const newFacture = await db.createFacture(artisan.id, {
         clientId: input.clientId,
         numero,
         objet: input.objet,
         referenceClient: input.referenceClient,
+        siretDestinataire,
         conditionsPaiement: input.conditionsPaiement,
         notes: input.notes,
         dateEcheance,
