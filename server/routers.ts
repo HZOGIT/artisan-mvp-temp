@@ -5387,8 +5387,11 @@ const interventionsMobileRouter = router({
   endIntervention: protectedProcedure
     .input(z.object({
       interventionId: z.number(),
-      notes: z.string().optional(),
-      signatureClient: z.string().optional(),
+      // Bornes (classe « entrées non bornées ») : `notes` ~5 000 car, `signatureClient`
+      // = image base64 (~500 Ko, même borne que signDevis). Évite qu'une entrée géante
+      // (jusqu'à la limite body 50 Mo) sature/overflow la colonne TEXT.
+      notes: z.string().max(5000).optional(),
+      signatureClient: z.string().max(500000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const intervention = await db.getInterventionById(input.interventionId);
