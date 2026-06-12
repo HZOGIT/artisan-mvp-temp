@@ -182,7 +182,18 @@ export const ClientInputSchema = z.object({
     .string()
     .max(100, "La ville est trop longue")
     .optional(),
+  // Identité B2B (OPE-92) — additifs, optionnels (un client reste « particulier »).
+  type: z.enum(["particulier", "professionnel"]).optional(),
+  raisonSociale: z
+    .string()
+    .max(255, "La raison sociale est trop longue")
+    .optional(),
   siret: SiretSchema,
+  numeroTVA: z
+    .string()
+    .max(20, "Le n° de TVA est trop long")
+    .optional()
+    .or(z.literal("")),
   notes: z
     .string()
     .max(1000, "Les notes sont trop longues")

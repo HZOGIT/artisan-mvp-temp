@@ -257,14 +257,22 @@ function buildArtisanBlock(artisan: Artisan): InfoBlock {
 
 function buildClientBlock(client: Client): InfoBlock {
   const lines: string[] = [];
+  const personName = `${client.prenom || ""} ${client.nom}`.trim();
+  // OPE-92 — un client professionnel : la raison sociale devient l'intitulé,
+  // le contact figure en première ligne, et SIRET / n° TVA sont rappelés (mentions B2B).
+  const isPro = (client as any).type === "professionnel";
+  const raisonSociale = (client as any).raisonSociale as string | null | undefined;
+  if (isPro && raisonSociale && personName) lines.push(`Contact: ${personName}`);
   if (client.adresse) lines.push(client.adresse);
   const cpVille = `${client.codePostal || ""} ${client.ville || ""}`.trim();
   if (cpVille) lines.push(cpVille);
   if (client.telephone) lines.push(`Tél: ${client.telephone}`);
   if (client.email) lines.push(`Email: ${client.email}`);
+  if (isPro && (client as any).siret) lines.push(`SIRET: ${(client as any).siret}`);
+  if (isPro && (client as any).numeroTVA) lines.push(`TVA: ${(client as any).numeroTVA}`);
   return {
     label: "CLIENT",
-    name: `${client.prenom || ""} ${client.nom}`.trim(),
+    name: isPro && raisonSociale ? raisonSociale : personName,
     lines,
   };
 }

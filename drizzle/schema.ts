@@ -80,6 +80,13 @@ export const clients = mysqlTable("clients", {
   adresse: text("adresse"),
   codePostal: varchar("codePostal", { length: 10 }),
   ville: varchar("ville", { length: 100 }),
+  // Identité B2B (OPE-92) — distinction particulier/professionnel + identifiants
+  // légaux du client, requis sur une facture B2B (mentions + TVA intracom).
+  // Tous additifs/nullables : un client existant reste « particulier » par défaut.
+  type: mysqlEnum("type", ["particulier", "professionnel"]).default("particulier"),
+  raisonSociale: varchar("raisonSociale", { length: 255 }),
+  siret: varchar("siret", { length: 14 }),
+  numeroTVA: varchar("numeroTVA", { length: 20 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

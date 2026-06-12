@@ -215,6 +215,11 @@ interface Client {
   ville?: string | null;
   telephone?: string | null;
   email?: string | null;
+  // OPE-92 — identité B2B (rappelée sur le document si client professionnel)
+  type?: string | null;
+  raisonSociale?: string | null;
+  siret?: string | null;
+  numeroTVA?: string | null;
 }
 
 interface LigneDocument {
@@ -319,7 +324,9 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
-  const clientName = client.entreprise || `${client.prenom || ""} ${client.nom}`.trim();
+  // OPE-92 — client pro : raison sociale comme intitulé + mentions SIRET / TVA.
+  const isPro = client.type === "professionnel";
+  const clientName = (isPro && client.raisonSociale) || client.entreprise || `${client.prenom || ""} ${client.nom}`.trim();
   doc.text(clientName, pageWidth - 85, yPos);
   yPos += 5;
 
@@ -335,8 +342,16 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
     doc.text(`Tél: ${client.telephone}`, pageWidth - 85, yPos);
     yPos += 5;
   }
+  if (isPro && client.siret) {
+    doc.text(`SIRET: ${client.siret}`, pageWidth - 85, yPos);
+    yPos += 5;
+  }
+  if (isPro && client.numeroTVA) {
+    doc.text(`TVA: ${client.numeroTVA}`, pageWidth - 85, yPos);
+    yPos += 5;
+  }
 
-  return yStart + 50;
+  return Math.max(yStart + 50, yPos + 5);
 }
 
 function addDocumentInfo(

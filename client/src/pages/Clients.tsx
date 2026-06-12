@@ -19,6 +19,10 @@ interface ClientFormData {
   adresse: string;
   codePostal: string;
   ville: string;
+  type: "particulier" | "professionnel";
+  raisonSociale: string;
+  siret: string;
+  numeroTVA: string;
   notes: string;
 }
 
@@ -30,6 +34,10 @@ const initialFormData: ClientFormData = {
   adresse: "",
   codePostal: "",
   ville: "",
+  type: "particulier",
+  raisonSociale: "",
+  siret: "",
+  numeroTVA: "",
   notes: "",
 };
 
@@ -110,6 +118,10 @@ export function Clients() {
       adresse: client.adresse || "",
       codePostal: client.codePostal || "",
       ville: client.ville || "",
+      type: (client.type === "professionnel" ? "professionnel" : "particulier"),
+      raisonSociale: client.raisonSociale || "",
+      siret: client.siret || "",
+      numeroTVA: client.numeroTVA || "",
       notes: client.notes || "",
     });
     setEditingClientId(client.id);
@@ -160,9 +172,9 @@ export function Clients() {
       toast.error("Aucun client à exporter");
       return;
     }
-    const headers = ["Nom", "Prénom", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "Notes"];
+    const headers = ["Nom", "Prénom", "Type", "Raison sociale", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "N° TVA", "Notes"];
     const rows = data.map((c: any) => [
-      c.nom, c.prenom, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.notes,
+      c.nom, c.prenom, c.type, c.raisonSociale, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.numeroTVA, c.notes,
     ]);
     exportToCsv(`clients_${csvDateSuffix()}.csv`, headers, rows);
     toast.success(`${data.length} client(s) exporté(s)`);
@@ -274,6 +286,23 @@ export function Clients() {
 
             <div className="p-6">
               <form onSubmit={handleSubmitEdit} className="space-y-4">
+                {/* Type de client (OPE-92) */}
+                <div>
+                  <Label htmlFor="edit-type" className="block text-sm font-medium mb-1">
+                    Type de client
+                  </Label>
+                  <select
+                    id="edit-type"
+                    name="type"
+                    value={formData.type}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="particulier">Particulier</option>
+                    <option value="professionnel">Professionnel (entreprise, syndic…)</option>
+                  </select>
+                </div>
+
                 {/* Nom */}
                 <div>
                   <Label htmlFor="edit-nom" className="block text-sm font-medium mb-1">
@@ -380,6 +409,56 @@ export function Clients() {
                     />
                   </div>
                 </div>
+
+                {/* Champs professionnels (OPE-92) */}
+                {formData.type === "professionnel" && (
+                  <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-sm font-medium text-gray-700">Informations professionnelles</p>
+                    <div>
+                      <Label htmlFor="edit-raisonSociale" className="block text-sm font-medium mb-1">
+                        Raison sociale
+                      </Label>
+                      <input
+                        id="edit-raisonSociale"
+                        type="text"
+                        name="raisonSociale"
+                        value={formData.raisonSociale}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="edit-siret" className="block text-sm font-medium mb-1">
+                          SIRET
+                        </Label>
+                        <input
+                          id="edit-siret"
+                          type="text"
+                          name="siret"
+                          value={formData.siret}
+                          onChange={handleInputChange}
+                          maxLength={14}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-numeroTVA" className="block text-sm font-medium mb-1">
+                          N° TVA intracom.
+                        </Label>
+                        <input
+                          id="edit-numeroTVA"
+                          type="text"
+                          name="numeroTVA"
+                          value={formData.numeroTVA}
+                          onChange={handleInputChange}
+                          maxLength={20}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Notes */}
                 <div>
