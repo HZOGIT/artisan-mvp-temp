@@ -134,6 +134,8 @@ export default function DevisNouveauPage() {
             description: article.nom,
             prixUnitaireHT: parseFloat(article.prix_base) || 0,
             unite: article.unite || "unité",
+            // OPE-142/167 : taux de TVA par défaut de l'article (fallback : valeur courante de la ligne).
+            tauxTVA: (article as any).tauxTVA != null && (article as any).tauxTVA !== "" ? parseFloat((article as any).tauxTVA) : ligne.tauxTVA,
           }
         : ligne
     ));

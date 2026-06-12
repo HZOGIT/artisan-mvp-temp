@@ -286,6 +286,9 @@ export default function DevisDetail() {
         description: article.description || "",
         unite: article.unite || "unité",
         prixUnitaireHT: String(article.prixUnitaireHT),
+        // OPE-142/167 : pré-remplir le taux de TVA porté par l'article (articles_artisan
+        // ou bibliothèque). Fallback sur la valeur courante si l'article n'en porte pas.
+        tauxTVA: article.tauxTVA != null && article.tauxTVA !== "" ? String(parseFloat(article.tauxTVA)) : lineFormData.tauxTVA,
       });
     }
   };
@@ -846,7 +849,8 @@ export default function DevisDetail() {
                       quantite: "1",
                       unite: article.unite || "unité",
                       prixUnitaireHT: String(article.prixUnitaireHT || ""),
-                      tauxTVA: "20.00",
+                      // OPE-142/167 : taux de TVA par défaut de l'article (fallback 20).
+                      tauxTVA: article.tauxTVA != null && article.tauxTVA !== "" ? String(parseFloat(article.tauxTVA)) : "20.00",
                     });
                   }
                 }}>

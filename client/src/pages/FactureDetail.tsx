@@ -258,6 +258,8 @@ export default function FactureDetail() {
         description: article.description || "",
         unite: article.unite || "unité",
         prixUnitaireHT: String(article.prixUnitaireHT),
+        // OPE-142/167 : pré-remplir le taux de TVA porté par l'article (fallback : valeur courante).
+        tauxTVA: article.tauxTVA != null && article.tauxTVA !== "" ? String(parseFloat(article.tauxTVA)) : lineFormData.tauxTVA,
       });
     }
   };
@@ -843,6 +845,8 @@ export default function FactureDetail() {
                                     description: article.description || "",
                                     prixUnitaireHT: article.prix_base,
                                     unite: article.unite || "unité",
+                                    // OPE-142/167 : taux de TVA par défaut de l'article (fallback valeur courante).
+                                    tauxTVA: (article as any).tauxTVA != null && (article as any).tauxTVA !== "" ? String(parseFloat((article as any).tauxTVA)) : lineFormData.tauxTVA,
                                   });
                                   setShowDropdown(false);
                                   toast.success(`${article.nom} sélectionné`);
