@@ -710,6 +710,7 @@ export async function getEncoursClient(clientId: number, artisanId: number): Pro
     totalTTC: factures.totalTTC,
     montantPaye: factures.montantPaye,
     dateEcheance: factures.dateEcheance,
+    typeDocument: factures.typeDocument,
   }).from(factures)
     .where(and(eq(factures.clientId, clientId), eq(factures.artisanId, artisanId)));
 
@@ -717,7 +718,17 @@ export async function getEncoursClient(clientId: number, artisanId: number): Pro
   let encoursTotal = 0;
   let echu = 0;
   let nb = 0;
+  // OPE-247 — les avoirs validés (notes de crédit) RÉDUISENT ce que le client doit.
+  // Ils sont stockés `typeDocument='avoir'`, `totalTTC` négatif → on accumule leur
+  // valeur absolue comme crédit à déduire de l'encours (nette globale, sans lettrage fin).
+  let creditAvoirs = 0;
   for (const f of rows) {
+    if ((f.typeDocument || "facture") === "avoir") {
+      if (f.statut !== "annulee" && f.statut !== "brouillon") {
+        creditAvoirs += Math.abs(parseFloat(String(f.totalTTC ?? "0")) || 0);
+      }
+      continue;
+    }
     if (f.statut !== "envoyee" && f.statut !== "en_retard") continue;
     const reste = (parseFloat(String(f.totalTTC ?? "0")) || 0) - (parseFloat(String(f.montantPaye ?? "0")) || 0);
     if (reste <= 0) continue;
@@ -727,6 +738,9 @@ export async function getEncoursClient(clientId: number, artisanId: number): Pro
     const estEchue = f.statut === "en_retard" || (!isNaN(echeance) && echeance < now);
     if (estEchue) echu += reste;
   }
+  // Déduit le crédit des avoirs (planché à 0), et borne l'échu au net total dû.
+  encoursTotal = Math.max(0, encoursTotal - creditAvoirs);
+  echu = Math.min(echu, encoursTotal);
   return { encoursTotal: encoursTotal.toFixed(2), echu: echu.toFixed(2), nbFacturesImpayees: nb };
 }
 
@@ -3340,6 +3354,22 @@ export async function getTresoreriePrevisionnelle(
     if (isNaN(ech.getTime()) || ech >= windowEnd) continue;
     const idx = weekIndex(ech);
     if (idx >= 0) buckets[idx].entrees += reste;
+  }
+
+  // OPE-247 — les avoirs validés (crédits client non appliqués) réduisent les encaissements
+  // attendus : on les nette globalement contre les entrées les plus PROCHES (semaine par
+  // semaine), planché à 0. Sans ça la trésorerie côté créances est sur-optimiste.
+  const avoirsRows = await db.select({ totalTTC: factures.totalTTC }).from(factures).where(and(
+    eq(factures.artisanId, artisanId),
+    eq(factures.typeDocument, "avoir"),
+    inArray(factures.statut, ["validee", "envoyee", "en_retard", "payee"] as any),
+  ));
+  let creditAvoirs = avoirsRows.reduce((s, a) => s + Math.abs(parseFloat(String(a.totalTTC ?? "0")) || 0), 0);
+  for (const b of buckets) {
+    if (creditAvoirs <= 0) break;
+    const use = Math.min(b.entrees, creditAvoirs);
+    b.entrees -= use;
+    creditAvoirs -= use;
   }
 
   // ── Décaissements attendus : dépenses récurrentes, expansées selon leur fréquence ──

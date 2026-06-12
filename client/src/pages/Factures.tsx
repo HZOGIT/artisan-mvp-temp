@@ -309,8 +309,16 @@ export default function Factures() {
         if (reelles.length === 0) return null;
         const reste = (f: any) => Math.max(0, (parseFloat(f.totalTTC || "0") || 0) - (parseFloat(f.montantPaye || "0") || 0));
         const impayees = reelles.filter((f: any) => f.statut === "envoyee" || f.statut === "en_retard" || f.statut === "validee");
-        const totalImpaye = impayees.reduce((s: number, f: any) => s + reste(f), 0);
-        const totalEnRetard = reelles.filter((f: any) => f.statut === "en_retard").reduce((s: number, f: any) => s + reste(f), 0);
+        // OPE-247 — les avoirs validés (notes de crédit, totalTTC négatif) réduisent le
+        // « à encaisser » : sans cette déduction, l'impayé est sur-évalué dès qu'un avoir existe.
+        const creditAvoirs = (facturesList || [])
+          .filter((f: any) => f.typeDocument === "avoir" && f.statut !== "annulee" && f.statut !== "brouillon")
+          .reduce((s: number, f: any) => s + Math.abs(parseFloat(f.totalTTC || "0") || 0), 0);
+        const totalImpaye = Math.max(0, impayees.reduce((s: number, f: any) => s + reste(f), 0) - creditAvoirs);
+        const totalEnRetard = Math.min(
+          reelles.filter((f: any) => f.statut === "en_retard").reduce((s: number, f: any) => s + reste(f), 0),
+          totalImpaye,
+        );
         return (
           <div className="grid gap-4 sm:grid-cols-3">
             <Card>
