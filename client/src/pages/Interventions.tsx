@@ -400,6 +400,7 @@ export default function Interventions() {
                 <th>Titre</th>
                 <th className="whitespace-nowrap">Date</th>
                 <th className="whitespace-nowrap">Statut</th>
+                <th className="whitespace-nowrap">Durée réelle</th>
                 <th></th>
               </tr>
             </thead>
@@ -414,6 +415,14 @@ export default function Interventions() {
                   </td>
                   <td className="whitespace-nowrap">
                     <StatutBadge statut={intervention.statut || 'planifiee'} />
+                  </td>
+                  {/* OPE-173 — durée réelle sur site captée par l'app mobile (arrivée→départ) */}
+                  <td className="whitespace-nowrap text-muted-foreground">
+                    {intervention.dureeReelleMinutes != null
+                      ? (intervention.dureeReelleMinutes >= 60
+                          ? `${Math.floor(intervention.dureeReelleMinutes / 60)} h ${String(intervention.dureeReelleMinutes % 60).padStart(2, "0")}`
+                          : `${intervention.dureeReelleMinutes} min`)
+                      : "-"}
                   </td>
                   <td className="whitespace-nowrap">
                     <DropdownMenu>

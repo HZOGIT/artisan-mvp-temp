@@ -4797,6 +4797,28 @@ type InterventionMobileRow = {
   updatedAt: Date;
 };
 
+// OPE-173 — récupère en UNE requête les horodatages mobiles (arrivée/départ) de toutes
+// les interventions d'un artisan, pour afficher la durée réelle sur site côté desktop sans
+// N+1. Scopé tenant. Retourne une map interventionId -> { heureArrivee, heureDepart }.
+export async function getInterventionsMobileByArtisanId(
+  artisanId: number
+): Promise<Array<{ interventionId: number; heureArrivee: any; heureDepart: any }>> {
+  const pool = getPool();
+  if (!pool) return [];
+  try {
+    const [rows] = await pool.execute(
+      `SELECT interventionId, heureArrivee, heureDepart
+         FROM interventions_mobile
+        WHERE artisanId = ?`,
+      [artisanId]
+    );
+    return rows as any[];
+  } catch (e: any) {
+    console.warn("[getInterventionsMobileByArtisanId]", e?.message || e);
+    return [];
+  }
+}
+
 export async function getInterventionMobileByInterventionId(
   interventionId: number
 ): Promise<InterventionMobileRow | null> {

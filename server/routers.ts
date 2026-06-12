@@ -2145,7 +2145,21 @@ const interventionsRouter = router({
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
     // Utiliser la version sécurisée
-    return await dbSecure.getInterventionsByArtisanIdSecure(artisan.id);
+    const interventions = await dbSecure.getInterventionsByArtisanIdSecure(artisan.id);
+    // OPE-173 — durée réelle sur site (heureDépart − heureArrivée), captée par l'app mobile.
+    // 1 requête batch (pas de N+1) ; null si la pointe terrain est incomplète.
+    const mobiles = await db.getInterventionsMobileByArtisanId(artisan.id);
+    const mobileByIntervention = new Map<number, { heureArrivee: any; heureDepart: any }>();
+    for (const m of mobiles) mobileByIntervention.set(m.interventionId, m);
+    return (interventions as any[]).map((i) => {
+      const m = mobileByIntervention.get(i.id);
+      let dureeReelleMinutes: number | null = null;
+      if (m?.heureArrivee && m?.heureDepart) {
+        const diff = new Date(m.heureDepart).getTime() - new Date(m.heureArrivee).getTime();
+        if (diff > 0) dureeReelleMinutes = Math.round(diff / 60000);
+      }
+      return { ...i, dureeReelleMinutes };
+    });
   }),
   
   getById: protectedProcedure
