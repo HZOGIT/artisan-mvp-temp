@@ -4610,6 +4610,13 @@ ${questionsHtml}`,
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      // OPE-246 — vérifier l'appartenance de la conversation au client du token (comme
+      // getConversationMessages/sendClientMessage) : sans ça, n'importe quel token de
+      // portail pouvait marquer comme lu / remettre à zéro le compteur de N'IMPORTE
+      // quelle conversation (IDOR cross-tenant sur le statut de lecture).
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.clientId !== access.clientId || conv.artisanId !== access.artisanId)
+        throw new TRPCError({ code: "FORBIDDEN" });
       await db.markMessagesAsRead(input.conversationId, 'client');
       return { success: true };
     }),
