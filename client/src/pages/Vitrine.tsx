@@ -228,6 +228,16 @@ export default function Vitrine() {
             bestRating: 5,
             worstRating: 1,
           },
+          // OPE-113 (volet 2) — quelques avis individuels en `Review` schema.org (données
+          // DÉJÀ publiques sur la vitrine : auteur affiché, commentaire, note) pour enrichir
+          // le rich snippet. Limité aux 5 plus récents. Aucune nouvelle donnée exposée.
+          review: (avis || []).slice(0, 5).map((r: any) => ({
+            "@type": "Review",
+            author: { "@type": "Person", name: r.clientNom || "Client" },
+            reviewRating: { "@type": "Rating", ratingValue: r.note, bestRating: 5, worstRating: 1 },
+            ...(r.createdAt ? { datePublished: new Date(r.createdAt).toISOString().slice(0, 10) } : {}),
+            ...(r.commentaire ? { reviewBody: String(r.commentaire) } : {}),
+          })),
         }
       : {}),
   };
