@@ -2063,13 +2063,27 @@ const interventionsRouter = router({
       if (!client) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
       }
+      // Garde de validité des dates : `new Date("garbage")` -> Invalid Date qui finit dans
+      // `interventions.dateDebut` (timestamp NOT NULL) -> 500 MySQL strict. Rejet propre en 400.
+      // Behavior-preserving : une date valide (sélecteur front) passe à l'identique.
+      const dateDebut = new Date(input.dateDebut);
+      if (isNaN(dateDebut.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de début invalide" });
+      }
+      let dateFin: Date | undefined;
+      if (input.dateFin) {
+        dateFin = new Date(input.dateFin);
+        if (isNaN(dateFin.getTime())) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Date de fin invalide" });
+        }
+      }
       return await db.createIntervention({
         artisanId: artisan.id,
         clientId: input.clientId,
         titre: input.titre,
         description: input.description,
-        dateDebut: new Date(input.dateDebut),
-        dateFin: input.dateFin ? new Date(input.dateFin) : undefined,
+        dateDebut,
+        dateFin,
         adresse: input.adresse,
         notes: input.notes,
         statut: "planifiee",
