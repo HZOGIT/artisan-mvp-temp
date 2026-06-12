@@ -39,6 +39,7 @@ interface TechnicienForm {
   couleur: string;
   coutHoraire: string;
   statut: "actif" | "inactif" | "conge";
+  userId: number | null;
 }
 
 const initialForm: TechnicienForm = {
@@ -50,6 +51,7 @@ const initialForm: TechnicienForm = {
   couleur: "#3b82f6",
   coutHoraire: "",
   statut: "actif",
+  userId: null,
 };
 
 const couleurs = [
@@ -71,6 +73,8 @@ export default function Techniciens() {
   const [habilForm, setHabilForm] = useState({ type: "", numero: "", organisme: "", dateObtention: "", dateExpiration: "" });
 
   const { data: techniciens, refetch } = trpc.techniciens.getAll.useQuery();
+  // OPE-124 — comptes utilisateurs du tenant liables à une fiche technicien.
+  const { data: linkableUsers } = trpc.techniciens.getLinkableUsers.useQuery();
   const { data: stats } = trpc.techniciens.getStats.useQuery(
     { technicienId: selectedTechnicien! },
     { enabled: !!selectedTechnicien }
@@ -149,6 +153,7 @@ export default function Techniciens() {
       couleur: technicien.couleur || "#3b82f6",
       coutHoraire: (technicien as any).coutHoraire != null ? String((technicien as any).coutHoraire) : "",
       statut: technicien.statut as "actif" | "inactif" | "conge",
+      userId: (technicien as any).userId ?? null,
     });
     setIsDialogOpen(true);
   };
@@ -257,6 +262,29 @@ export default function Techniciens() {
                   onChange={(e) => setForm({ ...form, coutHoraire: e.target.value })}
                   placeholder="Ex: 35.00 (optionnel)"
                 />
+              </div>
+              {/* OPE-124 — lien vers le compte de connexion du salarié (optionnel) */}
+              <div className="space-y-2">
+                <Label>Compte utilisateur lié</Label>
+                <Select
+                  value={form.userId != null ? String(form.userId) : "none"}
+                  onValueChange={(value) => setForm({ ...form, userId: value === "none" ? null : Number(value) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Aucun compte lié" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun compte lié</SelectItem>
+                    {(linkableUsers || []).map((u: any) => (
+                      <SelectItem key={u.id} value={String(u.id)}>
+                        {u.nom}{u.role ? ` — ${u.role}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Relie cette fiche planning au compte de connexion du salarié (base du filtrage « mes interventions »).
+                </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">

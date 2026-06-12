@@ -162,6 +162,13 @@
       "when": 1781293754442,
       "tag": "0022_round_vance_astro",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "5",
+      "when": 1781303190778,
+      "tag": "0023_special_redwing",
+      "breakpoints": true
     }
   ]
 }

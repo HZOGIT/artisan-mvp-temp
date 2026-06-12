@@ -5587,6 +5587,15 @@ const chatRouter = router({
 // ============================================================================
 // TECHNICIENS ROUTER
 // ============================================================================
+// OPE-124 — valide qu'un `userId` à lier à une fiche technicien appartient bien au tenant
+// (collaborateur ou propriétaire). `null`/absent = délier / non fourni (autorisé).
+async function assertUserLinkable(userId: number | null | undefined, artisan: { id: number; userId: number | null }) {
+  if (userId == null) return;
+  const u = await db.getUserById(userId);
+  const belongs = !!u && ((u as any).artisanId === artisan.id || u.id === artisan.userId);
+  if (!belongs) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable" });
+}
+
 const techniciensRouter = router({
   // Récupérer tous les techniciens
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -5625,12 +5634,15 @@ const techniciensRouter = router({
       couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
       // OPE-123 — coût horaire chargé (decimal stocké en string). Borné, optionnel.
       coutHoraire: z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12).optional(),
+      // OPE-124 — compte de connexion lié (collaborateur du même tenant). Optionnel.
+      userId: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
       }
+      await assertUserLinkable(input.userId, artisan);
 
       return await db.createTechnicien({
         artisanId: artisan.id,
@@ -5651,21 +5663,38 @@ const techniciensRouter = router({
       coutHoraire: z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12).optional(),
       statut: z.enum(["actif", "inactif", "conge"]).optional(),
       notes: z.string().max(5000).optional(),
+      // OPE-124 — compte de connexion lié (null pour délier). Optionnel.
+      userId: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
       }
-      
+
       const technicien = await db.getTechnicienById(input.id);
       if (!technicien || technicien.artisanId !== artisan.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
       }
-      
+      await assertUserLinkable(input.userId, artisan);
+
       const { id, ...data } = input;
       return await db.updateTechnicien(id, data);
     }),
+
+  // OPE-124 — utilisateurs du tenant liables à une fiche technicien (sélecteur du formulaire).
+  // Lecture légère scopée tenant (id/nom/rôle), accessible à qui gère les techniciens.
+  getLinkableUsers: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const users = await db.getUsersByArtisanId(artisan.id);
+    return users.map((u: any) => ({
+      id: u.id,
+      nom: [u.prenom, u.name].filter(Boolean).join(" ").trim() || u.email,
+      email: u.email,
+      role: u.role,
+    }));
+  }),
 
   // Supprimer un technicien
   delete: protectedProcedure

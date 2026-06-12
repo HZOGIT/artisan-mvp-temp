@@ -819,6 +819,9 @@ export const techniciens = mysqlTable("techniciens", {
   // Coût horaire chargé du technicien (OPE-123) — base du coût main-d'œuvre des
   // chantiers (Σ heures × coutHoraire, cf. OPE-106/107). Nullable/additif.
   coutHoraire: decimal("coutHoraire", { precision: 8, scale: 2 }),
+  // OPE-124 — lien optionnel vers le compte de connexion (users) du salarié : unifie
+  // la ressource de planning et le compte (base du filtrage « mes interventions »). Additif.
+  userId: int("userId"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

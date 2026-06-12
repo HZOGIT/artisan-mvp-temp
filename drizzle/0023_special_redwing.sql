@@ -1,0 +1,1 @@
+ALTER TABLE `techniciens` ADD `userId` int;
