@@ -2610,6 +2610,9 @@ export async function deleteChantier(id: number): Promise<void> {
   await db.delete(interventionsChantier).where(eq(interventionsChantier.chantierId, id));
   await db.delete(phasesChantier).where(eq(phasesChantier.chantierId, id));
   await db.delete(suiviChantier).where(eq(suiviChantier.chantierId, id));
+  // OPE-106 — pointages de main-d'œuvre du chantier (heures, opérationnel) : sinon
+  // lignes orphelines de pointages_chantier à la suppression du chantier.
+  await db.delete(pointagesChantier).where(eq(pointagesChantier.chantierId, id));
   await db.delete(chantiers).where(eq(chantiers.id, id));
 }
 
