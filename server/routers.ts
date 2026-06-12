@@ -5407,10 +5407,13 @@ const chatRouter = router({
         contenu: input.contenu,
       });
 
-      // Email notification au client
+      // Email notification au client (best-effort). OPE-24 — classe email : borne
+      // anti-spam (20 / 15 min / artisan). Le message reste créé en in-app ; au-delà
+      // du quota, seule la notification email est sautée (pas d'erreur côté UI), pour
+      // empêcher un compte authentifié d'inonder la boîte du client via le chat.
       try {
         const client = await db.getClientById(conv.clientId);
-        if (client?.email) {
+        if (client?.email && checkDocumentEmailRate(`chat:${artisan.id}`)) {
           const portalAccess = await db.getPortalAccessByClientId(conv.clientId, artisan.id);
           const portalLink = portalAccess?.token
             ? `${process.env.APP_URL || 'https://www.operioz.com'}/portail/${portalAccess.token}`
