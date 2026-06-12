@@ -461,6 +461,34 @@ export default function Chantiers() {
                           </p>
                         </CardContent>
                       </Card>
+                      {/* OPE-107 — coût réel agrégé depuis les dépenses + marge */}
+                      <Card>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-2">
+                            <Euro className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Coût réel</span>
+                          </div>
+                          <p className="text-lg font-semibold mt-1">
+                            {(statistiques?.coutReel || 0).toLocaleString()} €
+                          </p>
+                        </CardContent>
+                      </Card>
+                      {statistiques?.marge !== null && statistiques?.marge !== undefined && (
+                        <Card>
+                          <CardContent className="pt-4">
+                            <div className="flex items-center gap-2">
+                              <Euro className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">Marge</span>
+                            </div>
+                            <p className={`text-lg font-semibold mt-1 ${statistiques.marge >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {statistiques.marge.toLocaleString()} €
+                              {statistiques.margePct !== null && statistiques.margePct !== undefined && (
+                                <span className="text-sm font-normal"> ({statistiques.margePct}%)</span>
+                              )}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
                       <Card>
                         <CardContent className="pt-4">
                           <div className="flex items-center gap-2">

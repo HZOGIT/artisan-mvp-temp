@@ -2580,8 +2580,27 @@ export async function getStatistiquesChantier(chantierId: number): Promise<any> 
   const documents = await getDocumentsByChantier(chantierId);
 
   const phasesTerminees = phases.filter(p => p.statut === 'termine').length;
-  const budgetConsomme = parseFloat(String(chantier.budgetRealise || '0'));
   const budgetTotal = parseFloat(String(chantier.budgetPrevisionnel || '0'));
+
+  // OPE-107 — coût réel AGRÉGÉ depuis les dépenses rattachées au chantier
+  // (`depenses.chantier_id`) au lieu du champ `budgetRealise` statique (jamais
+  // calculé, toujours 0). Scopé par `artisan_id` du chantier (multi-tenant).
+  let coutReel = 0;
+  const pool = getPool();
+  if (pool) {
+    try {
+      const [rows]: any = await pool.execute(
+        `SELECT COALESCE(SUM(montant_ttc), 0) AS total FROM depenses WHERE chantier_id = ? AND artisan_id = ?`,
+        [chantierId, chantier.artisanId]
+      );
+      coutReel = parseFloat(String(rows?.[0]?.total ?? '0')) || 0;
+    } catch (e: any) { console.warn('[getStatistiquesChantier] coutReel:', String(e?.message || e)); }
+  }
+  // Repli sur le champ manuel `budgetRealise` s'il a été saisi et qu'aucune dépense
+  // n'est rattachée (rétro-compat).
+  const budgetRealiseManuel = parseFloat(String(chantier.budgetRealise || '0'));
+  const budgetConsomme = coutReel > 0 ? coutReel : budgetRealiseManuel;
+  const marge = budgetTotal > 0 ? budgetTotal - budgetConsomme : null;
 
   return {
     nombrePhases: phases.length,
@@ -2590,6 +2609,9 @@ export async function getStatistiquesChantier(chantierId: number): Promise<any> 
     nombreDocuments: documents.length,
     budgetConsomme,
     budgetTotal,
+    coutReel,
+    marge,
+    margePct: budgetTotal > 0 ? Math.round(((budgetTotal - budgetConsomme) / budgetTotal) * 100) : null,
     pourcentageBudget: budgetTotal > 0 ? Math.round((budgetConsomme / budgetTotal) * 100) : 0,
     avancement: chantier.avancement || 0,
   };
