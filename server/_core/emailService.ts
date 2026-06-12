@@ -7,6 +7,12 @@ export interface EmailPayload {
   body: string;
   attachmentName?: string;
   attachmentContent?: string; // Base64 encoded
+  // OPE-157 — identité d'expédition par artisan (optionnels ; défaut = identité Operioz).
+  // `fromName` = nom AFFICHÉ de l'expéditeur (le DOMAINE d'enveloppe reste operioz.com →
+  // DKIM/SPF préservés, pas d'usurpation). `replyTo` = adresse de réponse (email de
+  // l'artisan) pour que les réponses du client arrivent à l'artisan.
+  fromName?: string;
+  replyTo?: string;
 }
 
 const resendConfigured = !!ENV.resendApiKey;
@@ -39,10 +45,19 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
     return { success: true, message: `Email simulé avec succès à ${to}` };
   }
 
+  // OPE-157 — identité d'expédition par artisan, domaine d'enveloppe INCHANGÉ.
+  // Sanitisation CRLF + retrait de <>" (anti header-injection, display name RFC 5322 sûr).
+  const sanitizeHeader = (s: string) => String(s).replace(/[\r\n<>"]+/g, " ").trim();
+  const defaultFrom = ENV.emailFrom || "Operioz <noreply@operioz.com>";
+  const cleanFromName = payload.fromName ? sanitizeHeader(payload.fromName) : "";
+  const from = cleanFromName ? `"${cleanFromName}" <noreply@operioz.com>` : defaultFrom;
+  const replyToClean = payload.replyTo ? payload.replyTo.trim() : "";
+  const replyTo = replyToClean && emailRegex.test(replyToClean) ? replyToClean : "support@operioz.com";
+
   try {
     const emailOptions: Parameters<typeof resend.emails.send>[0] = {
-      from: ENV.emailFrom || "Operioz <noreply@operioz.com>",
-      replyTo: "support@operioz.com",
+      from,
+      replyTo,
       to,
       subject,
       html: body,

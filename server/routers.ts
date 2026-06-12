@@ -1093,6 +1093,8 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
       const result = await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject,
         body: finalBody,
         attachmentName: input.attachPdf ? `Devis_${devis.numero}.pdf` : undefined,
@@ -1244,6 +1246,8 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       // Envoyer l'email
       const emailResult = await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `Relance - Devis n°${devisData.numero}`,
         body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2c3e50;">Relance - Devis n°${devisData.numero}</h2>
@@ -1322,6 +1326,8 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
         const emailResult = await sendEmail({
           to: client.email,
+          fromName: artisan.nomEntreprise || undefined, // OPE-157
+          replyTo: artisan.email || undefined,
           subject: `Relance - Devis n°${d.numero}`,
           body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2c3e50;">Relance - Devis n°${d.numero}</h2>
@@ -1793,6 +1799,8 @@ const facturesRouter = router({
 
       const result = await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject,
         body: finalBody,
         attachmentName: input.attachPdf ? `Facture_${facture.numero}.pdf` : undefined,
@@ -2779,6 +2787,8 @@ const signatureRouter = router({
 
         await sendEmail({
           to: client.email,
+          fromName: artisan.nomEntreprise || undefined, // OPE-157
+          replyTo: artisan.email || undefined,
           subject: `Devis ${devisData.numero} à signer - ${artisanName}`,
           body: `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"></head>
@@ -4164,6 +4174,8 @@ const clientPortalRouter = router({
       const artisanName = artisan.nomEntreprise || 'Votre artisan';
       await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `${artisanName} — Accès à votre espace client`,
         body: `<!DOCTYPE html>
 <html lang="fr">
@@ -5227,6 +5239,8 @@ const chatRouter = router({
             : null;
           await sendEmail({
             to: client.email,
+            fromName: artisan.nomEntreprise || undefined, // OPE-157
+            replyTo: artisan.email || undefined,
             subject: `Nouveau message de ${artisan.nomEntreprise || 'votre artisan'}`,
             body: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
               <h2 style="color:#2980b9">Nouveau message</h2>
@@ -5567,6 +5581,8 @@ const avisRouter = router({
       
       await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `Votre avis sur notre intervention - ${artisan.nomEntreprise || 'Artisan'}`,
         body: `
           <h2>Bonjour ${safeHtml(client.nom)},</h2>
@@ -5633,6 +5649,8 @@ const avisRouter = router({
 
       await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `Votre avis nous intéresse - ${artisan.nomEntreprise || 'Artisan'}`,
         body: `
           <h2>Bonjour ${safeHtml(client.nom)},</h2>

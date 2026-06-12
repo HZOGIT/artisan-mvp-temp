@@ -1028,6 +1028,8 @@ async function sendFactureEmailHelper(factureId: number, customMessage: string |
 
   const result = await sendEmail({
     to: client.email,
+    fromName: artisan.nomEntreprise || undefined, // OPE-157
+    replyTo: (artisan as any).email || undefined,
     subject,
     body: finalBody,
     attachmentName: `Facture_${factureData.numero}.pdf`,
