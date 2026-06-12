@@ -9789,6 +9789,16 @@ const depensesRouter = router({
       if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
       }
+      // OPE-25 (même classe, FK chantier/intervention) — si la dépense est rattachée à un
+      // chantier ou une intervention, valider qu'ils appartiennent au tenant (FK pendante sinon).
+      if (input.chantierId != null) {
+        const ch = await db.getChantierById(input.chantierId);
+        if (!ch || ch.artisanId !== artisan.id) throw new TRPCError({ code: "NOT_FOUND", message: "Chantier introuvable" });
+      }
+      if (input.interventionId != null) {
+        const itv = await db.getInterventionById(input.interventionId);
+        if (!itv || itv.artisanId !== artisan.id) throw new TRPCError({ code: "NOT_FOUND", message: "Intervention introuvable" });
+      }
       const numero = await db.getNextDepenseNumero(artisan.id);
       const montantTva = +(input.montantHt * (input.tauxTva / 100)).toFixed(2);
       const montantTtc = +(input.montantHt + montantTva).toFixed(2);
@@ -10217,6 +10227,11 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
       // OPE-25 (classe clientId) — si l'indemnité est rattachée à un client, valider l'appartenance.
       if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
+      }
+      // OPE-25 (même classe, FK chantier) — valider l'appartenance du chantier rattaché.
+      if (input.chantierId != null) {
+        const ch = await db.getChantierById(input.chantierId);
+        if (!ch || ch.artisanId !== artisan.id) throw new TRPCError({ code: "NOT_FOUND", message: "Chantier introuvable" });
       }
       const numero = await db.getNextDepenseNumero(artisan.id);
       // Indemnites km : sans TVA recuperable (regime fiscal forfait).
