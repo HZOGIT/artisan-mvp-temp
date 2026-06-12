@@ -6412,9 +6412,9 @@ const vehiculesRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      immatriculation: z.string(),
-      marque: z.string().optional(),
-      modele: z.string().optional(),
+      immatriculation: z.string().max(20),
+      marque: z.string().max(100).optional(),
+      modele: z.string().max(100).optional(),
       annee: z.number().optional(),
       typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
       kilometrageActuel: z.number().optional(),
@@ -6435,9 +6435,9 @@ const vehiculesRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      immatriculation: z.string().optional(),
-      marque: z.string().optional(),
-      modele: z.string().optional(),
+      immatriculation: z.string().max(20).optional(),
+      marque: z.string().max(100).optional(),
+      modele: z.string().max(100).optional(),
       annee: z.number().optional(),
       typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
       kilometrageActuel: z.number().optional(),
@@ -6463,7 +6463,7 @@ const vehiculesRouter = router({
       vehiculeId: z.number(),
       kilometrage: z.number(),
       dateReleve: z.string(),
-      motif: z.string().optional(),
+      motif: z.string().max(255).optional(),
       technicienId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -6488,7 +6488,7 @@ const vehiculesRouter = router({
       dateEntretien: z.string(),
       kilometrageEntretien: z.number().optional(),
       cout: z.string().optional(),
-      prestataire: z.string().optional(),
+      prestataire: z.string().max(255).optional(),
       description: z.string().optional(),
       prochainEntretienKm: z.number().optional(),
       prochainEntretienDate: z.string().optional(),
@@ -6518,8 +6518,8 @@ const vehiculesRouter = router({
   addAssurance: protectedProcedure
     .input(z.object({
       vehiculeId: z.number(),
-      compagnie: z.string(),
-      numeroContrat: z.string().optional(),
+      compagnie: z.string().max(255),
+      numeroContrat: z.string().max(100).optional(),
       typeAssurance: z.enum(["tiers", "tiers_plus", "tous_risques"]).optional(),
       dateDebut: z.string(),
       dateFin: z.string(),
