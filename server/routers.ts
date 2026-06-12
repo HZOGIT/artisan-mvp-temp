@@ -9011,9 +9011,7 @@ const supportRouter = router({
           <tr><td><strong>User ID :</strong></td><td>${ctx.user.id} (artisanId ${ctx.user.artisanId ?? "—"})</td></tr>
           <tr><td><strong>Sujet :</strong></td><td>${subjectLabel}</td></tr>
         </table>
-        <div style="background:#f9fafb;border-left:3px solid #2563eb;padding:12px 16px;margin-top:16px;white-space:pre-wrap;">
-          ${input.message.replace(/[<>]/g, (c) => c === "<" ? "&lt;" : "&gt;")}
-        </div>
+        <div style="background:#f9fafb;border-left:3px solid #2563eb;padding:12px 16px;margin-top:16px;white-space:pre-wrap;">${safeHtml(input.message)}</div>
       </body></html>`;
       await sendEmail({
         to: process.env.SUPPORT_EMAIL || "support@operioz.com",
