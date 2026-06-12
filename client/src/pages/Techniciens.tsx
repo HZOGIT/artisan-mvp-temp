@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, Plus, Pencil, Trash2, Phone, Mail, Wrench, Calendar } from "lucide-react";
+import { Users, Plus, Pencil, Trash2, Phone, Mail, Wrench, Calendar, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 interface TechnicienForm {
@@ -68,12 +68,34 @@ export default function Techniciens() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<TechnicienForm>(initialForm);
   const [selectedTechnicien, setSelectedTechnicien] = useState<number | null>(null);
+  const [habilForm, setHabilForm] = useState({ type: "", numero: "", organisme: "", dateObtention: "", dateExpiration: "" });
 
   const { data: techniciens, refetch } = trpc.techniciens.getAll.useQuery();
   const { data: stats } = trpc.techniciens.getStats.useQuery(
     { technicienId: selectedTechnicien! },
     { enabled: !!selectedTechnicien }
   );
+  const { data: habilitations, refetch: refetchHabil } = trpc.techniciens.getHabilitations.useQuery(
+    { technicienId: selectedTechnicien! },
+    { enabled: !!selectedTechnicien }
+  );
+
+  const addHabilMutation = trpc.techniciens.addHabilitation.useMutation({
+    onSuccess: () => {
+      toast.success("Habilitation ajoutée");
+      setHabilForm({ type: "", numero: "", organisme: "", dateObtention: "", dateExpiration: "" });
+      refetchHabil();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteHabilMutation = trpc.techniciens.deleteHabilitation.useMutation({
+    onSuccess: () => {
+      toast.success("Habilitation supprimée");
+      refetchHabil();
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const createMutation = trpc.techniciens.create.useMutation({
     onSuccess: () => {
@@ -432,6 +454,136 @@ export default function Techniciens() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 Sélectionnez un technicien pour voir ses statistiques
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Habilitations / certifications du technicien sélectionné (OPE-162) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              Habilitations & certifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!selectedTechnicien ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Sélectionnez un technicien pour gérer ses habilitations
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Liste */}
+                {habilitations && habilitations.length > 0 ? (
+                  <div className="space-y-2">
+                    {habilitations.map((h) => {
+                      const exp = h.dateExpiration ? new Date(h.dateExpiration) : null;
+                      const valid = exp && !isNaN(exp.getTime());
+                      const joursRestants = valid ? Math.ceil((exp!.getTime() - Date.now()) / 86400000) : null;
+                      let badge: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } = { label: "Sans échéance", variant: "outline" };
+                      if (joursRestants != null) {
+                        if (joursRestants < 0) badge = { label: "Expirée", variant: "destructive" };
+                        else if (joursRestants <= 60) badge = { label: `Expire dans ${joursRestants} j`, variant: "secondary" };
+                        else badge = { label: "Valide", variant: "default" };
+                      }
+                      return (
+                        <div key={h.id} className="flex items-start justify-between gap-2 p-3 border rounded-lg">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium">{h.type}</span>
+                              <Badge variant={badge.variant}>{badge.label}</Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
+                              {h.numero && <p>N° {h.numero}</p>}
+                              {h.organisme && <p>Organisme : {h.organisme}</p>}
+                              {valid && <p>Échéance : {exp!.toLocaleDateString("fr-FR")}</p>}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm("Supprimer cette habilitation ?")) {
+                                deleteHabilMutation.mutate({ technicienId: selectedTechnicien, id: h.id });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucune habilitation enregistrée.</p>
+                )}
+
+                {/* Formulaire d'ajout */}
+                <form
+                  className="space-y-2 border-t pt-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!habilForm.type.trim()) {
+                      toast.error("Le type d'habilitation est requis");
+                      return;
+                    }
+                    addHabilMutation.mutate({
+                      technicienId: selectedTechnicien,
+                      type: habilForm.type.trim(),
+                      numero: habilForm.numero.trim() || undefined,
+                      organisme: habilForm.organisme.trim() || undefined,
+                      dateObtention: habilForm.dateObtention || undefined,
+                      dateExpiration: habilForm.dateExpiration || undefined,
+                    });
+                  }}
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Type *</Label>
+                      <Input
+                        value={habilForm.type}
+                        onChange={(e) => setHabilForm({ ...habilForm, type: e.target.value })}
+                        placeholder="Habilitation électrique B1V…"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">N°</Label>
+                      <Input
+                        value={habilForm.numero}
+                        onChange={(e) => setHabilForm({ ...habilForm, numero: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Organisme</Label>
+                      <Input
+                        value={habilForm.organisme}
+                        onChange={(e) => setHabilForm({ ...habilForm, organisme: e.target.value })}
+                        placeholder="APAVE, Qualibat…"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Obtention</Label>
+                      <Input
+                        type="date"
+                        value={habilForm.dateObtention}
+                        onChange={(e) => setHabilForm({ ...habilForm, dateObtention: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Expiration</Label>
+                      <Input
+                        type="date"
+                        value={habilForm.dateExpiration}
+                        onChange={(e) => setHabilForm({ ...habilForm, dateExpiration: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <Button type="submit" size="sm" disabled={addHabilMutation.isPending}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Ajouter
+                  </Button>
+                </form>
               </div>
             )}
           </CardContent>

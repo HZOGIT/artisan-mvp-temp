@@ -798,6 +798,27 @@ export type Technicien = typeof techniciens.$inferSelect;
 export type InsertTechnicien = typeof techniciens.$inferInsert;
 
 // ============================================================================
+// HABILITATIONS / CERTIFICATIONS DES TECHNICIENS (OPE-162)
+// ============================================================================
+// Suivi des habilitations BTP (habilitation électrique NF C18-510, CACES, travail
+// en hauteur, amiante SS4…) avec date d'expiration → conformité sécurité/légale.
+// Table additive, nullable sur les dates (une habilitation sans échéance reste valide).
+export const habilitationsTechniciens = mysqlTable("habilitations_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  type: varchar("type", { length: 255 }).notNull(),
+  numero: varchar("numero", { length: 100 }),
+  organisme: varchar("organisme", { length: 255 }),
+  dateObtention: date("dateObtention"),
+  dateExpiration: date("dateExpiration"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type HabilitationTechnicien = typeof habilitationsTechniciens.$inferSelect;
+export type InsertHabilitationTechnicien = typeof habilitationsTechniciens.$inferInsert;
+
+// ============================================================================
 // DISPONIBILITES TECHNICIENS (Availability schedule)
 // ============================================================================
 export const disponibilitesTechniciens = mysqlTable("disponibilites_techniciens", {

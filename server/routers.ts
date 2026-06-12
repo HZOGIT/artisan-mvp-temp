@@ -5512,6 +5512,53 @@ const techniciensRouter = router({
       
       return { total, terminees, enCours, planifiees };
     }),
+
+  // ── Habilitations / certifications (OPE-162) ────────────────────────────────
+  // Suivi des habilitations BTP avec échéance. Chaque endpoint vérifie d'abord
+  // que le technicien appartient bien à l'artisan authentifié (assertTechnicienOwner).
+  getHabilitations: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
+      return await db.getHabilitationsByTechnicienId(input.technicienId);
+    }),
+
+  addHabilitation: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      type: z.string().trim().min(1).max(255),
+      numero: z.string().trim().max(100).optional(),
+      organisme: z.string().trim().max(255).optional(),
+      dateObtention: z.string().optional(),
+      dateExpiration: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id);
+      // Garde-fous date : on ignore les valeurs invalides plutôt que d'insérer une
+      // date NaN (cohérent avec le reste de la codebase, cf. sweep dates invalides).
+      const parseDate = (s?: string): Date | null => {
+        if (!s) return null;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+      };
+      return await db.createHabilitationTechnicien({
+        technicienId: input.technicienId,
+        artisanId: artisan.id,
+        type: input.type,
+        numero: input.numero || null,
+        organisme: input.organisme || null,
+        dateObtention: parseDate(input.dateObtention),
+        dateExpiration: parseDate(input.dateExpiration),
+      });
+    }),
+
+  deleteHabilitation: protectedProcedure
+    .input(z.object({ technicienId: z.number(), id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
+      await db.deleteHabilitationTechnicien(input.id, input.technicienId);
+      return { success: true };
+    }),
 });
 
 // ============================================================================

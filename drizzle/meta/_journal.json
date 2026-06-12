@@ -127,6 +127,13 @@
       "when": 1781272796004,
       "tag": "0017_wealthy_thunderbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1781281843723,
+      "tag": "0018_jazzy_captain_midlands",
+      "breakpoints": true
     }
   ]
 }

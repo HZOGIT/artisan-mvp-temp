@@ -31,6 +31,7 @@ import {
   demandesContact, DemandeContact, InsertDemandeContact,
   demandesAvis, DemandeAvis, InsertDemandeAvis,
   techniciens, Technicien, InsertTechnicien,
+  habilitationsTechniciens, HabilitationTechnicien, InsertHabilitationTechnicien,
   positionsTechniciens, PositionTechnicien, InsertPositionTechnicien,
   disponibilitesTechniciens, DisponibiliteTechnicien,
   historiqueDeplacements,
@@ -2150,6 +2151,35 @@ export async function updateTechnicien(id: number, data: Partial<InsertTechnicie
 export async function deleteTechnicien(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(techniciens).where(eq(techniciens.id, id));
+}
+
+// ── Habilitations / certifications des techniciens (OPE-162) ──────────────────
+// Suivi des habilitations BTP avec échéance (habilitation électrique, CACES,
+// travail en hauteur, amiante SS4…). Toujours scopé par technicien (ownership
+// vérifié en amont dans le routeur via assertTechnicienOwner).
+export async function getHabilitationsByTechnicienId(technicienId: number): Promise<HabilitationTechnicien[]> {
+  const db = await getDb();
+  return await db.select().from(habilitationsTechniciens)
+    .where(eq(habilitationsTechniciens.technicienId, technicienId))
+    .orderBy(desc(habilitationsTechniciens.dateExpiration));
+}
+
+export async function createHabilitationTechnicien(data: InsertHabilitationTechnicien): Promise<HabilitationTechnicien> {
+  const db = await getDb();
+  const [result] = await db.insert(habilitationsTechniciens).values(data);
+  const [created] = await db.select().from(habilitationsTechniciens)
+    .where(eq(habilitationsTechniciens.id, result.insertId));
+  return created;
+}
+
+// Suppression scopée : exige que l'habilitation appartienne bien au technicien
+// fourni (lui-même déjà vérifié comme appartenant à l'artisan dans le routeur).
+export async function deleteHabilitationTechnicien(id: number, technicienId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(habilitationsTechniciens).where(and(
+    eq(habilitationsTechniciens.id, id),
+    eq(habilitationsTechniciens.technicienId, technicienId),
+  ));
 }
 
 export async function getTechniciensDisponibles(artisanId: number, date: Date): Promise<Technicien[]> {
