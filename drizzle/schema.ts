@@ -832,6 +832,25 @@ export const avisClients = mysqlTable("avis_clients", {
 });
 
 export type AvisClient = typeof avisClients.$inferSelect;
+
+// OPE-172 — demandes de contact entrantes (vitrine) persistées (≈ Odoo crm.lead).
+// Auparavant fire-and-forget (email seul) → leads perdus. Additif, non destructif.
+export const demandesContact = mysqlTable("demandes_contact", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  nom: varchar("nom", { length: 200 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  telephone: varchar("telephone", { length: 30 }),
+  message: text("message"),
+  source: varchar("source", { length: 50 }).default("vitrine"),
+  statut: mysqlEnum("statut_demande_contact", ["nouveau", "contacte", "converti", "perdu"]).default("nouveau"),
+  clientId: int("clientId"), // posé à la conversion en client
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DemandeContact = typeof demandesContact.$inferSelect;
+export type InsertDemandeContact = typeof demandesContact.$inferInsert;
 export type InsertAvisClient = typeof avisClients.$inferInsert;
 
 // ============================================================================

@@ -28,6 +28,7 @@ import {
   modelesDevis, ModeleDevis, InsertModeleDevis,
   modelesDevisLignes, ModeleDevisLigne, InsertModeleDevisLigne,
   avisClients, AvisClient, InsertAvisClient,
+  demandesContact, DemandeContact, InsertDemandeContact,
   demandesAvis, DemandeAvis, InsertDemandeAvis,
   techniciens, Technicien, InsertTechnicien,
   positionsTechniciens, PositionTechnicien, InsertPositionTechnicien,
@@ -246,6 +247,35 @@ export async function getArtisanByIcalToken(token: string): Promise<Artisan | un
   const db = await getDb();
   if (!token) return undefined;
   const result = await db.select().from(artisans).where(eq(artisans.icalToken, token)).limit(1);
+  return result[0];
+}
+
+// OPE-172 — demandes de contact (vitrine) : persistance + suivi.
+export async function createDemandeContact(data: InsertDemandeContact): Promise<void> {
+  const db = await getDb();
+  await db.insert(demandesContact).values(data);
+}
+
+export async function getDemandesContactByArtisanId(artisanId: number): Promise<DemandeContact[]> {
+  const db = await getDb();
+  return await db.select().from(demandesContact)
+    .where(eq(demandesContact.artisanId, artisanId))
+    .orderBy(desc(demandesContact.createdAt));
+}
+
+// Met à jour le statut d'une demande, SCOPÉ par artisanId (pas d'IDOR).
+export async function updateDemandeContactStatut(id: number, artisanId: number, statut: "nouveau" | "contacte" | "converti" | "perdu", clientId?: number): Promise<void> {
+  const db = await getDb();
+  const data: any = { statut };
+  if (clientId !== undefined) data.clientId = clientId;
+  await db.update(demandesContact).set(data)
+    .where(and(eq(demandesContact.id, id), eq(demandesContact.artisanId, artisanId)));
+}
+
+export async function getDemandeContactById(id: number, artisanId: number): Promise<DemandeContact | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(demandesContact)
+    .where(and(eq(demandesContact.id, id), eq(demandesContact.artisanId, artisanId))).limit(1);
   return result[0];
 }
 

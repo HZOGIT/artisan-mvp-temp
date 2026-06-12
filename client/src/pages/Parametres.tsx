@@ -47,6 +47,17 @@ export default function Parametres() {
     onError: () => toast.error("Impossible de régénérer le lien"),
   });
 
+  // OPE-172 — demandes de contact (leads) de la vitrine.
+  const { data: demandesContact, refetch: refetchDemandes } = trpc.vitrine.getDemandesContact.useQuery();
+  const updateDemandeStatut = trpc.vitrine.updateDemandeContactStatut.useMutation({
+    onSuccess: () => { refetchDemandes(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const convertirDemande = trpc.vitrine.convertirDemandeEnClient.useMutation({
+    onSuccess: () => { refetchDemandes(); toast.success("Lead converti en client"); },
+    onError: (e) => toast.error(e.message),
+  });
+
   const updateMutation = trpc.parametres.update.useMutation({
     onSuccess: () => {
       toast.success("Paramètres enregistrés avec succès");
@@ -594,6 +605,66 @@ export default function Parametres() {
           >
             Régénérer le lien (révoque l'ancien)
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* OPE-172 — Demandes de contact (leads vitrine) */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Demandes de contact</CardTitle>
+          <CardDescription>
+            Les messages reçus via votre page vitrine. Suivez-les (nouveau → contacté → converti/perdu)
+            pour ne perdre aucun prospect.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(!demandesContact || demandesContact.length === 0) ? (
+            <p className="text-sm text-muted-foreground">Aucune demande pour le moment.</p>
+          ) : (
+            <div className="space-y-3">
+              {demandesContact.map((d: any) => (
+                <div key={d.id} className="border rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="space-y-0.5">
+                      <p className="font-medium">
+                        {d.nom}
+                        <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          d.statut === "converti" ? "bg-green-100 text-green-700"
+                          : d.statut === "perdu" ? "bg-gray-200 text-gray-600"
+                          : d.statut === "contacte" ? "bg-amber-100 text-amber-800"
+                          : "bg-blue-100 text-blue-700"}`}>
+                          {d.statut}
+                        </span>
+                      </p>
+                      {d.email && <p className="text-xs text-muted-foreground">{d.email}</p>}
+                      {d.telephone && <p className="text-xs text-muted-foreground">{d.telephone}</p>}
+                      {d.message && <p className="text-sm mt-1 whitespace-pre-wrap">{d.message}</p>}
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      {d.statut !== "converti" && (
+                        <Button type="button" size="sm" variant="outline" disabled={convertirDemande.isPending}
+                          onClick={() => convertirDemande.mutate({ id: d.id })}>
+                          Convertir en client
+                        </Button>
+                      )}
+                      {d.statut === "nouveau" && (
+                        <Button type="button" size="sm" variant="ghost"
+                          onClick={() => updateDemandeStatut.mutate({ id: d.id, statut: "contacte" })}>
+                          Marquer contacté
+                        </Button>
+                      )}
+                      {d.statut !== "perdu" && d.statut !== "converti" && (
+                        <Button type="button" size="sm" variant="ghost" className="text-muted-foreground"
+                          onClick={() => updateDemandeStatut.mutate({ id: d.id, statut: "perdu" })}>
+                          Marquer perdu
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
         </TabsContent>

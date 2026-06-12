@@ -8302,7 +8302,57 @@ const vitrineRouter = router({
         lien: '/parametres',
       });
 
+      // OPE-172 — persiste le lead (best-effort : ne casse pas l'envoi si l'insert échoue).
+      try {
+        await db.createDemandeContact({
+          artisanId: artisan.id,
+          nom: input.nom,
+          email: input.email,
+          telephone: input.telephone || null,
+          message: input.message,
+          source: 'vitrine',
+        });
+      } catch (e) { console.error('[submitContact] persist lead:', e); }
+
       return { success: true };
+    }),
+
+  // OPE-172 — liste des demandes de contact (leads) de l'artisan.
+  getDemandesContact: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getDemandesContactByArtisanId(artisan.id);
+  }),
+
+  // OPE-172 — met à jour le statut d'un lead (suivi nouveau → contacté/perdu). Scopé artisan.
+  updateDemandeContactStatut: protectedProcedure
+    .input(z.object({ id: z.number(), statut: z.enum(["nouveau", "contacte", "converti", "perdu"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const demande = await db.getDemandeContactById(input.id, artisan.id);
+      if (!demande) throw new TRPCError({ code: "NOT_FOUND", message: "Demande non trouvée" });
+      await db.updateDemandeContactStatut(input.id, artisan.id, input.statut);
+      return { success: true };
+    }),
+
+  // OPE-172 — convertit un lead en client (réutilise createClientSecure) + lie la demande.
+  convertirDemandeEnClient: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const demande = await db.getDemandeContactById(input.id, artisan.id);
+      if (!demande) throw new TRPCError({ code: "NOT_FOUND", message: "Demande non trouvée" });
+      if (demande.clientId) throw new TRPCError({ code: "BAD_REQUEST", message: "Demande déjà convertie" });
+      // Nom : « Prénom Nom » du formulaire → on met tout dans `nom` (champ requis), le reste vide.
+      const client = await dbSecure.createClientSecure(artisan.id, {
+        nom: demande.nom,
+        email: demande.email || undefined,
+        telephone: demande.telephone || undefined,
+      } as any);
+      await db.updateDemandeContactStatut(input.id, artisan.id, "converti", client.id);
+      return { success: true, clientId: client.id };
     }),
 
   checkSlug: protectedProcedure
