@@ -174,6 +174,26 @@ export default function NouvelleDepense() {
   const montantTva = +(montantHt * tauxTva / 100).toFixed(2);
   const montantTtc = +(montantHt + montantTva).toFixed(2);
 
+  // OPE-99 — détection NON bloquante de doublons probables (même montant TTC + date +
+  // fournisseur), debouncée pour ne pas requêter à chaque frappe. Avertit l'artisan d'un
+  // possible double remboursement / double déduction de TVA ; n'empêche jamais la saisie.
+  const [doublonKey, setDoublonKey] = useState({ montantTtc: 0, dateDepense: "", fournisseur: "" });
+  useEffect(() => {
+    const t = setTimeout(
+      () => setDoublonKey({ montantTtc, dateDepense: form.dateDepense, fournisseur: form.fournisseur }),
+      500,
+    );
+    return () => clearTimeout(t);
+  }, [montantTtc, form.dateDepense, form.fournisseur]);
+  const { data: doublons } = trpc.depenses.checkDoublons.useQuery(
+    {
+      montantTtc: doublonKey.montantTtc,
+      dateDepense: doublonKey.dateDepense,
+      fournisseur: doublonKey.fournisseur || undefined,
+    },
+    { enabled: doublonKey.montantTtc > 0 && !!doublonKey.dateDepense, staleTime: 30000 },
+  );
+
   function buildPayload() {
     return {
       dateDepense: form.dateDepense,
@@ -437,6 +457,36 @@ export default function NouvelleDepense() {
               {montantTtc.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
             </span>
           </div>
+
+          {/* OPE-99 — avertissement non bloquant de doublon probable */}
+          {doublons && doublons.length > 0 && (
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-800">
+              <div className="flex items-start gap-2">
+                <ScanLine className="h-4 w-4 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold">
+                    Doublon probable : {doublons.length} dépense{doublons.length > 1 ? "s" : ""} déjà
+                    saisie{doublons.length > 1 ? "s" : ""} avec le même montant, la même date et le même fournisseur.
+                  </p>
+                  <ul className="mt-1 list-disc list-inside text-xs space-y-0.5">
+                    {doublons.slice(0, 5).map((d: any) => (
+                      <li key={d.id}>
+                        {d.numero ? `${d.numero} — ` : ""}
+                        {Number(d.montantTtc).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}
+                        {" le "}
+                        {new Date(d.dateDepense).toLocaleDateString("fr-FR")}
+                        {d.fournisseur ? ` — ${d.fournisseur}` : ""}
+                        {d.description ? ` (${d.description})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-xs">
+                    Vérifiez qu'il ne s'agit pas d'un double remboursement. Vous pouvez quand même enregistrer si c'est volontaire.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between">
             <Label htmlFor="tva-ded" className="cursor-pointer">TVA déductible</Label>

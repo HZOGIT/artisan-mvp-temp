@@ -9387,6 +9387,29 @@ const depensesRouter = router({
       return await db.getDepenseById(input.id, artisan.id);
     }),
 
+  // OPE-99 — détection (non bloquante) de doublons probables d'une dépense, à la saisie.
+  checkDoublons: protectedProcedure
+    .input(z.object({
+      montantTtc: z.number(),
+      dateDepense: z.string().min(1),
+      fournisseur: z.string().max(255).optional(),
+      excludeId: z.number().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      // Pas de détection sur un montant nul / date invalide (évite des faux positifs en masse).
+      if (!(input.montantTtc > 0)) return [];
+      const d = new Date(input.dateDepense);
+      if (isNaN(d.getTime())) return [];
+      return await db.findDepensesDoublons(artisan.id, {
+        montantTtc: input.montantTtc,
+        dateDepense: input.dateDepense,
+        fournisseur: input.fournisseur,
+        excludeId: input.excludeId,
+      });
+    }),
+
   create: protectedProcedure
     .input(z.object({
       dateDepense: z.string(),

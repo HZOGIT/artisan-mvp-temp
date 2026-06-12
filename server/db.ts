@@ -6482,6 +6482,37 @@ export async function getDepenseById(id: number, artisanId: number): Promise<any
   return (rows as any[])[0] || null;
 }
 
+// OPE-99 — détection de doublon probable d'une dépense (anti double-remboursement /
+// double déduction TVA). Avertissement NON bloquant : on retourne les dépenses du même
+// tenant qui partagent montant TTC + date + fournisseur (triplet retenu par Odoo
+// hr_expense.duplicate_expense_ids). `excludeId` permet d'ignorer la dépense en cours
+// d'édition. Toujours scopé `artisan_id` (jamais cross-tenant).
+export async function findDepensesDoublons(
+  artisanId: number,
+  params: { montantTtc: number; dateDepense: string; fournisseur?: string | null; excludeId?: number },
+): Promise<any[]> {
+  const pool = getPool();
+  if (!pool) return [];
+  const conds: string[] = [
+    "artisan_id = ?",
+    "ABS(montant_ttc - ?) < 0.01",
+    "date_depense = ?",
+    "COALESCE(fournisseur, '') = COALESCE(?, '')",
+  ];
+  const sqlParams: any[] = [artisanId, params.montantTtc, params.dateDepense, params.fournisseur ?? ""];
+  if (params.excludeId) { conds.push("id != ?"); sqlParams.push(params.excludeId); }
+  const [rows]: any = await pool.execute(
+    `SELECT id, numero, montant_ttc AS montantTtc, date_depense AS dateDepense,
+            fournisseur, description, statut
+       FROM depenses
+      WHERE ${conds.join(" AND ")}
+      ORDER BY date_depense DESC, id DESC
+      LIMIT 10`,
+    sqlParams,
+  );
+  return rows as any[];
+}
+
 export async function createDepense(data: {
   artisanId: number;
   userId: number;
