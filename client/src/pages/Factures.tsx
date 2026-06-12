@@ -66,6 +66,13 @@ export default function Factures() {
   const utils = trpc.useUtils();
   const { data: facturesList, isLoading } = trpc.factures.list.useQuery();
   const { data: clients } = trpc.clients.list.useQuery();
+  // OPE-144 — encours impayé du client sélectionné dans le dialogue de création
+  // (alerte non bloquante « client à risque » avant d'émettre une nouvelle facture).
+  // Symétrique de l'alerte déjà présente à la création d'un devis.
+  const { data: encoursClient } = trpc.clients.getEncours.useQuery(
+    { clientId: parseInt(selectedClientId) },
+    { enabled: !!selectedClientId && !isNaN(parseInt(selectedClientId)) }
+  );
 
   const createMutation = trpc.factures.create.useMutation({
     onSuccess: (data) => {
@@ -233,6 +240,19 @@ export default function Factures() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* OPE-144 — alerte non bloquante « client à risque » : impayés en cours */}
+                  {selectedClientId && encoursClient && parseFloat(encoursClient.encoursTotal) > 0 && (
+                    <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      <span aria-hidden="true">⚠️</span>
+                      <span>
+                        Ce client a <strong>{formatCurrency(encoursClient.encoursTotal)}</strong> d'impayés en cours
+                        {parseFloat(encoursClient.echu) > 0 && (
+                          <> (dont <strong>{formatCurrency(encoursClient.echu)}</strong> échus)</>
+                        )}
+                        {" "}sur {encoursClient.nbFacturesImpayees} facture{encoursClient.nbFacturesImpayees > 1 ? "s" : ""}.
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="objet">Objet</Label>
