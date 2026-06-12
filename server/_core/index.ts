@@ -37,6 +37,27 @@ const voiceDebugHits = new Map<string, { count: number; resetAt: number }>();
 // Borne le scraping/flood non authentifié du catalogue de référence par IP.
 const articleSearchHits = new Map<string, { count: number; resetAt: number }>();
 
+// OPE-24 — rate-limit IP des routes publiques GÉNÉRATRICES de PDF/iCal (jsPDF/sérialisation
+// = CPU + N requêtes DB par appel). Token-gated mais un token fuité pourrait spammer la
+// génération → épuisement CPU. Seau dédié, limite généreuse (consultation/abonnement
+// légitime très en-dessous), 429 au-delà.
+const pdfRouteHits = new Map<string, { count: number; resetAt: number }>();
+function checkIpRouteLimit(req: any, bucket: Map<string, { count: number; resetAt: number }>, limit: number, windowMs: number): boolean {
+  const ip = String(
+    (req.headers['cf-connecting-ip'] as string)
+    || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+    || req.socket?.remoteAddress || 'unknown'
+  );
+  const now = Date.now();
+  const hit = bucket.get(ip);
+  if (!hit || hit.resetAt <= now) {
+    bucket.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (++hit.count > limit) return false;
+  return true;
+}
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -484,6 +505,7 @@ async function startServer() {
   // ============================================================
   app.get('/api/portail/:token/devis/:id/pdf', async (req, res) => {
     try {
+      if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' }); return; }
       const { getClientPortalAccessByToken, getDevisById, getLignesDevisByDevisId, getArtisanById, getClientById } = await import('../db');
       const access = await getClientPortalAccessByToken(req.params.token);
       if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
@@ -510,6 +532,7 @@ async function startServer() {
 
   app.get('/api/portail/:token/factures/:id/pdf', async (req, res) => {
     try {
+      if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' }); return; }
       const { getClientPortalAccessByToken, getFactureById, getLignesFacturesByFactureId, getArtisanById, getClientById } = await import('../db');
       const access = await getClientPortalAccessByToken(req.params.token);
       if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
@@ -607,6 +630,7 @@ async function startServer() {
   // l'artisan via calendrier.getIcalFeed). Lecture seule.
   app.get('/api/calendar/:token.ics', async (req, res) => {
     try {
+      if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).type('text/plain').send('Trop de requêtes'); return; }
       const { getArtisanByIcalToken, getInterventionsByArtisanId, getClientById } = await import('../db');
       const token = String(req.params.token || '').replace(/\.ics$/i, '');
       const artisan = token ? await getArtisanByIcalToken(token) : undefined;
