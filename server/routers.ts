@@ -4495,7 +4495,7 @@ const contratsRouter = router({
   create: protectedProcedure
     .input(z.object({
       clientId: z.number(),
-      titre: z.string(),
+      titre: z.string().max(255),
       description: z.string().optional(),
       type: z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]).optional(),
       montantHT: z.string(),
@@ -4539,7 +4539,7 @@ const contratsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      titre: z.string().optional(),
+      titre: z.string().max(255).optional(),
       description: z.string().optional(),
       type: z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]).optional(),
       montantHT: z.string().optional(),
