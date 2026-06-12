@@ -19,6 +19,8 @@ export default function Parametres() {
     mentionsLegalesDevis: "",
     mentionsLegalesFacture: "",
     conditionsPaiementDefaut: "Paiement à 30 jours",
+    delaiPaiementJours: "",
+    delaiPaiementType: "net",
     delaiValiditeDevis: "30",
     notificationsEmail: true,
     vitrineActive: false,
@@ -65,6 +67,8 @@ export default function Parametres() {
         mentionsLegalesDevis: parametres.mentionsLegales || "",
         mentionsLegalesFacture: parametres.conditionsGenerales || "",
         conditionsPaiementDefaut: parametres.conditionsPaiementDefaut || "Paiement à 30 jours",
+        delaiPaiementJours: parametres.delaiPaiementJours != null ? String(parametres.delaiPaiementJours) : "",
+        delaiPaiementType: parametres.delaiPaiementType || "net",
         delaiValiditeDevis: String(parametres.rappelDevisJours || 30),
         notificationsEmail: parametres.notificationsEmail ?? true,
         vitrineActive: parametres.vitrineActive ?? false,
@@ -93,6 +97,8 @@ export default function Parametres() {
       mentionsLegales: formData.mentionsLegalesDevis,
       conditionsGenerales: formData.mentionsLegalesFacture,
       conditionsPaiementDefaut: formData.conditionsPaiementDefaut,
+      delaiPaiementJours: formData.delaiPaiementJours.trim() === "" ? null : (parseInt(formData.delaiPaiementJours) || 0),
+      delaiPaiementType: formData.delaiPaiementType as "net" | "fin_de_mois",
       notificationsEmail: formData.notificationsEmail,
       rappelDevisJours: parseInt(formData.delaiValiditeDevis) || 30,
       vitrineActive: formData.vitrineActive,
@@ -367,6 +373,34 @@ export default function Parametres() {
                 onChange={(e) => setFormData({ ...formData, conditionsPaiementDefaut: e.target.value })}
                 placeholder="Paiement à 30 jours"
               />
+            </div>
+            {/* OPE-94 — délai de paiement structuré : calcule l'échéance des factures */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="delaiPaiementJours">Délai de paiement (jours)</Label>
+                <Input
+                  id="delaiPaiementJours"
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={formData.delaiPaiementJours}
+                  onChange={(e) => setFormData({ ...formData, delaiPaiementJours: e.target.value })}
+                  placeholder="Ex : 30 (vide = pas d'échéance auto)"
+                />
+                <p className="text-xs text-muted-foreground">Calcule automatiquement la date d'échéance des nouvelles factures.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="delaiPaiementType">Type de délai</Label>
+                <select
+                  id="delaiPaiementType"
+                  value={formData.delaiPaiementType}
+                  onChange={(e) => setFormData({ ...formData, delaiPaiementType: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="net">Net (date + N jours)</option>
+                  <option value="fin_de_mois">N jours fin de mois</option>
+                </select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="mentionsLegalesDevis">Mentions légales</Label>

@@ -1462,6 +1462,12 @@ const facturesRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
       }
       const numero = await db.getNextFactureNumber(artisan.id);
+      // OPE-94 — si pas d'échéance saisie, la dériver du délai de paiement par défaut
+      // de l'artisan (si configuré). Sinon undefined (comportement inchangé).
+      const dateFacture = new Date();
+      const dateEcheance = input.dateEcheance
+        ? new Date(input.dateEcheance)
+        : await db.defaultDateEcheance(artisan.id, dateFacture);
       // Utiliser la version sécurisée (créer une fonction si nécessaire)
       const newFacture = await db.createFacture(artisan.id, {
         clientId: input.clientId,
@@ -1470,9 +1476,9 @@ const facturesRouter = router({
         referenceClient: input.referenceClient,
         conditionsPaiement: input.conditionsPaiement,
         notes: input.notes,
-        dateEcheance: input.dateEcheance ? new Date(input.dateEcheance) : undefined,
+        dateEcheance,
         statut: "brouillon",
-        dateFacture: new Date(),
+        dateFacture,
         totalHT: "0.00",
         totalTVA: "0.00",
         totalTTC: "0.00",
@@ -3314,6 +3320,9 @@ const parametresRouter = router({
       couleurPrincipale: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
       couleurSecondaire: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
       conditionsPaiementDefaut: z.string().max(2000).optional(),
+      // OPE-94 — délai de paiement structuré (calcul d'échéance des factures).
+      delaiPaiementJours: z.number().int().min(0).max(365).nullable().optional(),
+      delaiPaiementType: z.enum(["net", "fin_de_mois"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);

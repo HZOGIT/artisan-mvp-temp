@@ -340,6 +340,12 @@ export const parametresArtisan = mysqlTable("parametres_artisan", {
   couleurPrincipale: varchar("couleurPrincipale", { length: 20 }).default("#4F46E5"),
   couleurSecondaire: varchar("couleurSecondaire", { length: 20 }).default("#6366F1"),
   conditionsPaiementDefaut: text("conditionsPaiementDefaut"),
+  // Délai de paiement structuré (OPE-94) — sert à CALCULER dateEcheance à la création
+  // d'une facture (≈ Odoo account.payment.term). Nullable → tant que l'artisan ne le
+  // configure pas, aucune échéance n'est dérivée (comportement inchangé). `net` = date
+  // facture + N jours ; `fin_de_mois` = puis fin du mois de l'échéance.
+  delaiPaiementJours: int("delaiPaiementJours"),
+  delaiPaiementType: mysqlEnum("delaiPaiementType", ["net", "fin_de_mois"]).default("net"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

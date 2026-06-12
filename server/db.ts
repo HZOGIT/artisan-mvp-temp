@@ -684,6 +684,26 @@ export async function getNextFactureNumber(artisanId: number): Promise<string> {
   return `${prefix}-${String(compteur).padStart(5, '0')}`;
 }
 
+// OPE-94 — calcule la date d'échéance d'une facture depuis un délai de paiement
+// structuré (≈ Odoo account.payment.term). `net` = base + N jours ; `fin_de_mois`
+// = base + N jours, puis dernier jour de ce mois. Fonction pure (testable).
+export function computeDateEcheance(base: Date, jours: number, type: "net" | "fin_de_mois" = "net"): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + (jours || 0));
+  if (type === "fin_de_mois") {
+    d.setMonth(d.getMonth() + 1, 0); // jour 0 du mois suivant = dernier jour du mois courant
+  }
+  return d;
+}
+
+// OPE-94 — échéance par défaut dérivée des paramètres de l'artisan, si configurée.
+// Renvoie `undefined` si aucun délai n'est paramétré (→ comportement inchangé).
+export async function defaultDateEcheance(artisanId: number, base: Date): Promise<Date | undefined> {
+  const params = await getParametresArtisan(artisanId);
+  if (params?.delaiPaiementJours == null) return undefined;
+  return computeDateEcheance(base, params.delaiPaiementJours, (params.delaiPaiementType as any) || "net");
+}
+
 export async function createFacture(artisanId: number, data: Omit<InsertFacture, 'artisanId'>): Promise<Facture> {
   const db = await getDb();
   const numero = data.numero || await getNextFactureNumber(artisanId);
@@ -701,7 +721,9 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
   
   const lignesDevis = await getLignesDevisByDevisId(devisId);
   const numero = await getNextFactureNumber(devisData.artisanId);
-  
+  // OPE-94 — échéance dérivée du délai de paiement par défaut de l'artisan (si configuré).
+  const dateEcheance = await defaultDateEcheance(devisData.artisanId, new Date());
+
   // Create facture
   await db.insert(factures).values({
     artisanId: devisData.artisanId,
@@ -713,6 +735,7 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
     referenceClient: devisData.referenceClient,
     conditionsPaiement: devisData.conditionsPaiement,
     notes: devisData.notes,
+    dateEcheance,
     totalHT: devisData.totalHT,
     totalTVA: devisData.totalTVA,
     totalTTC: devisData.totalTTC,
