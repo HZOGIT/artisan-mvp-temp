@@ -329,6 +329,8 @@ export default function FactureDetail() {
       },
       {
         mentionsLegales: parametresData?.mentionsLegales || null,
+        // OPE-127 — CGV réutilisables (même source que le devis : conditionsGenerales).
+        cgv: parametresData?.conditionsGenerales || null,
       }
     );
     toast.success("PDF généré avec succès");

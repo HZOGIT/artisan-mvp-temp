@@ -647,6 +647,12 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
         .join("\n");
   addFooter(doc, factureConditions, options?.mentionsLegales);
 
+  // OPE-127 — CGV réutilisables sur une page dédiée (comme le devis). Pas sur un avoir
+  // (document d'annulation). N'apparaît que si l'artisan a renseigné ses CGV.
+  if (!isAvoir && options?.cgv) {
+    addCgvPage(doc, options.cgv);
+  }
+
   const prefix = isAvoir ? "Avoir" : "Facture";
   doc.save(`${prefix}_${facture.numero}.pdf`);
 }
