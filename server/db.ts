@@ -6535,9 +6535,15 @@ const DEPENSE_FIELD_MAP: Record<string, string> = {
   dateDepense: "date_depense", fournisseur: "fournisseur", categorie: "categorie",
   sousCategorie: "sous_categorie", description: "description",
   montantHt: "montant_ht", tauxTva: "taux_tva", montantTva: "montant_tva",
-  montantTtc: "montant_ttc", modePaiement: "mode_paiement", statut: "statut",
-  remboursable: "remboursable", rembourse: "rembourse",
-  dateRemboursement: "date_remboursement", chantierId: "chantier_id",
+  montantTtc: "montant_ttc", modePaiement: "mode_paiement",
+  // OPE-63 — `statut`/`rembourse`/`dateRemboursement` VOLONTAIREMENT hors map : les
+  // transitions d'état de remboursement sont réservées au circuit contrôlé des notes de
+  // frais (addDepenseToNoteFrais / approuverNoteFrais / payerNoteFrais, en SQL direct).
+  // Les laisser ici permettait à un collaborateur de s'auto-rembourser via le `update`
+  // générique (depenses.update accepte un objet libre) en contournant tout approbateur.
+  // `remboursable` (classification « éligible au remboursement ») reste éditable.
+  remboursable: "remboursable",
+  chantierId: "chantier_id",
   interventionId: "intervention_id", clientId: "client_id", notes: "notes",
   justificatifUrl: "justificatif_url", justificatifNom: "justificatif_nom",
   ocrBrut: "ocr_brut", ocrTraite: "ocr_traite",
