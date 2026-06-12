@@ -1072,6 +1072,18 @@ export async function updateFournisseur(id: number, data: Partial<InsertFourniss
 
 export async function deleteFournisseur(id: number): Promise<void> {
   const db = await getDb();
+  // Cascade des données OPÉRATIONNELLES du fournisseur (pas de document légal/comptable :
+  // les commandes fournisseurs sont des bons de commande, pas des écritures ; la compta
+  // passe par `depenses`). Évite des orphelins : liens article-fournisseur + commandes +
+  // leurs lignes. Même pattern que deleteChantier/deleteVehicule (qui cascadent déjà leurs
+  // enfants opérationnels — documents, entretiens, assurances…).
+  await db.delete(articlesFournisseurs).where(eq(articlesFournisseurs.fournisseurId, id));
+  const cmds = await db.select({ id: commandesFournisseurs.id })
+    .from(commandesFournisseurs).where(eq(commandesFournisseurs.fournisseurId, id));
+  for (const c of cmds) {
+    await db.delete(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.commandeId, c.id));
+  }
+  await db.delete(commandesFournisseurs).where(eq(commandesFournisseurs.fournisseurId, id));
   await db.delete(fournisseurs).where(eq(fournisseurs.id, id));
 }
 
