@@ -9066,7 +9066,10 @@ const utilisateursRouter = router({
   updatePermissions: utilisateursGererProcedure
     .input(z.object({
       userId: z.number(),
-      permissions: z.array(z.string()),
+      // OPE-24 — borne defense-in-depth : un tableau non borne est filtre via
+      // ALL_PERMISSIONS.includes() (O(n)) ; cap l'entree pour eviter un filter sur
+      // un tableau geant. Une selection legitime a < 200 codes courts.
+      permissions: z.array(z.string().max(100)).max(200),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -9162,7 +9165,9 @@ const modulesRouter = router({
       z.object({
         metier: z.string().optional(),
         plan: z.string().optional(),
-        moduleSlugs: z.array(z.string()).optional(),
+        // OPE-24 — borne defense-in-depth : moduleSlugs est parcouru via includes()
+        // pour chaque module du catalogue ; cap l'entree (catalogue << 200 slugs courts).
+        moduleSlugs: z.array(z.string().max(100)).max(200).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
