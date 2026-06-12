@@ -3487,8 +3487,15 @@ const modelesEmailRouter = router({
     }))
     .query(({ input }) => {
       let preview = input.contenu;
+      // Échappe les métacaractères regex de la clé (nom de variable, contrôlé par
+      // l'utilisateur) avant de l'injecter dans `new RegExp` : sans cela une clé
+      // malformée (parenthèses déséquilibrées) fait throw -> 500, et une clé piégée
+      // (ex. « (a+)+ ») peut provoquer un ReDoS (backtracking catastrophique).
+      // Behavior-preserving : un nom de variable normal (« nom », « date ») ne contient
+      // aucun métacaractère, l'échappement est alors un no-op.
+      const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       for (const [key, value] of Object.entries(input.variables)) {
-        preview = preview.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+        preview = preview.replace(new RegExp(`\\{\\{${escapeRegex(key)}\\}\\}`, 'g'), value);
       }
       return preview;
     }),
