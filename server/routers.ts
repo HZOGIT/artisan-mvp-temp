@@ -4639,7 +4639,21 @@ const contratsRouter = router({
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const reference = await db.getNextContratNumber(artisan.id);
 
+      // Garde de validité des dates : `new Date("garbage")` -> Invalid Date, qui finit
+      // dans `contrats_maintenance.dateDebut` (timestamp NOT NULL) -> 500 MySQL en mode
+      // strict, et casse silencieusement `prochainFacturation`. On rejette proprement en 400.
+      // Behavior-preserving : une date valide (sélecteur front) passe à l'identique.
       const dateDebut = new Date(input.dateDebut);
+      if (isNaN(dateDebut.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de début invalide" });
+      }
+      let dateFin: Date | undefined;
+      if (input.dateFin) {
+        dateFin = new Date(input.dateFin);
+        if (isNaN(dateFin.getTime())) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Date de fin invalide" });
+        }
+      }
       let prochainFacturation = new Date(dateDebut);
 
       return await db.createContrat({
@@ -4653,7 +4667,7 @@ const contratsRouter = router({
         tauxTVA: input.tauxTVA || "20.00",
         periodicite: input.periodicite,
         dateDebut,
-        dateFin: input.dateFin ? new Date(input.dateFin) : undefined,
+        dateFin,
         reconduction: input.reconduction ?? true,
         preavisResiliation: input.preavisResiliation ?? 1,
         conditionsParticulieres: input.conditionsParticulieres,
