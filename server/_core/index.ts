@@ -633,6 +633,21 @@ async function startServer() {
     return `${y}${m}${day}`;
   }
 
+  // OPE-180 — neutralise une cellule CSV avant interpolation :
+  // 1) injection de formule (cellule commençant par = + - @ TAB CR exécutée par
+  //    Excel/LibreOffice chez le comptable) → préfixe d'une apostrophe ;
+  // 2) rupture de structure (séparateur ; guillemet ou newline dans un nom de
+  //    client légitime → colonnes décalées) → échappement RFC 4180 (guillemets).
+  // Les nombres (montants fecAmount à virgule décimale, éventuellement négatifs) et
+  // les dates sont laissés inchangés → sortie identique pour des données saines.
+  function csvCell(val: string | number | null | undefined): string {
+    let s = String(val ?? '');
+    if (/^-?\d+(?:[.,]\d+)?$/.test(s)) return s; // nombre pur : inchangé
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;      // anti injection de formule
+    if (/[;"\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"'; // anti rupture de structure
+    return s;
+  }
+
   // GET /api/comptabilite/fec - Generate FEC file
   app.get('/api/comptabilite/fec', async (req, res) => {
     try {
@@ -689,7 +704,11 @@ async function startServer() {
       for (const f of factures) {
         const client = await getClientById(f.clientId);
         const date = new Date(f.dateFacture).toLocaleDateString('fr-FR');
-        csvLines.push(`${date};${f.numero};${client?.nom || 'Client'};${fecAmount(f.totalHT)};${fecAmount(f.totalTVA)};${fecAmount(f.totalTTC)};${f.statut}`);
+        csvLines.push([
+          date, f.numero, client?.nom || 'Client',
+          fecAmount(f.totalHT), fecAmount(f.totalTVA), fecAmount(f.totalTTC),
+          f.statut,
+        ].map(csvCell).join(';'));
       }
 
       const content = '\ufeff' + csvLines.join('\n'); // BOM for Excel
