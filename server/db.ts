@@ -379,8 +379,14 @@ export async function searchArticles(query: string, metier?: string): Promise<Bi
 export async function createBibliothequeArticle(data: InsertBibliothequeArticle): Promise<BibliothequeArticle> {
   const db = await getDb();
   await db.insert(bibliothequeArticles).values(data);
+  // `bibliotheque_articles` n'a PAS de colonne `reference` : l'ancienne relecture
+  // `eq(bibliothequeArticles.reference, data.reference)` portait sur une colonne
+  // inexistante (-> undefined -> throw) et cassait cet endpoint admin. On relit par
+  // `nom` (réel, NOT NULL) en prenant la ligne la plus récente (= celle qu'on vient
+  // d'insérer), idiome déjà utilisé par createBadge/createNotification.
   const result = await db.select().from(bibliothequeArticles)
-    .where(eq(bibliothequeArticles.reference, data.reference))
+    .where(eq(bibliothequeArticles.nom, data.nom))
+    .orderBy(desc(bibliothequeArticles.id))
     .limit(1);
   return result[0];
 }
