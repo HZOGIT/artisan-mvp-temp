@@ -6778,6 +6778,23 @@ const congesRouter = router({
       if (isNaN(dateDebut.getTime()) || isNaN(dateFin.getTime())) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Date invalide" });
       }
+      if (dateFin < dateDebut) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La date de fin doit être postérieure à la date de début" });
+      }
+      // OPE-97 — anti-chevauchement : un même technicien ne peut pas avoir deux congés
+      // (en_attente ou approuvé) sur des dates qui se recouvrent (double décompte + conflit
+      // de planning). ↔ Odoo hr_leave (« time off which overlaps with this period »).
+      const chevauchements = await db.getCongesChevauchants(
+        input.technicienId, artisan.id, dateDebut, dateFin,
+      );
+      if (chevauchements.length > 0) {
+        const c = chevauchements[0];
+        const fmt = (d: any) => new Date(d).toLocaleDateString("fr-FR");
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Ce technicien a déjà un congé sur cette période (du ${fmt(c.dateDebut)} au ${fmt(c.dateFin)}).`,
+        });
+      }
       return await db.createConge({
         ...input,
         artisanId: artisan.id,

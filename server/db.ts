@@ -5236,6 +5236,29 @@ export async function getCongeById(id: number): Promise<Conge | undefined> {
   return r[0];
 }
 
+// OPE-97 — congés du même technicien (statut en_attente/approuvé) chevauchant la période
+// [dateDebut, dateFin]. Deux intervalles se chevauchent ssi début_existant <= fin_demandée
+// ET fin_existant >= début_demandée. Scopé tenant + technicien. `excludeId` permet d'ignorer
+// le congé en cours d'édition. Dates au format 'YYYY-MM-DD'.
+export async function getCongesChevauchants(
+  technicienId: number,
+  artisanId: number,
+  dateDebut: Date,
+  dateFin: Date,
+  excludeId?: number,
+): Promise<Conge[]> {
+  const dbi = await getDb();
+  const conds = [
+    eq(conges.artisanId, artisanId),
+    eq(conges.technicienId, technicienId),
+    inArray(conges.statut, ["en_attente", "approuve"]),
+    lte(conges.dateDebut, dateFin),
+    gte(conges.dateFin, dateDebut),
+  ];
+  if (excludeId !== undefined) conds.push(ne(conges.id, excludeId));
+  return await dbi.select().from(conges).where(and(...conds)).orderBy(asc(conges.dateDebut));
+}
+
 export async function createConge(data: InsertConge): Promise<Conge | undefined> {
   const dbi = await getDb();
   await dbi.insert(conges).values(data);
