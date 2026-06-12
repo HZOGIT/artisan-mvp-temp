@@ -4110,16 +4110,22 @@ Reponds UNIQUEMENT en JSON pur :
           stockId: l.stockId ?? null,
         }]),
       );
+      // OPE-166 (durcissement) — dédoublonne les lignes par ligneId (dernière valeur retenue) :
+      // un ligneId envoyé en double ne doit pas appliquer DEUX fois l'entrée de stock pour la
+      // même variation. Chaque ligne n'est donc traitée qu'une seule fois.
+      const recueParLigne = new Map<number, number>();
       for (const r of input.lignes) {
-        if (!idsCommande.has(r.ligneId)) continue;
-        await db.updateLigneCommandeRecue(r.ligneId, input.id, r.quantiteRecue);
+        if (idsCommande.has(r.ligneId)) recueParLigne.set(r.ligneId, r.quantiteRecue);
+      }
+      for (const [ligneId, quantiteRecue] of recueParLigne) {
+        await db.updateLigneCommandeRecue(ligneId, input.id, quantiteRecue);
         // OPE-166 — entrée en stock automatique du DELTA reçu pour les lignes liées à un
         // article suivi en stock. On n'injecte que la VARIATION (réceptions partielles/
         // incrémentales gérées : pas de double-comptage du cumul). Best-effort (un échec
         // stock ne casse pas la réception) + vérif d'appartenance (adjustStock non scopé).
-        const avant = avantById.get(r.ligneId);
+        const avant = avantById.get(ligneId);
         if (avant?.stockId) {
-          const delta = r.quantiteRecue - avant.recue;
+          const delta = quantiteRecue - avant.recue;
           if (Math.abs(delta) > 1e-9) {
             try {
               const stock = await db.getStockById(avant.stockId);
