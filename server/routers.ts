@@ -3118,9 +3118,13 @@ const stocksRouter = router({
   adjustQuantity: protectedProcedure
     .input(z.object({
       stockId: z.number(),
-      quantite: z.number(),
+      // Quantité du mouvement bornée >= 0 (le front pose déjà min=0, mais l'API ne
+      // l'enforçait pas) : sans cette borne, une quantité NÉGATIVE passée à une `sortie`
+      // INVERSE l'opération (`currentQty - (-5)` = +5) et fausse le stock. Borne haute
+      // raisonnable contre les saisies aberrantes. Behavior-preserving (mouvements légitimes >= 0).
+      quantite: z.number().min(0).max(100_000_000),
       type: z.enum(["entree", "sortie", "ajustement"]),
-      motif: z.string().optional(),
+      motif: z.string().max(255).optional(),
       reference: z.string().max(100).optional()
     }))
     .mutation(async ({ ctx, input }) => {
