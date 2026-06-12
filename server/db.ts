@@ -6568,12 +6568,17 @@ export async function createNoteFrais(data: {
 export async function addDepenseToNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
   const pool = getPool();
   if (!pool) return;
-  // Verifier que la depense appartient bien a l'artisan.
+  // Verifier que la depense appartient bien a l'artisan + qu'elle est REMBOURSABLE :
+  // une note de frais ne regroupe que des avances remboursables au salarié (OPE-179).
+  // Skip silencieux (cohérent avec l'échec d'ownership) → une note ne contient jamais
+  // de dépense non remboursable « visible mais non comptée ». Sûr pour la création en lot.
   const [own]: any = await pool.execute(
-    `SELECT id FROM depenses WHERE id = ? AND artisan_id = ?`,
+    `SELECT remboursable FROM depenses WHERE id = ? AND artisan_id = ?`,
     [depenseId, artisanId]
   );
-  if ((own as any[]).length === 0) return;
+  const row = (own as any[])[0];
+  if (!row) return;
+  if (row.remboursable === 0 || row.remboursable === false || row.remboursable === null) return;
   await pool.execute(
     `INSERT IGNORE INTO notes_frais_depenses (note_id, depense_id) VALUES (?, ?)`,
     [noteId, depenseId]
