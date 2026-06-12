@@ -6126,13 +6126,16 @@ const rapportsRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      nom: z.string().min(1),
-      description: z.string().optional(),
+      // Bornes alignées sur les colonnes `rapports_personnalises` (nom varchar(100),
+      // groupement/tri varchar(50)) : évite un ER_DATA_TOO_LONG (500) sur une entrée
+      // surdimensionnée. Behavior-preserving (un nom/tri de rapport légitime est court).
+      nom: z.string().min(1).max(100),
+      description: z.string().max(2000).optional(),
       type: z.enum(["ventes", "clients", "interventions", "stocks", "fournisseurs", "techniciens", "financier"]),
       filtres: z.record(z.string(), z.unknown()).optional(),
-      colonnes: z.array(z.string()).optional(),
-      groupement: z.string().optional(),
-      tri: z.string().optional(),
+      colonnes: z.array(z.string().max(100)).max(100).optional(),
+      groupement: z.string().max(50).optional(),
+      tri: z.string().max(50).optional(),
       format: z.enum(["tableau", "graphique", "liste"]).optional(),
       graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
     }))
@@ -6147,12 +6150,12 @@ const rapportsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
+      nom: z.string().min(1).max(100).optional(),
+      description: z.string().max(2000).optional(),
       filtres: z.record(z.string(), z.unknown()).optional(),
-      colonnes: z.array(z.string()).optional(),
-      groupement: z.string().optional(),
-      tri: z.string().optional(),
+      colonnes: z.array(z.string().max(100)).max(100).optional(),
+      groupement: z.string().max(50).optional(),
+      tri: z.string().max(50).optional(),
       format: z.enum(["tableau", "graphique", "liste"]).optional(),
       graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
       favori: z.boolean().optional(),
