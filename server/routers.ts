@@ -3964,7 +3964,10 @@ Reponds UNIQUEMENT en JSON pur :
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       const lignes = await db.getLignesCommandeFournisseur(commande.id);
-      const fournisseur = await db.getFournisseurById(commande.fournisseurId);
+      // OPE-47 (défense en profondeur) — ne pas exposer un fournisseur d'un autre tenant si
+      // la commande pointait (données héritées) un fournisseurId étranger.
+      const fournisseurRow = await db.getFournisseurById(commande.fournisseurId);
+      const fournisseur = fournisseurRow && fournisseurRow.artisanId === artisan.id ? fournisseurRow : null;
       return { ...commande, lignes, fournisseur };
     }),
 
@@ -3989,6 +3992,14 @@ Reponds UNIQUEMENT en JSON pur :
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+
+      // OPE-47 (classe IDOR-FK) — valider que le fournisseur appartient au tenant avant de
+      // créer une commande qui le référence. Sinon une commande pointant un fournisseurId
+      // étranger fuite, à la relecture (getById), les données complètes du fournisseur d'autrui.
+      const fournisseurOwner = await db.getFournisseurById(input.fournisseurId);
+      if (!fournisseurOwner || fournisseurOwner.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable" });
+      }
 
       // Generate numero CMD-XXXXX
       const numero = await db.getNextCommandeNumero(artisan.id);
