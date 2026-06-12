@@ -172,6 +172,24 @@ function checkSupportContactRate(key: string): boolean {
   return true;
 }
 
+// Throttle des envois d'email de DOCUMENT (bon de commande fournisseur…) par artisan :
+// chaque envoi génère un PDF + un email Resend. Sans borne, un compte authentifié/compromis
+// (ou un collaborateur) pourrait spammer le destinataire + gonfler les coûts Resend/CPU.
+// Limite généreuse (20 / 15 min par artisan) : un usage légitime ne l'atteint jamais.
+// (classe rate-limit OPE-24, même pattern que checkSupportContactRate)
+const documentEmailRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkDocumentEmailRate(key: string): boolean {
+  const now = Date.now();
+  const entry = documentEmailRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    documentEmailRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 20) return false;
+  entry.count++;
+  return true;
+}
+
 // Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
 // Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
 // pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
@@ -4142,6 +4160,11 @@ Reponds UNIQUEMENT en JSON pur :
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan || commande.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      // OPE-24 — anti-abus : borne l'envoi du bon de commande (PDF + email Resend) par
+      // artisan ; sans ça un compte authentifié pourrait spammer le fournisseur.
+      if (!checkDocumentEmailRate(`bc:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois de bons de commande. Réessayez dans quelques minutes." });
       }
       const fournisseur = await db.getFournisseurById(commande.fournisseurId);
       if (!fournisseur?.email) {
