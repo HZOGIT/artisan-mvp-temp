@@ -4374,7 +4374,13 @@ const clientPortalRouter = router({
       if (!client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
       }
-      
+      // OPE-24 — anti-abus : borne l'envoi de l'email d'accès portail (génère un token +
+      // email Resend au client). Sans ça, un compte authentifié peut spammer le client.
+      // Même limiteur que les autres envois de documents (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`portal:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois d'accès portail. Réessayez dans quelques minutes." });
+      }
+
       // Générer un token unique
       const token = crypto.randomUUID();
       const expiresAt = new Date();
