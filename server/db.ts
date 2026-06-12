@@ -81,6 +81,7 @@ import {
   preferencesNotifications, PreferenceNotification, InsertPreferenceNotification,
   configAlertesPrevisions, ConfigAlertePrevision, InsertConfigAlertePrevision,
   historiqueAlertesPrevisions, HistoriqueAlertePrevision, InsertHistoriqueAlertePrevision,
+  emailsLog, EmailLog, InsertEmailLog,
 } from "../drizzle/schema";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -909,6 +910,27 @@ export async function getAuditLogsByEntity(entityType: string, entityId: number)
   return await db.select().from(auditLog)
     .where(and(eq(auditLog.entityType, entityType), eq(auditLog.entityId, entityId)))
     .orderBy(desc(auditLog.createdAt));
+}
+
+// OPE-114 — journal des envois d'emails (traçabilité + socle webhooks délivrabilité)
+export async function createEmailLog(data: InsertEmailLog): Promise<void> {
+  const db = await getDb();
+  await db.insert(emailsLog).values(data);
+}
+
+// Liste scopée tenant ; filtre optionnel par entité (devis/facture…).
+export async function getEmailsLog(
+  artisanId: number,
+  opts?: { entiteType?: string; entiteId?: number; limit?: number },
+): Promise<EmailLog[]> {
+  const db = await getDb();
+  const conds = [eq(emailsLog.artisanId, artisanId)];
+  if (opts?.entiteType) conds.push(eq(emailsLog.entiteType, opts.entiteType));
+  if (opts?.entiteId !== undefined) conds.push(eq(emailsLog.entiteId, opts.entiteId));
+  return await db.select().from(emailsLog)
+    .where(and(...conds))
+    .orderBy(desc(emailsLog.createdAt))
+    .limit(Math.min(Math.max(opts?.limit ?? 100, 1), 500));
 }
 
 export async function getAvoirsByFactureId(factureOrigineId: number): Promise<Facture[]> {

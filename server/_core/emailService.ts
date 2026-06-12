@@ -13,6 +13,33 @@ export interface EmailPayload {
   // l'artisan) pour que les réponses du client arrivent à l'artisan.
   fromName?: string;
   replyTo?: string;
+  // OPE-114 — contexte de journalisation (optionnel ; sans incidence sur l'envoi).
+  // Permet de tracer l'email dans `emails_log` et de le rattacher à une entité.
+  artisanId?: number;
+  emailType?: string; // devis | facture | relance | avis | portail | systeme…
+  entiteType?: string; // devis | facture | intervention…
+  entiteId?: number;
+}
+
+// OPE-114 — journalisation best-effort d'un envoi (ne casse JAMAIS l'envoi).
+// Import dynamique de la couche DB pour éviter tout cycle d'import au boot.
+async function logEmail(payload: EmailPayload, statut: "envoye" | "echec" | "simule", resendId: string | null, erreur?: string): Promise<void> {
+  try {
+    const { createEmailLog } = await import("../db");
+    await createEmailLog({
+      artisanId: payload.artisanId ?? null,
+      destinataire: String(payload.to).slice(0, 320),
+      sujet: String(payload.subject).slice(0, 500),
+      type: payload.emailType ?? null,
+      resendId,
+      statut,
+      erreur: erreur ? String(erreur).slice(0, 2000) : null,
+      entiteType: payload.entiteType ?? null,
+      entiteId: payload.entiteId ?? null,
+    });
+  } catch (e) {
+    console.error("[Email] Journalisation emails_log échouée (non bloquant):", e);
+  }
 }
 
 const resendConfigured = !!ENV.resendApiKey;
@@ -42,6 +69,7 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
   // Mode simulation si Resend non configuré
   if (!resend) {
     console.log(`[Email][SIM] → ${to} | ${subject}`);
+    await logEmail(payload, "simule", null);
     return { success: true, message: `Email simulé avec succès à ${to}` };
   }
 
@@ -72,17 +100,20 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
       ];
     }
 
-    const { error } = await resend.emails.send(emailOptions);
+    const { data, error } = await resend.emails.send(emailOptions);
 
     if (error) {
       console.error("[Email] Erreur Resend:", error);
+      await logEmail(payload, "echec", null, error.message);
       return { success: false, message: `Erreur lors de l'envoi: ${error.message}` };
     }
 
     console.log(`[Email] Envoyé à ${to} — ${subject}`);
+    await logEmail(payload, "envoye", data?.id ?? null);
     return { success: true, message: `Email envoyé avec succès à ${to}` };
   } catch (error) {
     console.error("[Email] Erreur:", error);
+    await logEmail(payload, "echec", null, error instanceof Error ? error.message : String(error));
     return { success: false, message: "Erreur lors de l'envoi de l'email" };
   }
 }

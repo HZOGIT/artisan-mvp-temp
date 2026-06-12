@@ -1117,6 +1117,11 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
         body: finalBody,
         attachmentName: input.attachPdf ? `Devis_${devis.numero}.pdf` : undefined,
         attachmentContent,
+        // OPE-114 — traçabilité de l'envoi
+        artisanId: artisan.id,
+        emailType: "devis",
+        entiteType: "devis",
+        entiteId: devis.id,
       });
 
       if (result.success) {
@@ -1830,6 +1835,11 @@ const facturesRouter = router({
         body: finalBody,
         attachmentName: input.attachPdf ? `Facture_${facture.numero}.pdf` : undefined,
         attachmentContent,
+        // OPE-114 — traçabilité de l'envoi
+        artisanId: artisan.id,
+        emailType: facture.typeDocument === "avoir" ? "avoir" : "facture",
+        entiteType: "facture",
+        entiteId: facture.id,
       });
 
       if (result.success) {
@@ -5778,8 +5788,9 @@ const avisRouter = router({
           <p>Ce lien est valable pendant 14 jours.</p>
           <p>Merci de votre confiance,<br>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</p>
         `,
+        artisanId: artisan.id, emailType: "avis", entiteType: "intervention", entiteId: intervention.id, // OPE-114
       });
-      
+
       return demande;
     }),
 
@@ -5846,6 +5857,7 @@ const avisRouter = router({
           <p>Ce lien est valable pendant 14 jours.</p>
           <p>Merci de votre confiance,<br>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</p>
         `,
+        artisanId: artisan.id, emailType: "avis", entiteType: "intervention", entiteId: intervention.id, // OPE-114
       });
 
       return demande;
@@ -10172,7 +10184,27 @@ const activitesRouter = router({
     }),
 });
 
+// OPE-114 — journal des envois d'emails (lecture seule, scopée tenant)
+const emailsRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      entiteType: z.enum(["devis", "facture", "intervention"]).optional(),
+      entiteId: z.number().int().positive().optional(),
+      limit: z.number().int().min(1).max(500).optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getEmailsLog(artisan.id, {
+        entiteType: input?.entiteType,
+        entiteId: input?.entiteId,
+        limit: input?.limit,
+      });
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
+  emails: emailsRouter,
   activites: activitesRouter,
   depenses: depensesRouter,
   search: searchRouter,

@@ -1841,3 +1841,26 @@ export const aiMessages = mysqlTable("ai_messages", {
 
 export type AiMessage = typeof aiMessages.$inferSelect;
 export type InsertAiMessage = typeof aiMessages.$inferInsert;
+
+// ============================================================================
+// EMAILS LOG — journal des envois transactionnels (OPE-114)
+// Trace chaque email envoyé via emailService.sendEmail : statut, id Resend
+// (pour corréler les futurs webhooks de délivrabilité — OPE-115), et lien
+// optionnel vers l'entité (devis/facture/avis…). Additif, lecture seule côté UI.
+// ============================================================================
+export const emailsLog = mysqlTable("emails_log", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId"), // nullable : certains envois système ne sont pas rattachés à un artisan
+  destinataire: varchar("destinataire", { length: 320 }).notNull(),
+  sujet: varchar("sujet", { length: 500 }).notNull(),
+  type: varchar("type", { length: 50 }), // devis | facture | relance | avis | portail | systeme…
+  resendId: varchar("resendId", { length: 255 }), // id du message renvoyé par Resend (null si échec/simulation)
+  statut: varchar("statut", { length: 20 }).notNull(), // envoye | echec | simule
+  erreur: text("erreur"), // message d'erreur si statut = echec
+  entiteType: varchar("entiteType", { length: 50 }), // devis | facture | intervention…
+  entiteId: int("entiteId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EmailLog = typeof emailsLog.$inferSelect;
+export type InsertEmailLog = typeof emailsLog.$inferInsert;
