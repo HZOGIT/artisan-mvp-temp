@@ -590,6 +590,45 @@ async function startServer() {
     }
   });
 
+  // OPE-161 — bon d'intervention / compte-rendu signé (PDF). Scopé artisan (JWT cookie).
+  app.get('/api/interventions/:id/bon-pdf', async (req, res) => {
+    try {
+      const { getInterventionById, getArtisanByUserId, getClientById, getInterventionMobileByInterventionId, getTechnicienById } = await import('../db');
+      const { generateInterventionPDF } = await import('./pdfGenerator');
+      const { jwtVerify } = await import('jose');
+
+      const token = req.cookies?.token;
+      if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
+      const secret = new TextEncoder().encode(JWT_SECRET);
+      let payload: any;
+      try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+
+      const intervention = await getInterventionById(parseInt(req.params.id));
+      if (!intervention) { res.status(404).json({ error: 'Intervention non trouvée' }); return; }
+
+      const artisan = await getArtisanByUserId(payload.userId);
+      if (!artisan || intervention.artisanId !== artisan.id) { res.status(403).json({ error: 'Accès non autorisé' }); return; }
+
+      const client = intervention.clientId ? await getClientById(intervention.clientId) : null;
+      if (!client) { res.status(404).json({ error: 'Client non trouvé' }); return; }
+
+      const mobile = await getInterventionMobileByInterventionId(intervention.id).catch(() => null);
+      let technicienNom: string | null = null;
+      if (intervention.technicienId) {
+        const tech = await getTechnicienById(intervention.technicienId);
+        if (tech && tech.artisanId === artisan.id) technicienNom = `${tech.prenom || ''} ${tech.nom}`.trim();
+      }
+
+      const pdfBuffer = generateInterventionPDF({ intervention, artisan, client, mobile, technicienNom });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="bon-intervention-${intervention.id}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[Intervention] PDF error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+    }
+  });
+
   // Bon de commande PDF (authenticated via cookie)
   app.get('/api/commandes-fournisseurs/:id/pdf', async (req, res) => {
     try {

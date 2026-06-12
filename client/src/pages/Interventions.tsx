@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation, useSearch } from "wouter";
-import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2, FileDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { StatutBadge } from "@/components/StatutBadge";
@@ -427,6 +427,19 @@ export default function Interventions() {
                           <Pencil className="h-4 w-4 mr-2" />
                           Modifier
                         </DropdownMenuItem>
+                        {/* OPE-161 — bon d'intervention signé (disponible dès qu'elle est terminée) */}
+                        {intervention.statut === "terminee" && (
+                          <DropdownMenuItem asChild>
+                            <a
+                              href={`/api/interventions/${intervention.id}/bon-pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Bon d'intervention
+                            </a>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => handleDelete(intervention.id)}
                           className="text-destructive"

@@ -877,6 +877,144 @@ export function generateContratPDF(data: PDFContratData): Buffer {
 }
 
 // ============================================================================
+// BON D'INTERVENTION / COMPTE-RENDU SIGNÉ (OPE-161)
+// ============================================================================
+// Matérialise en PDF une intervention terminée + sa signature client déjà
+// capturée (interventions_mobile). Rapport FIXE (pas de worksheet paramétrable).
+
+export interface PDFInterventionData {
+  intervention: any; // titre, description, dateDebut, dateFin, adresse, statut, numero?
+  artisan: Artisan;
+  client: Client;
+  mobile?: any | null; // signatureClient (base64), signatureDate, heureArrivee/Depart, notesIntervention
+  technicienNom?: string | null;
+}
+
+export function generateInterventionPDF(data: PDFInterventionData): Buffer {
+  const { intervention, artisan, client, mobile, technicienNom } = data;
+  const doc = new jsPDF();
+  registerFonts(doc);
+
+  const primary = COLOR_COMMANDE; // vert — distinct des devis/factures
+
+  const fmtDate = (d: any) => (d ? new Date(d).toLocaleDateString("fr-FR") : "—");
+  const fmtHeure = (d: any) =>
+    d ? new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+
+  renderHeaderBand(doc, {
+    primaryColor: primary,
+    artisan,
+    title: "BON D'INTERVENTION",
+    number: intervention.numero ? `N° ${intervention.numero}` : `Réf : INT-${intervention.id}`,
+    dateLines: [
+      `Date : ${fmtDate(intervention.dateDebut)}`,
+      ...(technicienNom ? [`Technicien : ${technicienNom}`] : []),
+    ],
+  });
+
+  const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
+
+  // Titre de l'intervention
+  let y = blocksEndY + 10;
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...primary);
+  doc.text(intervention.titre || "Intervention", MARGIN, y);
+  y += 8;
+
+  // Détails
+  const arrivee = fmtHeure(mobile?.heureArrivee);
+  const depart = fmtHeure(mobile?.heureDepart);
+  let duree = "—";
+  if (mobile?.heureArrivee && mobile?.heureDepart) {
+    const mins = Math.round(
+      (new Date(mobile.heureDepart).getTime() - new Date(mobile.heureArrivee).getTime()) / 60000,
+    );
+    if (mins > 0) duree = `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}`;
+  }
+  const detailsData: string[][] = [
+    ["Date", fmtDate(intervention.dateDebut)],
+    ["Statut", intervention.statut === "terminee" ? "Terminée" : (intervention.statut || "—")],
+  ];
+  if (intervention.adresse) detailsData.push(["Lieu", String(intervention.adresse)]);
+  if (technicienNom) detailsData.push(["Technicien", technicienNom]);
+  if (arrivee) detailsData.push(["Heure d'arrivée", arrivee]);
+  if (depart) detailsData.push(["Heure de départ", depart]);
+  if (duree !== "—") detailsData.push(["Durée sur site", duree]);
+
+  autoTable(doc, {
+    body: detailsData,
+    startY: y,
+    theme: "plain",
+    styles: { font: "Roboto", fontSize: 10, textColor: TEXT_BODY, cellPadding: 3 },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 60, textColor: TEXT_DARK },
+      1: { cellWidth: 110 },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+  });
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // Travaux réalisés (description + notes terrain)
+  const corps = [intervention.description, mobile?.notesIntervention].filter(Boolean).join("\n\n");
+  if (corps) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...primary);
+    doc.text("Travaux réalisés", MARGIN, y);
+    y += 6;
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...TEXT_BODY);
+    const lines = doc.splitTextToSize(corps, PAGE_W - 2 * MARGIN);
+    doc.text(lines, MARGIN, y);
+    y += lines.length * 4 + 6;
+  }
+
+  // Signature client (image base64 déjà capturée)
+  const sig: string | undefined = mobile?.signatureClient;
+  y = Math.max(y + 6, 225);
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...TEXT_DARK);
+  doc.text("Signature du client", MARGIN, y);
+  if (mobile?.signatureDate) {
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text(`Signé le ${fmtDate(mobile.signatureDate)}`, MARGIN, y + 5);
+  }
+  if (sig && /^data:image\/(png|jpe?g);base64,/i.test(sig)) {
+    try {
+      const fmt = /jpe?g/i.test(sig) ? "JPEG" : "PNG";
+      doc.addImage(sig, fmt, MARGIN, y + 8, 60, 25);
+    } catch (e) {
+      // signature illisible → on n'embarque pas l'image, le cadre reste
+    }
+  }
+  doc.setDrawColor(...DIVIDER);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y + 36, MARGIN + 70, y + 36);
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_BODY);
+  doc.text(`${client.prenom || ""} ${client.nom}`.trim(), MARGIN, y + 41);
+
+  // Pied de page
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...TEXT_MUTED);
+  doc.text(
+    `${artisan.nomEntreprise || ""}${artisan.siret ? ` — SIRET : ${artisan.siret}` : ""}`,
+    MARGIN,
+    PAGE_H - 12,
+  );
+  doc.text("Document généré automatiquement — Bon d'intervention", MARGIN, PAGE_H - 8);
+
+  return Buffer.from(doc.output("arraybuffer"));
+}
+
+// ============================================================================
 // BON DE COMMANDE FOURNISSEUR
 // ============================================================================
 
