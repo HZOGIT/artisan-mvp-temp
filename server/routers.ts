@@ -6527,7 +6527,10 @@ const congesRouter = router({
 
         // Mettre à jour le solde si c'est un congé payé ou RTT
         if (conge.type === 'conge_paye' || conge.type === 'rtt') {
-          await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, new Date().getFullYear(), jours);
+          // OPE-126 — indexer le solde sur l'année DU CONGÉ (dateDebut), pas l'année
+          // courante : sinon un congé approuvé en N et annulé/supprimé en N+1 décompte
+          // soldes(N) mais recrédite soldes(N+1) → corruption inter-exercices.
+          await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, debut.getFullYear(), jours);
         }
       }
       return await db.updateCongeStatut(input.id, 'approuve', ctx.user.id, input.commentaire);
@@ -6563,7 +6566,8 @@ const congesRouter = router({
         let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         if (conge.demiJourneeDebut) jours -= 0.5;
         if (conge.demiJourneeFin) jours -= 0.5;
-        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, new Date().getFullYear(), -jours);
+        // OPE-126 — recrédit sur l'année DU CONGÉ (dateDebut), symétrique du décompte.
+        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, debut.getFullYear(), -jours);
       }
       return await db.updateCongeStatut(input.id, 'annule', ctx.user.id);
     }),
@@ -6584,7 +6588,8 @@ const congesRouter = router({
         let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         if (conge.demiJourneeDebut) jours -= 0.5;
         if (conge.demiJourneeFin) jours -= 0.5;
-        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, new Date().getFullYear(), -jours);
+        // OPE-126 — recrédit sur l'année DU CONGÉ (dateDebut), symétrique du décompte.
+        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, debut.getFullYear(), -jours);
       }
       await db.deleteConge(input.id);
       return { success: true };
