@@ -652,8 +652,14 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
     totalTTC: devisData.totalTTC,
   });
   
+  // OPE-176 — relire la facture qu'on vient d'insérer EN SCOPANT sur l'artisan.
+  // La numérotation est par artisan (FAC-0000N pour tous) et `factures.numero` n'a
+  // pas de contrainte UNIQUE : un lookup par `numero` seul pouvait renvoyer la facture
+  // d'un AUTRE artisan (collision) -> lignes rattachées + facture renvoyée cross-tenant.
+  // On scope par artisanId et on prend la plus récente (= celle qu'on vient de créer).
   const factureResult = await db.select().from(factures)
-    .where(eq(factures.numero, numero))
+    .where(and(eq(factures.artisanId, devisData.artisanId), eq(factures.numero, numero)))
+    .orderBy(desc(factures.id))
     .limit(1);
   const facture = factureResult[0];
   
