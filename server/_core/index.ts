@@ -601,6 +601,65 @@ async function startServer() {
   });
 
   // ============================================================================
+  // FLUX iCAL — abonnement agenda externe aux interventions (OPE-156)
+  // ============================================================================
+  // Public mais protégé par un jeton secret non devinable dans l'URL (généré par
+  // l'artisan via calendrier.getIcalFeed). Lecture seule.
+  app.get('/api/calendar/:token.ics', async (req, res) => {
+    try {
+      const { getArtisanByIcalToken, getInterventionsByArtisanId, getClientById } = await import('../db');
+      const token = String(req.params.token || '').replace(/\.ics$/i, '');
+      const artisan = token ? await getArtisanByIcalToken(token) : undefined;
+      if (!artisan) { res.status(404).type('text/plain').send('Calendrier introuvable'); return; }
+
+      const icalText = (s: any) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+      const icalDate = (d: any) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+
+      // Fenêtre raisonnable : interventions à partir d'il y a 90 jours.
+      const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const all = await getInterventionsByArtisanId(artisan.id);
+      const list = all.filter((i: any) => new Date(i.dateDebut) >= since);
+
+      const lines: string[] = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Operioz//Interventions//FR',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        `X-WR-CALNAME:${icalText(`Operioz — ${artisan.nomEntreprise || 'Interventions'}`)}`,
+      ];
+      const stamp = icalDate(new Date());
+      for (const i of list as any[]) {
+        const client = i.clientId ? await getClientById(i.clientId) : null;
+        const clientNom = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : '';
+        const debut = new Date(i.dateDebut);
+        const fin = i.dateFin ? new Date(i.dateFin) : new Date(debut.getTime() + 60 * 60000);
+        const descParts = [i.description, clientNom ? `Client : ${clientNom}` : '', client?.telephone ? `Tél : ${client.telephone}` : ''].filter(Boolean);
+        lines.push(
+          'BEGIN:VEVENT',
+          `UID:operioz-intervention-${i.id}@operioz.com`,
+          `DTSTAMP:${stamp}`,
+          `DTSTART:${icalDate(debut)}`,
+          `DTEND:${icalDate(fin)}`,
+          `SUMMARY:${icalText(i.titre || 'Intervention')}`,
+          ...(i.adresse ? [`LOCATION:${icalText(i.adresse)}`] : []),
+          ...(descParts.length ? [`DESCRIPTION:${icalText(descParts.join('\n'))}`] : []),
+          `STATUS:${i.statut === 'annulee' ? 'CANCELLED' : 'CONFIRMED'}`,
+          'END:VEVENT',
+        );
+      }
+      lines.push('END:VCALENDAR');
+
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', 'inline; filename="operioz.ics"');
+      res.send(lines.join('\r\n') + '\r\n');
+    } catch (error) {
+      console.error('[iCal] feed error:', error);
+      res.status(500).type('text/plain').send('Erreur de génération du calendrier');
+    }
+  });
+
+  // ============================================================================
   // COMPTABILITE EXPORTS (FEC + CSV)
   // ============================================================================
 

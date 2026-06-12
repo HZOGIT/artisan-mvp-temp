@@ -7981,6 +7981,28 @@ const portailRouter = router({
 // CALENDRIER ROUTER
 // ============================================================================
 const calendrierRouter = router({
+  // OPE-156 — flux iCal : renvoie (en le générant à la 1ʳᵉ fois) le chemin d'abonnement
+  // au calendrier des interventions. Le front préfixe l'origine pour l'URL complète.
+  getIcalFeed: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+    let token = (artisan as any).icalToken as string | null;
+    if (!token) {
+      token = randomBytes(24).toString("hex"); // 48 hex chars, non devinable
+      await db.updateArtisan(artisan.id, { icalToken: token } as any);
+    }
+    return { path: `/api/calendar/${token}.ics` };
+  }),
+
+  // Régénère le jeton (révoque l'ancien lien d'abonnement).
+  regenerateIcalFeed: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+    const token = randomBytes(24).toString("hex");
+    await db.updateArtisan(artisan.id, { icalToken: token } as any);
+    return { path: `/api/calendar/${token}.ics` };
+  }),
+
   getEvents: protectedProcedure
     .input(z.object({
       dateDebut: z.string().optional(),

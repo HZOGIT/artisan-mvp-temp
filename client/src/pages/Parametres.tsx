@@ -39,6 +39,14 @@ export default function Parametres() {
   const { data: parametres, isLoading } = trpc.parametres.get.useQuery();
   const { data: artisan, refetch: refetchArtisan } = trpc.artisan.getProfile.useQuery();
 
+  // OPE-156 — flux iCal (abonnement agenda externe aux interventions).
+  const { data: icalFeed, refetch: refetchIcal } = trpc.calendrier.getIcalFeed.useQuery();
+  const icalUrl = icalFeed?.path ? `${window.location.origin}${icalFeed.path}` : "";
+  const regenIcal = trpc.calendrier.regenerateIcalFeed.useMutation({
+    onSuccess: () => { refetchIcal(); toast.success("Lien d'abonnement régénéré (l'ancien est révoqué)"); },
+    onError: () => toast.error("Impossible de régénérer le lien"),
+  });
+
   const updateMutation = trpc.parametres.update.useMutation({
     onSuccess: () => {
       toast.success("Paramètres enregistrés avec succès");
@@ -551,6 +559,43 @@ export default function Parametres() {
           </Button>
         </div>
       </form>
+
+      {/* OPE-156 — Synchronisation calendrier (iCal) */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Synchroniser mon agenda</CardTitle>
+          <CardDescription>
+            Abonnez votre agenda (Google Agenda, Apple Calendrier, Outlook) à vos interventions
+            Operioz. Le lien est secret — ne le partagez pas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Input readOnly value={icalUrl} placeholder="Génération du lien…" onFocus={(e) => e.currentTarget.select()} />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!icalUrl}
+              onClick={() => { if (icalUrl) { navigator.clipboard?.writeText(icalUrl); toast.success("Lien copié"); } }}
+            >
+              Copier
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Dans votre agenda : « Ajouter un calendrier » → « À partir d'une URL » → collez ce lien.
+            Les interventions s'y mettent à jour automatiquement.
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={regenIcal.isPending}
+            onClick={() => regenIcal.mutate()}
+          >
+            Régénérer le lien (révoque l'ancien)
+          </Button>
+        </CardContent>
+      </Card>
         </TabsContent>
       </Tabs>
     </div>

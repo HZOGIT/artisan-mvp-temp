@@ -1,0 +1,1 @@
+ALTER TABLE `artisans` ADD `icalToken` varchar(64);

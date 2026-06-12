@@ -68,6 +68,10 @@ export const artisans = mysqlTable("artisans", {
   numeroRM: varchar("numeroRM", { length: 50 }),
   logo: mediumtext("logo"),
   slug: varchar("slug", { length: 255 }).unique(),
+  // Jeton secret du flux iCal (OPE-156) : permet de s'abonner aux interventions
+  // depuis un agenda externe (Google/Apple) via une URL non devinable. Nullable,
+  // généré à la demande → comportement inchangé tant qu'il n'est pas activé.
+  icalToken: varchar("icalToken", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

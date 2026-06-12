@@ -241,6 +241,14 @@ export async function getArtisanBySlug(slug: string): Promise<Artisan | undefine
   return result[0];
 }
 
+// OPE-156 — flux iCal : résolution de l'artisan par son jeton secret de calendrier.
+export async function getArtisanByIcalToken(token: string): Promise<Artisan | undefined> {
+  const db = await getDb();
+  if (!token) return undefined;
+  const result = await db.select().from(artisans).where(eq(artisans.icalToken, token)).limit(1);
+  return result[0];
+}
+
 export async function isSlugAvailable(slug: string, excludeArtisanId?: number): Promise<boolean> {
   const db = await getDb();
   if (excludeArtisanId) {
