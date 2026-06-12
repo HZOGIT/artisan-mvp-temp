@@ -7416,6 +7416,10 @@ const chantiersRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — valider que le client appartient au tenant avant de créer
+      // un chantier qui le référence (sinon FK cliente d'un autre tenant). NOT_FOUND si étranger.
+      const clientChantier = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!clientChantier) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
       return await db.createChantier({
         artisanId: artisan.id,
         ...input,
@@ -7912,6 +7916,10 @@ const devisIARouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — si un client est rattaché, valider son appartenance au tenant.
+      if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
+      }
       return await db.createAnalysePhoto({ artisanId: artisan.id, ...input });
     }),
 
@@ -8135,6 +8143,11 @@ Reponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
+      // OPE-25/OPE-30 (classe clientId) — valider l'appartenance du client AVANT de générer
+      // le devis : sinon un devis créé avec un clientId étranger fuite la PII du client via
+      // la relecture du devis (getClientById non scopé). C'est le seul vecteur de fuite résiduel.
+      const clientIA = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!clientIA) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
       return await db.creerDevisDepuisAnalyseIA({
         analyseId: input.analyseId,
         clientId: input.clientId,
@@ -9758,6 +9771,10 @@ const depensesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — si la dépense est rattachée à un client, valider l'appartenance.
+      if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
+      }
       const numero = await db.getNextDepenseNumero(artisan.id);
       const montantTva = +(input.montantHt * (input.tauxTva / 100)).toFixed(2);
       const montantTtc = +(input.montantHt + montantTva).toFixed(2);
@@ -10183,6 +10200,10 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — si l'indemnité est rattachée à un client, valider l'appartenance.
+      if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
+      }
       const numero = await db.getNextDepenseNumero(artisan.id);
       // Indemnites km : sans TVA recuperable (regime fiscal forfait).
       const montant = +(input.kilometres * input.tarifKm).toFixed(2);
