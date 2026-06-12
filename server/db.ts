@@ -2306,10 +2306,13 @@ export async function updateChantier(id: number, data: any): Promise<Chantier | 
 
 export async function deleteChantier(id: number): Promise<void> {
   const db = await getDb();
-  // Delete related data first
+  // Delete related data first — children PUREMENT opérationnels du chantier
+  // (aucun document légal/fiscal). suivi_chantier (avancement/jalons) référence
+  // chantierId mais n'était pas cascadé → lignes orphelines à la suppression.
   await db.delete(documentsChantier).where(eq(documentsChantier.chantierId, id));
   await db.delete(interventionsChantier).where(eq(interventionsChantier.chantierId, id));
   await db.delete(phasesChantier).where(eq(phasesChantier.chantierId, id));
+  await db.delete(suiviChantier).where(eq(suiviChantier.chantierId, id));
   await db.delete(chantiers).where(eq(chantiers.id, id));
 }
 
