@@ -343,18 +343,29 @@ export const AGENT_TOOLS: FunctionDeclaration[] = [
   {
     name: "naviguer_vers",
     description:
-      "Redirige l'artisan vers une page de l'application avec un filtre optionnel pour afficher des données spécifiques. À appeler APRÈS avoir listé des données pour que l'artisan puisse voir tous les résultats filtrés dans la page concernée. Le résumé court reste affiché dans le panneau de chat.",
+      "Ouvre une page de l'application pour l'artisan (avec un filtre optionnel). Deux usages : (1) après avoir listé des données, ouvrir la page liste filtrée ; (2) après une ACTION de création/modification, ouvrir le DEEP-LINK du document créé (ex. /devis/<id>). Le résumé court reste dans le panneau de chat. N'invente JAMAIS de chemin : utilise uniquement une page connue ou un deep-link vers un id réel retourné par un outil.",
     parameters: {
       type: Type.OBJECT,
       properties: {
         page: {
           type: Type.STRING,
-          description: "Page de destination : /factures, /devis, /clients, /interventions, /stocks, /commandes",
+          description:
+            "Chemin de destination. DEEP-LINKS vers un document précis (utilise l'id réel retourné par l'outil de création) : /devis/<id>, /factures/<id>, /clients/<id>, /contrats/<id>, /commandes/<id>. " +
+            "PAGES LISTE / SECTIONS (liste non exhaustive, choisis la plus pertinente) : " +
+            "cœur métier → /dashboard, /clients, /devis, /factures, /interventions, /calendrier, /stocks, /articles, /fournisseurs, /commandes, /contrats ; " +
+            "compta & dépenses → /comptabilite (TVA, FEC, écritures), /depenses, /notes-de-frais, /tableau-bord-depenses, /budgets-depenses, /regles-depenses, /import-releve, /integrations-comptables, /tableau-bord-sync-comptable ; " +
+            "chantiers & planning → /chantiers (rentabilité chantier), /calendrier-chantiers, /planification, /previsions, /alertes-previsions ; " +
+            "équipe & véhicules → /techniciens, /conges, /utilisateurs, /vehicules, /flotte, /geolocalisation, /classement, /badges ; " +
+            "commercial & IA → /devis-ia, /devis-options, /relances, /avis, /analyses-photos, /rdv-en-ligne ; " +
+            "stats & rapports → /statistiques, /rapports, /rapport-commande, /performances-fournisseurs ; " +
+            "vitrine & comm → /ma-vitrine, /portail-gestion, /notifications, /modeles-email, /modeles-email-transactionnels ; " +
+            "compte & réglages → /profil, /parametres, /modules, /import, /documentation, /support. " +
+            "Pas de /interventions/<id> (la nav intervention va sur /interventions ou /calendrier).",
         },
         filtre: {
           type: Type.STRING,
           description:
-            "Filtre à appliquer sur la page. Valeurs valides selon la page : factures → impayees, en_retard, brouillon ; devis → brouillon, envoye, accepte, refuse ; interventions → planifiee, en_cours, terminee ; stocks → rupture, alerte ; commandes → brouillon, envoyee.",
+            "Filtre à appliquer sur la page liste (ignoré pour un deep-link). Valeurs valides selon la page : factures → impayees, en_retard, brouillon ; devis → brouillon, envoye, accepte, refuse ; interventions → planifiee, en_cours, terminee ; stocks → rupture, alerte ; commandes → brouillon, envoyee.",
         },
         message: {
           type: Type.STRING,
@@ -1615,19 +1626,91 @@ async function execModifierIntervention(input: any, ctx: ToolContext): Promise<T
 // Navigation UI
 // ============================================================================
 
+// Carte complète des pages navigables de l'app (miroir de client/src/App.tsx).
+// Sert de garde anti-hallucination : toute page hors de cette liste (ou hors
+// des deep-links autorisés ci-dessous) est rejetée pour éviter un 404.
 const VALID_NAV_PAGES = [
-  "/factures",
-  "/devis",
+  // Cœur métier
+  "/dashboard",
   "/clients",
+  "/devis",
+  "/factures",
   "/interventions",
+  "/calendrier",
   "/stocks",
+  "/articles",
+  "/fournisseurs",
   "/commandes",
+  "/contrats",
+  // Compta / dépenses / finances
+  "/comptabilite",
+  "/integrations-comptables",
+  "/tableau-bord-sync-comptable",
+  "/depenses",
+  "/notes-de-frais",
+  "/tableau-bord-depenses",
+  "/import-releve",
+  "/budgets-depenses",
+  "/regles-depenses",
+  // Chantiers / planification / rentabilité
+  "/chantiers",
+  "/calendrier-chantiers",
+  "/planification",
+  "/previsions",
+  "/alertes-previsions",
+  // Équipe / RH / véhicules
+  "/techniciens",
+  "/conges",
+  "/utilisateurs",
+  "/vehicules",
+  "/flotte",
+  "/geolocalisation",
+  "/classement",
+  "/badges",
+  // Commercial / IA / relances / avis
+  "/devis-ia",
+  "/devis-options",
+  "/relances",
+  "/avis",
+  "/analyses-photos",
+  "/rdv-en-ligne",
+  // Stats & rapports
+  "/statistiques",
+  "/rapports",
+  "/rapport-commande",
+  "/performances-fournisseurs",
+  // Vitrine / portail / divers
+  "/ma-vitrine",
+  "/portail-gestion",
+  "/notifications",
+  "/modeles-email",
+  "/modeles-email-transactionnels",
+  // Paramétrage / compte
+  "/profil",
+  "/parametres",
+  "/modules",
+  "/import",
+  "/documentation",
+  "/support",
 ];
+
+// Deep-links autorisés : /<ressource>/<id numérique>. Le front (Assistant.tsx)
+// fait setLocation pour n'importe quel chemin, donc ces deep-links ouvrent
+// directement la vue détail du document (ex. le devis qu'on vient de créer).
+// NB : pas de /interventions/:id côté front (cf. App.tsx) → la nav intervention
+// va sur /interventions ou /calendrier, jamais sur un deep-link détail.
+const DEEP_LINK_RE = /^\/(devis|factures|clients|contrats|commandes)\/\d+$/;
+
+function isValidNavPage(page: string): boolean {
+  return VALID_NAV_PAGES.includes(page) || DEEP_LINK_RE.test(page);
+}
 
 async function execNaviguerVers(input: any, _ctx: ToolContext): Promise<ToolResult> {
   const page = String(input?.page || "").trim();
-  if (!VALID_NAV_PAGES.includes(page)) {
-    return fail(`Page invalide : ${page || "(vide)"}. Valeurs autorisées : ${VALID_NAV_PAGES.join(", ")}`);
+  if (!isValidNavPage(page)) {
+    return fail(
+      `Page invalide : ${page || "(vide)"}. Utilise une page connue (ex. /devis, /comptabilite, /chantiers) ou un deep-link vers un document existant (/devis/<id>, /factures/<id>, /clients/<id>, /contrats/<id>, /commandes/<id>).`
+    );
   }
   const filtre = input?.filtre ? String(input.filtre).trim() : undefined;
   const message = input?.message ? String(input.message).trim() : undefined;
