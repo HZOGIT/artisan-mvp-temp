@@ -3605,6 +3605,23 @@ export async function getContratsByClientId(clientId: number, artisanId: number)
     .orderBy(desc(contratsMaintenance.createdAt));
 }
 
+// OPE-140 — contrats actifs dont l'échéance de facturation est atteinte (à facturer).
+// Volet INDICATEUR (lecture seule) : aide l'artisan à ne pas oublier de facturer un
+// contrat récurrent — la génération automatique n'est volontairement PAS faite ici.
+// (Le filtre `<= fin de journée` exclut naturellement les `prochainFacturation` NULL.)
+export async function getContratsAFacturer(artisanId: number): Promise<ContratMaintenance[]> {
+  const db = await getDb();
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return db.select().from(contratsMaintenance)
+    .where(and(
+      eq(contratsMaintenance.artisanId, artisanId),
+      eq(contratsMaintenance.statut, "actif"),
+      lte(contratsMaintenance.prochainFacturation, endOfToday),
+    ))
+    .orderBy(asc(contratsMaintenance.prochainFacturation));
+}
+
 export async function getContratById(id: number): Promise<ContratMaintenance | undefined> {
   const db = await getDb();
   const result = await db.select().from(contratsMaintenance)

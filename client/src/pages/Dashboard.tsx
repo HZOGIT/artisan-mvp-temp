@@ -37,6 +37,7 @@ import { ObjectifsWidget } from "@/components/dashboard/widgets/Objectifs";
 import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesAFaire";
 import { TresoreriePrevisionnelleWidget } from "@/components/dashboard/widgets/TresoreriePrevisionnelle";
 import { LivraisonsEnRetardWidget } from "@/components/dashboard/widgets/LivraisonsEnRetard";
+import { ContratsAFacturerWidget } from "@/components/dashboard/widgets/ContratsAFacturer";
 
 // ============================================================================
 // Définition des widgets disponibles dans le dashboard
@@ -66,6 +67,12 @@ function useWidgetDefinitions(): WidgetDef[] {
         label: "Livraisons fournisseurs en retard",
         description: "Commandes attendues dont la date de livraison prévue est dépassée",
         render: () => <LivraisonsEnRetardWidget />,
+      },
+      {
+        id: "contratsAFacturer",
+        label: "Contrats à facturer",
+        description: "Contrats de maintenance dont l'échéance de facturation est atteinte",
+        render: () => <ContratsAFacturerWidget />,
       },
       {
         id: "revenue",
@@ -112,6 +119,7 @@ const DEFAULT_ORDER = [
   "activitesAFaire",
   "tresoreriePrevisionnelle",
   "livraisonsEnRetard",
+  "contratsAFacturer",
   "revenue",
   "devisRepartition",
   "topClients",

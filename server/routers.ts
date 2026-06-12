@@ -4912,6 +4912,32 @@ const contratsRouter = router({
     }));
   }),
 
+  // OPE-140 — indicateur (lecture seule) des contrats à facturer (échéance atteinte).
+  // Réutilise la donnée existante (prochainFacturation + statut). Enrichit avec le nom
+  // du client, le montant TTC et le nombre de jours depuis l'échéance. Aucune écriture,
+  // aucune génération automatique de facture (volet « indicateur » de l'alerte).
+  getAFacturer: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const contrats = await db.getContratsAFacturer(artisan.id);
+    const now = Date.now();
+    return Promise.all(contrats.map(async (c) => {
+      const client = await db.getClientById(c.clientId);
+      const clientNom = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : '';
+      const montantHT = parseFloat(c.montantHT || '0');
+      const tauxTVA = parseFloat(c.tauxTVA || '0');
+      const montantTTC = montantHT * (1 + tauxTVA / 100);
+      return {
+        ...c,
+        clientNom: clientNom || 'Client',
+        montantTTC: montantTTC.toFixed(2),
+        joursRetard: c.prochainFacturation
+          ? Math.max(0, Math.floor((now - new Date(c.prochainFacturation).getTime()) / 86_400_000))
+          : 0,
+      };
+    }));
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
