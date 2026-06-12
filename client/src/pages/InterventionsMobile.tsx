@@ -233,6 +233,22 @@ export default function InterventionsMobile() {
                       {intervention.mobileData.heureDepart && (
                         <p>Départ: {format(new Date(intervention.mobileData.heureDepart), "HH:mm")}</p>
                       )}
+                      {/* OPE-173 — durée réelle sur site dérivée des horodatages déjà
+                          captés (départ − arrivée). Affichage pur, aucune donnée nouvelle. */}
+                      {intervention.mobileData.heureArrivee && intervention.mobileData.heureDepart && (
+                        <p className="font-medium">
+                          Durée sur site:{" "}
+                          {(() => {
+                            const min = Math.max(0, Math.round(
+                              (new Date(intervention.mobileData.heureDepart).getTime() -
+                                new Date(intervention.mobileData.heureArrivee).getTime()) / 60000
+                            ));
+                            const h = Math.floor(min / 60);
+                            const m = min % 60;
+                            return h > 0 ? `${h} h ${String(m).padStart(2, "0")}` : `${m} min`;
+                          })()}
+                        </p>
+                      )}
                     </div>
                   )}
 
