@@ -745,6 +745,58 @@ export async function getEncoursClient(clientId: number, artisanId: number): Pro
   return { encoursTotal: encoursTotal.toFixed(2), echu: echu.toFixed(2), nbFacturesImpayees: nb };
 }
 
+// OPE-144 — encours impayé de TOUS les clients en UNE requête (badge « à risque » de la liste
+// clients). Même logique que getEncoursClient (reste des factures envoyee/en_retard, avoirs
+// validés déduits par client, échu borné au net), agrégée par clientId. Scopé tenant.
+export async function getEncoursByClient(
+  artisanId: number,
+): Promise<Record<number, { encoursTotal: string; echu: string; nbFacturesImpayees: number }>> {
+  const db = await getDb();
+  const rows = await db.select({
+    clientId: factures.clientId,
+    statut: factures.statut,
+    totalTTC: factures.totalTTC,
+    montantPaye: factures.montantPaye,
+    dateEcheance: factures.dateEcheance,
+    typeDocument: factures.typeDocument,
+  }).from(factures).where(eq(factures.artisanId, artisanId));
+
+  const now = Date.now();
+  const enc: Record<number, number> = {};
+  const ech: Record<number, number> = {};
+  const credit: Record<number, number> = {};
+  const nb: Record<number, number> = {};
+  for (const f of rows) {
+    const cid = f.clientId;
+    if ((f.typeDocument || "facture") === "avoir") {
+      if (f.statut !== "annulee" && f.statut !== "brouillon") {
+        credit[cid] = (credit[cid] || 0) + Math.abs(parseFloat(String(f.totalTTC ?? "0")) || 0);
+      }
+      continue;
+    }
+    if (f.statut !== "envoyee" && f.statut !== "en_retard") continue;
+    const reste = (parseFloat(String(f.totalTTC ?? "0")) || 0) - (parseFloat(String(f.montantPaye ?? "0")) || 0);
+    if (reste <= 0) continue;
+    enc[cid] = (enc[cid] || 0) + reste;
+    nb[cid] = (nb[cid] || 0) + 1;
+    const echeance = f.dateEcheance ? new Date(f.dateEcheance).getTime() : NaN;
+    const estEchue = f.statut === "en_retard" || (!isNaN(echeance) && echeance < now);
+    if (estEchue) ech[cid] = (ech[cid] || 0) + reste;
+  }
+  const out: Record<number, { encoursTotal: string; echu: string; nbFacturesImpayees: number }> = {};
+  const clientIds = new Set<number>([...Object.keys(enc), ...Object.keys(credit)].map(Number));
+  for (const cid of clientIds) {
+    const total = Math.max(0, (enc[cid] || 0) - (credit[cid] || 0));
+    if (total <= 0) continue; // seuls les clients réellement débiteurs sont retournés
+    out[cid] = {
+      encoursTotal: total.toFixed(2),
+      echu: Math.min(ech[cid] || 0, total).toFixed(2),
+      nbFacturesImpayees: nb[cid] || 0,
+    };
+  }
+  return out;
+}
+
 export async function getNextFactureNumber(artisanId: number): Promise<string> {
   const db = await getDb();
   const params = await db.select().from(parametresArtisan).where(eq(parametresArtisan.artisanId, artisanId)).limit(1);

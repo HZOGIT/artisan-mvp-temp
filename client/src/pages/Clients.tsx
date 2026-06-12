@@ -70,6 +70,8 @@ export function Clients() {
 
   // Queries
   const { data: clients = [], isLoading } = trpc.clients.list.useQuery();
+  // OPE-144 — encours impayé par client (badge « à risque » de la liste).
+  const { data: encoursMap = {} } = trpc.clients.getEncoursMap.useQuery();
 
   // OPE-130 — détection de doublons potentiels (lecture seule, calculée depuis la liste
   // déjà chargée) : même email OU même prénom+nom (normalisés). Purement informatif pour
@@ -306,7 +308,18 @@ export function Clients() {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
+                      {/* OPE-144 — badge « à risque » : impayés en cours */}
+                      {(encoursMap as any)[client.id] && parseFloat((encoursMap as any)[client.id].encoursTotal) > 0 && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                          title={`${(encoursMap as any)[client.id].echu} € échus sur ${(encoursMap as any)[client.id].nbFacturesImpayees} facture(s)`}
+                        >
+                          ⚠️ {(encoursMap as any)[client.id].encoursTotal} € impayés
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-1 text-sm text-gray-600 mt-2">
                       {client.email && (
                         <div className="flex items-center gap-2">

@@ -320,7 +320,15 @@ const clientsRouter = router({
     // Utiliser la version sécurisée
     return await dbSecure.getClientsByArtisanIdSecure(artisan.id);
   }),
-  
+
+  // OPE-144 — encours impayé par client (1 requête) pour le badge « à risque » de la liste.
+  // Seuls les clients réellement débiteurs sont présents. Scopé tenant.
+  getEncoursMap: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return {} as Record<number, { encoursTotal: string; echu: string; nbFacturesImpayees: number }>;
+    return await db.getEncoursByClient(artisan.id);
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
