@@ -5223,6 +5223,8 @@ const techniciensRouter = router({
       telephone: z.string().max(20).optional(),
       specialite: z.string().max(100).optional(),
       couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      // OPE-123 — coût horaire chargé (decimal stocké en string). Borné, optionnel.
+      coutHoraire: z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -5246,6 +5248,7 @@ const techniciensRouter = router({
       telephone: z.string().max(20).optional(),
       specialite: z.string().max(100).optional(),
       couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      coutHoraire: z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12).optional(),
       statut: z.enum(["actif", "inactif", "conge"]).optional(),
       notes: z.string().max(5000).optional(),
     }))

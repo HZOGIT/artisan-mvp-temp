@@ -37,6 +37,7 @@ interface TechnicienForm {
   telephone: string;
   specialite: string;
   couleur: string;
+  coutHoraire: string;
   statut: "actif" | "inactif" | "conge";
 }
 
@@ -47,6 +48,7 @@ const initialForm: TechnicienForm = {
   telephone: "",
   specialite: "",
   couleur: "#3b82f6",
+  coutHoraire: "",
   statut: "actif",
 };
 
@@ -104,10 +106,12 @@ export default function Techniciens() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // `coutHoraire` vide -> undefined : l'input serveur est un decimal validé (rejette "").
+    const payload = { ...form, coutHoraire: form.coutHoraire || undefined };
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...form });
+      updateMutation.mutate({ id: editingId, ...payload });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(payload);
     }
   };
 
@@ -121,6 +125,7 @@ export default function Techniciens() {
       telephone: technicien.telephone || "",
       specialite: technicien.specialite || "",
       couleur: technicien.couleur || "#3b82f6",
+      coutHoraire: (technicien as any).coutHoraire != null ? String((technicien as any).coutHoraire) : "",
       statut: technicien.statut as "actif" | "inactif" | "conge",
     });
     setIsDialogOpen(true);
@@ -216,6 +221,19 @@ export default function Techniciens() {
                   value={form.specialite}
                   onChange={(e) => setForm({ ...form, specialite: e.target.value })}
                   placeholder="Ex: Plomberie, Électricité..."
+                />
+              </div>
+              {/* Coût horaire chargé (OPE-123) — base du coût main-d'œuvre des chantiers */}
+              <div className="space-y-2">
+                <Label htmlFor="coutHoraire">Coût horaire chargé (€/h)</Label>
+                <Input
+                  id="coutHoraire"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.coutHoraire}
+                  onChange={(e) => setForm({ ...form, coutHoraire: e.target.value })}
+                  placeholder="Ex: 35.00 (optionnel)"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -339,6 +357,11 @@ export default function Techniciens() {
                             <Wrench className="h-3 w-3" />
                             {tech.specialite}
                           </Badge>
+                        )}
+                        {(tech as any).coutHoraire != null && (tech as any).coutHoraire !== "" && (
+                          <span className="text-xs text-muted-foreground block mt-1">
+                            {Number((tech as any).coutHoraire).toFixed(2)} €/h
+                          </span>
                         )}
                       </TableCell>
                       <TableCell>{getStatutBadge(tech.statut)}</TableCell>

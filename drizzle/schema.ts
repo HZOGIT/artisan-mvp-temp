@@ -763,6 +763,9 @@ export const techniciens = mysqlTable("techniciens", {
   specialite: varchar("specialite", { length: 100 }),
   couleur: varchar("couleur", { length: 7 }).default("#3b82f6"),
   statut: mysqlEnum("statut", ["actif", "inactif", "conge"]).default("actif"),
+  // Coût horaire chargé du technicien (OPE-123) — base du coût main-d'œuvre des
+  // chantiers (Σ heures × coutHoraire, cf. OPE-106/107). Nullable/additif.
+  coutHoraire: decimal("coutHoraire", { precision: 8, scale: 2 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
