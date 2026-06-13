@@ -1,15 +1,16 @@
 import type { IChantierRepository } from "./application/chantier-repository";
+import { createChantiersRouter } from "./interface/trpc/chantiers.router";
 
-// Wiring DI du module chantiers. À l'étape scaffold, le module ne porte que ses dépendances ;
-// le routeur tRPC sera assemblé et exposé à l'étape interface (5/9).
+// Wiring DI du module chantiers : assemble le routeur tRPC à partir du repository injecté.
 export interface ChantiersModuleDeps {
   readonly repository: IChantierRepository;
 }
 
 export interface ChantiersModule {
   readonly deps: ChantiersModuleDeps;
+  readonly router: ReturnType<typeof createChantiersRouter>;
 }
 
 export function createChantiersModule(deps: ChantiersModuleDeps): ChantiersModule {
-  return { deps };
+  return { deps, router: createChantiersRouter(deps.repository) };
 }
