@@ -28,6 +28,12 @@ export class FakeDevisRepository implements IDevisRepository {
     this.ownedClients.add(`${artisanId}:${clientId}`);
   }
 
+  // Aide de test : force le statut d'un devis (le statut n'est pas modifiable via l'interface
+  // publique — il sera piloté par le workflow en 7/9). Sert à tester l'immutabilité post-acceptation.
+  setStatutForTest(id: number, statut: Devis["statut"]): void {
+    this.devisStore = this.devisStore.map((d) => (d.id === id ? { ...d, statut } : d));
+  }
+
   async list(ctx: TenantContext): Promise<Devis[]> {
     return this.devisStore.filter((d) => d.artisanId === ctx.artisanId);
   }
