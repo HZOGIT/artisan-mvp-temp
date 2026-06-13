@@ -166,9 +166,31 @@ describe("bascule du domaine commandes (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine stocks (flag gateway)", () => {
+  it("stocks routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("stocks", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { stocks: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("stocks", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("stocks", 8, canary)).toBe(false);
+    const global: FeatureFlags = { stocks: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("stocks", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("stocks", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine stocks extraient bien le domaine (dont la voie sensible adjustQuantity)", () => {
+    expect(domainFromTrpcPath("stocks.adjustQuantity")).toBe("stocks");
+    expect(domainFromTrpcPath("/stocks.getMouvements")).toBe("stocks");
+  });
+
+  it("parse env : stocks enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "stocks" } as NodeJS.ProcessEnv).stocks).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_STOCKS: "7" } as NodeJS.ProcessEnv).stocks?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 7 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes"]) {
+  it("les 8 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
