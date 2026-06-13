@@ -114,4 +114,42 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     const lst = await callQuery(server, "badges.getBadgesTechnicien", { technicienId: techA }, tA);
     expect((lst.json().result.data as unknown[]).length).toBe(1);
   });
+
+  it("getBadgesTechnicien sur un technicien d'un autre tenant → [] (lecture sans oracle, pas 404)", async () => {
+    const tB = await token(UB);
+    const res = await callQuery(server, "badges.getBadgesTechnicien", { technicienId: techA }, tB);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().result.data).toEqual([]);
+  });
+
+  it("attribuerBadge avec un badge d'un autre tenant → 404 (anti-IDOR sur la 2e FK)", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const badgeDeA = (await callMutation(server, "badges.create", { code: "OWN", nom: "OwnA" }, tA)).json().result.data.id as number;
+    // B attribue le badge de A sur son propre technicien → badge hors tenant → 404
+    const res = await callMutation(server, "badges.attribuerBadge", { technicienId: techB, badgeId: badgeDeA }, tB);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("update / delete sur un id inexistant du même tenant → 404", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "badges.update", { id: 999999999, data: { nom: "x" } }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "badges.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("validation Zod : nom > 100 caractères → 400", async () => {
+    const tA = await token(UA);
+    const res = await callMutation(server, "badges.create", { code: "LONG", nom: "x".repeat(101) }, tA);
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("attribuerBadge idempotent en e2e : double appel → une seule attribution", async () => {
+    const tA = await token(UA);
+    const bId = (await callMutation(server, "badges.create", { code: "IDEM", nom: "Idem" }, tA)).json().result.data.id as number;
+    const a1 = await callMutation(server, "badges.attribuerBadge", { technicienId: techA, badgeId: bId }, tA);
+    const a2 = await callMutation(server, "badges.attribuerBadge", { technicienId: techA, badgeId: bId, valeurAtteinte: 99 }, tA);
+    expect(a1.json().result.data.id).toBe(a2.json().result.data.id);
+    const lst = await callQuery(server, "badges.getBadgesTechnicien", { technicienId: techA }, tA);
+    expect((lst.json().result.data as Array<{ badgeId: number }>).filter((x) => x.badgeId === bId).length).toBe(1);
+  });
 });
