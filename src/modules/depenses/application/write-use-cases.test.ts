@@ -10,7 +10,6 @@ const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
 
 const base = (over: Partial<CreerDepenseInput> = {}): CreerDepenseInput => ({
-  numero: "DEP-1",
   dateDepense: "2026-06-15",
   categorie: "fournitures",
   montantHt: "100.00",
@@ -47,9 +46,15 @@ describe("depenses — use-cases d'écriture", () => {
     expect((await repo.list(A)).map((d) => d.description)).toEqual(["Chez A"]);
   });
 
-  it("creerDepense — numéro vide → Validation", async () => {
+  it("creerDepense génère le numéro côté serveur (DEP-00001, incrémenté), jamais fourni par le client", async () => {
     const repo = new FakeDepenseRepository();
-    await expect(creerDepense(repo, A, base({ numero: "  " }))).rejects.toBeInstanceOf(ValidationError);
+    const d1 = await creerDepense(repo, A, base());
+    const d2 = await creerDepense(repo, A, base());
+    expect(d1.numero).toBe("DEP-00001");
+    expect(d2.numero).toBe("DEP-00002");
+    // Numérotation scopée tenant : un autre tenant repart de DEP-00001.
+    const dB = await creerDepense(repo, B, base());
+    expect(dB.numero).toBe("DEP-00001");
   });
 
   it("creerDepense — catégorie vide → Validation", async () => {

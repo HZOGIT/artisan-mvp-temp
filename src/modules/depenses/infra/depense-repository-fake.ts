@@ -1,6 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository, DepenseRefKind } from "../application/depense-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
+import { computeNextNumero } from "../application/numero";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
 // tenant et les valeurs par défaut PG (statut brouillon, montants/flags). ⚠️ `update` ne touche
@@ -83,5 +84,13 @@ export class FakeDepenseRepository implements IDepenseRepository {
 
   async ownsRef(ctx: TenantContext, kind: DepenseRefKind, id: number): Promise<boolean> {
     return this.ownedRefs.has(`${ctx.artisanId}:${kind}:${id}`);
+  }
+
+  async nextNumero(ctx: TenantContext): Promise<string> {
+    // Dernière dépense du tenant (plus grand id) → incrément du suffixe.
+    const last = this.store
+      .filter((d) => d.artisanId === ctx.artisanId)
+      .reduce<Depense | null>((acc, d) => (acc && acc.id > d.id ? acc : d), null);
+    return computeNextNumero(last?.numero ?? "");
   }
 }

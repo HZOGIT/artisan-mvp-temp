@@ -14,8 +14,6 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 
 const UA = 9890101;
 const UB = 9890102;
-let seq = 0;
-const num = () => `DEP-${Date.now() % 100000}-${++seq}`;
 
 async function token(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -91,14 +89,15 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     const created = await callMutation(
       server,
       "depenses.create",
-      { numero: num(), dateDepense: "2026-06-15", categorie: "fournitures", montantHt: "100.00", tauxTva: "20" },
+      { dateDepense: "2026-06-15", categorie: "fournitures", montantHt: "100.00", tauxTva: "20" },
       tA,
     );
     expect(created.statusCode).toBe(200);
-    const data = created.json().result.data as { id: number; montantTva: string; montantTtc: string; statut: string; userId: number };
+    const data = created.json().result.data as { id: number; numero: string; montantTva: string; montantTtc: string; statut: string; userId: number };
     expect(data.montantTva).toBe("20.00");
     expect(data.montantTtc).toBe("120.00");
     expect(data.statut).toBe("brouillon");
+    expect(data.numero).toMatch(/^DEP-\d{5}$/); // numéro généré côté serveur
     expect(data.userId).toBe(UA); // userId forcé au créateur
     const list = await callQuery(server, "depenses.list", undefined, tA);
     expect((list.json().result.data as Array<{ id: number }>).some((d) => d.id === data.id)).toBe(true);
@@ -109,7 +108,7 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     const created = await callMutation(
       server,
       "depenses.create",
-      { numero: num(), dateDepense: "2026-06-15", categorie: "divers", montantHt: "50.00" },
+      { dateDepense: "2026-06-15", categorie: "divers", montantHt: "50.00" },
       tA,
     );
     const data = created.json().result.data as { montantTva: string; montantTtc: string };
@@ -117,19 +116,29 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect(data.montantTtc).toBe("60.00");
   });
 
-  it("validation : montant non décimal → 400 ; taux > 100 → 400 ; numero vide → 400", async () => {
+  it("numéro auto-généré, scopé tenant et incrémenté (parité legacy getNextDepenseNumero)", async () => {
+    const tB = await token(UB);
+    // Tenant B vierge → première dépense = DEP-00001, suivante = DEP-00002.
+    const d1 = await callMutation(server, "depenses.create", { dateDepense: "2026-06-15", categorie: "x", montantHt: "1.00" }, tB);
+    const d2 = await callMutation(server, "depenses.create", { dateDepense: "2026-06-15", categorie: "x", montantHt: "1.00" }, tB);
+    const n1 = d1.json().result.data.numero as string;
+    const n2 = d2.json().result.data.numero as string;
+    expect(n1).toBe("DEP-00001");
+    expect(n2).toBe("DEP-00002");
+  });
+
+  it("validation : montant non décimal → 400 ; taux > 100 → 400", async () => {
     const tA = await token(UA);
     const b = { dateDepense: "2026-06-15", categorie: "x" };
-    expect((await callMutation(server, "depenses.create", { ...b, numero: num(), montantHt: "abc" }, tA)).statusCode).toBe(400);
-    expect((await callMutation(server, "depenses.create", { ...b, numero: num(), montantHt: "10", tauxTva: "150" }, tA)).statusCode).toBe(400);
-    expect((await callMutation(server, "depenses.create", { ...b, numero: "", montantHt: "10" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "depenses.create", { ...b, montantHt: "abc" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "depenses.create", { ...b, montantHt: "10", tauxTva: "150" }, tA)).statusCode).toBe(400);
   });
 
   it("ANTI-IDOR-FK : create avec un clientId/chantierId d'un autre tenant → 404", async () => {
     const tA = await token(UA);
-    const base = { numero: num(), dateDepense: "2026-06-15", categorie: "achat", montantHt: "10.00" };
+    const base = { dateDepense: "2026-06-15", categorie: "achat", montantHt: "10.00" };
     expect((await callMutation(server, "depenses.create", { ...base, clientId: clientB }, tA)).statusCode).toBe(404);
-    expect((await callMutation(server, "depenses.create", { ...base, numero: num(), chantierId: chantierB }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "depenses.create", { ...base, chantierId: chantierB }, tA)).statusCode).toBe(404);
   });
 
   it("ANTI-IDOR-FK : create avec un clientId du tenant → OK", async () => {
@@ -137,7 +146,7 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     const created = await callMutation(
       server,
       "depenses.create",
-      { numero: num(), dateDepense: "2026-06-15", categorie: "achat", montantHt: "10.00", clientId: clientA },
+      { dateDepense: "2026-06-15", categorie: "achat", montantHt: "10.00", clientId: clientA },
       tA,
     );
     expect(created.statusCode).toBe(200);
@@ -148,10 +157,11 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     const tA = await token(UA);
     const tB = await token(UB);
     const id = (
-      await callMutation(server, "depenses.create", { numero: num(), dateDepense: "2026-06-15", categorie: "secret", montantHt: "99.00" }, tA)
+      await callMutation(server, "depenses.create", { dateDepense: "2026-06-15", categorie: "secret", montantHt: "99.00" }, tA)
     ).json().result.data.id as number;
     expect((await callQuery(server, "depenses.getById", { id }, tB)).statusCode).toBe(404);
-    expect((await callQuery(server, "depenses.list", undefined, tB)).json().result.data).toEqual([]);
+    const listB = (await callQuery(server, "depenses.list", undefined, tB)).json().result.data as Array<{ id: number }>;
+    expect(listB.some((d) => d.id === id)).toBe(false); // B ne voit jamais la dépense de A
     expect((await callMutation(server, "depenses.update", { id, description: "hack" }, tB)).statusCode).toBe(404);
     expect((await callMutation(server, "depenses.delete", { id }, tB)).statusCode).toBe(404);
     expect((await callQuery(server, "depenses.getById", { id }, tA)).json().result.data.categorie).toBe("secret");
@@ -163,7 +173,7 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
       await callMutation(
         server,
         "depenses.create",
-        { numero: num(), dateDepense: "2026-06-15", categorie: "outil", montantHt: "100.00", tauxTva: "20", fournisseur: "ACME" },
+        { dateDepense: "2026-06-15", categorie: "outil", montantHt: "100.00", tauxTva: "20", fournisseur: "ACME" },
         tA,
       )
     ).json().result.data.id as number;

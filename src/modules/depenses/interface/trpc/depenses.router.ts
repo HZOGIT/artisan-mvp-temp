@@ -10,10 +10,10 @@ const modePaiementEnum = z.enum(["carte", "especes", "virement", "cheque", "prel
 const frequenceEnum = z.enum(["mensuelle", "trimestrielle", "annuelle"]);
 
 // Bornes alignées sur la table `depenses` (defense-in-depth). ⚠️ Le client NE fournit PAS
-// `userId` (forcé au créateur) ni `montantTva`/`montantTtc` (dérivés côté serveur de
-// montantHt+tauxTva) → garde l'intégrité comptable (pas de TTC falsifiable).
+// `numero` (généré côté serveur), ni `userId` (forcé au créateur), ni `montantTva`/`montantTtc`
+// (dérivés côté serveur de montantHt+tauxTva) → garde l'intégrité comptable (numérotation
+// maîtrisée + pas de TTC falsifiable).
 const createSchema = z.object({
-  numero: z.string().min(1).max(20),
   dateDepense: isoDate,
   categorie: z.string().min(1).max(50),
   montantHt: decimal,
@@ -35,10 +35,9 @@ const createSchema = z.object({
   tvaDeductible: z.boolean().optional(),
 });
 
-// ⚠️ `numero` reste modifiable mais `userId`/`statut`/`rembourse`/`dateRemboursement` ABSENTS :
-// l'identité du créateur et le workflow de remboursement ne passent pas par `update`.
+// ⚠️ `numero` (numérotation maîtrisée, immuable), `userId`, `statut`/`rembourse`/
+// `dateRemboursement` ABSENTS : l'identité du créateur et le numéro ne passent pas par `update`.
 const updateSchema = z.object({
-  numero: z.string().min(1).max(20).optional(),
   dateDepense: isoDate.optional(),
   categorie: z.string().min(1).max(50).optional(),
   montantHt: decimal.optional(),

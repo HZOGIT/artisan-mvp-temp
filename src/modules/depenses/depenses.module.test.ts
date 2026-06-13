@@ -11,6 +11,7 @@ const stubRepo: IDepenseRepository = {
   update: async () => null,
   delete: async () => false,
   ownsRef: async () => false,
+  nextNumero: async () => "DEP-00001",
 };
 
 describe("depenses.module", () => {
@@ -20,6 +21,6 @@ describe("depenses.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsRef", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "nextNumero", "ownsRef", "update"]);
   });
 });

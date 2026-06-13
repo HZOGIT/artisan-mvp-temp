@@ -18,8 +18,6 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 
 const UA = 9890301;
 const UB = 9890302;
-let seq = 0;
-const num = () => `DEP-${Date.now() % 100000}-${++seq}`;
 
 async function token(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -87,7 +85,6 @@ describe.skipIf(!URL)("depenses.router e2e — bornes & invariants transport", (
   });
 
   const baseCreate = (over: Record<string, unknown> = {}) => ({
-    numero: num(),
     dateDepense: "2026-06-15",
     categorie: "achat",
     montantHt: "100.00",
@@ -105,9 +102,8 @@ describe.skipIf(!URL)("depenses.router e2e — bornes & invariants transport", (
     expect((await callMutation(server, "depenses.create", baseCreate({ recurrente: true, frequenceRecurrence: "hebdo" }), tA)).statusCode).toBe(400);
   });
 
-  it("create — longueurs max dépassées (numero>20 / categorie>50 / fournisseur>255) → 400", async () => {
+  it("create — longueurs max dépassées (categorie>50 / fournisseur>255) → 400", async () => {
     const tA = await token(UA);
-    expect((await callMutation(server, "depenses.create", baseCreate({ numero: "X".repeat(21) }), tA)).statusCode).toBe(400);
     expect((await callMutation(server, "depenses.create", baseCreate({ categorie: "c".repeat(51) }), tA)).statusCode).toBe(400);
     expect((await callMutation(server, "depenses.create", baseCreate({ fournisseur: "f".repeat(256) }), tA)).statusCode).toBe(400);
   });
@@ -147,21 +143,23 @@ describe.skipIf(!URL)("depenses.router e2e — bornes & invariants transport", (
     expect((res.json().result.data as { clientId: number }).clientId).toBe(clientA);
   });
 
-  it("update — statut/rembourse/userId NON modifiables via update (clés strippées par zod)", async () => {
+  it("update — statut/rembourse/userId/numero NON modifiables via update (clés strippées par zod)", async () => {
     const tA = await token(UA);
     const id = await createDepense(tA);
-    // Tente d'injecter des champs réservés au workflow + l'identité du créateur.
+    const numAvant = (await callQuery(server, "depenses.getById", { id }, tA)).json().result.data.numero as string;
+    // Tente d'injecter des champs réservés au workflow + l'identité du créateur + le numéro.
     const res = await callMutation(
       server,
       "depenses.update",
-      { id, statut: "remboursee", rembourse: true, userId: 999999, description: "maj légitime" },
+      { id, statut: "remboursee", rembourse: true, userId: 999999, numero: "DEP-99999", description: "maj légitime" },
       tA,
     );
     expect(res.statusCode).toBe(200);
-    const data = res.json().result.data as { statut: string; rembourse: boolean; userId: number; description: string };
+    const data = res.json().result.data as { statut: string; rembourse: boolean; userId: number; numero: string; description: string };
     expect(data.statut).toBe("brouillon"); // inchangé
     expect(data.rembourse).toBe(false); // inchangé
     expect(data.userId).toBe(UA); // créateur inchangé
+    expect(data.numero).toBe(numAvant); // numéro immuable
     expect(data.description).toBe("maj légitime"); // seul le champ légitime appliqué
   });
 

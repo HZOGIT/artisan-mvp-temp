@@ -20,4 +20,8 @@ export interface IDepenseRepository {
   // true si la ressource référencée (chantier/intervention/client) appartient au tenant.
   // Garde anti-IDOR-FK : interdit de lier une dépense à la ressource d'un autre tenant.
   ownsRef(ctx: TenantContext, kind: DepenseRefKind, id: number): Promise<boolean>;
+  // Prochain numéro de dépense (format `DEP-00001`), scopé tenant, incrémenté depuis la
+  // dernière dépense de l'artisan. Le numéro est généré côté serveur (jamais fourni par le
+  // client) → intégrité de la numérotation comptable (parité legacy `getNextDepenseNumero`).
+  nextNumero(ctx: TenantContext): Promise<string>;
 }

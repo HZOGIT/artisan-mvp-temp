@@ -5,6 +5,7 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository, DepenseRefKind } from "../application/depense-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
+import { computeNextNumero } from "../application/numero";
 
 type DepenseRow = typeof depenses.$inferSelect;
 
@@ -166,6 +167,19 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
         .where(and(eq(depenses.id, id), eq(depenses.artisan_id, ctx.artisanId)))
         .returning({ id: depenses.id });
       return deleted.length > 0;
+    });
+  }
+
+  nextNumero(ctx: TenantContext): Promise<string> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Dernière dépense de l'artisan (par id desc) → incrément du suffixe numérique.
+      const [row] = await tx
+        .select({ numero: depenses.numero })
+        .from(depenses)
+        .where(eq(depenses.artisan_id, ctx.artisanId))
+        .orderBy(desc(depenses.id))
+        .limit(1);
+      return computeNextNumero(row?.numero ?? "");
     });
   }
 

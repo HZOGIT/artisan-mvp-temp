@@ -19,10 +19,12 @@ const REF_LABEL: Record<DepenseRefKind, string> = {
   client: "Client",
 };
 
-// Entrée de création : pas de userId (forcé) ni de montants TVA (dérivés). tauxTva optionnel.
-export type CreerDepenseInput = Omit<CreateDepenseInput, "userId" | "montantTva" | "montantTtc">;
-// Entrée de modification : montants TVA dérivés (recalculés si montantHt/tauxTva changent).
-export type ModifierDepenseInput = Omit<UpdateDepenseInput, "montantTva" | "montantTtc">;
+// Entrée de création : pas de userId (forcé), ni montants TVA (dérivés), ni numero (généré
+// côté serveur). tauxTva optionnel.
+export type CreerDepenseInput = Omit<CreateDepenseInput, "userId" | "numero" | "montantTva" | "montantTtc">;
+// Entrée de modification : montants TVA dérivés (recalculés si montantHt/tauxTva changent) ;
+// `numero` immuable après création (numérotation comptable maîtrisée).
+export type ModifierDepenseInput = Omit<UpdateDepenseInput, "montantTva" | "montantTtc" | "numero">;
 
 async function assertRefOwned(
   repo: IDepenseRepository,
@@ -63,15 +65,15 @@ export async function creerDepense(
   ctx: TenantContext,
   input: CreerDepenseInput,
 ): Promise<Depense> {
-  if (!input.numero?.trim()) throw new ValidationError("Le numéro est requis");
   if (!input.categorie?.trim()) throw new ValidationError("La catégorie est requise");
   assertMontantValide(input.montantHt);
   const tauxTva = input.tauxTva ?? "20";
   assertTauxValide(tauxTva);
   await assertFksOwned(repo, ctx, input);
-  // TVA dérivée côté serveur + userId forcé au créateur.
+  // Numéro généré côté serveur (jamais fourni par le client) + TVA dérivée + userId forcé.
+  const numero = await repo.nextNumero(ctx);
   const { montantTva, montantTtc } = calculerTva(input.montantHt, tauxTva);
-  return repo.create(ctx, { ...input, tauxTva, userId: ctx.userId, montantTva, montantTtc });
+  return repo.create(ctx, { ...input, numero, tauxTva, userId: ctx.userId, montantTva, montantTtc });
 }
 
 export async function modifierDepense(
@@ -80,7 +82,6 @@ export async function modifierDepense(
   id: number,
   input: ModifierDepenseInput,
 ): Promise<Depense> {
-  if (input.numero !== undefined && !input.numero.trim()) throw new ValidationError("Le numéro est requis");
   if (input.categorie !== undefined && !input.categorie.trim()) throw new ValidationError("La catégorie est requise");
   if (input.montantHt !== undefined) assertMontantValide(input.montantHt);
   if (input.tauxTva != null) assertTauxValide(input.tauxTva);
