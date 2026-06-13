@@ -512,7 +512,7 @@ async function startServer() {
   app.get('/api/portail/:token/devis/:id/pdf', async (req, res) => {
     try {
       if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' }); return; }
-      const { getClientPortalAccessByToken, getDevisById, getLignesDevisByDevisId, getArtisanById, getClientById } = await import('../db');
+      const { getClientPortalAccessByToken, getDevisById, getLignesDevisByDevisId, getArtisanById, getClientById, getParametresArtisan } = await import('../db');
       const access = await getClientPortalAccessByToken(req.params.token);
       if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
 
@@ -524,8 +524,11 @@ async function startServer() {
       const client = await getClientById(access.clientId);
       if (!artisan || !client) return res.status(404).json({ error: 'Données introuvables' });
 
+      // OPE-127 — CGV de l'artisan (parametres) sur le PDF du PORTAIL (parité avec le PDF
+      // client téléchargé par l'artisan, qui les imprime déjà). N'apparaît que si renseignées.
+      const paramsDevis = await getParametresArtisan(access.artisanId);
       const { generateDevisPDF } = await import('./pdfGenerator');
-      const pdfBuffer = generateDevisPDF({ devis: { ...devisData, lignes }, artisan, client });
+      const pdfBuffer = generateDevisPDF({ devis: { ...devisData, lignes }, artisan, client, cgv: paramsDevis?.conditionsGenerales });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="Devis_${devisData.numero}.pdf"`);
@@ -539,7 +542,7 @@ async function startServer() {
   app.get('/api/portail/:token/factures/:id/pdf', async (req, res) => {
     try {
       if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' }); return; }
-      const { getClientPortalAccessByToken, getFactureById, getLignesFacturesByFactureId, getArtisanById, getClientById } = await import('../db');
+      const { getClientPortalAccessByToken, getFactureById, getLignesFacturesByFactureId, getArtisanById, getClientById, getParametresArtisan } = await import('../db');
       const access = await getClientPortalAccessByToken(req.params.token);
       if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
 
@@ -551,8 +554,10 @@ async function startServer() {
       const client = await getClientById(access.clientId);
       if (!artisan || !client) return res.status(404).json({ error: 'Données introuvables' });
 
+      // OPE-127 — CGV sur le PDF facture du PORTAIL (parité PDF client). Pas sur un avoir (géré côté générateur).
+      const paramsFacture = await getParametresArtisan(access.artisanId);
       const { generateFacturePDF } = await import('./pdfGenerator');
-      const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client });
+      const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client, cgv: paramsFacture?.conditionsGenerales });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="Facture_${facture.numero}.pdf"`);

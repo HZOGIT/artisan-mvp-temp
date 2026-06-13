@@ -441,12 +441,38 @@ export interface PDFDevisData {
   devis: Devis & { lignes: DevisLigne[] };
   artisan: Artisan;
   client: Client;
+  // OPE-127 — CGV réutilisables (parametres_artisan.conditionsGenerales). Si fournies,
+  // ajoutées sur une page dédiée en fin de document. Parité avec le générateur client.
+  cgv?: string | null;
 }
 
 export interface PDFFactureData {
   facture: Facture & { lignes: FactureLigne[] };
   artisan: Artisan;
   client: Client;
+  cgv?: string | null; // OPE-127 — CGV (cf. PDFDevisData) ; pas sur un avoir.
+}
+
+// OPE-127 — page CGV dédiée (mirroir de `addCgvPage` du générateur client), avec saut
+// de page si le texte déborde (CGV potentiellement longues). Lecture seule, additif.
+function renderCgvPage(doc: jsPDF, cgv: string): void {
+  doc.addPage();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setFontSize(16);
+  doc.setFont("Roboto", "bold");
+  doc.setTextColor(41, 128, 185);
+  doc.text("Conditions Générales de Vente", pageWidth / 2, 25, { align: "center" });
+  doc.setFontSize(8);
+  doc.setFont("Roboto", "normal");
+  doc.setTextColor(60, 60, 60);
+  const lines = doc.splitTextToSize(cgv, pageWidth - 2 * MARGIN) as string[];
+  let y = 40;
+  for (const line of lines) {
+    if (y > pageHeight - 15) { doc.addPage(); y = 20; }
+    doc.text(line, MARGIN, y);
+    y += 4;
+  }
 }
 
 // ============================================================================
@@ -552,6 +578,9 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
       my += 4;
     }
   }
+
+  // OPE-127 — CGV sur page dédiée (parité avec le PDF client). N'apparaît que si renseignées.
+  if (data.cgv && String(data.cgv).trim()) renderCgvPage(doc, String(data.cgv));
 
   return Buffer.from(doc.output("arraybuffer"));
 }
@@ -749,6 +778,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   for (const m of mentions) {
     doc.text(m, MARGIN, my);
     my += 4;
+  }
+
+  // OPE-127 — CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation).
+  if (data.cgv && String(data.cgv).trim() && (facture as any).typeDocument !== "avoir") {
+    renderCgvPage(doc, String(data.cgv));
   }
 
   return Buffer.from(doc.output("arraybuffer"));
