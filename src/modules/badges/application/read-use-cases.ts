@@ -2,6 +2,7 @@ import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "./badge-repository";
 import type { Badge, BadgeTechnicien } from "../domain/badge";
+import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
 // par le `TenantContext` (le repo l'applique). `getBadge` sur une ressource d'un autre
@@ -25,4 +26,13 @@ export function listBadgesDuTechnicien(
   technicienId: number,
 ): Promise<BadgeTechnicien[]> {
   return repo.listBadgesTechnicien(ctx, technicienId);
+}
+
+// Classement des techniciens du tenant pour une période (lecture scopée tenant).
+export function getClassementTechniciens(
+  repo: IBadgeRepository,
+  ctx: TenantContext,
+  periode: PeriodeClassement,
+): Promise<ClassementEntry[]> {
+  return repo.getClassement(ctx, periode);
 }

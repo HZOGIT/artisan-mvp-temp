@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeBadgeRepository } from "../infra/badge-repository-fake";
-import { listBadges, getBadge, listBadgesDuTechnicien } from "./read-use-cases";
+import { listBadges, getBadge, listBadgesDuTechnicien, getClassementTechniciens } from "./read-use-cases";
+import type { ClassementEntry } from "../domain/classement";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -46,5 +47,33 @@ describe("badges — use-cases lecture (repo mocké)", () => {
 
   it("listBadgesDuTechnicien : technicien d'un autre tenant → [] (anti-IDOR, pas d'oracle)", async () => {
     expect(await listBadgesDuTechnicien(repo, B, 100)).toEqual([]);
+  });
+
+  it("getClassementTechniciens : scopé tenant, ordonné par rang", async () => {
+    const mk = (artisanId: number, technicienId: number, rang: number): ClassementEntry => ({
+      id: rang + artisanId * 10,
+      technicienId,
+      artisanId,
+      periode: "mois",
+      dateDebut: "2026-06-01",
+      dateFin: "2026-06-30",
+      rang,
+      pointsTotal: 100 - rang,
+      interventions: 5,
+      ca: "1000.00",
+      noteMoyenne: null,
+      createdAt: new Date(),
+    });
+    repo.seedClassement(mk(1, 100, 2));
+    repo.seedClassement(mk(1, 101, 1));
+    repo.seedClassement(mk(2, 200, 1)); // tenant B
+
+    const classement = await getClassementTechniciens(repo, A, "mois");
+    expect(classement.map((c) => c.rang)).toEqual([1, 2]); // trié par rang
+    expect(classement.every((c) => c.artisanId === 1)).toBe(true);
+    // autre période → vide
+    expect(await getClassementTechniciens(repo, A, "annee")).toEqual([]);
+    // tenant B isolé
+    expect((await getClassementTechniciens(repo, B, "mois")).map((c) => c.technicienId)).toEqual([200]);
   });
 });

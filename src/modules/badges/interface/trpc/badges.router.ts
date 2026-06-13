@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IBadgeRepository } from "../../application/badge-repository";
-import { listBadges, listBadgesDuTechnicien } from "../../application/read-use-cases";
+import { listBadges, listBadgesDuTechnicien, getClassementTechniciens } from "../../application/read-use-cases";
 import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge } from "../../application/write-use-cases";
 
 const categorie = z.enum(["interventions", "avis", "ca", "anciennete", "special"]);
@@ -63,5 +63,9 @@ export function createBadgesRouter(repo: IBadgeRepository) {
     attribuerBadge: protectedProcedure
       .input(z.object({ technicienId: z.number().int(), badgeId: z.number().int(), valeurAtteinte: z.number().int().nullish() }))
       .mutation(({ ctx, input }) => attribuerBadge(repo, ctx.tenant, input.technicienId, input.badgeId, input.valeurAtteinte)),
+
+    getClassement: protectedProcedure
+      .input(z.object({ periode: z.enum(["semaine", "mois", "trimestre", "annee"]) }))
+      .query(({ ctx, input }) => getClassementTechniciens(repo, ctx.tenant, input.periode)),
   });
 }

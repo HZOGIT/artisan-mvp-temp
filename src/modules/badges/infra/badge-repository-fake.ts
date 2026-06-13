@@ -1,6 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "../application/badge-repository";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 // Double in-memory du repository badges pour les tests de use-cases (sans DB). Reproduit
 // le scoping tenant (artisanId forcé du contexte) ET l'anti-IDOR sur badges_techniciens :
@@ -10,12 +11,18 @@ export class FakeBadgeRepository implements IBadgeRepository {
   private badgesStore: Badge[] = [];
   private attributions: BadgeTechnicien[] = [];
   private techniciens: Array<{ id: number; artisanId: number }> = [];
+  private classementStore: ClassementEntry[] = [];
   private seq = 0;
   private attrSeq = 0;
 
   // Utilitaire de test (hors port) : déclare un technicien appartenant à un tenant.
   seedTechnicien(id: number, artisanId: number): void {
     this.techniciens.push({ id, artisanId });
+  }
+
+  // Utilitaire de test (hors port) : ajoute une ligne de classement.
+  seedClassement(entry: ClassementEntry): void {
+    this.classementStore.push(entry);
   }
 
   private ownsTechnicien(ctx: TenantContext, technicienId: number): boolean {
@@ -91,5 +98,11 @@ export class FakeBadgeRepository implements IBadgeRepository {
     };
     this.attributions.push(at);
     return at;
+  }
+
+  async getClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]> {
+    return this.classementStore
+      .filter((c) => c.artisanId === ctx.artisanId && c.periode === periode)
+      .sort((a, b) => a.rang - b.rang);
   }
 }

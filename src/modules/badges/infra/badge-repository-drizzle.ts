@@ -1,13 +1,32 @@
-import { and, desc, eq } from "drizzle-orm";
-import { badges, badgesTechniciens, techniciens } from "../../../../drizzle/schema.pg";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { badges, badgesTechniciens, classementTechniciens, techniciens } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "../application/badge-repository";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 type BadgeRow = typeof badges.$inferSelect;
 type BadgeTechRow = typeof badgesTechniciens.$inferSelect;
+type ClassementRow = typeof classementTechniciens.$inferSelect;
+
+function toClassement(r: ClassementRow): ClassementEntry {
+  return {
+    id: r.id,
+    technicienId: r.technicienId,
+    artisanId: r.artisanId,
+    periode: r.periode as PeriodeClassement,
+    dateDebut: r.dateDebut,
+    dateFin: r.dateFin,
+    rang: r.rang,
+    pointsTotal: r.pointsTotal ?? 0,
+    interventions: r.interventions ?? 0,
+    ca: r.ca ?? "0.00",
+    noteMoyenne: r.noteMoyenne ?? null,
+    createdAt: r.createdAt,
+  };
+}
 
 function toBadge(r: BadgeRow): Badge {
   return {
@@ -138,6 +157,17 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         .values({ technicienId, badgeId, valeurAtteinte: valeurAtteinte ?? null })
         .returning();
       return toBadgeTech(row);
+    });
+  }
+
+  getClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(classementTechniciens)
+        .where(and(eq(classementTechniciens.artisanId, ctx.artisanId), eq(classementTechniciens.periode, periode)))
+        .orderBy(asc(classementTechniciens.rang));
+      return rows.map(toClassement);
     });
   }
 

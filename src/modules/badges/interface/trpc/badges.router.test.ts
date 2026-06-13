@@ -47,6 +47,7 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
   beforeAll(async () => {
     for (const uid of [UA, UB]) {
       await admin.query('delete from badges_techniciens where "technicienId" in (select id from techniciens where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
+      await admin.query('delete from classement_techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from badges where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -64,6 +65,7 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     await server.close();
     for (const aId of [artisanA, artisanB]) {
       await admin.query('delete from badges_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
+      await admin.query('delete from classement_techniciens where "artisanId"=$1', [aId]);
       await admin.query('delete from techniciens where "artisanId"=$1', [aId]);
       await admin.query('delete from badges where "artisanId"=$1', [aId]);
     }
@@ -151,5 +153,27 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     expect(a1.json().result.data.id).toBe(a2.json().result.data.id);
     const lst = await callQuery(server, "badges.getBadgesTechnicien", { technicienId: techA }, tA);
     expect((lst.json().result.data as Array<{ badgeId: number }>).filter((x) => x.badgeId === bId).length).toBe(1);
+  });
+
+  it("getClassement : scopé tenant (B ne voit pas le classement de A)", async () => {
+    // Seed classement via admin pour A et B (même période).
+    await admin.query(
+      'insert into classement_techniciens ("technicienId","artisanId",periode,"dateDebut","dateFin",rang,"pointsTotal") values ($1,$2,$3,$4,$5,$6,$7)',
+      [techA, artisanA, "mois", "2026-06-01", "2026-06-30", 1, 90],
+    );
+    await admin.query(
+      'insert into classement_techniciens ("technicienId","artisanId",periode,"dateDebut","dateFin",rang,"pointsTotal") values ($1,$2,$3,$4,$5,$6,$7)',
+      [techB, artisanB, "mois", "2026-06-01", "2026-06-30", 1, 80],
+    );
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const resA = await callQuery(server, "badges.getClassement", { periode: "mois" }, tA);
+    expect(resA.statusCode).toBe(200);
+    const dataA = resA.json().result.data as Array<{ technicienId: number; artisanId: number }>;
+    expect(dataA.every((c) => c.artisanId === artisanA)).toBe(true);
+    expect(dataA.some((c) => c.technicienId === techB)).toBe(false);
+    // B ne voit que le sien
+    const dataB = (await callQuery(server, "badges.getClassement", { periode: "mois" }, tB)).json().result.data as Array<{ technicienId: number }>;
+    expect(dataB.some((c) => c.technicienId === techA)).toBe(false);
   });
 });

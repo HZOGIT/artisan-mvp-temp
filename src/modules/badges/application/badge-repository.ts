@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 // Port du repository badges. Chaque méthode exige le TenantContext (scope tenant + RLS).
 // Deux niveaux d'isolation :
@@ -26,4 +27,8 @@ export interface IBadgeRepository {
     badgeId: number,
     valeurAtteinte?: number | null,
   ): Promise<BadgeTechnicien | null>;
+
+  // Classement des techniciens du tenant pour une période (lecture, ordre par rang).
+  // Scopé artisanId (RLS + filtre) → ne renvoie jamais le classement d'un autre tenant.
+  getClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]>;
 }
