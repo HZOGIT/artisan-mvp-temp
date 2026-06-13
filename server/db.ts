@@ -7094,8 +7094,7 @@ export async function getDepensesStats(
   artisanId: number,
   mois?: string
 ): Promise<any> {
-  const pool = getPool();
-  if (!pool) return null;
+  const db = await getDb();
   const m = mois || new Date().toISOString().slice(0, 7);
   const debutMois = `${m}-01`;
   const [y, mo] = m.split("-").map(Number);
@@ -7105,75 +7104,75 @@ export async function getDepensesStats(
   const finPrec = new Date(y, mo - 1, 0).toISOString().slice(0, 10);
   const anneeDebut = `${y}-01-01`;
   const anneeFin = `${y}-12-31`;
+  // 5 mois avant debutMois (remplace DATE_SUB(?, INTERVAL 5 MONTH)).
+  const cinqMoisAvant = new Date(y, (mo - 1) - 5, 1).toISOString().slice(0, 10);
 
-  const [totMois]: any = await pool.execute(
-    `SELECT COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb,
-            COALESCE(SUM(CASE WHEN remboursable = TRUE AND rembourse = FALSE THEN montant_ttc ELSE 0 END), 0) AS aRembourser,
-            COALESCE(SUM(CASE WHEN tva_deductible = TRUE THEN montant_tva ELSE 0 END), 0) AS tvaRecup
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
-    [artisanId, debutMois, finMois]
-  );
-  const [totPrec]: any = await pool.execute(
-    `SELECT COALESCE(SUM(montant_ttc), 0) AS total
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
-    [artisanId, debutPrec, finPrec]
-  );
-  const [totAnnee]: any = await pool.execute(
-    `SELECT COALESCE(SUM(montant_ttc), 0) AS total
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
-    [artisanId, anneeDebut, anneeFin]
-  );
-  const [parCategorie]: any = await pool.execute(
-    `SELECT categorie, COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-      GROUP BY categorie
-      ORDER BY total DESC`,
-    [artisanId, debutMois, finMois]
-  );
-  const [topDepenses]: any = await pool.execute(
-    `SELECT id, numero, fournisseur, categorie, montant_ttc, date_depense
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-      ORDER BY montant_ttc DESC
-      LIMIT 5`,
-    [artisanId, debutMois, finMois]
-  );
-  const [topFournisseurs]: any = await pool.execute(
-    `SELECT fournisseur, COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ? AND fournisseur IS NOT NULL AND fournisseur <> ''
-      GROUP BY fournisseur
-      ORDER BY total DESC
-      LIMIT 3`,
-    [artisanId, debutMois, finMois]
-  );
-  const [parMois]: any = await pool.execute(
-    `SELECT DATE_FORMAT(date_depense, '%Y-%m') AS mois,
-            COALESCE(SUM(montant_ttc), 0) AS total
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense >= DATE_SUB(?, INTERVAL 5 MONTH)
-      GROUP BY DATE_FORMAT(date_depense, '%Y-%m')
-      ORDER BY mois ASC`,
-    [artisanId, debutMois]
-  );
+  const sumTtcEntre = (d1: string, d2: string) =>
+    db.select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+      .from(depenses)
+      .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, d1, d2)));
 
-  const totalM = Number(totMois[0]?.total || 0);
-  const totalP = Number(totPrec[0]?.total || 0);
+  const [totMois] = await db.select({
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+    nb: sql<number>`COUNT(*)`,
+    aRembourser: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.remboursable} = TRUE AND ${depenses.rembourse} = FALSE THEN ${depenses.montant_ttc} ELSE 0 END), 0)`,
+    tvaRecup: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.tva_deductible} = TRUE THEN ${depenses.montant_tva} ELSE 0 END), 0)`,
+  }).from(depenses).where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)));
+
+  const [totPrec] = await sumTtcEntre(debutPrec, finPrec);
+  const [totAnnee] = await sumTtcEntre(anneeDebut, anneeFin);
+
+  const parCategorie = await db.select({
+    categorie: depenses.categorie,
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+    nb: sql<number>`COUNT(*)`,
+  }).from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)))
+    .groupBy(depenses.categorie)
+    .orderBy(desc(sql`COALESCE(SUM(${depenses.montant_ttc}), 0)`));
+
+  const topDepenses = await db.select({
+    id: depenses.id, numero: depenses.numero, fournisseur: depenses.fournisseur,
+    categorie: depenses.categorie, montant_ttc: depenses.montant_ttc, date_depense: depenses.date_depense,
+  }).from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)))
+    .orderBy(desc(depenses.montant_ttc)).limit(5);
+
+  const topFournisseurs = await db.select({
+    fournisseur: depenses.fournisseur,
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+    nb: sql<number>`COUNT(*)`,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, debutMois, finMois),
+      isNotNull(depenses.fournisseur),
+      ne(depenses.fournisseur, ""),
+    ))
+    .groupBy(depenses.fournisseur)
+    .orderBy(desc(sql`COALESCE(SUM(${depenses.montant_ttc}), 0)`)).limit(3);
+
+  const parMois = await db.select({
+    mois: sql<string>`to_char(${depenses.date_depense}, 'YYYY-MM')`,
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+  }).from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), gte(depenses.date_depense, cinqMoisAvant)))
+    .groupBy(sql`to_char(${depenses.date_depense}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${depenses.date_depense}, 'YYYY-MM') ASC`);
+
+  const totalM = Number(totMois?.total || 0);
+  const totalP = Number(totPrec?.total || 0);
   const variation = totalP > 0 ? ((totalM - totalP) / totalP) * 100 : null;
 
   return {
     mois: m,
     totalMois: totalM,
-    nbDepensesMois: Number(totMois[0]?.nb || 0),
-    aRembourser: Number(totMois[0]?.aRembourser || 0),
-    tvaRecuperable: Number(totMois[0]?.tvaRecup || 0),
+    nbDepensesMois: Number(totMois?.nb || 0),
+    aRembourser: Number(totMois?.aRembourser || 0),
+    tvaRecuperable: Number(totMois?.tvaRecup || 0),
     totalMoisPrecedent: totalP,
     variation,
-    totalAnnee: Number(totAnnee[0]?.total || 0),
+    totalAnnee: Number(totAnnee?.total || 0),
     parCategorie: parCategorie as any[],
     topDepenses: topDepenses as any[],
     topFournisseurs: topFournisseurs as any[],
