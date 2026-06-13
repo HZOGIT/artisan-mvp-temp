@@ -1,9 +1,9 @@
-import { and, desc, eq } from "drizzle-orm";
-import { interventions } from "../../../../drizzle/schema.pg";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { interventions, clients, techniciens, devis, factures } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IInterventionRepository } from "../application/intervention-repository";
+import type { IInterventionRepository, InterventionRefKind } from "../application/intervention-repository";
 import type { Intervention, CreateInterventionInput, UpdateInterventionInput } from "../domain/intervention";
 
 type InterventionRow = typeof interventions.$inferSelect;
@@ -85,6 +85,29 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
         .where(and(eq(interventions.id, id), eq(interventions.artisanId, ctx.artisanId)))
         .returning({ id: interventions.id });
       return deleted.length > 0;
+    });
+  }
+
+  ownsRef(ctx: TenantContext, kind: InterventionRefKind, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const n = sql<number>`count(*)::int`;
+      // Chaque table cible porte un `artisanId` (toutes RLS-isolées) → double cloisonnement.
+      let row: { n: number } | undefined;
+      switch (kind) {
+        case "client":
+          [row] = await tx.select({ n }).from(clients).where(and(eq(clients.id, id), eq(clients.artisanId, ctx.artisanId)));
+          break;
+        case "technicien":
+          [row] = await tx.select({ n }).from(techniciens).where(and(eq(techniciens.id, id), eq(techniciens.artisanId, ctx.artisanId)));
+          break;
+        case "devis":
+          [row] = await tx.select({ n }).from(devis).where(and(eq(devis.id, id), eq(devis.artisanId, ctx.artisanId)));
+          break;
+        case "facture":
+          [row] = await tx.select({ n }).from(factures).where(and(eq(factures.id, id), eq(factures.artisanId, ctx.artisanId)));
+          break;
+      }
+      return (row?.n ?? 0) > 0;
     });
   }
 }

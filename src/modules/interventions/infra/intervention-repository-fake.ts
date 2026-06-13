@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IInterventionRepository } from "../application/intervention-repository";
+import type { IInterventionRepository, InterventionRefKind } from "../application/intervention-repository";
 import type { Intervention, CreateInterventionInput, UpdateInterventionInput } from "../domain/intervention";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -7,6 +7,13 @@ import type { Intervention, CreateInterventionInput, UpdateInterventionInput } f
 export class FakeInterventionRepository implements IInterventionRepository {
   private store: Intervention[] = [];
   private seq = 0;
+  // FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned.
+  private ownedRefs = new Set<string>();
+
+  // Aide de test : déclare qu'une ressource référencée appartient au tenant.
+  registerRef(artisanId: number, kind: InterventionRefKind, id: number): void {
+    this.ownedRefs.add(`${artisanId}:${kind}:${id}`);
+  }
 
   async list(ctx: TenantContext): Promise<Intervention[]> {
     return this.store.filter((i) => i.artisanId === ctx.artisanId);
@@ -52,5 +59,9 @@ export class FakeInterventionRepository implements IInterventionRepository {
     if (!i) return false;
     this.store = this.store.filter((x) => x.id !== id);
     return true;
+  }
+
+  async ownsRef(ctx: TenantContext, kind: InterventionRefKind, id: number): Promise<boolean> {
+    return this.ownedRefs.has(`${ctx.artisanId}:${kind}:${id}`);
   }
 }

@@ -70,4 +70,12 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
     expect(await repo.delete(ctx(A), i.id)).toBe(true);
     expect(await repo.getById(ctx(A), i.id)).toBeNull();
   });
+
+  it("ownsRef (anti-IDOR-FK) : un client est reconnu pour son tenant, pas pour un autre", async () => {
+    // clientA appartient à A ; depuis B il ne doit pas être « possédé »
+    expect(await repo.ownsRef(ctx(A), "client", clientA)).toBe(true);
+    expect(await repo.ownsRef(ctx(B), "client", clientA)).toBe(false);
+    // un id inexistant → false
+    expect(await repo.ownsRef(ctx(A), "client", 987654321)).toBe(false);
+  });
 });
