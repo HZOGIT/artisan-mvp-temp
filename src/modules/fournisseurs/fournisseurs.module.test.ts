@@ -10,6 +10,10 @@ const stubRepo: IFournisseurRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  listAssociationsArticle: async () => [],
+  listAssociationsFournisseur: async () => [],
+  ajouterAssociation: async () => null,
+  supprimerAssociation: async () => false,
 };
 
 describe("fournisseurs.module", () => {
@@ -19,7 +23,17 @@ describe("fournisseurs.module", () => {
   });
 
   it("le port expose les opérations attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "ajouterAssociation",
+      "create",
+      "delete",
+      "getById",
+      "list",
+      "listAssociationsArticle",
+      "listAssociationsFournisseur",
+      "supprimerAssociation",
+      "update",
+    ]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {

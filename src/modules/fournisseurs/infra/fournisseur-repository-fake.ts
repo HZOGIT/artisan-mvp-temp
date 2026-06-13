@@ -1,12 +1,28 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IFournisseurRepository } from "../application/fournisseur-repository";
 import type { Fournisseur, CreateFournisseurInput, UpdateFournisseurInput } from "../domain/fournisseur";
+import type { ArticleFournisseur, AjouterAssociationInput } from "../domain/article-fournisseur";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
 // scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
 export class FakeFournisseurRepository implements IFournisseurRepository {
   private store: Fournisseur[] = [];
+  private articles: Array<{ id: number; artisanId: number }> = [];
+  private assocs: ArticleFournisseur[] = [];
   private seq = 0;
+  private assocSeq = 0;
+
+  // Utilitaire de test (hors port) : déclare un article appartenant à un tenant.
+  seedArticle(id: number, artisanId: number): void {
+    this.articles.push({ id, artisanId });
+  }
+
+  private ownsArticle(ctx: TenantContext, articleId: number): boolean {
+    return this.articles.some((a) => a.id === articleId && a.artisanId === ctx.artisanId);
+  }
+  private ownsFournisseur(ctx: TenantContext, fournisseurId: number): boolean {
+    return this.store.some((f) => f.id === fournisseurId && f.artisanId === ctx.artisanId);
+  }
 
   async list(ctx: TenantContext): Promise<Fournisseur[]> {
     return this.store.filter((f) => f.artisanId === ctx.artisanId);
@@ -48,6 +64,40 @@ export class FakeFournisseurRepository implements IFournisseurRepository {
     const f = await this.getById(ctx, id);
     if (!f) return false;
     this.store = this.store.filter((x) => x.id !== id);
+    this.assocs = this.assocs.filter((a) => a.fournisseurId !== id);
+    return true;
+  }
+
+  async listAssociationsArticle(ctx: TenantContext, articleId: number): Promise<ArticleFournisseur[]> {
+    if (!this.ownsArticle(ctx, articleId)) return [];
+    return this.assocs.filter((a) => a.articleId === articleId && this.ownsFournisseur(ctx, a.fournisseurId));
+  }
+
+  async listAssociationsFournisseur(ctx: TenantContext, fournisseurId: number): Promise<ArticleFournisseur[]> {
+    if (!this.ownsFournisseur(ctx, fournisseurId)) return [];
+    return this.assocs.filter((a) => a.fournisseurId === fournisseurId);
+  }
+
+  async ajouterAssociation(ctx: TenantContext, input: AjouterAssociationInput): Promise<ArticleFournisseur | null> {
+    if (!this.ownsArticle(ctx, input.articleId)) return null;
+    if (!this.ownsFournisseur(ctx, input.fournisseurId)) return null;
+    const a: ArticleFournisseur = {
+      id: ++this.assocSeq,
+      articleId: input.articleId,
+      fournisseurId: input.fournisseurId,
+      referenceExterne: input.referenceExterne ?? null,
+      prixAchat: input.prixAchat ?? null,
+      delaiLivraison: input.delaiLivraison ?? null,
+      createdAt: new Date(),
+    };
+    this.assocs.push(a);
+    return a;
+  }
+
+  async supprimerAssociation(ctx: TenantContext, id: number): Promise<boolean> {
+    const a = this.assocs.find((x) => x.id === id);
+    if (!a || !this.ownsFournisseur(ctx, a.fournisseurId)) return false;
+    this.assocs = this.assocs.filter((x) => x.id !== id);
     return true;
   }
 }
