@@ -3,6 +3,7 @@ import type { EmailPort, EmailMessage } from "./email";
 import type { SmsPort, SmsMessage } from "./sms";
 import type { StoragePort, PutOptions } from "./storage";
 import type { PdfPort } from "./pdf";
+import type { RateLimiterPort } from "./rate-limiter";
 
 export class FakeEmailPort implements EmailPort {
   readonly sent: EmailMessage[] = [];
@@ -16,6 +17,20 @@ export class FakeEmailPort implements EmailPort {
       throw new Error("envoi email simulé en échec");
     }
     this.sent.push(message);
+  }
+}
+
+// Limiteur de débit factice : autorise tout par défaut ; `denyKey(key)` fait échouer
+// la prochaine vérification de cette clé. Mémorise les clés vérifiées (assertions).
+export class FakeRateLimiter implements RateLimiterPort {
+  readonly checked: string[] = [];
+  private denied = new Set<string>();
+  denyKey(key: string): void {
+    this.denied.add(key);
+  }
+  async check(key: string): Promise<boolean> {
+    this.checked.push(key);
+    return !this.denied.has(key);
   }
 }
 

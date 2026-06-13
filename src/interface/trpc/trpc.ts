@@ -1,7 +1,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import type { AppContext } from "./context";
 import type { TenantContext } from "../../shared/tenant";
-import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from "../../shared/errors";
+import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyRequestsError } from "../../shared/errors";
 
 const t = initTRPC.context<AppContext>().create();
 
@@ -20,6 +20,7 @@ const mapDomainErrors = t.middleware(async ({ next }) => {
   if (cause instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: cause.message });
   if (cause instanceof ForbiddenError) throw new TRPCError({ code: "FORBIDDEN", message: cause.message });
   if (cause instanceof ConflictError) throw new TRPCError({ code: "CONFLICT", message: cause.message });
+  if (cause instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: cause.message });
   return result;
 });
 
