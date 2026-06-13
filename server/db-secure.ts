@@ -23,7 +23,7 @@ import {
   stocks, Stock, InsertStock,
   fournisseurs, Fournisseur, InsertFournisseur,
 } from "../drizzle/schema";
-import { getDb } from "./db";
+import { getDb, insertReturningId } from "./db";
 import { createSecureQuery, validateArtisanId } from "./_core/security";
 import { logError } from "./_core/errorHandler";
 
@@ -348,8 +348,8 @@ export async function createDevisSecure(
       clientId,
     };
 
-    const result = await db.insert(devis).values(devisData);
-    const insertId = Number(result[0].insertId);
+    // OPE-184 — insert dialect-aware (pg `.returning()` / mysql `insertId`).
+    const insertId = await insertReturningId(devis, devisData);
 
     const created = await db.select()
       .from(devis)

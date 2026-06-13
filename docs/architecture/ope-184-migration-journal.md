@@ -205,7 +205,19 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ 🎯🎯🎯 `server/_core/index.ts` = ZÉRO `.execute`. Les 3 fichiers serveur (db.ts, routers.ts, index.ts) sont désormais 100% Drizzle / dialect-aware.** Tout le raw-SQL mysql2 de l'application est porté + validé PG (≈30 sous-batchs, ~250 checks PG verts).
 
-**Prochaine action : P0.7-FIN — vérif globale** : `grep -rnE "pool.execute|getPool\(\)|\.insertId" server/` (hors définition de getPool + tests legacy) pour confirmer 0 raw-SQL applicatif résiduel ; vérifier que l'app **boote de bout en bout sur PG** (`DB_DIALECT=postgresql pnpm dev`, requêtes réelles). Puis **P0.8** (copie data staging→PG) + **P0.9** (suite de tests Vitest sur PG, OPE-195) avant cutover. Ensuite OPE-193 peut passer Done.
+- **7-FIN FAIT** (2026-06-13) : **vérif globale raw-SQL + boot end-to-end PG**.
+  - Bug résiduel trouvé+corrigé : `db-secure.ts createDevisSecure` utilisait `result[0].insertId` (mysql2, **cassé en PG**) → porté sur `insertReturningId` (helper db.ts désormais **exporté**). Validé PG (`scripts/test-devsecure-pg.mjs`, 5/5) : devis créé+persisté, scope artisan, clientId forcé, TTC=1200.
+  - **Grep final** : `pool.execute`/`.insertId` applicatif résiduel hors tests = **0** (db.ts:210 = le helper `insertReturningId` lui-même ; reste uniquement `server/_core/fix-duplicates.ts` = script DDL/dedup **mysql-only**, voué au retrait P0.5f avant cutover, hors périmètre runtime applicatif).
+  - **Boot end-to-end sur PostgreSQL** : `DB_DIALECT=postgresql tsx server/_core/index.ts` → « Connected successfully (postgres) » + « Server running ». Health HTTP (node http) : `/api/articles/search` **200**, `/api/articles/categories` **200**, `/` **200** (endpoints frappant les helpers Drizzle portés). Aucune erreur DB au boot.
+
+**→ 🎯🎯🎯🎯 P0.7 COMPLET : 100% du raw-SQL applicatif porté en Drizzle dialect-aware + validé PG + app fonctionnelle de bout en bout sur PostgreSQL.**
+
+**Reste avant de clôturer OPE-193 / cutover :**
+- **P0.5f** : sortir/neutraliser `fix-duplicates.ts` (DDL mysql) en mode PG — soit no-op si `DB_DIALECT=postgresql` (le schéma PG est déjà géré par les migrations Drizzle), soit retrait. ⚠️ à faire AVANT de booter le nouveau code sur staging.
+- **P0.8** : copie data **staging** MySQL→PG (le `scripts/pg-data-copy.mjs` existe et est idempotent ; l'exécuter contre la vraie base staging).
+- **P0.9 (OPE-195)** : faire tourner la suite Vitest complète sur PG (filet de non-régression) — noter que certains e2e/security échouent par **pollution de data** (fixtures à IDs fixes vs lignes copiées), pas par régression de port.
+
+**Prochaine action : P0.5f** — rendre `fix-duplicates.ts` no-op quand `DB_DIALECT=postgresql` (garde au tout début : `if (process.env.DB_DIALECT === "postgresql") return;`), car son DDL mysql (ALTER/ENUM/INDEX) n'a pas de sens en PG et planterait. Vérifier le point d'entrée (boot prod `node dist/fix-duplicates.js` + appel éventuel dans index.ts).
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).

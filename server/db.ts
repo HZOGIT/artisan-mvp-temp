@@ -200,7 +200,7 @@ export async function getDb() {
 // Postgres : `.returning({id})` (drizzle-mysql2 ne supporte PAS returning).
 // MySQL : forme historique mysql2 (ResultSetHeader.insertId). Remplace le pattern
 // `const [result] = await db.insert(X).values(Y); ... result.insertId`.
-async function insertReturningId(table: any, values: any): Promise<number> {
+export async function insertReturningId(table: any, values: any): Promise<number> {
   const db: any = await getDb();
   if (process.env.DB_DIALECT === "postgresql") {
     const [row]: any = await db.insert(table).values(values).returning({ id: table.id });
