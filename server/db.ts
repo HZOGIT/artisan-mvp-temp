@@ -90,7 +90,7 @@ import {
   interventionsMobile, photosInterventions,
   depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
   relevesBancaires, transactionsBancaires, reglesCategorisation,
-  couleursInterventions, modules, artisanModules, subscriptions, devices,
+  couleursInterventions, modules, artisanModules, subscriptions, devices, activeSessions,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -4814,12 +4814,11 @@ function rowToSession(r: any): SessionRow {
 
 export async function getActiveSessions(userId: number): Promise<SessionRow[]> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM active_sessions WHERE user_id = ? AND expires_at > NOW() ORDER BY last_active_at DESC',
-      [userId]
-    ) as any;
-    return (rows as any[]).map(rowToSession);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(activeSessions)
+      .where(and(eq(activeSessions.user_id, userId), sql`${activeSessions.expires_at} > NOW()`))
+      .orderBy(desc(activeSessions.last_active_at));
+    return rows.map(rowToSession);
   } catch {
     return [];
   }
@@ -4827,12 +4826,10 @@ export async function getActiveSessions(userId: number): Promise<SessionRow[]> {
 
 export async function countActiveSessions(userId: number): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT COUNT(*) AS cnt FROM active_sessions WHERE user_id = ? AND expires_at > NOW()',
-      [userId]
-    ) as any;
-    return Number((rows as any[])[0]?.cnt || 0);
+    const dbi = await getDb();
+    const [row] = await dbi.select({ cnt: sql<number>`COUNT(*)` }).from(activeSessions)
+      .where(and(eq(activeSessions.user_id, userId), sql`${activeSessions.expires_at} > NOW()`));
+    return Number(row?.cnt || 0);
   } catch {
     return 0;
   }
@@ -4847,15 +4844,18 @@ export async function createSession(params: {
   ttlDays?: number;
 }): Promise<void> {
   try {
-    const pool = await ensurePool();
+    const dbi = await getDb();
     const ttl = params.ttlDays || 7;
-    await pool.execute(
-      `INSERT INTO active_sessions
-         (user_id, artisan_id, session_token, device_fingerprint, ip, expires_at)
-       VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))
-       ON DUPLICATE KEY UPDATE last_active_at = CURRENT_TIMESTAMP, expires_at = DATE_ADD(NOW(), INTERVAL ? DAY)`,
-      [params.userId, params.artisanId, params.token, params.fingerprint, params.ip, ttl, ttl]
-    );
+    // DATE_ADD(NOW(), INTERVAL ttl DAY) → calcul de date en JS (neutre dialecte).
+    const expiresAt = new Date(Date.now() + ttl * 24 * 3600 * 1000);
+    // Upsert sur l'unique (user_id, session_token) : prolonge la session si re-login.
+    await dbi.insert(activeSessions).values({
+      user_id: params.userId, artisan_id: params.artisanId, session_token: params.token,
+      device_fingerprint: params.fingerprint, ip: params.ip, expires_at: expiresAt,
+    }).onConflictDoUpdate({
+      target: [activeSessions.user_id, activeSessions.session_token],
+      set: { last_active_at: sql`CURRENT_TIMESTAMP`, expires_at: expiresAt },
+    });
   } catch (e: any) {
     console.warn('[createSession] failed:', e?.message || e);
   }
@@ -4863,17 +4863,13 @@ export async function createSession(params: {
 
 export async function deleteOldestSession(userId: number): Promise<void> {
   try {
-    const pool = await ensurePool();
-    // MySQL ne supporte pas DELETE ... ORDER BY LIMIT dans toutes les
-    // configurations. On selectionne d'abord l'id, puis on delete.
-    const [rows] = await pool.execute(
-      `SELECT id FROM active_sessions WHERE user_id = ? AND expires_at > NOW()
-       ORDER BY last_active_at ASC LIMIT 1`,
-      [userId]
-    ) as any;
-    const oldId = (rows as any[])[0]?.id;
-    if (oldId) {
-      await pool.execute('DELETE FROM active_sessions WHERE id = ?', [oldId]);
+    const dbi = await getDb();
+    // Select-puis-delete : la plus ancienne session active (last_active_at ASC).
+    const [oldest] = await dbi.select({ id: activeSessions.id }).from(activeSessions)
+      .where(and(eq(activeSessions.user_id, userId), sql`${activeSessions.expires_at} > NOW()`))
+      .orderBy(asc(activeSessions.last_active_at)).limit(1);
+    if (oldest?.id) {
+      await dbi.delete(activeSessions).where(eq(activeSessions.id, oldest.id));
     }
   } catch (e: any) {
     console.warn('[deleteOldestSession] failed:', e?.message || e);
@@ -4882,11 +4878,10 @@ export async function deleteOldestSession(userId: number): Promise<void> {
 
 export async function cleanExpiredSessions(): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [r] = await pool.execute(
-      'DELETE FROM active_sessions WHERE expires_at < NOW()'
-    ) as any;
-    return Number(r.affectedRows || 0);
+    const dbi = await getDb();
+    const deleted = await dbi.delete(activeSessions)
+      .where(sql`${activeSessions.expires_at} < NOW()`).returning({ id: activeSessions.id });
+    return deleted.length;
   } catch {
     return 0;
   }
