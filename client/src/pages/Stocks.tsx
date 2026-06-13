@@ -76,6 +76,11 @@ export default function Stocks() {
   const utils = trpc.useUtils();
   const { data: stocks, isLoading } = trpc.stocks.list.useQuery();
   const { data: lowStockItems } = trpc.stocks.getLowStock.useQuery();
+  // OPE-105 — quantité entrante (commandes fournisseurs en cours) par fiche stock,
+  // pour afficher le « stock prévisionnel » = physique + entrant. Map stockId → entrant.
+  const { data: stockEntrant } = trpc.stocks.getEntrant.useQuery();
+  const entrantByStock: Record<number, number> = {};
+  (stockEntrant || []).forEach((e: any) => { entrantByStock[e.stockId] = e.entrant; });
   const { data: mouvements, isLoading: loadingMouvements } = trpc.stocks.getMouvements.useQuery(
     { stockId: selectedStock?.id || 0 },
     { enabled: !!selectedStock && isHistoryDialogOpen }
@@ -487,6 +492,17 @@ export default function Stocks() {
                           <span className={isLowStock(stock) ? 'text-orange-600 font-bold' : ''}>
                             {stock.quantiteEnStock} {stock.unite}
                           </span>
+                          {/* OPE-105 — quantité entrante (commandes fournisseurs en cours) :
+                              affiche le prévisionnel sans changer le stock physique ni l'alerte. */}
+                          {entrantByStock[stock.id] > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 border-blue-300 text-blue-700 bg-blue-50"
+                              title={`Prévisionnel : ${(parseFloat(stock.quantiteEnStock || '0') + entrantByStock[stock.id]).toFixed(2)} ${stock.unite} (physique + commandes en cours)`}
+                            >
+                              +{entrantByStock[stock.id]} en commande
+                            </Badge>
+                          )}
                         </td>
                         <td className="text-right p-2 text-muted-foreground whitespace-nowrap">{stock.seuilAlerte}</td>
                         <td className="text-right p-2 whitespace-nowrap">

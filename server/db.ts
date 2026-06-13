@@ -1442,6 +1442,36 @@ export async function getMouvementsStock(stockId: number): Promise<MouvementStoc
     .orderBy(desc(mouvementsStock.createdAt));
 }
 
+// OPE-105 — quantité ENTRANTE par fiche stock = reste à recevoir (`quantite − quantiteRecue`,
+// planché à 0) des lignes de commandes fournisseurs ENCORE en cours (envoyée / confirmée /
+// partiellement livrée), liées à la fiche stock via `stockId`. Lecture seule, scopée tenant
+// (jointure sur `commandes_fournisseurs.artisanId`), une requête (pas de N+1, pas de migration).
+// Sert à afficher le « stock prévisionnel » = physique + entrant SANS modifier l'alerte de seuil.
+export async function getStockEntrantByArtisan(
+  artisanId: number,
+): Promise<Array<{ stockId: number; entrant: number }>> {
+  const pool = getPool();
+  if (!pool) return [];
+  try {
+    const [rows] = await pool.execute(
+      `SELECT l.stockId AS stockId,
+              SUM(GREATEST(CAST(l.quantite AS DECIMAL(10,2)) - CAST(l.quantiteRecue AS DECIMAL(10,2)), 0)) AS entrant
+         FROM lignes_commandes_fournisseurs l
+         JOIN commandes_fournisseurs c ON c.id = l.commandeId
+        WHERE c.artisanId = ?
+          AND c.statut IN ('envoyee','confirmee','partiellement_livree')
+          AND l.stockId IS NOT NULL
+        GROUP BY l.stockId
+        HAVING entrant > 0`,
+      [artisanId],
+    );
+    return (rows as any[]).map((r) => ({ stockId: Number(r.stockId), entrant: Number(r.entrant) || 0 }));
+  } catch (e: any) {
+    console.warn("[getStockEntrantByArtisan]", e?.message || e);
+    return [];
+  }
+}
+
 // ============================================================================
 // FOURNISSEURS
 // ============================================================================

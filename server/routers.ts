@@ -3380,7 +3380,16 @@ const stocksRouter = router({
       };
     });
   }),
-  
+
+  // OPE-105 — quantité entrante (commandes fournisseurs en cours, par fiche stock) →
+  // permet d'afficher le « stock prévisionnel » = physique + entrant. Lecture seule,
+  // scopée tenant. N'altère PAS l'alerte de seuil (reste sur le stock physique).
+  getEntrant: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getStockEntrantByArtisan(artisan.id);
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
