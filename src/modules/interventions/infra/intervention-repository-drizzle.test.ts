@@ -78,4 +78,20 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
     // un id inexistant → false
     expect(await repo.ownsRef(ctx(A), "client", 987654321)).toBe(false);
   });
+
+  it("findTechnicienIdForUser + listByTechnicien : scope technicien (minimisation RGPD)", async () => {
+    // fiche technicien de A liée à un userId dédié
+    const userTech = 996777;
+    const techId = (await admin.query('insert into techniciens ("artisanId",nom,"userId") values ($1,$2,$3) returning id', [A, "Tech RGPD", userTech])).rows[0].id as number;
+    const ctxTech: TenantContext = { artisanId: A, userId: userTech };
+    expect(await repo.findTechnicienIdForUser(ctxTech)).toBe(techId);
+    // user d'un autre tenant non lié → null
+    expect(await repo.findTechnicienIdForUser(ctx(B))).toBeNull();
+    // 2 interventions de A : une assignée au technicien, une non
+    const iMine = await repo.create(ctx(A), { clientId: clientA, titre: "À moi", dateDebut: new Date("2026-06-14T08:00:00Z"), technicienId: techId });
+    await repo.create(ctx(A), { clientId: clientA, titre: "Pas à moi", dateDebut: new Date("2026-06-14T09:00:00Z") });
+    const mine = await repo.listByTechnicien(ctx(A), techId);
+    expect(mine.map((x) => x.id)).toEqual([iMine.id]);
+    await admin.query('delete from techniciens where id=$1', [techId]);
+  });
 });

@@ -20,3 +20,18 @@ export async function getIntervention(
   if (!intervention) throw new NotFoundError("Intervention introuvable");
   return intervention;
 }
+
+// Interventions visibles par l'utilisateur courant. Minimisation RGPD (parité legacy
+// getTodayInterventions) : un utilisateur de rôle « technicien » LIÉ à une fiche ne voit que
+// SES interventions assignées ; sinon (owner/secrétaire, ou technicien non lié) → vue tenant
+// complète (behavior-preserving). Toujours scopé au tenant par le repo.
+export async function listMesInterventions(
+  repo: IInterventionRepository,
+  ctx: TenantContext,
+): Promise<Intervention[]> {
+  if (ctx.role === "technicien") {
+    const technicienId = await repo.findTechnicienIdForUser(ctx);
+    if (technicienId != null) return repo.listByTechnicien(ctx, technicienId);
+  }
+  return repo.list(ctx);
+}

@@ -9,10 +9,17 @@ export class FakeInterventionRepository implements IInterventionRepository {
   private seq = 0;
   // FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned.
   private ownedRefs = new Set<string>();
+  // Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId.
+  private userTechnicien = new Map<string, number>();
 
   // Aide de test : déclare qu'une ressource référencée appartient au tenant.
   registerRef(artisanId: number, kind: InterventionRefKind, id: number): void {
     this.ownedRefs.add(`${artisanId}:${kind}:${id}`);
+  }
+
+  // Aide de test : lie un utilisateur à une fiche technicien dans un tenant.
+  linkTechnicien(artisanId: number, userId: number, technicienId: number): void {
+    this.userTechnicien.set(`${artisanId}:${userId}`, technicienId);
   }
 
   async list(ctx: TenantContext): Promise<Intervention[]> {
@@ -63,5 +70,13 @@ export class FakeInterventionRepository implements IInterventionRepository {
 
   async ownsRef(ctx: TenantContext, kind: InterventionRefKind, id: number): Promise<boolean> {
     return this.ownedRefs.has(`${ctx.artisanId}:${kind}:${id}`);
+  }
+
+  async findTechnicienIdForUser(ctx: TenantContext): Promise<number | null> {
+    return this.userTechnicien.get(`${ctx.artisanId}:${ctx.userId}`) ?? null;
+  }
+
+  async listByTechnicien(ctx: TenantContext, technicienId: number): Promise<Intervention[]> {
+    return this.store.filter((i) => i.artisanId === ctx.artisanId && i.technicienId === technicienId);
   }
 }

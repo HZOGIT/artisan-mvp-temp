@@ -110,4 +110,26 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
       return (row?.n ?? 0) > 0;
     });
   }
+
+  findTechnicienIdForUser(ctx: TenantContext): Promise<number | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ id: techniciens.id })
+        .from(techniciens)
+        .where(and(eq(techniciens.userId, ctx.userId), eq(techniciens.artisanId, ctx.artisanId)))
+        .limit(1);
+      return row?.id ?? null;
+    });
+  }
+
+  listByTechnicien(ctx: TenantContext, technicienId: number): Promise<Intervention[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(interventions)
+        .where(and(eq(interventions.artisanId, ctx.artisanId), eq(interventions.technicienId, technicienId)))
+        .orderBy(desc(interventions.dateDebut), desc(interventions.id));
+      return rows.map(toIntervention);
+    });
+  }
 }

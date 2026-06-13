@@ -20,4 +20,9 @@ export interface IInterventionRepository {
   // true si la ressource référencée (client/technicien/devis/facture) appartient au tenant.
   // Garde anti-IDOR-FK : interdit de lier une intervention à la ressource d'un autre tenant.
   ownsRef(ctx: TenantContext, kind: InterventionRefKind, id: number): Promise<boolean>;
+  // Identifiant de la fiche technicien liée à l'utilisateur courant dans le tenant, ou null.
+  // Sert au cloisonnement « un technicien ne voit que SES interventions » (minimisation RGPD).
+  findTechnicienIdForUser(ctx: TenantContext): Promise<number | null>;
+  // Interventions du tenant assignées à un technicien donné (scopé).
+  listByTechnicien(ctx: TenantContext, technicienId: number): Promise<Intervention[]>;
 }

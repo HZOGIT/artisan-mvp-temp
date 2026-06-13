@@ -11,6 +11,8 @@ const stubRepo: IInterventionRepository = {
   update: async () => null,
   delete: async () => false,
   ownsRef: async () => false,
+  findTechnicienIdForUser: async () => null,
+  listByTechnicien: async () => [],
 };
 
 describe("interventions.module", () => {
@@ -20,12 +22,21 @@ describe("interventions.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsRef", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "create",
+      "delete",
+      "findTechnicienIdForUser",
+      "getById",
+      "list",
+      "listByTechnicien",
+      "ownsRef",
+      "update",
+    ]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createInterventionsModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["create", "delete", "getById", "getMine", "list", "update"]);
   });
 });

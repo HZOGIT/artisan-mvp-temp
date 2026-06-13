@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import { ValidationError } from "../../../../shared/errors";
 import type { IInterventionRepository } from "../../application/intervention-repository";
-import { listInterventions, getIntervention } from "../../application/read-use-cases";
+import { listInterventions, getIntervention, listMesInterventions } from "../../application/read-use-cases";
 import {
   creerIntervention,
   modifierIntervention,
@@ -53,6 +53,9 @@ const updateSchema = z.object({
 export function createInterventionsRouter(repo: IInterventionRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
+
+    // Vue « mes interventions » : minimisation RGPD (un technicien lié ne voit que les siennes).
+    getMine: protectedProcedure.query(({ ctx }) => listMesInterventions(repo, ctx.tenant)),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
