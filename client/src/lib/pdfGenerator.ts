@@ -665,10 +665,18 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
-  // OPE-164 — conditions réelles + mention d'escompte B2B (L441-9) sur une facture (pas un avoir).
+  // OPE-164/95 — sur une facture (pas un avoir) : conditions réelles + mentions légales.
+  // OPE-95 ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
+  // de 40 €, Art. L441-10 / D441-5 C. com.) — obligatoires et sanctionnées si absentes.
+  // Parité avec le générateur PDF serveur (portail) qui les affiche déjà : le PDF client
+  // (téléchargé/envoyé par l'artisan) les omettait → divergence corrigée.
   const factureConditions = isAvoir
     ? facture.conditions
-    : [facture.conditions, "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.)."]
+    : [
+        facture.conditions,
+        "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée, ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C. com.).",
+        "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
+      ]
         .filter(Boolean)
         .join("\n");
   addFooter(doc, factureConditions, options?.mentionsLegales);
