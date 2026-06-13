@@ -128,7 +128,11 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 - **7c-1 FAIT** : getCategoriesDepenses, createCategorieDepense (INSERT IGNORE → select-puis-insert), updateCategorieDepense, deleteCategorieDepense (soft-delete) → Drizzle. **Validé PG** (CRUD + idempotence + soft-delete + filtre actif corrects). tsc neuf vert.
 
-**Prochaine action : P0.7c-2** (createDepense, updateDepense, deleteDepense, getDepenseById, getDepensesByArtisan). Importer `depenses` (déjà fait). Test PG. Vérifier montants TTC=HT+TVA + numéro.
+- **7c-2 FAIT** : dépenses CRUD + filtres + findDepensesDoublons → Drizzle. Validé PG (TTC=HT+TVA, recalcul update HT200→TVA40/TTC240, whitelist OPE-63).
+- **7c-3a FAIT** : getNextDepenseNumero + getNextNoteFraisNumero (séquence DEP-00001→00002 sans trou), markDepenseOcrTraite, upsertBudget (ON DUPLICATE→select-puis-insert/update, idempotent vérifié 1 ligne/budget=2000), calculerBudgetsRealises → Drizzle. Validé PG.
+- **7c-3b À FAIRE** : getDepensesStats (7 agrégats : SUM/COUNT/CASE WHEN, GROUP BY categorie/fournisseur/mois ; `DATE_FORMAT`→`to_char`, `DATE_SUB`→calcul date JS ; PG-only).
+
+**Prochaine action : P0.7c-3b** (getDepensesStats), puis 7c-4/5 (NoteFrais + workflow), 7c-6 (FEC), 7c-7 (banque).
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 

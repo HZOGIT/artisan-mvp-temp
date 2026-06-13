@@ -88,7 +88,7 @@ import {
   emailsLog, EmailLog, InsertEmailLog,
   aiThreads, aiMessages,
   interventionsMobile, photosInterventions,
-  depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses,
+  depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -6898,26 +6898,20 @@ export async function verifierEcartsEtEnvoyerAlertes(
 // ============================================================================
 
 export async function getNextDepenseNumero(artisanId: number): Promise<string> {
-  const pool = getPool();
-  if (!pool) return "DEP-00001";
-  const [rows]: any = await pool.execute(
-    "SELECT numero FROM depenses WHERE artisan_id = ? ORDER BY id DESC LIMIT 1",
-    [artisanId]
-  );
-  const last = (rows as any[])[0]?.numero || "";
+  const db = await getDb();
+  const [row] = await db.select({ numero: depenses.numero }).from(depenses)
+    .where(eq(depenses.artisan_id, artisanId)).orderBy(desc(depenses.id)).limit(1);
+  const last = row?.numero || "";
   const m = last.match(/-(\d+)$/);
   const n = m ? parseInt(m[1], 10) + 1 : 1;
   return `DEP-${String(n).padStart(5, "0")}`;
 }
 
 export async function getNextNoteFraisNumero(artisanId: number): Promise<string> {
-  const pool = getPool();
-  if (!pool) return "NDF-00001";
-  const [rows]: any = await pool.execute(
-    "SELECT numero FROM notes_de_frais WHERE artisan_id = ? ORDER BY id DESC LIMIT 1",
-    [artisanId]
-  );
-  const last = (rows as any[])[0]?.numero || "";
+  const db = await getDb();
+  const [row] = await db.select({ numero: notesDeFrais.numero }).from(notesDeFrais)
+    .where(eq(notesDeFrais.artisan_id, artisanId)).orderBy(desc(notesDeFrais.id)).limit(1);
+  const last = row?.numero || "";
   const m = last.match(/-(\d+)$/);
   const n = m ? parseInt(m[1], 10) + 1 : 1;
   return `NDF-${String(n).padStart(5, "0")}`;
@@ -7089,13 +7083,11 @@ export async function deleteDepense(id: number, artisanId: number): Promise<void
 }
 
 export async function markDepenseOcrTraite(id: number, artisanId: number, ocrData: any): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
+  const db = await getDb();
   // OPE-91 : scope par artisan_id pour éviter l'écriture cross-tenant.
-  await pool.execute(
-    `UPDATE depenses SET ocr_brut = ?, ocr_traite = TRUE WHERE id = ? AND artisan_id = ?`,
-    [JSON.stringify(ocrData || {}).slice(0, 5000), id, artisanId]
-  );
+  await db.update(depenses)
+    .set({ ocr_brut: JSON.stringify(ocrData || {}).slice(0, 5000), ocr_traite: true })
+    .where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
 }
 
 export async function getDepensesStats(
@@ -7446,29 +7438,23 @@ export async function payerNoteFrais(id: number, artisanId: number): Promise<any
 // === Budgets ===
 
 export async function calculerBudgetsRealises(artisanId: number, mois: string): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
+  const db = await getDb();
   // Realise du mois par categorie.
   const debutMois = `${mois}-01`;
   const [y, m] = mois.split("-").map(Number);
   const finMois = new Date(y, m, 0).toISOString().slice(0, 10);
-  const [realises]: any = await pool.execute(
-    `SELECT categorie, COALESCE(SUM(montant_ttc), 0) AS reel
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-      GROUP BY categorie`,
-    [artisanId, debutMois, finMois]
-  );
+  const realises = await db.select({ categorie: depenses.categorie, reel: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+    .from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)))
+    .groupBy(depenses.categorie);
   const reelMap = new Map<string, number>();
-  for (const r of realises as any[]) reelMap.set(r.categorie, Number(r.reel));
+  for (const r of realises) reelMap.set(r.categorie as string, Number(r.reel));
 
-  const [budgets]: any = await pool.execute(
-    `SELECT categorie, budget FROM budgets_categories
-      WHERE artisan_id = ? AND mois = ?`,
-    [artisanId, mois]
-  );
+  const budgets = await db.select({ categorie: budgetsCategories.categorie, budget: budgetsCategories.budget })
+    .from(budgetsCategories)
+    .where(and(eq(budgetsCategories.artisan_id, artisanId), eq(budgetsCategories.mois, mois)));
   const budgetMap = new Map<string, number>();
-  for (const b of budgets as any[]) budgetMap.set(b.categorie, Number(b.budget));
+  for (const b of budgets) budgetMap.set(b.categorie as string, Number(b.budget));
 
   const cats = await getCategoriesDepenses(artisanId);
   return cats.map((c: any) => {
@@ -7488,14 +7474,16 @@ export async function upsertBudget(
   mois: string,
   budget: number
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `INSERT INTO budgets_categories (artisan_id, categorie, mois, budget)
-     VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE budget = VALUES(budget)`,
-    [artisanId, categorie, mois, budget]
-  );
+  const db = await getDb();
+  // ON DUPLICATE KEY (unique artisan_id+categorie+mois) → select-puis-insert/update (dialect-neutre).
+  const existing = await db.select({ id: budgetsCategories.id }).from(budgetsCategories)
+    .where(and(eq(budgetsCategories.artisan_id, artisanId), eq(budgetsCategories.categorie, categorie), eq(budgetsCategories.mois, mois)))
+    .limit(1);
+  if (existing[0]) {
+    await db.update(budgetsCategories).set({ budget: String(budget) }).where(eq(budgetsCategories.id, existing[0].id));
+  } else {
+    await db.insert(budgetsCategories).values({ artisan_id: artisanId, categorie, mois, budget: String(budget) });
+  }
 }
 
 // === Relevés bancaires ===
