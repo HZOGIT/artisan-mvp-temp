@@ -91,65 +91,24 @@ async function startServer() {
   console.log('[Stripe] STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET ? 'Set' : 'Missing');
   
   try {
-    const { getDb, seedTestData } = await import('../db');
+    const { getDb, seedTestData, migrateDefaultObjectifs, seedDemoNotifications, seedDemoRdv } = await import('../db');
     const db = await getDb();
     if (db) {
       console.log('[Database] MySQL connected successfully');
       // Seed test data (one-time, skips if data already exists)
       try { await seedTestData(); } catch (e) { console.error('[Seed] Error:', e); }
-      // Migrate parametres_artisan: set default objectif values
+      // OPE-184 — bootstrap/seed portés en Drizzle (dialect-aware, idempotents).
       try {
-        const { getPool: getMigPool } = await import('../db');
-        const migPool = getMigPool();
-        if (migPool) {
-          const [rows] = await migPool.execute("SELECT id FROM parametres_artisan WHERE (objectifCA IS NULL OR objectifCA = 0) AND (objectifDevis IS NULL OR objectifDevis = 0) LIMIT 1");
-          if ((rows as any[]).length > 0) {
-            await migPool.execute("UPDATE parametres_artisan SET objectifCA = 10000, objectifDevis = 15, objectifClients = 5 WHERE objectifCA IS NULL OR objectifCA = 0");
-            console.log('[Migration] Set default objectif values in parametres_artisan');
-          }
-        }
+        const n = await migrateDefaultObjectifs();
+        if (n > 0) console.log(`[Migration] Set default objectif values in parametres_artisan (${n})`);
       } catch (e) { console.error('[Migration] objectif values error:', e); }
-      // Seed demo notifications (one-time)
       try {
-        const { getPool } = await import('../db');
-        const pool = getPool();
-        if (pool) {
-          const [existing] = await pool.execute('SELECT COUNT(*) as cnt FROM notifications WHERE artisanId = 1');
-          if ((existing as any)[0].cnt === 0) {
-            const now = new Date();
-            const notifs = [
-              { type: 'succes', titre: 'Devis DEV-00026 accepte et signe', message: 'Le client Durand Pierre a accepte et signe le devis DEV-00026', lien: '/devis/26', lu: 0, hours: 2 },
-              { type: 'info', titre: 'Nouveau message de Hab Doudi', message: 'Bonjour, je souhaiterais modifier la date de mon intervention...', lien: '/chat', lu: 0, hours: 4 },
-              { type: 'rappel', titre: 'Intervention demain : Entretien chauffage M. Durand', message: 'Rappel: Intervention prevue demain a 09:00 chez Pierre Durand', lien: '/interventions', lu: 0, hours: 6 },
-              { type: 'alerte', titre: 'Stock bas : Joint torique (5 restants)', message: 'Le stock de Joint torique est descendu sous le seuil d\'alerte', lien: '/stocks', lu: 1, hours: 24 },
-              { type: 'rappel', titre: 'Facture FAC-00008 en retard de 35 jours', message: 'La facture FAC-00008 de 360.00 EUR est en retard de paiement', lien: '/factures/8', lu: 1, hours: 48 },
-            ];
-            for (const n of notifs) {
-              const createdAt = new Date(now.getTime() - n.hours * 3600000);
-              await pool.execute(
-                'INSERT INTO notifications (artisanId, type, titre, message, lien, lu, createdAt) VALUES (1, ?, ?, ?, ?, ?, ?)',
-                [n.type, n.titre, n.message, n.lien, n.lu, createdAt]
-              );
-            }
-            console.log('[Seed] 5 demo notifications inserted');
-          }
-        }
+        const n = await seedDemoNotifications();
+        if (n > 0) console.log(`[Seed] ${n} demo notifications inserted`);
       } catch (e) { console.error('[Seed] Notifications error:', e); }
-      // Seed demo RDV en ligne (one-time)
       try {
-        const { getPool: getRdvPool } = await import('../db');
-        const rdvPool = getRdvPool();
-        if (rdvPool) {
-          const [existingRdv] = await rdvPool.execute('SELECT COUNT(*) as cnt FROM rdv_en_ligne WHERE artisanId = 1');
-          if ((existingRdv as any)[0].cnt === 0) {
-            await rdvPool.execute(
-              `INSERT INTO rdv_en_ligne (artisanId, clientId, titre, description, dateProposee, dureeEstimee, statut_rdv, urgence_rdv, createdAt, updatedAt) VALUES
-              (1, 2, 'Fuite robinet cuisine', 'Le robinet de la cuisine fuit depuis 2 jours, goutte a goutte permanent. Marque Grohe.', '2026-02-24 10:00:00', 60, 'en_attente', 'normale', NOW(), NOW()),
-              (1, 5, 'Panne chauffe-eau', 'Le chauffe-eau ne produit plus d''eau chaude depuis ce matin. Modele Atlantic 200L.', '2026-02-25 14:00:00', 60, 'en_attente', 'urgente', NOW(), NOW())`
-            );
-            console.log('[Seed] 2 demo RDV en ligne inserted');
-          }
-        }
+        const n = await seedDemoRdv();
+        if (n > 0) console.log(`[Seed] ${n} demo RDV en ligne inserted`);
       } catch (e) { console.error('[Seed] RDV en ligne error:', e); }
     } else {
       console.error('[Database] MySQL connection failed: getDb returned null');

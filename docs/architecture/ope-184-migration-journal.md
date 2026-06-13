@@ -195,7 +195,9 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ 🎯 `server/routers.ts` = ZÉRO `pool.execute`** (recherche `grep -c pool.execute` = 0). Tout le raw-SQL des routers porté.
 
-**Prochaine action : P0.7e-4 — `server/_core/index.ts`** (16 `.execute` : bootstrap/seed — parametres_artisan defaults L105/107, notifications seed L117/129, rdv_en_ligne seed L143/145, + bloc L433-488, + L1636-1789). Recenser puis porter par bloc (sous-batchs). Puis **P0.8** (copie data staging) + **P0.9** (tests sur PG) avant cutover.
+- **7e-4 FAIT** (2026-06-13) : index.ts **bootstrap/seed démo** (parametres_artisan defaults, notifications, rdv_en_ligne — 6 `.execute`). Extraits en helpers db.ts dialect-aware : `migrateDefaultObjectifs` (UPDATE objectifs défauts où 0/null + `.returning()`), `seedDemoNotifications` (guard count + 5 inserts, `lu` 0/1→bool), `seedDemoRdv` (guard + 2 inserts ; ⚠️ colonnes pg = `statut`/`urgence`, pas `statut_rdv`/`urgence_rdv`). index.ts importe+appelle les helpers (au lieu de getPool() mysql, qui ne tournait jamais en PG). **Validé PG** (`scripts/test-seed-bootstrap-pg.mjs`, 15/15) : 5 notifs (lu bool, 2 lues), idempotent, 2 RDV (statut/urgence), idempotent, migrate objectifs (0→défauts, **n'écrase pas** un objectif déjà défini). tsc neuf vert.
+
+**Prochaine action : P0.7e-5 — index.ts bloc L392-447** (2 `.execute` : `const pool = getPool()` + query dynamique L413 + L447 — identifier l'endpoint/usage). Puis 7e-6 (index.ts L1595-1748, ~8 `.execute`). Puis **P0.8** (copie data staging) + **P0.9** (tests sur PG) avant cutover. (index.ts : 16→10 `.execute` restants.)
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).

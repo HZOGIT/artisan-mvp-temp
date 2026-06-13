@@ -7456,6 +7456,53 @@ export async function deleteRegleCategorisation(id: number, artisanId: number): 
     .where(and(eq(reglesCategorisation.id, id), eq(reglesCategorisation.artisan_id, artisanId)));
 }
 
+// === Bootstrap / seed démo (OPE-184 : dialect-aware Drizzle, remplacent le raw SQL d'index.ts) ===
+
+// Met des objectifs par défaut là où ils sont absents/0 (idempotent). Renvoie le nb de lignes touchées.
+export async function migrateDefaultObjectifs(): Promise<number> {
+  const dbi = await getDb();
+  const updated = await dbi.update(parametresArtisan)
+    .set({ objectifCA: "10000", objectifDevis: 15, objectifClients: 5 })
+    .where(sql`(${parametresArtisan.objectifCA} IS NULL OR ${parametresArtisan.objectifCA} = 0)
+               AND (${parametresArtisan.objectifDevis} IS NULL OR ${parametresArtisan.objectifDevis} = 0)`)
+    .returning({ id: parametresArtisan.id });
+  return updated.length;
+}
+
+// Seed 5 notifications de démo pour l'artisan 1 (one-time, skip si déjà présentes).
+export async function seedDemoNotifications(): Promise<number> {
+  const dbi = await getDb();
+  const [c] = await dbi.select({ cnt: sql<number>`COUNT(*)` }).from(notifications).where(eq(notifications.artisanId, 1));
+  if (Number(c?.cnt || 0) > 0) return 0;
+  const now = Date.now();
+  const rows = [
+    { type: 'succes', titre: 'Devis DEV-00026 accepte et signe', message: 'Le client Durand Pierre a accepte et signe le devis DEV-00026', lien: '/devis/26', lu: false, hours: 2 },
+    { type: 'info', titre: 'Nouveau message de Hab Doudi', message: 'Bonjour, je souhaiterais modifier la date de mon intervention...', lien: '/chat', lu: false, hours: 4 },
+    { type: 'rappel', titre: 'Intervention demain : Entretien chauffage M. Durand', message: 'Rappel: Intervention prevue demain a 09:00 chez Pierre Durand', lien: '/interventions', lu: false, hours: 6 },
+    { type: 'alerte', titre: 'Stock bas : Joint torique (5 restants)', message: "Le stock de Joint torique est descendu sous le seuil d'alerte", lien: '/stocks', lu: true, hours: 24 },
+    { type: 'rappel', titre: 'Facture FAC-00008 en retard de 35 jours', message: 'La facture FAC-00008 de 360.00 EUR est en retard de paiement', lien: '/factures/8', lu: true, hours: 48 },
+  ];
+  for (const n of rows) {
+    await dbi.insert(notifications).values({
+      artisanId: 1, type: n.type as any, titre: n.titre, message: n.message,
+      lien: n.lien, lu: n.lu, createdAt: new Date(now - n.hours * 3600000),
+    } as any);
+  }
+  return rows.length;
+}
+
+// Seed 2 RDV en ligne de démo pour l'artisan 1 (one-time, skip si déjà présents).
+export async function seedDemoRdv(): Promise<number> {
+  const dbi = await getDb();
+  const [c] = await dbi.select({ cnt: sql<number>`COUNT(*)` }).from(rdvEnLigne).where(eq(rdvEnLigne.artisanId, 1));
+  if (Number(c?.cnt || 0) > 0) return 0;
+  await dbi.insert(rdvEnLigne).values([
+    { artisanId: 1, clientId: 2, titre: 'Fuite robinet cuisine', description: 'Le robinet de la cuisine fuit depuis 2 jours, goutte a goutte permanent. Marque Grohe.', dateProposee: new Date('2026-02-24T10:00:00'), dureeEstimee: 60, statut: 'en_attente' as any, urgence: 'normale' as any },
+    { artisanId: 1, clientId: 5, titre: 'Panne chauffe-eau', description: "Le chauffe-eau ne produit plus d'eau chaude depuis ce matin. Modele Atlantic 200L.", dateProposee: new Date('2026-02-25T14:00:00'), dureeEstimee: 60, statut: 'en_attente' as any, urgence: 'urgente' as any },
+  ] as any);
+  return 2;
+}
+
 // === Relevés bancaires ===
 
 export async function importReleve(
