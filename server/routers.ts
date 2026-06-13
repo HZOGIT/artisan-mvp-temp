@@ -2005,8 +2005,10 @@ const facturesRouter = router({
         prixUnitaireHT: z.string(),
         tauxTVA: z.string().default("20.00"),
       })).max(500, "Trop de lignes (max 500 par avoir)"), // OPE-24 — anti-DoS (boucle d'INSERT)
-      objet: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes alignées sur factures.create/devis.create (champs TEXT) — OPE-24,
+      // defense-in-depth : borne le stockage + 400 clair au lieu d'un débordement.
+      objet: z.string().max(500).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
