@@ -3343,34 +3343,40 @@ export async function getRapportTVA(artisanId: number, dateDebut: Date, dateFin:
 export async function getDeclarationTVADetail(
   artisanId: number, dateDebut: Date, dateFin: Date,
 ): Promise<{ parTaux: { taux: number; baseHT: number; tvaCollectee: number }[]; tvaCollectee: number; tvaDeductible: number; tvaNette: number }> {
-  const pool = getPool();
-  if (!pool) return { parTaux: [], tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
+  const dbi = await getDb();
   const dStr = dateDebut.toISOString().slice(0, 10);
   const fStr = dateFin.toISOString().slice(0, 10);
   // Base + TVA collectée par taux, depuis les lignes de factures émises.
-  const [rows]: any = await pool.execute(
-    `SELECT fl.tauxTVA AS taux, SUM(fl.montantHT) AS baseHT, SUM(fl.montantTVA) AS tva
-       FROM factures_lignes fl
-       JOIN factures f ON f.id = fl.factureId
-      WHERE f.artisanId = ? AND DATE(f.dateFacture) BETWEEN ? AND ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-      GROUP BY fl.tauxTVA
-      ORDER BY fl.tauxTVA DESC`,
-    [artisanId, dStr, fStr]
-  );
+  // DATE(dateFacture) conservé en sql brut (timestamp ; neutre dialecte).
+  const rows: any[] = await dbi.select({
+    taux: facturesLignes.tauxTVA,
+    baseHT: sql<string>`SUM(${facturesLignes.montantHT})`,
+    tva: sql<string>`SUM(${facturesLignes.montantTVA})`,
+  }).from(facturesLignes)
+    .innerJoin(factures, eq(factures.id, facturesLignes.factureId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`DATE(${factures.dateFacture}) BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .groupBy(facturesLignes.tauxTVA)
+    .orderBy(desc(facturesLignes.tauxTVA));
   const parTaux = (rows as any[]).map((r) => ({
     taux: Number(r.taux || 0),
     baseHT: Math.round(Number(r.baseHT || 0) * 100) / 100,
     tvaCollectee: Math.round(Number(r.tva || 0) * 100) / 100,
   }));
   const tvaCollectee = Math.round(parTaux.reduce((s, t) => s + t.tvaCollectee, 0) * 100) / 100;
-  // TVA déductible depuis les dépenses déductibles.
-  const [ded]: any = await pool.execute(
-    `SELECT COALESCE(SUM(montant_tva),0) AS tva FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ? AND tva_deductible = TRUE`,
-    [artisanId, dStr, fStr]
-  );
-  const tvaDeductible = Math.round(Number((ded as any[])[0]?.tva || 0) * 100) / 100;
+  // TVA déductible depuis les dépenses déductibles (date_depense = colonne date).
+  const [ded] = await dbi.select({
+    tva: sql<string>`COALESCE(SUM(${depenses.montant_tva}), 0)`,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, dStr, fStr),
+      eq(depenses.tva_deductible, true),
+    ));
+  const tvaDeductible = Math.round(Number(ded?.tva || 0) * 100) / 100;
   return { parTaux, tvaCollectee, tvaDeductible, tvaNette: Math.round((tvaCollectee - tvaDeductible) * 100) / 100 };
 }
 
@@ -7567,23 +7573,24 @@ export async function exportDepensesFEC(
   dateDebut: string,
   dateFin: string
 ): Promise<string> {
-  const pool = getPool();
-  if (!pool) return "";
+  const dbi = await getDb();
   const config = await getConfigurationComptable(artisanId);
   const compteAchats = config?.compteAchats || "607000";
   const compteTVA = config?.compteTVADeductible || "445660";
   const compteFournisseurs = config?.compteFournisseurs || "401000";
   const journal = config?.journalAchats || "AC";
 
-  const [rows]: any = await pool.execute(
-    `SELECT id, numero, date_depense, fournisseur, montant_ht, montant_tva,
-            montant_ttc, description
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-        AND tva_deductible = TRUE
-      ORDER BY date_depense ASC, id ASC`,
-    [artisanId, dateDebut, dateFin]
-  );
+  const rows: any[] = await dbi.select({
+    id: depenses.id, numero: depenses.numero, date_depense: depenses.date_depense,
+    fournisseur: depenses.fournisseur, montant_ht: depenses.montant_ht,
+    montant_tva: depenses.montant_tva, montant_ttc: depenses.montant_ttc, description: depenses.description,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, dateDebut, dateFin),
+      eq(depenses.tva_deductible, true),
+    ))
+    .orderBy(asc(depenses.date_depense), asc(depenses.id));
 
   const header = [
     "JournalCode", "JournalLib", "EcritureNum", "EcritureDate", "CompteNum",
