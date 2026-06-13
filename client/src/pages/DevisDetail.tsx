@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen, Layers, Star, Check, ArrowRight } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, FileText, User, Receipt, Download, Mail, Copy, Pen, Layers, Star, Check, ArrowRight, Bell, Circle, AlarmClock } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -54,6 +54,35 @@ export default function DevisDetail() {
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
   const { data: artisan } = trpc.artisan.getProfile.useQuery();
   const { data: parametresData } = trpc.parametres.get.useQuery();
+
+  // OPE-121 — rappels/activités CRM rattachés à CE devis (relance signature).
+  const devisIdNum = parseInt(id || "0");
+  const { data: allActivitesDv, refetch: refetchActivitesDv } = trpc.activites.list.useQuery();
+  const activitesDevis = (allActivitesDv || []).filter(
+    (a: any) => a.entiteType === "devis" && a.entiteId === devisIdNum,
+  );
+  const [rappelTitre, setRappelTitre] = useState("");
+  const [rappelEcheance, setRappelEcheance] = useState("");
+  const [rappelType, setRappelType] = useState("relance");
+  const createRappel = trpc.activites.create.useMutation({
+    onSuccess: () => {
+      toast.success("Rappel ajouté");
+      setRappelTitre(""); setRappelEcheance(""); setRappelType("relance");
+      refetchActivitesDv();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const toggleRappel = trpc.activites.toggleFait.useMutation({
+    onSuccess: () => refetchActivitesDv(),
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteRappel = trpc.activites.delete.useMutation({
+    onSuccess: () => refetchActivitesDv(),
+    onError: (e) => toast.error(e.message),
+  });
+  const rappelTypeLabels: Record<string, string> = {
+    appel: "Appel", email: "Email", rdv: "RDV", relance: "Relance", autre: "À faire",
+  };
   const { data: signatureData } = trpc.signature.getSignatureByDevis.useQuery(
     { devisId: parseInt(id || "0") },
     { enabled: !!id }
@@ -947,6 +976,107 @@ export default function DevisDetail() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* OPE-121 — Rappels / activités CRM rattachés à ce devis (relance signature) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Rappels ({activitesDevis.filter((a: any) => !a.fait).length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="flex flex-col sm:flex-row gap-2 mb-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!rappelTitre.trim()) { toast.error("Le titre est requis"); return; }
+              if (!rappelEcheance) { toast.error("L'échéance est requise"); return; }
+              createRappel.mutate({
+                titre: rappelTitre.trim(),
+                echeance: rappelEcheance,
+                type: rappelType as any,
+                entiteType: "devis",
+                entiteId: devisIdNum,
+              });
+            }}
+          >
+            <Input
+              placeholder={`Relancer ${devis?.numero || "le devis"} pour signature…`}
+              value={rappelTitre}
+              onChange={(e) => setRappelTitre(e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              type="date"
+              value={rappelEcheance}
+              onChange={(e) => setRappelEcheance(e.target.value)}
+              className="sm:w-40"
+            />
+            <Select value={rappelType} onValueChange={setRappelType}>
+              <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="relance">Relance</SelectItem>
+                <SelectItem value="appel">Appel</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="rdv">RDV</SelectItem>
+                <SelectItem value="autre">À faire</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="submit" disabled={createRappel.isPending}>
+              <Plus className="h-4 w-4 mr-1" /> Ajouter
+            </Button>
+          </form>
+
+          {activitesDevis.length > 0 ? (
+            <div className="space-y-2">
+              {activitesDevis
+                .slice()
+                .sort((a: any, b: any) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime())
+                .map((a: any) => (
+                  <div key={a.id} className="flex items-start gap-2 p-3 rounded-lg border">
+                    <button
+                      type="button"
+                      title={a.fait ? "Marquer à faire" : "Marquer fait"}
+                      onClick={() => toggleRappel.mutate({ id: a.id, fait: !a.fait })}
+                      className="mt-0.5 shrink-0"
+                    >
+                      {a.fait
+                        ? <Check className="h-4 w-4 text-emerald-500" />
+                        : <Circle className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${a.fait ? "line-through text-muted-foreground" : ""}`}>
+                        {a.titre}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <AlarmClock className="h-3 w-3" />
+                          {format(new Date(a.echeance), "dd MMM yyyy", { locale: fr })}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-semibold">
+                          {rappelTypeLabels[a.type] || a.type}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      title="Supprimer"
+                      onClick={() => deleteRappel.mutate({ id: a.id })}
+                      className="mt-0.5 shrink-0 text-muted-foreground hover:text-rose-500"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className="text-center py-6 text-sm text-muted-foreground">
+              Aucun rappel pour ce devis.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
