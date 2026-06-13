@@ -3,6 +3,12 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IFournisseurRepository } from "../../application/fournisseur-repository";
 import { listFournisseurs, getFournisseur } from "../../application/read-use-cases";
 import { creerFournisseur, modifierFournisseur, supprimerFournisseur } from "../../application/write-use-cases";
+import {
+  listerFournisseursDeArticle,
+  listerArticlesDeFournisseur,
+  associerArticleFournisseur,
+  dissocierArticleFournisseur,
+} from "../../application/association-use-cases";
 
 // Bornes alignées sur la table `fournisseurs` (defense-in-depth).
 const createSchema = z.object({
@@ -53,6 +59,34 @@ export function createFournisseursRouter(repo: IFournisseurRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerFournisseur(repo, ctx.tenant, input.id);
+        return { success: true };
+      }),
+
+    // ── Associations article↔fournisseur (prix d'achat, données tenant-privées) ──
+    getArticleFournisseurs: protectedProcedure
+      .input(z.object({ articleId: z.number().int() }))
+      .query(({ ctx, input }) => listerFournisseursDeArticle(repo, ctx.tenant, input.articleId)),
+
+    getFournisseurArticles: protectedProcedure
+      .input(z.object({ fournisseurId: z.number().int() }))
+      .query(({ ctx, input }) => listerArticlesDeFournisseur(repo, ctx.tenant, input.fournisseurId)),
+
+    associateArticle: protectedProcedure
+      .input(
+        z.object({
+          articleId: z.number().int(),
+          fournisseurId: z.number().int(),
+          referenceExterne: z.string().max(100).nullish(),
+          prixAchat: z.string().regex(/^\d+(\.\d{1,2})?$/, "Prix d'achat invalide").nullish(),
+          delaiLivraison: z.number().int().min(0).nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => associerArticleFournisseur(repo, ctx.tenant, input)),
+
+    dissociateArticle: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await dissocierArticleFournisseur(repo, ctx.tenant, input.id);
         return { success: true };
       }),
   });

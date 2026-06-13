@@ -39,6 +39,16 @@ describe("fournisseurs.module", () => {
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createFournisseursModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual([
+      "associateArticle",
+      "create",
+      "delete",
+      "dissociateArticle",
+      "getArticleFournisseurs",
+      "getById",
+      "getFournisseurArticles",
+      "list",
+      "update",
+    ]);
   });
 });

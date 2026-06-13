@@ -44,6 +44,8 @@ describe.skipIf(!URL)("fournisseurs.router e2e (HTTP → tRPC → use-case → r
 
   beforeAll(async () => {
     for (const uid of [UA, UB]) {
+      await admin.query('delete from articles_fournisseurs where "fournisseurId" in (select id from fournisseurs where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
+      await admin.query('delete from articles_artisan where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from fournisseurs where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from artisans where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
@@ -57,6 +59,8 @@ describe.skipIf(!URL)("fournisseurs.router e2e (HTTP → tRPC → use-case → r
   afterAll(async () => {
     await server.close();
     for (const aId of [artisanA, artisanB]) {
+      await admin.query('delete from articles_fournisseurs where "fournisseurId" in (select id from fournisseurs where "artisanId"=$1)', [aId]);
+      await admin.query('delete from articles_artisan where "artisanId"=$1', [aId]);
       await admin.query('delete from fournisseurs where "artisanId"=$1', [aId]);
     }
     for (const uid of [UA, UB]) {
@@ -126,5 +130,35 @@ describe.skipIf(!URL)("fournisseurs.router e2e (HTTP → tRPC → use-case → r
     expect(maj.ville).toBe("Marseille");
     expect(maj.nom).toBe("Garder");
     expect(maj.contact).toBe("Jean");
+  });
+
+  it("associations article↔fournisseur : associate/get/dissociate scopés, anti-IDOR prix d'achat", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // article + fournisseur de A
+    const articleA = (await admin.query(
+      'insert into articles_artisan ("artisanId", reference, designation, "prixUnitaireHT") values ($1,$2,$3,$4) returning id',
+      [artisanA, `REF-${Date.now()}`, "Tube cuivre", "12.50"],
+    )).rows[0].id as number;
+    const fournA = (await callMutation(server, "fournisseurs.create", { nom: "Point P" }, tA)).json().result.data.id as number;
+    // fournisseur de B
+    const fournB = (await callMutation(server, "fournisseurs.create", { nom: "Cedeo" }, tB)).json().result.data.id as number;
+
+    // A associe son article à son fournisseur (prix d'achat tenant-privé)
+    const assoc = await callMutation(server, "fournisseurs.associateArticle", { articleId: articleA, fournisseurId: fournA, prixAchat: "9.90" }, tA);
+    expect(assoc.statusCode).toBe(200);
+    const assocId = assoc.json().result.data.id as number;
+    // getArticleFournisseurs (A) renvoie l'assoc avec le prix
+    const listA = (await callQuery(server, "fournisseurs.getArticleFournisseurs", { articleId: articleA }, tA)).json().result.data as Array<{ prixAchat: string }>;
+    expect(listA.length).toBe(1);
+    expect(listA[0].prixAchat).toBe("9.90");
+    // anti-IDOR : A associe avec le fournisseur de B → 404
+    expect((await callMutation(server, "fournisseurs.associateArticle", { articleId: articleA, fournisseurId: fournB }, tA)).statusCode).toBe(404);
+    // anti-IDOR : B ne lit pas le prix d'achat de l'article de A → [] (sans oracle)
+    expect((await callQuery(server, "fournisseurs.getArticleFournisseurs", { articleId: articleA }, tB)).json().result.data).toEqual([]);
+    // dissociate : B → 404, A → OK
+    expect((await callMutation(server, "fournisseurs.dissociateArticle", { id: assocId }, tB)).statusCode).toBe(404);
+    expect((await callMutation(server, "fournisseurs.dissociateArticle", { id: assocId }, tA)).json().result.data).toEqual({ success: true });
+    expect(((await callQuery(server, "fournisseurs.getArticleFournisseurs", { articleId: articleA }, tA)).json().result.data as unknown[]).length).toBe(0);
   });
 });
