@@ -60,8 +60,13 @@ Méthode : nouveau fichier **`drizzle/schema.pg.ts`** (pg-core) séparé du `sch
 ### ▶️ Prochaine action
 → **P0.6 (OPE-192) = FAIT** — drizzle.config branché (DB_DIALECT=postgresql → schema.pg.ts, out=drizzle/pg). Baseline `drizzle/pg/0000_pretty_puma.sql` générée (89 tables / 67 types) et **`drizzle-kit migrate` testé sur le conteneur postgres:18 (:5432) → 89 tables + 67 enums créés sans erreur** (vérifié psql). Commande de migration PG : `DB_DIALECT=postgresql DATABASE_URL=postgres://artisan_user:artisan_password@127.0.0.1:5432/artisan_mvp pnpm exec drizzle-kit migrate`.
 
-### ⏸️ P0.7 (OPE-193) — PARTIEL / EN PAUSE (décision humaine requise) — 2026-06-13 ~07:32
-**Ne pas reprendre automatiquement** tant que l'humain n'a pas tranché l'approche.
+### ▶️ P0.7 (OPE-193) — PARTIEL, REPRISE AUTORISÉE (décision prise : option a « harnais d'abord ») — 2026-06-13 ~07:34
+**DÉCISION HUMAINE** : on garde PG-first. On NE grind PAS le SQL legacy en aveugle. **Nouveau séquencement** :
+1. **P0.8 (OPE-194)** : écrire + exécuter le script de copie data MySQL(:3306)→PG(:5432) sur dev (ETL mysql2→pg dans l'ordre des FK, reset des séquences `serial`). Gate = comptes de lignes identiques table par table, 0 erreur.
+2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
+3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
+
+**NB TESTS (rappel humain 2026-06-13 07:35)** : la **refonte des tests en CLEAN ARCHITECTURE** (unit par use-case + e2e sur PG jetable) est un **chantier SÉPARÉ**, mené avec les NOUVEAUX modules (phases 1+) et le harnais P0.20 — **PAS** P0.7. Pour le harnais de validation du port P0.7, on **réutilise TEL QUEL** le sous-ensemble des tests existants qui frappe la DB **directement** (db-secure / integration : `security.test.ts`, `tests/isolation-multi-tenant`, `fournisseurs.test.ts`… — **PAS** les e2e `localhost:3000` qui sont fragiles) comme **filet de régression JETABLE**. **Ne pas investir à réécrire les anciens tests maintenant** ; ils seront remplacés domaine par domaine.
 
 **Fait & validé** : `server/db.ts` rendu dialect-aware (pool `pg`/node-postgres + import des tables via nouveau `drizzle/schema.active.ts` qui sélectionne schema.pg/schema selon DB_DIALECT). **L'app BOOTE sur PostgreSQL** (`pnpm dev` DB_DIALECT=postgresql → « Connected successfully (postgres) », serveur up) et le **chemin Drizzle SELECT fonctionne** (la requête de seed `getArtisan…` tourne sans erreur). Chemin mysql inchangé (défaut).
 
@@ -71,6 +76,6 @@ Méthode : nouveau fichier **`drizzle/schema.pg.ts`** (pg-core) séparé du `sch
 
 → **~104 points de réécriture SQL legacy**, sur des données financières, avec une PG de test **vide** (impossible de valider le comportement tant que la data n'est pas copiée — P0.8). Mon gate « boote + read 200 » **ne détecte pas** une corruption subtile (numéro de séquence, onConflict, arrondi). **Risque d'intégrité → arrêt + escalade** plutôt que grind autonome.
 
-**Décision attendue (voir message)** : (a) je porte les ~104 points en sous-batchs prudents, ou (b) on revoit l'approche (ex. garder mysql pour le legacy raw-SQL et n'envoyer que le NOUVEAU stack sur PG — revient sur le PG-first), ou (c) tu reprends la main pour cette partie.
+**Décision prise = (a)** harnais d'abord (cf. séquencement ci-dessus). **Prochaine action immédiate : P0.8** (script de copie data MySQL→PG sur dev).
 
 _Plan initial P0.7 (référence) :_ repointer `server/db.ts` `getDb()` du pool `mysql2` vers un pool `pg` + `drizzle(pool)` (drizzle-orm/node-postgres) quand DB_DIALECT=postgresql ; importer les tables depuis `schema.pg.ts` ; corriger les requêtes raw `sql\`\`` MySQL-spécifiques (16 onDuplicateKey → onConflictDoUpdate, CURDATE/DATE_FORMAT/DATE_ADD/IFNULL). ⚠️ C'est ici que ça devient DÉPLOYABLE et que le LEGACY (server/db.ts, gros volume, 561 err tsc) entre en jeu — itération potentiellement longue, découper si besoin (sous-batchs par groupe de fonctions). Puis P0.8 (copie data MySQL→PG), P0.9 (Vitest sur PG).
