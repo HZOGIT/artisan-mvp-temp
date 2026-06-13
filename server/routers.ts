@@ -7695,8 +7695,10 @@ const chantiersRouter = router({
   createPhase: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
-      nom: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `phases_chantier` (nom varchar 255, description TEXT) —
+      // defense-in-depth : évite une erreur/troncature MySQL (mode strict). OPE-24.
+      nom: z.string().max(255),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
       dateDebutPrevue: z.string().optional(),
       dateFinPrevue: z.string().optional(),
@@ -7715,7 +7717,7 @@ const chantiersRouter = router({
   updatePhase: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
+      nom: z.string().max(255).optional(), // borne alignée sur phases_chantier.nom (OPE-24)
       statut: z.enum(["a_faire", "en_cours", "termine", "annule"]).optional(),
       avancement: z.number().optional(),
       dateDebutReelle: z.string().optional(),
@@ -7799,9 +7801,10 @@ const chantiersRouter = router({
   addDocument: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
-      nom: z.string(),
+      // Bornes alignées sur `documents_chantier` (nom varchar 255, url TEXT) — OPE-24.
+      nom: z.string().max(255),
       type: z.enum(["plan", "photo", "permis", "contrat", "facture", "autre"]).optional(),
-      url: z.string(),
+      url: z.string().max(65535),
       taille: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
