@@ -116,7 +116,13 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 - **5e-4 À FAIRE** : lire les **37 `ALTER TABLE`** de fix-duplicates.ts ; pour chaque colonne ajoutée à une table Drizzle existante, l'ajouter au pgTable si manquante (drift de colonnes).
 - **5e-FIN** : régénérer baseline incrémentale (`drizzle/pg/0002`) + `drizzle-kit migrate` sur postgres:18 + régénérer schema.active.ts + **créer ces tables dans dev mysql+pg** (jouer le DDL) pour valider les fonctions ensuite.
 
-**Prochaine action : P0.5e-3.**
+- **5e-3 FAIT** : modules, artisan_modules, couleurs_interventions (PK composite). **couleurs_interventions EXISTE** (créée par fix-duplicates) → calendrier couleurs **n'est PAS dead-code** (correction de la conclusion 7b-1 : juste absent du dev).
+- **5e-4 FAIT** : seules 3 colonnes réellement manquantes (`artisans.metier/plan/onboarding_completed`, utilisées dans routers.ts) ajoutées ; les 34 autres ALTER = colonnes déjà dans Drizzle (fix-duplicates défensif).
+- **5e-FIN FAIT** : baseline `drizzle/pg/0002` migrée sur postgres:18 → **103 tables PG** ; schema.active.ts régénéré (103) ; 11 tables créées dans **mysql dev** (via fix-duplicates, + seed 18 modules/12 catégories) ; ETL re-exécuté → **parité** (modules 20/20, categories 12/12). **Les bases dev (mysql + pg) ont désormais les tables compta** → 7c testable des deux côtés.
+
+**→ P0.5e (OPE-254) = FAIT. Périmètre réel : 103 tables (vs 89 estimées au départ).**
+
+**Prochaine action : reprise P0.7b-2-b** (getStatistiquesChantier→depenses, calculerBudgetsRealises→budgets) puis **7c** (compta, ~30 fn, HAUT RISQUE).
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
