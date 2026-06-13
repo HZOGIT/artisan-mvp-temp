@@ -5513,8 +5513,11 @@ const interventionsMobileRouter = router({
   addPhoto: protectedProcedure
     .input(z.object({
       interventionId: z.number(),
-      url: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `photos_interventions` (url varchar 500, description
+      // varchar 255) — defense-in-depth : une entrée surdimensionnée provoquait une
+      // erreur/troncature MySQL (mode strict) au lieu d'un 400 clair. OPE-24.
+      url: z.string().max(500),
+      description: z.string().max(255).optional(),
       type: z.enum(["avant", "pendant", "apres"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -8094,8 +8097,11 @@ const devisIARouter = router({
   addPhoto: protectedProcedure
     .input(z.object({
       analyseId: z.number(),
-      url: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `photos_analyse` (url/description = colonnes TEXT, 65535
+      // octets) — defense-in-depth : au-delà, MySQL tronque/erre (mode strict) au lieu
+      // d'un 400 clair. OPE-24.
+      url: z.string().max(65535),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
