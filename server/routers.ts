@@ -10456,6 +10456,23 @@ const activitesRouter = router({
       if (isNaN(echeance.getTime())) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Échéance invalide" });
       }
+      // Garde FK : si un rattachement est fourni, l'entité doit appartenir à
+      // l'artisan (évite une référence pendante vers une entité d'un autre tenant ;
+      // cohérent avec le pattern *ByIdSecure systémique). Behavior-preserving : un
+      // rattachement légitime (entité du tenant) passe à l'identique.
+      if (input.entiteId != null && input.entiteType && input.entiteType !== "aucun") {
+        let owned: unknown;
+        if (input.entiteType === "client") owned = await dbSecure.getClientByIdSecure(input.entiteId, artisan.id);
+        else if (input.entiteType === "devis") owned = await dbSecure.getDevisByIdSecure(input.entiteId, artisan.id);
+        else if (input.entiteType === "facture") owned = await dbSecure.getFactureByIdSecure(input.entiteId, artisan.id);
+        else if (input.entiteType === "chantier") {
+          const ch = await db.getChantierById(input.entiteId);
+          owned = ch && ch.artisanId === artisan.id ? ch : undefined;
+        }
+        if (!owned) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Entité rattachée non autorisée" });
+        }
+      }
       return await db.createActivite({
         artisanId: artisan.id,
         type: input.type,
