@@ -2371,6 +2371,56 @@ const interventionsRouter = router({
       return { ...updated, conflits };
     }),
 
+  // OPE-111 — Équipe d'intervention (plusieurs intervenants). Le « responsable »
+  // reste interventions.technicienId ; ces endpoints gèrent le reste de l'équipe.
+  getEquipe: protectedProcedure
+    .input(z.object({ interventionId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return await db.getEquipeIntervention(input.interventionId, artisan.id);
+    }),
+
+  ajouterMembreEquipe: protectedProcedure
+    .input(z.object({
+      interventionId: z.number(),
+      technicienId: z.number(),
+      role: z.string().max(50).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      // SECURITE : le technicien doit appartenir à cet artisan (multi-tenant).
+      const tech = await db.getTechnicienById(input.technicienId);
+      if (!tech || tech.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Technicien non autorisé" });
+      }
+      return await db.addMembreEquipe({
+        artisanId: artisan.id,
+        interventionId: input.interventionId,
+        technicienId: input.technicienId,
+        role: input.role,
+      });
+    }),
+
+  retirerMembreEquipe: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      // removeMembreEquipe est scopé par artisanId → pas de retrait cross-tenant.
+      await db.removeMembreEquipe(input.id, artisan.id);
+      return { success: true };
+    }),
+
   // Gestion des couleurs personnalisées du calendrier
   getCouleursCalendrier: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);

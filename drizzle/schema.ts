@@ -332,6 +332,26 @@ export type Intervention = typeof interventions.$inferSelect;
 export type InsertIntervention = typeof interventions.$inferInsert;
 
 // ============================================================================
+// ÉQUIPE D'INTERVENTION (OPE-111) — plusieurs intervenants sur une intervention
+// ----------------------------------------------------------------------------
+// Table de liaison ADDITIVE (Many2many) ↔ Odoo project.task.user_ids. Compat
+// ascendante : `interventions.technicienId` reste le technicien RESPONSABLE ;
+// cette table ajoute le RESTE de l'équipe (binôme, aide…). Nullable `role`.
+// Le code existant (assignation simple) reste inchangé.
+// ============================================================================
+export const interventionsTechniciens = mysqlTable("interventions_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  interventionId: int("interventionId").notNull(),
+  technicienId: int("technicienId").notNull(),
+  role: varchar("role", { length: 50 }), // ex. « responsable » / « aide » — informatif
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InterventionTechnicien = typeof interventionsTechniciens.$inferSelect;
+export type InsertInterventionTechnicien = typeof interventionsTechniciens.$inferInsert;
+
+// ============================================================================
 // NOTIFICATIONS
 // ============================================================================
 export const notifications = mysqlTable("notifications", {

@@ -13,6 +13,7 @@ import {
   factures, Facture, InsertFacture,
   facturesLignes, FactureLigne, InsertFactureLigne,
   interventions, Intervention, InsertIntervention,
+  interventionsTechniciens, InterventionTechnicien, InsertInterventionTechnicien,
   notifications, Notification, InsertNotification,
   parametresArtisan, ParametresArtisan, InsertParametresArtisan,
   signaturesDevis, SignatureDevis, InsertSignatureDevis,
@@ -1133,7 +1134,72 @@ export async function updateIntervention(id: number, data: Partial<InsertInterve
 
 export async function deleteIntervention(id: number): Promise<void> {
   const db = await getDb();
+  // OPE-111 — nettoie les liaisons d'équipe (enfant purement opérationnel) pour
+  // éviter des lignes orphelines (pas de FK dure en base).
+  await db.delete(interventionsTechniciens).where(eq(interventionsTechniciens.interventionId, id));
   await db.delete(interventions).where(eq(interventions.id, id));
+}
+
+// OPE-111 — Équipe d'intervention (Many2many additif). Le technicien « responsable »
+// reste `interventions.technicienId` ; ces helpers gèrent le RESTE de l'équipe.
+
+// Liste l'équipe d'une intervention, jointe aux fiches techniciens (nom/prénom).
+export async function getEquipeIntervention(
+  interventionId: number,
+  artisanId: number,
+): Promise<Array<{ id: number; technicienId: number; role: string | null; nom: string | null; prenom: string | null }>> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      id: interventionsTechniciens.id,
+      technicienId: interventionsTechniciens.technicienId,
+      role: interventionsTechniciens.role,
+      nom: techniciens.nom,
+      prenom: techniciens.prenom,
+    })
+    .from(interventionsTechniciens)
+    .leftJoin(techniciens, eq(interventionsTechniciens.technicienId, techniciens.id))
+    .where(and(
+      eq(interventionsTechniciens.interventionId, interventionId),
+      eq(interventionsTechniciens.artisanId, artisanId),
+    ))
+    .orderBy(asc(interventionsTechniciens.id));
+  return rows;
+}
+
+// Ajoute un membre à l'équipe (idempotent : ignore un doublon intervention+technicien).
+export async function addMembreEquipe(data: {
+  artisanId: number;
+  interventionId: number;
+  technicienId: number;
+  role?: string | null;
+}): Promise<InterventionTechnicien | null> {
+  const db = await getDb();
+  const existing = await db.select().from(interventionsTechniciens).where(and(
+    eq(interventionsTechniciens.interventionId, data.interventionId),
+    eq(interventionsTechniciens.technicienId, data.technicienId),
+  )).limit(1);
+  if (existing[0]) return existing[0];
+  await db.insert(interventionsTechniciens).values({
+    artisanId: data.artisanId,
+    interventionId: data.interventionId,
+    technicienId: data.technicienId,
+    role: data.role ?? null,
+  });
+  const result = await db.select().from(interventionsTechniciens).where(and(
+    eq(interventionsTechniciens.interventionId, data.interventionId),
+    eq(interventionsTechniciens.technicienId, data.technicienId),
+  )).limit(1);
+  return result[0] ?? null;
+}
+
+// Retire un membre de l'équipe (par id de liaison), scopé tenant.
+export async function removeMembreEquipe(id: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(interventionsTechniciens).where(and(
+    eq(interventionsTechniciens.id, id),
+    eq(interventionsTechniciens.artisanId, artisanId),
+  ));
 }
 
 // ============================================================================

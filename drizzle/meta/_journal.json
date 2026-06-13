@@ -176,6 +176,13 @@
       "when": 1781307111291,
       "tag": "0024_chemical_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1781309019668,
+      "tag": "0025_cloudy_jimmy_woo",
+      "breakpoints": true
     }
   ]
 }

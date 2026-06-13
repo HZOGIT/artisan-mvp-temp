@@ -102,6 +102,29 @@ export default function Interventions() {
     },
   });
 
+  // OPE-111 — équipe d'intervention (plusieurs intervenants additionnels)
+  const { data: techniciensList } = trpc.techniciens.getAll.useQuery();
+  const [membreToAdd, setMembreToAdd] = useState<string>("");
+  const { data: equipe } = trpc.interventions.getEquipe.useQuery(
+    { interventionId: selectedIntervention?.id ?? 0 },
+    { enabled: isEditDialogOpen && !!selectedIntervention?.id },
+  );
+  const addMembreMutation = trpc.interventions.ajouterMembreEquipe.useMutation({
+    onSuccess: () => {
+      utils.interventions.getEquipe.invalidate();
+      setMembreToAdd("");
+      toast.success("Membre ajouté à l'équipe");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeMembreMutation = trpc.interventions.retirerMembreEquipe.useMutation({
+    onSuccess: () => {
+      utils.interventions.getEquipe.invalidate();
+      toast.success("Membre retiré de l'équipe");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const resetForm = () => {
     setFormData({
       titre: "",
@@ -346,6 +369,61 @@ export default function Interventions() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   rows={3}
                 />
+              </div>
+              {/* OPE-111 — Équipe : intervenants supplémentaires (binôme, aide…) */}
+              <div className="space-y-2">
+                <Label>Équipe (intervenants supplémentaires)</Label>
+                {equipe && equipe.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {equipe.map((m) => (
+                      <Badge key={m.id} variant="secondary" className="gap-1 pr-1">
+                        {[m.prenom, m.nom].filter(Boolean).join(" ") || `Technicien #${m.technicienId}`}
+                        {m.role ? <span className="text-[10px] opacity-70">({m.role})</span> : null}
+                        <button
+                          type="button"
+                          aria-label="Retirer de l'équipe"
+                          className="ml-0.5 rounded hover:bg-muted-foreground/20"
+                          onClick={() => removeMembreMutation.mutate({ id: m.id })}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Aucun intervenant supplémentaire.</p>
+                )}
+                <div className="flex gap-2">
+                  <Select value={membreToAdd} onValueChange={setMembreToAdd}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Ajouter un technicien…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(techniciensList || [])
+                        .filter((t: any) => !equipe?.some((m) => m.technicienId === t.id))
+                        .map((t: any) => (
+                          <SelectItem key={t.id} value={String(t.id)}>
+                            {[t.prenom, t.nom].filter(Boolean).join(" ") || `Technicien #${t.id}`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!membreToAdd || !selectedIntervention?.id || addMembreMutation.isPending}
+                    onClick={() =>
+                      selectedIntervention?.id &&
+                      membreToAdd &&
+                      addMembreMutation.mutate({
+                        interventionId: selectedIntervention.id,
+                        technicienId: parseInt(membreToAdd),
+                      })
+                    }
+                  >
+                    Ajouter
+                  </Button>
+                </div>
               </div>
             </div>
             <DialogFooter>
