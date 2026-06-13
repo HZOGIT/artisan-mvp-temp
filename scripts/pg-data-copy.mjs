@@ -57,11 +57,18 @@ for (const [table, columns] of pgTables) {
   const [rows] = await my.query(`select * from \`${table}\``);
   await pgc.query(`truncate table "${table}" restart identity cascade`);
   if (rows.length === 0) { report.push([table, "0"]); continue; }
-  const colList = names.map((n) => `"${n}"`).join(",");
-  const ph = names.map((_, i) => `$${i + 1}`).join(",");
-  const sql = `insert into "${table}" (${colList}) values (${ph})`;
+  // Insert par ligne en N'INCLUANT QUE les colonnes non-null : les colonnes
+  // dont la valeur source est null sont omises → PG applique leur DEFAULT
+  // (ex. created_at NOT NULL DEFAULT now() en mysql null) ou null (colonnes
+  // nullable). Évite "null value violates not-null constraint" sur des données
+  // mysql laxistes, sans rien perdre des valeurs réellement présentes.
   for (const row of rows) {
-    await pgc.query(sql, names.map((n) => coerce(row[n], typeByName[n])));
+    const present = names.filter((n) => coerce(row[n], typeByName[n]) !== null);
+    if (present.length === 0) continue;
+    const colList = present.map((n) => `"${n}"`).join(",");
+    const ph = present.map((_, i) => `$${i + 1}`).join(",");
+    const vals = present.map((n) => coerce(row[n], typeByName[n]));
+    await pgc.query(`insert into "${table}" (${colList}) values (${ph})`, vals);
   }
   report.push([table, String(rows.length)]);
 }
