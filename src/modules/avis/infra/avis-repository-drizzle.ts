@@ -1,10 +1,10 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { avisClients } from "../../../../drizzle/schema.pg";
+import { avisClients, clients, interventions } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IAvisRepository } from "../application/avis-repository";
-import type { Avis, AvisStats, StatutAvis } from "../domain/avis";
+import type { Avis, AvisEnrichi, AvisStats, StatutAvis } from "../domain/avis";
 
 type AvisRow = typeof avisClients.$inferSelect;
 
@@ -39,6 +39,34 @@ export class AvisRepositoryDrizzle implements IAvisRepository {
         .where(eq(avisClients.artisanId, ctx.artisanId))
         .orderBy(desc(avisClients.createdAt), desc(avisClients.id));
       return rows.map(toAvis);
+    });
+  }
+
+  listEnrichi(ctx: TenantContext): Promise<AvisEnrichi[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Jointures scopées tenant : le client et l'intervention liés doivent appartenir
+      // au même artisan (RLS sur les 3 tables + condition artisanId dans le ON). Un avis
+      // ne peut donc jamais exposer le client/intervention d'un autre tenant.
+      const rows = await tx
+        .select({
+          avis: avisClients,
+          client: { id: clients.id, nom: clients.nom, prenom: clients.prenom, email: clients.email },
+          intervention: { id: interventions.id, titre: interventions.titre, dateDebut: interventions.dateDebut },
+        })
+        .from(avisClients)
+        .leftJoin(clients, and(eq(clients.id, avisClients.clientId), eq(clients.artisanId, ctx.artisanId)))
+        .leftJoin(
+          interventions,
+          and(eq(interventions.id, avisClients.interventionId), eq(interventions.artisanId, ctx.artisanId)),
+        )
+        .where(eq(avisClients.artisanId, ctx.artisanId))
+        .orderBy(desc(avisClients.createdAt), desc(avisClients.id));
+
+      return rows.map((r) => ({
+        ...toAvis(r.avis),
+        client: r.client && r.client.id != null ? { ...r.client, prenom: r.client.prenom ?? null, email: r.client.email ?? null } : null,
+        intervention: r.intervention && r.intervention.id != null ? r.intervention : null,
+      }));
     });
   }
 

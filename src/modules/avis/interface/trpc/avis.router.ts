@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IAvisRepository } from "../../application/avis-repository";
-import { listAvis, getAvis, getAvisStats } from "../../application/read-use-cases";
+import { listAvisEnrichi, getAvis, getAvisStats } from "../../application/read-use-cases";
 import { repondreAvis, changerStatutAvis } from "../../application/write-use-cases";
 
 const idInput = z.object({ id: z.number().int() });
@@ -16,8 +16,9 @@ const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publ
 // (envoyerDemande/envoyerDemandeParClient) est traité dans une étape métier ultérieure.
 export function createAvisRouter(repo: IAvisRepository) {
   return router({
-    list: protectedProcedure.query(({ ctx }) => listAvis(repo, ctx.tenant)),
-    getAll: protectedProcedure.query(({ ctx }) => listAvis(repo, ctx.tenant)),
+    // Parité legacy : list/getAll renvoient l'avis enrichi (client + intervention).
+    list: protectedProcedure.query(({ ctx }) => listAvisEnrichi(repo, ctx.tenant)),
+    getAll: protectedProcedure.query(({ ctx }) => listAvisEnrichi(repo, ctx.tenant)),
 
     getById: protectedProcedure
       .input(idInput)

@@ -94,17 +94,31 @@ describe.skipIf(!URL)("avis.router e2e (HTTP → tRPC → use-case → repo → 
     expect(res.statusCode).toBe(401);
   });
 
-  it("list + getStats scopés au tenant A", async () => {
+  it("list (enrichi) + getStats scopés au tenant A", async () => {
     const tA = await token(UA);
     const list = await callQuery(server, "avis.list", undefined, tA);
     expect(list.statusCode).toBe(200);
-    const ids = (list.json().result.data as Array<{ id: number }>).map((a) => a.id);
+    const data = list.json().result.data as Array<{ id: number; client: { nom: string } | null }>;
+    const ids = data.map((a) => a.id);
     expect(ids).toContain(avisA);
     expect(ids.length).toBe(2);
+    // enrichissement : le client lié (même tenant) est joint
+    const enrichi = data.find((a) => a.id === avisA);
+    expect(enrichi?.client?.nom).toBe("Client A");
 
     const stats = await callQuery(server, "avis.getStats", undefined, tA);
     expect(stats.statusCode).toBe(200);
     expect(stats.json().result.data.total).toBe(1); // 1 seul publié pour A
+  });
+
+  it("getById sur un id inexistant du même tenant → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "avis.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("moderer avec statut hors union (en_attente) → 400 (zod, parité publie|masque)", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "avis.moderer", { avisId: avisA, statut: "en_attente" }, tA)).statusCode).toBe(400);
   });
 
   it("repondre + moderer par le propriétaire", async () => {

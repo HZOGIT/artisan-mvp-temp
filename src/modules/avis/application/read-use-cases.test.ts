@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeAvisRepository } from "../infra/avis-repository-fake";
-import { listAvis, getAvis, getAvisStats } from "./read-use-cases";
+import { listAvis, listAvisEnrichi, getAvis, getAvisStats } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -37,6 +37,22 @@ describe("avis — use-cases lecture (repo mocké)", () => {
 
   it("getAvis sur un id inexistant → NotFoundError", async () => {
     await expect(getAvis(repo, A, 99999)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("listAvisEnrichi : joint client + intervention scopés tenant, sans fuite cross-tenant", async () => {
+    const repo2 = new FakeAvisRepository();
+    const av = repo2.seed({ artisanId: 1, clientId: 100, interventionId: 200, note: 5 });
+    repo2.seedClient({ id: 100, artisanId: 1, nom: "Dupont", prenom: "Jean", email: "j@d.fr" });
+    repo2.seedIntervention({ id: 200, artisanId: 1, titre: "Fuite cuisine", dateDebut: new Date("2026-05-01") });
+    // client/intervention d'un AUTRE tenant avec un id qui pourrait collisionner
+    repo2.seedClient({ id: 100, artisanId: 2, nom: "Autre", prenom: null, email: null });
+
+    const [enrichi] = await listAvisEnrichi(repo2, A);
+    expect(enrichi.id).toBe(av.id);
+    expect(enrichi.client?.nom).toBe("Dupont");
+    expect(enrichi.intervention?.titre).toBe("Fuite cuisine");
+    // tenant B ne voit pas l'avis de A
+    expect(await listAvisEnrichi(repo2, B)).toEqual([]);
   });
 
   it("getAvisStats : agrégats scopés au tenant (publiés uniquement)", async () => {

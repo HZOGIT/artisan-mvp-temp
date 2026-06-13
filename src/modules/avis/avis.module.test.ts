@@ -4,6 +4,7 @@ import type { IAvisRepository } from "./application/avis-repository";
 
 const stubRepo: IAvisRepository = {
   list: async () => [],
+  listEnrichi: async () => [],
   getById: async () => null,
   getStats: async () => ({ moyenne: 0, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } }),
   repondre: async () => null,
@@ -17,6 +18,6 @@ describe("avis.module (scaffold)", () => {
   });
 
   it("le port expose les opérations attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["changerStatut", "getById", "getStats", "list", "repondre"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["changerStatut", "getById", "getStats", "list", "listEnrichi", "repondre"]);
   });
 });
