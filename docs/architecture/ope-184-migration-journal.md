@@ -110,7 +110,13 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 - Puis **reprise 7b-2-b (getStatistiquesChantier, calculerBudgetsRealises) + 7c** sur ces tables, gaté par tests.
 - ⚠️ **Validation compta limitée sur dev** (données absentes) → la vraie validation compta = **sur staging** au cutover.
 
-**Prochaine action : P0.5e** (modéliser le 2e schéma fix-duplicates).
+### P0.5e EN COURS — modélisation du 2e schéma
+- **5e-1 + 5e-2 FAIT** : 8 tables compta modélisées en PG (depenses, categories_depenses, notes_de_frais, notes_frais_depenses, budgets_categories, releves_bancaires, transactions_bancaires, regles_categorisation) + 9 enums + uniques. tsc vert + DDL OK (**100 tables**).
+- **5e-3 À FAIRE** : modules, artisan_modules (fix-duplicates ~918-960), couleurs_interventions (~1440). Lire le DDL, modéliser (snake_case).
+- **5e-4 À FAIRE** : lire les **37 `ALTER TABLE`** de fix-duplicates.ts ; pour chaque colonne ajoutée à une table Drizzle existante, l'ajouter au pgTable si manquante (drift de colonnes).
+- **5e-FIN** : régénérer baseline incrémentale (`drizzle/pg/0002`) + `drizzle-kit migrate` sur postgres:18 + régénérer schema.active.ts + **créer ces tables dans dev mysql+pg** (jouer le DDL) pour valider les fonctions ensuite.
+
+**Prochaine action : P0.5e-3.**
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
