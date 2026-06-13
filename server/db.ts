@@ -6658,23 +6658,27 @@ export async function retrySyncItem(exportId: number): Promise<ExportComptable |
 export async function savePushSubscription(
   data: InsertPushSubscription
 ): Promise<PushSubscription | undefined> {
-  // Upsert sur (technicienId, endpoint) : reactive ou recree.
-  const pool = getPool();
-  if (!pool) return undefined;
-  await pool.execute(
-    `INSERT INTO push_subscriptions
-       (technicienId, endpoint, p256dh, auth, userAgent, actif)
-     VALUES (?, ?, ?, ?, ?, TRUE)
-     ON DUPLICATE KEY UPDATE p256dh = VALUES(p256dh),
-                             auth = VALUES(auth),
-                             userAgent = VALUES(userAgent),
-                             actif = TRUE,
-                             updatedAt = CURRENT_TIMESTAMP`,
-    [data.technicienId, data.endpoint, data.p256dh, data.auth, data.userAgent || null]
-  );
+  // Upsert sur (technicienId, endpoint) : reactive ou recree — check-then-act neutre dialecte.
+  // NB OPE-184 : `push_subscriptions` n'a PAS de clé unique (seul `id` PK, vérifié base live)
+  // → l'ancien `ON DUPLICATE KEY UPDATE` ne déclenchait jamais l'update en mysql (bug latent :
+  // ré-abonnement = doublon de subscription). Le check-then-act rend l'upsert réellement idempotent.
+  // `actif` est forcé à TRUE (réactivation) ; `updatedAt` géré par $onUpdate.
   const dbi = await getDb();
+  const existing = await dbi.select({ id: pushSubscriptions.id }).from(pushSubscriptions)
+    .where(and(eq(pushSubscriptions.technicienId, data.technicienId), eq(pushSubscriptions.endpoint, data.endpoint)))
+    .limit(1);
+  if (existing[0]) {
+    await dbi.update(pushSubscriptions).set({
+      p256dh: data.p256dh, auth: data.auth, userAgent: data.userAgent || null, actif: true,
+    }).where(eq(pushSubscriptions.id, existing[0].id));
+  } else {
+    await dbi.insert(pushSubscriptions).values({
+      technicienId: data.technicienId, endpoint: data.endpoint, p256dh: data.p256dh,
+      auth: data.auth, userAgent: data.userAgent || null, actif: true,
+    });
+  }
   const r = await dbi.select().from(pushSubscriptions)
-    .where(and(eq(pushSubscriptions.technicienId, data.technicienId)))
+    .where(and(eq(pushSubscriptions.technicienId, data.technicienId), eq(pushSubscriptions.endpoint, data.endpoint)))
     .orderBy(desc(pushSubscriptions.id)).limit(1);
   return r[0];
 }
