@@ -104,6 +104,29 @@ export function Clients() {
     return groups;
   }, [clients]);
 
+  // OPE-130 (volet préventif) — avertissement NON BLOQUANT à la création : si l'email,
+  // le téléphone ou le nom+prénom saisi correspond à un client existant, on le signale
+  // (sans empêcher l'enregistrement). Calculé depuis la liste déjà chargée. Uniquement
+  // en création (editingClientId nul) pour ne pas alerter sur le client en cours d'édition.
+  const createDuplicateMatch = useMemo(() => {
+    if (editingClientId) return null;
+    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const digits = (s: any) => String(s || "").replace(/[\s.\-()+]/g, "");
+    const email = norm(formData.email);
+    const phone = digits(formData.telephone);
+    const name = `${norm(formData.prenom)} ${norm(formData.nom)}`.trim();
+    for (const c of clients as any[]) {
+      if (email && norm(c.email) === email) return { client: c, reason: "le même email" };
+      if (phone && phone.length >= 6 && digits(c.telephone) === phone) return { client: c, reason: "le même téléphone" };
+    }
+    if (name) {
+      for (const c of clients as any[]) {
+        if (`${norm(c.prenom)} ${norm(c.nom)}`.trim() === name) return { client: c, reason: "le même nom" };
+      }
+    }
+    return null;
+  }, [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients]);
+
   // Mutations
   const updateMutation = trpc.clients.update.useMutation({
     onSuccess: () => {
@@ -466,6 +489,17 @@ export function Clients() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
+                {/* OPE-130 — avertissement doublon (non bloquant) à la création */}
+                {createDuplicateMatch && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">
+                    ⚠️ Un client avec {createDuplicateMatch.reason} existe déjà :{" "}
+                    <strong>
+                      {createDuplicateMatch.client.prenom} {createDuplicateMatch.client.nom}
+                    </strong>
+                    . Vérifiez qu'il ne s'agit pas d'un doublon (vous pouvez tout de même enregistrer).
+                  </div>
+                )}
 
                 {/* Adresse */}
                 <div>
