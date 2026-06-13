@@ -90,6 +90,7 @@ import {
   interventionsMobile, photosInterventions,
   depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
   relevesBancaires, transactionsBancaires, reglesCategorisation,
+  couleursInterventions,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -4961,13 +4962,10 @@ export const PLAN_LIMITS: Record<string, { maxUsers: number; maxDevices: number;
 export async function getCouleursCalendrier(
   artisanId: number
 ): Promise<Record<number, string>> {
-  const pool = getPool();
-  if (!pool) return {};
+  const dbi = await getDb();
   try {
-    const [rows] = await pool.execute(
-      `SELECT interventionId, couleur FROM couleurs_interventions WHERE artisanId = ?`,
-      [artisanId]
-    );
+    const rows = await dbi.select({ interventionId: couleursInterventions.interventionId, couleur: couleursInterventions.couleur })
+      .from(couleursInterventions).where(eq(couleursInterventions.artisanId, artisanId));
     const out: Record<number, string> = {};
     for (const r of rows as any[]) {
       out[r.interventionId] = r.couleur;
@@ -4984,49 +4982,38 @@ export async function setCouleurIntervention(
   interventionId: number,
   couleur: string
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  // INSERT ... ON DUPLICATE KEY UPDATE : idempotent.
-  await pool.execute(
-    `INSERT INTO couleurs_interventions (artisanId, interventionId, couleur)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE couleur = VALUES(couleur)`,
-    [artisanId, interventionId, couleur]
-  );
+  const dbi = await getDb();
+  // Upsert idempotent sur la PK composite (artisanId, interventionId).
+  await dbi.insert(couleursInterventions).values({ artisanId, interventionId, couleur })
+    .onConflictDoUpdate({
+      target: [couleursInterventions.artisanId, couleursInterventions.interventionId],
+      set: { couleur },
+    });
 }
 
 export async function deleteCouleurIntervention(
   artisanId: number,
   interventionId: number
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `DELETE FROM couleurs_interventions WHERE artisanId = ? AND interventionId = ?`,
-    [artisanId, interventionId]
-  );
+  const dbi = await getDb();
+  await dbi.delete(couleursInterventions)
+    .where(and(eq(couleursInterventions.artisanId, artisanId), eq(couleursInterventions.interventionId, interventionId)));
 }
 
 export async function setCouleursMultiples(
   artisanId: number,
   couleurs: Record<number, string>
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
+  const dbi = await getDb();
   const entries = Object.entries(couleurs);
   if (entries.length === 0) return;
-  // Batch via 1 seul INSERT multi-rows + ON DUPLICATE KEY UPDATE.
-  const placeholders = entries.map(() => "(?, ?, ?)").join(", ");
-  const values: any[] = [];
-  for (const [k, v] of entries) {
-    values.push(artisanId, parseInt(k, 10), v);
-  }
-  await pool.execute(
-    `INSERT INTO couleurs_interventions (artisanId, interventionId, couleur)
-     VALUES ${placeholders}
-     ON DUPLICATE KEY UPDATE couleur = VALUES(couleur)`,
-    values
-  );
+  // Batch : 1 seul INSERT multi-rows + upsert sur la PK composite.
+  const rows = entries.map(([k, v]) => ({ artisanId, interventionId: parseInt(k, 10), couleur: v }));
+  await dbi.insert(couleursInterventions).values(rows)
+    .onConflictDoUpdate({
+      target: [couleursInterventions.artisanId, couleursInterventions.interventionId],
+      set: { couleur: sql`excluded.couleur` },
+    });
 }
 
 // ============================================================================

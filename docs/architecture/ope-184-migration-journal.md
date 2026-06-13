@@ -156,7 +156,11 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ 🎯 P0.7c (COMPTA/DÉPENSES — domaine HAUT RISQUE) COMPLET** : 7c-1 catégories, 7c-2 dépenses CRUD, 7c-3 numéro/budgets/stats, 7c-4 notes de frais, 7c-5 workflow NDF, 7c-6 FEC/exports/TVA, 7c-7 banque. **Tout le raw-SQL compta porté en Drizzle + validé PG (intégrité financière : TTC=HT+TVA, FEC débit=crédit, TVA nette, remboursable-only, cross-tenant).**
 
-**Prochaine action : recenser le raw-SQL `getPool()`/`insertId` RESTANT hors compta** (`grep -nE "getPool|insertId" server/db.ts` → factures/paiements/articles/devis…), puis reprendre les sous-batchs P0.7 par domaine (gatés par le filet de tests). Puis P0.8 (copie data staging) + P0.9 (suite tests sur PG) avant cutover.
+**P0.7d — raw-SQL `getPool()` RESTANT hors compta.** Recensement (2026-06-13) : **11 fonctions** réparties en domaines — couleurs calendrier (4), congés (initSoldeConges/updateSoldeConges), gamification (verifierEtAttribuerBadges/calculerClassement), push (savePushSubscription), alertes prévisions (saveConfigAlertePrevision/verifierEcartsEtEnvoyerAlertes). `insertId` = plus que la déf du helper (usage migré). Découpé par domaine, 1 batch/firing.
+
+- **7d-1 FAIT** (2026-06-13) : couleurs calendrier → Drizzle. getCouleursCalendrier (select map), setCouleurIntervention + setCouleursMultiples (`ON DUPLICATE KEY` → **`onConflictDoUpdate`** sur PK composite (artisanId, interventionId) ; batch multi-rows avec `set: { couleur: sql\`excluded.couleur\` }`), deleteCouleurIntervention. Table `couleursInterventions` ajoutée à l'import. **Validé PG** (`scripts/test-couleurs-pg.mjs`, 10/10) : upsert idempotent (1 ligne après ré-écriture), batch (3 lignes, 101 mis à jour pas dupliqué), delete. tsc neuf vert.
+
+**Prochaine action : P0.7d-2** (congés : `initSoldeConges`, `updateSoldeConges` — ~L5504/5541 ; vérifier le raw-SQL + tables soldes_conges). Puis 7d-3 gamification, 7d-4 push, 7d-5 alertes. Puis P0.8 (copie data staging) + P0.9 (tests sur PG) avant cutover.
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
