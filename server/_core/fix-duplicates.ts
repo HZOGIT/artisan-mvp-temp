@@ -7,6 +7,16 @@ import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
 
 async function fixDuplicates() {
+  // OPE-184 (P0.5f) — ce script est un correctif de schéma/dedup **mysql-only**
+  // (ALTER TABLE / ENUM / INDEX, syntaxe mysql, connexion mysql2). En mode
+  // PostgreSQL (PG-first) le schéma est entièrement géré par les migrations
+  // Drizzle (`drizzle/pg`) : on no-op pour ne pas crasher au boot (DATABASE_URL
+  // pointe alors une base postgres://, incompatible avec mysql2).
+  if (process.env.DB_DIALECT === 'postgresql') {
+    console.log('[FixDuplicates] DB_DIALECT=postgresql → skip (schéma géré par les migrations Drizzle)');
+    process.exit(0);
+  }
+
   const url = process.env.DATABASE_URL;
   if (!url) { console.log('[FixDuplicates] No DATABASE_URL, skipping'); process.exit(0); }
 

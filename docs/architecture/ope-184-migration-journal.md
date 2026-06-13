@@ -217,7 +217,11 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 - **P0.8** : copie data **staging** MySQL→PG (le `scripts/pg-data-copy.mjs` existe et est idempotent ; l'exécuter contre la vraie base staging).
 - **P0.9 (OPE-195)** : faire tourner la suite Vitest complète sur PG (filet de non-régression) — noter que certains e2e/security échouent par **pollution de data** (fixtures à IDs fixes vs lignes copiées), pas par régression de port.
 
-**Prochaine action : P0.5f** — rendre `fix-duplicates.ts` no-op quand `DB_DIALECT=postgresql` (garde au tout début : `if (process.env.DB_DIALECT === "postgresql") return;`), car son DDL mysql (ALTER/ENUM/INDEX) n'a pas de sens en PG et planterait. Vérifier le point d'entrée (boot prod `node dist/fix-duplicates.js` + appel éventuel dans index.ts).
+- **P0.5f FAIT** (2026-06-13) : `fix-duplicates.ts` rendu **no-op en mode PG**. Garde au tout début de `fixDuplicates()` : `if (process.env.DB_DIALECT === 'postgresql') { console.log(...skip...); process.exit(0); }` — AVANT toute connexion mysql2 (qui planterait sur un `DATABASE_URL` postgres://). Point d'entrée confirmé : `package.json` `start` = `node dist/fix-duplicates.js && node dist/index.js` (script standalone, pas appelé depuis index.ts). **Validé** : `DB_DIALECT=postgresql tsx server/_core/fix-duplicates.ts` → message skip + `exit 0`, **aucune tentative de connexion mysql**. Chemin mysql inchangé (garde ignorée si DB_DIALECT≠postgresql). tsc vert.
+
+**→ Le nouveau code peut désormais booter sur staging en PG sans crash de pré-démarrage.**
+
+**Prochaine action : P0.8 — copie data staging MySQL→PG.** ⚠️ Opération de niveau déploiement (mute la vraie base staging PG). Étapes : (1) vérifier que la stack staging a bien un service **postgres:18** + migrations Drizzle `drizzle/pg` appliquées (sinon les ajouter au `docker-compose.staging.yml` + `.env.staging` `DB_DIALECT`/`DATABASE_URL`) ; (2) exécuter `scripts/pg-data-copy.mjs` (idempotent : truncate+copy+setval) MySQL→PG sur staging ; (3) vérifier parité (counts par table) + intégrité financière sur quelques entités. NE PAS encore basculer `DB_DIALECT=postgresql` sur l'app staging tant que la parité n'est pas confirmée. Puis **P0.9** (Vitest sur PG) avant le cutover définitif (down mysql).
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
