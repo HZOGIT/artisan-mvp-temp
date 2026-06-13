@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 // OPE-184 P0.7 — bascule PG-first : pool/driver Postgres optionnel (DB_DIALECT=postgresql).
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import { Pool as PgPool } from "pg";
-import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne } from "drizzle-orm";
+import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne, getTableColumns } from "drizzle-orm";
 import { 
   users, User, InsertUser,
   artisans, Artisan, InsertArtisan,
@@ -7243,38 +7243,24 @@ export async function deleteCategorieDepense(id: number, artisanId: number): Pro
 // === Notes de frais ===
 
 export async function getNotesFrais(artisanId: number, userId?: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const conds = ["artisan_id = ?"];
-  const params: any[] = [artisanId];
-  if (userId) { conds.push("user_id = ?"); params.push(userId); }
-  const [rows]: any = await pool.execute(
-    `SELECT n.*,
-            (SELECT COUNT(*) FROM notes_frais_depenses WHERE note_id = n.id) AS nb_depenses
-       FROM notes_de_frais n
-      WHERE ${conds.join(" AND ")}
-      ORDER BY n.created_at DESC`,
-    params
-  );
-  return rows as any[];
+  const db = await getDb();
+  const conds: any[] = [eq(notesDeFrais.artisan_id, artisanId)];
+  if (userId) conds.push(eq(notesDeFrais.user_id, userId));
+  return await db.select({
+    ...getTableColumns(notesDeFrais),
+    nb_depenses: sql<number>`(SELECT COUNT(*) FROM ${notesFraisDepenses} WHERE ${notesFraisDepenses.note_id} = ${notesDeFrais.id})`,
+  }).from(notesDeFrais).where(and(...conds)).orderBy(desc(notesDeFrais.created_at));
 }
 
 export async function getNoteFraisById(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM notes_de_frais WHERE id = ? AND artisan_id = ? LIMIT 1`,
-    [id, artisanId]
-  );
-  const note = (rows as any[])[0];
+  const db = await getDb();
+  const [note] = await db.select().from(notesDeFrais)
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId))).limit(1);
   if (!note) return null;
-  const [deps]: any = await pool.execute(
-    `SELECT d.* FROM depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-      WHERE nfd.note_id = ?
-      ORDER BY d.date_depense DESC`,
-    [id]
-  );
+  const deps = await db.select(getTableColumns(depenses)).from(depenses)
+    .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
+    .where(eq(notesFraisDepenses.note_id, id))
+    .orderBy(desc(depenses.date_depense));
   return { ...note, depenses: deps };
 }
 
@@ -7286,77 +7272,70 @@ export async function createNoteFrais(data: {
   periodeDebut: string;
   periodeFin: string;
 }): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT INTO notes_de_frais
-       (artisan_id, user_id, numero, titre, periode_debut, periode_fin)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [data.artisanId, data.userId, data.numero, data.titre, data.periodeDebut, data.periodeFin]
-  );
-  if (!r?.insertId) return null;
-  return getNoteFraisById(r.insertId, data.artisanId);
+  const newId = await insertReturningId(notesDeFrais, {
+    artisan_id: data.artisanId,
+    user_id: data.userId,
+    numero: data.numero,
+    titre: data.titre,
+    periode_debut: data.periodeDebut,
+    periode_fin: data.periodeFin,
+  });
+  if (!newId) return null;
+  return getNoteFraisById(newId, data.artisanId);
 }
 
 export async function addDepenseToNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
+  const db = await getDb();
   // OPE-182 — vérifier que la NOTE appartient bien à l'artisan (la table de liaison
   // `notes_frais_depenses` n'a pas d'`artisan_id`) → empêche de lier sa dépense dans
   // la note d'un autre tenant. Skip silencieux si la note n'est pas la sienne.
-  const [noteOwn]: any = await pool.execute(
-    `SELECT id FROM notes_de_frais WHERE id = ? AND artisan_id = ?`,
-    [noteId, artisanId]
-  );
-  if (!(noteOwn as any[])[0]) return;
+  const [noteOwn] = await db.select({ id: notesDeFrais.id }).from(notesDeFrais)
+    .where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, artisanId))).limit(1);
+  if (!noteOwn) return;
   // Verifier que la depense appartient bien a l'artisan + qu'elle est REMBOURSABLE :
   // une note de frais ne regroupe que des avances remboursables au salarié (OPE-179).
   // Skip silencieux (cohérent avec l'échec d'ownership) → une note ne contient jamais
   // de dépense non remboursable « visible mais non comptée ». Sûr pour la création en lot.
-  const [own]: any = await pool.execute(
-    `SELECT remboursable FROM depenses WHERE id = ? AND artisan_id = ?`,
-    [depenseId, artisanId]
-  );
-  const row = (own as any[])[0];
-  if (!row) return;
-  if (row.remboursable === 0 || row.remboursable === false || row.remboursable === null) return;
-  await pool.execute(
-    `INSERT IGNORE INTO notes_frais_depenses (note_id, depense_id) VALUES (?, ?)`,
-    [noteId, depenseId]
-  );
+  const [dep] = await db.select({ remboursable: depenses.remboursable }).from(depenses)
+    .where(and(eq(depenses.id, depenseId), eq(depenses.artisan_id, artisanId))).limit(1);
+  if (!dep) return;
+  if (!dep.remboursable) return;
+  // INSERT IGNORE → select-then-insert (dialect-neutre, pas d'ON CONFLICT mysql).
+  const [existing] = await db.select({ note_id: notesFraisDepenses.note_id }).from(notesFraisDepenses)
+    .where(and(eq(notesFraisDepenses.note_id, noteId), eq(notesFraisDepenses.depense_id, depenseId))).limit(1);
+  if (existing) return;
+  await db.insert(notesFraisDepenses).values({ note_id: noteId, depense_id: depenseId });
 }
 
 export async function removeDepenseFromNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
+  const db = await getDb();
   // OPE-182 — scoper la suppression du lien à la NOTE de l'artisan (table de liaison
   // sans `artisan_id`) → empêche un retrait cross-tenant d'une dépense de la note d'autrui.
-  await pool.execute(
-    `DELETE nfd FROM notes_frais_depenses nfd
-       INNER JOIN notes_de_frais n ON n.id = nfd.note_id
-      WHERE nfd.note_id = ? AND nfd.depense_id = ? AND n.artisan_id = ?`,
-    [noteId, depenseId, artisanId]
-  );
+  // On vérifie d'abord l'ownership de la note, puis on supprime le lien.
+  const [noteOwn] = await db.select({ id: notesDeFrais.id }).from(notesDeFrais)
+    .where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, artisanId))).limit(1);
+  if (!noteOwn) return;
+  await db.delete(notesFraisDepenses)
+    .where(and(eq(notesFraisDepenses.note_id, noteId), eq(notesFraisDepenses.depense_id, depenseId)));
 }
 
 export async function calculerTotalNoteFrais(noteId: number, artisanId: number): Promise<number> {
-  const pool = getPool();
-  if (!pool) return 0;
-  const [rows]: any = await pool.execute(
-    // OPE-179 — ne somme QUE les dépenses remboursables (avances salarié) : une dépense
-    // `remboursable = FALSE` (réglée par l'entreprise) liée à une note ne doit pas gonfler
-    // le montant à rembourser. Aligné sur la stat `getDepensesStats` (filtre déjà remboursable).
-    `SELECT COALESCE(SUM(d.montant_ttc), 0) AS total
-       FROM depenses d
-       INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-      WHERE nfd.note_id = ? AND d.artisan_id = ? AND d.remboursable = TRUE`,
-    [noteId, artisanId]
-  );
-  const total = Number((rows as any[])[0]?.total || 0);
-  await pool.execute(
-    `UPDATE notes_de_frais SET montant_total = ? WHERE id = ? AND artisan_id = ?`,
-    [total, noteId, artisanId]
-  );
+  const db = await getDb();
+  // OPE-179 — ne somme QUE les dépenses remboursables (avances salarié) : une dépense
+  // `remboursable = FALSE` (réglée par l'entreprise) liée à une note ne doit pas gonfler
+  // le montant à rembourser. Aligné sur la stat `getDepensesStats` (filtre déjà remboursable).
+  const [agg] = await db.select({
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+  }).from(depenses)
+    .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
+    .where(and(
+      eq(notesFraisDepenses.note_id, noteId),
+      eq(depenses.artisan_id, artisanId),
+      eq(depenses.remboursable, true),
+    ));
+  const total = Number(agg?.total || 0);
+  await db.update(notesDeFrais).set({ montant_total: String(total) })
+    .where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, artisanId)));
   return total;
 }
 

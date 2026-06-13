@@ -134,7 +134,10 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 - **7c-3b FAIT** : getDepensesStats (7 agrégats SUM/COUNT/CASE WHEN, GROUP BY catégorie/fournisseur/mois ; `DATE_FORMAT`→`to_char`, `DATE_SUB`→date JS) → Drizzle. Validé PG : totalMois=180 (60+120), nb=2, parCatégorie somme=180, àRembourser=180, TVArécup=30. **→ 7c-3 complet.**
 
-**Prochaine action : P0.7c-4** (NoteFrais : getNotesFrais, getNoteFraisById, createNoteFrais, calculerTotalNoteFrais). Importer `notesDeFrais` (déjà fait). Puis 7c-5 (workflow approbation anti self-approbation OPE-63), 7c-6 (FEC équilibré), 7c-7 (banque).
+- **7c-4 FAIT** (2026-06-13) : Notes de frais → Drizzle. getNotesFrais (sous-requête corrélée `nb_depenses`), getNoteFraisById (innerJoin notesFraisDepenses), createNoteFrais (insertReturningId), addDepenseToNoteFrais (ownership note OPE-182 + remboursable OPE-179, INSERT IGNORE→select-puis-insert), removeDepenseFromNoteFrais (vérif ownership note puis delete lien), calculerTotalNoteFrais (`COALESCE(SUM(montant_ttc),0)` innerJoin where `remboursable=true`, update montant_total). **Validé PG** (`scripts/test-ndf-pg.mjs`, 10/10) : total=180 (120+60, exclut la non-remboursable de 240), montant_total persisté=180, 2 liens, re-add idempotent, **OPE-182 add+remove cross-tenant refusés**, après remove total=120, nb_depenses=1. tsc neuf vert.
+  - ⚠️ **Filet** : security.test.ts/isolation-multi-tenant échouent (clients=21 au lieu de 2, et 401 sur e2e HTTP) = **pollution data ETL** (IDs de fixtures qui collisionnent avec les lignes copiées de staging) + e2e localhost fragiles — **pas une régression NDF** (mon edit ne touche que `notes_de_frais`). fournisseurs.test.ts vert (17/17).
+
+**Prochaine action : P0.7c-5** (workflow NoteFrais : soumettreNoteFrais, approuverNoteFrais, rejeterNoteFrais, payerNoteFrais — préserver l'ANTI SELF-APPROBATION OPE-63). Puis 7c-6 (FEC équilibré débit=crédit), 7c-7 (banque).
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
