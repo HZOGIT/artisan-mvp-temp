@@ -7339,77 +7339,62 @@ export async function calculerTotalNoteFrais(noteId: number, artisanId: number):
   return total;
 }
 
+// Sous-requête réutilisable : ids des dépenses liées à une note (remplace l'UPDATE..JOIN
+// mysql, non supporté en PG). On filtre côté UPDATE par artisan_id en plus, conservant
+// le scope tenant d'origine. `db` est passé pour rester dans le même pool/dialecte.
+function depenseIdsLieesANote(db: any, noteId: number) {
+  return db.select({ id: notesFraisDepenses.depense_id }).from(notesFraisDepenses)
+    .where(eq(notesFraisDepenses.note_id, noteId));
+}
+
+const todayDate = () => new Date().toISOString().slice(0, 10);
+
 export async function soumettreNoteFrais(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
+  const db = await getDb();
   await calculerTotalNoteFrais(id, artisanId);
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'soumise', date_soumission = CURDATE() WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
-  // Marquer toutes les depenses associees en 'soumise'.
-  await pool.execute(
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'soumise'
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [id, artisanId]
-  );
+  await db.update(notesDeFrais)
+    .set({ statut: "soumise" as any, date_soumission: todayDate() })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  // Marquer toutes les depenses associees en 'soumise' (UPDATE..JOIN -> sous-requête).
+  await db.update(depenses).set({ statut: "soumise" as any })
+    .where(and(eq(depenses.artisan_id, artisanId), inArray(depenses.id, depenseIdsLieesANote(db, id))));
   return getNoteFraisById(id, artisanId);
 }
 
 export async function approuverNoteFrais(id: number, artisanId: number, commentaire?: string): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'approuvee', date_approbation = CURDATE(), commentaire_approbateur = ?
-      WHERE id = ? AND artisan_id = ?`,
-    [commentaire || null, id, artisanId]
-  );
-  await pool.execute(
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'approuvee'
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [id, artisanId]
-  );
+  const db = await getDb();
+  await db.update(notesDeFrais)
+    .set({ statut: "approuvee" as any, date_approbation: todayDate(), commentaire_approbateur: commentaire || null })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  await db.update(depenses).set({ statut: "approuvee" as any })
+    .where(and(eq(depenses.artisan_id, artisanId), inArray(depenses.id, depenseIdsLieesANote(db, id))));
   return getNoteFraisById(id, artisanId);
 }
 
 export async function rejeterNoteFrais(id: number, artisanId: number, commentaire: string): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'rejetee', commentaire_approbateur = ?
-      WHERE id = ? AND artisan_id = ?`,
-    [commentaire, id, artisanId]
-  );
-  await pool.execute(
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'rejetee'
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [id, artisanId]
-  );
+  const db = await getDb();
+  await db.update(notesDeFrais)
+    .set({ statut: "rejetee" as any, commentaire_approbateur: commentaire })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  await db.update(depenses).set({ statut: "rejetee" as any })
+    .where(and(eq(depenses.artisan_id, artisanId), inArray(depenses.id, depenseIdsLieesANote(db, id))));
   return getNoteFraisById(id, artisanId);
 }
 
 export async function payerNoteFrais(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'payee', date_paiement = CURDATE() WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
-  await pool.execute(
-    // OPE-179 — ne marque « remboursée » QUE les dépenses remboursables (cohérent avec le
-    // total calculé) : une dépense non remboursable liée à la note n'est pas remboursée au salarié.
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'remboursee', d.rembourse = TRUE, d.date_remboursement = CURDATE()
-      WHERE nfd.note_id = ? AND d.artisan_id = ? AND d.remboursable = TRUE`,
-    [id, artisanId]
-  );
+  const db = await getDb();
+  await db.update(notesDeFrais)
+    .set({ statut: "payee" as any, date_paiement: todayDate() })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  // OPE-179 — ne marque « remboursée » QUE les dépenses remboursables (cohérent avec le
+  // total calculé) : une dépense non remboursable liée à la note n'est pas remboursée au salarié.
+  await db.update(depenses)
+    .set({ statut: "remboursee" as any, rembourse: true, date_remboursement: todayDate() })
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      eq(depenses.remboursable, true),
+      inArray(depenses.id, depenseIdsLieesANote(db, id)),
+    ));
   return getNoteFraisById(id, artisanId);
 }
 
