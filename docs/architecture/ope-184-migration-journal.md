@@ -48,5 +48,9 @@ Méthode : nouveau fichier **`drizzle/schema.pg.ts`** (pg-core) séparé du `sch
 
 **P0.3 (OPE-189) = FAIT.**
 
+### P0.4 (OPE-190) — batch 2 (compta + terrain) — EN COURS (sous-batchs)
+- [x] **4a TERRAIN** — 11 tables : interventions, interventions_techniciens, techniciens, disponibilites/positions/objectifs/classement_techniciens, vehicules + historique_kilometrage/entretiens/assurances. +7 enums. **Cumul : 30 pgTable / 17 pgEnum.** tsc vert + DDL OK.
+- [ ] **4b COMPTA + CHANTIERS** — ecritures_comptables, plan_comptable, exports_comptables, configurations_comptables, previsions_ca, historique_ca, chantiers, phases_chantier, interventions_chantier, documents_chantier.
+
 ### Prochaine action
-→ **P0.4 (OPE-190)** : conversion batch 2 (compta + terrain) dans `drizzle/schema.pg.ts` : ecritures_comptables, plan_comptable, exports_comptables, configurations_comptables, previsions_ca, historique_ca, interventions*, chantiers*, phases/documents_chantier, techniciens, positions/disponibilites/classement/objectifs_techniciens, vehicules + entretiens/assurances/historique_kilometrage. Même méthode (lire défs schema.ts, mapping, tsc gate vert, valider DDL).
+→ **P0.4b** : convertir les tables compta + chantiers ci-dessus dans `drizzle/schema.pg.ts` (lire défs `schema.ts` autour des lignes 1011-1064, 1234-1272, 1469-1660, 1591/1631 ; mapping ; tsc gate vert ; valider DDL). Puis P0.5 (batch 3 : achats/stock, relation client, IA, reste plateforme).

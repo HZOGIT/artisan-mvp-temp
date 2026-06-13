@@ -22,6 +22,7 @@ import {
   varchar,
   text,
   timestamp,
+  date,
   boolean,
   numeric,
   bigint,
@@ -416,3 +417,208 @@ export const modelesDevisLignes = pgTable("modeles_devis_lignes", {
 });
 export type ModeleDevisLigne = typeof modelesDevisLignes.$inferSelect;
 export type InsertModeleDevisLigne = typeof modelesDevisLignes.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+// BATCH 2a (P0.4) — TERRAIN : interventions, techniciens, véhicules
+// ════════════════════════════════════════════════════════════════════════════
+export const interventionStatutEnum = pgEnum("intervention_statut", ["planifiee", "en_cours", "terminee", "annulee"]);
+export const technicienStatutEnum = pgEnum("technicien_statut", ["actif", "inactif", "conge"]);
+export const vehiculeCarburantEnum = pgEnum("vehicule_carburant", ["essence", "diesel", "electrique", "hybride", "gpl"]);
+export const vehiculeStatutEnum = pgEnum("vehicule_statut", ["actif", "en_maintenance", "hors_service", "vendu"]);
+export const entretienTypeEnum = pgEnum("entretien_type", ["vidange", "pneus", "freins", "controle_technique", "revision", "reparation", "autre"]);
+export const assuranceTypeEnum = pgEnum("assurance_type", ["tiers", "tiers_plus", "tous_risques"]);
+export const classementPeriodeEnum = pgEnum("classement_periode", ["semaine", "mois", "trimestre", "annee"]);
+
+// ── INTERVENTIONS ────────────────────────────────────────────────────────────
+export const interventions = pgTable("interventions", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  dateDebut: timestamp("dateDebut").notNull(),
+  dateFin: timestamp("dateFin"),
+  statut: interventionStatutEnum("statut").default("planifiee"),
+  adresse: text("adresse"),
+  notes: text("notes"),
+  devisId: integer("devisId"),
+  factureId: integer("factureId"),
+  technicienId: integer("technicienId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Intervention = typeof interventions.$inferSelect;
+export type InsertIntervention = typeof interventions.$inferInsert;
+
+// ── INTERVENTIONS TECHNICIENS (équipe) ───────────────────────────────────────
+export const interventionsTechniciens = pgTable("interventions_techniciens", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  interventionId: integer("interventionId").notNull(),
+  technicienId: integer("technicienId").notNull(),
+  role: varchar("role", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InterventionTechnicien = typeof interventionsTechniciens.$inferSelect;
+export type InsertInterventionTechnicien = typeof interventionsTechniciens.$inferInsert;
+
+// ── TECHNICIENS ──────────────────────────────────────────────────────────────
+export const techniciens = pgTable("techniciens", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  prenom: varchar("prenom", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  telephone: varchar("telephone", { length: 20 }),
+  specialite: varchar("specialite", { length: 100 }),
+  couleur: varchar("couleur", { length: 7 }).default("#3b82f6"),
+  statut: technicienStatutEnum("statut").default("actif"),
+  coutHoraire: numeric("coutHoraire", { precision: 8, scale: 2 }),
+  userId: integer("userId"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type Technicien = typeof techniciens.$inferSelect;
+export type InsertTechnicien = typeof techniciens.$inferInsert;
+
+// ── DISPONIBILITES TECHNICIENS ───────────────────────────────────────────────
+export const disponibilitesTechniciens = pgTable("disponibilites_techniciens", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  jourSemaine: integer("jourSemaine").notNull(),
+  heureDebut: varchar("heureDebut", { length: 5 }).notNull(),
+  heureFin: varchar("heureFin", { length: 5 }).notNull(),
+  disponible: boolean("disponible").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DisponibiliteTechnicien = typeof disponibilitesTechniciens.$inferSelect;
+export type InsertDisponibiliteTechnicien = typeof disponibilitesTechniciens.$inferInsert;
+
+// ── POSITIONS GPS TECHNICIENS ────────────────────────────────────────────────
+export const positionsTechniciens = pgTable("positions_techniciens", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  latitude: numeric("latitude", { precision: 10, scale: 8 }).notNull(),
+  longitude: numeric("longitude", { precision: 11, scale: 8 }).notNull(),
+  precision: integer("precision"),
+  vitesse: numeric("vitesse", { precision: 5, scale: 2 }),
+  cap: integer("cap"),
+  batterie: integer("batterie"),
+  enDeplacement: boolean("enDeplacement").default(false),
+  interventionEnCoursId: integer("interventionEnCoursId"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PositionTechnicien = typeof positionsTechniciens.$inferSelect;
+export type InsertPositionTechnicien = typeof positionsTechniciens.$inferInsert;
+
+// ── VEHICULES ────────────────────────────────────────────────────────────────
+export const vehicules = pgTable("vehicules", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  immatriculation: varchar("immatriculation", { length: 20 }).notNull(),
+  marque: varchar("marque", { length: 100 }),
+  modele: varchar("modele", { length: 100 }),
+  annee: integer("annee"),
+  typeCarburant: vehiculeCarburantEnum("typeCarburant").default("diesel"),
+  puissanceFiscale: integer("puissanceFiscale"),
+  kilometrageActuel: integer("kilometrageActuel").default(0),
+  dateAchat: date("dateAchat"),
+  prixAchat: numeric("prixAchat", { precision: 10, scale: 2 }),
+  technicienId: integer("technicienId"),
+  statut: vehiculeStatutEnum("statut").default("actif"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Vehicule = typeof vehicules.$inferSelect;
+export type InsertVehicule = typeof vehicules.$inferInsert;
+
+// ── HISTORIQUE KILOMETRAGE ───────────────────────────────────────────────────
+export const historiqueKilometrage = pgTable("historique_kilometrage", {
+  id: serial("id").primaryKey(),
+  vehiculeId: integer("vehiculeId").notNull(),
+  technicienId: integer("technicienId"),
+  kilometrage: integer("kilometrage").notNull(),
+  dateReleve: date("dateReleve").notNull(),
+  motif: varchar("motif", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type HistoriqueKilometrage = typeof historiqueKilometrage.$inferSelect;
+export type InsertHistoriqueKilometrage = typeof historiqueKilometrage.$inferInsert;
+
+// ── ENTRETIENS VEHICULES ─────────────────────────────────────────────────────
+export const entretiensVehicules = pgTable("entretiens_vehicules", {
+  id: serial("id").primaryKey(),
+  vehiculeId: integer("vehiculeId").notNull(),
+  type: entretienTypeEnum("type").notNull(),
+  dateEntretien: date("dateEntretien").notNull(),
+  kilometrageEntretien: integer("kilometrageEntretien"),
+  cout: numeric("cout", { precision: 10, scale: 2 }),
+  prestataire: varchar("prestataire", { length: 255 }),
+  description: text("description"),
+  prochainEntretienKm: integer("prochainEntretienKm"),
+  prochainEntretienDate: date("prochainEntretienDate"),
+  facture: text("facture"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EntretienVehicule = typeof entretiensVehicules.$inferSelect;
+export type InsertEntretienVehicule = typeof entretiensVehicules.$inferInsert;
+
+// ── ASSURANCES VEHICULES ─────────────────────────────────────────────────────
+export const assurancesVehicules = pgTable("assurances_vehicules", {
+  id: serial("id").primaryKey(),
+  vehiculeId: integer("vehiculeId").notNull(),
+  compagnie: varchar("compagnie", { length: 255 }).notNull(),
+  numeroContrat: varchar("numeroContrat", { length: 100 }),
+  typeAssurance: assuranceTypeEnum("typeAssurance").default("tiers"),
+  dateDebut: date("dateDebut").notNull(),
+  dateFin: date("dateFin").notNull(),
+  primeAnnuelle: numeric("primeAnnuelle", { precision: 10, scale: 2 }),
+  franchise: numeric("franchise", { precision: 10, scale: 2 }),
+  document: text("document"),
+  alerteEnvoyee: boolean("alerteEnvoyee").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type AssuranceVehicule = typeof assurancesVehicules.$inferSelect;
+export type InsertAssuranceVehicule = typeof assurancesVehicules.$inferInsert;
+
+// ── OBJECTIFS TECHNICIENS ────────────────────────────────────────────────────
+export const objectifsTechniciens = pgTable("objectifs_techniciens", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  mois: integer("mois").notNull(),
+  annee: integer("annee").notNull(),
+  objectifInterventions: integer("objectifInterventions").default(0),
+  objectifCA: numeric("objectifCA", { precision: 10, scale: 2 }).default("0.00"),
+  objectifAvisPositifs: integer("objectifAvisPositifs").default(0),
+  interventionsRealisees: integer("interventionsRealisees").default(0),
+  caRealise: numeric("caRealise", { precision: 10, scale: 2 }).default("0.00"),
+  avisPositifsObtenus: integer("avisPositifsObtenus").default(0),
+  pointsGagnes: integer("pointsGagnes").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type ObjectifTechnicien = typeof objectifsTechniciens.$inferSelect;
+export type InsertObjectifTechnicien = typeof objectifsTechniciens.$inferInsert;
+
+// ── CLASSEMENT TECHNICIENS ───────────────────────────────────────────────────
+export const classementTechniciens = pgTable("classement_techniciens", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  periode: classementPeriodeEnum("periode").notNull(),
+  dateDebut: date("dateDebut").notNull(),
+  dateFin: date("dateFin").notNull(),
+  rang: integer("rang").notNull(),
+  pointsTotal: integer("pointsTotal").default(0),
+  interventions: integer("interventions").default(0),
+  ca: numeric("ca", { precision: 10, scale: 2 }).default("0.00"),
+  noteMoyenne: numeric("noteMoyenne", { precision: 3, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ClassementTechnicien = typeof classementTechniciens.$inferSelect;
+export type InsertClassementTechnicien = typeof classementTechniciens.$inferInsert;
