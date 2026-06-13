@@ -10183,17 +10183,8 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
-      const pool = (db as any).getPool();
-      if (pool) {
-        await pool.execute(
-          `INSERT INTO budgets_categories (artisan_id, categorie, mois, budget)
-           SELECT artisan_id, categorie, ?, budget
-             FROM budgets_categories
-            WHERE artisan_id = ? AND mois = ?
-           ON DUPLICATE KEY UPDATE budget = VALUES(budget)`,
-          [input.moisCible, artisan.id, input.moisSource]
-        );
-      }
+      // OPE-184 — copie de budgets portée en Drizzle (db.copierBudgetsMois).
+      await db.copierBudgetsMois(artisan.id, input.moisSource, input.moisCible);
       return { success: true };
     }),
 
@@ -10365,26 +10356,14 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
   getRegles: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    const pool = (db as any).getPool();
-    if (!pool) return [];
-    const [rows]: any = await pool.execute(
-      `SELECT * FROM regles_categorisation WHERE artisan_id = ? AND actif = TRUE ORDER BY id DESC`,
-      [artisan.id]
-    );
-    return rows as any[];
+    return await db.getReglesCategorisation(artisan.id);
   }),
 
   createRegle: protectedProcedure
     .input(z.object({ motifLibelle: z.string(), categorie: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getOrCreateArtisan(ctx.user.id);
-      const pool = (db as any).getPool();
-      if (pool) {
-        await pool.execute(
-          `INSERT INTO regles_categorisation (artisan_id, motif_libelle, categorie) VALUES (?, ?, ?)`,
-          [artisan.id, input.motifLibelle, input.categorie]
-        );
-      }
+      const artisan = await db.getOrCreateArtisan(ctx.user.id);
+      await db.createRegleCategorisation(artisan.id, input.motifLibelle, input.categorie);
       return { success: true };
     }),
 
@@ -10393,13 +10372,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
-      const pool = (db as any).getPool();
-      if (pool) {
-        await pool.execute(
-          `UPDATE regles_categorisation SET actif = FALSE WHERE id = ? AND artisan_id = ?`,
-          [input.id, artisan.id]
-        );
-      }
+      await db.deleteRegleCategorisation(input.id, artisan.id);
       return { success: true };
     }),
 });

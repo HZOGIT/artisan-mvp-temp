@@ -7423,6 +7423,39 @@ export async function upsertBudget(
   }
 }
 
+// Copie tous les budgets d'un mois source vers un mois cible (upsert par catégorie).
+// Remplace l'ancien INSERT…SELECT…ON DUPLICATE KEY (routers.ts, raw SQL).
+export async function copierBudgetsMois(artisanId: number, moisSource: string, moisCible: string): Promise<void> {
+  const dbi = await getDb();
+  const sources = await dbi.select({ categorie: budgetsCategories.categorie, budget: budgetsCategories.budget })
+    .from(budgetsCategories)
+    .where(and(eq(budgetsCategories.artisan_id, artisanId), eq(budgetsCategories.mois, moisSource)));
+  for (const s of sources) {
+    await upsertBudget(artisanId, s.categorie as string, moisCible, Number(s.budget || 0));
+  }
+}
+
+// === Règles de catégorisation auto (T10C) ===
+
+export async function getReglesCategorisation(artisanId: number): Promise<any[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(reglesCategorisation)
+    .where(and(eq(reglesCategorisation.artisan_id, artisanId), eq(reglesCategorisation.actif, true)))
+    .orderBy(desc(reglesCategorisation.id));
+}
+
+export async function createRegleCategorisation(artisanId: number, motifLibelle: string, categorie: string): Promise<void> {
+  const dbi = await getDb();
+  await dbi.insert(reglesCategorisation).values({ artisan_id: artisanId, motif_libelle: motifLibelle, categorie });
+}
+
+export async function deleteRegleCategorisation(id: number, artisanId: number): Promise<void> {
+  const dbi = await getDb();
+  // Soft-delete scopé artisan (cohérent avec l'ancien UPDATE actif=FALSE).
+  await dbi.update(reglesCategorisation).set({ actif: false })
+    .where(and(eq(reglesCategorisation.id, id), eq(reglesCategorisation.artisan_id, artisanId)));
+}
+
 // === Relevés bancaires ===
 
 export async function importReleve(
