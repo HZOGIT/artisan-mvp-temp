@@ -2047,7 +2047,9 @@ export async function getDashboardStats(artisanId: number): Promise<any> {
   //
   // Note : colonnes en camelCase (artisanId, totalTTC, datePaiement,
   // dateDebut, createdAt), confirmees via drizzle/schema.ts.
-  const pool = await ensurePool();
+  const dbi = await getDb();
+  // MySQL MONTH()/YEAR()/CURRENT_DATE()/NOW() → PG EXTRACT(... FROM CURRENT_DATE) / NOW().
+  const moisCourant = sql`COALESCE(${factures.datePaiement}, ${factures.createdAt})`;
 
   // Toutes les queries lancees en parallele pour minimiser la latence totale.
   const [
@@ -2061,62 +2063,35 @@ export async function getDashboardStats(artisanId: number): Promise<any> {
     [totalFacturesRow],
     [totalInterventionsRow],
   ] = await Promise.all([
-    pool.execute(
-      `SELECT COALESCE(SUM(totalTTC), 0) AS total
-       FROM factures
-       WHERE artisanId = ?
-         AND statut = 'payee'
-         AND MONTH(COALESCE(datePaiement, createdAt)) = MONTH(CURRENT_DATE())
-         AND YEAR(COALESCE(datePaiement, createdAt))  = YEAR(CURRENT_DATE())`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COALESCE(SUM(totalTTC), 0) AS total
-       FROM factures
-       WHERE artisanId = ?
-         AND statut = 'payee'
-         AND YEAR(COALESCE(datePaiement, createdAt)) = YEAR(CURRENT_DATE())`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt
-       FROM devis
-       WHERE artisanId = ?
-         AND statut IN ('brouillon', 'envoye')`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt, COALESCE(SUM(totalTTC), 0) AS total
-       FROM factures
-       WHERE artisanId = ?
-         AND statut NOT IN ('payee', 'annulee', 'brouillon')`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM clients WHERE artisanId = ?`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt
-       FROM interventions
-       WHERE artisanId = ?
-         AND statut = 'planifiee'
-         AND dateDebut >= NOW()`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM devis WHERE artisanId = ?`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM factures WHERE artisanId = ?`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM interventions WHERE artisanId = ?`,
-      [artisanId]
-    ),
-  ]) as any;
+    dbi.select({ total: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` }).from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, 'payee' as any),
+      sql`EXTRACT(MONTH FROM ${moisCourant}) = EXTRACT(MONTH FROM CURRENT_DATE)`,
+      sql`EXTRACT(YEAR FROM ${moisCourant}) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+    )),
+    dbi.select({ total: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` }).from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, 'payee' as any),
+      sql`EXTRACT(YEAR FROM ${moisCourant}) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(devis).where(and(
+      eq(devis.artisanId, artisanId),
+      inArray(devis.statut, ['brouillon', 'envoye'] as any),
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)`, total: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` }).from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      sql`${factures.statut} NOT IN ('payee', 'annulee', 'brouillon')`,
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(clients).where(eq(clients.artisanId, artisanId)),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(interventions).where(and(
+      eq(interventions.artisanId, artisanId),
+      eq(interventions.statut, 'planifiee' as any),
+      sql`${interventions.dateDebut} >= NOW()`,
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(devis).where(eq(devis.artisanId, artisanId)),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(factures).where(eq(factures.artisanId, artisanId)),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(interventions).where(eq(interventions.artisanId, artisanId)),
+  ].map((q) => q.then((rows: any[]) => [rows] as any))) as any;
 
   const caMonth = Number(caMonthRow?.[0]?.total ?? 0);
   const caYear = Number(caYearRow?.[0]?.total ?? 0);
@@ -4424,13 +4399,8 @@ export function invalidateCache(prefix: string): void {
 // divergence entre schema.ts et la DB, ce qui avait causer le hang Railway.
 // ============================================================================
 
-async function ensurePool() {
-  // Garantit que _pool est initialise avant tout raw query.
-  await getDb();
-  const p = getPool();
-  if (!p) throw new Error('mysql pool unavailable');
-  return p;
-}
+// (OPE-184) `ensurePool()` retiré : plus aucun raw-SQL dans db.ts, tout est en Drizzle.
+// `getPool()` reste exporté pour routers.ts/index.ts (pas encore portés).
 
 export interface ModuleRow {
   id: number;
