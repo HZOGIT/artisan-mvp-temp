@@ -31,4 +31,9 @@ export interface IBadgeRepository {
   // Classement des techniciens du tenant pour une période (lecture, ordre par rang).
   // Scopé artisanId (RLS + filtre) → ne renvoie jamais le classement d'un autre tenant.
   getClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]>;
+
+  // Recalcule (et persiste) le classement de la période courante à partir des
+  // interventions terminées + CA des factures payées du tenant, puis le renvoie.
+  // Tout scopé artisanId (RLS + filtre). Idempotent (purge avant insert).
+  recalculerClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]>;
 }

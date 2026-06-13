@@ -13,6 +13,7 @@ const stubRepo: IBadgeRepository = {
   listBadgesTechnicien: async () => [],
   attribuer: async () => null,
   getClassement: async () => [],
+  recalculerClassement: async () => [],
 };
 
 describe("badges.module", () => {
@@ -30,6 +31,7 @@ describe("badges.module", () => {
       "getClassement",
       "list",
       "listBadgesTechnicien",
+      "recalculerClassement",
       "update",
     ]);
   });
@@ -39,6 +41,7 @@ describe("badges.module", () => {
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "attribuerBadge",
+      "calculerClassement",
       "create",
       "delete",
       "getBadgesTechnicien",

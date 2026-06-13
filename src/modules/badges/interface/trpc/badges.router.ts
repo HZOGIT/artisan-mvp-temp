@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IBadgeRepository } from "../../application/badge-repository";
 import { listBadges, listBadgesDuTechnicien, getClassementTechniciens } from "../../application/read-use-cases";
-import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge } from "../../application/write-use-cases";
+import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge, calculerClassement } from "../../application/write-use-cases";
 
 const categorie = z.enum(["interventions", "avis", "ca", "anciennete", "special"]);
 
@@ -67,5 +67,9 @@ export function createBadgesRouter(repo: IBadgeRepository) {
     getClassement: protectedProcedure
       .input(z.object({ periode: z.enum(["semaine", "mois", "trimestre", "annee"]) }))
       .query(({ ctx, input }) => getClassementTechniciens(repo, ctx.tenant, input.periode)),
+
+    calculerClassement: protectedProcedure
+      .input(z.object({ periode: z.enum(["semaine", "mois", "trimestre", "annee"]) }))
+      .mutation(({ ctx, input }) => calculerClassement(repo, ctx.tenant, input.periode)),
   });
 }

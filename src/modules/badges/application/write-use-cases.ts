@@ -2,6 +2,7 @@ import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "./badge-repository";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 // Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
 // une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
@@ -41,4 +42,13 @@ export async function attribuerBadge(
   const attribution = await repo.attribuer(ctx, technicienId, badgeId, valeurAtteinte);
   if (!attribution) throw new NotFoundError("Technicien ou badge introuvable");
   return attribution;
+}
+
+// Recalcule et persiste le classement des techniciens du tenant pour une période.
+export function calculerClassement(
+  repo: IBadgeRepository,
+  ctx: TenantContext,
+  periode: PeriodeClassement,
+): Promise<ClassementEntry[]> {
+  return repo.recalculerClassement(ctx, periode);
 }

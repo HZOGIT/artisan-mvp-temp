@@ -1,5 +1,5 @@
-import { and, asc, desc, eq } from "drizzle-orm";
-import { badges, badgesTechniciens, classementTechniciens, techniciens } from "../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { badges, badgesTechniciens, classementTechniciens, factures, interventions, techniciens } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -10,6 +10,23 @@ import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 type BadgeRow = typeof badges.$inferSelect;
 type BadgeTechRow = typeof badgesTechniciens.$inferSelect;
 type ClassementRow = typeof classementTechniciens.$inferSelect;
+
+// Bornes de la période courante (mirror legacy). dateFin = aujourd'hui.
+function bornesPeriode(periode: PeriodeClassement, now: Date): { debut: string; fin: string } {
+  let debut: Date;
+  if (periode === "semaine") {
+    debut = new Date(now);
+    debut.setDate(now.getDate() - 7);
+  } else if (periode === "mois") {
+    debut = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (periode === "trimestre") {
+    const q = Math.floor(now.getMonth() / 3) * 3;
+    debut = new Date(now.getFullYear(), q, 1);
+  } else {
+    debut = new Date(now.getFullYear(), 0, 1);
+  }
+  return { debut: debut.toISOString().slice(0, 10), fin: now.toISOString().slice(0, 10) };
+}
 
 function toClassement(r: ClassementRow): ClassementEntry {
   return {
@@ -62,7 +79,11 @@ function toBadgeTech(r: BadgeTechRow): BadgeTechnicien {
 // `badges_techniciens` n'a pas d'artisanId → on vérifie l'appartenance du technicien
 // ET du badge au tenant avant tout accès (ressource hors tenant → []/null) : anti-IDOR.
 export class BadgeRepositoryDrizzle implements IBadgeRepository {
-  constructor(private readonly db: DbClient) {}
+  constructor(
+    private readonly db: DbClient,
+    // Horloge injectable (déterminisme des tests de recalcul).
+    private readonly maintenant: () => Date = () => new Date(),
+  ) {}
 
   list(ctx: TenantContext): Promise<Badge[]> {
     return withTenant(this.db, ctx, async (tx) => {
@@ -168,6 +189,73 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         .where(and(eq(classementTechniciens.artisanId, ctx.artisanId), eq(classementTechniciens.periode, periode)))
         .orderBy(asc(classementTechniciens.rang));
       return rows.map(toClassement);
+    });
+  }
+
+  recalculerClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const { debut, fin } = bornesPeriode(periode, this.maintenant());
+
+      // Agrège par technicien : nb interventions terminées + CA des factures payées
+      // rattachées. Condition `statut='payee'` dans le ON (préserve la sémantique LEFT JOIN).
+      // Tout scopé tenant (interventions.artisanId = ctx.artisanId, RLS sur les 3 tables).
+      const rows = await tx
+        .select({
+          technicienId: interventions.technicienId,
+          nb: sql<number>`count(*)`,
+          ca: sql<string>`coalesce(sum(${factures.totalTTC}), 0)`,
+        })
+        .from(interventions)
+        .leftJoin(factures, and(eq(factures.id, interventions.factureId), eq(factures.statut, "payee")))
+        .where(
+          and(
+            eq(interventions.artisanId, ctx.artisanId),
+            eq(interventions.statut, "terminee"),
+            isNotNull(interventions.technicienId),
+            sql`${interventions.dateDebut}::date between ${debut} and ${fin}`,
+          ),
+        )
+        .groupBy(interventions.technicienId)
+        .orderBy(sql`count(*) desc`, sql`coalesce(sum(${factures.totalTTC}), 0) desc`);
+
+      // Purge le classement existant pour ce couple (artisan, période, début) puis réinsère.
+      await tx
+        .delete(classementTechniciens)
+        .where(
+          and(
+            eq(classementTechniciens.artisanId, ctx.artisanId),
+            eq(classementTechniciens.periode, periode),
+            eq(classementTechniciens.dateDebut, debut),
+          ),
+        );
+
+      let rang = 1;
+      for (const r of rows) {
+        if (r.technicienId == null) continue;
+        const nb = Number(r.nb);
+        const ca = Number(r.ca);
+        const points = nb * 10 + Math.floor(ca / 100);
+        await tx.insert(classementTechniciens).values({
+          technicienId: r.technicienId,
+          artisanId: ctx.artisanId,
+          periode,
+          dateDebut: debut,
+          dateFin: fin,
+          rang,
+          pointsTotal: points,
+          interventions: nb,
+          ca: String(ca),
+        });
+        rang++;
+      }
+
+      // Relit dans la MÊME transaction (les insert ci-dessus ne sont pas encore commités).
+      const finaux = await tx
+        .select()
+        .from(classementTechniciens)
+        .where(and(eq(classementTechniciens.artisanId, ctx.artisanId), eq(classementTechniciens.periode, periode)))
+        .orderBy(asc(classementTechniciens.rang));
+      return finaux.map(toClassement);
     });
   }
 

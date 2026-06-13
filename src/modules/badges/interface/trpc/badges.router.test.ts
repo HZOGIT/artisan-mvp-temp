@@ -48,6 +48,8 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     for (const uid of [UA, UB]) {
       await admin.query('delete from badges_techniciens where "technicienId" in (select id from techniciens where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
       await admin.query('delete from classement_techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+      await admin.query('delete from interventions where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+      await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from badges where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -66,6 +68,8 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     for (const aId of [artisanA, artisanB]) {
       await admin.query('delete from badges_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
       await admin.query('delete from classement_techniciens where "artisanId"=$1', [aId]);
+      await admin.query('delete from interventions where "artisanId"=$1', [aId]);
+      await admin.query('delete from factures where "artisanId"=$1', [aId]);
       await admin.query('delete from techniciens where "artisanId"=$1', [aId]);
       await admin.query('delete from badges where "artisanId"=$1', [aId]);
     }
@@ -153,6 +157,35 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     expect(a1.json().result.data.id).toBe(a2.json().result.data.id);
     const lst = await callQuery(server, "badges.getBadgesTechnicien", { technicienId: techA }, tA);
     expect((lst.json().result.data as Array<{ badgeId: number }>).filter((x) => x.badgeId === bId).length).toBe(1);
+  });
+
+  it("calculerClassement : recalcule à partir des interventions terminées + CA payé, scopé tenant", async () => {
+    const tA = await token(UA);
+    // 2 techniciens de A avec des interventions terminées (période annee → dateDebut = maintenant).
+    const tech2 = (await admin.query('insert into techniciens ("artisanId", nom) values ($1,$2) returning id', [artisanA, "Tech A2"])).rows[0].id as number;
+    // facture payée rattachée (CA) pour techA
+    const facture = (await admin.query(
+      'insert into factures ("artisanId","clientId",numero,statut,"totalTTC") values ($1,$2,$3,$4,$5) returning id',
+      [artisanA, 1, `F-${Date.now()}`, "payee", "500.00"],
+    )).rows[0].id as number;
+    // techA : 2 interventions terminées (dont une avec facture payée) ; tech2 : 1
+    await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut,"technicienId","factureId") values ($1,$2,$3,now(),$4,$5,$6)', [artisanA, 1, "I1", "terminee", techA, facture]);
+    await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut,"technicienId") values ($1,$2,$3,now(),$4,$5)', [artisanA, 1, "I2", "terminee", techA]);
+    await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut,"technicienId") values ($1,$2,$3,now(),$4,$5)', [artisanA, 1, "I3", "terminee", tech2]);
+    // intervention d'un AUTRE tenant (B) → ne doit pas polluer le classement de A
+    await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut,"technicienId") values ($1,$2,$3,now(),$4,$5)', [artisanB, 1, "IB", "terminee", techB]);
+
+    const res = await callMutation(server, "badges.calculerClassement", { periode: "annee" }, tA);
+    expect(res.statusCode).toBe(200);
+    const data = res.json().result.data as Array<{ technicienId: number; artisanId: number; rang: number; interventions: number; pointsTotal: number }>;
+    // tous scopés A, techB absent
+    expect(data.every((c) => c.artisanId === artisanA)).toBe(true);
+    expect(data.some((c) => c.technicienId === techB)).toBe(false);
+    // techA en tête (2 interventions + CA 500 → 2*10 + floor(500/100)=25), tech2 (1*10=10)
+    const top = data.find((c) => c.rang === 1);
+    expect(top?.technicienId).toBe(techA);
+    expect(top?.interventions).toBe(2);
+    expect(top?.pointsTotal).toBe(25);
   });
 
   it("getClassement : scopé tenant (B ne voit pas le classement de A)", async () => {

@@ -105,4 +105,10 @@ export class FakeBadgeRepository implements IBadgeRepository {
       .filter((c) => c.artisanId === ctx.artisanId && c.periode === periode)
       .sort((a, b) => a.rang - b.rang);
   }
+
+  // Recompute no-op (l'agrégation SQL interventions/factures est testée en PG) :
+  // renvoie le classement déjà seedé pour la période, scopé tenant.
+  async recalculerClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]> {
+    return this.getClassement(ctx, periode);
+  }
 }
