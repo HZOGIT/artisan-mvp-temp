@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IStockRepository } from "../../application/stock-repository";
-import { listStocks, getStock, getMouvementsStock } from "../../application/read-use-cases";
+import {
+  listStocks,
+  getStock,
+  getMouvementsStock,
+  listStocksEnAlerte,
+  listStocksEnRupture,
+} from "../../application/read-use-cases";
 import {
   creerStock,
   modifierStock,
@@ -86,5 +92,10 @@ export function createStocksRouter(repo: IStockRepository) {
     getMouvements: protectedProcedure
       .input(z.object({ stockId: z.number().int() }))
       .query(({ ctx, input }) => getMouvementsStock(repo, ctx.tenant, input.stockId)),
+
+    // Alertes de seuil (lecture seule, scopées tenant).
+    getLowStock: protectedProcedure.query(({ ctx }) => listStocksEnAlerte(repo, ctx.tenant)),
+
+    getStocksEnRupture: protectedProcedure.query(({ ctx }) => listStocksEnRupture(repo, ctx.tenant)),
   });
 }

@@ -32,4 +32,10 @@ export interface IStockRepository {
   // Historique des mouvements d'un stock (récents d'abord). null si le stock n'appartient
   // pas au tenant (scope via le stock parent — `mouvements_stock` n'a pas d'artisanId).
   listMouvements(ctx: TenantContext, stockId: number): Promise<MouvementStock[] | null>;
+  // Stocks du tenant sous le seuil d'alerte (`quantiteEnStock <= seuilAlerte`). Inclut les
+  // ruptures. Parité legacy `getLowStockItems`.
+  listLowStock(ctx: TenantContext): Promise<Stock[]>;
+  // Stocks du tenant en rupture stricte (`quantiteEnStock <= 0`, épuisés). Sous-ensemble de
+  // `listLowStock`. (Le legacy conflait les deux ; on distingue ici, plus correct sémantiquement.)
+  listEnRupture(ctx: TenantContext): Promise<Stock[]>;
 }

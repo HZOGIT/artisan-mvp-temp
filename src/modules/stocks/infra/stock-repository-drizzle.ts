@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { stocks, mouvementsStock } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -185,6 +185,33 @@ export class StockRepositoryDrizzle implements IStockRepository {
         .where(eq(mouvementsStock.stockId, stockId))
         .orderBy(desc(mouvementsStock.createdAt), desc(mouvementsStock.id));
       return rows.map(toMouvement);
+    });
+  }
+
+  listLowStock(ctx: TenantContext): Promise<Stock[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(stocks)
+        .where(
+          and(
+            eq(stocks.artisanId, ctx.artisanId),
+            sql`${stocks.quantiteEnStock} <= ${stocks.seuilAlerte}`,
+          ),
+        )
+        .orderBy(asc(stocks.designation), asc(stocks.id));
+      return rows.map(toStock);
+    });
+  }
+
+  listEnRupture(ctx: TenantContext): Promise<Stock[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(stocks)
+        .where(and(eq(stocks.artisanId, ctx.artisanId), sql`${stocks.quantiteEnStock} <= 0`))
+        .orderBy(asc(stocks.designation), asc(stocks.id));
+      return rows.map(toStock);
     });
   }
 }

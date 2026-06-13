@@ -95,4 +95,14 @@ export class FakeStockRepository implements IStockRepository {
       .filter((m) => m.stockId === stockId)
       .sort((a, b) => b.id - a.id);
   }
+
+  async listLowStock(ctx: TenantContext): Promise<Stock[]> {
+    return this.store.filter(
+      (s) => s.artisanId === ctx.artisanId && Number(s.quantiteEnStock) <= Number(s.seuilAlerte),
+    );
+  }
+
+  async listEnRupture(ctx: TenantContext): Promise<Stock[]> {
+    return this.store.filter((s) => s.artisanId === ctx.artisanId && Number(s.quantiteEnStock) <= 0);
+  }
 }

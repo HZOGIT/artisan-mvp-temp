@@ -29,3 +29,13 @@ export async function getMouvementsStock(
   if (mouvements === null) throw new NotFoundError("Stock introuvable");
   return mouvements;
 }
+
+// Stocks sous le seuil d'alerte (inclut les ruptures), scopés tenant.
+export function listStocksEnAlerte(repo: IStockRepository, ctx: TenantContext): Promise<Stock[]> {
+  return repo.listLowStock(ctx);
+}
+
+// Stocks en rupture stricte (épuisés, quantité ≤ 0), scopés tenant.
+export function listStocksEnRupture(repo: IStockRepository, ctx: TenantContext): Promise<Stock[]> {
+  return repo.listEnRupture(ctx);
+}

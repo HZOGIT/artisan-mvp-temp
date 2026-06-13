@@ -187,4 +187,32 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
     const id = (await callMutation(server, "stocks.create", { reference: "ZB", designation: "Borne", quantiteEnStock: "5" }, tA)).json().result.data.id as number;
     expect((await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "entree", quantite: "-2" }, tA)).statusCode).toBe(400);
   });
+
+  it("getLowStock / getStocksEnRupture : seuil et rupture stricte, scopés tenant", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const refBas = `LOW-${Date.now()}`;
+    const refVide = `RUP-${Date.now()}`;
+    const refOk = `OK-${Date.now()}`;
+    await callMutation(server, "stocks.create", { reference: refBas, designation: "Sous seuil", quantiteEnStock: "2", seuilAlerte: "5" }, tA);
+    await callMutation(server, "stocks.create", { reference: refVide, designation: "Épuisé", quantiteEnStock: "0", seuilAlerte: "5" }, tA);
+    await callMutation(server, "stocks.create", { reference: refOk, designation: "Au-dessus", quantiteEnStock: "20", seuilAlerte: "5" }, tA);
+    // B a aussi un stock bas, qui ne doit JAMAIS remonter pour A
+    await callMutation(server, "stocks.create", { reference: `B-${Date.now()}`, designation: "Bas chez B", quantiteEnStock: "0", seuilAlerte: "5" }, tB);
+
+    const low = (await callQuery(server, "stocks.getLowStock", undefined, tA)).json().result.data as Array<{ reference: string }>;
+    const lowRefs = low.map((s) => s.reference);
+    expect(lowRefs).toContain(refBas);
+    expect(lowRefs).toContain(refVide);
+    expect(lowRefs).not.toContain(refOk); // au-dessus du seuil exclu
+
+    const rupture = (await callQuery(server, "stocks.getStocksEnRupture", undefined, tA)).json().result.data as Array<{ reference: string }>;
+    const rupRefs = rupture.map((s) => s.reference);
+    expect(rupRefs).toContain(refVide); // épuisé
+    expect(rupRefs).not.toContain(refBas); // sous seuil mais pas épuisé → pas en rupture
+
+    // aucun stock de B (réf "B-…") ne fuite vers A
+    expect(lowRefs.some((r) => r.startsWith("B-"))).toBe(false);
+    expect(rupRefs.some((r) => r.startsWith("B-"))).toBe(false);
+  });
 });
