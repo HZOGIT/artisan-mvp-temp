@@ -7,6 +7,9 @@ import type {
   CreateEntretienInput,
   AssuranceVehicule,
   CreateAssuranceInput,
+  ReleveKilometrage,
+  CreateKilometrageInput,
+  StatistiquesFlotte,
 } from "../domain/vehicule";
 
 // Port du repository vehicules. CHAQUE méthode exige le TenantContext : le scoping
@@ -35,4 +38,12 @@ export interface IVehiculeRepository {
   addAssurance(ctx: TenantContext, vehiculeId: number, input: CreateAssuranceInput): Promise<AssuranceVehicule | null>;
   // Assurances expirant sous `joursAvant` jours sur toute la flotte du tenant.
   listAssurancesExpirant(ctx: TenantContext, joursAvant: number): Promise<AssuranceVehicule[]>;
+
+  // Relevés kilométriques (scopés via le véhicule owné) : enregistre un relevé d'historique
+  // ET met à jour le compteur du véhicule (non régressif). Renvoie null si véhicule hors tenant.
+  addKilometrage(ctx: TenantContext, vehiculeId: number, input: CreateKilometrageInput): Promise<ReleveKilometrage | null>;
+  getHistoriqueKilometrage(ctx: TenantContext, vehiculeId: number): Promise<ReleveKilometrage[]>;
+
+  // Statistiques agrégées de la flotte du tenant.
+  getStatistiquesFlotte(ctx: TenantContext): Promise<StatistiquesFlotte>;
 }

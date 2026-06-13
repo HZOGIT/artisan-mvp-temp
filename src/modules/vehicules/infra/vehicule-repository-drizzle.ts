@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, gte, lte, isNotNull, getTableColumns, sql } from "drizzle-orm";
-import { vehicules, entretiensVehicules, assurancesVehicules } from "../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, gte, lte, inArray, isNotNull, getTableColumns, sql } from "drizzle-orm";
+import { vehicules, entretiensVehicules, assurancesVehicules, historiqueKilometrage } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -12,11 +12,27 @@ import type {
   CreateEntretienInput,
   AssuranceVehicule,
   CreateAssuranceInput,
+  ReleveKilometrage,
+  CreateKilometrageInput,
+  StatistiquesFlotte,
 } from "../domain/vehicule";
 
 type VehiculeRow = typeof vehicules.$inferSelect;
 type EntretienRow = typeof entretiensVehicules.$inferSelect;
 type AssuranceRow = typeof assurancesVehicules.$inferSelect;
+type ReleveRow = typeof historiqueKilometrage.$inferSelect;
+
+function toReleve(r: ReleveRow): ReleveKilometrage {
+  return {
+    id: r.id,
+    vehiculeId: r.vehiculeId,
+    technicienId: r.technicienId ?? null,
+    kilometrage: r.kilometrage,
+    dateReleve: r.dateReleve,
+    motif: r.motif ?? null,
+    createdAt: r.createdAt,
+  };
+}
 
 function toVehicule(r: VehiculeRow): Vehicule {
   return {
@@ -235,6 +251,84 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
         )
         .orderBy(asc(assurancesVehicules.dateFin));
       return rows.map(toAssurance);
+    });
+  }
+
+  addKilometrage(ctx: TenantContext, vehiculeId: number, input: CreateKilometrageInput): Promise<ReleveKilometrage | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsVehicule(tx, ctx, vehiculeId))) return null;
+      const [row] = await tx
+        .insert(historiqueKilometrage)
+        .values({
+          vehiculeId,
+          kilometrage: input.kilometrage,
+          dateReleve: input.dateReleve,
+          motif: input.motif ?? null,
+          technicienId: input.technicienId ?? null,
+        })
+        .returning();
+      // Met à jour le compteur du véhicule (non régressif).
+      await tx
+        .update(vehicules)
+        .set({ kilometrageActuel: sql`GREATEST(${vehicules.kilometrageActuel}, ${input.kilometrage})` })
+        .where(and(eq(vehicules.id, vehiculeId), eq(vehicules.artisanId, ctx.artisanId)));
+      return toReleve(row);
+    });
+  }
+
+  getHistoriqueKilometrage(ctx: TenantContext, vehiculeId: number): Promise<ReleveKilometrage[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsVehicule(tx, ctx, vehiculeId))) return [];
+      const rows = await tx
+        .select()
+        .from(historiqueKilometrage)
+        .where(eq(historiqueKilometrage.vehiculeId, vehiculeId))
+        .orderBy(desc(historiqueKilometrage.dateReleve), desc(historiqueKilometrage.id));
+      return rows.map(toReleve);
+    });
+  }
+
+  getStatistiquesFlotte(ctx: TenantContext): Promise<StatistiquesFlotte> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const vehs = await tx.select().from(vehicules).where(eq(vehicules.artisanId, ctx.artisanId));
+      const nbVehicules = vehs.length;
+      const nbActifs = vehs.filter((v) => v.statut === "actif").length;
+      const nbEnMaintenance = vehs.filter((v) => v.statut === "en_maintenance").length;
+      const kmTotalFlotte = vehs.reduce((s, v) => s + (v.kilometrageActuel ?? 0), 0);
+      const ids = vehs.map((v) => v.id);
+
+      const year = new Date().getFullYear();
+      let coutEntretienAnneeEnCours = 0;
+      let assurancesAExpirer = 0;
+      if (ids.length > 0) {
+        const ents = await tx
+          .select({ cout: entretiensVehicules.cout })
+          .from(entretiensVehicules)
+          .where(
+            and(
+              inArray(entretiensVehicules.vehiculeId, ids),
+              gte(entretiensVehicules.dateEntretien, `${year}-01-01`),
+              lte(entretiensVehicules.dateEntretien, `${year}-12-31`),
+            ),
+          );
+        coutEntretienAnneeEnCours = ents.reduce((s, e) => s + Number(e.cout ?? 0), 0);
+
+        const today = new Date().toISOString().slice(0, 10);
+        const lim = new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+        const ass = await tx
+          .select({ id: assurancesVehicules.id })
+          .from(assurancesVehicules)
+          .where(
+            and(
+              inArray(assurancesVehicules.vehiculeId, ids),
+              gte(assurancesVehicules.dateFin, today),
+              lte(assurancesVehicules.dateFin, lim),
+            ),
+          );
+        assurancesAExpirer = ass.length;
+      }
+
+      return { nbVehicules, nbActifs, nbEnMaintenance, kmTotalFlotte, coutEntretienAnneeEnCours, assurancesAExpirer };
     });
   }
 

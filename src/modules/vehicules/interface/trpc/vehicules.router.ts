@@ -7,6 +7,7 @@ import {
   updateVehicule,
   deleteVehicule,
   enregistrerKilometrage,
+  enregistrerReleveKilometrage,
   ajouterEntretien,
   ajouterAssurance,
 } from "../../application/write-use-cases";
@@ -85,6 +86,31 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
     updateKilometrage: protectedProcedure
       .input(z.object({ id: z.number().int(), kilometrage: z.number().int().min(0) }))
       .mutation(({ ctx, input }) => enregistrerKilometrage(repo, ctx.tenant, input.id, input.kilometrage)),
+
+    addKilometrage: protectedProcedure
+      .input(
+        z.object({
+          vehiculeId: z.number().int(),
+          kilometrage: z.number().int().min(0),
+          dateReleve: z.string(),
+          motif: z.string().nullish(),
+          technicienId: z.number().int().nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        enregistrerReleveKilometrage(repo, ctx.tenant, input.vehiculeId, {
+          kilometrage: input.kilometrage,
+          dateReleve: input.dateReleve,
+          motif: input.motif,
+          technicienId: input.technicienId,
+        }),
+      ),
+
+    getHistoriqueKilometrage: protectedProcedure
+      .input(vehiculeIdInput)
+      .query(({ ctx, input }) => repo.getHistoriqueKilometrage(ctx.tenant, input.vehiculeId)),
+
+    getStatistiquesFlotte: protectedProcedure.query(({ ctx }) => repo.getStatistiquesFlotte(ctx.tenant)),
 
     getEntretiens: protectedProcedure
       .input(vehiculeIdInput)

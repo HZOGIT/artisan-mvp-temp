@@ -103,3 +103,29 @@ export interface CreateAssuranceInput {
   readonly franchise?: string | null;
   readonly document?: string | null;
 }
+
+export interface ReleveKilometrage {
+  readonly id: number;
+  readonly vehiculeId: number;
+  readonly technicienId: number | null;
+  readonly kilometrage: number;
+  readonly dateReleve: string;
+  readonly motif: string | null;
+  readonly createdAt: Date;
+}
+
+export interface CreateKilometrageInput {
+  readonly kilometrage: number;
+  readonly dateReleve: string;
+  readonly motif?: string | null;
+  readonly technicienId?: number | null;
+}
+
+export interface StatistiquesFlotte {
+  readonly nbVehicules: number;
+  readonly nbActifs: number;
+  readonly nbEnMaintenance: number;
+  readonly kmTotalFlotte: number;
+  readonly coutEntretienAnneeEnCours: number;
+  readonly assurancesAExpirer: number;
+}

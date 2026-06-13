@@ -9,6 +9,8 @@ import type {
   CreateEntretienInput,
   AssuranceVehicule,
   CreateAssuranceInput,
+  ReleveKilometrage,
+  CreateKilometrageInput,
 } from "../domain/vehicule";
 
 // Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
@@ -74,4 +76,18 @@ export async function ajouterAssurance(
   const assurance = await repo.addAssurance(ctx, vehiculeId, input);
   if (!assurance) throw new NotFoundError("Véhicule introuvable");
   return assurance;
+}
+
+export async function enregistrerReleveKilometrage(
+  repo: IVehiculeRepository,
+  ctx: TenantContext,
+  vehiculeId: number,
+  input: CreateKilometrageInput,
+): Promise<ReleveKilometrage> {
+  if (!Number.isInteger(input.kilometrage) || input.kilometrage < 0) {
+    throw new ValidationError("Kilométrage invalide");
+  }
+  const releve = await repo.addKilometrage(ctx, vehiculeId, input);
+  if (!releve) throw new NotFoundError("Véhicule introuvable");
+  return releve;
 }

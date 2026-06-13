@@ -8,6 +8,9 @@ import type {
   CreateEntretienInput,
   AssuranceVehicule,
   CreateAssuranceInput,
+  ReleveKilometrage,
+  CreateKilometrageInput,
+  StatistiquesFlotte,
 } from "../domain/vehicule";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
@@ -16,6 +19,7 @@ export class FakeVehiculeRepository implements IVehiculeRepository {
   private vehiculesStore: Vehicule[] = [];
   private entretiensStore: EntretienVehicule[] = [];
   private assurancesStore: AssuranceVehicule[] = [];
+  private relevesStore: ReleveKilometrage[] = [];
   private seq = 0;
 
   async list(ctx: TenantContext): Promise<Vehicule[]> {
@@ -142,5 +146,51 @@ export class FakeVehiculeRepository implements IVehiculeRepository {
     return this.assurancesStore
       .filter((a) => vehiculesDuTenant.has(a.vehiculeId) && a.dateFin >= today && a.dateFin <= limite)
       .sort((x, y) => x.dateFin.localeCompare(y.dateFin));
+  }
+
+  async addKilometrage(ctx: TenantContext, vehiculeId: number, input: CreateKilometrageInput): Promise<ReleveKilometrage | null> {
+    const v = await this.getById(ctx, vehiculeId);
+    if (!v) return null;
+    const releve: ReleveKilometrage = {
+      id: ++this.seq,
+      vehiculeId,
+      technicienId: input.technicienId ?? null,
+      kilometrage: input.kilometrage,
+      dateReleve: input.dateReleve,
+      motif: input.motif ?? null,
+      createdAt: new Date(),
+    };
+    this.relevesStore.push(releve);
+    await this.update(ctx, vehiculeId, { kilometrageActuel: Math.max(v.kilometrageActuel, input.kilometrage) });
+    return releve;
+  }
+
+  async getHistoriqueKilometrage(ctx: TenantContext, vehiculeId: number): Promise<ReleveKilometrage[]> {
+    if (!(await this.getById(ctx, vehiculeId))) return [];
+    return this.relevesStore
+      .filter((r) => r.vehiculeId === vehiculeId)
+      .sort((a, b) => b.dateReleve.localeCompare(a.dateReleve) || b.id - a.id);
+  }
+
+  async getStatistiquesFlotte(ctx: TenantContext): Promise<StatistiquesFlotte> {
+    const vehs = this.vehiculesStore.filter((v) => v.artisanId === ctx.artisanId);
+    const ids = new Set(vehs.map((v) => v.id));
+    const year = new Date().getFullYear();
+    const today = new Date().toISOString().slice(0, 10);
+    const lim = new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const coutEntretienAnneeEnCours = this.entretiensStore
+      .filter((e) => ids.has(e.vehiculeId) && e.dateEntretien >= `${year}-01-01` && e.dateEntretien <= `${year}-12-31`)
+      .reduce((s, e) => s + Number(e.cout ?? 0), 0);
+    const assurancesAExpirer = this.assurancesStore.filter(
+      (a) => ids.has(a.vehiculeId) && a.dateFin >= today && a.dateFin <= lim,
+    ).length;
+    return {
+      nbVehicules: vehs.length,
+      nbActifs: vehs.filter((v) => v.statut === "actif").length,
+      nbEnMaintenance: vehs.filter((v) => v.statut === "en_maintenance").length,
+      kmTotalFlotte: vehs.reduce((s, v) => s + (v.kilometrageActuel ?? 0), 0),
+      coutEntretienAnneeEnCours,
+      assurancesAExpirer,
+    };
   }
 }
