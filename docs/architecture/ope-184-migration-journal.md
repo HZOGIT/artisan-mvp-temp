@@ -189,7 +189,9 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 - **7e-1 FAIT** (2026-06-13) : routers.ts **metier** (L283 persistMetier + L4736 lecture). ⚠️ Les 2 référençaient un `pool` **hors scope** (latent : aurait planté à l'exécution). Remplacés par les helpers **déjà portés+validés 7d-7** : `db.updateArtisanOnboarding(id,{metier})` et `db.getArtisanOnboardingStatus(id)` (fallback `specialite` conservé). **Validé PG** : re-run `test-onboarding-pg.mjs` 11/11 (couvre metier set/get). tsc neuf vert.
 
-**Prochaine action : P0.7e-2** (routers.ts L~9552 : `const pool = db.getPool()` + 5 `pool.execute` — identifier le bloc/endpoint et porter). Puis 7e-3 (routers.ts 10275/10457/10470/10485), 7e-4..n (index.ts bootstrap/seed). Puis **P0.8** (copie data staging) + **P0.9** (tests sur PG) avant cutover.
+- **7e-2 FAIT** (2026-06-13) : routers.ts **recherche globale** (`searchRouter.global`, 5 `pool.execute`). Extraite en **`db.searchGlobal(artisanId, q)`** (db.ts, Drizzle) ; le router délègue. MySQL `COLLATE utf8mb4_general_ci LIKE` → **`ilike`** (insensible casse ; ⚠️ accents non gérés sans extension `unaccent` — acceptable, recherche non critique), `CONCAT`/`FORMAT`/`DATE_FORMAT` → **construction title/subtitle en JS** (`toLocaleString` → "1,234.56 €", date dd/mm/yyyy). 5 entités (clients/devis/factures/interventions/fournisseurs), scope artisan, limites 5/5/5/5/3. `ilike` ajouté à l'import drizzle-orm. **Validé PG** (`scripts/test-search-pg.mjs`, 11/11) : match ilike, **scope artisan** (client d'un autre artisan exclu), format montant/date, recherche par objet, aucun match → vide. tsc neuf vert.
+
+**Prochaine action : P0.7e-3** (routers.ts L~10275/10457/10470/10485 : 4 blocs `(db as any).getPool()` + `pool.execute` — identifier les endpoints et porter). Puis 7e-4..n (index.ts bootstrap/seed, 16 `.execute`). Puis **P0.8** (copie data staging) + **P0.9** (tests sur PG) avant cutover.
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).

@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 // OPE-184 P0.7 — bascule PG-first : pool/driver Postgres optionnel (DB_DIALECT=postgresql).
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import { Pool as PgPool } from "pg";
-import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne, getTableColumns, notExists } from "drizzle-orm";
+import { eq, and, or, like, ilike, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne, getTableColumns, notExists } from "drizzle-orm";
 import { 
   users, User, InsertUser,
   artisans, Artisan, InsertArtisan,
@@ -2119,6 +2119,56 @@ export async function getDashboardStats(artisanId: number): Promise<any> {
     totalFactures,
     totalInterventions,
   };
+}
+
+// OPE-184 — recherche globale (5 entités) portée en Drizzle. L'ancien raw SQL
+// MySQL utilisait COLLATE utf8mb4_general_ci (insensible casse + accents) + CONCAT/
+// FORMAT/DATE_FORMAT. PG : `ilike` (insensible à la casse ; l'insensibilité aux
+// accents nécessiterait l'extension unaccent, non requise ici) ; title/subtitle
+// construits en JS (FORMAT → toLocaleString, DATE_FORMAT → dd/mm/yyyy).
+export interface SearchResult { id: number; type: string; title: string; subtitle: string; url: string }
+
+export async function searchGlobal(artisanId: number, query: string): Promise<SearchResult[]> {
+  const dbi = await getDb();
+  const like = `%${query}%`;
+  const fmtEur = (v: any) => `${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  const fmtDate = (d: any) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
+  };
+
+  const [clientsRows, devisRows, facturesRows, interventionsRows, fournisseursRows] = await Promise.all([
+    dbi.select({ id: clients.id, nom: clients.nom, prenom: clients.prenom, email: clients.email, telephone: clients.telephone, ville: clients.ville })
+      .from(clients).where(and(eq(clients.artisanId, artisanId), or(
+        ilike(clients.nom, like), ilike(clients.prenom, like), ilike(clients.email, like),
+        ilike(clients.telephone, like), ilike(clients.ville, like),
+      ))).orderBy(desc(clients.id)).limit(5),
+    dbi.select({ id: devis.id, numero: devis.numero, objet: devis.objet, statut: devis.statut, totalTTC: devis.totalTTC })
+      .from(devis).where(and(eq(devis.artisanId, artisanId), or(
+        ilike(devis.numero, like), ilike(devis.objet, like),
+      ))).orderBy(desc(devis.id)).limit(5),
+    dbi.select({ id: factures.id, numero: factures.numero, objet: factures.objet, statut: factures.statut, totalTTC: factures.totalTTC })
+      .from(factures).where(and(eq(factures.artisanId, artisanId), or(
+        ilike(factures.numero, like), ilike(factures.objet, like),
+      ))).orderBy(desc(factures.id)).limit(5),
+    dbi.select({ id: interventions.id, titre: interventions.titre, statut: interventions.statut, dateDebut: interventions.dateDebut })
+      .from(interventions).where(and(eq(interventions.artisanId, artisanId), or(
+        ilike(interventions.titre, like), ilike(interventions.description, like),
+      ))).orderBy(desc(interventions.dateDebut)).limit(5),
+    dbi.select({ id: fournisseurs.id, nom: fournisseurs.nom, email: fournisseurs.email, telephone: fournisseurs.telephone })
+      .from(fournisseurs).where(and(eq(fournisseurs.artisanId, artisanId), or(
+        ilike(fournisseurs.nom, like), ilike(fournisseurs.email, like),
+      ))).orderBy(desc(fournisseurs.id)).limit(3),
+  ]);
+
+  const out: SearchResult[] = [];
+  for (const r of clientsRows) out.push({ id: r.id, type: 'client', title: `${r.prenom || ''} ${r.nom}`.trim(), subtitle: r.email || r.telephone || r.ville || '', url: `/clients/${r.id}` });
+  for (const r of devisRows) out.push({ id: r.id, type: 'devis', title: `${r.numero}${r.objet ? ' — ' + r.objet : ''}`, subtitle: `${r.statut || ''} — ${fmtEur(r.totalTTC)}`, url: `/devis/${r.id}` });
+  for (const r of facturesRows) out.push({ id: r.id, type: 'facture', title: `${r.numero}${r.objet ? ' — ' + r.objet : ''}`, subtitle: `${r.statut || ''} — ${fmtEur(r.totalTTC)}`, url: `/factures/${r.id}` });
+  for (const r of interventionsRows) out.push({ id: r.id, type: 'intervention', title: r.titre, subtitle: `${r.statut || ''} — ${fmtDate(r.dateDebut)}`, url: `/interventions/${r.id}` });
+  for (const r of fournisseursRows) out.push({ id: r.id, type: 'fournisseur', title: r.nom, subtitle: r.email || r.telephone || '', url: `/fournisseurs/${r.id}` });
+  return out;
 }
 
 export async function getMonthlyCAStats(artisanId: number, months: number = 12): Promise<any[]> {
