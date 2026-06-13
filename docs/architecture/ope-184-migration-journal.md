@@ -232,7 +232,14 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ 🎯 La base PostgreSQL staging contient une copie fidèle + financièrement intègre des données mysql staging.** L'app staging tourne TOUJOURS sur mysql (pas de flip `DB_DIALECT` : parité ✓ mais on passe d'abord P0.9).
 
-**Prochaine action : P0.9 (OPE-195) — suite Vitest sur PG (staging ou dev).** Faire tourner les tests d'intégration/sécurité contre PG comme filet de non-régression avant le cutover. Noter les échecs dus à la **pollution de data** (fixtures à IDs fixes vs lignes réelles copiées) ≠ régression de port. Puis **cutover** : flip app staging `DATABASE_URL=postgres://…` + `DB_DIALECT=postgresql` + `depends_on postgres` (commande compose `drizzle-kit migrate` déjà compatible) ; vérifier l'app live sur PG ; puis **down mysql** staging. → OPE-193 Done.
+- **P0.9 (OPE-195) FAIT** (2026-06-13) : **suite Vitest sur PG = filet de non-régression**. Suite complète sur PG (dev) : **310 passés / 30 échoués** (340). Décomposition + **preuve de non-régression par comparaison mysql** :
+  - **21 échecs** = `isolation-multi-tenant.test.ts` (e2e HTTP, 401 — pas de serveur live authentifié). Sur **mysql : 21/21 échouent aussi** → e2e fragile, **dialect-indépendant**.
+  - **9 échecs** = sprint12(3)/security(2)/artisan(2)/sprint13(1)/auth.logout(1) : count mismatches (`27 vs 2`, `13 vs 1` = **pollution data** fixtures à IDs fixes vs lignes copiées/accumulées) + cookie `secure`/`maxAge` (env, pas DB). Sur **mysql : 9/9 échouent aussi**.
+  - **→ Total : 30 échecs PG = 30 échecs mysql, identiques. ZÉRO régression de port PG.** Les 310 tests verts valident le port ; les 30 échecs sont 100% e2e-infra / pollution-data / env, indépendants du dialecte.
+
+**→ 🎯🎯🎯🎯🎯 MIGRATION CODE+DATA VALIDÉE : code 100% Drizzle PG, data staging copiée+intègre, suite de tests sans régression de port.** Il ne reste que le **cutover** (bascule de l'app staging sur PG + arrêt mysql).
+
+**Prochaine action : CUTOVER STAGING (P0.10).** ⚠️ Opération outward-facing sur le déploiement live staging. Étapes : (1) re-ETL final `pg-data-copy.mjs` (rattrape les écritures mysql depuis la 1ère copie — idempotent) ; (2) flip `docker-compose.staging.yml` app : `DATABASE_URL=postgres://…@postgres:5432/artisan_mvp` + `DB_DIALECT=postgresql` + `depends_on: postgres (healthy)` ; (3) `task staging:deploy` (rebuild+restart app) ; (4) **vérifier l'app live sur PG** (boot « postgres », endpoints clés 200, une lecture facture/devis réelle) ; (5) surveiller, puis **`docker compose stop mysql`** (garder le volume mysql en filet de rollback quelques jours avant `down`). → marquer **OPE-193 Done**. Tracer chaque étape (journal/ntfy/Linear).
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
