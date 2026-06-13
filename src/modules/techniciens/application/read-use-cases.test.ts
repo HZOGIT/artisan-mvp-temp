@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeTechnicienRepository } from "../infra/technicien-repository-fake";
-import { listTechniciens, getTechnicien } from "./read-use-cases";
+import { listTechniciens, getTechnicien, listDisponibilites } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -36,5 +36,12 @@ describe("techniciens — use-cases lecture (repo mocké)", () => {
 
   it("getTechnicien sur un id inexistant → NotFoundError", async () => {
     await expect(getTechnicien(repo, A, 99999)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("listDisponibilites : technicien d'un autre tenant → [] (anti-IDOR, sans oracle)", async () => {
+    const [tA] = await listTechniciens(repo, A);
+    await repo.setDisponibilite(A, tA.id, { jourSemaine: 1, heureDebut: "08:00", heureFin: "17:00", disponible: true });
+    expect((await listDisponibilites(repo, A, tA.id)).length).toBe(1);
+    expect(await listDisponibilites(repo, B, tA.id)).toEqual([]);
   });
 });

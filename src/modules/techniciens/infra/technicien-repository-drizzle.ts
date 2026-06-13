@@ -12,8 +12,21 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienRepository } from "../application/technicien-repository";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
+import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 
 type TechnicienRow = typeof techniciens.$inferSelect;
+type DispoRow = typeof disponibilitesTechniciens.$inferSelect;
+
+function toDispo(r: DispoRow): Disponibilite {
+  return {
+    id: r.id,
+    technicienId: r.technicienId,
+    jourSemaine: r.jourSemaine,
+    heureDebut: r.heureDebut,
+    heureFin: r.heureFin,
+    disponible: r.disponible ?? true,
+  };
+}
 
 function toTechnicien(r: TechnicienRow): Technicien {
   return {
@@ -107,5 +120,67 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
         .returning({ id: techniciens.id });
       return deleted.length > 0;
     });
+  }
+
+  listDisponibilites(ctx: TenantContext, technicienId: number): Promise<Disponibilite[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return [];
+      const rows = await tx
+        .select()
+        .from(disponibilitesTechniciens)
+        .where(eq(disponibilitesTechniciens.technicienId, technicienId))
+        .orderBy(asc(disponibilitesTechniciens.jourSemaine));
+      return rows.map(toDispo);
+    });
+  }
+
+  setDisponibilite(
+    ctx: TenantContext,
+    technicienId: number,
+    input: SetDisponibiliteInput,
+  ): Promise<Disponibilite | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
+      // Upsert par (technicienId, jourSemaine) : un seul créneau par jour.
+      const [existing] = await tx
+        .select()
+        .from(disponibilitesTechniciens)
+        .where(
+          and(
+            eq(disponibilitesTechniciens.technicienId, technicienId),
+            eq(disponibilitesTechniciens.jourSemaine, input.jourSemaine),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        const [row] = await tx
+          .update(disponibilitesTechniciens)
+          .set({ heureDebut: input.heureDebut, heureFin: input.heureFin, disponible: input.disponible })
+          .where(eq(disponibilitesTechniciens.id, existing.id))
+          .returning();
+        return toDispo(row);
+      }
+      const [row] = await tx
+        .insert(disponibilitesTechniciens)
+        .values({
+          technicienId,
+          jourSemaine: input.jourSemaine,
+          heureDebut: input.heureDebut,
+          heureFin: input.heureFin,
+          disponible: input.disponible,
+        })
+        .returning();
+      return toDispo(row);
+    });
+  }
+
+  // Le technicien appartient-il au tenant ? (techniciens a un artisanId → RLS + filtre)
+  private async ownsTechnicien(tx: DbClient, ctx: TenantContext, technicienId: number): Promise<boolean> {
+    const [row] = await tx
+      .select({ id: techniciens.id })
+      .from(techniciens)
+      .where(and(eq(techniciens.id, technicienId), eq(techniciens.artisanId, ctx.artisanId)))
+      .limit(1);
+    return Boolean(row);
   }
 }

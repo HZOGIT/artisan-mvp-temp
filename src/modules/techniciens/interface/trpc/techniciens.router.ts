@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ITechnicienRepository } from "../../application/technicien-repository";
-import { listTechniciens, getTechnicien } from "../../application/read-use-cases";
-import { creerTechnicien, modifierTechnicien, supprimerTechnicien } from "../../application/write-use-cases";
+import { listTechniciens, getTechnicien, listDisponibilites } from "../../application/read-use-cases";
+import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite } from "../../application/write-use-cases";
 
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
 const coutHoraire = z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12);
@@ -64,6 +64,25 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
       .mutation(async ({ ctx, input }) => {
         await supprimerTechnicien(repo, ctx.tenant, input.id);
         return { success: true };
+      }),
+
+    getDisponibilites: protectedProcedure
+      .input(z.object({ technicienId: z.number().int() }))
+      .query(({ ctx, input }) => listDisponibilites(repo, ctx.tenant, input.technicienId)),
+
+    setDisponibilite: protectedProcedure
+      .input(
+        z.object({
+          technicienId: z.number().int(),
+          jourSemaine: z.number().int().min(0).max(6),
+          heureDebut: z.string().regex(/^\d{2}:\d{2}$/, "Heure invalide (HH:MM)"),
+          heureFin: z.string().regex(/^\d{2}:\d{2}$/, "Heure invalide (HH:MM)"),
+          disponible: z.boolean(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { technicienId, ...data } = input;
+        return definirDisponibilite(repo, ctx.tenant, technicienId, data);
       }),
   });
 }

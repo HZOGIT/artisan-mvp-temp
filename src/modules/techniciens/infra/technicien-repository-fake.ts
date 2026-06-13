@@ -1,12 +1,19 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienRepository } from "../application/technicien-repository";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
+import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
 // scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
 export class FakeTechnicienRepository implements ITechnicienRepository {
   private store: Technicien[] = [];
+  private dispos: Disponibilite[] = [];
   private seq = 0;
+  private dispoSeq = 0;
+
+  private async owns(ctx: TenantContext, technicienId: number): Promise<boolean> {
+    return (await this.getById(ctx, technicienId)) !== null;
+  }
 
   async list(ctx: TenantContext): Promise<Technicien[]> {
     return this.store.filter((t) => t.artisanId === ctx.artisanId);
@@ -50,6 +57,31 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     const t = await this.getById(ctx, id);
     if (!t) return false;
     this.store = this.store.filter((x) => x.id !== id);
+    this.dispos = this.dispos.filter((d) => d.technicienId !== id);
     return true;
+  }
+
+  async listDisponibilites(ctx: TenantContext, technicienId: number): Promise<Disponibilite[]> {
+    if (!(await this.owns(ctx, technicienId))) return [];
+    return this.dispos
+      .filter((d) => d.technicienId === technicienId)
+      .sort((a, b) => a.jourSemaine - b.jourSemaine);
+  }
+
+  async setDisponibilite(
+    ctx: TenantContext,
+    technicienId: number,
+    input: SetDisponibiliteInput,
+  ): Promise<Disponibilite | null> {
+    if (!(await this.owns(ctx, technicienId))) return null;
+    const existing = this.dispos.find((d) => d.technicienId === technicienId && d.jourSemaine === input.jourSemaine);
+    if (existing) {
+      const updated: Disponibilite = { ...existing, ...input };
+      this.dispos = this.dispos.map((d) => (d.id === existing.id ? updated : d));
+      return updated;
+    }
+    const d: Disponibilite = { id: ++this.dispoSeq, technicienId, ...input };
+    this.dispos.push(d);
+    return d;
   }
 }

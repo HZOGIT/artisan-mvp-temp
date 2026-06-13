@@ -44,6 +44,7 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
 
   beforeAll(async () => {
     for (const uid of [UA, UB]) {
+      await admin.query('delete from disponibilites_techniciens where "technicienId" in (select id from techniciens where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
       await admin.query('delete from techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from artisans where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
@@ -57,6 +58,7 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
   afterAll(async () => {
     await server.close();
     for (const aId of [artisanA, artisanB]) {
+      await admin.query('delete from disponibilites_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
       await admin.query('delete from techniciens where "artisanId"=$1', [aId]);
     }
     for (const uid of [UA, UB]) {
@@ -126,6 +128,27 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     const list = (await callQuery(server, "techniciens.list", undefined, tA)).json().result.data as Array<{ id: number }>;
     const getAll = (await callQuery(server, "techniciens.getAll", undefined, tA)).json().result.data as Array<{ id: number }>;
     expect(getAll.map((t) => t.id).sort()).toEqual(list.map((t) => t.id).sort());
+  });
+
+  it("disponibilités : setDisponibilite (upsert) + getDisponibilites scopés, anti-IDOR", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const techId = (await callMutation(server, "techniciens.create", { nom: "Dispo" }, tA)).json().result.data.id as number;
+    // set OK
+    const set = await callMutation(server, "techniciens.setDisponibilite", { technicienId: techId, jourSemaine: 1, heureDebut: "08:00", heureFin: "17:00", disponible: true }, tA);
+    expect(set.statusCode).toBe(200);
+    // upsert même jour → une seule ligne
+    await callMutation(server, "techniciens.setDisponibilite", { technicienId: techId, jourSemaine: 1, heureDebut: "09:00", heureFin: "18:00", disponible: false }, tA);
+    const lst = await callQuery(server, "techniciens.getDisponibilites", { technicienId: techId }, tA);
+    const data = lst.json().result.data as Array<{ jourSemaine: number; heureDebut: string }>;
+    expect(data.filter((d) => d.jourSemaine === 1).length).toBe(1);
+    expect(data.find((d) => d.jourSemaine === 1)?.heureDebut).toBe("09:00");
+    // validation zod : jourSemaine 7 → 400 ; heure mal formée → 400
+    expect((await callMutation(server, "techniciens.setDisponibilite", { technicienId: techId, jourSemaine: 7, heureDebut: "08:00", heureFin: "17:00", disponible: true }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "techniciens.setDisponibilite", { technicienId: techId, jourSemaine: 2, heureDebut: "8h", heureFin: "17:00", disponible: true }, tA)).statusCode).toBe(400);
+    // anti-IDOR géoloc/planning : B sur le technicien de A → set 404, get → [] (sans oracle)
+    expect((await callMutation(server, "techniciens.setDisponibilite", { technicienId: techId, jourSemaine: 3, heureDebut: "08:00", heureFin: "17:00", disponible: true }, tB)).statusCode).toBe(404);
+    expect((await callQuery(server, "techniciens.getDisponibilites", { technicienId: techId }, tB)).json().result.data).toEqual([]);
   });
 
   it("update partiel : ne touche pas les champs non fournis", async () => {
