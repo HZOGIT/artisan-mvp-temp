@@ -45,6 +45,7 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
   beforeAll(async () => {
     for (const uid of [UA, UB]) {
       await admin.query('delete from disponibilites_techniciens where "technicienId" in (select id from techniciens where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
+      await admin.query('delete from positions_techniciens where "technicienId" in (select id from techniciens where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
       await admin.query('delete from techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from artisans where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
@@ -59,6 +60,7 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     await server.close();
     for (const aId of [artisanA, artisanB]) {
       await admin.query('delete from disponibilites_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
+      await admin.query('delete from positions_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
       await admin.query('delete from techniciens where "artisanId"=$1', [aId]);
     }
     for (const uid of [UA, UB]) {
@@ -149,6 +151,25 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     // anti-IDOR géoloc/planning : B sur le technicien de A → set 404, get → [] (sans oracle)
     expect((await callMutation(server, "techniciens.setDisponibilite", { technicienId: techId, jourSemaine: 3, heureDebut: "08:00", heureFin: "17:00", disponible: true }, tB)).statusCode).toBe(404);
     expect((await callQuery(server, "techniciens.getDisponibilites", { technicienId: techId }, tB)).json().result.data).toEqual([]);
+  });
+
+  it("positions GPS : enregistrer + getDernierePosition scopés, anti-IDOR géoloc", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const techId = (await callMutation(server, "techniciens.create", { nom: "GPS" }, tA)).json().result.data.id as number;
+    // aucune position → null
+    expect((await callQuery(server, "techniciens.getDernierePosition", { technicienId: techId }, tA)).json().result.data).toBeNull();
+    // enregistre 2 positions → la dernière est renvoyée
+    await callMutation(server, "techniciens.enregistrerPosition", { technicienId: techId, latitude: "48.85", longitude: "2.35", batterie: 90 }, tA);
+    const p2 = await callMutation(server, "techniciens.enregistrerPosition", { technicienId: techId, latitude: "45.76", longitude: "4.84", enDeplacement: true }, tA);
+    expect(p2.statusCode).toBe(200);
+    const last = await callQuery(server, "techniciens.getDernierePosition", { technicienId: techId }, tA);
+    expect(Number(last.json().result.data.latitude)).toBeCloseTo(45.76, 2);
+    // validation : latitude hors plage → 400
+    expect((await callMutation(server, "techniciens.enregistrerPosition", { technicienId: techId, latitude: "120", longitude: "2.35" }, tA)).statusCode).toBe(400);
+    // anti-IDOR géoloc : B ne lit/écrit pas la position du technicien de A → null / 404
+    expect((await callQuery(server, "techniciens.getDernierePosition", { technicienId: techId }, tB)).json().result.data).toBeNull();
+    expect((await callMutation(server, "techniciens.enregistrerPosition", { technicienId: techId, latitude: "48.85", longitude: "2.35" }, tB)).statusCode).toBe(404);
   });
 
   it("update partiel : ne touche pas les champs non fournis", async () => {

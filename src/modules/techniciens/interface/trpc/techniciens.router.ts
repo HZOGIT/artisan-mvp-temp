@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ITechnicienRepository } from "../../application/technicien-repository";
-import { listTechniciens, getTechnicien, listDisponibilites } from "../../application/read-use-cases";
-import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite } from "../../application/write-use-cases";
+import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition } from "../../application/read-use-cases";
+import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition } from "../../application/write-use-cases";
 
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
 const coutHoraire = z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12);
@@ -83,6 +83,29 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
       .mutation(({ ctx, input }) => {
         const { technicienId, ...data } = input;
         return definirDisponibilite(repo, ctx.tenant, technicienId, data);
+      }),
+
+    getDernierePosition: protectedProcedure
+      .input(z.object({ technicienId: z.number().int() }))
+      .query(({ ctx, input }) => getDernierePosition(repo, ctx.tenant, input.technicienId)),
+
+    enregistrerPosition: protectedProcedure
+      .input(
+        z.object({
+          technicienId: z.number().int(),
+          latitude: z.string().regex(/^-?\d+(\.\d+)?$/, "Latitude invalide"),
+          longitude: z.string().regex(/^-?\d+(\.\d+)?$/, "Longitude invalide"),
+          precision: z.number().int().nullish(),
+          vitesse: z.string().regex(/^\d+(\.\d{1,2})?$/, "Vitesse invalide").nullish(),
+          cap: z.number().int().min(0).max(360).nullish(),
+          batterie: z.number().int().min(0).max(100).nullish(),
+          enDeplacement: z.boolean().optional(),
+          interventionEnCoursId: z.number().int().nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { technicienId, ...data } = input;
+        return enregistrerPosition(repo, ctx.tenant, technicienId, data);
       }),
   });
 }

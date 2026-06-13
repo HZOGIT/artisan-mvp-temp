@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import {
   techniciens,
   positionsTechniciens,
@@ -13,9 +13,27 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienRepository } from "../application/technicien-repository";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
+import type { Position, EnregistrerPositionInput } from "../domain/position";
 
 type TechnicienRow = typeof techniciens.$inferSelect;
 type DispoRow = typeof disponibilitesTechniciens.$inferSelect;
+type PositionRow = typeof positionsTechniciens.$inferSelect;
+
+function toPosition(r: PositionRow): Position {
+  return {
+    id: r.id,
+    technicienId: r.technicienId,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    precision: r.precision ?? null,
+    vitesse: r.vitesse ?? null,
+    cap: r.cap ?? null,
+    batterie: r.batterie ?? null,
+    enDeplacement: r.enDeplacement ?? false,
+    interventionEnCoursId: r.interventionEnCoursId ?? null,
+    timestamp: r.timestamp,
+  };
+}
 
 function toDispo(r: DispoRow): Disponibilite {
   return {
@@ -171,6 +189,44 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
         })
         .returning();
       return toDispo(row);
+    });
+  }
+
+  getDernierePosition(ctx: TenantContext, technicienId: number): Promise<Position | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
+      const [row] = await tx
+        .select()
+        .from(positionsTechniciens)
+        .where(eq(positionsTechniciens.technicienId, technicienId))
+        .orderBy(desc(positionsTechniciens.id))
+        .limit(1);
+      return row ? toPosition(row) : null;
+    });
+  }
+
+  enregistrerPosition(
+    ctx: TenantContext,
+    technicienId: number,
+    input: EnregistrerPositionInput,
+  ): Promise<Position | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
+      const [row] = await tx
+        .insert(positionsTechniciens)
+        .values({
+          technicienId,
+          latitude: input.latitude,
+          longitude: input.longitude,
+          precision: input.precision ?? null,
+          vitesse: input.vitesse ?? null,
+          cap: input.cap ?? null,
+          batterie: input.batterie ?? null,
+          enDeplacement: input.enDeplacement ?? false,
+          interventionEnCoursId: input.interventionEnCoursId ?? null,
+        })
+        .returning();
+      return toPosition(row);
     });
   }
 

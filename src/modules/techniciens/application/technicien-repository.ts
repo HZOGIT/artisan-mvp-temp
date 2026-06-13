@@ -1,6 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
+import type { Position, EnregistrerPositionInput } from "../domain/position";
 
 // Port du repository techniciens. Chaque méthode exige le TenantContext (scope tenant +
 // RLS). `techniciens` possède un `artisanId` → double cloisonnement RLS + filtre.
@@ -21,4 +22,10 @@ export interface ITechnicienRepository {
   listDisponibilites(ctx: TenantContext, technicienId: number): Promise<Disponibilite[]>;
   // Définit (upsert par jourSemaine) un créneau de disponibilité — null si technicien hors tenant.
   setDisponibilite(ctx: TenantContext, technicienId: number, input: SetDisponibiliteInput): Promise<Disponibilite | null>;
+
+  // Dernière position GPS connue d'un technicien — null si technicien hors tenant ou aucune
+  // position (lecture sans oracle ; la table n'a pas d'artisanId → anti-IDOR géoloc).
+  getDernierePosition(ctx: TenantContext, technicienId: number): Promise<Position | null>;
+  // Enregistre une position GPS — null si le technicien n'appartient pas au tenant.
+  enregistrerPosition(ctx: TenantContext, technicienId: number, input: EnregistrerPositionInput): Promise<Position | null>;
 }

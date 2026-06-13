@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeTechnicienRepository } from "../infra/technicien-repository-fake";
-import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite } from "./write-use-cases";
+import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -53,5 +53,16 @@ describe("techniciens — use-cases écriture (repo mocké)", () => {
     // anti-IDOR : B sur le technicien de A → NotFound
     await expect(definirDisponibilite(repo, B, techA, { jourSemaine: 1, heureDebut: "08:00", heureFin: "17:00", disponible: true })).rejects.toBeInstanceOf(NotFoundError);
     await expectCrossTenantDenied(() => definirDisponibilite(repo, B, techA, { jourSemaine: 1, heureDebut: "08:00", heureFin: "17:00", disponible: true }));
+  });
+
+  it("enregistrerPosition : OK + validations coordonnées + anti-IDOR", async () => {
+    const p = await enregistrerPosition(repo, A, techA, { latitude: "48.85", longitude: "2.35", batterie: 80 });
+    expect(p.latitude).toBe("48.85");
+    // validations plage
+    await expect(enregistrerPosition(repo, A, techA, { latitude: "120", longitude: "2.35" })).rejects.toBeInstanceOf(ValidationError);
+    await expect(enregistrerPosition(repo, A, techA, { latitude: "48.85", longitude: "200" })).rejects.toBeInstanceOf(ValidationError);
+    // anti-IDOR géoloc : B sur le technicien de A → NotFound
+    await expect(enregistrerPosition(repo, B, techA, { latitude: "48.85", longitude: "2.35" })).rejects.toBeInstanceOf(NotFoundError);
+    await expectCrossTenantDenied(() => enregistrerPosition(repo, B, techA, { latitude: "48.85", longitude: "2.35" }));
   });
 });

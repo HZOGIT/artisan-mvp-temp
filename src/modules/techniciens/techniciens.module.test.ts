@@ -12,6 +12,8 @@ const stubRepo: ITechnicienRepository = {
   delete: async () => false,
   listDisponibilites: async () => [],
   setDisponibilite: async () => null,
+  getDernierePosition: async () => null,
+  enregistrerPosition: async () => null,
 };
 
 describe("techniciens.module", () => {
@@ -24,7 +26,9 @@ describe("techniciens.module", () => {
     expect(Object.keys(stubRepo).sort()).toEqual([
       "create",
       "delete",
+      "enregistrerPosition",
       "getById",
+      "getDernierePosition",
       "list",
       "listDisponibilites",
       "setDisponibilite",
@@ -38,8 +42,10 @@ describe("techniciens.module", () => {
     expect(procedures).toEqual([
       "create",
       "delete",
+      "enregistrerPosition",
       "getAll",
       "getById",
+      "getDernierePosition",
       "getDisponibilites",
       "list",
       "setDisponibilite",

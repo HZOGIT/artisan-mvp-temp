@@ -3,6 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienRepository } from "./technicien-repository";
 import type { Technicien } from "../domain/technicien";
 import type { Disponibilite } from "../domain/disponibilite";
+import type { Position } from "../domain/position";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
 // par le `TenantContext` (le repo l'applique). `getTechnicien` sur une ressource d'un
@@ -26,4 +27,14 @@ export function listDisponibilites(
   technicienId: number,
 ): Promise<Disponibilite[]> {
   return repo.listDisponibilites(ctx, technicienId);
+}
+
+// Dernière position GPS d'un technicien — null si technicien hors tenant ou aucune
+// position (lecture sans oracle, anti-IDOR géoloc).
+export function getDernierePosition(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+  technicienId: number,
+): Promise<Position | null> {
+  return repo.getDernierePosition(ctx, technicienId);
 }

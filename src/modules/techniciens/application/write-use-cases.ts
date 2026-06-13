@@ -3,6 +3,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienRepository } from "./technicien-repository";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
+import type { Position, EnregistrerPositionInput } from "../domain/position";
 
 // Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
 // une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
@@ -51,4 +52,21 @@ export async function definirDisponibilite(
   const dispo = await repo.setDisponibilite(ctx, technicienId, input);
   if (!dispo) throw new NotFoundError("Technicien introuvable");
   return dispo;
+}
+
+// Enregistre une position GPS (anti-IDOR : null si technicien hors tenant → NotFound).
+// Valide la plage des coordonnées (latitude -90..90, longitude -180..180).
+export async function enregistrerPosition(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+  technicienId: number,
+  input: EnregistrerPositionInput,
+): Promise<Position> {
+  const lat = Number(input.latitude);
+  const lon = Number(input.longitude);
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new ValidationError("Latitude invalide");
+  if (!Number.isFinite(lon) || lon < -180 || lon > 180) throw new ValidationError("Longitude invalide");
+  const position = await repo.enregistrerPosition(ctx, technicienId, input);
+  if (!position) throw new NotFoundError("Technicien introuvable");
+  return position;
 }

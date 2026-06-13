@@ -2,14 +2,17 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ITechnicienRepository } from "../application/technicien-repository";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
+import type { Position, EnregistrerPositionInput } from "../domain/position";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
 // scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
 export class FakeTechnicienRepository implements ITechnicienRepository {
   private store: Technicien[] = [];
   private dispos: Disponibilite[] = [];
+  private positions: Position[] = [];
   private seq = 0;
   private dispoSeq = 0;
+  private posSeq = 0;
 
   private async owns(ctx: TenantContext, technicienId: number): Promise<boolean> {
     return (await this.getById(ctx, technicienId)) !== null;
@@ -83,5 +86,36 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     const d: Disponibilite = { id: ++this.dispoSeq, technicienId, ...input };
     this.dispos.push(d);
     return d;
+  }
+
+  async getDernierePosition(ctx: TenantContext, technicienId: number): Promise<Position | null> {
+    if (!(await this.owns(ctx, technicienId))) return null;
+    const list = this.positions
+      .filter((p) => p.technicienId === technicienId)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime() || b.id - a.id);
+    return list[0] ?? null;
+  }
+
+  async enregistrerPosition(
+    ctx: TenantContext,
+    technicienId: number,
+    input: EnregistrerPositionInput,
+  ): Promise<Position | null> {
+    if (!(await this.owns(ctx, technicienId))) return null;
+    const p: Position = {
+      id: ++this.posSeq,
+      technicienId,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      precision: input.precision ?? null,
+      vitesse: input.vitesse ?? null,
+      cap: input.cap ?? null,
+      batterie: input.batterie ?? null,
+      enDeplacement: input.enDeplacement ?? false,
+      interventionEnCoursId: input.interventionEnCoursId ?? null,
+      timestamp: new Date(),
+    };
+    this.positions.push(p);
+    return p;
   }
 }
