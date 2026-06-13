@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { INotificationRepository } from "../../application/notification-repository";
 import { listNotifications, compterNonLues } from "../../application/read-use-cases";
 import { marquerLue, marquerToutesLues, archiver } from "../../application/write-use-cases";
+import { genererRappelsFacturesEnRetard } from "../../application/derived-use-cases";
 
 // Bornes alignées sur le legacy : page cap anti-DoS (offset énorme), limit max 100.
 const listInput = z
@@ -51,5 +52,11 @@ export function createNotificationsRouter(repo: INotificationRepository) {
         await archiver(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // Logique dérivée : génère les rappels pour les factures impayées en retard (idempotent).
+    generateOverdueReminders: protectedProcedure.mutation(async ({ ctx }) => {
+      const { rappelsCreated } = await genererRappelsFacturesEnRetard(repo, ctx.tenant);
+      return { success: true, rappelsCreated };
+    }),
   });
 }

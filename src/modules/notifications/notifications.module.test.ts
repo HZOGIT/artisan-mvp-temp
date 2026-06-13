@@ -37,6 +37,14 @@ describe("notifications.module", () => {
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createNotificationsModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["archive", "delete", "getUnreadCount", "list", "markAllAsRead", "markAsRead"]);
+    expect(procedures).toEqual([
+      "archive",
+      "delete",
+      "generateOverdueReminders",
+      "getUnreadCount",
+      "list",
+      "markAllAsRead",
+      "markAsRead",
+    ]);
   });
 });
