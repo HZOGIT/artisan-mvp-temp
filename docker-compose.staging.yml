@@ -27,6 +27,29 @@ services:
       retries: 10
       start_period: 30s
 
+  # OPE-184 (P0.8a) — Postgres cible de la migration MySQL→PG. Provisionné AVANT
+  # le cutover : l'app reste sur mysql (DATABASE_URL ci-dessous) tant que la parité
+  # data n'est pas confirmée. Cutover = (1) ETL `scripts/pg-data-copy.mjs`, (2) flip
+  # DATABASE_URL→postgres:// + DB_DIALECT=postgresql + depends_on postgres, (3) down mysql.
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: artisan_mvp
+      POSTGRES_USER: ${POSTGRES_USER:-artisan_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-artisan_password}
+    ports:
+      # Port hôte différent du dev (5432) pour debug.
+      - "5433:5432"
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-artisan_user} -d artisan_mvp"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   app:
     image: node:22-slim
     working_dir: /app
@@ -65,4 +88,5 @@ services:
 
 volumes:
   mysql_staging_data:
+  postgres_staging_data:
   app_staging_node_modules:
