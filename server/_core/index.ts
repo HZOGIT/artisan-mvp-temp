@@ -1565,16 +1565,8 @@ RÈGLES STRICTES sur les outils :
       //    envois d'email pour ne pas envoyer un J-3 alors qu'il est deja
       //    a 0 jour (edge case du scheduler qui aurait saute des heures).
       try {
-        const pool = db.getPool();
-        if (pool) {
-          const [r] = await pool.execute(
-            `UPDATE subscriptions SET status='expired', plan='expired'
-             WHERE status='trialing' AND trial_ends_at < NOW()`
-          ) as any;
-          if (r.affectedRows > 0) {
-            console.log(`[Scheduler] ${r.affectedRows} trial(s) expire(s) -> plan='expired'`);
-          }
-        }
+        const n = await db.expireTrials();
+        if (n > 0) console.log(`[Scheduler] ${n} trial(s) expire(s) -> plan='expired'`);
       } catch (e: any) {
         console.warn("[Scheduler] expire trials:", e?.message || e);
       }
@@ -1583,54 +1575,26 @@ RÈGLES STRICTES sur les outils :
       //    On utilise DATE() pour matcher par jour calendaire et eviter
       //    un envoi a la minute pres.
       try {
-        const pool = db.getPool();
-        if (pool) {
-          const [rows] = await pool.execute(`
-            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
-            FROM artisans a
-            JOIN users u ON u.id = a.userId
-            JOIN subscriptions s ON s.artisan_id = a.id
-            WHERE s.status = 'trialing'
-              AND DATE(s.trial_ends_at) = DATE(DATE_ADD(NOW(), INTERVAL 3 DAY))
-          `) as any;
-          for (const row of rows as any[]) {
-            if (!row.email) continue;
-            const { subject, body } = buildTrialEndingJ3Email({
-              firstName: row.prenom, appUrl,
-            });
-            await sendEmail({ to: row.email, subject, body });
-          }
-          if ((rows as any[]).length > 0) {
-            console.log(`[Scheduler] ${(rows as any[]).length} email(s) J-3 envoye(s)`);
-          }
+        const rows = await db.getTrialEndingRecipients(3);
+        for (const row of rows) {
+          if (!row.email) continue;
+          const { subject, body } = buildTrialEndingJ3Email({ firstName: row.prenom ?? undefined, appUrl });
+          await sendEmail({ to: row.email, subject, body });
         }
+        if (rows.length > 0) console.log(`[Scheduler] ${rows.length} email(s) J-3 envoye(s)`);
       } catch (e: any) {
         console.warn("[Scheduler] J-3:", e?.message || e);
       }
 
       // 4) Emails J-1.
       try {
-        const pool = db.getPool();
-        if (pool) {
-          const [rows] = await pool.execute(`
-            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
-            FROM artisans a
-            JOIN users u ON u.id = a.userId
-            JOIN subscriptions s ON s.artisan_id = a.id
-            WHERE s.status = 'trialing'
-              AND DATE(s.trial_ends_at) = DATE(DATE_ADD(NOW(), INTERVAL 1 DAY))
-          `) as any;
-          for (const row of rows as any[]) {
-            if (!row.email) continue;
-            const { subject, body } = buildTrialEndingJ1Email({
-              firstName: row.prenom, appUrl,
-            });
-            await sendEmail({ to: row.email, subject, body });
-          }
-          if ((rows as any[]).length > 0) {
-            console.log(`[Scheduler] ${(rows as any[]).length} email(s) J-1 envoye(s)`);
-          }
+        const rows = await db.getTrialEndingRecipients(1);
+        for (const row of rows) {
+          if (!row.email) continue;
+          const { subject, body } = buildTrialEndingJ1Email({ firstName: row.prenom ?? undefined, appUrl });
+          await sendEmail({ to: row.email, subject, body });
         }
+        if (rows.length > 0) console.log(`[Scheduler] ${rows.length} email(s) J-1 envoye(s)`);
       } catch (e: any) {
         console.warn("[Scheduler] J-1:", e?.message || e);
       }
@@ -1639,25 +1603,13 @@ RÈGLES STRICTES sur les outils :
       //    bien demarrer (devis IA, import clients, paiement en ligne).
       try {
         const { buildDiscoveryJ3Email } = await import("./emailService");
-        const pool = db.getPool();
-        if (pool) {
-          const [rows] = await pool.execute(`
-            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
-            FROM artisans a
-            JOIN users u ON u.id = a.userId
-            WHERE DATE(u.createdAt) = DATE(DATE_SUB(NOW(), INTERVAL 3 DAY))
-          `) as any;
-          for (const row of rows as any[]) {
-            if (!row.email) continue;
-            const { subject, body } = buildDiscoveryJ3Email({
-              firstName: row.prenom, appUrl,
-            });
-            await sendEmail({ to: row.email, subject, body });
-          }
-          if ((rows as any[]).length > 0) {
-            console.log(`[Scheduler] ${(rows as any[]).length} email(s) decouverte J+3 envoye(s)`);
-          }
+        const rows = await db.getDiscoveryRecipients(3);
+        for (const row of rows) {
+          if (!row.email) continue;
+          const { subject, body } = buildDiscoveryJ3Email({ firstName: row.prenom ?? undefined, appUrl });
+          await sendEmail({ to: row.email, subject, body });
         }
+        if (rows.length > 0) console.log(`[Scheduler] ${rows.length} email(s) decouverte J+3 envoye(s)`);
       } catch (e: any) {
         console.warn("[Scheduler] J+3:", e?.message || e);
       }

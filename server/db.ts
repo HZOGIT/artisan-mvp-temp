@@ -7456,6 +7456,42 @@ export async function deleteRegleCategorisation(id: number, artisanId: number): 
     .where(and(eq(reglesCategorisation.id, id), eq(reglesCategorisation.artisan_id, artisanId)));
 }
 
+// === Scheduler (T5) : expiration trials + destinataires emails — portés en Drizzle ===
+
+// Bascule les trials échus en 'expired' (status + plan). Renvoie le nb de lignes touchées.
+export async function expireTrials(): Promise<number> {
+  const dbi = await getDb();
+  const updated = await dbi.update(subscriptions)
+    .set({ status: "expired", plan: "expired" })
+    .where(and(eq(subscriptions.status, "trialing"), sql`${subscriptions.trial_ends_at} < NOW()`))
+    .returning({ id: subscriptions.id });
+  return updated.length;
+}
+
+// Destinataires d'un email de fin d'essai à J-N (trial_ends_at = aujourd'hui + N jours).
+export async function getTrialEndingRecipients(daysAhead: number): Promise<Array<{ artisanId: number; email: string | null; prenom: string | null }>> {
+  const dbi = await getDb();
+  const cible = new Date(Date.now() + daysAhead * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  return await dbi.select({ artisanId: artisans.id, email: users.email, prenom: users.prenom })
+    .from(artisans)
+    .innerJoin(users, eq(users.id, artisans.userId))
+    .innerJoin(subscriptions, eq(subscriptions.artisan_id, artisans.id))
+    .where(and(
+      eq(subscriptions.status, "trialing"),
+      sql`DATE(${subscriptions.trial_ends_at}) = ${cible}`,
+    ));
+}
+
+// Destinataires de l'email découverte J+N après inscription (users.createdAt = aujourd'hui - N jours).
+export async function getDiscoveryRecipients(daysAfterSignup: number): Promise<Array<{ artisanId: number; email: string | null; prenom: string | null }>> {
+  const dbi = await getDb();
+  const cible = new Date(Date.now() - daysAfterSignup * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  return await dbi.select({ artisanId: artisans.id, email: users.email, prenom: users.prenom })
+    .from(artisans)
+    .innerJoin(users, eq(users.id, artisans.userId))
+    .where(sql`DATE(${users.createdAt}) = ${cible}`);
+}
+
 // === Bibliothèque d'articles (catalogue public, endpoints /api/articles/*) ===
 
 // Recherche d'articles visibles (nom/description/categorie ilike) + filtres optionnels.
