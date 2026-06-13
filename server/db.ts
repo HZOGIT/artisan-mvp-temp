@@ -90,7 +90,7 @@ import {
   interventionsMobile, photosInterventions,
   depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
   relevesBancaires, transactionsBancaires, reglesCategorisation,
-  couleursInterventions, modules, artisanModules, subscriptions,
+  couleursInterventions, modules, artisanModules, subscriptions, devices,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -4706,12 +4706,10 @@ function rowToDevice(r: any): DeviceRow {
 
 export async function getDevices(userId: number): Promise<DeviceRow[]> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM devices WHERE user_id = ? ORDER BY last_active_at DESC',
-      [userId]
-    ) as any;
-    return (rows as any[]).map(rowToDevice);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(devices)
+      .where(eq(devices.user_id, userId)).orderBy(desc(devices.last_active_at));
+    return rows.map(rowToDevice);
   } catch {
     return [];
   }
@@ -4719,13 +4717,10 @@ export async function getDevices(userId: number): Promise<DeviceRow[]> {
 
 export async function getDevice(userId: number, fingerprint: string): Promise<DeviceRow | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM devices WHERE user_id = ? AND device_fingerprint = ? LIMIT 1',
-      [userId, fingerprint]
-    ) as any;
-    const r = (rows as any[])[0];
-    return r ? rowToDevice(r) : null;
+    const dbi = await getDb();
+    const rows = await dbi.select().from(devices)
+      .where(and(eq(devices.user_id, userId), eq(devices.device_fingerprint, fingerprint))).limit(1);
+    return rows[0] ? rowToDevice(rows[0]) : null;
   } catch {
     return null;
   }
@@ -4741,27 +4736,19 @@ export async function registerDevice(params: {
   ip: string;
 }): Promise<void> {
   try {
-    const pool = await ensurePool();
-    await pool.execute(
-      `INSERT INTO devices
-         (user_id, artisan_id, device_fingerprint, device_type, browser, os, last_ip)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         device_type = VALUES(device_type),
-         browser = VALUES(browser),
-         os = VALUES(os),
-         last_ip = VALUES(last_ip),
-         last_active_at = CURRENT_TIMESTAMP`,
-      [
-        params.userId,
-        params.artisanId,
-        params.fingerprint,
-        params.deviceType,
-        params.browser,
-        params.os,
-        params.ip,
-      ]
-    );
+    const dbi = await getDb();
+    // Upsert sur l'unique (user_id, device_fingerprint). last_active_at rafraîchi
+    // explicitement à CURRENT_TIMESTAMP en cas de conflit (le device se reconnecte).
+    await dbi.insert(devices).values({
+      user_id: params.userId, artisan_id: params.artisanId, device_fingerprint: params.fingerprint,
+      device_type: params.deviceType, browser: params.browser, os: params.os, last_ip: params.ip,
+    }).onConflictDoUpdate({
+      target: [devices.user_id, devices.device_fingerprint],
+      set: {
+        device_type: params.deviceType, browser: params.browser, os: params.os,
+        last_ip: params.ip, last_active_at: sql`CURRENT_TIMESTAMP`,
+      },
+    });
   } catch (e: any) {
     // On ne bloque jamais la requete utilisateur sur un fail d'enregistrement
     // device. On loggue et on continue.
@@ -4771,30 +4758,27 @@ export async function registerDevice(params: {
 
 export async function countActiveDevices(userId: number): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT COUNT(DISTINCT device_fingerprint) AS cnt FROM devices WHERE user_id = ?',
-      [userId]
-    ) as any;
-    return Number((rows as any[])[0]?.cnt || 0);
+    const dbi = await getDb();
+    const [row] = await dbi.select({ cnt: sql<number>`COUNT(DISTINCT ${devices.device_fingerprint})` })
+      .from(devices).where(eq(devices.user_id, userId));
+    return Number(row?.cnt || 0);
   } catch {
     return 0;
   }
 }
 
 export async function deleteDevice(deviceId: number, userId: number): Promise<void> {
-  const pool = await ensurePool();
-  await pool.execute('DELETE FROM devices WHERE id = ? AND user_id = ?', [deviceId, userId]);
+  const dbi = await getDb();
+  await dbi.delete(devices).where(and(eq(devices.id, deviceId), eq(devices.user_id, userId)));
 }
 
 export async function deleteOtherDevices(userId: number, currentFingerprint: string): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [r] = await pool.execute(
-      'DELETE FROM devices WHERE user_id = ? AND device_fingerprint != ?',
-      [userId, currentFingerprint]
-    ) as any;
-    return Number(r.affectedRows || 0);
+    const dbi = await getDb();
+    const deleted = await dbi.delete(devices)
+      .where(and(eq(devices.user_id, userId), ne(devices.device_fingerprint, currentFingerprint)))
+      .returning({ id: devices.id });
+    return deleted.length;
   } catch {
     return 0;
   }
