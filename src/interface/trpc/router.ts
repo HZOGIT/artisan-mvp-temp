@@ -3,10 +3,12 @@ import { createVehiculesRouter } from "../../modules/vehicules/interface/trpc/ve
 import type { IVehiculeRepository } from "../../modules/vehicules/application/vehicule-repository";
 import { createAvisRouter } from "../../modules/avis/interface/trpc/avis.router";
 import type { IAvisRepository } from "../../modules/avis/application/avis-repository";
+import type { DemandeAvisDeps } from "../../modules/avis/application/demande-avis-use-cases";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
   readonly avisRepo: IAvisRepository;
+  readonly demandeAvisDeps: DemandeAvisDeps;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -20,7 +22,7 @@ export function createAppRouter(deps: AppRouterDeps) {
       role: ctx.tenant.role ?? null,
     })),
     vehicules: createVehiculesRouter(deps.vehiculeRepo),
-    avis: createAvisRouter(deps.avisRepo),
+    avis: createAvisRouter(deps.avisRepo, deps.demandeAvisDeps),
   });
 }
 

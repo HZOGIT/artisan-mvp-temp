@@ -3,6 +3,11 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IAvisRepository } from "../../application/avis-repository";
 import { listAvisEnrichi, getAvis, getAvisStats } from "../../application/read-use-cases";
 import { repondreAvis, changerStatutAvis } from "../../application/write-use-cases";
+import {
+  envoyerDemandeAvis,
+  envoyerDemandeAvisParClient,
+  type DemandeAvisDeps,
+} from "../../application/demande-avis-use-cases";
 
 const idInput = z.object({ id: z.number().int() });
 // Parité legacy avisRouter : input.avisId pour repondre/moderer.
@@ -11,10 +16,10 @@ const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publ
 
 // Routeur tRPC du domaine avis. Transport mince : valide les inputs (zod), délègue aux
 // use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400) au middleware. Repository injecté (DI) → testable.
-// `getAll` = alias de `list` (parité legacy). Le workflow email demande d'avis
-// (envoyerDemande/envoyerDemandeParClient) est traité dans une étape métier ultérieure.
-export function createAvisRouter(repo: IAvisRepository) {
+// (NotFound→404, Validation→400, TooManyRequests→429) au middleware. Repository et
+// dépendances du workflow demande d'avis injectés (DI) → testable.
+// `getAll` = alias de `list` (parité legacy).
+export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvisDeps) {
   return router({
     // Parité legacy : list/getAll renvoient l'avis enrichi (client + intervention).
     list: protectedProcedure.query(({ ctx }) => listAvisEnrichi(repo, ctx.tenant)),
@@ -33,5 +38,14 @@ export function createAvisRouter(repo: IAvisRepository) {
     moderer: protectedProcedure
       .input(modererSchema)
       .mutation(({ ctx, input }) => changerStatutAvis(repo, ctx.tenant, input.avisId, input.statut)),
+
+    // Workflow demande d'avis (parité legacy) : envoi d'un lien d'avis au client.
+    envoyerDemande: protectedProcedure
+      .input(z.object({ interventionId: z.number().int() }))
+      .mutation(({ ctx, input }) => envoyerDemandeAvis(demandeDeps, ctx.tenant, input.interventionId)),
+
+    envoyerDemandeParClient: protectedProcedure
+      .input(z.object({ clientId: z.number().int() }))
+      .mutation(({ ctx, input }) => envoyerDemandeAvisParClient(demandeDeps, ctx.tenant, input.clientId)),
   });
 }
