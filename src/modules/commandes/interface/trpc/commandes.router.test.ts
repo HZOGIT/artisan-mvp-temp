@@ -120,4 +120,32 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     expect((await callMutation(server, "commandes.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "commandes.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("getById / update / delete sur un id inexistant du même tenant → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "commandes.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandes.update", { id: 999999999, notes: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandes.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : quantite ≤ 0, lignes > 500, designation vide, tauxTVA > 100 → 400", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ ...ligne, quantite: 0 }] }, tA)).statusCode).toBe(400);
+    const trop = Array.from({ length: 501 }, () => ligne);
+    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: trop }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ ...ligne, designation: "" }] }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ ...ligne, tauxTVA: 150 }] }, tA)).statusCode).toBe(400);
+  });
+
+  it("getLignes reflète les lignes créées (quantité/prix/montantTotal serveur)", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ designation: "Coude", quantite: 4, prixUnitaire: 2.5, tauxTVA: 10 }] }, tA)).json().result.data.id as number;
+    const lignes = (await callQuery(server, "commandes.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ designation: string; quantite: string; prixUnitaire: string; montantTotal: string; quantiteRecue: string }>;
+    expect(lignes.length).toBe(1);
+    expect(lignes[0].designation).toBe("Coude");
+    expect(lignes[0].quantite).toBe("4.00");
+    expect(lignes[0].prixUnitaire).toBe("2.50");
+    expect(lignes[0].montantTotal).toBe("10.00"); // 4 × 2.5
+    expect(lignes[0].quantiteRecue).toBe("0.00");
+  });
 });
