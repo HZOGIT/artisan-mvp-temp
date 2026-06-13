@@ -14,6 +14,9 @@ import type { IDemandeAvisRepository } from "./modules/avis/application/demande-
 import { createBadgesModule } from "./modules/badges/badges.module";
 import { BadgeRepositoryDrizzle } from "./modules/badges/infra/badge-repository-drizzle";
 import type { IBadgeRepository } from "./modules/badges/application/badge-repository";
+import { createTechniciensModule } from "./modules/techniciens/techniciens.module";
+import { TechnicienRepositoryDrizzle } from "./modules/techniciens/infra/technicien-repository-drizzle";
+import type { ITechnicienRepository } from "./modules/techniciens/application/technicien-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -28,6 +31,7 @@ export interface AppDeps extends ContextDeps {
   readonly rateLimiter?: RateLimiterPort;
   readonly lienBaseUrl?: string;
   readonly badgeRepo?: IBadgeRepository;
+  readonly technicienRepo?: ITechnicienRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -51,7 +55,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const badges = createBadgesModule({
     repository: deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges });
+  const techniciens = createTechniciensModule({
+    repository: deps.technicienRepo ?? new TechnicienRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

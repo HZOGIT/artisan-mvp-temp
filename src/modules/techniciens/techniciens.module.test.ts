@@ -12,7 +12,7 @@ const stubRepo: ITechnicienRepository = {
   delete: async () => false,
 };
 
-describe("techniciens.module (scaffold)", () => {
+describe("techniciens.module", () => {
   it("createTechniciensModule câble le repository injecté", () => {
     const module = createTechniciensModule({ repository: stubRepo });
     expect(module.deps.repository).toBe(stubRepo);
@@ -20,5 +20,11 @@ describe("techniciens.module (scaffold)", () => {
 
   it("le port expose les opérations attendues", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+  });
+
+  it("expose un routeur tRPC assemblé (procédures parité)", () => {
+    const module = createTechniciensModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["create", "delete", "getAll", "getById", "list", "update"]);
   });
 });
