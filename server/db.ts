@@ -534,9 +534,12 @@ export async function getDevisById(id: number): Promise<Devis | undefined> {
   return result[0];
 }
 
-export async function getDevisByClientId(clientId: number): Promise<Devis[]> {
+export async function getDevisByClientId(clientId: number, artisanId?: number): Promise<Devis[]> {
   const db = await getDb();
-  return await db.select().from(devis).where(eq(devis.clientId, clientId)).orderBy(desc(devis.createdAt));
+  // artisanId optionnel : scope tenant defense-in-depth (portail public notamment).
+  const conds = [eq(devis.clientId, clientId)];
+  if (artisanId !== undefined) conds.push(eq(devis.artisanId, artisanId));
+  return await db.select().from(devis).where(and(...conds)).orderBy(desc(devis.createdAt));
 }
 
 export async function getNextDevisNumber(artisanId: number): Promise<string> {
@@ -688,9 +691,12 @@ export async function getFactureById(id: number): Promise<Facture | undefined> {
   return result[0];
 }
 
-export async function getFacturesByClientId(clientId: number): Promise<Facture[]> {
+export async function getFacturesByClientId(clientId: number, artisanId?: number): Promise<Facture[]> {
   const db = await getDb();
-  return await db.select().from(factures).where(eq(factures.clientId, clientId)).orderBy(desc(factures.createdAt));
+  // artisanId optionnel : scope tenant defense-in-depth (portail public notamment).
+  const conds = [eq(factures.clientId, clientId)];
+  if (artisanId !== undefined) conds.push(eq(factures.artisanId, artisanId));
+  return await db.select().from(factures).where(and(...conds)).orderBy(desc(factures.createdAt));
 }
 
 // OPE-144 — encours client (lecture seule, sans migration). Somme du reste dû
@@ -1095,9 +1101,12 @@ export async function getConflitsTechnicien(
   return { interventions: inter as any, conges: congesList as any };
 }
 
-export async function getInterventionsByClientId(clientId: number): Promise<Intervention[]> {
+export async function getInterventionsByClientId(clientId: number, artisanId?: number): Promise<Intervention[]> {
   const db = await getDb();
-  return await db.select().from(interventions).where(eq(interventions.clientId, clientId)).orderBy(desc(interventions.dateDebut));
+  // artisanId optionnel : scope tenant defense-in-depth (portail public notamment).
+  const conds = [eq(interventions.clientId, clientId)];
+  if (artisanId !== undefined) conds.push(eq(interventions.artisanId, artisanId));
+  return await db.select().from(interventions).where(and(...conds)).orderBy(desc(interventions.dateDebut));
 }
 
 export async function getUpcomingInterventions(artisanId: number, days: number = 7): Promise<Intervention[]> {

@@ -4533,7 +4533,7 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      const devisList = await db.getDevisByClientId(access.clientId);
+      const devisList = await db.getDevisByClientId(access.clientId, access.artisanId);
       return devisList.map(d => ({
         id: d.id,
         numero: d.numero,
@@ -4553,7 +4553,7 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      const facturesList = await db.getFacturesByClientId(access.clientId);
+      const facturesList = await db.getFacturesByClientId(access.clientId, access.artisanId);
       // Récupérer les paiements pour chaque facture
       const facturesWithPayments = await Promise.all(facturesList.map(async (f) => {
         const paiements = await db.getPaiementsByFactureId(f.id);
@@ -4580,7 +4580,7 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      const interventionsList = await db.getInterventionsByClientId(access.clientId);
+      const interventionsList = await db.getInterventionsByClientId(access.clientId, access.artisanId);
       return interventionsList.map(i => ({
         id: i.id,
         titre: i.titre,
@@ -6047,7 +6047,7 @@ const avisRouter = router({
       }
 
       // Trouver la dernière intervention pour ce client
-      const interventions = await db.getInterventionsByClientId(input.clientId);
+      const interventions = await db.getInterventionsByClientId(input.clientId, artisan.id);
       const artisanInterventions = interventions.filter(i => i.artisanId === artisan.id);
 
       // Utiliser la dernière intervention, ou créer une demande sans intervention spécifique
