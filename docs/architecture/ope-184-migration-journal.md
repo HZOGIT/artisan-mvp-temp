@@ -144,7 +144,9 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 - **7c-6a FAIT** (2026-06-13) : `saveConfigurationComptable` (+ variante `saveSyncConfigComptable`) → Drizzle. `INSERT … ON DUPLICATE KEY UPDATE` (clé unique artisanId) → **upsert select-puis-insert/update** neutre dialecte. **Whitelist `CONFIG_COMPTABLE_COLS` conservée** (defense-in-depth audit injection SQL 2026-06-13). **Validé PG** (`scripts/test-config-comptable-pg.mjs`, 11/11) : insert, update idempotent (1 seule ligne/artisan), whitelist (colonne non autorisée ignorée), variante sync partielle préserve les champs existants. tsc vert.
 
-**Prochaine action : P0.7c-6b** (`genererFEC` — le générateur FEC 18 colonnes équilibré par construction, 5 raw SQL : factures/depenses/encaissements ; vérifier **totalDébit = totalCrédit**, écart=0). Puis 7c-6c (genererExportFEC/IIF, exportDepensesFEC, getPendingItemsComptables, lancerSynchronisationComptable, getDeclarationTVADetail), puis 7c-7 (banque).
+- **7c-6b FAIT** (2026-06-13) : `genererFEC` → Drizzle. Les **4 SELECT raw** (factures⋈clients, factures_lignes GROUP BY/HAVING, depenses, encaissements payés) portés en Drizzle ; toute la logique JS d'écritures (sens débit/crédit, avoir OPE-136, TVA ventilée par taux, lettrage) **inchangée**. `DATE(dateFacture/datePaiement) BETWEEN` conservé en `sql\`\`` brut (neutre dialecte PG+mysql). pool→getDb. **Validé PG** (`scripts/test-fec-pg.mjs`, 11/11) : **FEC équilibré écart=0, totalDébit=totalCrédit=1800** (1200 ventes + 600 achats), 2 écritures, 0 erreur de conformité, 18 colonnes/ligne, **aucun montant négatif**, comptes PCG valides (411/401 présents). tsc neuf vert.
+
+**Prochaine action : P0.7c-6c** (`genererExportFEC`, `genererExportIIF`, `exportDepensesFEC`, `getPendingItemsComptables`, `lancerSynchronisationComptable`, `getDeclarationTVADetail` — 2-3 raw SQL chacun). Puis 7c-7 (banque).
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).

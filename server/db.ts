@@ -6307,8 +6307,7 @@ export async function genererFEC(
   dateFin: Date,
 ): Promise<FecResultat> {
   const vide: FecConformite = { nbEcritures: 0, nbLignes: 0, totalDebit: 0, totalCredit: 0, ecart: 0, equilibre: true, erreurs: [], comptesUtilises: [] };
-  const pool = getPool();
-  if (!pool) return { content: "", conformite: { ...vide, erreurs: ["Base de donnees indisponible"] } };
+  const dbi = await getDb();
 
   const config = await getConfigurationComptable(artisanId);
   const cVentes = config?.compteVentes || "706000";
@@ -6365,15 +6364,20 @@ export async function genererFEC(
   let num = 0;
 
   // ---- 1) JOURNAL DES VENTES (VE) : 1 ecriture equilibree par facture ----
-  const [facts]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.dateFacture, f.totalHT, f.totalTVA, f.totalTTC,
-            f.statut, f.datePaiement, f.typeDocument, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
-       FROM factures f LEFT JOIN clients c ON c.id = f.clientId
-      WHERE f.artisanId = ? AND DATE(f.dateFacture) BETWEEN ? AND ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-      ORDER BY f.dateFacture ASC, f.id ASC`,
-    [artisanId, dStr, fStr]
-  );
+  // DATE(dateFacture) (cast jour) conservé en sql brut : neutre dialecte (PG+mysql
+  // supportent DATE() + BETWEEN) → mêmes bornes qu'avant (ignore l'heure).
+  const facts: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalHT: factures.totalHT, totalTVA: factures.totalTVA, totalTTC: factures.totalTTC,
+    statut: factures.statut, datePaiement: factures.datePaiement, typeDocument: factures.typeDocument,
+    clientId: factures.clientId, clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`DATE(${factures.dateFacture}) BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .orderBy(asc(factures.dateFacture), asc(factures.id));
   for (const f of facts as any[]) {
     num++;
     const auxNum = `C${String(f.clientId).padStart(5, "0")}`;
@@ -6399,10 +6403,13 @@ export async function genererFEC(
       // TVA ventilee par taux depuis les lignes de facture (445711/712/713...).
       // Les lignes d'avoir ont des montants negatifs : on filtre sur SUM <> 0 et on
       // prend la valeur absolue, en inversant le sens (debit pour un avoir).
-      const [lignes]: any = await pool.execute(
-        `SELECT tauxTVA, SUM(montantTVA) AS tva FROM factures_lignes WHERE factureId = ? GROUP BY tauxTVA HAVING ABS(SUM(montantTVA)) > 0`,
-        [f.id]
-      );
+      const lignes: any[] = await dbi.select({
+        tauxTVA: facturesLignes.tauxTVA,
+        tva: sql<string>`SUM(${facturesLignes.montantTVA})`,
+      }).from(facturesLignes)
+        .where(eq(facturesLignes.factureId, f.id))
+        .groupBy(facturesLignes.tauxTVA)
+        .having(sql`ABS(SUM(${facturesLignes.montantTVA})) > 0`);
       const rows = (lignes as any[]) || [];
       const sommeLignes = rows.reduce((s, l) => s + Math.abs(Number(l.tva || 0)), 0);
       if (rows.length > 0 && Math.abs(sommeLignes - tva) < 0.02) {
@@ -6421,13 +6428,16 @@ export async function genererFEC(
   }
 
   // ---- 2) JOURNAL DES ACHATS (AC) : depenses deductibles ----
-  const [deps]: any = await pool.execute(
-    `SELECT id, numero, date_depense, fournisseur, categorie, montant_ht, montant_tva, montant_ttc
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-      ORDER BY date_depense ASC, id ASC`,
-    [artisanId, dStr, fStr]
-  );
+  const deps: any[] = await dbi.select({
+    id: depenses.id, numero: depenses.numero, date_depense: depenses.date_depense,
+    fournisseur: depenses.fournisseur, categorie: depenses.categorie,
+    montant_ht: depenses.montant_ht, montant_tva: depenses.montant_tva, montant_ttc: depenses.montant_ttc,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, dStr, fStr),
+    ))
+    .orderBy(asc(depenses.date_depense), asc(depenses.id));
   for (const d of deps as any[]) {
     num++;
     const piece = d.numero || `D-${d.id}`;
@@ -6441,14 +6451,18 @@ export async function genererFEC(
   }
 
   // ---- 3) JOURNAL DE BANQUE (BQ) : encaissements (factures reglees) ----
-  const [pays]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.datePaiement, f.totalTTC, f.typeDocument, f.clientId, c.nom AS clientNom, c.prenom AS clientPrenom
-       FROM factures f LEFT JOIN clients c ON c.id = f.clientId
-      WHERE f.artisanId = ? AND f.statut = 'payee' AND f.datePaiement IS NOT NULL
-        AND DATE(f.datePaiement) BETWEEN ? AND ?
-      ORDER BY f.datePaiement ASC, f.id ASC`,
-    [artisanId, dStr, fStr]
-  );
+  const pays: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, datePaiement: factures.datePaiement,
+    totalTTC: factures.totalTTC, typeDocument: factures.typeDocument,
+    clientId: factures.clientId, clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, "payee" as any),
+      isNotNull(factures.datePaiement),
+      sql`DATE(${factures.datePaiement}) BETWEEN ${dStr} AND ${fStr}`,
+    ))
+    .orderBy(asc(factures.datePaiement), asc(factures.id));
   for (const p of pays as any[]) {
     num++;
     const auxNum = `C${String(p.clientId).padStart(5, "0")}`;
