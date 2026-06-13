@@ -7105,8 +7105,12 @@ export async function updateDepense(
       vals
     );
   }
-  // Recalcul TVA/TTC si montant_ht ou taux_tva ont change.
-  if ("montantHt" in data || "tauxTva" in data) {
+  // Recalcul TVA/TTC dès qu'un champ monétaire est touché (OPE-252) : la TVA et le
+  // TTC sont TOUJOURS dérivés du HT + taux (le formulaire est HT-first), donc on ne
+  // peut pas persister un montant_tva/montant_ttc incohérent avec le HT (qui
+  // corromprait FEC/CA3). Behavior-preserving : le front envoie HT+taux → recalcul
+  // déjà déclenché ; on ajoute juste le cas « TTC/TVA seul » (forgé) pour le corriger.
+  if ("montantHt" in data || "tauxTva" in data || "montantTva" in data || "montantTtc" in data) {
     const dep = await getDepenseById(id, artisanId);
     if (dep) {
       const ht = Number(dep.montant_ht || 0);
