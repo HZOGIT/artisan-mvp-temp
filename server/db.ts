@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 // OPE-184 P0.7 — bascule PG-first : pool/driver Postgres optionnel (DB_DIALECT=postgresql).
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import { Pool as PgPool } from "pg";
-import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, between, ne } from "drizzle-orm";
+import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne } from "drizzle-orm";
 import { 
   users, User, InsertUser,
   artisans, Artisan, InsertArtisan,
@@ -88,6 +88,7 @@ import {
   emailsLog, EmailLog, InsertEmailLog,
   aiThreads, aiMessages,
   interventionsMobile, photosInterventions,
+  depenses, budgetsCategories, categoriesDepenses,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -1485,22 +1486,23 @@ export async function getMouvementsStock(stockId: number): Promise<MouvementStoc
 export async function getStockEntrantByArtisan(
   artisanId: number,
 ): Promise<Array<{ stockId: number; entrant: number }>> {
-  const pool = getPool();
-  if (!pool) return [];
+  const db = await getDb();
+  const entrantExpr = sql<string>`COALESCE(SUM(GREATEST(${lignesCommandesFournisseurs.quantite} - ${lignesCommandesFournisseurs.quantiteRecue}, 0)), 0)`;
   try {
-    const [rows] = await pool.execute(
-      `SELECT l.stockId AS stockId,
-              SUM(GREATEST(CAST(l.quantite AS DECIMAL(10,2)) - CAST(l.quantiteRecue AS DECIMAL(10,2)), 0)) AS entrant
-         FROM lignes_commandes_fournisseurs l
-         JOIN commandes_fournisseurs c ON c.id = l.commandeId
-        WHERE c.artisanId = ?
-          AND c.statut IN ('envoyee','confirmee','partiellement_livree')
-          AND l.stockId IS NOT NULL
-        GROUP BY l.stockId
-        HAVING entrant > 0`,
-      [artisanId],
-    );
-    return (rows as any[]).map((r) => ({ stockId: Number(r.stockId), entrant: Number(r.entrant) || 0 }));
+    const rows = await db.select({
+      stockId: lignesCommandesFournisseurs.stockId,
+      entrant: entrantExpr,
+    })
+      .from(lignesCommandesFournisseurs)
+      .innerJoin(commandesFournisseurs, eq(commandesFournisseurs.id, lignesCommandesFournisseurs.commandeId))
+      .where(and(
+        eq(commandesFournisseurs.artisanId, artisanId),
+        inArray(commandesFournisseurs.statut, ["envoyee", "confirmee", "partiellement_livree"]),
+        isNotNull(lignesCommandesFournisseurs.stockId),
+      ))
+      .groupBy(lignesCommandesFournisseurs.stockId)
+      .having(sql`${entrantExpr} > 0`);
+    return rows.map((r) => ({ stockId: Number(r.stockId), entrant: Number(r.entrant) || 0 }));
   } catch (e: any) {
     console.warn("[getStockEntrantByArtisan]", e?.message || e);
     return [];
@@ -3054,16 +3056,12 @@ export async function getStatistiquesChantier(chantierId: number): Promise<any> 
   // (`depenses.chantier_id`) au lieu du champ `budgetRealise` statique (jamais
   // calculé, toujours 0). Scopé par `artisan_id` du chantier (multi-tenant).
   let coutReel = 0;
-  const pool = getPool();
-  if (pool) {
-    try {
-      const [rows]: any = await pool.execute(
-        `SELECT COALESCE(SUM(montant_ttc), 0) AS total FROM depenses WHERE chantier_id = ? AND artisan_id = ?`,
-        [chantierId, chantier.artisanId]
-      );
-      coutReel = parseFloat(String(rows?.[0]?.total ?? '0')) || 0;
-    } catch (e: any) { console.warn('[getStatistiquesChantier] coutReel:', String(e?.message || e)); }
-  }
+  try {
+    const [agg] = await db.select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+      .from(depenses)
+      .where(and(eq(depenses.chantier_id, chantierId), eq(depenses.artisan_id, chantier.artisanId)));
+    coutReel = parseFloat(String(agg?.total ?? '0')) || 0;
+  } catch (e: any) { console.warn('[getStatistiquesChantier] coutReel:', String(e?.message || e)); }
   // Repli sur le champ manuel `budgetRealise` s'il a été saisi et qu'aucune dépense
   // n'est rattachée (rétro-compat).
   const budgetRealiseManuel = parseFloat(String(chantier.budgetRealise || '0'));

@@ -91,7 +91,7 @@ Tests db-direct sur PG : `fournisseurs.test.ts` **17/17 ✓**, `security.test.ts
 - **7b-1 FAIT** : 5 fn ai réécrites en Drizzle (getOrCreateAiThread, getAiThread, listAiThreads, insertAiMessage, getAiMessages) — `ensurePool()` raw → Drizzle. Validé **PG + mysql** sur vraies données (25 threads / 74 msgs). aiThreads/aiMessages ajoutés à l'import db.ts.
 - 🪦 **Calendrier couleurs (getCouleursCalendrier/setCouleurIntervention/setCouleursMultiples/deleteCouleurIntervention) = DEAD CODE** : tapent la table `couleurs_interventions` qui **n'existe dans AUCUNE base** (mysql 0 / pg 0). Déjà cassées sur mysql (pré-existant ; getCouleurs catch→{}, les set/delete throw). → **NE PAS porter à l'aveugle.** Option : réécrire contre `preferencesCouleursCalendrier` (= bugfix + changement de comportement, à valider) OU supprimer comme dead-code. **Sorti de la boucle → décision humaine / tâche dédiée.**
 - **7b-2-a FAIT** : mobile/photos (6 fn — get/create/update InterventionMobile, get/create PhotoIntervention) raw → Drizzle. Validé **PG + mysql** (create/get/update/photos). interventionsMobile/photosInterventions ajoutés à l'import.
-- **7b-2-b À FAIRE** : stats — getStockEntrantByArtisan, getStatistiquesChantier, calculerBudgetsRealises, invalidateCache (agrégats : utiliser Drizzle + `sql` avec colonnes interpolées si besoin).
+- **7b-2-b FAIT** : getStockEntrantByArtisan (join+agrégat GREATEST/COALESCE/SUM/HAVING → Drizzle, validé PG+mysql), getStatistiquesChantier (sous-requête depenses → Drizzle). `invalidateCache` = cache mémoire (déjà neutre, rien à faire). `calculerBudgetsRealises` → reporté en **7c** (dépend de getCategoriesDepenses, raw). **→ 7b COMPLET.**
 
 ### ▶️ 2e schéma `fix-duplicates.ts` — DÉCISION PRISE (modéliser + unifier) — reprise 2026-06-13 ~08:38
 Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
@@ -122,7 +122,7 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ P0.5e (OPE-254) = FAIT. Périmètre réel : 103 tables (vs 89 estimées au départ).**
 
-**Prochaine action : reprise P0.7b-2-b** (getStatistiquesChantier→depenses, calculerBudgetsRealises→budgets) puis **7c** (compta, ~30 fn, HAUT RISQUE).
+**Prochaine action : P0.7c** (compta/dépenses, ~30 fn, HAUT RISQUE) — désormais testable PG+mysql (tables compta créées des deux côtés en P0.5e). Sous-batchs fins, valider chaque fonction sur les 2 dialectes. Inclut calculerBudgetsRealises (reporté de 7b). Importer depenses/categoriesDepenses/notesDeFrais/notesFraisDepenses/budgetsCategories/transactionsBancaires/relevesBancaires/reglesCategorisation dans db.ts.
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
