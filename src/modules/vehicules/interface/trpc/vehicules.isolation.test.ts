@@ -85,14 +85,15 @@ describe.skipIf(!URL)("vehicules — isolation cross-tenant systématique (toute
     ["mutation", "vehicules.update", () => ({ id: vehiculeDeA, data: { marque: "x" } })],
     ["mutation", "vehicules.delete", () => ({ id: vehiculeDeA })],
     ["mutation", "vehicules.updateKilometrage", () => ({ id: vehiculeDeA, kilometrage: 1 })],
-    ["query", "vehicules.listEntretiens", () => ({ vehiculeId: vehiculeDeA })],
+    ["query", "vehicules.getEntretiens", () => ({ vehiculeId: vehiculeDeA })],
     ["mutation", "vehicules.addEntretien", () => ({ vehiculeId: vehiculeDeA, data: { type: "vidange", dateEntretien: "2026-06-01" } })],
-    ["query", "vehicules.listAssurances", () => ({ vehiculeId: vehiculeDeA })],
+    ["query", "vehicules.getAssurances", () => ({ vehiculeId: vehiculeDeA })],
     ["mutation", "vehicules.addAssurance", () => ({ vehiculeId: vehiculeDeA, data: { compagnie: "X", dateDebut: "2026-01-01", dateFin: "2026-12-31" } })],
   ] as const)("B → %s %s sur la ressource de A est refusé (404 ou liste vide)", async (kind, path, mkInput) => {
     const res = kind === "query" ? await get(path, mkInput()) : await post(path, mkInput());
-    if (path.startsWith("vehicules.list")) {
-      // Les list* renvoient [] (le véhicule n'appartient pas à B) → 200 mais vide.
+    const returnsEmptyList = path === "vehicules.getEntretiens" || path === "vehicules.getAssurances";
+    if (returnsEmptyList) {
+      // Lecture par vehiculeId d'un véhicule non owné → [] (le véhicule n'appartient pas à B).
       expect(res.statusCode).toBe(200);
       expect(res.json().result.data).toEqual([]);
     } else {

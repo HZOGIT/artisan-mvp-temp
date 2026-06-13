@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, isNotNull, getTableColumns, sql } from "drizzle-orm";
 import { vehicules, entretiensVehicules, assurancesVehicules } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -176,6 +176,25 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
     });
   }
 
+  listEntretiensAVenir(ctx: TenantContext): Promise<EntretienVehicule[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await tx
+        .select(getTableColumns(entretiensVehicules))
+        .from(entretiensVehicules)
+        .innerJoin(vehicules, eq(vehicules.id, entretiensVehicules.vehiculeId))
+        .where(
+          and(
+            eq(vehicules.artisanId, ctx.artisanId),
+            isNotNull(entretiensVehicules.prochainEntretienDate),
+            gte(entretiensVehicules.prochainEntretienDate, today),
+          ),
+        )
+        .orderBy(asc(entretiensVehicules.prochainEntretienDate));
+      return rows.map(toEntretien);
+    });
+  }
+
   listAssurances(ctx: TenantContext, vehiculeId: number): Promise<AssuranceVehicule[]> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsVehicule(tx, ctx, vehiculeId))) return [];
@@ -196,6 +215,26 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
         .values({ ...input, vehiculeId } as typeof assurancesVehicules.$inferInsert)
         .returning();
       return toAssurance(row);
+    });
+  }
+
+  listAssurancesExpirant(ctx: TenantContext, joursAvant: number): Promise<AssuranceVehicule[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const limite = new Date(Date.now() + joursAvant * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const rows = await tx
+        .select(getTableColumns(assurancesVehicules))
+        .from(assurancesVehicules)
+        .innerJoin(vehicules, eq(vehicules.id, assurancesVehicules.vehiculeId))
+        .where(
+          and(
+            eq(vehicules.artisanId, ctx.artisanId),
+            gte(assurancesVehicules.dateFin, today),
+            lte(assurancesVehicules.dateFin, limite),
+          ),
+        )
+        .orderBy(asc(assurancesVehicules.dateFin));
+      return rows.map(toAssurance);
     });
   }
 

@@ -100,6 +100,14 @@ export class FakeVehiculeRepository implements IVehiculeRepository {
     return e;
   }
 
+  async listEntretiensAVenir(ctx: TenantContext): Promise<EntretienVehicule[]> {
+    const today = new Date().toISOString().slice(0, 10);
+    const vehiculesDuTenant = new Set(this.vehiculesStore.filter((v) => v.artisanId === ctx.artisanId).map((v) => v.id));
+    return this.entretiensStore
+      .filter((e) => vehiculesDuTenant.has(e.vehiculeId) && e.prochainEntretienDate !== null && e.prochainEntretienDate >= today)
+      .sort((a, b) => (a.prochainEntretienDate ?? "").localeCompare(b.prochainEntretienDate ?? ""));
+  }
+
   async listAssurances(ctx: TenantContext, vehiculeId: number): Promise<AssuranceVehicule[]> {
     if (!(await this.getById(ctx, vehiculeId))) return [];
     return this.assurancesStore.filter((a) => a.vehiculeId === vehiculeId);
@@ -125,5 +133,14 @@ export class FakeVehiculeRepository implements IVehiculeRepository {
     };
     this.assurancesStore.push(a);
     return a;
+  }
+
+  async listAssurancesExpirant(ctx: TenantContext, joursAvant: number): Promise<AssuranceVehicule[]> {
+    const today = new Date().toISOString().slice(0, 10);
+    const limite = new Date(Date.now() + joursAvant * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const vehiculesDuTenant = new Set(this.vehiculesStore.filter((v) => v.artisanId === ctx.artisanId).map((v) => v.id));
+    return this.assurancesStore
+      .filter((a) => vehiculesDuTenant.has(a.vehiculeId) && a.dateFin >= today && a.dateFin <= limite)
+      .sort((x, y) => x.dateFin.localeCompare(y.dateFin));
   }
 }

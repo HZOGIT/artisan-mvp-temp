@@ -86,7 +86,7 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
       .input(z.object({ id: z.number().int(), kilometrage: z.number().int().min(0) }))
       .mutation(({ ctx, input }) => enregistrerKilometrage(repo, ctx.tenant, input.id, input.kilometrage)),
 
-    listEntretiens: protectedProcedure
+    getEntretiens: protectedProcedure
       .input(vehiculeIdInput)
       .query(({ ctx, input }) => repo.listEntretiens(ctx.tenant, input.vehiculeId)),
 
@@ -94,12 +94,18 @@ export function createVehiculesRouter(repo: IVehiculeRepository) {
       .input(z.object({ vehiculeId: z.number().int(), data: entretienSchema }))
       .mutation(({ ctx, input }) => ajouterEntretien(repo, ctx.tenant, input.vehiculeId, input.data)),
 
-    listAssurances: protectedProcedure
+    getEntretiensAVenir: protectedProcedure.query(({ ctx }) => repo.listEntretiensAVenir(ctx.tenant)),
+
+    getAssurances: protectedProcedure
       .input(vehiculeIdInput)
       .query(({ ctx, input }) => repo.listAssurances(ctx.tenant, input.vehiculeId)),
 
     addAssurance: protectedProcedure
       .input(z.object({ vehiculeId: z.number().int(), data: assuranceSchema }))
       .mutation(({ ctx, input }) => ajouterAssurance(repo, ctx.tenant, input.vehiculeId, input.data)),
+
+    getAssurancesExpirant: protectedProcedure
+      .input(z.object({ joursAvant: z.number().int().min(1).max(365).default(30) }).optional())
+      .query(({ ctx, input }) => repo.listAssurancesExpirant(ctx.tenant, input?.joursAvant ?? 30)),
   });
 }
