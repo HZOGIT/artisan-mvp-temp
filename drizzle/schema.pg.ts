@@ -622,3 +622,211 @@ export const classementTechniciens = pgTable("classement_techniciens", {
 });
 export type ClassementTechnicien = typeof classementTechniciens.$inferSelect;
 export type InsertClassementTechnicien = typeof classementTechniciens.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+// BATCH 2b (P0.4) — COMPTA + CHANTIERS
+// ════════════════════════════════════════════════════════════════════════════
+export const ecritureJournalEnum = pgEnum("ecriture_journal", ["VE", "AC", "BQ", "OD"]);
+export const compteTypeEnum = pgEnum("compte_type", ["actif", "passif", "charge", "produit"]);
+export const previsionMethodeEnum = pgEnum("prevision_methode", ["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"]);
+export const chantierStatutEnum = pgEnum("chantier_statut", ["planifie", "en_cours", "en_pause", "termine", "annule"]);
+export const chantierPrioriteEnum = pgEnum("chantier_priorite", ["basse", "normale", "haute", "urgente"]);
+export const phaseStatutEnum = pgEnum("phase_statut", ["a_faire", "en_cours", "termine", "annule"]);
+export const documentChantierTypeEnum = pgEnum("document_chantier_type", ["plan", "photo", "permis", "contrat", "facture", "autre"]);
+export const comptaLogicielEnum = pgEnum("compta_logiciel", ["sage", "quickbooks", "ciel", "ebp", "autre"]); // partagé config/exports
+export const comptaFormatExportEnum = pgEnum("compta_format_export", ["fec", "iif", "qbo", "csv"]); // partagé config/exports
+export const comptaFrequenceSyncEnum = pgEnum("compta_frequence_sync", ["quotidien", "hebdomadaire", "mensuel", "manuel"]);
+export const exportStatutEnum = pgEnum("export_statut", ["en_cours", "termine", "erreur"]);
+
+// ── ECRITURES COMPTABLES ─────────────────────────────────────────────────────
+export const ecrituresComptables = pgTable("ecritures_comptables", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  dateEcriture: timestamp("dateEcriture").notNull(),
+  journal: ecritureJournalEnum("journal").notNull(),
+  numeroCompte: varchar("numeroCompte", { length: 10 }).notNull(),
+  libelleCompte: varchar("libelleCompte", { length: 100 }),
+  libelle: varchar("libelle", { length: 255 }).notNull(),
+  pieceRef: varchar("pieceRef", { length: 50 }),
+  debit: numeric("debit", { precision: 12, scale: 2 }).default("0.00"),
+  credit: numeric("credit", { precision: 12, scale: 2 }).default("0.00"),
+  factureId: integer("factureId"),
+  lettrage: varchar("lettrage", { length: 10 }),
+  pointage: boolean("pointage").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EcritureComptable = typeof ecrituresComptables.$inferSelect;
+export type InsertEcritureComptable = typeof ecrituresComptables.$inferInsert;
+
+// ── PLAN COMPTABLE ───────────────────────────────────────────────────────────
+export const planComptable = pgTable("plan_comptable", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  numeroCompte: varchar("numeroCompte", { length: 10 }).notNull(),
+  libelle: varchar("libelle", { length: 100 }).notNull(),
+  classe: integer("classe").notNull(),
+  type: compteTypeEnum("type").notNull(),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CompteComptable = typeof planComptable.$inferSelect;
+export type InsertCompteComptable = typeof planComptable.$inferInsert;
+
+// ── PREVISIONS CA ────────────────────────────────────────────────────────────
+export const previsionsCA = pgTable("previsions_ca", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  mois: integer("mois").notNull(),
+  annee: integer("annee").notNull(),
+  caPrevisionnel: numeric("caPrevisionnel", { precision: 12, scale: 2 }).default("0.00"),
+  caRealise: numeric("caRealise", { precision: 12, scale: 2 }).default("0.00"),
+  ecart: numeric("ecart", { precision: 12, scale: 2 }).default("0.00"),
+  ecartPourcentage: numeric("ecartPourcentage", { precision: 5, scale: 2 }).default("0.00"),
+  methodeCalcul: previsionMethodeEnum("methodeCalcul").default("moyenne_mobile"),
+  confiance: numeric("confiance", { precision: 5, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type PrevisionCA = typeof previsionsCA.$inferSelect;
+export type InsertPrevisionCA = typeof previsionsCA.$inferInsert;
+
+// ── HISTORIQUE CA ────────────────────────────────────────────────────────────
+export const historiqueCA = pgTable("historique_ca", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  mois: integer("mois").notNull(),
+  annee: integer("annee").notNull(),
+  caTotal: numeric("caTotal", { precision: 12, scale: 2 }).default("0.00"),
+  nombreFactures: integer("nombreFactures").default(0),
+  nombreClients: integer("nombreClients").default(0),
+  panierMoyen: numeric("panierMoyen", { precision: 10, scale: 2 }).default("0.00"),
+  tauxConversion: numeric("tauxConversion", { precision: 5, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type HistoriqueCA = typeof historiqueCA.$inferSelect;
+export type InsertHistoriqueCA = typeof historiqueCA.$inferInsert;
+
+// ── CHANTIERS ────────────────────────────────────────────────────────────────
+export const chantiers = pgTable("chantiers", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  description: text("description"),
+  adresse: text("adresse"),
+  codePostal: varchar("codePostal", { length: 10 }),
+  ville: varchar("ville", { length: 100 }),
+  dateDebut: date("dateDebut"),
+  dateFinPrevue: date("dateFinPrevue"),
+  dateFinReelle: date("dateFinReelle"),
+  budgetPrevisionnel: numeric("budgetPrevisionnel", { precision: 12, scale: 2 }),
+  budgetRealise: numeric("budgetRealise", { precision: 12, scale: 2 }).default("0.00"),
+  statut: chantierStatutEnum("statut").default("planifie"),
+  avancement: integer("avancement").default(0),
+  priorite: chantierPrioriteEnum("priorite").default("normale"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Chantier = typeof chantiers.$inferSelect;
+export type InsertChantier = typeof chantiers.$inferInsert;
+
+// ── PHASES CHANTIER ──────────────────────────────────────────────────────────
+export const phasesChantier = pgTable("phases_chantier", {
+  id: serial("id").primaryKey(),
+  chantierId: integer("chantierId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  description: text("description"),
+  ordre: integer("ordre").default(1),
+  dateDebutPrevue: date("dateDebutPrevue"),
+  dateFinPrevue: date("dateFinPrevue"),
+  dateDebutReelle: date("dateDebutReelle"),
+  dateFinReelle: date("dateFinReelle"),
+  statut: phaseStatutEnum("statut").default("a_faire"),
+  avancement: integer("avancement").default(0),
+  budgetPhase: numeric("budgetPhase", { precision: 10, scale: 2 }),
+  coutReel: numeric("coutReel", { precision: 10, scale: 2 }).default("0.00"),
+  heuresPrevues: numeric("heuresPrevues", { precision: 7, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PhaseChantier = typeof phasesChantier.$inferSelect;
+export type InsertPhaseChantier = typeof phasesChantier.$inferInsert;
+
+// ── INTERVENTIONS CHANTIER ───────────────────────────────────────────────────
+export const interventionsChantier = pgTable("interventions_chantier", {
+  id: serial("id").primaryKey(),
+  chantierId: integer("chantierId").notNull(),
+  interventionId: integer("interventionId").notNull(),
+  phaseId: integer("phaseId"),
+  ordre: integer("ordre").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InterventionChantier = typeof interventionsChantier.$inferSelect;
+export type InsertInterventionChantier = typeof interventionsChantier.$inferInsert;
+
+// ── DOCUMENTS CHANTIER ───────────────────────────────────────────────────────
+export const documentsChantier = pgTable("documents_chantier", {
+  id: serial("id").primaryKey(),
+  chantierId: integer("chantierId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  type: documentChantierTypeEnum("type").default("autre"),
+  url: text("url").notNull(),
+  taille: integer("taille"),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+});
+export type DocumentChantier = typeof documentsChantier.$inferSelect;
+export type InsertDocumentChantier = typeof documentsChantier.$inferInsert;
+
+// ── CONFIGURATIONS COMPTABLES ────────────────────────────────────────────────
+export const configurationsComptables = pgTable("configurations_comptables", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull().unique(),
+  logiciel: comptaLogicielEnum("logiciel").default("sage"),
+  formatExport: comptaFormatExportEnum("formatExport").default("fec"),
+  compteVentes: varchar("compteVentes", { length: 20 }).default("706000"),
+  compteTVACollectee: varchar("compteTVACollectee", { length: 20 }).default("445710"),
+  compteClients: varchar("compteClients", { length: 20 }).default("411000"),
+  compteAchats: varchar("compteAchats", { length: 20 }).default("607000"),
+  compteTVADeductible: varchar("compteTVADeductible", { length: 20 }).default("445660"),
+  compteFournisseurs: varchar("compteFournisseurs", { length: 20 }).default("401000"),
+  compteBanque: varchar("compteBanque", { length: 20 }).default("512000"),
+  compteCaisse: varchar("compteCaisse", { length: 20 }).default("530000"),
+  journalVentes: varchar("journalVentes", { length: 10 }).default("VE"),
+  journalAchats: varchar("journalAchats", { length: 10 }).default("AC"),
+  journalBanque: varchar("journalBanque", { length: 10 }).default("BQ"),
+  prefixeFacture: varchar("prefixeFacture", { length: 10 }).default("FA"),
+  prefixeAvoir: varchar("prefixeAvoir", { length: 10 }).default("AV"),
+  exerciceDebut: integer("exerciceDebut").default(1),
+  actif: boolean("actif").default(true),
+  syncAutoFactures: boolean("syncAutoFactures").default(false),
+  syncAutoPaiements: boolean("syncAutoPaiements").default(false),
+  frequenceSync: comptaFrequenceSyncEnum("frequenceSync").default("manuel"),
+  heureSync: varchar("heureSync", { length: 5 }).default("02:00"),
+  notifierErreurs: boolean("notifierErreurs").default(true),
+  notifierSucces: boolean("notifierSucces").default(false),
+  derniereSync: timestamp("derniereSync"),
+  prochainSync: timestamp("prochainSync"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type ConfigurationComptable = typeof configurationsComptables.$inferSelect;
+export type InsertConfigurationComptable = typeof configurationsComptables.$inferInsert;
+
+// ── EXPORTS COMPTABLES ───────────────────────────────────────────────────────
+export const exportsComptables = pgTable("exports_comptables", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  logiciel: comptaLogicielEnum("logiciel").notNull(),
+  formatExport: comptaFormatExportEnum("formatExport").notNull(),
+  periodeDebut: date("periodeDebut").notNull(),
+  periodeFin: date("periodeFin").notNull(),
+  nombreEcritures: integer("nombreEcritures").default(0),
+  montantTotal: numeric("montantTotal", { precision: 12, scale: 2 }),
+  fichierUrl: text("fichierUrl"),
+  statut: exportStatutEnum("statut").default("en_cours"),
+  erreur: text("erreur"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ExportComptable = typeof exportsComptables.$inferSelect;
+export type InsertExportComptable = typeof exportsComptables.$inferInsert;
