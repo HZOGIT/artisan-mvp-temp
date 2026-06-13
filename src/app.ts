@@ -11,6 +11,9 @@ import type { IAvisRepository } from "./modules/avis/application/avis-repository
 import { createAvisModule } from "./modules/avis/avis.module";
 import { DemandeAvisRepositoryDrizzle } from "./modules/avis/infra/demande-avis-repository-drizzle";
 import type { IDemandeAvisRepository } from "./modules/avis/application/demande-avis-repository";
+import { createBadgesModule } from "./modules/badges/badges.module";
+import { BadgeRepositoryDrizzle } from "./modules/badges/infra/badge-repository-drizzle";
+import type { IBadgeRepository } from "./modules/badges/application/badge-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -24,6 +27,7 @@ export interface AppDeps extends ContextDeps {
   readonly emailPort?: EmailPort;
   readonly rateLimiter?: RateLimiterPort;
   readonly lienBaseUrl?: string;
+  readonly badgeRepo?: IBadgeRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -44,7 +48,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     },
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis });
+  const badges = createBadgesModule({
+    repository: deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

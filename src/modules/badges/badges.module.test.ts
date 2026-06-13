@@ -14,7 +14,7 @@ const stubRepo: IBadgeRepository = {
   attribuer: async () => null,
 };
 
-describe("badges.module (scaffold)", () => {
+describe("badges.module", () => {
   it("createBadgesModule câble le repository injecté", () => {
     const module = createBadgesModule({ repository: stubRepo });
     expect(module.deps.repository).toBe(stubRepo);
@@ -30,5 +30,11 @@ describe("badges.module (scaffold)", () => {
       "listBadgesTechnicien",
       "update",
     ]);
+  });
+
+  it("expose un routeur tRPC assemblé (procédures parité)", () => {
+    const module = createBadgesModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["attribuerBadge", "create", "delete", "getBadgesTechnicien", "list", "update"]);
   });
 });

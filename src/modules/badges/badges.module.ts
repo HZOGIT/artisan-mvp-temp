@@ -1,15 +1,17 @@
 import type { IBadgeRepository } from "./application/badge-repository";
+import { createBadgesRouter } from "./interface/trpc/badges.router";
 
-// Wiring DI du module badges. Les use-cases et l'adapter tRPC sont assemblés aux étapes
-// suivantes du gabarit ; ici la forme des dépendances + le factory squelette.
+// Wiring DI du module badges : assemble le routeur tRPC à partir du repository injecté.
+// Découple `app.ts`/`createAppRouter` des détails d'instanciation.
 export interface BadgesModuleDeps {
   readonly repository: IBadgeRepository;
 }
 
 export interface BadgesModule {
   readonly deps: BadgesModuleDeps;
+  readonly router: ReturnType<typeof createBadgesRouter>;
 }
 
 export function createBadgesModule(deps: BadgesModuleDeps): BadgesModule {
-  return { deps };
+  return { deps, router: createBadgesRouter(deps.repository) };
 }

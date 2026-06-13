@@ -2,11 +2,13 @@ import { router, publicProcedure, protectedProcedure } from "./trpc";
 import { createVehiculesRouter } from "../../modules/vehicules/interface/trpc/vehicules.router";
 import type { IVehiculeRepository } from "../../modules/vehicules/application/vehicule-repository";
 import type { AvisModule } from "../../modules/avis/avis.module";
+import type { BadgesModule } from "../../modules/badges/badges.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
-  // Module avis déjà assemblé (router prêt) → découple la composition des détails du domaine.
+  // Modules déjà assemblés (router prêt) → découple la composition des détails du domaine.
   readonly avis: AvisModule;
+  readonly badges: BadgesModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -21,6 +23,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     })),
     vehicules: createVehiculesRouter(deps.vehiculeRepo),
     avis: deps.avis.router,
+    badges: deps.badges.router,
   });
 }
 
