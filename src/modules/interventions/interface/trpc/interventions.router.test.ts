@@ -116,4 +116,41 @@ describe.skipIf(!URL)("interventions.router e2e (HTTP → tRPC → use-case → 
     expect((await callMutation(server, "interventions.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "interventions.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("id inexistant du même tenant : getById / update / delete → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "interventions.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "interventions.update", { id: 999999999, titre: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "interventions.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : titre > 255, adresse > 500, statut invalide → 400", async () => {
+    const tA = await token(UA);
+    const base = { clientId: clientA, dateDebut: "2026-06-10T08:00:00Z" };
+    expect((await callMutation(server, "interventions.create", { ...base, titre: "x".repeat(256) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "interventions.create", { ...base, titre: "OK", adresse: "x".repeat(501) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "interventions.create", { ...base, titre: "OK", statut: "inconnu" }, tA)).statusCode).toBe(400);
+  });
+
+  it("ANTI-IDOR-FK étendu : create avec un technicienId d'un autre tenant → 404", async () => {
+    const tA = await token(UA);
+    // technicien appartenant à B
+    const techB = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [artisanB, "TechB"])).rows[0].id as number;
+    expect((await callMutation(server, "interventions.create", { clientId: clientA, titre: "Vol tech", dateDebut: "2026-06-10T08:00:00Z", technicienId: techB }, tA)).statusCode).toBe(404);
+    await admin.query('delete from techniciens where id=$1', [techB]);
+  });
+
+  it("update qui (re)lie un technicienId hors tenant → 404", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "interventions.create", { clientId: clientA, titre: "Aff", dateDebut: "2026-06-10T08:00:00Z" }, tA)).json().result.data.id as number;
+    const techB = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [artisanB, "TechB2"])).rows[0].id as number;
+    expect((await callMutation(server, "interventions.update", { id, technicienId: techB }, tA)).statusCode).toBe(404);
+    await admin.query('delete from techniciens where id=$1', [techB]);
+  });
+
+  it("update : dateFin < dateDebut (fournies ensemble) → 400", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "interventions.create", { clientId: clientA, titre: "Dates", dateDebut: "2026-06-10T08:00:00Z" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "interventions.update", { id, dateDebut: "2026-06-12T10:00:00Z", dateFin: "2026-06-11T10:00:00Z" }, tA)).statusCode).toBe(400);
+  });
 });
