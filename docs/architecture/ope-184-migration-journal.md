@@ -152,7 +152,11 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ P0.7c-6 (FEC/exports/compta) COMPLET** : 6a config, 6b genererFEC, 6c exports/sync, 6d TVA. Toutes les fonctions FEC/déclaratives portées + validées (équilibre débit=crédit garanti).
 
-**Prochaine action : P0.7c-7** (banque : getTransactionsBancaires, getTresoreriePrevisionnelle, importReleve, ignorerTransaction, lierTransactionDepense). Recenser le raw-SQL d'abord.
+- **7c-7 FAIT** (2026-06-13) : banque → Drizzle. `importReleve` (INSERT releve via insertReturningId, règles lues 1×, INSERT transactions, UPDATE statut/nb_importees), `getTransactionsBancaires` (conds dynamiques eq + filtre `ignoree=false`), `lierTransactionDepense` + `ignorerTransaction` (UPDATE scopé artisan_id), `getTresoreriePrevisionnelle` (1 SELECT dépenses récurrentes → Drizzle ; toute la logique d'expansion par fréquence + nettage avoirs OPE-247 + clamp fin de mois OPE-249 inchangée). 3 tables ajoutées à l'import schema.active (relevesBancaires, transactionsBancaires, reglesCategorisation). **Validé PG** (`scripts/test-banque-pg.mjs`, 14/14) : import 3 txns + relevé 'termine', montant en valeur absolue, **règle catégorisation** (TOTAL→carburant), lien dépense, `ignoree` exclut de la liste, **garde-fou cross-tenant** (ignorer par autre artisan sans effet), trésorerie 8 semaines, **sorties récurrentes=1600** (dépense mensuelle 800 expansée ×2), net cohérent. tsc neuf vert.
+
+**→ 🎯 P0.7c (COMPTA/DÉPENSES — domaine HAUT RISQUE) COMPLET** : 7c-1 catégories, 7c-2 dépenses CRUD, 7c-3 numéro/budgets/stats, 7c-4 notes de frais, 7c-5 workflow NDF, 7c-6 FEC/exports/TVA, 7c-7 banque. **Tout le raw-SQL compta porté en Drizzle + validé PG (intégrité financière : TTC=HT+TVA, FEC débit=crédit, TVA nette, remboursable-only, cross-tenant).**
+
+**Prochaine action : recenser le raw-SQL `getPool()`/`insertId` RESTANT hors compta** (`grep -nE "getPool|insertId" server/db.ts` → factures/paiements/articles/devis…), puis reprendre les sous-batchs P0.7 par domaine (gatés par le filet de tests). Puis P0.8 (copie data staging) + P0.9 (suite tests sur PG) avant cutover.
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).

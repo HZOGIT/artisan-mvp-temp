@@ -89,6 +89,7 @@ import {
   aiThreads, aiMessages,
   interventionsMobile, photosInterventions,
   depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
+  relevesBancaires, transactionsBancaires, reglesCategorisation,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -3660,14 +3661,16 @@ export async function getTresoreriePrevisionnelle(
   }
 
   // ── Décaissements attendus : dépenses récurrentes, expansées selon leur fréquence ──
-  const pool = getPool();
-  if (pool) {
-    const [deps]: any = await pool.execute(
-      `SELECT montant_ttc, frequence_recurrence, prochaine_occurrence
-         FROM depenses
-        WHERE artisan_id = ? AND recurrente = TRUE AND prochaine_occurrence IS NOT NULL`,
-      [artisanId],
-    );
+  {
+    const deps = await db.select({
+      montant_ttc: depenses.montant_ttc,
+      frequence_recurrence: depenses.frequence_recurrence,
+      prochaine_occurrence: depenses.prochaine_occurrence,
+    }).from(depenses).where(and(
+      eq(depenses.artisan_id, artisanId),
+      eq(depenses.recurrente, true),
+      isNotNull(depenses.prochaine_occurrence),
+    ));
     const stepMonths: Record<string, number> = { mensuelle: 1, trimestrielle: 3, annuelle: 12 };
     for (const d of deps as any[]) {
       const montant = parseFloat(String(d.montant_ttc || "0")) || 0;
@@ -7477,69 +7480,54 @@ export async function importReleve(
   nomFichier: string,
   transactions: Array<{ dateTransaction: string; libelle: string; montant: number; typeTransaction: string }>
 ): Promise<{ releveId: number; nbImportees: number }> {
-  const pool = getPool();
-  if (!pool) return { releveId: 0, nbImportees: 0 };
-  const [rRel]: any = await pool.execute(
-    `INSERT INTO releves_bancaires (artisan_id, nom_fichier, nb_transactions, statut)
-     VALUES (?, ?, ?, 'en_cours')`,
-    [artisanId, nomFichier, transactions.length]
-  );
-  const releveId = rRel?.insertId || 0;
+  const dbi = await getDb();
+  const releveId = await insertReturningId(relevesBancaires, {
+    artisan_id: artisanId, nom_fichier: nomFichier,
+    nb_transactions: transactions.length, statut: "en_cours",
+  });
+  if (!releveId) return { releveId: 0, nbImportees: 0 };
+  // Règles de catégorisation actives, lues une seule fois (boucle en mémoire).
+  let regles: any[] = [];
+  try {
+    regles = await dbi.select({ motif_libelle: reglesCategorisation.motif_libelle, categorie: reglesCategorisation.categorie })
+      .from(reglesCategorisation)
+      .where(and(eq(reglesCategorisation.artisan_id, artisanId), eq(reglesCategorisation.actif, true)));
+  } catch { /* ok */ }
   let nbImportees = 0;
   for (const t of transactions) {
     // Detection categorie suggeree via regles_categorisation.
     let categorieSuggeree: string | null = null;
-    try {
-      const [regles]: any = await pool.execute(
-        `SELECT motif_libelle, categorie FROM regles_categorisation
-          WHERE artisan_id = ? AND actif = TRUE`,
-        [artisanId]
-      );
-      const lib = String(t.libelle || "").toUpperCase();
-      for (const r of regles as any[]) {
-        if (lib.includes(String(r.motif_libelle).toUpperCase())) {
-          categorieSuggeree = r.categorie;
-          break;
-        }
+    const lib = String(t.libelle || "").toUpperCase();
+    for (const r of regles) {
+      if (lib.includes(String(r.motif_libelle).toUpperCase())) {
+        categorieSuggeree = r.categorie;
+        break;
       }
-    } catch {
-      /* ok */
     }
     try {
-      await pool.execute(
-        `INSERT INTO transactions_bancaires
-           (artisan_id, releve_id, date_transaction, libelle, montant,
-            type_transaction, categorie_suggeree)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          artisanId, releveId, t.dateTransaction, t.libelle,
-          Math.abs(t.montant), t.typeTransaction, categorieSuggeree,
-        ]
-      );
+      await dbi.insert(transactionsBancaires).values({
+        artisan_id: artisanId, releve_id: releveId, date_transaction: t.dateTransaction,
+        libelle: t.libelle, montant: String(Math.abs(t.montant)),
+        type_transaction: t.typeTransaction as any, categorie_suggeree: categorieSuggeree,
+      });
       nbImportees++;
     } catch {
       /* ok ligne suivante */
     }
   }
-  await pool.execute(
-    `UPDATE releves_bancaires SET nb_importees = ?, statut = 'termine' WHERE id = ?`,
-    [nbImportees, releveId]
-  );
+  await dbi.update(relevesBancaires).set({ nb_importees: nbImportees, statut: "termine" as any })
+    .where(eq(relevesBancaires.id, releveId));
   return { releveId, nbImportees };
 }
 
 export async function getTransactionsBancaires(artisanId: number, releveId?: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const conds = ["artisan_id = ?", "ignoree = FALSE"];
-  const params: any[] = [artisanId];
-  if (releveId) { conds.push("releve_id = ?"); params.push(releveId); }
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM transactions_bancaires WHERE ${conds.join(" AND ")}
-      ORDER BY date_transaction DESC, id DESC LIMIT 500`,
-    params
-  );
-  return rows as any[];
+  const dbi = await getDb();
+  const conds: any[] = [eq(transactionsBancaires.artisan_id, artisanId), eq(transactionsBancaires.ignoree, false)];
+  if (releveId) conds.push(eq(transactionsBancaires.releve_id, releveId));
+  return await dbi.select().from(transactionsBancaires)
+    .where(and(...conds))
+    .orderBy(desc(transactionsBancaires.date_transaction), desc(transactionsBancaires.id))
+    .limit(500);
 }
 
 export async function lierTransactionDepense(
@@ -7547,23 +7535,15 @@ export async function lierTransactionDepense(
   depenseId: number,
   artisanId: number
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `UPDATE transactions_bancaires SET depense_id = ?
-      WHERE id = ? AND artisan_id = ?`,
-    [depenseId, transactionId, artisanId]
-  );
+  const dbi = await getDb();
+  await dbi.update(transactionsBancaires).set({ depense_id: depenseId })
+    .where(and(eq(transactionsBancaires.id, transactionId), eq(transactionsBancaires.artisan_id, artisanId)));
 }
 
 export async function ignorerTransaction(id: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `UPDATE transactions_bancaires SET ignoree = TRUE
-      WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
+  const dbi = await getDb();
+  await dbi.update(transactionsBancaires).set({ ignoree: true })
+    .where(and(eq(transactionsBancaires.id, id), eq(transactionsBancaires.artisan_id, artisanId)));
 }
 
 // === Export FEC achats ===
