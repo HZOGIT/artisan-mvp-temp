@@ -1112,3 +1112,254 @@ export const interventionsMobile = pgTable("interventions_mobile", {
 });
 export type InterventionMobile = typeof interventionsMobile.$inferSelect;
 export type InsertInterventionMobile = typeof interventionsMobile.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+// BATCH 3b (P0.5) — CRM/activités, notifications, avis, badges, alertes, chantier
+// ════════════════════════════════════════════════════════════════════════════
+export const activiteTypeEnum = pgEnum("activite_type", ["appel", "email", "rdv", "relance", "autre"]);
+export const activiteEntiteTypeEnum = pgEnum("activite_entite_type", ["client", "devis", "facture", "chantier", "aucun"]);
+export const notificationTypeEnum = pgEnum("notification_type", ["info", "alerte", "rappel", "succes", "erreur"]);
+export const avisStatutEnum = pgEnum("avis_statut", ["en_attente", "publie", "masque"]);
+export const demandeContactStatutEnum = pgEnum("demande_contact_statut", ["nouveau", "contacte", "converti", "perdu"]);
+export const demandeAvisStatutEnum = pgEnum("demande_avis_statut", ["envoyee", "ouverte", "completee", "expiree"]);
+export const badgeCategorieEnum = pgEnum("badge_categorie", ["interventions", "avis", "ca", "anciennete", "special"]);
+export const alerteFrequenceEnum = pgEnum("alerte_frequence", ["quotidien", "hebdomadaire", "mensuel"]);
+export const alerteTypeEnum = pgEnum("alerte_type", ["depassement_positif", "depassement_negatif"]);
+export const alerteCanalEnum = pgEnum("alerte_canal", ["email", "sms", "les_deux"]);
+export const alerteEnvoiStatutEnum = pgEnum("alerte_envoi_statut", ["envoye", "echec", "lu"]);
+export const suiviStatutEnum = pgEnum("suivi_statut", ["a_faire", "en_cours", "termine"]);
+export const analyseStatutEnum = pgEnum("analyse_statut", ["en_attente", "en_cours", "termine", "erreur"]);
+
+// ── ACTIVITES (CRM next-action) ──────────────────────────────────────────────
+export const activites = pgTable("activites", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  type: activiteTypeEnum("type").default("autre").notNull(),
+  titre: varchar("titre", { length: 500 }).notNull(),
+  echeance: date("echeance").notNull(),
+  entiteType: activiteEntiteTypeEnum("entiteType").default("aucun"),
+  entiteId: integer("entiteId"),
+  responsableUserId: integer("responsableUserId"),
+  fait: boolean("fait").default(false).notNull(),
+  faitAt: timestamp("faitAt"),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Activite = typeof activites.$inferSelect;
+export type InsertActivite = typeof activites.$inferInsert;
+
+// ── NOTIFICATIONS ────────────────────────────────────────────────────────────
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  type: notificationTypeEnum("type").default("info"),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  message: text("message"),
+  lien: varchar("lien", { length: 500 }),
+  lu: boolean("lu").default(false),
+  archived: boolean("archived").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+// ── HABILITATIONS TECHNICIENS ────────────────────────────────────────────────
+export const habilitationsTechniciens = pgTable("habilitations_techniciens", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  type: varchar("type", { length: 255 }).notNull(),
+  numero: varchar("numero", { length: 100 }),
+  organisme: varchar("organisme", { length: 255 }),
+  dateObtention: date("dateObtention"),
+  dateExpiration: date("dateExpiration"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type HabilitationTechnicien = typeof habilitationsTechniciens.$inferSelect;
+export type InsertHabilitationTechnicien = typeof habilitationsTechniciens.$inferInsert;
+
+// ── AVIS CLIENTS ─────────────────────────────────────────────────────────────
+export const avisClients = pgTable("avis_clients", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  interventionId: integer("interventionId"),
+  note: integer("note").notNull(),
+  commentaire: text("commentaire"),
+  tokenAvis: varchar("tokenAvis", { length: 64 }).unique(),
+  reponseArtisan: text("reponseArtisan"),
+  reponseAt: timestamp("reponseAt"),
+  statut: avisStatutEnum("statut").default("en_attente"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type AvisClient = typeof avisClients.$inferSelect;
+export type InsertAvisClient = typeof avisClients.$inferInsert;
+
+// ── DEMANDES CONTACT (leads vitrine) ─────────────────────────────────────────
+export const demandesContact = pgTable("demandes_contact", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  nom: varchar("nom", { length: 200 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  telephone: varchar("telephone", { length: 30 }),
+  message: text("message"),
+  source: varchar("source", { length: 50 }).default("vitrine"),
+  statut: demandeContactStatutEnum("statut").default("nouveau"),
+  clientId: integer("clientId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type DemandeContact = typeof demandesContact.$inferSelect;
+export type InsertDemandeContact = typeof demandesContact.$inferInsert;
+
+// ── DEMANDES AVIS ────────────────────────────────────────────────────────────
+export const demandesAvis = pgTable("demandes_avis", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  interventionId: integer("interventionId").notNull(),
+  tokenDemande: varchar("tokenDemande", { length: 64 }).notNull().unique(),
+  emailEnvoyeAt: timestamp("emailEnvoyeAt"),
+  avisRecuAt: timestamp("avisRecuAt"),
+  statut: demandeAvisStatutEnum("statut").default("envoyee"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DemandeAvis = typeof demandesAvis.$inferSelect;
+export type InsertDemandeAvis = typeof demandesAvis.$inferInsert;
+
+// ── HISTORIQUE DEPLACEMENTS ──────────────────────────────────────────────────
+export const historiqueDeplacements = pgTable("historique_deplacements", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  interventionId: integer("interventionId"),
+  dateDebut: timestamp("dateDebut").notNull(),
+  dateFin: timestamp("dateFin"),
+  distanceKm: numeric("distanceKm", { precision: 8, scale: 2 }),
+  dureeMinutes: integer("dureeMinutes"),
+  latitudeDepart: numeric("latitudeDepart", { precision: 10, scale: 8 }),
+  longitudeDepart: numeric("longitudeDepart", { precision: 11, scale: 8 }),
+  latitudeArrivee: numeric("latitudeArrivee", { precision: 10, scale: 8 }),
+  longitudeArrivee: numeric("longitudeArrivee", { precision: 11, scale: 8 }),
+  adresseDepart: text("adresseDepart"),
+  adresseArrivee: text("adresseArrivee"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type HistoriqueDeplacement = typeof historiqueDeplacements.$inferSelect;
+export type InsertHistoriqueDeplacement = typeof historiqueDeplacements.$inferInsert;
+
+// ── BADGES ───────────────────────────────────────────────────────────────────
+export const badges = pgTable("badges", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  nom: varchar("nom", { length: 100 }).notNull(),
+  description: text("description"),
+  icone: varchar("icone", { length: 50 }),
+  couleur: varchar("couleur", { length: 20 }),
+  categorie: badgeCategorieEnum("categorie").default("interventions"),
+  condition: text("condition"),
+  seuil: integer("seuil"),
+  points: integer("points").default(10),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Badge = typeof badges.$inferSelect;
+export type InsertBadge = typeof badges.$inferInsert;
+
+// ── BADGES TECHNICIENS ───────────────────────────────────────────────────────
+export const badgesTechniciens = pgTable("badges_techniciens", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  badgeId: integer("badgeId").notNull(),
+  dateObtention: timestamp("dateObtention").defaultNow().notNull(),
+  valeurAtteinte: integer("valeurAtteinte"),
+  notifie: boolean("notifie").default(false),
+});
+export type BadgeTechnicien = typeof badgesTechniciens.$inferSelect;
+export type InsertBadgeTechnicien = typeof badgesTechniciens.$inferInsert;
+
+// ── CONFIG ALERTES PREVISIONS ────────────────────────────────────────────────
+export const configAlertesPrevisions = pgTable("config_alertes_previsions", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull().unique(),
+  seuilAlertePositif: numeric("seuilAlertePositif", { precision: 5, scale: 2 }).default("10.00"),
+  seuilAlerteNegatif: numeric("seuilAlerteNegatif", { precision: 5, scale: 2 }).default("10.00"),
+  alerteEmail: boolean("alerteEmail").default(true),
+  alerteSms: boolean("alerteSms").default(false),
+  emailDestination: varchar("emailDestination", { length: 320 }),
+  telephoneDestination: varchar("telephoneDestination", { length: 20 }),
+  frequenceVerification: alerteFrequenceEnum("frequenceVerification").default("hebdomadaire"),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type ConfigAlertePrevision = typeof configAlertesPrevisions.$inferSelect;
+export type InsertConfigAlertePrevision = typeof configAlertesPrevisions.$inferInsert;
+
+// ── HISTORIQUE ALERTES PREVISIONS ────────────────────────────────────────────
+export const historiqueAlertesPrevisions = pgTable("historique_alertes_previsions", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  mois: integer("mois").notNull(),
+  annee: integer("annee").notNull(),
+  typeAlerte: alerteTypeEnum("typeAlerte").notNull(),
+  caPrevisionnel: numeric("caPrevisionnel", { precision: 12, scale: 2 }),
+  caRealise: numeric("caRealise", { precision: 12, scale: 2 }),
+  ecartPourcentage: numeric("ecartPourcentage", { precision: 5, scale: 2 }),
+  canalEnvoi: alerteCanalEnum("canalEnvoi").notNull(),
+  dateEnvoi: timestamp("dateEnvoi").defaultNow().notNull(),
+  statut: alerteEnvoiStatutEnum("statut").default("envoye"),
+  message: text("message"),
+});
+export type HistoriqueAlertePrevision = typeof historiqueAlertesPrevisions.$inferSelect;
+export type InsertHistoriqueAlertePrevision = typeof historiqueAlertesPrevisions.$inferInsert;
+
+// ── POINTAGES CHANTIER ───────────────────────────────────────────────────────
+export const pointagesChantier = pgTable("pointages_chantier", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  chantierId: integer("chantierId").notNull(),
+  phaseId: integer("phaseId"),
+  technicienId: integer("technicienId"),
+  date: date("date").notNull(),
+  heures: numeric("heures", { precision: 6, scale: 2 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PointageChantier = typeof pointagesChantier.$inferSelect;
+export type InsertPointageChantier = typeof pointagesChantier.$inferInsert;
+
+// ── SUIVI CHANTIER ───────────────────────────────────────────────────────────
+export const suiviChantier = pgTable("suivi_chantier", {
+  id: serial("id").primaryKey(),
+  chantierId: integer("chantierId").notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  statut: suiviStatutEnum("statut").default("a_faire"),
+  pourcentage: integer("pourcentage").default(0),
+  ordre: integer("ordre").default(1),
+  visibleClient: boolean("visibleClient").default(true),
+  dateDebut: date("dateDebut"),
+  dateFin: date("dateFin"),
+  commentaire: text("commentaire"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type SuiviChantier = typeof suiviChantier.$inferSelect;
+export type InsertSuiviChantier = typeof suiviChantier.$inferInsert;
+
+// ── ANALYSES PHOTOS CHANTIER (IA) ────────────────────────────────────────────
+export const analysesPhotosChantier = pgTable("analyses_photos_chantier", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId"),
+  titre: varchar("titre", { length: 255 }),
+  description: text("description"),
+  statut: analyseStatutEnum("statut").default("en_attente"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type AnalysePhotoChantier = typeof analysesPhotosChantier.$inferSelect;
+export type InsertAnalysePhotoChantier = typeof analysesPhotosChantier.$inferInsert;
