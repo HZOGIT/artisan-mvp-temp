@@ -92,6 +92,14 @@ export class FakeDevisRepository implements IDevisRepository {
     return true;
   }
 
+  async setStatut(ctx: TenantContext, id: number, statut: Devis["statut"]): Promise<Devis | null> {
+    const d = await this.getById(ctx, id);
+    if (!d) return null;
+    const updated: Devis = { ...d, statut, updatedAt: new Date() };
+    this.devisStore = this.devisStore.map((x) => (x.id === id ? updated : x));
+    return updated;
+  }
+
   async nextNumero(ctx: TenantContext): Promise<string> {
     const compteurParam = (this.compteur.get(ctx.artisanId) ?? 0) + 1;
     let maxFromDb = 0;

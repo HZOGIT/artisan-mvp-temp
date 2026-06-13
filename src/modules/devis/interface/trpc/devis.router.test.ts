@@ -140,4 +140,18 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     expect((await callQuery(server, "devis.getById", { id }, tA)).statusCode).toBe(404);
     expect((await callMutation(server, "devis.update", { id: 999999999, objet: "x" }, tA)).statusCode).toBe(404);
   });
+
+  it("transitions de statut : envoyer→accepter ; transition invalide → 409 ; cross-tenant → 404", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "devis.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    // brouillon → accepter directement interdit (409)
+    expect((await callMutation(server, "devis.accepter", { id }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "devis.envoyer", { id }, tA)).json().result.data.statut).toBe("envoye");
+    expect((await callMutation(server, "devis.accepter", { id }, tA)).json().result.data.statut).toBe("accepte");
+    // accepté = terminal : refuser → 409
+    expect((await callMutation(server, "devis.refuser", { id }, tA)).statusCode).toBe(409);
+    // cross-tenant : B ne transitionne pas le devis de A
+    expect((await callMutation(server, "devis.envoyer", { id }, tB)).statusCode).toBe(404);
+  });
 });

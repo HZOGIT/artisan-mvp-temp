@@ -7,6 +7,7 @@ import {
   ajouterLigneDevis,
   modifierLigneDevis,
   supprimerLigneDevis,
+  changerStatutDevis,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
@@ -98,5 +99,33 @@ describe("devis — use-cases d'écriture", () => {
     await expect(supprimerLigneDevis(repo, B, d.id, l.id)).rejects.toBeInstanceOf(NotFoundError);
     await supprimerLigneDevis(repo, A, d.id, l.id);
     expect((await repo.getById(A, d.id))?.totalTTC).toBe("0.00");
+  });
+
+  it("changerStatutDevis — machine à états : brouillon→envoye→accepte ; idempotence", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye");
+    expect((await changerStatutDevis(repo, A, d.id, "envoye")).statut).toBe("envoye"); // idempotent
+    expect((await changerStatutDevis(repo, A, d.id, "accepte")).statut).toBe("accepte");
+    expect((await changerStatutDevis(repo, A, d.id, "accepte")).statut).toBe("accepte"); // idempotent
+  });
+
+  it("changerStatutDevis — transitions invalides → Conflict ; états terminaux figés", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    // brouillon → accepte (saute envoye) interdit
+    await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError);
+    await changerStatutDevis(repo, A, d.id, "envoye");
+    await changerStatutDevis(repo, A, d.id, "refuse");
+    // refuse est terminal → toute autre transition → Conflict
+    await expect(changerStatutDevis(repo, A, d.id, "envoye")).rejects.toBeInstanceOf(ConflictError);
+    await expect(changerStatutDevis(repo, A, d.id, "accepte")).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("changerStatutDevis — devis d'un autre tenant → NotFound", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    await expectCrossTenantDenied(() => changerStatutDevis(repo, B, d.id, "envoye"));
+    await expect(changerStatutDevis(repo, B, d.id, "envoye")).rejects.toBeInstanceOf(NotFoundError);
   });
 });

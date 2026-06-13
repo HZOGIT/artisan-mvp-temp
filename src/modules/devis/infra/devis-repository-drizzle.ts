@@ -142,6 +142,17 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
     });
   }
 
+  setStatut(ctx: TenantContext, id: number, statut: Devis["statut"]): Promise<Devis | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .update(devis)
+        .set({ statut, updatedAt: new Date() })
+        .where(and(eq(devis.id, id), eq(devis.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toDevis(row) : null;
+    });
+  }
+
   nextNumero(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
       // Parité legacy `getNextDevisNumber` : préfixe + compteur persistés dans

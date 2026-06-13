@@ -2,6 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type {
   Devis,
   DevisLigne,
+  DevisStatut,
   CreateDevisInput,
   UpdateDevisInput,
   CreateDevisLigneInput,
@@ -25,6 +26,10 @@ export interface IDevisRepository {
   // false si le devis n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
+  // Définit le statut d'un devis (transition pilotée par le use-case workflow) — null hors
+  // tenant. La machine à états (transitions valides, idempotence, immutabilité) est portée par
+  // le use-case, pas par le repo.
+  setStatut(ctx: TenantContext, id: number, statut: DevisStatut): Promise<Devis | null>;
   // Prochain numéro de devis, scopé tenant, généré serveur (jamais fourni par le client) →
   // intégrité de la numérotation commerciale (parité legacy `getNextDevisNumber`).
   nextNumero(ctx: TenantContext): Promise<string>;

@@ -9,6 +9,7 @@ import {
   ajouterLigneDevis,
   modifierLigneDevis,
   supprimerLigneDevis,
+  changerStatutDevis,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -121,5 +122,22 @@ export function createDevisRouter(repo: IDevisRepository) {
         await supprimerLigneDevis(repo, ctx.tenant, input.devisId, input.id);
         return { success: true };
       }),
+
+    // Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide).
+    envoyer: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "envoye")),
+
+    accepter: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "accepte")),
+
+    refuser: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "refuse")),
+
+    expirer: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
   });
 }

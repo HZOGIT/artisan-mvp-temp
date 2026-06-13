@@ -10,6 +10,7 @@ const stubRepo: IDevisRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  setStatut: async () => null,
   nextNumero: async () => "DEV-00001",
   ownsClient: async () => false,
   listLignes: async () => [],
@@ -35,22 +36,27 @@ describe("devis.module", () => {
       "listLignes",
       "nextNumero",
       "ownsClient",
+      "setStatut",
       "update",
       "updateLigne",
     ]);
   });
 
-  it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes)", () => {
+  it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
     const module = createDevisModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
+      "accepter",
       "addLigne",
       "create",
       "delete",
       "deleteLigne",
+      "envoyer",
+      "expirer",
       "getById",
       "getLignes",
       "list",
+      "refuser",
       "update",
       "updateLigne",
     ]);

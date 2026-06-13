@@ -4,6 +4,7 @@ import type { IDevisRepository } from "./devis-repository";
 import type {
   Devis,
   DevisLigne,
+  DevisStatut,
   CreateDevisInput,
   UpdateDevisInput,
   CreateDevisLigneInput,
@@ -102,6 +103,33 @@ export async function modifierLigneDevis(
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
   const updated = await repo.updateLigne(ctx, ligneId, input);
   if (!updated) throw new NotFoundError("Ligne introuvable");
+  return updated;
+}
+
+// Machine à états des devis (durcissement : le legacy laissait le statut libre).
+//  brouillon → envoye ; envoye → accepte | refuse | expire. Les états accepte/refuse/expire
+//  sont **terminaux** (plus de transition). Idempotence : repasser au même statut est un no-op.
+const TRANSITIONS: Record<DevisStatut, readonly DevisStatut[]> = {
+  brouillon: ["envoye"],
+  envoye: ["accepte", "refuse", "expire"],
+  accepte: [],
+  refuse: [],
+  expire: [],
+};
+
+export async function changerStatutDevis(
+  repo: IDevisRepository,
+  ctx: TenantContext,
+  id: number,
+  cible: DevisStatut,
+): Promise<Devis> {
+  const devis = await getDevisOwned(repo, ctx, id);
+  if (devis.statut === cible) return devis; // idempotent
+  if (!TRANSITIONS[devis.statut].includes(cible)) {
+    throw new ConflictError(`Transition de statut invalide : ${devis.statut} → ${cible}`);
+  }
+  const updated = await repo.setStatut(ctx, id, cible);
+  if (!updated) throw new NotFoundError("Devis introuvable");
   return updated;
 }
 
