@@ -12,7 +12,7 @@ const stubRepo: IStockRepository = {
   delete: async () => false,
 };
 
-describe("stocks.module (scaffold)", () => {
+describe("stocks.module", () => {
   it("createStocksModule câble le repository injecté", () => {
     const module = createStocksModule({ repository: stubRepo });
     expect(module.deps.repository).toBe(stubRepo);
@@ -20,5 +20,11 @@ describe("stocks.module (scaffold)", () => {
 
   it("le port expose les opérations attendues", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+  });
+
+  it("expose un routeur tRPC assemblé (procédures parité)", () => {
+    const module = createStocksModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
   });
 });

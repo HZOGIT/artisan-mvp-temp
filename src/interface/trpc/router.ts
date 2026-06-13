@@ -7,6 +7,7 @@ import type { TechniciensModule } from "../../modules/techniciens/techniciens.mo
 import type { NotificationsModule } from "../../modules/notifications/notifications.module";
 import type { FournisseursModule } from "../../modules/fournisseurs/fournisseurs.module";
 import type { CommandesModule } from "../../modules/commandes/commandes.module";
+import type { StocksModule } from "../../modules/stocks/stocks.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -17,6 +18,7 @@ export interface AppRouterDeps {
   readonly notifications: NotificationsModule;
   readonly fournisseurs: FournisseursModule;
   readonly commandes: CommandesModule;
+  readonly stocks: StocksModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -36,6 +38,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     notifications: deps.notifications.router,
     fournisseurs: deps.fournisseurs.router,
     commandes: deps.commandes.router,
+    stocks: deps.stocks.router,
   });
 }
 
