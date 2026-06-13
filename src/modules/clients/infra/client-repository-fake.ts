@@ -7,6 +7,13 @@ import type { Client, CreateClientInput, UpdateClientInput } from "../domain/cli
 export class FakeClientRepository implements IClientRepository {
   private store: Client[] = [];
   private seq = 0;
+  // Nombre de documents liés par clientId (injectable pour tester la garde de suppression).
+  private documentsLies = new Map<number, number>();
+
+  // Aide de test : déclare N documents métier liés à un client (garde d'intégrité).
+  setDocumentsLies(clientId: number, n: number): void {
+    this.documentsLies.set(clientId, n);
+  }
 
   async list(ctx: TenantContext): Promise<Client[]> {
     return this.store.filter((c) => c.artisanId === ctx.artisanId);
@@ -57,5 +64,12 @@ export class FakeClientRepository implements IClientRepository {
     if (!c) return false;
     this.store = this.store.filter((x) => x.id !== id);
     return true;
+  }
+
+  async countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number> {
+    // Le client doit appartenir au tenant ; sinon 0 (rien de visible cross-tenant).
+    const c = await this.getById(ctx, clientId);
+    if (!c) return 0;
+    return this.documentsLies.get(clientId) ?? 0;
   }
 }

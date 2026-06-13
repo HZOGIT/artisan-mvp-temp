@@ -1,5 +1,12 @@
-import { and, asc, eq } from "drizzle-orm";
-import { clients } from "../../../../drizzle/schema.pg";
+import { and, asc, eq, sql } from "drizzle-orm";
+import {
+  clients,
+  devis,
+  factures,
+  interventions,
+  chantiers,
+  contratsMaintenance,
+} from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -90,6 +97,30 @@ export class ClientRepositoryDrizzle implements IClientRepository {
         .where(and(eq(clients.id, id), eq(clients.artisanId, ctx.artisanId)))
         .returning({ id: clients.id });
       return deleted.length > 0;
+    });
+  }
+
+  countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const a = ctx.artisanId;
+      // Double cloisonnement : clientId + artisanId (en plus de la RLS). Chaque table porte
+      // un `artisanId` (toutes RLS-isolées) → on compte uniquement les documents du tenant.
+      const n = sql<number>`count(*)::int`;
+      const [d] = await tx.select({ n }).from(devis).where(and(eq(devis.clientId, clientId), eq(devis.artisanId, a)));
+      const [f] = await tx.select({ n }).from(factures).where(and(eq(factures.clientId, clientId), eq(factures.artisanId, a)));
+      const [i] = await tx
+        .select({ n })
+        .from(interventions)
+        .where(and(eq(interventions.clientId, clientId), eq(interventions.artisanId, a)));
+      const [c] = await tx
+        .select({ n })
+        .from(chantiers)
+        .where(and(eq(chantiers.clientId, clientId), eq(chantiers.artisanId, a)));
+      const [ct] = await tx
+        .select({ n })
+        .from(contratsMaintenance)
+        .where(and(eq(contratsMaintenance.clientId, clientId), eq(contratsMaintenance.artisanId, a)));
+      return (d?.n ?? 0) + (f?.n ?? 0) + (i?.n ?? 0) + (c?.n ?? 0) + (ct?.n ?? 0);
     });
   }
 }

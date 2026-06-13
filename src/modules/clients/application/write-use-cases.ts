@@ -1,4 +1,4 @@
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IClientRepository } from "./client-repository";
 import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
@@ -33,4 +33,21 @@ export async function modifierClient(
   const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Client introuvable");
   return updated;
+}
+
+// Supprime un client AVEC garde d'intégrité référentielle : un client encore référencé par
+// des documents métier (devis/factures/interventions/chantiers/contrats) ne peut pas être
+// supprimé (sinon documents orphelins / factures cassées). Corrige le défaut du legacy
+// (hard delete sans garde). NotFound si le client n'appartient pas au tenant.
+export async function supprimerClient(repo: IClientRepository, ctx: TenantContext, id: number): Promise<void> {
+  const client = await repo.getById(ctx, id);
+  if (!client) throw new NotFoundError("Client introuvable");
+  const lies = await repo.countDocumentsLies(ctx, id);
+  if (lies > 0) {
+    throw new ConflictError(
+      `Suppression refusée : ce client est référencé par ${lies} document(s) (devis, factures, interventions…). Archivez-le ou supprimez d'abord les documents liés.`,
+    );
+  }
+  const ok = await repo.delete(ctx, id);
+  if (!ok) throw new NotFoundError("Client introuvable");
 }

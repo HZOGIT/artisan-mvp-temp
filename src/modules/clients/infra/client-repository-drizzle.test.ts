@@ -20,6 +20,8 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
   const repo = new ClientRepositoryDrizzle(app.db);
 
   const cleanup = async () => {
+    await admin.query('delete from factures where "artisanId" in ($1,$2)', [A, B]);
+    await admin.query('delete from devis where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
   };
 
@@ -68,5 +70,23 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
     const c = await repo.create(ctx(A), { nom: "ASupprimer" });
     expect(await repo.delete(ctx(A), c.id)).toBe(true);
     expect(await repo.getById(ctx(A), c.id)).toBeNull();
+  });
+
+  it("countDocumentsLies : compte les documents métier du tenant, ignore les autres tenants", async () => {
+    const c = await repo.create(ctx(A), { nom: "AvecDocs" });
+    // aucun document au départ
+    expect(await repo.countDocumentsLies(ctx(A), c.id)).toBe(0);
+    // seed 2 factures + 1 devis liés au client de A (colonnes non-null minimales)
+    await admin.query(
+      `insert into factures ("artisanId","clientId",numero) values ($1,$2,'F-A-1'),($1,$2,'F-A-2')`,
+      [A, c.id],
+    );
+    await admin.query(`insert into devis ("artisanId","clientId",numero) values ($1,$2,'D-A-1')`, [A, c.id]);
+    expect(await repo.countDocumentsLies(ctx(A), c.id)).toBe(3);
+    // un document d'un AUTRE tenant pointant un id de client identique ne doit pas compter
+    expect(await repo.countDocumentsLies(ctx(B), c.id)).toBe(0);
+    // nettoyage des documents seedés
+    await admin.query('delete from factures where "artisanId"=$1', [A]);
+    await admin.query('delete from devis where "artisanId"=$1', [A]);
   });
 });

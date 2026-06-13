@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeClientRepository } from "../infra/client-repository-fake";
-import { creerClient, modifierClient } from "./write-use-cases";
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { creerClient, modifierClient, supprimerClient } from "./write-use-cases";
+import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
@@ -59,5 +59,30 @@ describe("clients — use-cases d'écriture (create / update)", () => {
     // le client de A reste intact
     const repoA = await repo.getById(A, c.id);
     expect(repoA?.nom).toBe("Secret");
+  });
+});
+
+describe("clients — suppression avec garde d'intégrité référentielle", () => {
+  it("supprimerClient OK quand aucun document lié", async () => {
+    const repo = new FakeClientRepository();
+    const c = await creerClient(repo, A, { nom: "Libre" });
+    await supprimerClient(repo, A, c.id);
+    expect(await repo.getById(A, c.id)).toBeNull();
+  });
+
+  it("supprimerClient REFUSÉ (ConflictError) si des documents pointent le client", async () => {
+    const repo = new FakeClientRepository();
+    const c = await creerClient(repo, A, { nom: "Référencé" });
+    repo.setDocumentsLies(c.id, 3); // ex. 3 factures/devis liés
+    await expect(supprimerClient(repo, A, c.id)).rejects.toBeInstanceOf(ConflictError);
+    // le client n'a PAS été supprimé (intégrité préservée)
+    expect(await repo.getById(A, c.id)).not.toBeNull();
+  });
+
+  it("supprimerClient : client d'un autre tenant → NotFound (ne révèle pas l'existence)", async () => {
+    const repo = new FakeClientRepository();
+    const c = await creerClient(repo, A, { nom: "Secret" });
+    await expect(supprimerClient(repo, B, c.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect(await repo.getById(A, c.id)).not.toBeNull();
   });
 });

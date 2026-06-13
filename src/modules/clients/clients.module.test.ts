@@ -10,6 +10,7 @@ const stubRepo: IClientRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  countDocumentsLies: async () => 0,
 };
 
 describe("clients.module", () => {
@@ -19,6 +20,13 @@ describe("clients.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "countDocumentsLies",
+      "create",
+      "delete",
+      "getById",
+      "list",
+      "update",
+    ]);
   });
 });
