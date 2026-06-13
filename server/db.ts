@@ -7456,6 +7456,44 @@ export async function deleteRegleCategorisation(id: number, artisanId: number): 
     .where(and(eq(reglesCategorisation.id, id), eq(reglesCategorisation.artisan_id, artisanId)));
 }
 
+// === Bibliothèque d'articles (catalogue public, endpoints /api/articles/*) ===
+
+// Recherche d'articles visibles (nom/description/categorie ilike) + filtres optionnels.
+export async function searchBibliothequeArticles(
+  q: string,
+  filters: { metier?: string; categorie?: string; sousCategorie?: string } = {},
+): Promise<any[]> {
+  const dbi = await getDb();
+  const like = `%${q}%`;
+  const conds: any[] = [
+    eq(bibliothequeArticles.visible, true),
+    or(
+      ilike(bibliothequeArticles.nom, like),
+      ilike(bibliothequeArticles.description, like),
+      ilike(bibliothequeArticles.categorie, like),
+    ),
+  ];
+  if (filters.metier) conds.push(eq(bibliothequeArticles.metier, filters.metier));
+  if (filters.categorie) conds.push(eq(bibliothequeArticles.categorie, filters.categorie));
+  if (filters.sousCategorie) conds.push(eq(bibliothequeArticles.sous_categorie, filters.sousCategorie));
+  return await dbi.select({
+    id: bibliothequeArticles.id, nom: bibliothequeArticles.nom, description: bibliothequeArticles.description,
+    prix_base: bibliothequeArticles.prix_base, unite: bibliothequeArticles.unite, metier: bibliothequeArticles.metier,
+    categorie: bibliothequeArticles.categorie, sous_categorie: bibliothequeArticles.sous_categorie,
+    duree_moyenne_minutes: bibliothequeArticles.duree_moyenne_minutes,
+  }).from(bibliothequeArticles).where(and(...conds)).orderBy(asc(bibliothequeArticles.nom)).limit(10);
+}
+
+// Couples (categorie, sous_categorie) distincts pour un métier (catalogue visible).
+export async function getBibliothequeCategories(metier: string): Promise<Array<{ categorie: string; sous_categorie: string }>> {
+  const dbi = await getDb();
+  return await dbi.selectDistinct({
+    categorie: bibliothequeArticles.categorie, sous_categorie: bibliothequeArticles.sous_categorie,
+  }).from(bibliothequeArticles)
+    .where(and(eq(bibliothequeArticles.visible, true), eq(bibliothequeArticles.metier, metier)))
+    .orderBy(asc(bibliothequeArticles.categorie), asc(bibliothequeArticles.sous_categorie));
+}
+
 // === Bootstrap / seed démo (OPE-184 : dialect-aware Drizzle, remplacent le raw SQL d'index.ts) ===
 
 // Met des objectifs par défaut là où ils sont absents/0 (idempotent). Renvoie le nb de lignes touchées.

@@ -387,30 +387,9 @@ async function startServer() {
       const categorie = req.query.categorie as string | undefined;
       const sous_categorie = req.query.sous_categorie as string | undefined;
 
-      const { getDb, getPool } = await import('../db');
-      await getDb(); // ensure connection is initialized
-      const pool = getPool();
-      if (!pool) return res.status(500).json({ error: 'Database unavailable' });
-
-      // COLLATE utf8mb4_general_ci : insensible aux accents et a la casse.
-      // Recherche elargie au-dela du nom : description et categorie.
-      let query = `
-        SELECT id, nom, description, prix_base, unite, metier, categorie, sous_categorie, duree_moyenne_minutes
-        FROM bibliotheque_articles
-        WHERE visible = 1
-          AND (nom COLLATE utf8mb4_general_ci LIKE ?
-               OR description COLLATE utf8mb4_general_ci LIKE ?
-               OR categorie COLLATE utf8mb4_general_ci LIKE ?)
-      `;
-      const params: any[] = [`%${q}%`, `%${q}%`, `%${q}%`];
-
-      if (metier) { query += ' AND metier = ?'; params.push(metier); }
-      if (categorie) { query += ' AND categorie = ?'; params.push(categorie); }
-      if (sous_categorie) { query += ' AND sous_categorie = ?'; params.push(sous_categorie); }
-
-      query += ' ORDER BY nom LIMIT 10';
-
-      const [rows] = await pool.execute(query, params);
+      // OPE-184 — recherche d'articles portée en Drizzle (db.searchBibliothequeArticles).
+      const { searchBibliothequeArticles } = await import('../db');
+      const rows = await searchBibliothequeArticles(q, { metier, categorie, sousCategorie: sous_categorie });
       res.json(rows);
     } catch (error) {
       console.error('[API] /api/articles/search error:', error);
@@ -439,15 +418,9 @@ async function startServer() {
         return res.status(400).json({ error: 'Parameter metier is required' });
       }
 
-      const { getDb, getPool } = await import('../db');
-      await getDb();
-      const pool = getPool();
-      if (!pool) return res.status(500).json({ error: 'Database unavailable' });
-
-      const [rows] = await pool.execute(
-        `SELECT DISTINCT categorie, sous_categorie FROM bibliotheque_articles WHERE visible = 1 AND metier = ? ORDER BY categorie, sous_categorie`,
-        [metier]
-      );
+      // OPE-184 — catégories portées en Drizzle (db.getBibliothequeCategories).
+      const { getBibliothequeCategories } = await import('../db');
+      const rows = await getBibliothequeCategories(metier);
 
       // Group by categorie
       const grouped: Record<string, string[]> = {};
