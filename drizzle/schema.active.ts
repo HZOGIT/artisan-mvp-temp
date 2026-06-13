@@ -2,7 +2,7 @@
 // Runtime : ré-exporte les objets-tables du bon dialecte selon DB_DIALECT, pour que
 // le legacy server/db.ts (et ses ~425 fonctions) tape Postgres sans réécrire ses imports.
 // Les TYPES restent fournis par db.ts via ../drizzle/schema (compile-only, strippés par tsx).
-// mysql = défaut (comportement inchangé). Généré (P0.7/P0.8) — ne pas éditer à la main.
+// mysql = défaut (comportement inchangé). Généré (P0.7/P0.8/P0.5e) — ne pas éditer à la main.
 import * as mysqlSchema from "./schema";
 import * as pgSchema from "./schema.pg";
 
@@ -101,3 +101,14 @@ export const emailsLog: any = A.emailsLog;
 export const activeSessions: any = A.activeSessions;
 export const devices: any = A.devices;
 export const subscriptions: any = A.subscriptions;
+export const depenses: any = A.depenses;
+export const categoriesDepenses: any = A.categoriesDepenses;
+export const notesDeFrais: any = A.notesDeFrais;
+export const notesFraisDepenses: any = A.notesFraisDepenses;
+export const budgetsCategories: any = A.budgetsCategories;
+export const relevesBancaires: any = A.relevesBancaires;
+export const transactionsBancaires: any = A.transactionsBancaires;
+export const reglesCategorisation: any = A.reglesCategorisation;
+export const modules: any = A.modules;
+export const artisanModules: any = A.artisanModules;
+export const couleursInterventions: any = A.couleursInterventions;

@@ -92,6 +92,11 @@ export const artisans = pgTable("artisans", {
   logo: text("logo"),
   slug: varchar("slug", { length: 255 }).unique(),
   icalToken: varchar("icalToken", { length: 64 }),
+  // OPE-184 P0.5e-4 — colonnes ajoutées par fix-duplicates.ts (ALTER), absentes du schéma Drizzle.
+  // `artisan.metier` est consommé dans routers.ts (fallback sur specialite).
+  metier: varchar("metier", { length: 100 }),
+  plan: varchar("plan", { length: 20 }).default("essentiel"),
+  onboardingCompleted: boolean("onboarding_completed").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
 });
