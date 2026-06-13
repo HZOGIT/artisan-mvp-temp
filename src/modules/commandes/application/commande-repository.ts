@@ -1,0 +1,27 @@
+import type { TenantContext } from "../../../shared/tenant";
+import type {
+  Commande,
+  LigneCommande,
+  CreateCommandeInput,
+  UpdateCommandeInput,
+} from "../domain/commande";
+
+// Port du repository commandes fournisseurs. Chaque méthode exige le TenantContext (scope
+// tenant + RLS). `commandes_fournisseurs` possède un `artisanId` → double cloisonnement
+// RLS + filtre. Les `lignes_commandes_fournisseurs` (SANS artisanId) sont scopées via
+// l'appartenance de la commande au tenant. ⚠️ Domaine sensible : les totaux sont calculés
+// côté repo/use-case (jamais fournis par le client), la réception (quantiteRecue) et les
+// transitions de statut sont des étapes ultérieures avec leurs invariants.
+export interface ICommandeRepository {
+  list(ctx: TenantContext): Promise<Commande[]>;
+  getById(ctx: TenantContext, id: number): Promise<Commande | null>;
+  // Lignes d'une commande — [] si la commande n'appartient pas au tenant.
+  listLignes(ctx: TenantContext, commandeId: number): Promise<LigneCommande[]>;
+  // Crée la commande + ses lignes (totaux calculés). Le fournisseur doit appartenir au
+  // tenant (null sinon).
+  create(ctx: TenantContext, input: CreateCommandeInput): Promise<Commande | null>;
+  // null si la commande n'appartient pas au tenant.
+  update(ctx: TenantContext, id: number, input: UpdateCommandeInput): Promise<Commande | null>;
+  // false si la commande n'appartient pas au tenant.
+  delete(ctx: TenantContext, id: number): Promise<boolean>;
+}
