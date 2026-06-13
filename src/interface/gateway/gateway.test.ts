@@ -78,12 +78,35 @@ describe("bascule du domaine badges (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine techniciens (flag gateway)", () => {
+  it("techniciens routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("techniciens", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { techniciens: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("techniciens", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("techniciens", 8, canary)).toBe(false);
+    const global: FeatureFlags = { techniciens: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("techniciens", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("techniciens", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine techniciens extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("techniciens.setDisponibilite")).toBe("techniciens");
+    expect(domainFromTrpcPath("/techniciens.enregistrerPosition")).toBe("techniciens");
+  });
+
+  it("parse env : techniciens enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "techniciens" } as NodeJS.ProcessEnv).techniciens).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_TECHNICIENS: "7" } as NodeJS.ProcessEnv).techniciens?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("avis/vehicules/badges sont éligibles à la bascule, pas un domaine non porté", () => {
+  it("avis/vehicules/badges/techniciens sont éligibles à la bascule, pas un domaine non porté", () => {
     expect(MIGRATED_DOMAINS).toContain("avis");
     expect(MIGRATED_DOMAINS).toContain("vehicules");
     expect(MIGRATED_DOMAINS).toContain("badges");
-    expect(isMigratedDomainAvailable("badges")).toBe(true);
+    expect(MIGRATED_DOMAINS).toContain("techniciens");
+    expect(isMigratedDomainAvailable("techniciens")).toBe(true);
     expect(isMigratedDomainAvailable("factures")).toBe(false);
   });
 });
