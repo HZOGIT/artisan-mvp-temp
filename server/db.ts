@@ -1083,6 +1083,9 @@ export async function getConflitsTechnicien(
   const congesList = await db.select({
     id: conges.id, type: conges.type, dateDebut: conges.dateDebut, dateFin: conges.dateFin,
   }).from(conges).where(and(
+    // Defense-in-depth : scope tenant explicite (cohérent avec le pattern systémique).
+    // technicienId est déjà propre à un artisan, mais on ne dépend pas de cet invariant.
+    eq(conges.artisanId, artisanId),
     eq(conges.technicienId, technicienId),
     eq(conges.statut, "approuve" as any),
     lte(conges.dateDebut, ymd(dateFin)),
