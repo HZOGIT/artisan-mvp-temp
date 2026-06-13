@@ -17,6 +17,9 @@ import type { IBadgeRepository } from "./modules/badges/application/badge-reposi
 import { createTechniciensModule } from "./modules/techniciens/techniciens.module";
 import { TechnicienRepositoryDrizzle } from "./modules/techniciens/infra/technicien-repository-drizzle";
 import type { ITechnicienRepository } from "./modules/techniciens/application/technicien-repository";
+import { createNotificationsModule } from "./modules/notifications/notifications.module";
+import { NotificationRepositoryDrizzle } from "./modules/notifications/infra/notification-repository-drizzle";
+import type { INotificationRepository } from "./modules/notifications/application/notification-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -32,6 +35,7 @@ export interface AppDeps extends ContextDeps {
   readonly lienBaseUrl?: string;
   readonly badgeRepo?: IBadgeRepository;
   readonly technicienRepo?: ITechnicienRepository;
+  readonly notificationRepo?: INotificationRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -58,7 +62,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const techniciens = createTechniciensModule({
     repository: deps.technicienRepo ?? new TechnicienRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens });
+  const notifications = createNotificationsModule({
+    repository: deps.notificationRepo ?? new NotificationRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

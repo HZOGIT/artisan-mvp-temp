@@ -4,6 +4,7 @@ import type { IVehiculeRepository } from "../../modules/vehicules/application/ve
 import type { AvisModule } from "../../modules/avis/avis.module";
 import type { BadgesModule } from "../../modules/badges/badges.module";
 import type { TechniciensModule } from "../../modules/techniciens/techniciens.module";
+import type { NotificationsModule } from "../../modules/notifications/notifications.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -11,6 +12,7 @@ export interface AppRouterDeps {
   readonly avis: AvisModule;
   readonly badges: BadgesModule;
   readonly techniciens: TechniciensModule;
+  readonly notifications: NotificationsModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -27,6 +29,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     avis: deps.avis.router,
     badges: deps.badges.router,
     techniciens: deps.techniciens.router,
+    notifications: deps.notifications.router,
   });
 }
 
