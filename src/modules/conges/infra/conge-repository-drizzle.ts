@@ -4,7 +4,7 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICongeRepository } from "../application/conge-repository";
-import type { Conge, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
+import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
 type CongeRow = typeof conges.$inferSelect;
 
@@ -97,6 +97,40 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
         .from(techniciens)
         .where(and(eq(techniciens.id, technicienId), eq(techniciens.artisanId, ctx.artisanId)));
       return (row?.n ?? 0) > 0;
+    });
+  }
+
+  findTechnicienIdForUser(ctx: TenantContext): Promise<number | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ id: techniciens.id })
+        .from(techniciens)
+        .where(and(eq(techniciens.userId, ctx.userId), eq(techniciens.artisanId, ctx.artisanId)))
+        .limit(1);
+      return row?.id ?? null;
+    });
+  }
+
+  setStatut(
+    ctx: TenantContext,
+    id: number,
+    statut: CongeStatut,
+    validePar: number,
+    commentaire?: string | null,
+  ): Promise<Conge | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .update(conges)
+        .set({
+          statut,
+          validePar,
+          dateValidation: new Date(),
+          commentaireValidation: commentaire ?? null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(conges.id, id), eq(conges.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toConge(row) : null;
     });
   }
 }

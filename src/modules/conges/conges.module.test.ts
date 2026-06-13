@@ -11,6 +11,8 @@ const stubRepo: ICongeRepository = {
   update: async () => null,
   delete: async () => false,
   ownsTechnicien: async () => false,
+  findTechnicienIdForUser: async () => null,
+  setStatut: async () => null,
 };
 
 describe("conges.module", () => {
@@ -20,12 +22,21 @@ describe("conges.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsTechnicien", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "create",
+      "delete",
+      "findTechnicienIdForUser",
+      "getById",
+      "list",
+      "ownsTechnicien",
+      "setStatut",
+      "update",
+    ]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createCongesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["annuler", "approuver", "create", "delete", "getById", "list", "refuser", "update"]);
   });
 });

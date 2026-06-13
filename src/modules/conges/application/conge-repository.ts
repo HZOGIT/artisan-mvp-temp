@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { Conge, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
+import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
 // Port du repository conges. Chaque méthode exige le TenantContext (scope tenant + RLS).
 // `conges` possède un `artisanId` → double cloisonnement RLS + filtre. ⚠️ Les invariants
@@ -17,4 +17,17 @@ export interface ICongeRepository {
   // true si le technicien (demandeur) appartient au tenant. Garde anti-IDOR-FK : interdit de
   // créer/affecter une demande de congé à un technicien d'un autre tenant.
   ownsTechnicien(ctx: TenantContext, technicienId: number): Promise<boolean>;
+  // Identifiant de la fiche technicien liée à l'utilisateur courant dans le tenant, ou null.
+  // Sert à la garde **anti self-approbation** (l'approbateur ne doit pas être le demandeur).
+  findTechnicienIdForUser(ctx: TenantContext): Promise<number | null>;
+  // Applique une décision du workflow (statut + validePar + dateValidation + commentaire),
+  // scopé tenant. null si la demande n'appartient pas au tenant. ⚠️ N'altère PAS le solde
+  // (intégration du solde portée séparément).
+  setStatut(
+    ctx: TenantContext,
+    id: number,
+    statut: CongeStatut,
+    validePar: number,
+    commentaire?: string | null,
+  ): Promise<Conge | null>;
 }

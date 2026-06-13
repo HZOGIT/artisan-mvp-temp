@@ -148,4 +148,29 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     expect(after.validePar).toBeNull();
     expect(after.motif).toBe("Tentative"); // seul le champ légitime a été appliqué
   });
+
+  it("workflow : approuver (owner) → approuve ; ré-approuver = idempotent ; refuser après approuve → 409", async () => {
+    const tA = await token(UA); // l'owner (user UA) n'est lié à aucune fiche technicien → peut approuver
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "conge_paye", dateDebut: "2026-12-01", dateFin: "2026-12-02" }, tA)).json().result.data.id as number;
+    const appr = await callMutation(server, "conges.approuver", { id, commentaire: "Validé" }, tA);
+    expect(appr.statusCode).toBe(200);
+    expect(appr.json().result.data.statut).toBe("approuve");
+    // idempotent
+    expect((await callMutation(server, "conges.approuver", { id }, tA)).json().result.data.statut).toBe("approuve");
+    // transition invalide
+    expect((await callMutation(server, "conges.refuser", { id }, tA)).statusCode).toBe(409);
+  });
+
+  it("ANTI SELF-APPROBATION e2e : l'utilisateur lié à la fiche demandeuse ne peut pas approuver → 403", async () => {
+    const tA = await token(UA);
+    // on lie la fiche techA à l'utilisateur courant (UA) → UA devient le « demandeur » de techA
+    await admin.query('update techniciens set "userId"=$1 where id=$2', [UA, techA]);
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2026-12-10", dateFin: "2026-12-11" }, tA)).json().result.data.id as number;
+    // UA (lié à techA = le demandeur) tente d'approuver SA propre demande → 403
+    expect((await callMutation(server, "conges.approuver", { id }, tA)).statusCode).toBe(403);
+    // la demande est restée en_attente (non auto-approuvée)
+    expect((await callQuery(server, "conges.getById", { id }, tA)).json().result.data.statut).toBe("en_attente");
+    // nettoyage : délier la fiche
+    await admin.query('update techniciens set "userId"=null where id=$1', [techA]);
+  });
 });

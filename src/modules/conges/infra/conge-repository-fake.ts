@@ -1,6 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICongeRepository } from "../application/conge-repository";
-import type { Conge, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
+import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
 // tenant et les valeurs par défaut PG (`statut` → en_attente, demi-journées → false). ⚠️
@@ -10,10 +10,17 @@ export class FakeCongeRepository implements ICongeRepository {
   private seq = 0;
   // Techniciens appartenant à un tenant (injectable) : clé `${artisanId}:${technicienId}`.
   private ownedTechniciens = new Set<string>();
+  // Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId.
+  private userTechnicien = new Map<string, number>();
 
   // Aide de test : déclare qu'un technicien appartient au tenant.
   registerTechnicien(artisanId: number, technicienId: number): void {
     this.ownedTechniciens.add(`${artisanId}:${technicienId}`);
+  }
+
+  // Aide de test : lie un utilisateur à une fiche technicien (garde anti self-approbation).
+  linkTechnicien(artisanId: number, userId: number, technicienId: number): void {
+    this.userTechnicien.set(`${artisanId}:${userId}`, technicienId);
   }
 
   async list(ctx: TenantContext): Promise<Conge[]> {
@@ -65,5 +72,30 @@ export class FakeCongeRepository implements ICongeRepository {
 
   async ownsTechnicien(ctx: TenantContext, technicienId: number): Promise<boolean> {
     return this.ownedTechniciens.has(`${ctx.artisanId}:${technicienId}`);
+  }
+
+  async findTechnicienIdForUser(ctx: TenantContext): Promise<number | null> {
+    return this.userTechnicien.get(`${ctx.artisanId}:${ctx.userId}`) ?? null;
+  }
+
+  async setStatut(
+    ctx: TenantContext,
+    id: number,
+    statut: CongeStatut,
+    validePar: number,
+    commentaire?: string | null,
+  ): Promise<Conge | null> {
+    const c = await this.getById(ctx, id);
+    if (!c) return null;
+    const updated: Conge = {
+      ...c,
+      statut,
+      validePar,
+      dateValidation: new Date(),
+      commentaireValidation: commentaire ?? null,
+      updatedAt: new Date(),
+    };
+    this.store = this.store.map((x) => (x.id === id ? updated : x));
+    return updated;
   }
 }

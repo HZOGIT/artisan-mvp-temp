@@ -2,7 +2,14 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ICongeRepository } from "../../application/conge-repository";
 import { listConges, getConge } from "../../application/read-use-cases";
-import { creerConge, modifierConge, supprimerConge } from "../../application/write-use-cases";
+import {
+  creerConge,
+  modifierConge,
+  supprimerConge,
+  approuverConge,
+  refuserConge,
+  annulerConge,
+} from "../../application/write-use-cases";
 
 const typeEnum = z.enum(["conge_paye", "rtt", "maladie", "sans_solde", "formation", "autre"]);
 // Date PG `date` au format ISO `YYYY-MM-DD`.
@@ -57,5 +64,18 @@ export function createCongesRouter(repo: ICongeRepository) {
         await supprimerConge(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self).
+    approuver: protectedProcedure
+      .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
+      .mutation(({ ctx, input }) => approuverConge(repo, ctx.tenant, input.id, input.commentaire)),
+
+    refuser: protectedProcedure
+      .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
+      .mutation(({ ctx, input }) => refuserConge(repo, ctx.tenant, input.id, input.commentaire)),
+
+    annuler: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => annulerConge(repo, ctx.tenant, input.id)),
   });
 }
