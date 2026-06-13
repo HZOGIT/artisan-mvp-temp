@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
+import type { FactureEncoursLigne } from "./encours";
 
 // Port du repository clients. Chaque méthode exige le TenantContext (scope tenant + RLS).
 // `clients` possède un `artisanId` → double cloisonnement RLS + filtre. ⚠️ PII : aucune
@@ -23,4 +24,8 @@ export interface IClientRepository {
   // (`%`, `_`, `\`) de la saisie sont échappés par l'implémentation → pas d'injection de
   // wildcard (une recherche `%` ne « matche » pas tout).
   search(ctx: TenantContext, query: string): Promise<Client[]>;
+  // Lignes de factures nécessaires au calcul de l'encours (lecture seule, scopée tenant).
+  // `clientId` fourni → un seul client ; absent → tout le tenant (pour la map). Le calcul
+  // (pur) est fait dans la couche application, pas ici.
+  listFacturesPourEncours(ctx: TenantContext, clientId?: number): Promise<FactureEncoursLigne[]>;
 }

@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IClientRepository } from "../../application/client-repository";
-import { listClients, getClient, rechercherClients } from "../../application/read-use-cases";
+import {
+  listClients,
+  getClient,
+  rechercherClients,
+  getEncoursClient,
+  getEncoursMap,
+} from "../../application/read-use-cases";
 import { creerClient, modifierClient, supprimerClient } from "../../application/write-use-cases";
 
 // Bornes alignées sur `ClientInputSchema` (shared/validation.ts) — defense-in-depth côté
@@ -60,6 +66,13 @@ export function createClientsRouter(repo: IClientRepository) {
     search: protectedProcedure
       .input(z.object({ query: z.string().min(1).max(100) }))
       .query(({ ctx, input }) => rechercherClients(repo, ctx.tenant, input.query)),
+
+    // Encours financier (reste dû des factures impayées). Lecture seule, scopée tenant.
+    getEncours: protectedProcedure
+      .input(z.object({ clientId: z.number().int() }))
+      .query(({ ctx, input }) => getEncoursClient(repo, ctx.tenant, input.clientId)),
+
+    getEncoursMap: protectedProcedure.query(({ ctx }) => getEncoursMap(repo, ctx.tenant)),
 
     create: protectedProcedure
       .input(createSchema)

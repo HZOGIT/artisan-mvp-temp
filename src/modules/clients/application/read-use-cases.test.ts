@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeClientRepository } from "../infra/client-repository-fake";
-import { listClients, getClient, rechercherClients } from "./read-use-cases";
+import { listClients, getClient, rechercherClients, getEncoursClient, getEncoursMap } from "./read-use-cases";
+import type { FactureEncoursLigne } from "./encours";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -59,5 +60,40 @@ describe("clients — recherche (search)", () => {
     await repo.create(A, { nom: "a%b" });
     // `%` ne doit PAS tout matcher : seul le client contenant littéralement `%` ressort
     expect((await rechercherClients(repo, A, "%")).map((c) => c.nom)).toEqual(["a%b"]);
+  });
+});
+
+describe("clients — encours (wiring use-case)", () => {
+  const NOW = new Date("2026-06-13T12:00:00Z").getTime();
+  const facture = (p: Partial<FactureEncoursLigne>): FactureEncoursLigne => ({
+    clientId: 1,
+    statut: "envoyee",
+    totalTTC: "100.00",
+    montantPaye: "0.00",
+    dateEcheance: new Date("2026-12-01T00:00:00Z"),
+    typeDocument: "facture",
+    ...p,
+  });
+
+  it("getEncoursClient agrège les factures du client", async () => {
+    const repo = new FakeClientRepository();
+    repo.setFacturesEncours([
+      facture({ clientId: 7, totalTTC: "100.00" }),
+      facture({ clientId: 7, totalTTC: "50.00", montantPaye: "20.00" }),
+    ]);
+    const enc = await getEncoursClient(repo, A, 7, NOW);
+    expect(enc.encoursTotal).toBe("130.00");
+    expect(enc.nbFacturesImpayees).toBe(2);
+  });
+
+  it("getEncoursMap ne renvoie que les clients débiteurs", async () => {
+    const repo = new FakeClientRepository();
+    repo.setFacturesEncours([
+      facture({ clientId: 1, totalTTC: "80.00" }),
+      facture({ clientId: 2, statut: "payee", totalTTC: "999.00" }),
+    ]);
+    const map = await getEncoursMap(repo, A, NOW);
+    expect(map[1].encoursTotal).toBe("80.00");
+    expect(map[2]).toBeUndefined();
   });
 });

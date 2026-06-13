@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IClientRepository } from "../application/client-repository";
+import type { FactureEncoursLigne } from "../application/encours";
 import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -9,10 +10,17 @@ export class FakeClientRepository implements IClientRepository {
   private seq = 0;
   // Nombre de documents liés par clientId (injectable pour tester la garde de suppression).
   private documentsLies = new Map<number, number>();
+  // Lignes de factures injectables (pour tester le wiring de l'encours).
+  private facturesEncours: FactureEncoursLigne[] = [];
 
   // Aide de test : déclare N documents métier liés à un client (garde d'intégrité).
   setDocumentsLies(clientId: number, n: number): void {
     this.documentsLies.set(clientId, n);
+  }
+
+  // Aide de test : injecte les lignes de factures servant au calcul de l'encours.
+  setFacturesEncours(rows: FactureEncoursLigne[]): void {
+    this.facturesEncours = rows;
   }
 
   async list(ctx: TenantContext): Promise<Client[]> {
@@ -82,5 +90,11 @@ export class FakeClientRepository implements IClientRepository {
         c.artisanId === ctx.artisanId &&
         [c.nom, c.prenom, c.email, c.telephone].some((f) => (f ?? "").toLowerCase().includes(q)),
     );
+  }
+
+  async listFacturesPourEncours(_ctx: TenantContext, clientId?: number): Promise<FactureEncoursLigne[]> {
+    return clientId != null
+      ? this.facturesEncours.filter((f) => f.clientId === clientId)
+      : this.facturesEncours;
   }
 }

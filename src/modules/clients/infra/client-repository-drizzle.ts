@@ -11,6 +11,7 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IClientRepository } from "../application/client-repository";
+import type { FactureEncoursLigne } from "../application/encours";
 import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
 
 type ClientRow = typeof clients.$inferSelect;
@@ -146,6 +147,34 @@ export class ClientRepositoryDrizzle implements IClientRepository {
         )
         .orderBy(asc(clients.nom), asc(clients.id));
       return rows.map(toClient);
+    });
+  }
+
+  listFacturesPourEncours(ctx: TenantContext, clientId?: number): Promise<FactureEncoursLigne[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const where =
+        clientId != null
+          ? and(eq(factures.artisanId, ctx.artisanId), eq(factures.clientId, clientId))
+          : eq(factures.artisanId, ctx.artisanId);
+      const rows = await tx
+        .select({
+          clientId: factures.clientId,
+          statut: factures.statut,
+          totalTTC: factures.totalTTC,
+          montantPaye: factures.montantPaye,
+          dateEcheance: factures.dateEcheance,
+          typeDocument: factures.typeDocument,
+        })
+        .from(factures)
+        .where(where);
+      return rows.map((r) => ({
+        clientId: r.clientId,
+        statut: r.statut ?? "",
+        totalTTC: r.totalTTC ?? null,
+        montantPaye: r.montantPaye ?? null,
+        dateEcheance: r.dateEcheance ?? null,
+        typeDocument: r.typeDocument ?? null,
+      }));
     });
   }
 }

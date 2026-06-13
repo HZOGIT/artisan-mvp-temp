@@ -2,6 +2,7 @@ import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { Pool } from "pg";
 import { createDbClient } from "../../../shared/db";
 import { ClientRepositoryDrizzle } from "./client-repository-drizzle";
+import { calculerEncours } from "../application/encours";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
 
@@ -101,5 +102,31 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
     // `%` traité littéralement : ne renvoie QUE le client contenant `%`, pas tout le tenant
     const wild = await repo.search(ctx(A), "%");
     expect(wild.map((c) => c.nom)).toEqual(["a%b"]);
+  });
+
+  it("listFacturesPourEncours : lignes scopées tenant ; encours = somme attendue, factures d'un autre tenant exclues", async () => {
+    const cA = await repo.create(ctx(A), { nom: "Débiteur A" });
+    // 2 factures envoyées (impayée + partielle) + 1 payée (exclue) du client A
+    await admin.query(
+      `insert into factures ("artisanId","clientId",numero,statut,"totalTTC","montantPaye") values
+        ($1,$2,'F-E-1','envoyee','100.00','0.00'),
+        ($1,$2,'F-E-2','envoyee','50.00','20.00'),
+        ($1,$2,'F-E-3','payee','999.00','0.00')`,
+      [A, cA.id],
+    );
+    // une facture d'un AUTRE tenant ne doit pas être visible
+    const cB = await repo.create(ctx(B), { nom: "Débiteur B" });
+    await admin.query(`insert into factures ("artisanId","clientId",numero,statut,"totalTTC") values ($1,$2,'F-B-1','envoyee','777.00')`, [B, cB.id]);
+
+    const rows = await repo.listFacturesPourEncours(ctx(A), cA.id);
+    const enc = calculerEncours(rows, Date.now());
+    expect(enc.encoursTotal).toBe("130.00"); // 100 + (50−20), payée exclue
+    expect(enc.nbFacturesImpayees).toBe(2);
+
+    // depuis le tenant A, on ne voit jamais les factures de B
+    const tousA = await repo.listFacturesPourEncours(ctx(A));
+    expect(tousA.some((r) => Number(r.totalTTC) === 777)).toBe(false);
+
+    await admin.query('delete from factures where "artisanId" in ($1,$2)', [A, B]);
   });
 });

@@ -12,6 +12,7 @@ const stubRepo: IClientRepository = {
   delete: async () => false,
   countDocumentsLies: async () => 0,
   search: async () => [],
+  listFacturesPourEncours: async () => [],
 };
 
 describe("clients.module", () => {
@@ -27,6 +28,7 @@ describe("clients.module", () => {
       "delete",
       "getById",
       "list",
+      "listFacturesPourEncours",
       "search",
       "update",
     ]);
@@ -35,6 +37,15 @@ describe("clients.module", () => {
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createClientsModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "search", "update"]);
+    expect(procedures).toEqual([
+      "create",
+      "delete",
+      "getById",
+      "getEncours",
+      "getEncoursMap",
+      "list",
+      "search",
+      "update",
+    ]);
   });
 });
