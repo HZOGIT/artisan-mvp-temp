@@ -321,9 +321,31 @@ describe("bascule du domaine depenses (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine devis (flag gateway)", () => {
+  it("devis routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("devis", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { devis: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("devis", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("devis", 8, canary)).toBe(false);
+    const global: FeatureFlags = { devis: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("devis", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("devis", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine devis extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("devis.create")).toBe("devis");
+    expect(domainFromTrpcPath("/devis.accepter")).toBe("devis");
+  });
+
+  it("parse env : devis enabled + canary (lowercase → canary env fonctionnel)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "devis" } as NodeJS.ProcessEnv).devis).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_DEVIS: "7" } as NodeJS.ProcessEnv).devis?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 14 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses"]) {
+  it("les 15 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
