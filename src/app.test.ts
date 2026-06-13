@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { buildApp } from "./app";
 
-describe("app Fastify (scaffold)", () => {
+describe("app Fastify (scaffold + tRPC)", () => {
   const app = buildApp();
   afterAll(() => app.close());
 
@@ -13,6 +13,18 @@ describe("app Fastify (scaffold)", () => {
 
   it("route inconnue → 404", async () => {
     const res = await app.inject({ method: "GET", url: "/inexistant" });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("tRPC: GET /api/trpc/health → 200 (procedure publique servie)", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/trpc/health" });
+    expect(res.statusCode).toBe(200);
+    // Format tRPC v11 (non-batché) : { result: { data: { status: 'ok' } } }
+    expect(res.json()).toMatchObject({ result: { data: { status: "ok" } } });
+  });
+
+  it("tRPC: une procédure inexistante → 404", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/trpc/nope" });
     expect(res.statusCode).toBe(404);
   });
 });
