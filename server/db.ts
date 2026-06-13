@@ -90,7 +90,7 @@ import {
   interventionsMobile, photosInterventions,
   depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
   relevesBancaires, transactionsBancaires, reglesCategorisation,
-  couleursInterventions,
+  couleursInterventions, modules, artisanModules,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -4444,19 +4444,25 @@ export interface ModuleRow {
   ordre: number;
 }
 
+// Mappe une ligne Drizzle `modules` (actif_par_defaut: boolean PG) vers ModuleRow
+// (actif_par_defaut: number 1/0) — préserve le contrat consommé par routers.ts (=== 1).
+function toModuleRow(r: any): ModuleRow {
+  return { ...r, actif_par_defaut: r.actif_par_defaut ? 1 : 0 } as ModuleRow;
+}
+
 export async function getModules(): Promise<ModuleRow[]> {
   // Catalogue tres statique → cache 5 min, partage entre tous les artisans.
   return getCached("modules:all", 5 * 60 * 1000, async () => {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute('SELECT * FROM modules ORDER BY ordre ASC') as any;
-    return rows as ModuleRow[];
+    const dbi = await getDb();
+    const rows = await dbi.select().from(modules).orderBy(asc(modules.ordre));
+    return rows.map(toModuleRow);
   });
 }
 
 export async function getModuleBySlug(slug: string): Promise<ModuleRow | undefined> {
-  const pool = await ensurePool();
-  const [rows] = await pool.execute('SELECT * FROM modules WHERE slug = ? LIMIT 1', [slug]) as any;
-  return (rows as ModuleRow[])[0];
+  const dbi = await getDb();
+  const rows = await dbi.select().from(modules).where(eq(modules.slug, slug)).limit(1);
+  return rows[0] ? toModuleRow(rows[0]) : undefined;
 }
 
 /**
@@ -4468,19 +4474,15 @@ export async function getModuleBySlug(slug: string): Promise<ModuleRow | undefin
 export async function getArtisanModulesActifs(artisanId: number): Promise<string[]> {
   // TTL 60s : les toggles modules invalident via invalidateCache("modules:actifs:").
   return getCached(`modules:actifs:${artisanId}`, 60 * 1000, async () => {
-    const pool = await ensurePool();
-    const [prefs] = await pool.execute(
-      'SELECT module_slug, actif FROM artisan_modules WHERE artisan_id = ?',
-      [artisanId]
-    ) as any;
-    const arr = prefs as Array<{ module_slug: string; actif: number }>;
+    const dbi = await getDb();
+    const arr = await dbi.select({ module_slug: artisanModules.module_slug, actif: artisanModules.actif })
+      .from(artisanModules).where(eq(artisanModules.artisan_id, artisanId));
     if (arr.length === 0) {
-      const [defaults] = await pool.execute(
-        'SELECT slug FROM modules WHERE actif_par_defaut = TRUE'
-      ) as any;
-      return (defaults as Array<{ slug: string }>).map((r) => r.slug);
+      const defaults = await dbi.select({ slug: modules.slug }).from(modules)
+        .where(eq(modules.actif_par_defaut, true));
+      return defaults.map((r) => r.slug);
     }
-    return arr.filter((r) => r.actif === 1 || (r.actif as any) === true).map((r) => r.module_slug);
+    return arr.filter((r) => r.actif === true).map((r) => r.module_slug);
   });
 }
 
@@ -4489,13 +4491,13 @@ export async function setArtisanModule(
   moduleSlug: string,
   actif: boolean
 ): Promise<void> {
-  const pool = await ensurePool();
-  await pool.execute(
-    `INSERT INTO artisan_modules (artisan_id, module_slug, actif)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE actif = VALUES(actif)`,
-    [artisanId, moduleSlug, actif ? 1 : 0]
-  );
+  const dbi = await getDb();
+  // Upsert sur la clé unique (artisan_id, module_slug) → onConflictDoUpdate.
+  await dbi.insert(artisanModules).values({ artisan_id: artisanId, module_slug: moduleSlug, actif })
+    .onConflictDoUpdate({
+      target: [artisanModules.artisan_id, artisanModules.module_slug],
+      set: { actif },
+    });
   // Invalide le cache : la liste de modules actifs vient de changer.
   invalidateCache(`modules:actifs:${artisanId}`);
 }
