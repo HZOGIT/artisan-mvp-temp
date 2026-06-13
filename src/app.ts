@@ -8,6 +8,7 @@ import { VehiculeRepositoryDrizzle } from "./modules/vehicules/infra/vehicule-re
 import type { IVehiculeRepository } from "./modules/vehicules/application/vehicule-repository";
 import { AvisRepositoryDrizzle } from "./modules/avis/infra/avis-repository-drizzle";
 import type { IAvisRepository } from "./modules/avis/application/avis-repository";
+import { createAvisModule } from "./modules/avis/avis.module";
 import { DemandeAvisRepositoryDrizzle } from "./modules/avis/infra/demande-avis-repository-drizzle";
 import type { IDemandeAvisRepository } from "./modules/avis/application/demande-avis-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
@@ -34,14 +35,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.get("/health", async () => ({ status: "ok" }));
 
   const vehiculeRepo = deps.vehiculeRepo ?? new VehiculeRepositoryDrizzle(getDbHandle().db);
-  const avisRepo = deps.avisRepo ?? new AvisRepositoryDrizzle(getDbHandle().db);
-  const demandeAvisDeps = {
-    repo: deps.demandeAvisRepo ?? new DemandeAvisRepositoryDrizzle(getDbHandle().db),
-    email: deps.emailPort ?? new LegacyEmailAdapter(),
-    rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
-    lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
-  };
-  const appRouter = createAppRouter({ vehiculeRepo, avisRepo, demandeAvisDeps });
+  const avis = createAvisModule({
+    avisRepo: deps.avisRepo ?? new AvisRepositoryDrizzle(getDbHandle().db),
+    demande: {
+      repo: deps.demandeAvisRepo ?? new DemandeAvisRepositoryDrizzle(getDbHandle().db),
+      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
+      lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    },
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
