@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Pencil, Download, Mail, Trash2, ChevronDown, Truck, Building2, CalendarDays, MapPin, FileText, Package } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -91,6 +92,16 @@ export default function CommandeFournisseurDetail() {
   });
   const handleToggleFacturation = (next: "a_facturer" | "facturee") => {
     setFacturationMutation.mutate({ id: parseInt(id || "0"), statutFacturation: next });
+  };
+  // OPE-101 — lier la facture fournisseur (dépense) à la commande : marque « facturée »
+  // ET enregistre depenseId (réutilise setStatutFacturation). Liste des dépenses du tenant.
+  const { data: depensesData } = trpc.depenses.list.useQuery({});
+  const linkedDepenseId = (commande as any)?.depenseId ?? null;
+  const linkedDepense = (depensesData as any[] | undefined)?.find((d) => d.id === linkedDepenseId);
+  const handleLinkDepense = (depenseIdStr: string) => {
+    const depId = parseInt(depenseIdStr);
+    if (!depId) return;
+    setFacturationMutation.mutate({ id: parseInt(id || "0"), statutFacturation: "facturee", depenseId: depId });
   };
 
   // OPE-100 — saisie de la réception (quantité reçue par ligne). État local indexé par ligneId.
@@ -187,6 +198,12 @@ export default function CommandeFournisseurDetail() {
                 {statutFacturation === "facturee" ? "Facturée" : "À facturer"}
               </Badge>
             )}
+            {/* OPE-101 — facture fournisseur (dépense) liée */}
+            {statutFacturation === "facturee" && linkedDepense && (
+              <span className="text-sm text-muted-foreground">
+                · Facture : {linkedDepense.fournisseur || linkedDepense.description || `Dépense #${linkedDepense.id}`} ({formatCurrency(linkedDepense.montant_ttc)})
+              </span>
+            )}
           </div>
           {fournisseur && (
             <p className="text-muted-foreground">{fournisseur.nom}</p>
@@ -216,6 +233,21 @@ export default function CommandeFournisseurDetail() {
             >
               {statutFacturation === "facturee" ? "Marquer à facturer" : "Marquer facturée"}
             </Button>
+          )}
+          {/* OPE-101 — lier la facture fournisseur (dépense) à la commande */}
+          {estRecue && statutFacturation !== "facturee" && (depensesData?.length ?? 0) > 0 && (
+            <Select value="" onValueChange={handleLinkDepense} disabled={setFacturationMutation.isPending}>
+              <SelectTrigger className="w-[230px]">
+                <SelectValue placeholder="Lier une facture fournisseur…" />
+              </SelectTrigger>
+              <SelectContent>
+                {(depensesData as any[]).map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {(d.fournisseur || d.description || `Dépense #${d.id}`)} — {formatCurrency(d.montant_ttc)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           {possibleNextStatuses.length > 0 && (
             <DropdownMenu>
