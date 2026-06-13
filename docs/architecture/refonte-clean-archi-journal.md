@@ -4,6 +4,9 @@
 > pour récupérer la **Prochaine action**, puis l'exécuter, gater, tracer (4 canaux), et
 > mettre à jour ce fichier. Survit à la compaction de contexte.
 
+## Décisions verrouillées
+- **Framework serveur cible = Fastify** (choisi 2026-06-13, vs Hono). Le nouveau stack se scaffolde en Fastify (`src/app.ts` + adapter tRPC + `/health`), adapté progressivement derrière le gateway/flag. tRPC conservé, Drizzle (node-postgres).
+
 ## Convention de code (IMPORTANT)
 - **Pas de références ticket `OPE-XXX` dans les commentaires de code** — seulement dans les messages de commit (et ce journal/docs). Cleanup du legacy = carte OPE-255 (backlog).
 - Code neuf clean-archi dans **`src/**`** (gate : `pnpm exec tsc -p tsconfig.src.json`). Le legacy (`server/`, `client/`) garde sa dette tsc (hors scope).
