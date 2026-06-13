@@ -4519,27 +4519,14 @@ export async function updateArtisanOnboarding(
   artisanId: number,
   data: { onboardingCompleted?: boolean; metier?: string; plan?: string }
 ): Promise<void> {
-  const sets: string[] = [];
-  const values: any[] = [];
-  if (data.onboardingCompleted !== undefined) {
-    sets.push('onboarding_completed = ?');
-    values.push(data.onboardingCompleted ? 1 : 0);
-  }
-  if (data.metier !== undefined) {
-    sets.push('metier = ?');
-    values.push(data.metier);
-  }
-  if (data.plan !== undefined) {
-    sets.push('plan = ?');
-    values.push(data.plan);
-  }
-  if (sets.length === 0) return;
-  values.push(artisanId);
-  const pool = await ensurePool();
-  await pool.execute(
-    `UPDATE artisans SET ${sets.join(', ')} WHERE id = ?`,
-    values
-  );
+  // Set partiel dynamique (seuls les champs fournis sont mis à jour).
+  const set: Record<string, any> = {};
+  if (data.onboardingCompleted !== undefined) set.onboardingCompleted = data.onboardingCompleted;
+  if (data.metier !== undefined) set.metier = data.metier;
+  if (data.plan !== undefined) set.plan = data.plan;
+  if (Object.keys(set).length === 0) return;
+  const dbi = await getDb();
+  await dbi.update(artisans).set(set).where(eq(artisans.id, artisanId));
 }
 
 /**
@@ -4551,15 +4538,16 @@ export async function getArtisanOnboardingStatus(
   artisanId: number
 ): Promise<{ onboardingCompleted: boolean; metier: string | null; plan: string | null } | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT onboarding_completed, metier, plan FROM artisans WHERE id = ? LIMIT 1',
-      [artisanId]
-    ) as any;
-    const r = (rows as any[])[0];
+    const dbi = await getDb();
+    const rows = await dbi.select({
+      onboardingCompleted: artisans.onboardingCompleted,
+      metier: artisans.metier,
+      plan: artisans.plan,
+    }).from(artisans).where(eq(artisans.id, artisanId)).limit(1);
+    const r = rows[0];
     if (!r) return null;
     return {
-      onboardingCompleted: r.onboarding_completed === 1 || r.onboarding_completed === true,
+      onboardingCompleted: r.onboardingCompleted === true,
       metier: r.metier ?? null,
       plan: r.plan ?? null,
     };
