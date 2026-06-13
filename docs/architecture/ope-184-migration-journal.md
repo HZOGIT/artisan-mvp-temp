@@ -93,7 +93,20 @@ Tests db-direct sur PG : `fournisseurs.test.ts` **17/17 ✓**, `security.test.ts
 - **7b-2-a FAIT** : mobile/photos (6 fn — get/create/update InterventionMobile, get/create PhotoIntervention) raw → Drizzle. Validé **PG + mysql** (create/get/update/photos). interventionsMobile/photosInterventions ajoutés à l'import.
 - **7b-2-b À FAIRE** : stats — getStockEntrantByArtisan, getStatistiquesChantier, calculerBudgetsRealises, invalidateCache (agrégats : utiliser Drizzle + `sql` avec colonnes interpolées si besoin).
 
-**Prochaine action : P0.7b-2-b.**
+### ⏸️ BLOCAGE STRUCTUREL — 2e schéma `fix-duplicates.ts` (décision humaine requise) — 2026-06-13 ~08:36
+**Loop EN PAUSE.** Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
+
+**Constat** : il existe un **DEUXIÈME système de schéma** hors Drizzle : `server/_core/fix-duplicates.ts` exécute au **démarrage prod** (`node dist/fix-duplicates.js` avant `start`) **18 `CREATE TABLE IF NOT EXISTS` + 37 `ALTER TABLE`**. Tables **raw-only** (absentes de drizzle/schema.ts, de schema.pg.ts, ET de la base dev) : `depenses, notes_de_frais, notes_frais_depenses, categories_depenses, budgets_categories, regles_categorisation, transactions_bancaires, releves_bancaires, couleurs_interventions, modules, artisan_modules`. (Les 37 ALTER ajoutent aussi des colonnes raw à des tables Drizzle existantes → drift de colonnes.)
+
+**Impact** :
+- **Tout 7c (compta/dépenses/FEC/banque, ~30 fn)** tape ces tables → **non portable tant qu'elles ne sont pas modélisées + créées en pg + données copiées**.
+- Une partie de 7b aussi (getStatistiquesChantier→depenses, calculerBudgetsRealises→budgets). (getStockEntrantByArtisan + invalidateCache restent portables : tables modélisées / cache mémoire.)
+- La base **dev ne contient PAS** ces tables (fix-duplicates ne tourne qu'en prod) → **impossible de valider la compta sur dev**. Les données réelles sont en **staging/prod**.
+- ⚠️ Le périmètre « 92 tables » de P0.6 est **INCOMPLET** : +~11 tables raw + 37 colonnes raw.
+
+**Décision attendue (voir message)** : comment intégrer ce 2e schéma au PG-first.
+
+**Reste portable sans débloquer** (si on veut avancer en parallèle) : getStockEntrantByArtisan, invalidateCache (7b-2-b partiel) ; les domaines NON-compta de 7c (aucun — 7c est tout compta) ; 7d banque dépend aussi de transactions/releves_bancaires (bloqué).
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
