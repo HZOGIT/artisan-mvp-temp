@@ -56,11 +56,34 @@ describe("bascule du domaine avis (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine badges (flag gateway)", () => {
+  it("badges routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("badges", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { badges: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("badges", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("badges", 8, canary)).toBe(false);
+    const global: FeatureFlags = { badges: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("badges", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("badges", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine badges extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("badges.attribuerBadge")).toBe("badges");
+    expect(domainFromTrpcPath("/badges.calculerClassement")).toBe("badges");
+  });
+
+  it("parse env : badges enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "badges" } as NodeJS.ProcessEnv).badges).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_BADGES: "7" } as NodeJS.ProcessEnv).badges?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("avis et vehicules sont éligibles à la bascule, pas un domaine non porté", () => {
+  it("avis/vehicules/badges sont éligibles à la bascule, pas un domaine non porté", () => {
     expect(MIGRATED_DOMAINS).toContain("avis");
     expect(MIGRATED_DOMAINS).toContain("vehicules");
-    expect(isMigratedDomainAvailable("avis")).toBe(true);
+    expect(MIGRATED_DOMAINS).toContain("badges");
+    expect(isMigratedDomainAvailable("badges")).toBe(true);
     expect(isMigratedDomainAvailable("factures")).toBe(false);
   });
 });
