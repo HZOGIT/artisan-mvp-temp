@@ -122,14 +122,34 @@ describe("bascule du domaine notifications (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine fournisseurs (flag gateway)", () => {
+  it("fournisseurs routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("fournisseurs", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { fournisseurs: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("fournisseurs", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("fournisseurs", 8, canary)).toBe(false);
+    const global: FeatureFlags = { fournisseurs: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("fournisseurs", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("fournisseurs", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine fournisseurs extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("fournisseurs.associateArticle")).toBe("fournisseurs");
+    expect(domainFromTrpcPath("/fournisseurs.getArticleFournisseurs")).toBe("fournisseurs");
+  });
+
+  it("parse env : fournisseurs enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "fournisseurs" } as NodeJS.ProcessEnv).fournisseurs).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_FOURNISSEURS: "7" } as NodeJS.ProcessEnv).fournisseurs?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("avis/vehicules/badges/techniciens/notifications sont éligibles à la bascule, pas un domaine non porté", () => {
-    expect(MIGRATED_DOMAINS).toContain("avis");
-    expect(MIGRATED_DOMAINS).toContain("vehicules");
-    expect(MIGRATED_DOMAINS).toContain("badges");
-    expect(MIGRATED_DOMAINS).toContain("techniciens");
-    expect(MIGRATED_DOMAINS).toContain("notifications");
-    expect(isMigratedDomainAvailable("notifications")).toBe(true);
+  it("les 6 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs"]) {
+      expect(MIGRATED_DOMAINS).toContain(d);
+      expect(isMigratedDomainAvailable(d)).toBe(true);
+    }
     expect(isMigratedDomainAvailable("factures")).toBe(false);
   });
 });
