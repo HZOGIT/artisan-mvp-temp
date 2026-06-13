@@ -253,6 +253,9 @@ interface LigneDocument {
   unite?: string | null;
   prixUnitaire: number;
   tauxTva?: number | null;
+  // OPE-168 — `section` (en-tête de lot) / `note` (texte libre) rendues en pleine
+  // largeur, sans colonnes de prix, exclues des totaux. Absent/`produit` = ligne normale.
+  type?: string | null;
 }
 
 interface DevisData {
@@ -441,14 +444,37 @@ function addDocumentInfo(
 }
 
 function addLignesTable(doc: jsPDF, lignes: LigneDocument[], yStart: number): number {
-  const tableData = lignes.map((ligne) => [
-    ligne.designation,
-    ligne.quantite.toString(),
-    ligne.unite || "u",
-    formatCurrency(ligne.prixUnitaire),
-    `${ligne.tauxTva || 20}%`,
-    formatCurrency(ligne.quantite * ligne.prixUnitaire),
-  ]);
+  // OPE-168 — une ligne `section`/`note` occupe toute la largeur (titre de lot en
+  // gras / texte libre en italique) sans colonnes chiffrées ; les autres restent des
+  // lignes produit normales. autoTable accepte des cellules { content, colSpan, styles }.
+  const tableData = lignes.map((ligne) => {
+    if (ligne.type === "section") {
+      return [
+        {
+          content: ligne.designation,
+          colSpan: 6,
+          styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] },
+        },
+      ];
+    }
+    if (ligne.type === "note") {
+      return [
+        {
+          content: ligne.designation,
+          colSpan: 6,
+          styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] },
+        },
+      ];
+    }
+    return [
+      ligne.designation,
+      ligne.quantite.toString(),
+      ligne.unite || "u",
+      formatCurrency(ligne.prixUnitaire),
+      `${ligne.tauxTva || 20}%`,
+      formatCurrency(ligne.quantite * ligne.prixUnitaire),
+    ];
+  });
 
   autoTable(doc, {
     startY: yStart,

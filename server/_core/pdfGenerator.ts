@@ -477,6 +477,15 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
 
   // Tableau des lignes
   const tableData = devis.lignes.map((ligne) => {
+    // OPE-168 — section (en-tête de lot, gras) / note (texte libre, italique) en
+    // pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+    const type = (ligne as any).type ?? "produit";
+    if (type === "section") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+    }
+    if (type === "note") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+    }
     const quantite = Number(ligne.quantite) || 0;
     const prixUnitaire =
       typeof ligne.prixUnitaireHT === "string" ? parseFloat(ligne.prixUnitaireHT) : Number(ligne.prixUnitaireHT);

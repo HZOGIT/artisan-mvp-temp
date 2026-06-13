@@ -916,8 +916,11 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       description: z.string().max(5000).optional(),
       quantite: z.string().max(20).default("1"),
       unite: z.string().max(20).optional(),
-      prixUnitaireHT: z.string().max(20),
+      prixUnitaireHT: z.string().max(20).default("0"),
       tauxTVA: z.string().max(10).default("20.00"),
+      // OPE-168 — type de ligne. `section`/`note` = lignes d'affichage (titre de
+      // lot / texte libre), sans prix → montants forcés à 0, exclues des totaux.
+      type: z.enum(["produit", "section", "note"]).default("produit"),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : verifier l'ownership du devis avant d'ajouter une ligne.
@@ -927,9 +930,12 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
       }
 
-      const quantite = parseFloat(input.quantite);
-      const prixUnitaireHT = parseFloat(input.prixUnitaireHT);
-      const tauxTVA = parseFloat(input.tauxTVA);
+      // OPE-168 — une section/note ne porte ni quantité ni prix : on neutralise
+      // ses montants (0) pour qu'elle n'impacte JAMAIS les totaux (HT/TVA/TTC).
+      const isDisplay = input.type === "section" || input.type === "note";
+      const quantite = isDisplay ? 0 : parseFloat(input.quantite);
+      const prixUnitaireHT = isDisplay ? 0 : parseFloat(input.prixUnitaireHT);
+      const tauxTVA = isDisplay ? 0 : parseFloat(input.tauxTVA);
 
       const montantHT = quantite * prixUnitaireHT;
       const montantTVA = montantHT * (tauxTVA / 100);
@@ -937,13 +943,14 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
       const ligne = await db.createLigneDevis({
         devisId: input.devisId,
-        reference: input.reference,
+        type: input.type,
+        reference: isDisplay ? undefined : input.reference,
         designation: input.designation,
         description: input.description,
-        quantite: input.quantite,
-        unite: input.unite,
-        prixUnitaireHT: input.prixUnitaireHT,
-        tauxTVA: input.tauxTVA,
+        quantite: isDisplay ? "0" : input.quantite,
+        unite: isDisplay ? undefined : input.unite,
+        prixUnitaireHT: isDisplay ? "0" : input.prixUnitaireHT,
+        tauxTVA: isDisplay ? "0" : input.tauxTVA,
         montantHT: montantHT.toFixed(2),
         montantTVA: montantTVA.toFixed(2),
         montantTTC: montantTTC.toFixed(2),

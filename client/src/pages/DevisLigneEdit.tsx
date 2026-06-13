@@ -43,6 +43,11 @@ export default function DevisLigneEdit() {
     prixUnitaireHT: "",
     tauxTVA: "20",
   });
+  // OPE-168 — type de ligne : `produit` (ligne chiffrée normale), `section`
+  // (en-tête de lot, sans prix) ou `note` (texte libre). Section/note structurent
+  // un devis BTP par pièce/lot ; elles n'impactent pas les totaux.
+  const [ligneType, setLigneType] = useState<"produit" | "section" | "note">("produit");
+  const isDisplayLine = ligneType === "section" || ligneType === "note";
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArticleId, setSelectedArticleId] = useState<string>("");
@@ -145,7 +150,21 @@ export default function DevisLigneEdit() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // OPE-168 — une section/note ne nécessite QUE la désignation (le titre/texte).
+    if (isDisplayLine) {
+      if (!formData.designation) {
+        toast.error(ligneType === "section" ? "Veuillez saisir le titre de la section" : "Veuillez saisir le texte de la note");
+        return;
+      }
+      addLineMutation.mutate({
+        devisId: parseInt(id || "0"),
+        designation: formData.designation,
+        type: ligneType,
+      });
+      return;
+    }
+
     if (!formData.designation || !formData.prixUnitaireHT) {
       toast.error("Veuillez remplir la désignation et le prix");
       return;
@@ -160,6 +179,7 @@ export default function DevisLigneEdit() {
       unite: formData.unite,
       prixUnitaireHT: String(parseFloat(formData.prixUnitaireHT) || 0),
       tauxTVA: String(parseFloat(formData.tauxTVA) || 20),
+      type: "produit",
     });
   };
 
@@ -206,6 +226,32 @@ export default function DevisLigneEdit() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* OPE-168 — choix du type de ligne : produit chiffré, section (titre de
+            lot) ou note (texte libre). Sections/notes structurent le devis. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Type de ligne</CardTitle>
+            <CardDescription>
+              Une <strong>section</strong> est un titre de lot (ex. « Salle de bain »), une{" "}
+              <strong>note</strong> est un texte libre — ni l'une ni l'autre n'a de prix et n'entre dans les totaux.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={ligneType} onValueChange={(v) => setLigneType(v as "produit" | "section" | "note")}>
+              <SelectTrigger className="w-full sm:w-72">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="produit">Produit / prestation (ligne chiffrée)</SelectItem>
+                <SelectItem value="section">Section (titre de lot)</SelectItem>
+                <SelectItem value="note">Note (texte libre)</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {!isDisplayLine && (
+        <>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -452,13 +498,16 @@ export default function DevisLigneEdit() {
             </ScrollArea>
           </DialogContent>
         </Dialog>
+        </>
+        )}
 
         <Card>
           <CardHeader>
-            <CardTitle>Détails de la ligne</CardTitle>
+            <CardTitle>{isDisplayLine ? (ligneType === "section" ? "Titre de la section" : "Texte de la note") : "Détails de la ligne"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {!isDisplayLine && (
               <div className="space-y-2">
                 <Label htmlFor="reference">Référence</Label>
                 <Input
@@ -468,13 +517,16 @@ export default function DevisLigneEdit() {
                   placeholder="REF-001"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="designation">Désignation *</Label>
+              )}
+              <div className={cn("space-y-2", isDisplayLine && "sm:col-span-2")}>
+                <Label htmlFor="designation">
+                  {isDisplayLine ? (ligneType === "section" ? "Titre de la section *" : "Texte de la note *") : "Désignation *"}
+                </Label>
                 <Input
                   id="designation"
                   value={formData.designation}
                   onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                  placeholder="Nom de l'article ou du service"
+                  placeholder={isDisplayLine ? (ligneType === "section" ? "Ex. Salle de bain" : "Ex. Travaux réalisés hors fournitures") : "Nom de l'article ou du service"}
                   required
                 />
               </div>
@@ -491,6 +543,7 @@ export default function DevisLigneEdit() {
               />
             </div>
 
+            {!isDisplayLine && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="quantite">Quantité</Label>
@@ -554,9 +607,11 @@ export default function DevisLigneEdit() {
                 </Select>
               </div>
             </div>
+            )}
           </CardContent>
         </Card>
 
+        {!isDisplayLine && (
         <Card>
           <CardHeader>
             <CardTitle>Récapitulatif</CardTitle>
@@ -578,6 +633,7 @@ export default function DevisLigneEdit() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         <div className="flex justify-end gap-4">
           <Button

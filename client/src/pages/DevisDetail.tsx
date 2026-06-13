@@ -280,6 +280,7 @@ export default function DevisDetail() {
       unite: l.unite,
       prixUnitaire: parseFloat(l.prixUnitaireHT) || 0,
       tauxTva: parseFloat(l.tauxTVA) || 20,
+      type: l.type, // OPE-168 — section/note rendues en pleine largeur dans le PDF
     }));
     generateDevisPDF(
       artisanData,
@@ -618,7 +619,29 @@ export default function DevisDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {devis.lignes.map((ligne: any) => (
+                  {devis.lignes.map((ligne: any) => {
+                    // OPE-168 — section (en-tête de lot) / note (texte libre) :
+                    // affichées en pleine largeur, sans colonnes de prix.
+                    if (ligne.type === "section" || ligne.type === "note") {
+                      return (
+                        <tr key={ligne.id} className={ligne.type === "section" ? "bg-muted/50" : ""}>
+                          <td colSpan={6} className={ligne.type === "section" ? "font-semibold" : "italic text-muted-foreground"}>
+                            {ligne.type === "section" ? "§ " : ""}{ligne.designation}
+                          </td>
+                          <td>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => handleDeleteLine(ligne.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
                     <tr key={ligne.id}>
                       <td>{ligne.reference || "-"}</td>
                       <td>{ligne.designation}</td>
@@ -637,7 +660,8 @@ export default function DevisDetail() {
                         </Button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2">

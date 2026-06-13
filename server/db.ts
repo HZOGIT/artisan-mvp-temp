@@ -915,6 +915,10 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
   
   // Copy lignes
   for (const ligne of lignesDevis) {
+    // OPE-168 — les lignes d'affichage (section/note) du devis ne sont PAS reportées
+    // sur la facture (le modèle facture ne porte pas ce typage). Seules les lignes
+    // `produit` (vraies lignes chiffrées) sont copiées → facture inchangée vs avant.
+    if (((ligne as any).type ?? "produit") !== "produit") continue;
     await db.insert(facturesLignes).values({
       factureId: facture.id,
       ordre: ligne.ordre,

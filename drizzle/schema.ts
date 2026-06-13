@@ -243,6 +243,11 @@ export const devisLignes = mysqlTable("devis_lignes", {
   montantHT: decimal("montantHT", { precision: 10, scale: 2 }).default("0.00"),
   montantTVA: decimal("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: decimal("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  // OPE-168 — typage de ligne pour structurer un devis (BTP par lot/pièce) :
+  // `section` = en-tête de lot (titre, sans prix), `note` = texte libre. Défaut
+  // `produit` → lignes existantes inchangées. Les lignes section/note portent des
+  // montants à 0 et sont exclues des totaux (sommés depuis montantHT/TVA). Additif.
+  type: mysqlEnum("type", ["produit", "section", "note"]).default("produit"),
 });
 
 export type DevisLigne = typeof devisLignes.$inferSelect;
