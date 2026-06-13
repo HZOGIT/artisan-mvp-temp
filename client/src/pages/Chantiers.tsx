@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Building2, Calendar, Euro, Users, FileText, Trash2, Edit, ChevronRight, Clock, CheckCircle2, PauseCircle, XCircle, AlertCircle, Eye, EyeOff, ListChecks } from "lucide-react";
+import { Plus, Building2, Calendar, Euro, Users, FileText, Trash2, Edit, ChevronRight, Clock, CheckCircle2, PauseCircle, XCircle, AlertCircle, Eye, EyeOff, ListChecks, Bell, Circle, AlarmClock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 export default function Chantiers() {
@@ -55,6 +55,34 @@ export default function Chantiers() {
     { chantierId: selectedChantier! },
     { enabled: !!selectedChantier }
   );
+
+  // OPE-121 — rappels/activités CRM rattachés au chantier sélectionné.
+  const { data: allActivitesCh, refetch: refetchActivitesCh } = trpc.activites.list.useQuery();
+  const activitesChantier = (allActivitesCh || []).filter(
+    (a: any) => a.entiteType === "chantier" && a.entiteId === selectedChantier,
+  );
+  const [rappelTitre, setRappelTitre] = useState("");
+  const [rappelEcheance, setRappelEcheance] = useState("");
+  const [rappelType, setRappelType] = useState("autre");
+  const createRappelCh = trpc.activites.create.useMutation({
+    onSuccess: () => {
+      toast.success("Rappel ajouté");
+      setRappelTitre(""); setRappelEcheance(""); setRappelType("autre");
+      refetchActivitesCh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const toggleRappelCh = trpc.activites.toggleFait.useMutation({
+    onSuccess: () => refetchActivitesCh(),
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteRappelCh = trpc.activites.delete.useMutation({
+    onSuccess: () => refetchActivitesCh(),
+    onError: (e) => toast.error(e.message),
+  });
+  const rappelTypeLabels: Record<string, string> = {
+    appel: "Appel", email: "Email", rdv: "RDV", relance: "Relance", autre: "À faire",
+  };
 
   const [suiviForm, setSuiviForm] = useState({ titre: "", description: "", ordre: 1, visibleClient: true });
   const [isSuiviDialogOpen, setIsSuiviDialogOpen] = useState(false);
@@ -418,6 +446,7 @@ export default function Chantiers() {
         {/* Détails du chantier */}
         <div className="lg:col-span-2">
           {selectedChantier && chantierDetails ? (
+            <>
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -887,6 +916,108 @@ export default function Chantiers() {
                 </Tabs>
               </CardContent>
             </Card>
+
+            {/* OPE-121 — Rappels / activités CRM rattachés à ce chantier */}
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Bell className="h-5 w-5" />
+                  Rappels ({activitesChantier.filter((a: any) => !a.fait).length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  className="flex flex-col sm:flex-row gap-2 mb-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!rappelTitre.trim()) { toast.error("Le titre est requis"); return; }
+                    if (!rappelEcheance) { toast.error("L'échéance est requise"); return; }
+                    createRappelCh.mutate({
+                      titre: rappelTitre.trim(),
+                      echeance: rappelEcheance,
+                      type: rappelType as any,
+                      entiteType: "chantier",
+                      entiteId: selectedChantier!,
+                    });
+                  }}
+                >
+                  <Input
+                    placeholder="Rappel sur ce chantier (visite, relance, livraison…)"
+                    value={rappelTitre}
+                    onChange={(e) => setRappelTitre(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    type="date"
+                    value={rappelEcheance}
+                    onChange={(e) => setRappelEcheance(e.target.value)}
+                    className="sm:w-40"
+                  />
+                  <Select value={rappelType} onValueChange={setRappelType}>
+                    <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="autre">À faire</SelectItem>
+                      <SelectItem value="appel">Appel</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="rdv">RDV</SelectItem>
+                      <SelectItem value="relance">Relance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button type="submit" disabled={createRappelCh.isPending}>
+                    <Plus className="h-4 w-4 mr-1" /> Ajouter
+                  </Button>
+                </form>
+
+                {activitesChantier.length > 0 ? (
+                  <div className="space-y-2">
+                    {activitesChantier
+                      .slice()
+                      .sort((a: any, b: any) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime())
+                      .map((a: any) => (
+                        <div key={a.id} className="flex items-start gap-2 p-3 rounded-lg border">
+                          <button
+                            type="button"
+                            title={a.fait ? "Marquer à faire" : "Marquer fait"}
+                            onClick={() => toggleRappelCh.mutate({ id: a.id, fait: !a.fait })}
+                            className="mt-0.5 shrink-0"
+                          >
+                            {a.fait
+                              ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              : <Circle className="h-4 w-4 text-muted-foreground" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium ${a.fait ? "line-through text-muted-foreground" : ""}`}>
+                              {a.titre}
+                            </p>
+                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <AlarmClock className="h-3 w-3" />
+                                {new Date(a.echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-semibold">
+                                {rappelTypeLabels[a.type] || a.type}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            title="Supprimer"
+                            onClick={() => deleteRappelCh.mutate({ id: a.id })}
+                            className="mt-0.5 shrink-0 text-muted-foreground hover:text-rose-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-6 text-sm text-muted-foreground">
+                    Aucun rappel pour ce chantier.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            </>
           ) : (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
