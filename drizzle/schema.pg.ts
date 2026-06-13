@@ -27,6 +27,7 @@ import {
   numeric,
   bigint,
   jsonb,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // ── Enums ──────────────────────────────────────────────────────────────────
@@ -1696,3 +1697,62 @@ export const emailsLog = pgTable("emails_log", {
 });
 export type EmailLog = typeof emailsLog.$inferSelect;
 export type InsertEmailLog = typeof emailsLog.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+// DRIFT (P0.8) — tables présentes en base live mais ABSENTES de schema.ts (créées
+// hors Drizzle via SQL brut : abonnement SaaS + sessions/devices). Modélisées ici
+// pour la bascule PG. Colonnes en snake_case (conformes à la base, pour la copie data).
+// ════════════════════════════════════════════════════════════════════════════
+export const activeSessions = pgTable("active_sessions", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").notNull(),
+  artisan_id: integer("artisan_id").notNull(),
+  session_token: varchar("session_token", { length: 200 }).notNull(),
+  device_fingerprint: varchar("device_fingerprint", { length: 255 }),
+  ip: varchar("ip", { length: 64 }),
+  expires_at: timestamp("expires_at").notNull(),
+  last_active_at: timestamp("last_active_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  userToken: unique("sessions_user_token").on(t.user_id, t.session_token),
+}));
+export type ActiveSession = typeof activeSessions.$inferSelect;
+export type InsertActiveSession = typeof activeSessions.$inferInsert;
+
+export const devices = pgTable("devices", {
+  id: serial("id").primaryKey(),
+  user_id: integer("user_id").notNull(),
+  artisan_id: integer("artisan_id").notNull(),
+  device_fingerprint: varchar("device_fingerprint", { length: 255 }).notNull(),
+  device_type: varchar("device_type", { length: 50 }),
+  browser: varchar("browser", { length: 100 }),
+  os: varchar("os", { length: 100 }),
+  last_ip: varchar("last_ip", { length: 64 }),
+  last_active_at: timestamp("last_active_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  userFingerprint: unique("devices_user_fingerprint").on(t.user_id, t.device_fingerprint),
+}));
+export type Device = typeof devices.$inferSelect;
+export type InsertDevice = typeof devices.$inferInsert;
+
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  artisan_id: integer("artisan_id").notNull().unique(),
+  stripe_customer_id: varchar("stripe_customer_id", { length: 255 }),
+  stripe_subscription_id: varchar("stripe_subscription_id", { length: 255 }),
+  stripe_price_id: varchar("stripe_price_id", { length: 255 }),
+  plan: varchar("plan", { length: 50 }).default("trial").notNull(),
+  status: varchar("status", { length: 50 }).default("trialing").notNull(),
+  trial_ends_at: timestamp("trial_ends_at"),
+  current_period_start: timestamp("current_period_start"),
+  current_period_end: timestamp("current_period_end"),
+  cancel_at_period_end: boolean("cancel_at_period_end").default(false).notNull(),
+  max_users: integer("max_users").default(1).notNull(),
+  max_devices_per_user: integer("max_devices_per_user").default(3).notNull(),
+  max_concurrent_sessions: integer("max_concurrent_sessions").default(2).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;
