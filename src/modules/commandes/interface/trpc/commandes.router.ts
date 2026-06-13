@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ICommandeRepository } from "../../application/commande-repository";
 import { listCommandes, getCommande, listLignesCommande } from "../../application/read-use-cases";
 import { creerCommande, modifierCommande, supprimerCommande } from "../../application/write-use-cases";
-import { changerStatutCommande, listerCommandesEnRetard } from "../../application/statut-use-cases";
+import { changerStatutCommande, listerCommandesEnRetard, recevoirCommande } from "../../application/statut-use-cases";
 import type { CreateLigneInput } from "../../domain/commande";
 
 const statutEnum = z.enum(["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]);
@@ -104,5 +104,23 @@ export function createCommandesRouter(repo: ICommandeRepository) {
       ),
 
     getEnRetard: protectedProcedure.query(({ ctx }) => listerCommandesEnRetard(repo, ctx.tenant)),
+
+    recevoir: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int(),
+          lignes: z
+            .array(z.object({ ligneId: z.number().int(), quantiteRecue: z.number().min(0).max(1_000_000) }))
+            .max(500),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        recevoirCommande(
+          repo,
+          ctx.tenant,
+          input.id,
+          input.lignes.map((l) => ({ ligneId: l.ligneId, quantiteRecue: l.quantiteRecue })),
+        ),
+      ),
   });
 }

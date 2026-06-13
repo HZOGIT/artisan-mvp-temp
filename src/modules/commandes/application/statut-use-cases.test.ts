@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeCommandeRepository } from "../infra/commande-repository-fake";
-import { changerStatutCommande, listerCommandesEnRetard } from "./statut-use-cases";
+import { changerStatutCommande, listerCommandesEnRetard, recevoirCommande } from "./statut-use-cases";
+import { listLignesCommande } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
-import { NotFoundError } from "../../../shared/errors";
+import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
@@ -49,5 +50,29 @@ describe("commandes — use-cases dérivés statut/retard (repo mocké)", () => 
     const retards = await listerCommandesEnRetard(repo, A);
     expect(retards.map((c) => c.id)).toEqual([enRetard]);
     expect((await listerCommandesEnRetard(repo, B)).length).toBe(1);
+  });
+
+  it("recevoirCommande : réception partielle → partiellement_livree ; totale → livree", async () => {
+    const cmd = (await repo.create(A, { fournisseurId: 10, lignes: [{ designation: "Tube", quantite: "10", prixUnitaire: "5" }] }))!;
+    await changerStatutCommande(repo, A, cmd.id, "confirmee");
+    const [l] = await listLignesCommande(repo, A, cmd.id);
+    // partielle
+    const partiel = await recevoirCommande(repo, A, cmd.id, [{ ligneId: l.id, quantiteRecue: 4 }]);
+    expect(partiel.statut).toBe("partiellement_livree");
+    expect((await listLignesCommande(repo, A, cmd.id))[0].quantiteRecue).toBe("4.00");
+    // totale
+    const total = await recevoirCommande(repo, A, cmd.id, [{ ligneId: l.id, quantiteRecue: 10 }]);
+    expect(total.statut).toBe("livree");
+    expect(total.dateLivraisonReelle).not.toBeNull();
+  });
+
+  it("recevoirCommande : quantité reçue > commandée → ValidationError", async () => {
+    const [l] = await listLignesCommande(repo, A, cmdA); // ligne quantité 2
+    await expect(recevoirCommande(repo, A, cmdA, [{ ligneId: l.id, quantiteRecue: 5 }])).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("recevoirCommande : commande d'un autre tenant → NotFound (anti-IDOR)", async () => {
+    await expect(recevoirCommande(repo, B, cmdA, [])).rejects.toBeInstanceOf(NotFoundError);
+    await expectCrossTenantDenied(() => recevoirCommande(repo, B, cmdA, []));
   });
 });

@@ -7,7 +7,7 @@ import {
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICommandeRepository } from "../application/commande-repository";
+import type { ICommandeRepository, ReceptionLigne } from "../application/commande-repository";
 import type {
   Commande,
   LigneCommande,
@@ -233,6 +233,71 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         )
         .orderBy(asc(commandesFournisseurs.dateLivraisonPrevue));
       return rows.map(toCommande);
+    });
+  }
+
+  recevoir(ctx: TenantContext, commandeId: number, receptions: ReceptionLigne[]): Promise<Commande | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [commande] = await tx
+        .select()
+        .from(commandesFournisseurs)
+        .where(and(eq(commandesFournisseurs.id, commandeId), eq(commandesFournisseurs.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!commande) return null;
+
+      const lignes = await tx
+        .select()
+        .from(lignesCommandesFournisseurs)
+        .where(eq(lignesCommandesFournisseurs.commandeId, commandeId));
+      const ligneById = new Map(lignes.map((l) => [l.id, l]));
+
+      // Dédoublonne par ligneId (dernière valeur) ; ignore les ligneId hors commande.
+      const recueParLigne = new Map<number, number>();
+      for (const r of receptions) {
+        if (ligneById.has(r.ligneId)) recueParLigne.set(r.ligneId, r.quantiteRecue);
+      }
+
+      for (const [ligneId, quantiteRecue] of Array.from(recueParLigne.entries())) {
+        const ligne = ligneById.get(ligneId)!;
+        // Invariant garanti côté infra : qté reçue ∈ [0, quantité commandée] (clamp défensif).
+        const max = Number(ligne.quantite);
+        const valeur = Math.max(0, Math.min(quantiteRecue, max));
+        await tx
+          .update(lignesCommandesFournisseurs)
+          .set({ quantiteRecue: valeur.toFixed(2) })
+          .where(eq(lignesCommandesFournisseurs.id, ligneId));
+      }
+
+      // Recalcule le statut depuis les quantités reçues (source de vérité = lignes).
+      const apres = await tx
+        .select()
+        .from(lignesCommandesFournisseurs)
+        .where(eq(lignesCommandesFournisseurs.commandeId, commandeId));
+      let totalCommande = 0;
+      let totalRecu = 0;
+      let toutRecu = true;
+      for (const l of apres) {
+        const cmd = Number(l.quantite);
+        const recu = Number(l.quantiteRecue ?? 0);
+        totalCommande += cmd;
+        totalRecu += recu;
+        if (recu < cmd) toutRecu = false;
+      }
+      const set: Record<string, unknown> = { updatedAt: new Date() };
+      // On ne sort pas d'un état terminal (annulee) ni du brouillon via la réception.
+      if (commande.statut !== "annulee" && commande.statut !== "brouillon") {
+        if (totalCommande > 0 && toutRecu) set.statut = "livree";
+        else if (totalRecu > 0) set.statut = "partiellement_livree";
+        else set.statut = "confirmee";
+      }
+      if (totalRecu > 0 && !commande.dateLivraisonReelle) set.dateLivraisonReelle = new Date();
+
+      const [row] = await tx
+        .update(commandesFournisseurs)
+        .set(set)
+        .where(and(eq(commandesFournisseurs.id, commandeId), eq(commandesFournisseurs.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toCommande(row) : null;
     });
   }
 

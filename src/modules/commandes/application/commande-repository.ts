@@ -36,4 +36,16 @@ export interface ICommandeRepository {
   ): Promise<Commande | null>;
   // Commandes du tenant en retard de livraison (échéance dépassée, non livrées/annulées).
   listEnRetard(ctx: TenantContext): Promise<Commande[]>;
+
+  // Enregistre la réception (quantiteRecue par ligne) — n'affecte que les lignes de CETTE
+  // commande (les autres ligneId sont ignorées). Recalcule le statut depuis les quantités
+  // reçues (livree si tout reçu, partiellement_livree si partiel, sinon inchangé/confirmee).
+  // null si la commande n'appartient pas au tenant. ⚠️ L'invariant `quantiteRecue ≤ quantite`
+  // est garanti (clamp) ; la validation stricte (rejet) est portée par le use-case.
+  recevoir(ctx: TenantContext, commandeId: number, receptions: ReceptionLigne[]): Promise<Commande | null>;
+}
+
+export interface ReceptionLigne {
+  readonly ligneId: number;
+  readonly quantiteRecue: number;
 }

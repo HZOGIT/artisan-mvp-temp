@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICommandeRepository } from "../application/commande-repository";
+import type { ICommandeRepository, ReceptionLigne } from "../application/commande-repository";
 import type {
   Commande,
   LigneCommande,
@@ -141,5 +141,47 @@ export class FakeCommandeRepository implements ICommandeRepository {
         c.statut !== "livree" &&
         c.statut !== "annulee",
     );
+  }
+
+  async recevoir(ctx: TenantContext, commandeId: number, receptions: ReceptionLigne[]): Promise<Commande | null> {
+    const commande = await this.getById(ctx, commandeId);
+    if (!commande) return null;
+    const lignes = this.lignesStore.filter((l) => l.commandeId === commandeId);
+    const ligneIds = new Set(lignes.map((l) => l.id));
+    const recueParLigne = new Map<number, number>();
+    for (const r of receptions) if (ligneIds.has(r.ligneId)) recueParLigne.set(r.ligneId, r.quantiteRecue);
+
+    this.lignesStore = this.lignesStore.map((l) => {
+      if (!recueParLigne.has(l.id)) return l;
+      const max = Number(l.quantite);
+      const valeur = Math.max(0, Math.min(recueParLigne.get(l.id)!, max));
+      return { ...l, quantiteRecue: valeur.toFixed(2) };
+    });
+
+    const apres = this.lignesStore.filter((l) => l.commandeId === commandeId);
+    let totalCommande = 0;
+    let totalRecu = 0;
+    let toutRecu = true;
+    for (const l of apres) {
+      const cmd = Number(l.quantite);
+      const recu = Number(l.quantiteRecue);
+      totalCommande += cmd;
+      totalRecu += recu;
+      if (recu < cmd) toutRecu = false;
+    }
+    let statut = commande.statut;
+    if (commande.statut !== "annulee" && commande.statut !== "brouillon") {
+      if (totalCommande > 0 && toutRecu) statut = "livree";
+      else if (totalRecu > 0) statut = "partiellement_livree";
+      else statut = "confirmee";
+    }
+    const updated: Commande = {
+      ...commande,
+      statut,
+      dateLivraisonReelle: totalRecu > 0 && !commande.dateLivraisonReelle ? new Date() : commande.dateLivraisonReelle,
+      updatedAt: new Date(),
+    };
+    this.store = this.store.map((x) => (x.id === commandeId ? updated : x));
+    return updated;
   }
 }

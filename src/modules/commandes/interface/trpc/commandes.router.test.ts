@@ -158,6 +158,25 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     expect((await callMutation(server, "commandes.updateStatut", { id, statut: "x_invalide" as unknown as string }, tA)).statusCode).toBe(400);
   });
 
+  it("recevoir : réception partielle → partiellement_livree, totale → livree ; qté > commandée → 400 ; cross-tenant → 404", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ designation: "Tube", quantite: 10, prixUnitaire: 5 }] }, tA)).json().result.data.id as number;
+    await callMutation(server, "commandes.updateStatut", { id, statut: "confirmee" }, tA);
+    const ligneId = ((await callQuery(server, "commandes.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ id: number }>)[0].id;
+    // partielle
+    const partiel = await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 4 }] }, tA);
+    expect(partiel.statusCode).toBe(200);
+    expect(partiel.json().result.data.statut).toBe("partiellement_livree");
+    expect(((await callQuery(server, "commandes.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ quantiteRecue: string }>)[0].quantiteRecue).toBe("4.00");
+    // qté reçue > commandée → 400 (invariant)
+    expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 99 }] }, tA)).statusCode).toBe(400);
+    // totale → livree
+    expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 10 }] }, tA)).json().result.data.statut).toBe("livree");
+    // cross-tenant → 404
+    expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 1 }] }, tB)).statusCode).toBe(404);
+  });
+
   it("getEnRetard : commandes échéance dépassée non livrées, scopé tenant", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
