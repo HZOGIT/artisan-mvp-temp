@@ -110,4 +110,36 @@ describe.skipIf(!URL)("notesDeFrais.router e2e (HTTP → tRPC → use-case → r
     expect((await callMutation(server, "notesDeFrais.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "notesDeFrais.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("id inexistant du même tenant : getById / update / delete → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "notesDeFrais.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "notesDeFrais.update", { id: 999999999, titre: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "notesDeFrais.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : numero > 20, titre > 255, montant non décimal → 400", async () => {
+    const tA = await token(UA);
+    const base = { periodeDebut: "2026-06-01", periodeFin: "2026-06-30" };
+    expect((await callMutation(server, "notesDeFrais.create", { ...base, numero: "x".repeat(21), titre: "OK" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "notesDeFrais.create", { ...base, numero: numero(), titre: "x".repeat(256) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "notesDeFrais.create", { ...base, numero: numero(), titre: "OK", montantTotal: "abc" }, tA)).statusCode).toBe(400);
+  });
+
+  it("update : periodeFin < periodeDebut (fournies ensemble) → 400", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "notesDeFrais.create", { numero: numero(), titre: "Dates", periodeDebut: "2026-10-01", periodeFin: "2026-10-31" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "notesDeFrais.update", { id, periodeDebut: "2026-10-20", periodeFin: "2026-10-10" }, tA)).statusCode).toBe(400);
+  });
+
+  it("update ne peut PAS passer statut/userId (zod strip) — note brouillon, userId inchangé", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "notesDeFrais.create", { numero: numero(), titre: "Garde", periodeDebut: "2026-11-01", periodeFin: "2026-11-30" }, tA)).json().result.data.id as number;
+    // tente d'auto-approuver + usurper le demandeur via update : clés hors schéma retirées par zod
+    await callMutation(server, "notesDeFrais.update", { id, statut: "approuvee", userId: 999, titre: "Toujours" }, tA);
+    const after = (await callQuery(server, "notesDeFrais.getById", { id }, tA)).json().result.data as { statut: string; userId: number; titre: string };
+    expect(after.statut).toBe("brouillon"); // workflow inviolé
+    expect(after.userId).toBe(UA); // demandeur inchangé
+    expect(after.titre).toBe("Toujours"); // seul le champ légitime appliqué
+  });
 });
