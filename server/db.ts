@@ -5653,26 +5653,22 @@ export async function verifierEtAttribuerBadges(
   // les badges atteints. Retourne la liste des badges nouvellement
   // obtenus dans ce passage.
   const dbi = await getDb();
-  const pool = getPool();
-  if (!pool) return [];
 
   // Calculs statistiques pour ce technicien chez cet artisan.
-  const [intRows]: any = await pool.execute(
-    `SELECT COUNT(*) AS n FROM interventions
-      WHERE technicienId = ? AND artisanId = ? AND statut = 'terminee'`,
-    [technicienId, artisanId]
-  );
-  const nbInterventions = Number(intRows[0]?.n || 0);
+  const [intRow] = await dbi.select({ n: sql<number>`COUNT(*)` }).from(interventions)
+    .where(and(
+      eq(interventions.technicienId, technicienId),
+      eq(interventions.artisanId, artisanId),
+      eq(interventions.statut, "terminee" as any),
+    ));
+  const nbInterventions = Number(intRow?.n || 0);
 
   // Avis positifs (note >= 4) — on tolere l'absence de la table.
   let nbAvisPositifs = 0;
   try {
-    const [aRows]: any = await pool.execute(
-      `SELECT COUNT(*) AS n FROM avis_clients
-        WHERE artisanId = ? AND note >= 4`,
-      [artisanId]
-    );
-    nbAvisPositifs = Number(aRows[0]?.n || 0);
+    const [aRow] = await dbi.select({ n: sql<number>`COUNT(*)` }).from(avisClients)
+      .where(and(eq(avisClients.artisanId, artisanId), gte(avisClients.note, 4)));
+    nbAvisPositifs = Number(aRow?.n || 0);
   } catch {
     /* table absente */
   }
@@ -5712,8 +5708,7 @@ export async function calculerClassement(
   periode: "semaine" | "mois" | "trimestre" | "annee"
 ): Promise<ClassementTechnicien[]> {
   // Calcule le classement pour la periode courante et l'enregistre.
-  const pool = getPool();
-  if (!pool) return [];
+  const dbi = await getDb();
   const today = new Date();
   let dateDebut: Date;
   const dateFin = today;
@@ -5733,38 +5728,37 @@ export async function calculerClassement(
 
   // Agreger par technicien : nb interventions terminees + CA factures
   // payees attache aux interventions de ce technicien.
-  const [rows]: any = await pool.execute(
-    `SELECT i.technicienId AS technicienId,
-            COUNT(*) AS interventions,
-            COALESCE(SUM(f.totalTTC), 0) AS ca
-       FROM interventions i
-       LEFT JOIN factures f
-         ON f.id = i.factureId AND f.statut = 'payee'
-      WHERE i.artisanId = ?
-        AND i.statut = 'terminee'
-        AND i.technicienId IS NOT NULL
-        AND i.dateDebut BETWEEN ? AND ?
-      GROUP BY i.technicienId
-      ORDER BY interventions DESC, ca DESC`,
-    [artisanId, dStr, fStr]
-  );
+  // LEFT JOIN avec condition `f.statut='payee'` portée dans le ON (pas le WHERE)
+  // pour préserver la sémantique LEFT JOIN. dateDebut = timestamp → sql BETWEEN brut.
+  const rows: any[] = await dbi.select({
+    technicienId: interventions.technicienId,
+    interventions: sql<number>`COUNT(*)`,
+    ca: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)`,
+  }).from(interventions)
+    .leftJoin(factures, and(eq(factures.id, interventions.factureId), eq(factures.statut, "payee" as any)))
+    .where(and(
+      eq(interventions.artisanId, artisanId),
+      eq(interventions.statut, "terminee" as any),
+      isNotNull(interventions.technicienId),
+      sql`${interventions.dateDebut} BETWEEN ${dStr} AND ${fStr}`,
+    ))
+    .groupBy(interventions.technicienId)
+    .orderBy(sql`COUNT(*) DESC`, sql`COALESCE(SUM(${factures.totalTTC}), 0) DESC`);
 
   // Insert classements (purge prealable pour ce couple artisan+periode).
-  await pool.execute(
-    `DELETE FROM classement_techniciens
-      WHERE artisanId = ? AND periode = ? AND dateDebut = ?`,
-    [artisanId, periode, dStr]
-  );
+  await dbi.delete(classementTechniciens)
+    .where(and(
+      eq(classementTechniciens.artisanId, artisanId),
+      eq(classementTechniciens.periode, periode),
+      eq(classementTechniciens.dateDebut, dStr),
+    ));
   let rang = 1;
-  for (const r of rows as any[]) {
+  for (const r of rows) {
     const points = Number(r.interventions) * 10 + Math.floor(Number(r.ca) / 100);
-    await pool.execute(
-      `INSERT INTO classement_techniciens
-         (technicienId, artisanId, periode, dateDebut, dateFin, rang,
-          pointsTotal, interventions, ca)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [r.technicienId, artisanId, periode, dStr, fStr, rang, points, r.interventions, r.ca]
-    );
+    await dbi.insert(classementTechniciens).values({
+      technicienId: r.technicienId, artisanId, periode, dateDebut: dStr, dateFin: fStr,
+      rang, pointsTotal: points, interventions: Number(r.interventions), ca: String(r.ca),
+    });
     rang++;
   }
   return getClassementTechniciens(artisanId, periode);
