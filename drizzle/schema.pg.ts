@@ -26,6 +26,7 @@ import {
   boolean,
   numeric,
   bigint,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // ── Enums ──────────────────────────────────────────────────────────────────
@@ -1363,3 +1364,335 @@ export const analysesPhotosChantier = pgTable("analyses_photos_chantier", {
 });
 export type AnalysePhotoChantier = typeof analysesPhotosChantier.$inferSelect;
 export type InsertAnalysePhotoChantier = typeof analysesPhotosChantier.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+// BATCH 3c (P0.5) — IA, chat, rapports, congés, push, rdv, emails (20 tables, fin)
+// ════════════════════════════════════════════════════════════════════════════
+export const photoInterventionTypeEnum = pgEnum("photo_intervention_type", ["avant", "pendant", "apres"]);
+export const conversationStatutEnum = pgEnum("conversation_statut", ["ouverte", "fermee", "archivee"]);
+export const messageAuteurEnum = pgEnum("message_auteur", ["artisan", "client"]);
+export const rapportTypeEnum = pgEnum("rapport_type", ["ventes", "clients", "interventions", "stocks", "fournisseurs", "techniciens", "financier"]);
+export const rapportFormatEnum = pgEnum("rapport_format", ["tableau", "graphique", "liste"]);
+export const rapportGraphiqueTypeEnum = pgEnum("rapport_graphique_type", ["bar", "line", "pie", "doughnut"]);
+export const notifPushTypeEnum = pgEnum("notif_push_type", ["assignation", "modification", "annulation", "rappel", "message", "avis"]);
+export const congeTypeEnum = pgEnum("conge_type", ["conge_paye", "rtt", "maladie", "sans_solde", "formation", "autre"]);
+export const congeStatutEnum = pgEnum("conge_statut", ["en_attente", "approuve", "refuse", "annule"]);
+export const soldeCongeTypeEnum = pgEnum("solde_conge_type", ["conge_paye", "rtt"]);
+export const analyseUrgenceEnum = pgEnum("analyse_urgence", ["faible", "moyenne", "haute", "critique"]);
+export const rdvStatutEnum = pgEnum("rdv_statut", ["en_attente", "confirme", "refuse", "annule"]);
+export const rdvUrgenceEnum = pgEnum("rdv_urgence", ["normale", "urgente", "tres_urgente"]);
+
+// ── PHOTOS INTERVENTIONS ─────────────────────────────────────────────────────
+export const photosInterventions = pgTable("photos_interventions", {
+  id: serial("id").primaryKey(),
+  interventionMobileId: integer("interventionMobileId").notNull(),
+  url: varchar("url", { length: 500 }).notNull(),
+  description: varchar("description", { length: 255 }),
+  type: photoInterventionTypeEnum("type").default("pendant"),
+  takenAt: timestamp("takenAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PhotoIntervention = typeof photosInterventions.$inferSelect;
+export type InsertPhotoIntervention = typeof photosInterventions.$inferInsert;
+
+// ── CONVERSATIONS ────────────────────────────────────────────────────────────
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  sujet: varchar("sujet", { length: 255 }),
+  statut: conversationStatutEnum("statut").default("ouverte"),
+  devisId: integer("devisId"),
+  factureId: integer("factureId"),
+  interventionId: integer("interventionId"),
+  dernierMessage: text("dernierMessage"),
+  dernierMessageDate: timestamp("dernierMessageDate"),
+  nonLuArtisan: integer("nonLuArtisan").default(0),
+  nonLuClient: integer("nonLuClient").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+// ── MESSAGES ─────────────────────────────────────────────────────────────────
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversationId").notNull(),
+  auteur: messageAuteurEnum("auteur").notNull(),
+  contenu: text("contenu").notNull(),
+  lu: boolean("lu").default(false),
+  pieceJointe: text("pieceJointe"),
+  pieceJointeUrl: text("pieceJointeUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+
+// ── RAPPORTS PERSONNALISES ───────────────────────────────────────────────────
+export const rapportsPersonnalises = pgTable("rapports_personnalises", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  nom: varchar("nom", { length: 100 }).notNull(),
+  description: text("description"),
+  type: rapportTypeEnum("type").notNull(),
+  filtres: jsonb("filtres"),
+  colonnes: jsonb("colonnes"),
+  groupement: varchar("groupement", { length: 50 }),
+  tri: varchar("tri", { length: 50 }),
+  format: rapportFormatEnum("format").default("tableau"),
+  graphiqueType: rapportGraphiqueTypeEnum("graphiqueType"),
+  favori: boolean("favori").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type RapportPersonnalise = typeof rapportsPersonnalises.$inferSelect;
+export type InsertRapportPersonnalise = typeof rapportsPersonnalises.$inferInsert;
+
+// ── EXECUTIONS RAPPORTS ──────────────────────────────────────────────────────
+export const executionsRapports = pgTable("executions_rapports", {
+  id: serial("id").primaryKey(),
+  rapportId: integer("rapportId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  dateExecution: timestamp("dateExecution").defaultNow().notNull(),
+  parametres: jsonb("parametres"),
+  resultats: jsonb("resultats"),
+  nombreLignes: integer("nombreLignes").default(0),
+  tempsExecution: integer("tempsExecution"),
+});
+export type ExecutionRapport = typeof executionsRapports.$inferSelect;
+export type InsertExecutionRapport = typeof executionsRapports.$inferInsert;
+
+// ── PUSH SUBSCRIPTIONS ───────────────────────────────────────────────────────
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  endpoint: text("endpoint").notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: varchar("userAgent", { length: 255 }),
+  actif: boolean("actif").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+// ── PREFERENCES NOTIFICATIONS ────────────────────────────────────────────────
+export const preferencesNotifications = pgTable("preferences_notifications", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  nouvelleAssignation: boolean("nouvelleAssignation").default(true),
+  modificationIntervention: boolean("modificationIntervention").default(true),
+  annulationIntervention: boolean("annulationIntervention").default(true),
+  rappelIntervention: boolean("rappelIntervention").default(true),
+  nouveauMessage: boolean("nouveauMessage").default(true),
+  demandeAvis: boolean("demandeAvis").default(false),
+  heureDebutNotif: varchar("heureDebutNotif", { length: 5 }).default("08:00"),
+  heureFinNotif: varchar("heureFinNotif", { length: 5 }).default("20:00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type PreferenceNotification = typeof preferencesNotifications.$inferSelect;
+export type InsertPreferenceNotification = typeof preferencesNotifications.$inferInsert;
+
+// ── HISTORIQUE NOTIFICATIONS PUSH ────────────────────────────────────────────
+export const historiqueNotificationsPush = pgTable("historique_notifications_push", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  type: notifPushTypeEnum("type").notNull(),
+  titre: varchar("titre", { length: 100 }).notNull(),
+  corps: text("corps"),
+  referenceId: integer("referenceId"),
+  referenceType: varchar("referenceType", { length: 50 }),
+  statut: alerteEnvoiStatutEnum("statut").default("envoye"),
+  dateEnvoi: timestamp("dateEnvoi").defaultNow().notNull(),
+  dateLecture: timestamp("dateLecture"),
+});
+export type HistoriqueNotificationPush = typeof historiqueNotificationsPush.$inferSelect;
+export type InsertHistoriqueNotificationPush = typeof historiqueNotificationsPush.$inferInsert;
+
+// ── CONGES ───────────────────────────────────────────────────────────────────
+export const conges = pgTable("conges", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  type: congeTypeEnum("type").notNull(),
+  dateDebut: date("dateDebut").notNull(),
+  dateFin: date("dateFin").notNull(),
+  demiJourneeDebut: boolean("demiJourneeDebut").default(false),
+  demiJourneeFin: boolean("demiJourneeFin").default(false),
+  motif: text("motif"),
+  statut: congeStatutEnum("statut").default("en_attente"),
+  commentaireValidation: text("commentaireValidation"),
+  dateValidation: timestamp("dateValidation"),
+  validePar: integer("validePar"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Conge = typeof conges.$inferSelect;
+export type InsertConge = typeof conges.$inferInsert;
+
+// ── SOLDES CONGES ────────────────────────────────────────────────────────────
+export const soldesConges = pgTable("soldes_conges", {
+  id: serial("id").primaryKey(),
+  technicienId: integer("technicienId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  type: soldeCongeTypeEnum("type").notNull(),
+  annee: integer("annee").notNull(),
+  soldeInitial: numeric("soldeInitial", { precision: 5, scale: 2 }).default("0.00"),
+  soldeRestant: numeric("soldeRestant", { precision: 5, scale: 2 }).default("0.00"),
+  joursAcquis: numeric("joursAcquis", { precision: 5, scale: 2 }).default("0.00"),
+  joursPris: numeric("joursPris", { precision: 5, scale: 2 }).default("0.00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type SoldeConge = typeof soldesConges.$inferSelect;
+export type InsertSoldeConge = typeof soldesConges.$inferInsert;
+
+// ── PHOTOS ANALYSE (IA) ──────────────────────────────────────────────────────
+export const photosAnalyse = pgTable("photos_analyse", {
+  id: serial("id").primaryKey(),
+  analyseId: integer("analyseId").notNull(),
+  url: text("url").notNull(),
+  description: text("description"),
+  ordre: integer("ordre").default(1),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+});
+export type PhotoAnalyse = typeof photosAnalyse.$inferSelect;
+export type InsertPhotoAnalyse = typeof photosAnalyse.$inferInsert;
+
+// ── RESULTATS ANALYSE IA ─────────────────────────────────────────────────────
+export const resultatsAnalyseIA = pgTable("resultats_analyse_ia", {
+  id: serial("id").primaryKey(),
+  analyseId: integer("analyseId").notNull(),
+  typeTravauxDetecte: varchar("typeTravauxDetecte", { length: 255 }),
+  descriptionTravaux: text("descriptionTravaux"),
+  urgence: analyseUrgenceEnum("urgence").default("moyenne"),
+  confiance: numeric("confiance", { precision: 5, scale: 2 }),
+  rawResponse: jsonb("rawResponse"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ResultatAnalyseIA = typeof resultatsAnalyseIA.$inferSelect;
+export type InsertResultatAnalyseIA = typeof resultatsAnalyseIA.$inferInsert;
+
+// ── SUGGESTIONS ARTICLES IA ──────────────────────────────────────────────────
+export const suggestionsArticlesIA = pgTable("suggestions_articles_ia", {
+  id: serial("id").primaryKey(),
+  resultatId: integer("resultatId").notNull(),
+  articleId: integer("articleId"),
+  nomArticle: varchar("nomArticle", { length: 255 }).notNull(),
+  description: text("description"),
+  quantiteSuggeree: numeric("quantiteSuggeree", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixEstime: numeric("prixEstime", { precision: 10, scale: 2 }),
+  confiance: numeric("confiance", { precision: 5, scale: 2 }),
+  selectionne: boolean("selectionne").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SuggestionArticleIA = typeof suggestionsArticlesIA.$inferSelect;
+export type InsertSuggestionArticleIA = typeof suggestionsArticlesIA.$inferInsert;
+
+// ── DEVIS GENERE IA ──────────────────────────────────────────────────────────
+export const devisGenereIA = pgTable("devis_genere_ia", {
+  id: serial("id").primaryKey(),
+  analyseId: integer("analyseId").notNull(),
+  devisId: integer("devisId"),
+  montantEstime: numeric("montantEstime", { precision: 12, scale: 2 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type DevisGenereIA = typeof devisGenereIA.$inferSelect;
+export type InsertDevisGenereIA = typeof devisGenereIA.$inferInsert;
+
+// ── PREFERENCES COULEURS CALENDRIER ──────────────────────────────────────────
+export const preferencesCouleursCalendrier = pgTable("preferences_couleurs_calendrier", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  interventionId: integer("interventionId").notNull(),
+  couleur: varchar("couleur", { length: 50 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type PreferenceCouleurCalendrier = typeof preferencesCouleursCalendrier.$inferSelect;
+export type InsertPreferenceCouleurCalendrier = typeof preferencesCouleursCalendrier.$inferInsert;
+
+// ── CONFIG RELANCES AUTO ─────────────────────────────────────────────────────
+export const configRelancesAuto = pgTable("config_relances_auto", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull().unique(),
+  actif: boolean("actif").default(false),
+  joursApresEnvoi: integer("joursApresEnvoi").default(7),
+  joursEntreRelances: integer("joursEntreRelances").default(7),
+  nombreMaxRelances: integer("nombreMaxRelances").default(3),
+  heureEnvoi: varchar("heureEnvoi", { length: 5 }).default("09:00"),
+  joursEnvoi: varchar("joursEnvoi", { length: 50 }).default("1,2,3,4,5"),
+  modeleEmailId: integer("modeleEmailId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type ConfigRelancesAuto = typeof configRelancesAuto.$inferSelect;
+export type InsertConfigRelancesAuto = typeof configRelancesAuto.$inferInsert;
+
+// ── RDV EN LIGNE ─────────────────────────────────────────────────────────────
+export const rdvEnLigne = pgTable("rdv_en_ligne", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  dateProposee: timestamp("dateProposee").notNull(),
+  dureeEstimee: integer("dureeEstimee").default(60),
+  statut: rdvStatutEnum("statut").default("en_attente"),
+  motifRefus: text("motifRefus"),
+  urgence: rdvUrgenceEnum("urgence").default("normale"),
+  interventionId: integer("interventionId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type RdvEnLigne = typeof rdvEnLigne.$inferSelect;
+export type InsertRdvEnLigne = typeof rdvEnLigne.$inferInsert;
+
+// ── AI THREADS ───────────────────────────────────────────────────────────────
+export const aiThreads = pgTable("ai_threads", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  mode: varchar("mode", { length: 50 }).notNull().default("general"),
+  parcoursId: varchar("parcoursId", { length: 255 }),
+  title: text("title").notNull(),
+  lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type AiThread = typeof aiThreads.$inferSelect;
+export type InsertAiThread = typeof aiThreads.$inferInsert;
+
+// ── AI MESSAGES ──────────────────────────────────────────────────────────────
+export const aiMessages = pgTable("ai_messages", {
+  id: serial("id").primaryKey(),
+  threadId: integer("threadId").notNull(),
+  role: varchar("role", { length: 20 }).notNull(),
+  transcript: text("transcript").notNull(),
+  attachments: jsonb("attachments"),
+  metadata: jsonb("metadata"),
+  pricingMetadata: jsonb("pricingMetadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type AiMessage = typeof aiMessages.$inferSelect;
+export type InsertAiMessage = typeof aiMessages.$inferInsert;
+
+// ── EMAILS LOG ───────────────────────────────────────────────────────────────
+export const emailsLog = pgTable("emails_log", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId"),
+  destinataire: varchar("destinataire", { length: 320 }).notNull(),
+  sujet: varchar("sujet", { length: 500 }).notNull(),
+  type: varchar("type", { length: 50 }),
+  resendId: varchar("resendId", { length: 255 }),
+  statut: varchar("statut", { length: 20 }).notNull(),
+  erreur: text("erreur"),
+  entiteType: varchar("entiteType", { length: 50 }),
+  entiteId: integer("entiteId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EmailLog = typeof emailsLog.$inferSelect;
+export type InsertEmailLog = typeof emailsLog.$inferInsert;
