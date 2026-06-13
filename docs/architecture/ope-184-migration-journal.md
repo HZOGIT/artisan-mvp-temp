@@ -60,4 +60,17 @@ Méthode : nouveau fichier **`drizzle/schema.pg.ts`** (pg-core) séparé du `sch
 ### ▶️ Prochaine action
 → **P0.6 (OPE-192) = FAIT** — drizzle.config branché (DB_DIALECT=postgresql → schema.pg.ts, out=drizzle/pg). Baseline `drizzle/pg/0000_pretty_puma.sql` générée (89 tables / 67 types) et **`drizzle-kit migrate` testé sur le conteneur postgres:18 (:5432) → 89 tables + 67 enums créés sans erreur** (vérifié psql). Commande de migration PG : `DB_DIALECT=postgresql DATABASE_URL=postgres://artisan_user:artisan_password@127.0.0.1:5432/artisan_mvp pnpm exec drizzle-kit migrate`.
 
-→ **P0.7 (OPE-193) — PROCHAINE** : repointer `server/db.ts` `getDb()` du pool `mysql2` vers un pool `pg` + `drizzle(pool)` (drizzle-orm/node-postgres) quand DB_DIALECT=postgresql ; importer les tables depuis `schema.pg.ts` ; corriger les requêtes raw `sql\`\`` MySQL-spécifiques (16 onDuplicateKey → onConflictDoUpdate, CURDATE/DATE_FORMAT/DATE_ADD/IFNULL). ⚠️ C'est ici que ça devient DÉPLOYABLE et que le LEGACY (server/db.ts, gros volume, 561 err tsc) entre en jeu — itération potentiellement longue, découper si besoin (sous-batchs par groupe de fonctions). Puis P0.8 (copie data MySQL→PG), P0.9 (Vitest sur PG).
+### ⏸️ P0.7 (OPE-193) — PARTIEL / EN PAUSE (décision humaine requise) — 2026-06-13 ~07:32
+**Ne pas reprendre automatiquement** tant que l'humain n'a pas tranché l'approche.
+
+**Fait & validé** : `server/db.ts` rendu dialect-aware (pool `pg`/node-postgres + import des tables via nouveau `drizzle/schema.active.ts` qui sélectionne schema.pg/schema selon DB_DIALECT). **L'app BOOTE sur PostgreSQL** (`pnpm dev` DB_DIALECT=postgresql → « Connected successfully (postgres) », serveur up) et le **chemin Drizzle SELECT fonctionne** (la requête de seed `getArtisan…` tourne sans erreur). Chemin mysql inchangé (défaut).
+
+**Découverte BLOQUANTE pour finir P0.7** : le legacy ne se résume pas à Drizzle. Deux classes d'incompatibilité PG restent, sur du code qui manipule **factures / paiements / écritures comptables** :
+1. **~73 appels `getPool()`** = usage **direct du pool mysql2 brut** + SQL **brut** (placeholders `?` vs `$1`, fonctions mysql, forme de résultat `[rows]`). En mode pg, `getPool()` renvoie null → endpoints `/api/articles/*` cassent (« Database unavailable »/500). Répartis : db.ts (60), routers.ts (5), index.ts (8).
+2. **31 `insertId`** Drizzle (`result.insertId` mysql2 → nécessite `.returning()` en pg).
+
+→ **~104 points de réécriture SQL legacy**, sur des données financières, avec une PG de test **vide** (impossible de valider le comportement tant que la data n'est pas copiée — P0.8). Mon gate « boote + read 200 » **ne détecte pas** une corruption subtile (numéro de séquence, onConflict, arrondi). **Risque d'intégrité → arrêt + escalade** plutôt que grind autonome.
+
+**Décision attendue (voir message)** : (a) je porte les ~104 points en sous-batchs prudents, ou (b) on revoit l'approche (ex. garder mysql pour le legacy raw-SQL et n'envoyer que le NOUVEAU stack sur PG — revient sur le PG-first), ou (c) tu reprends la main pour cette partie.
+
+_Plan initial P0.7 (référence) :_ repointer `server/db.ts` `getDb()` du pool `mysql2` vers un pool `pg` + `drizzle(pool)` (drizzle-orm/node-postgres) quand DB_DIALECT=postgresql ; importer les tables depuis `schema.pg.ts` ; corriger les requêtes raw `sql\`\`` MySQL-spécifiques (16 onDuplicateKey → onConflictDoUpdate, CURDATE/DATE_FORMAT/DATE_ADD/IFNULL). ⚠️ C'est ici que ça devient DÉPLOYABLE et que le LEGACY (server/db.ts, gros volume, 561 err tsc) entre en jeu — itération potentiellement longue, découper si besoin (sous-batchs par groupe de fonctions). Puis P0.8 (copie data MySQL→PG), P0.9 (Vitest sur PG).

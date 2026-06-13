@@ -1,5 +1,8 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
+// OPE-184 P0.7 — bascule PG-first : pool/driver Postgres optionnel (DB_DIALECT=postgresql).
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
+import { Pool as PgPool } from "pg";
 import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, between, ne } from "drizzle-orm";
 import { 
   users, User, InsertUser,
@@ -83,7 +86,7 @@ import {
   configAlertesPrevisions, ConfigAlertePrevision, InsertConfigAlertePrevision,
   historiqueAlertesPrevisions, HistoriqueAlertePrevision, InsertHistoriqueAlertePrevision,
   emailsLog, EmailLog, InsertEmailLog,
-} from "../drizzle/schema";
+} from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
 // ============================================================================
@@ -130,7 +133,23 @@ export async function getDb() {
     if (!databaseUrl) {
       throw new Error('DATABASE_URL is not defined');
     }
-    
+
+    // OPE-184 P0.7 — chemin Postgres (PG-first). node-postgres accepte la
+    // connectionString directement ; les objets-tables proviennent de schema.active
+    // (sélectionnés par DB_DIALECT). Le chemin mysql ci-dessous reste inchangé.
+    if (process.env.DB_DIALECT === "postgresql") {
+      const pgPool = new PgPool({ connectionString: databaseUrl, max: 10 });
+      pgPool.on("error", (err: any) => {
+        console.error("[PG pool] error (non-fatal):", err?.code, err?.message);
+      });
+      const conn = await pgPool.connect();
+      await conn.query("select 1");
+      conn.release();
+      _db = drizzlePg(pgPool) as any;
+      console.log("[Database] Connected successfully (postgres)");
+      return _db;
+    }
+
     const dbConfig = parseDatabaseUrl(databaseUrl);
     
     _pool = mysql.createPool({
