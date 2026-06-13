@@ -18,6 +18,8 @@ interface Intervention {
     nom: string;
     prenom?: string | null;
   } | null;
+  // OPE-111 — équipe (intervenants additionnels), optionnel.
+  equipe?: { technicienId: number; nom?: string | null; prenom?: string | null }[];
 }
 
 interface CalendarProps {
@@ -237,6 +239,16 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
                             <> - {format(new Date(intervention.dateFin), "HH:mm", { locale: fr })}</>
                           )}
                         </p>
+                        {/* OPE-111 — équipe (intervenants additionnels) */}
+                        {intervention.equipe && intervention.equipe.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {intervention.equipe.map((m) => (
+                              <Badge key={m.technicienId} variant="outline" className="text-[10px] font-normal">
+                                {[m.prenom, m.nom].filter(Boolean).join(" ") || `Tech #${m.technicienId}`}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <Badge
                         variant="secondary"
