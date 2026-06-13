@@ -120,4 +120,40 @@ describe.skipIf(!URL)("clients.router e2e (HTTP → tRPC → use-case → repo �
     // le client est toujours là (intégrité préservée)
     expect((await callQuery(server, "clients.getById", { id }, tA)).statusCode).toBe(200);
   });
+
+  it("id inexistant du même tenant : getById / update / delete → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "clients.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "clients.update", { id: 999999999, nom: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "clients.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : nom > 100, email > 320, siret > 14, type invalide → 400", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "clients.create", { nom: "x".repeat(101) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "clients.create", { nom: "OK", email: `${"a".repeat(320)}@b.fr` }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "clients.create", { nom: "OK", siret: "1".repeat(15) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "clients.create", { nom: "OK", type: "inconnu" }, tA)).statusCode).toBe(400);
+  });
+
+  it("delete 409 via un DEVIS, puis redevient supprimable après retrait des documents liés", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "clients.create", { nom: "AvecDevis" }, tA)).json().result.data.id as number;
+    await admin.query(`insert into devis ("artisanId","clientId",numero) values ($1,$2,'D-CLI-1')`, [artisanA, id]);
+    expect((await callMutation(server, "clients.delete", { id }, tA)).statusCode).toBe(409);
+    // une fois le devis retiré, la suppression redevient possible
+    await admin.query('delete from devis where "artisanId"=$1 and "clientId"=$2', [artisanA, id]);
+    expect((await callMutation(server, "clients.delete", { id }, tA)).json().result.data).toEqual({ success: true });
+    expect((await callQuery(server, "clients.getById", { id }, tA)).statusCode).toBe(404);
+  });
+
+  it("update partiel : un champ PII non fourni n'est pas effacé", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "clients.create", { nom: "Plein", email: "plein@a.fr", telephone: "0102030405", ville: "Nice" }, tA)).json().result.data.id as number;
+    // on ne met à jour que la ville → email/telephone préservés
+    const maj = (await callMutation(server, "clients.update", { id, ville: "Cannes" }, tA)).json().result.data as { email: string; telephone: string; ville: string };
+    expect(maj.ville).toBe("Cannes");
+    expect(maj.email).toBe("plein@a.fr");
+    expect(maj.telephone).toBe("0102030405");
+  });
 });
