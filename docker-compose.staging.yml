@@ -60,12 +60,16 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      DATABASE_URL: mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp
+      # OPE-184 — CUTOVER : l'app staging tourne désormais sur PostgreSQL.
+      # (Ancien : mysql://…@mysql:3306. mysql conservé arrêté en filet de rollback.)
+      DB_DIALECT: postgresql
+      DATABASE_URL: postgres://${POSTGRES_USER:-artisan_user}:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp
     env_file:
       - .env.staging
     # Staging : le FRONT est servi par Cloudflare Pages, donc on NE build PAS le
     # client (vite) ici — uniquement le serveur (build:server = esbuild, ~5s au
-    # lieu de ~1min). install → build serveur → migrate → run.
+    # lieu de ~1min). install → build serveur → migrate (drizzle/pg) → run.
+    # `fix-duplicates` (npm start) est no-op en mode postgresql (P0.5f).
     command: >
       sh -c "npm install -g pnpm@10.4.1 --silent &&
              pnpm install --frozen-lockfile &&
@@ -73,7 +77,7 @@ services:
              pnpm exec drizzle-kit migrate &&
              pnpm start"
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
 
   cloudflared:

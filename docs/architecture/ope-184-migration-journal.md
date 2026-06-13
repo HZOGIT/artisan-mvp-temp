@@ -239,7 +239,23 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ 🎯🎯🎯🎯🎯 MIGRATION CODE+DATA VALIDÉE : code 100% Drizzle PG, data staging copiée+intègre, suite de tests sans régression de port.** Il ne reste que le **cutover** (bascule de l'app staging sur PG + arrêt mysql).
 
-**Prochaine action : CUTOVER STAGING (P0.10).** ⚠️ Opération outward-facing sur le déploiement live staging. Étapes : (1) re-ETL final `pg-data-copy.mjs` (rattrape les écritures mysql depuis la 1ère copie — idempotent) ; (2) flip `docker-compose.staging.yml` app : `DATABASE_URL=postgres://…@postgres:5432/artisan_mvp` + `DB_DIALECT=postgresql` + `depends_on: postgres (healthy)` ; (3) `task staging:deploy` (rebuild+restart app) ; (4) **vérifier l'app live sur PG** (boot « postgres », endpoints clés 200, une lecture facture/devis réelle) ; (5) surveiller, puis **`docker compose stop mysql`** (garder le volume mysql en filet de rollback quelques jours avant `down`). → marquer **OPE-193 Done**. Tracer chaque étape (journal/ntfy/Linear).
+- **CUTOVER STAGING (P0.10) FAIT** (2026-06-13) : **l'app staging tourne désormais sur PostgreSQL, mysql arrêté.**
+  1. **Re-ETL final** `pg-data-copy.mjs` (idempotent) → PG à jour (6 factures, 5 clients, 8 users, ΣTTC=13199.00).
+  2. **Flip compose app** : `DB_DIALECT=postgresql` + `DATABASE_URL=postgres://…@postgres:5432/artisan_mvp` + `depends_on: postgres (healthy)` (au lieu de mysql). Config validée.
+  3. **Déploiement** : `up -d --force-recreate app`. Logs boot : « Using 'pg' driver » + « migrations applied successfully » (drizzle/pg) + « [FixDuplicates] DB_DIALECT=postgresql → skip » (P0.5f OK en prod) + **« [Database] Connected successfully (postgres) »** + « Server running … env=production ».
+  4. **App live sur PG vérifiée** : `/` 200, `/api/articles/search` 200, `/api/health` 200 ; lecture factures réelles via PG (FAC-00001=1200.00, FAC-00002=156.00, FAC-00003=230.00).
+  5. **`docker compose stop mysql`** : mysql arrêté, **volume `mysql_staging_data` conservé** (filet de rollback). Stack post-cutover = app + cloudflared + postgres. **L'app sert toujours 200 (`/api/articles/search`) APRÈS l'arrêt de mysql → ne dépend plus que de PostgreSQL.**
+
+## 🏁🏁🏁 OPE-184 / OPE-193 — MIGRATION MySQL → PostgreSQL TERMINÉE
+- **Code** : 100% Drizzle dialect-aware (db.ts, routers.ts, index.ts, db-secure.ts), ~270 checks PG verts, intégrité financière garantie à chaque sous-batch.
+- **Schéma** : 103 tables PG (migrations Drizzle `drizzle/pg`), `fix-duplicates` no-op en PG.
+- **Data staging** : copiée + parité 14/14 tables + intégrité financière confirmée.
+- **Tests** : suite PG sans régression de port (310 verts ; 30 échecs pré-existants identiques mysql).
+- **Cutover** : app staging **live sur PostgreSQL**, mysql arrêté (volume gardé en rollback).
+
+**Reste optionnel (post-migration, hors OPE-193)** : après quelques jours de stabilité sur PG, `docker compose rm mysql` + retrait du service mysql du compose + retrait de `getPool()`/schema mysql legacy (`drizzle/schema.ts`) + dette tsc legacy (OPE-253). La refonte clean-archi (phases 1-5, modules/TenantContext/RLS) reste un chantier distinct ultérieur.
+
+**Prochaine action : aucune obligatoire** — la migration MySQL→PG est terminée et validée. Marquer **OPE-193 = Done**. (Optionnel : surveiller staging.operioz.com sur PG, puis nettoyage mysql legacy.)
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
