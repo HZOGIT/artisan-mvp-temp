@@ -87,6 +87,7 @@ import {
   historiqueAlertesPrevisions, HistoriqueAlertePrevision, InsertHistoriqueAlertePrevision,
   emailsLog, EmailLog, InsertEmailLog,
   aiThreads, aiMessages,
+  interventionsMobile, photosInterventions,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -5050,16 +5051,13 @@ type InterventionMobileRow = {
 export async function getInterventionsMobileByArtisanId(
   artisanId: number
 ): Promise<Array<{ interventionId: number; heureArrivee: any; heureDepart: any }>> {
-  const pool = getPool();
-  if (!pool) return [];
+  const db = await getDb();
   try {
-    const [rows] = await pool.execute(
-      `SELECT interventionId, heureArrivee, heureDepart
-         FROM interventions_mobile
-        WHERE artisanId = ?`,
-      [artisanId]
-    );
-    return rows as any[];
+    return await db.select({
+      interventionId: interventionsMobile.interventionId,
+      heureArrivee: interventionsMobile.heureArrivee,
+      heureDepart: interventionsMobile.heureDepart,
+    }).from(interventionsMobile).where(eq(interventionsMobile.artisanId, artisanId));
   } catch (e: any) {
     console.warn("[getInterventionsMobileByArtisanId]", e?.message || e);
     return [];
@@ -5069,21 +5067,11 @@ export async function getInterventionsMobileByArtisanId(
 export async function getInterventionMobileByInterventionId(
   interventionId: number
 ): Promise<InterventionMobileRow | null> {
-  const pool = getPool();
-  if (!pool) return null;
+  const db = await getDb();
   try {
-    const [rows] = await pool.execute(
-      `SELECT id, interventionId, artisanId, latitude, longitude,
-              heureArrivee, heureDepart, notesIntervention,
-              signatureClient, signatureDate, syncStatus, lastSyncAt,
-              createdAt, updatedAt
-         FROM interventions_mobile
-        WHERE interventionId = ?
-        LIMIT 1`,
-      [interventionId]
-    );
-    const r = (rows as any[])[0];
-    return r || null;
+    const [r] = await db.select().from(interventionsMobile)
+      .where(eq(interventionsMobile.interventionId, interventionId)).limit(1);
+    return (r as any) || null;
   } catch (e: any) {
     console.warn("[getInterventionMobileByInterventionId]", e?.message || e);
     return null;
@@ -5105,95 +5093,39 @@ type InterventionMobileWritable = Partial<{
 export async function createInterventionMobile(
   data: { interventionId: number; artisanId: number } & InterventionMobileWritable
 ): Promise<InterventionMobileRow | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const cols = ["interventionId", "artisanId"];
-  const vals: any[] = [data.interventionId, data.artisanId];
+  const db = await getDb();
+  const values: any = { interventionId: data.interventionId, artisanId: data.artisanId };
   for (const k of [
-    "heureArrivee",
-    "heureDepart",
-    "latitude",
-    "longitude",
-    "notesIntervention",
-    "signatureClient",
-    "signatureDate",
-    "syncStatus",
-    "lastSyncAt",
+    "heureArrivee", "heureDepart", "latitude", "longitude",
+    "notesIntervention", "signatureClient", "signatureDate", "syncStatus", "lastSyncAt",
   ] as const) {
-    if (data[k] !== undefined) {
-      cols.push(k);
-      vals.push(data[k]);
-    }
+    if (data[k] !== undefined) values[k] = data[k];
   }
-  const placeholders = cols.map(() => "?").join(", ");
-  const [r]: any = await pool.execute(
-    `INSERT INTO interventions_mobile (${cols.join(", ")}) VALUES (${placeholders})`,
-    vals
-  );
-  const insertId = r?.insertId;
+  const insertId = await insertReturningId(interventionsMobile, values);
   if (!insertId) return null;
-  // Lecture du record cree pour retour standardise.
-  const [rows] = await pool.execute(
-    `SELECT id, interventionId, artisanId, latitude, longitude,
-            heureArrivee, heureDepart, notesIntervention,
-            signatureClient, signatureDate, syncStatus, lastSyncAt,
-            createdAt, updatedAt
-       FROM interventions_mobile WHERE id = ? LIMIT 1`,
-    [insertId]
-  );
-  return (rows as any[])[0] || null;
+  const [row] = await db.select().from(interventionsMobile)
+    .where(eq(interventionsMobile.id, insertId)).limit(1);
+  return (row as any) || null;
 }
 
 export async function updateInterventionMobile(
   mobileId: number,
   data: InterventionMobileWritable
 ): Promise<InterventionMobileRow | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const sets: string[] = [];
-  const vals: any[] = [];
+  const db = await getDb();
+  const sets: any = {};
   for (const k of [
-    "heureArrivee",
-    "heureDepart",
-    "latitude",
-    "longitude",
-    "notesIntervention",
-    "signatureClient",
-    "signatureDate",
-    "syncStatus",
-    "lastSyncAt",
+    "heureArrivee", "heureDepart", "latitude", "longitude",
+    "notesIntervention", "signatureClient", "signatureDate", "syncStatus", "lastSyncAt",
   ] as const) {
-    if (data[k] !== undefined) {
-      sets.push(`${k} = ?`);
-      vals.push(data[k]);
-    }
+    if (data[k] !== undefined) sets[k] = data[k];
   }
-  if (sets.length === 0) {
-    // Rien a mettre a jour : juste relire le record.
-    const [rows] = await pool.execute(
-      `SELECT id, interventionId, artisanId, latitude, longitude,
-              heureArrivee, heureDepart, notesIntervention,
-              signatureClient, signatureDate, syncStatus, lastSyncAt,
-              createdAt, updatedAt
-         FROM interventions_mobile WHERE id = ? LIMIT 1`,
-      [mobileId]
-    );
-    return (rows as any[])[0] || null;
+  if (Object.keys(sets).length > 0) {
+    await db.update(interventionsMobile).set(sets).where(eq(interventionsMobile.id, mobileId));
   }
-  vals.push(mobileId);
-  await pool.execute(
-    `UPDATE interventions_mobile SET ${sets.join(", ")} WHERE id = ?`,
-    vals
-  );
-  const [rows] = await pool.execute(
-    `SELECT id, interventionId, artisanId, latitude, longitude,
-            heureArrivee, heureDepart, notesIntervention,
-            signatureClient, signatureDate, syncStatus, lastSyncAt,
-            createdAt, updatedAt
-       FROM interventions_mobile WHERE id = ? LIMIT 1`,
-    [mobileId]
-  );
-  return (rows as any[])[0] || null;
+  const [row] = await db.select().from(interventionsMobile)
+    .where(eq(interventionsMobile.id, mobileId)).limit(1);
+  return (row as any) || null;
 }
 
 // ============================================================================
@@ -5207,41 +5139,33 @@ export async function createPhotoIntervention(data: {
   description?: string | null;
   type?: "avant" | "pendant" | "apres";
 }): Promise<{ id: number; url: string; description: string | null; type: string } | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT INTO photos_interventions (interventionMobileId, url, description, type)
-     VALUES (?, ?, ?, ?)`,
-    [
-      data.interventionMobileId,
-      data.url,
-      data.description ?? null,
-      data.type ?? "pendant",
-    ]
-  );
-  const insertId = r?.insertId;
+  const db = await getDb();
+  const insertId = await insertReturningId(photosInterventions, {
+    interventionMobileId: data.interventionMobileId,
+    url: data.url,
+    description: data.description ?? null,
+    type: data.type ?? "pendant",
+  });
   if (!insertId) return null;
-  const [rows] = await pool.execute(
-    `SELECT id, url, description, type, takenAt, createdAt
-       FROM photos_interventions WHERE id = ? LIMIT 1`,
-    [insertId]
-  );
-  return (rows as any[])[0] || null;
+  const [row] = await db.select({
+    id: photosInterventions.id, url: photosInterventions.url,
+    description: photosInterventions.description, type: photosInterventions.type,
+    takenAt: photosInterventions.takenAt, createdAt: photosInterventions.createdAt,
+  }).from(photosInterventions).where(eq(photosInterventions.id, insertId)).limit(1);
+  return (row as any) || null;
 }
 
 export async function getPhotosByInterventionMobileId(
   mobileId: number
 ): Promise<Array<{ id: number; url: string; description: string | null; type: string }>> {
-  const pool = getPool();
-  if (!pool) return [];
-  const [rows] = await pool.execute(
-    `SELECT id, url, description, type, takenAt, createdAt
-       FROM photos_interventions
-      WHERE interventionMobileId = ?
-      ORDER BY takenAt DESC`,
-    [mobileId]
-  );
-  return (rows as any[]) || [];
+  const db = await getDb();
+  return await db.select({
+    id: photosInterventions.id, url: photosInterventions.url,
+    description: photosInterventions.description, type: photosInterventions.type,
+    takenAt: photosInterventions.takenAt, createdAt: photosInterventions.createdAt,
+  }).from(photosInterventions)
+    .where(eq(photosInterventions.interventionMobileId, mobileId))
+    .orderBy(desc(photosInterventions.takenAt));
 }
 
 // ============================================================================
