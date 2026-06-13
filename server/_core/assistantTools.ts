@@ -194,6 +194,34 @@ export const AGENT_TOOLS: FunctionDeclaration[] = [
       "Liste les devis envoyés en attente de réponse du client (statut envoye). Retourne id, numéro, client, montantTTC, date du devis.",
     parameters: { type: Type.OBJECT, properties: {} },
   },
+  {
+    name: "lister_factures",
+    description:
+      "Liste TOUTES les factures de l'artisan, TOUS STATUTS confondus (brouillon, envoyée, payée, annulée), de la plus récente à la plus ancienne. À utiliser pour répondre à toute question générale sur les factures : « mes factures », « la dernière / la première facture », « combien de factures », « la plus grosse facture », ou un statut autre qu'impayées. N'utilise lister_factures_impayees QUE pour le sous-ensemble impayé. Retourne count + id, numéro, client, statut, montantTTC, dateFacture, dateEcheance.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        statut: {
+          type: Type.STRING,
+          description: "Filtre optionnel : brouillon | envoyee | payee | annulee. Omettre pour TOUTES les factures.",
+        },
+      },
+    },
+  },
+  {
+    name: "lister_devis",
+    description:
+      "Liste TOUS les devis de l'artisan, TOUS STATUTS confondus (brouillon, envoye, accepte, refuse), du plus récent au plus ancien. À utiliser pour toute question générale sur les devis : « mes devis », « le dernier devis », « combien de devis », « le plus gros devis ». N'utilise lister_devis_en_attente QUE pour le sous-ensemble envoyé/en attente. Retourne count + id, numéro, client, statut, montantTTC, dateDevis.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        statut: {
+          type: Type.STRING,
+          description: "Filtre optionnel : brouillon | envoye | accepte | refuse. Omettre pour TOUS les devis.",
+        },
+      },
+    },
+  },
 
   // ── Stocks & commandes fournisseurs ────────────────────────────────────
   {
@@ -1266,6 +1294,58 @@ async function execListerDevisEnAttente(_input: any, ctx: ToolContext): Promise<
   return ok({ count: enAttente.length, devis: enAttente });
 }
 
+// Construit une map clientId -> "Prénom Nom" pour enrichir les listes.
+async function buildClientNameMap(ctx: ToolContext): Promise<Map<number, string>> {
+  const clients = await db.getClientsByArtisanId(ctx.artisanId);
+  const map = new Map<number, string>();
+  for (const c of clients as any[]) {
+    map.set(c.id, `${c.prenom || ""} ${c.nom || ""}`.trim() || `#${c.id}`);
+  }
+  return map;
+}
+
+async function execListerFactures(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const [factures, names] = await Promise.all([
+    db.getFacturesByArtisanId(ctx.artisanId),
+    buildClientNameMap(ctx),
+  ]);
+  const wantStatut = input?.statut ? String(input.statut).trim() : undefined;
+  let list = (factures as any[]).map((f) => ({
+    id: f.id,
+    numero: f.numero,
+    client: names.get(f.clientId) || `#${f.clientId}`,
+    statut: f.statut,
+    totalTTC: f.totalTTC,
+    dateFacture: f.dateFacture,
+    dateEcheance: f.dateEcheance,
+  }));
+  if (wantStatut) list = list.filter((f) => f.statut === wantStatut);
+  // La plus récente d'abord (pour « la dernière facture »).
+  list.sort((a, b) => new Date(b.dateFacture).getTime() - new Date(a.dateFacture).getTime());
+  return ok({ count: list.length, factures: list });
+}
+
+async function execListerDevis(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const [devisList, names] = await Promise.all([
+    db.getDevisByArtisanId(ctx.artisanId),
+    buildClientNameMap(ctx),
+  ]);
+  const wantStatut = input?.statut ? String(input.statut).trim() : undefined;
+  let list = (devisList as any[]).map((d) => ({
+    id: d.id,
+    numero: d.numero,
+    client: names.get(d.clientId) || `#${d.clientId}`,
+    objet: d.objet,
+    statut: d.statut,
+    totalTTC: d.totalTTC,
+    dateDevis: d.dateDevis,
+  }));
+  if (wantStatut) list = list.filter((d) => d.statut === wantStatut);
+  // Le plus récent d'abord (pour « le dernier devis »).
+  list.sort((a, b) => new Date(b.dateDevis).getTime() - new Date(a.dateDevis).getTime());
+  return ok({ count: list.length, devis: list });
+}
+
 // ============================================================================
 // Stocks & commandes fournisseurs
 // ============================================================================
@@ -1763,6 +1843,10 @@ export async function executeTool(
       return execListerFacturesImpayees(input as any, ctx);
     case "lister_devis_en_attente":
       return execListerDevisEnAttente(input as any, ctx);
+    case "lister_factures":
+      return execListerFactures(input as any, ctx);
+    case "lister_devis":
+      return execListerDevis(input as any, ctx);
     // Stocks & commandes fournisseurs
     case "verifier_stocks":
       return execVerifierStocks(input as any, ctx);
