@@ -1,9 +1,9 @@
-import { and, desc, eq } from "drizzle-orm";
-import { depenses } from "../../../../drizzle/schema.pg";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { depenses, chantiers, interventions, clients } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IDepenseRepository } from "../application/depense-repository";
+import type { IDepenseRepository, DepenseRefKind } from "../application/depense-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
 
 type DepenseRow = typeof depenses.$inferSelect;
@@ -166,6 +166,26 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
         .where(and(eq(depenses.id, id), eq(depenses.artisan_id, ctx.artisanId)))
         .returning({ id: depenses.id });
       return deleted.length > 0;
+    });
+  }
+
+  ownsRef(ctx: TenantContext, kind: DepenseRefKind, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const n = sql<number>`count(*)::int`;
+      // Chaque table cible porte un `artisanId` (toutes RLS-isolées) → double cloisonnement.
+      let row: { n: number } | undefined;
+      switch (kind) {
+        case "chantier":
+          [row] = await tx.select({ n }).from(chantiers).where(and(eq(chantiers.id, id), eq(chantiers.artisanId, ctx.artisanId)));
+          break;
+        case "intervention":
+          [row] = await tx.select({ n }).from(interventions).where(and(eq(interventions.id, id), eq(interventions.artisanId, ctx.artisanId)));
+          break;
+        case "client":
+          [row] = await tx.select({ n }).from(clients).where(and(eq(clients.id, id), eq(clients.artisanId, ctx.artisanId)));
+          break;
+      }
+      return (row?.n ?? 0) > 0;
     });
   }
 }

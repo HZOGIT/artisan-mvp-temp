@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IDepenseRepository } from "../application/depense-repository";
+import type { IDepenseRepository, DepenseRefKind } from "../application/depense-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -8,6 +8,14 @@ import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/
 export class FakeDepenseRepository implements IDepenseRepository {
   private store: Depense[] = [];
   private seq = 0;
+  // FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned.
+  private ownedRefs = new Set<string>();
+
+  // Aide de test : déclare qu'une ressource référencée (chantier/intervention/client) appartient
+  // au tenant. Sert à valider la garde anti-IDOR-FK des use-cases d'écriture.
+  registerRef(artisanId: number, kind: DepenseRefKind, id: number): void {
+    this.ownedRefs.add(`${artisanId}:${kind}:${id}`);
+  }
 
   async list(ctx: TenantContext): Promise<Depense[]> {
     return this.store.filter((d) => d.artisanId === ctx.artisanId);
@@ -71,5 +79,9 @@ export class FakeDepenseRepository implements IDepenseRepository {
     if (!d) return false;
     this.store = this.store.filter((x) => x.id !== id);
     return true;
+  }
+
+  async ownsRef(ctx: TenantContext, kind: DepenseRefKind, id: number): Promise<boolean> {
+    return this.ownedRefs.has(`${ctx.artisanId}:${kind}:${id}`);
   }
 }

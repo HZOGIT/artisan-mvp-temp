@@ -1,6 +1,9 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
 
+// Nature d'une FK référencée par une dépense (toutes des tables scopées tenant).
+export type DepenseRefKind = "chantier" | "intervention" | "client";
+
 // Port du repository depenses. Chaque méthode exige le TenantContext (scope tenant + RLS).
 // `depenses` possède un `artisan_id` → double cloisonnement RLS + filtre. ⚠️ Les invariants
 // sensibles (cohérence TVA, anti-IDOR-FK des liens chantier/intervention/client, workflow de
@@ -14,4 +17,7 @@ export interface IDepenseRepository {
   update(ctx: TenantContext, id: number, input: UpdateDepenseInput): Promise<Depense | null>;
   // false si la dépense n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  // true si la ressource référencée (chantier/intervention/client) appartient au tenant.
+  // Garde anti-IDOR-FK : interdit de lier une dépense à la ressource d'un autre tenant.
+  ownsRef(ctx: TenantContext, kind: DepenseRefKind, id: number): Promise<boolean>;
 }
