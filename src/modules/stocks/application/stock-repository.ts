@@ -1,10 +1,24 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { Stock, CreateStockInput, UpdateStockInput } from "../domain/stock";
+import type {
+  Stock,
+  CreateStockInput,
+  UpdateStockInput,
+  AdjustStockInput,
+  MouvementStock,
+} from "../domain/stock";
+
+// Résultat d'un ajustement de quantité (mouvement tracé). `not_found` = stock hors tenant ;
+// `insufficient_stock` = une `sortie` rendrait la quantité physique négative (refusée, le
+// stock ne peut pas être négatif). `disponible` = quantité avant le mouvement.
+export type AdjustStockResult =
+  | { readonly status: "ok"; readonly stock: Stock }
+  | { readonly status: "not_found" }
+  | { readonly status: "insufficient_stock"; readonly disponible: string };
 
 // Port du repository stocks. Chaque méthode exige le TenantContext (scope tenant + RLS).
 // `stocks` possède un `artisanId` → double cloisonnement RLS + filtre. Les `mouvements_stock`
-// (SANS artisanId) sont scopés via le stock. ⚠️ Domaine sensible : la quantité n'est jamais
-// modifiée par `update` (métadonnées) — seul un mouvement tracé l'ajuste (étape ultérieure).
+// (SANS artisanId) sont scopés via le stock parent. ⚠️ Domaine sensible : la quantité n'est
+// jamais modifiée par `update` (métadonnées) — seul `adjustQuantity` (mouvement tracé) l'ajuste.
 export interface IStockRepository {
   list(ctx: TenantContext): Promise<Stock[]>;
   getById(ctx: TenantContext, id: number): Promise<Stock | null>;
@@ -13,4 +27,9 @@ export interface IStockRepository {
   update(ctx: TenantContext, id: number, input: UpdateStockInput): Promise<Stock | null>;
   // false si le stock n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  // Ajuste la quantité via un mouvement tracé (insert mouvement + maj quantité, ATOMIQUE).
+  adjustQuantity(ctx: TenantContext, stockId: number, input: AdjustStockInput): Promise<AdjustStockResult>;
+  // Historique des mouvements d'un stock (récents d'abord). null si le stock n'appartient
+  // pas au tenant (scope via le stock parent — `mouvements_stock` n'a pas d'artisanId).
+  listMouvements(ctx: TenantContext, stockId: number): Promise<MouvementStock[] | null>;
 }

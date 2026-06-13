@@ -58,3 +58,13 @@ export interface UpdateStockInput {
   // ⚠️ `quantiteEnStock` n'est PAS modifiable via update : seul un mouvement (ajustement
   // tracé) change la quantité (invariant d'audit).
 }
+
+// Entrée d'un mouvement de stock — l'UNIQUE voie de modification de la quantité.
+// `entree`/`ajustement` ajoutent `quantite` à la quantité physique, `sortie` la retranche.
+// `quantite` est le montant (absolu, ≥ 0) du mouvement, pas la quantité cible.
+export interface AdjustStockInput {
+  readonly type: MouvementType;
+  readonly quantite: string; // montant du mouvement, ≥ 0 (numeric PG en string)
+  readonly motif?: string | null;
+  readonly reference?: string | null;
+}

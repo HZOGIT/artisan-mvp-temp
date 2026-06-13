@@ -1,9 +1,15 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IStockRepository } from "../../application/stock-repository";
-import { listStocks, getStock } from "../../application/read-use-cases";
-import { creerStock, modifierStock, supprimerStock } from "../../application/write-use-cases";
+import { listStocks, getStock, getMouvementsStock } from "../../application/read-use-cases";
+import {
+  creerStock,
+  modifierStock,
+  supprimerStock,
+  ajusterQuantiteStock,
+} from "../../application/write-use-cases";
 
+// Décimal positif (≥ 0) : la regex (pas de signe) interdit déjà toute valeur négative.
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Valeur décimale invalide");
 
 // Bornes alignées sur la table `stocks` (defense-in-depth).
@@ -60,5 +66,25 @@ export function createStocksRouter(repo: IStockRepository) {
         await supprimerStock(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // ⚠️ L'UNIQUE voie de modification de la quantité : un mouvement tracé (audit).
+    adjustQuantity: protectedProcedure
+      .input(
+        z.object({
+          stockId: z.number().int(),
+          type: z.enum(["entree", "sortie", "ajustement"]),
+          quantite: decimal,
+          motif: z.string().max(255).nullish(),
+          reference: z.string().max(100).nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { stockId, ...mouvement } = input;
+        return ajusterQuantiteStock(repo, ctx.tenant, stockId, mouvement);
+      }),
+
+    getMouvements: protectedProcedure
+      .input(z.object({ stockId: z.number().int() }))
+      .query(({ ctx, input }) => getMouvementsStock(repo, ctx.tenant, input.stockId)),
   });
 }

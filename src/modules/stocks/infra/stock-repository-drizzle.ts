@@ -1,12 +1,20 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { stocks, mouvementsStock } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IStockRepository } from "../application/stock-repository";
-import type { Stock, CreateStockInput, UpdateStockInput } from "../domain/stock";
+import type { IStockRepository, AdjustStockResult } from "../application/stock-repository";
+import type {
+  Stock,
+  CreateStockInput,
+  UpdateStockInput,
+  AdjustStockInput,
+  MouvementStock,
+  MouvementType,
+} from "../domain/stock";
 
 type StockRow = typeof stocks.$inferSelect;
+type MouvementRow = typeof mouvementsStock.$inferSelect;
 
 function toStock(r: StockRow): Stock {
   return {
@@ -25,6 +33,25 @@ function toStock(r: StockRow): Stock {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
+}
+
+function toMouvement(r: MouvementRow): MouvementStock {
+  return {
+    id: r.id,
+    stockId: r.stockId,
+    type: r.type as MouvementType,
+    quantite: r.quantite,
+    quantiteAvant: r.quantiteAvant,
+    quantiteApres: r.quantiteApres,
+    motif: r.motif ?? null,
+    reference: r.reference ?? null,
+    createdAt: r.createdAt,
+  };
+}
+
+// Motif par défaut (parité legacy) quand l'appelant n'en fournit pas.
+function defaultMotif(type: MouvementType): string {
+  return type === "entree" ? "Ajout manuel" : type === "sortie" ? "Retrait manuel" : "Ajustement";
 }
 
 // Implémentation Drizzle du repository stocks. Double cloisonnement RLS + filtre artisanId
@@ -96,6 +123,68 @@ export class StockRepositoryDrizzle implements IStockRepository {
         .where(and(eq(stocks.id, id), eq(stocks.artisanId, ctx.artisanId)))
         .returning({ id: stocks.id });
       return deleted.length > 0;
+    });
+  }
+
+  adjustQuantity(ctx: TenantContext, stockId: number, input: AdjustStockInput): Promise<AdjustStockResult> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Ownership AVANT toute écriture : `mouvements_stock` n'a pas d'artisanId, on ne doit
+      // jamais l'ajuster pour un stock hors tenant. Lecture + maj + log dans la MÊME
+      // transaction (atomicité : pas de mouvement sans maj de quantité, ni l'inverse).
+      const [stock] = await tx
+        .select()
+        .from(stocks)
+        .where(and(eq(stocks.id, stockId), eq(stocks.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!stock) return { status: "not_found" };
+
+      const avant = Number(stock.quantiteEnStock ?? "0");
+      const delta = Number(input.quantite);
+      // `entree`/`ajustement` ajoutent, `sortie` retranche (parité legacy adjustStock).
+      const apresNum = input.type === "sortie" ? avant - delta : avant + delta;
+      // Invariant : la quantité physique ne peut jamais devenir négative (sortie refusée).
+      if (apresNum < 0) return { status: "insufficient_stock", disponible: avant.toFixed(2) };
+      const apres = apresNum.toFixed(2);
+
+      await tx
+        .update(stocks)
+        .set({ quantiteEnStock: apres, updatedAt: new Date() })
+        .where(and(eq(stocks.id, stockId), eq(stocks.artisanId, ctx.artisanId)));
+
+      await tx.insert(mouvementsStock).values({
+        stockId,
+        type: input.type,
+        quantite: delta.toFixed(2),
+        quantiteAvant: avant.toFixed(2),
+        quantiteApres: apres,
+        motif: input.motif ?? defaultMotif(input.type),
+        reference: input.reference ?? null,
+      });
+
+      const [updated] = await tx
+        .select()
+        .from(stocks)
+        .where(and(eq(stocks.id, stockId), eq(stocks.artisanId, ctx.artisanId)))
+        .limit(1);
+      return { status: "ok", stock: toStock(updated) };
+    });
+  }
+
+  listMouvements(ctx: TenantContext, stockId: number): Promise<MouvementStock[] | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Scope via le stock parent (mouvements_stock SANS artisanId) : null si hors tenant.
+      const [owned] = await tx
+        .select({ id: stocks.id })
+        .from(stocks)
+        .where(and(eq(stocks.id, stockId), eq(stocks.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!owned) return null;
+      const rows = await tx
+        .select()
+        .from(mouvementsStock)
+        .where(eq(mouvementsStock.stockId, stockId))
+        .orderBy(desc(mouvementsStock.createdAt), desc(mouvementsStock.id));
+      return rows.map(toMouvement);
     });
   }
 }

@@ -10,6 +10,8 @@ const stubRepo: IStockRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  adjustQuantity: async () => ({ status: "not_found" }),
+  listMouvements: async () => null,
 };
 
 describe("stocks.module", () => {
@@ -19,12 +21,28 @@ describe("stocks.module", () => {
   });
 
   it("le port expose les opérations attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "adjustQuantity",
+      "create",
+      "delete",
+      "getById",
+      "list",
+      "listMouvements",
+      "update",
+    ]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createStocksModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual([
+      "adjustQuantity",
+      "create",
+      "delete",
+      "getById",
+      "getMouvements",
+      "list",
+      "update",
+    ]);
   });
 });

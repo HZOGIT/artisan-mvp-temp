@@ -140,4 +140,51 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
     expect(maj.reference).toBe("PART");
     expect(maj.emplacement).toBe("Allée 1");
   });
+
+  it("adjustQuantity : entrée incrémente + mouvement tracé (avant/après) ; sortie décrémente", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "stocks.create", { reference: "MV", designation: "Mvt", quantiteEnStock: "10" }, tA)).json().result.data.id as number;
+    const entree = await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "entree", quantite: "5", motif: "Réappro" }, tA);
+    expect(entree.statusCode).toBe(200);
+    expect(entree.json().result.data.quantiteEnStock).toBe("15.00");
+    const sortie = await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "sortie", quantite: "4" }, tA);
+    expect(sortie.json().result.data.quantiteEnStock).toBe("11.00");
+    const mvts = (await callQuery(server, "stocks.getMouvements", { stockId: id }, tA)).json().result.data as Array<{ type: string; quantiteAvant: string; quantiteApres: string }>;
+    expect(mvts.length).toBe(2);
+    expect(mvts[0].type).toBe("sortie"); // récents d'abord
+    expect(mvts[0].quantiteAvant).toBe("15.00");
+    expect(mvts[0].quantiteApres).toBe("11.00");
+  });
+
+  it("adjustQuantity : sortie > stock → 400 (quantité jamais négative, aucun mouvement)", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "stocks.create", { reference: "NEG", designation: "Garde-fou", quantiteEnStock: "3" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "sortie", quantite: "5" }, tA)).statusCode).toBe(400);
+    expect((await callQuery(server, "stocks.getById", { id }, tA)).json().result.data.quantiteEnStock).toBe("3.00");
+    expect((await callQuery(server, "stocks.getMouvements", { stockId: id }, tA)).json().result.data).toEqual([]);
+  });
+
+  it("adjustQuantity : deux entrées successives cumulent (anti double-comptage)", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "stocks.create", { reference: "CUM", designation: "Cumul", quantiteEnStock: "0" }, tA)).json().result.data.id as number;
+    await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "entree", quantite: "7" }, tA);
+    const second = await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "entree", quantite: "3" }, tA);
+    expect(second.json().result.data.quantiteEnStock).toBe("10.00");
+  });
+
+  it("isolation cross-tenant : B ne peut ni ajuster ni lire les mouvements du stock de A → 404 / vide", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "stocks.create", { reference: "ISO", designation: "Isolé", quantiteEnStock: "20" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "entree", quantite: "1" }, tB)).statusCode).toBe(404);
+    expect((await callQuery(server, "stocks.getMouvements", { stockId: id }, tB)).statusCode).toBe(404);
+    // le stock de A n'a pas bougé
+    expect((await callQuery(server, "stocks.getById", { id }, tA)).json().result.data.quantiteEnStock).toBe("20.00");
+  });
+
+  it("adjustQuantity : quantité de mouvement négative refusée par zod → 400", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "stocks.create", { reference: "ZB", designation: "Borne", quantiteEnStock: "5" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "stocks.adjustQuantity", { stockId: id, type: "entree", quantite: "-2" }, tA)).statusCode).toBe(400);
+  });
 });

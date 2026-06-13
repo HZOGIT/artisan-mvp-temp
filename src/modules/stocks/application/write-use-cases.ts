@@ -1,7 +1,7 @@
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IStockRepository } from "./stock-repository";
-import type { Stock, CreateStockInput, UpdateStockInput } from "../domain/stock";
+import type { Stock, CreateStockInput, UpdateStockInput, AdjustStockInput } from "../domain/stock";
 
 // Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible : la quantité n'est
 // jamais modifiée ici (ni create au-delà de l'init, ni update) — seul un mouvement tracé
@@ -32,4 +32,21 @@ export async function modifierStock(
 export async function supprimerStock(repo: IStockRepository, ctx: TenantContext, id: number): Promise<void> {
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Stock introuvable");
+}
+
+// Ajuste la quantité d'un stock via un mouvement tracé — l'UNIQUE voie de modification de
+// la quantité (invariant d'audit). Une `sortie` qui rendrait le stock négatif est refusée.
+export async function ajusterQuantiteStock(
+  repo: IStockRepository,
+  ctx: TenantContext,
+  stockId: number,
+  input: AdjustStockInput,
+): Promise<Stock> {
+  if (Number(input.quantite) < 0) throw new ValidationError("Quantité du mouvement invalide");
+  const res = await repo.adjustQuantity(ctx, stockId, input);
+  if (res.status === "not_found") throw new NotFoundError("Stock introuvable");
+  if (res.status === "insufficient_stock") {
+    throw new ValidationError(`Stock insuffisant (disponible : ${res.disponible})`);
+  }
+  return res.stock;
 }
