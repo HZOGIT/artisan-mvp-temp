@@ -1,0 +1,29 @@
+import type { TenantContext } from "../../../shared/tenant";
+import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+
+// Port du repository badges. Chaque méthode exige le TenantContext (scope tenant + RLS).
+// Deux niveaux d'isolation :
+//  - `badges` possède un `artisanId` → RLS + filtre explicite ;
+//  - `badges_techniciens` n'en a pas → scope via l'appartenance du technicien (et du
+//    badge) au tenant. Toute attribution/lecture sur un technicien d'un autre artisan
+//    doit échouer (null) — anti-IDOR.
+export interface IBadgeRepository {
+  list(ctx: TenantContext): Promise<Badge[]>;
+  getById(ctx: TenantContext, id: number): Promise<Badge | null>;
+  create(ctx: TenantContext, input: CreateBadgeInput): Promise<Badge>;
+  // null si le badge n'appartient pas au tenant.
+  update(ctx: TenantContext, id: number, input: UpdateBadgeInput): Promise<Badge | null>;
+  // false si le badge n'appartient pas au tenant.
+  delete(ctx: TenantContext, id: number): Promise<boolean>;
+
+  // Badges attribués à un technicien — [] si le technicien n'appartient pas au tenant.
+  listBadgesTechnicien(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[]>;
+  // Attribue un badge à un technicien — null si technicien OU badge hors tenant.
+  // Idempotent : une attribution déjà existante (même technicien+badge) est renvoyée telle quelle.
+  attribuer(
+    ctx: TenantContext,
+    technicienId: number,
+    badgeId: number,
+    valeurAtteinte?: number | null,
+  ): Promise<BadgeTechnicien | null>;
+}
