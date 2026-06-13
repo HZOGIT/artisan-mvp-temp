@@ -7,7 +7,7 @@
 - **Stratégie data** : **PG-first** — toute la data staging migrée vers PostgreSQL 18 une fois (itération 0/Phase 0) ; l'ancien stack Express ET le nouveau stack pointent sur le même PG. Pas de re-migration par domaine. **MySQL coupé tôt** (dès que l'ancien stack tourne sur PG, validé) ; **l'ancien serveur** s'éteint à la fin (dernier domaine migré).
 - **Déploiement** : à chaque itération déployable → commit sur `staging`, `git push origin staging`, puis `task staging:deploy`. Cible : **staging uniquement** (`staging.operioz.com`), prod intouchée.
 - **Politique d'échec** : si tests rouges / deploy KO / migration KO → **notifier + s'arrêter** (PAS de rollback auto, PAS de modif d'état). L'humain inspecte.
-- **Cadence** : événementielle (reprise à la complétion du travail de fond) + **fallback ~10 min** (ScheduleWakeup).
+- **Cadence** : événementielle (reprise à la complétion du travail de fond) + **fallback 5 min / 300 s** (ScheduleWakeup) — demandé par l'humain le 2026-06-13.
 - **Notification** : `curl https://ntfy.sh/operioz-claude-code-2026` (topic **PUBLIC** → aucune donnée sensible, seulement état/refs/liens). Helper : `devtools/agents/ntfy-pub.sh "<titre>" "<msg>" [tags]`.
 - **DB cible** : PostgreSQL **18**. ORM : Drizzle (dialect `pg`). Tests : Vitest + PG18 jetable (Testcontainers).
 - **Tests** : refonte des anciens tests sprint en tests alignés clean archi (unit par use-case + e2e sur PG18) au fil des domaines.
@@ -41,5 +41,10 @@
 - **Cause racine** : le projet build via **esbuild** (`build:server`) qui **ne typecheck pas** → l'app tourne malgré les 672 erreurs ; `tsc --noEmit` n'a jamais été vert (pas de CI). Le gate « tsc vert sur tout le repo » est donc **irréaliste** comme préalable.
 - Fixes déjà appliqués (corrects, à garder) : `trpc.ts` (narrowing user dans requireRole/requirePermission) + `routers.ts:10022` (z.record zod v4). Ils réduisent le total mais ne le rendent pas vert (legacy massif).
 
+### P0.3 (OPE-189) — conversion schéma batch 1 — EN COURS (sous-batchs)
+Méthode : nouveau fichier **`drizzle/schema.pg.ts`** (pg-core) séparé du `schema.ts` mysql (legacy intact jusqu'au repoint P0.7). Gate code neuf = **`tsconfig.src.json`** (`pnpm exec tsc -p tsconfig.src.json`).
+- [x] **3a** — rails + 6 tables fondatrices : enums (user_role, artisan_specialite, forme_juridique, client_type) + `users, permissions_utilisateur, artisans, clients, sessions, audit_log`. tsc gate **vert**. Pattern : serial (PK, copie ids OK), numeric, $onUpdate, pgEnum, noms de colonnes identiques.
+- [ ] **3b** — reste du batch 1 (cœur facturation) : `bibliotheque_articles, articles_artisan, articles_fournisseurs, devis, devis_lignes, devis_options, devis_options_lignes, signatures_devis, factures, factures_lignes, parametres_artisan, modeles_devis, modeles_devis_lignes`.
+
 ### Prochaine action
-→ **P0.3 (OPE-189)** : conversion schéma Drizzle `mysqlTable`→`pgTable` batch 1 (plateforme + cœur facturation), en appliquant `ope-184-mapping-types-mysql-pg.md`. Rappel pièges : 71 enums → pgEnum, 32 onUpdateNow (gérer en repo / trigger), pas de FK à convertir.
+→ **P0.3b** : convertir les tables cœur facturation ci-dessus dans `drizzle/schema.pg.ts` (lire leurs défs dans `drizzle/schema.ts`, appliquer le mapping, garder le tsc gate vert). Puis P0.4 (batch 2), P0.5 (batch 3), P0.6 (générer la baseline migration PG).
