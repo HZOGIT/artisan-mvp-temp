@@ -31,7 +31,7 @@ describe("app Fastify (scaffold + tRPC)", () => {
 
   // Garde-fou bascule : chaque domaine du registre MIGRATED_DOMAINS est réellement monté
   // dans le nouveau stack (procédure `list` présente → 401 auth requise, pas 404 inexistant).
-  const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list", badges: "badges.list", techniciens: "techniciens.list", notifications: "notifications.list", fournisseurs: "fournisseurs.list", commandes: "commandes.list", stocks: "stocks.list", clients: "clients.list" };
+  const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list", badges: "badges.list", techniciens: "techniciens.list", notifications: "notifications.list", fournisseurs: "fournisseurs.list", commandes: "commandes.list", stocks: "stocks.list", clients: "clients.list", interventions: "interventions.list" };
   for (const domain of MIGRATED_DOMAINS) {
     it(`domaine migré « ${domain} » monté dans le nouveau stack (≠ 404)`, async () => {
       const res = await app.inject({ method: "GET", url: `/api/trpc/${sampleProcedure[domain]}` });
