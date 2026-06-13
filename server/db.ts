@@ -88,7 +88,7 @@ import {
   emailsLog, EmailLog, InsertEmailLog,
   aiThreads, aiMessages,
   interventionsMobile, photosInterventions,
-  depenses, budgetsCategories, categoriesDepenses,
+  depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -6937,36 +6937,27 @@ export async function getDepensesByArtisan(
   artisanId: number,
   filters: DepenseFilters = {}
 ): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const conds: string[] = ["artisan_id = ?"];
-  const params: any[] = [artisanId];
-  if (filters.categorie) { conds.push("categorie = ?"); params.push(filters.categorie); }
-  if (filters.statut) { conds.push("statut = ?"); params.push(filters.statut); }
-  if (filters.dateDebut) { conds.push("date_depense >= ?"); params.push(filters.dateDebut); }
-  if (filters.dateFin) { conds.push("date_depense <= ?"); params.push(filters.dateFin); }
-  if (filters.userId) { conds.push("user_id = ?"); params.push(filters.userId); }
-  if (filters.clientId) { conds.push("client_id = ?"); params.push(filters.clientId); }
+  const db = await getDb();
+  const conds: any[] = [eq(depenses.artisan_id, artisanId)];
+  if (filters.categorie) conds.push(eq(depenses.categorie, filters.categorie));
+  if (filters.statut) conds.push(eq(depenses.statut, filters.statut as any));
+  if (filters.dateDebut) conds.push(gte(depenses.date_depense, filters.dateDebut));
+  if (filters.dateFin) conds.push(lte(depenses.date_depense, filters.dateFin));
+  if (filters.userId) conds.push(eq(depenses.user_id, filters.userId));
+  if (filters.clientId) conds.push(eq(depenses.client_id, filters.clientId));
   if (filters.search) {
-    conds.push("(fournisseur LIKE ? OR description LIKE ? OR numero LIKE ?)");
     const q = `%${filters.search}%`;
-    params.push(q, q, q);
+    conds.push(or(like(depenses.fournisseur, q), like(depenses.description, q), like(depenses.numero, q)));
   }
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM depenses WHERE ${conds.join(" AND ")} ORDER BY date_depense DESC, id DESC LIMIT 500`,
-    params
-  );
-  return rows as any[];
+  return await db.select().from(depenses).where(and(...conds))
+    .orderBy(desc(depenses.date_depense), desc(depenses.id)).limit(500);
 }
 
 export async function getDepenseById(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [rows]: any = await pool.execute(
-    "SELECT * FROM depenses WHERE id = ? AND artisan_id = ? LIMIT 1",
-    [id, artisanId]
-  );
-  return (rows as any[])[0] || null;
+  const db = await getDb();
+  const [row] = await db.select().from(depenses)
+    .where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId))).limit(1);
+  return row || null;
 }
 
 // OPE-99 — détection de doublon probable d'une dépense (anti double-remboursement /
@@ -6978,26 +6969,20 @@ export async function findDepensesDoublons(
   artisanId: number,
   params: { montantTtc: number; dateDepense: string; fournisseur?: string | null; excludeId?: number },
 ): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const conds: string[] = [
-    "artisan_id = ?",
-    "ABS(montant_ttc - ?) < 0.01",
-    "date_depense = ?",
-    "COALESCE(fournisseur, '') = COALESCE(?, '')",
+  const db = await getDb();
+  const conds: any[] = [
+    eq(depenses.artisan_id, artisanId),
+    sql`ABS(${depenses.montant_ttc} - ${params.montantTtc}) < 0.01`,
+    eq(depenses.date_depense, params.dateDepense),
+    sql`COALESCE(${depenses.fournisseur}, '') = COALESCE(${params.fournisseur ?? ''}, '')`,
   ];
-  const sqlParams: any[] = [artisanId, params.montantTtc, params.dateDepense, params.fournisseur ?? ""];
-  if (params.excludeId) { conds.push("id != ?"); sqlParams.push(params.excludeId); }
-  const [rows]: any = await pool.execute(
-    `SELECT id, numero, montant_ttc AS montantTtc, date_depense AS dateDepense,
-            fournisseur, description, statut
-       FROM depenses
-      WHERE ${conds.join(" AND ")}
-      ORDER BY date_depense DESC, id DESC
-      LIMIT 10`,
-    sqlParams,
-  );
-  return rows as any[];
+  if (params.excludeId) conds.push(ne(depenses.id, params.excludeId));
+  return await db.select({
+    id: depenses.id, numero: depenses.numero, montantTtc: depenses.montant_ttc,
+    dateDepense: depenses.date_depense, fournisseur: depenses.fournisseur,
+    description: depenses.description, statut: depenses.statut,
+  }).from(depenses).where(and(...conds))
+    .orderBy(desc(depenses.date_depense), desc(depenses.id)).limit(10);
 }
 
 export async function createDepense(data: {
@@ -7024,29 +7009,22 @@ export async function createDepense(data: {
   justificatifNom?: string | null;
   tvaDeductible?: boolean;
 }): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT INTO depenses
-       (artisan_id, user_id, numero, date_depense, fournisseur, categorie,
-        sous_categorie, description, montant_ht, taux_tva, montant_tva,
-        montant_ttc, mode_paiement, statut, remboursable, chantier_id,
-        intervention_id, client_id, notes, justificatif_url,
-        justificatif_nom, tva_deductible)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.artisanId, data.userId, data.numero, data.dateDepense,
-      data.fournisseur || null, data.categorie, data.sousCategorie || null,
-      data.description || null, data.montantHt, data.tauxTva, data.montantTva,
-      data.montantTtc, data.modePaiement || "carte", data.statut || "brouillon",
-      data.remboursable ?? true, data.chantierId || null,
-      data.interventionId || null, data.clientId || null, data.notes || null,
-      data.justificatifUrl || null, data.justificatifNom || null,
-      data.tvaDeductible ?? true,
-    ]
-  );
-  if (!r?.insertId) return null;
-  return getDepenseById(r.insertId, data.artisanId);
+  const db = await getDb();
+  const newId = await insertReturningId(depenses, {
+    artisan_id: data.artisanId, user_id: data.userId, numero: data.numero,
+    date_depense: data.dateDepense, fournisseur: data.fournisseur || null,
+    categorie: data.categorie, sous_categorie: data.sousCategorie || null,
+    description: data.description || null,
+    montant_ht: String(data.montantHt), taux_tva: String(data.tauxTva),
+    montant_tva: String(data.montantTva), montant_ttc: String(data.montantTtc),
+    mode_paiement: (data.modePaiement || "carte") as any, statut: (data.statut || "brouillon") as any,
+    remboursable: data.remboursable ?? true, chantier_id: data.chantierId || null,
+    intervention_id: data.interventionId || null, client_id: data.clientId || null,
+    notes: data.notes || null, justificatif_url: data.justificatifUrl || null,
+    justificatif_nom: data.justificatifNom || null, tva_deductible: data.tvaDeductible ?? true,
+  });
+  if (!newId) return null;
+  return getDepenseById(newId, data.artisanId);
 }
 
 const DEPENSE_FIELD_MAP: Record<string, string> = {
@@ -7074,23 +7052,16 @@ export async function updateDepense(
   artisanId: number,
   data: Record<string, any>
 ): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const sets: string[] = [];
-  const vals: any[] = [];
+  const db = await getDb();
+  const numericCols = new Set(["montant_ht", "taux_tva", "montant_tva", "montant_ttc"]);
+  const sets: any = {};
   for (const [key, val] of Object.entries(data)) {
     const col = DEPENSE_FIELD_MAP[key];
-    if (!col) continue;
-    sets.push(`${col} = ?`);
-    vals.push(val);
+    if (!col) continue; // whitelist OPE-63 préservée
+    sets[col] = (numericCols.has(col) && val != null) ? String(val) : val;
   }
-  if (sets.length > 0) {
-    // Recalcul TVA/TTC si HT ou taux changent.
-    vals.push(id, artisanId);
-    await pool.execute(
-      `UPDATE depenses SET ${sets.join(", ")} WHERE id = ? AND artisan_id = ?`,
-      vals
-    );
+  if (Object.keys(sets).length > 0) {
+    await db.update(depenses).set(sets).where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
   }
   // Recalcul TVA/TTC dès qu'un champ monétaire est touché (OPE-252) : la TVA et le
   // TTC sont TOUJOURS dérivés du HT + taux (le formulaire est HT-first), donc on ne
@@ -7104,20 +7075,17 @@ export async function updateDepense(
       const tx = Number(dep.taux_tva || 0);
       const tva = +(ht * tx / 100).toFixed(2);
       const ttc = +(ht + tva).toFixed(2);
-      await pool.execute(
-        `UPDATE depenses SET montant_tva = ?, montant_ttc = ? WHERE id = ? AND artisan_id = ?`,
-        [tva, ttc, id, artisanId]
-      );
+      await db.update(depenses).set({ montant_tva: String(tva), montant_ttc: String(ttc) })
+        .where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
     }
   }
   return getDepenseById(id, artisanId);
 }
 
 export async function deleteDepense(id: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(`DELETE FROM notes_frais_depenses WHERE depense_id = ?`, [id]);
-  await pool.execute(`DELETE FROM depenses WHERE id = ? AND artisan_id = ?`, [id, artisanId]);
+  const db = await getDb();
+  await db.delete(notesFraisDepenses).where(eq(notesFraisDepenses.depense_id, id));
+  await db.delete(depenses).where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
 }
 
 export async function markDepenseOcrTraite(id: number, artisanId: number, ocrData: any): Promise<void> {
