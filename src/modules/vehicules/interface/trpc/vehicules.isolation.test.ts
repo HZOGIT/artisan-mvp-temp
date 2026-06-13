@@ -74,7 +74,7 @@ describe.skipIf(!URL)("vehicules — isolation cross-tenant systématique (toute
   const get = (path: string, input: unknown) =>
     server.inject({
       method: "GET",
-      url: `/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
+      url: input === undefined ? `/api/trpc/${path}` : `/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
       headers: { cookie: `token=${tokenB}` },
     });
 
@@ -89,9 +89,14 @@ describe.skipIf(!URL)("vehicules — isolation cross-tenant systématique (toute
     ["mutation", "vehicules.addEntretien", () => ({ vehiculeId: vehiculeDeA, data: { type: "vidange", dateEntretien: "2026-06-01" } })],
     ["query", "vehicules.getAssurances", () => ({ vehiculeId: vehiculeDeA })],
     ["mutation", "vehicules.addAssurance", () => ({ vehiculeId: vehiculeDeA, data: { compagnie: "X", dateDebut: "2026-01-01", dateFin: "2026-12-31" } })],
+    ["mutation", "vehicules.addKilometrage", () => ({ vehiculeId: vehiculeDeA, kilometrage: 100, dateReleve: "2026-06-01" })],
+    ["query", "vehicules.getHistoriqueKilometrage", () => ({ vehiculeId: vehiculeDeA })],
   ] as const)("B → %s %s sur la ressource de A est refusé (404 ou liste vide)", async (kind, path, mkInput) => {
     const res = kind === "query" ? await get(path, mkInput()) : await post(path, mkInput());
-    const returnsEmptyList = path === "vehicules.getEntretiens" || path === "vehicules.getAssurances";
+    const returnsEmptyList =
+      path === "vehicules.getEntretiens" ||
+      path === "vehicules.getAssurances" ||
+      path === "vehicules.getHistoriqueKilometrage";
     if (returnsEmptyList) {
       // Lecture par vehiculeId d'un véhicule non owné → [] (le véhicule n'appartient pas à B).
       expect(res.statusCode).toBe(200);
@@ -106,5 +111,20 @@ describe.skipIf(!URL)("vehicules — isolation cross-tenant systématique (toute
     expect(row?.immatriculation).toBe("ISO-1");
     expect(row?.id).toBe(vehiculeDeA);
     void aId;
+  });
+
+  it("les lectures « flotte » de B ne fuient pas la flotte de A", async () => {
+    // B n'a aucun véhicule → stats à 0, listes dérivées vides (pas de fuite du véhicule de A).
+    const stats = await get("vehicules.getStatistiquesFlotte", undefined);
+    expect(stats.statusCode).toBe(200);
+    expect(stats.json().result.data.nbVehicules).toBe(0);
+
+    const aVenir = await get("vehicules.getEntretiensAVenir", undefined);
+    expect(aVenir.statusCode).toBe(200);
+    expect(aVenir.json().result.data).toEqual([]);
+
+    const expirant = await get("vehicules.getAssurancesExpirant", { joursAvant: 60 });
+    expect(expirant.statusCode).toBe(200);
+    expect(expirant.json().result.data).toEqual([]);
   });
 });
