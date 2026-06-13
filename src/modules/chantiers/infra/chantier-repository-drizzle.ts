@@ -1,5 +1,13 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { chantiers, clients } from "../../../../drizzle/schema.pg";
+import {
+  chantiers,
+  clients,
+  phasesChantier,
+  interventionsChantier,
+  documentsChantier,
+  suiviChantier,
+  pointagesChantier,
+} from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -85,6 +93,24 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
+      // Vérifie l'appartenance AVANT de purger les sous-ressources (tables enfants scopées via
+      // le chantier, sans artisanId propre pour certaines) → on ne supprime pas celles d'un
+      // autre tenant. Cascade atomique = parité legacy deleteChantier (évite des lignes
+      // orphelines pointant un chantierId supprimé). Le périmètre fonctionnel de ces
+      // sous-ressources (CRUD phases/pointages/documents/suivi/associations) reste à migrer.
+      const [owned] = await tx
+        .select({ id: chantiers.id })
+        .from(chantiers)
+        .where(and(eq(chantiers.id, id), eq(chantiers.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!owned) return false;
+
+      await tx.delete(documentsChantier).where(eq(documentsChantier.chantierId, id));
+      await tx.delete(interventionsChantier).where(eq(interventionsChantier.chantierId, id));
+      await tx.delete(phasesChantier).where(eq(phasesChantier.chantierId, id));
+      await tx.delete(suiviChantier).where(eq(suiviChantier.chantierId, id));
+      await tx.delete(pointagesChantier).where(eq(pointagesChantier.chantierId, id));
+
       const deleted = await tx
         .delete(chantiers)
         .where(and(eq(chantiers.id, id), eq(chantiers.artisanId, ctx.artisanId)))

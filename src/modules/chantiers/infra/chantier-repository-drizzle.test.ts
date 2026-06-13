@@ -82,4 +82,16 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.ownsClient(ctx(B), clientA)).toBe(false); // client de A, vu depuis B
     expect(await repo.ownsClient(ctx(A), 987654321)).toBe(false); // inexistant
   });
+
+  it("delete : cascade les sous-ressources (phases/documents…) — pas de lignes orphelines", async () => {
+    const c = await repo.create(ctx(A), { clientId: clientA, reference: ref(), nom: "Avec sous-ressources" });
+    await admin.query('insert into phases_chantier ("chantierId",nom) values ($1,$2),($1,$3)', [c.id, "Phase 1", "Phase 2"]);
+    await admin.query('insert into documents_chantier ("chantierId",nom,url) values ($1,$2,$3)', [c.id, "Plan", "https://x/plan.pdf"]);
+    expect(await repo.delete(ctx(A), c.id)).toBe(true);
+    expect(await repo.getById(ctx(A), c.id)).toBeNull();
+    const phases = await admin.query('select count(*)::int as n from phases_chantier where "chantierId"=$1', [c.id]);
+    const docs = await admin.query('select count(*)::int as n from documents_chantier where "chantierId"=$1', [c.id]);
+    expect(phases.rows[0].n).toBe(0);
+    expect(docs.rows[0].n).toBe(0);
+  });
 });
