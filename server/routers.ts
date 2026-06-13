@@ -2291,7 +2291,7 @@ const interventionsRouter = router({
     }),
   
   getUpcoming: protectedProcedure
-    .input(z.object({ limit: z.number().default(5) }).optional())
+    .input(z.object({ limit: z.number().max(100).default(5) }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -2739,7 +2739,7 @@ const dashboardRouter = router({
   }),
 
   getRecentActivity: protectedProcedure
-    .input(z.object({ limit: z.number().optional() }).optional())
+    .input(z.object({ limit: z.number().max(500).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -2808,7 +2808,7 @@ const dashboardRouter = router({
   }),
   
   getTopClients: protectedProcedure
-    .input(z.object({ limit: z.number().optional() }).optional())
+    .input(z.object({ limit: z.number().max(500).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -6787,7 +6787,7 @@ const rapportsRouter = router({
     }),
 
   historique: protectedProcedure
-    .input(z.object({ rapportId: z.number(), limit: z.number().default(10) }))
+    .input(z.object({ rapportId: z.number(), limit: z.number().max(500).default(10) }))
     .query(async ({ ctx, input }) => {
       await assertRapportOwner(input.rapportId, ctx.user.id);
       return await db.getHistoriqueExecutions(input.rapportId, input.limit);
@@ -6862,7 +6862,7 @@ const notificationsPushRouter = router({
     }),
 
   getHistorique: protectedProcedure
-    .input(z.object({ technicienId: z.number(), limit: z.number().default(50) }))
+    .input(z.object({ technicienId: z.number(), limit: z.number().max(500).default(50) }))
     .query(async ({ ctx, input }) => {
       await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.getHistoriqueNotificationsPush(input.technicienId, input.limit);
@@ -8558,7 +8558,7 @@ const statistiquesRouter = router({
     }),
 
   getTopClients: protectedProcedure
-    .input(z.object({ limit: z.number().optional() }).optional())
+    .input(z.object({ limit: z.number().max(500).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
