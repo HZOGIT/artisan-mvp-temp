@@ -7456,6 +7456,73 @@ export async function deleteRegleCategorisation(id: number, artisanId: number): 
     .where(and(eq(reglesCategorisation.id, id), eq(reglesCategorisation.artisan_id, artisanId)));
 }
 
+// === Scheduler (T5) : dépenses récurrentes — port FINANCIER en Drizzle ===
+
+// Pour chaque dépense récurrente échue (prochaine_occurrence <= aujourd'hui), crée une
+// copie datée du jour (statut brouillon, recurrente=FALSE, nouveau numéro) et avance
+// prochaine_occurrence selon la fréquence. Idempotent : l'avance empêche les doublons
+// si le scheduler retourne le même jour. Renvoie le nb de dépenses créées.
+export async function genererDepensesRecurrentes(): Promise<number> {
+  const dbi = await getDb();
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await dbi.select({
+    id: depenses.id, artisan_id: depenses.artisan_id, user_id: depenses.user_id,
+    fournisseur: depenses.fournisseur, categorie: depenses.categorie, sous_categorie: depenses.sous_categorie,
+    description: depenses.description, montant_ht: depenses.montant_ht, taux_tva: depenses.taux_tva,
+    montant_tva: depenses.montant_tva, montant_ttc: depenses.montant_ttc, mode_paiement: depenses.mode_paiement,
+    remboursable: depenses.remboursable, chantier_id: depenses.chantier_id, intervention_id: depenses.intervention_id,
+    client_id: depenses.client_id, notes: depenses.notes, tva_deductible: depenses.tva_deductible,
+    frequence_recurrence: depenses.frequence_recurrence, prochaine_occurrence: depenses.prochaine_occurrence,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.recurrente, true),
+      isNotNull(depenses.prochaine_occurrence),
+      lte(depenses.prochaine_occurrence, today),
+    ))
+    .limit(50);
+
+  let nbCreated = 0;
+  for (const d of rows) {
+    try {
+      const numero = await getNextDepenseNumero(d.artisan_id as number);
+      // Copie exacte des montants (HT/TVA/TTC) à la date du jour, statut brouillon, non récurrente.
+      await dbi.insert(depenses).values({
+        artisan_id: d.artisan_id, user_id: d.user_id, numero, date_depense: today,
+        fournisseur: d.fournisseur, categorie: d.categorie, sous_categorie: d.sous_categorie,
+        description: d.description, montant_ht: d.montant_ht, taux_tva: d.taux_tva,
+        montant_tva: d.montant_tva, montant_ttc: d.montant_ttc, mode_paiement: d.mode_paiement as any,
+        statut: "brouillon" as any, remboursable: d.remboursable, chantier_id: d.chantier_id,
+        intervention_id: d.intervention_id, client_id: d.client_id, notes: d.notes,
+        tva_deductible: d.tva_deductible, recurrente: false,
+      } as any);
+
+      // Avance prochaine_occurrence selon la fréquence (DATE_ADD → JS, clamp fin de mois).
+      const cur = new Date(d.prochaine_occurrence as string);
+      let next: Date;
+      if (d.frequence_recurrence === "hebdomadaire" as any) next = new Date(cur.getTime() + 7 * 24 * 3600 * 1000);
+      else if (d.frequence_recurrence === "trimestrielle") next = addMonthsClamped(cur, 3);
+      else if (d.frequence_recurrence === "annuelle") next = addMonthsClamped(cur, 12);
+      else next = addMonthsClamped(cur, 1); // mensuelle par défaut
+      await dbi.update(depenses).set({ prochaine_occurrence: next.toISOString().slice(0, 10) })
+        .where(eq(depenses.id, d.id));
+
+      // Notification à l'artisan (best-effort).
+      try {
+        await dbi.insert(notifications).values({
+          artisanId: d.artisan_id as number, type: "info" as any,
+          titre: `Dépense récurrente créée : ${d.fournisseur || d.categorie}`,
+          message: `${numero} — ${Number(d.montant_ttc).toLocaleString("fr-FR")} EUR — créée automatiquement aujourd'hui.`,
+          lien: "/depenses", lu: false,
+        } as any);
+      } catch { /* table notifications absente : ok */ }
+      nbCreated++;
+    } catch (errIn: any) {
+      console.warn(`[Scheduler] depense recurrente ${d.id} :`, errIn?.message);
+    }
+  }
+  return nbCreated;
+}
+
 // === Scheduler (T5) : expiration trials + destinataires emails — portés en Drizzle ===
 
 // Bascule les trials échus en 'expired' (status + plan). Renvoie le nb de lignes touchées.
