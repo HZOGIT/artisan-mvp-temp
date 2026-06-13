@@ -61,6 +61,9 @@ export class FakeVehiculeRepository implements IVehiculeRepository {
   async delete(ctx: TenantContext, id: number): Promise<boolean> {
     const v = await this.getById(ctx, id);
     if (!v) return false;
+    // Cascade : historique d'abord, puis le véhicule (cohérent avec l'impl Drizzle).
+    this.entretiensStore = this.entretiensStore.filter((e) => e.vehiculeId !== id);
+    this.assurancesStore = this.assurancesStore.filter((a) => a.vehiculeId !== id);
     this.vehiculesStore = this.vehiculesStore.filter((x) => x.id !== id);
     return true;
   }
