@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation, useSearch } from "wouter";
-import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2, FileDown } from "lucide-react";
+import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2, FileDown, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { StatutBadge } from "@/components/StatutBadge";
@@ -104,6 +104,15 @@ export default function Interventions() {
 
   // OPE-111 — équipe d'intervention (plusieurs intervenants additionnels)
   const { data: techniciensList } = trpc.techniciens.getAll.useQuery();
+  // OPE-111 — toutes les équipes (1 requête) → map interventionId → membres, pour
+  // afficher l'équipe sur chaque ligne du planning sans N+1.
+  const { data: equipesByArtisan } = trpc.interventions.getEquipesByArtisan.useQuery();
+  const equipeParIntervention = new Map<number, any[]>();
+  for (const m of equipesByArtisan || []) {
+    const arr = equipeParIntervention.get(m.interventionId) || [];
+    arr.push(m);
+    equipeParIntervention.set(m.interventionId, arr);
+  }
   const [membreToAdd, setMembreToAdd] = useState<string>("");
   const { data: equipe } = trpc.interventions.getEquipe.useQuery(
     { interventionId: selectedIntervention?.id ?? 0 },
@@ -485,7 +494,20 @@ export default function Interventions() {
             <tbody>
               {filteredInterventions.map((intervention: any) => (
                 <tr key={intervention.id}>
-                  <td className="font-medium">{intervention.titre}</td>
+                  <td className="font-medium">
+                    {intervention.titre}
+                    {/* OPE-111 — équipe (intervenants additionnels) */}
+                    {(equipeParIntervention.get(intervention.id)?.length ?? 0) > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {equipeParIntervention.get(intervention.id)!.map((m: any) => (
+                          <Badge key={m.technicienId} variant="secondary" className="text-[10px] font-normal gap-1">
+                            <Users className="h-2.5 w-2.5" />
+                            {[m.prenom, m.nom].filter(Boolean).join(" ") || `Tech #${m.technicienId}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap">
                     {intervention.dateDebut
                       ? format(new Date(intervention.dateDebut), "dd/MM/yyyy HH:mm", { locale: fr })

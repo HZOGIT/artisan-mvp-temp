@@ -2387,6 +2387,13 @@ const interventionsRouter = router({
       return await db.getEquipeIntervention(input.interventionId, artisan.id);
     }),
 
+  // OPE-111 — toutes les équipes de l'artisan en 1 requête (affichage liste/planning).
+  getEquipesByArtisan: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getEquipesByArtisan(artisan.id);
+  }),
+
   ajouterMembreEquipe: protectedProcedure
     .input(z.object({
       interventionId: z.number(),

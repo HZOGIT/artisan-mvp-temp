@@ -1194,6 +1194,27 @@ export async function getEquipeIntervention(
   return rows;
 }
 
+// OPE-111 — toutes les liaisons d'équipe de l'artisan (1 requête), pour afficher
+// l'équipe sur la liste/planning sans N+1. Scopé tenant.
+export async function getEquipesByArtisan(
+  artisanId: number,
+): Promise<Array<{ interventionId: number; technicienId: number; role: string | null; nom: string | null; prenom: string | null }>> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      interventionId: interventionsTechniciens.interventionId,
+      technicienId: interventionsTechniciens.technicienId,
+      role: interventionsTechniciens.role,
+      nom: techniciens.nom,
+      prenom: techniciens.prenom,
+    })
+    .from(interventionsTechniciens)
+    .leftJoin(techniciens, eq(interventionsTechniciens.technicienId, techniciens.id))
+    .where(eq(interventionsTechniciens.artisanId, artisanId))
+    .orderBy(asc(interventionsTechniciens.id));
+  return rows;
+}
+
 // Ajoute un membre à l'équipe (idempotent : ignore un doublon intervention+technicien).
 export async function addMembreEquipe(data: {
   artisanId: number;
