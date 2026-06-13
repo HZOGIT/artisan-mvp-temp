@@ -1,5 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
-import { conges } from "../../../../drizzle/schema.pg";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { conges, techniciens } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -87,6 +87,16 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
         .where(and(eq(conges.id, id), eq(conges.artisanId, ctx.artisanId)))
         .returning({ id: conges.id });
       return deleted.length > 0;
+    });
+  }
+
+  ownsTechnicien(ctx: TenantContext, technicienId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(techniciens)
+        .where(and(eq(techniciens.id, technicienId), eq(techniciens.artisanId, ctx.artisanId)));
+      return (row?.n ?? 0) > 0;
     });
   }
 }

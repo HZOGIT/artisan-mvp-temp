@@ -8,6 +8,13 @@ import type { Conge, CreateCongeInput, UpdateCongeInput } from "../domain/conge"
 export class FakeCongeRepository implements ICongeRepository {
   private store: Conge[] = [];
   private seq = 0;
+  // Techniciens appartenant à un tenant (injectable) : clé `${artisanId}:${technicienId}`.
+  private ownedTechniciens = new Set<string>();
+
+  // Aide de test : déclare qu'un technicien appartient au tenant.
+  registerTechnicien(artisanId: number, technicienId: number): void {
+    this.ownedTechniciens.add(`${artisanId}:${technicienId}`);
+  }
 
   async list(ctx: TenantContext): Promise<Conge[]> {
     return this.store.filter((c) => c.artisanId === ctx.artisanId);
@@ -54,5 +61,9 @@ export class FakeCongeRepository implements ICongeRepository {
     if (!c) return false;
     this.store = this.store.filter((x) => x.id !== id);
     return true;
+  }
+
+  async ownsTechnicien(ctx: TenantContext, technicienId: number): Promise<boolean> {
+    return this.ownedTechniciens.has(`${ctx.artisanId}:${technicienId}`);
   }
 }

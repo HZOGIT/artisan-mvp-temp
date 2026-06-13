@@ -72,4 +72,10 @@ describe.skipIf(!URL)("CongeRepositoryDrizzle (PG, RLS + scope tenant)", () => {
     expect(await repo.delete(ctx(A), c.id)).toBe(true);
     expect(await repo.getById(ctx(A), c.id)).toBeNull();
   });
+
+  it("ownsTechnicien (anti-IDOR-FK) : un technicien reconnu pour son tenant, pas pour un autre", async () => {
+    expect(await repo.ownsTechnicien(ctx(A), techA)).toBe(true);
+    expect(await repo.ownsTechnicien(ctx(B), techA)).toBe(false); // technicien de A, vu depuis B
+    expect(await repo.ownsTechnicien(ctx(A), 987654321)).toBe(false); // inexistant
+  });
 });

@@ -10,6 +10,7 @@ const stubRepo: ICongeRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  ownsTechnicien: async () => false,
 };
 
 describe("conges.module", () => {
@@ -19,6 +20,6 @@ describe("conges.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsTechnicien", "update"]);
   });
 });
