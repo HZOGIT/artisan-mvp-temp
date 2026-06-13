@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 // OPE-184 P0.7 — bascule PG-first : pool/driver Postgres optionnel (DB_DIALECT=postgresql).
 import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import { Pool as PgPool } from "pg";
-import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne, getTableColumns } from "drizzle-orm";
+import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne, getTableColumns, notExists } from "drizzle-orm";
 import { 
   users, User, InsertUser,
   artisans, Artisan, InsertArtisan,
@@ -6506,8 +6506,7 @@ export async function genererExportFEC(
   // FEC (Fichier des Ecritures Comptables, format reglementaire FR) :
   // 1 ligne d'entete + 1 ligne par ecriture comptable.
   // Source : factures payees + factures de la periode.
-  const pool = getPool();
-  if (!pool) return "";
+  const dbi = await getDb();
   const config = await getConfigurationComptable(artisanId);
   const compteVentes = config?.compteVentes || "706000";
   const compteTVA = config?.compteTVACollectee || "445710";
@@ -6516,18 +6515,18 @@ export async function genererExportFEC(
 
   const dStr = dateDebut.toISOString().slice(0, 10);
   const fStr = dateFin.toISOString().slice(0, 10);
-  const [factures]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.dateFacture, f.totalHT, f.totalTVA, f.totalTTC,
-            f.statut, f.datePaiement,
-            c.nom AS clientNom, c.prenom AS clientPrenom
-       FROM factures f
-       LEFT JOIN clients c ON c.id = f.clientId
-      WHERE f.artisanId = ?
-        AND f.dateFacture BETWEEN ? AND ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-      ORDER BY f.dateFacture ASC, f.id ASC`,
-    [artisanId, dStr, fStr]
-  );
+  const facts: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalHT: factures.totalHT, totalTVA: factures.totalTVA, totalTTC: factures.totalTTC,
+    statut: factures.statut, datePaiement: factures.datePaiement,
+    clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`${factures.dateFacture} BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .orderBy(asc(factures.dateFacture), asc(factures.id));
 
   // Entete FEC (18 colonnes obligatoires).
   const header = [
@@ -6539,7 +6538,7 @@ export async function genererExportFEC(
 
   const rows: string[] = [header];
   let ecritureNum = 1;
-  for (const f of factures as any[]) {
+  for (const f of facts) {
     const dateF = new Date(f.dateFacture).toISOString().slice(0, 10).replace(/-/g, "");
     const clientLib = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client #${f.id}`;
     const ttc = fecAmount(f.totalTTC);
@@ -6561,28 +6560,27 @@ export async function genererExportIIF(
 ): Promise<string> {
   // IIF (Intuit Interchange Format pour QuickBooks). Format ligne par
   // ligne avec sections !TRNS / !SPL / !ENDTRNS.
-  const pool = getPool();
-  if (!pool) return "";
+  const dbi = await getDb();
 
   const dStr = dateDebut.toISOString().slice(0, 10);
   const fStr = dateFin.toISOString().slice(0, 10);
-  const [factures]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.dateFacture, f.totalHT, f.totalTVA, f.totalTTC,
-            c.nom AS clientNom, c.prenom AS clientPrenom
-       FROM factures f
-       LEFT JOIN clients c ON c.id = f.clientId
-      WHERE f.artisanId = ?
-        AND f.dateFacture BETWEEN ? AND ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-      ORDER BY f.dateFacture ASC`,
-    [artisanId, dStr, fStr]
-  );
+  const facts: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalHT: factures.totalHT, totalTVA: factures.totalTVA, totalTTC: factures.totalTTC,
+    clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`${factures.dateFacture} BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .orderBy(asc(factures.dateFacture));
 
   const lines: string[] = [];
   lines.push("!TRNS\tTRNSID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO");
   lines.push("!SPL\tSPLID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO");
   lines.push("!ENDTRNS");
-  for (const f of factures as any[]) {
+  for (const f of facts) {
     const dateF = new Date(f.dateFacture).toLocaleDateString("en-US");
     const client = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client #${f.id}`;
     const ttc = Number(f.totalTTC).toFixed(2);
@@ -6598,24 +6596,27 @@ export async function genererExportIIF(
 
 // Items en attente de sync (factures non encore exportees vers le logiciel).
 export async function getPendingItemsComptables(artisanId: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const [rows]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.dateFacture, f.totalTTC, f.statut
-       FROM factures f
-      WHERE f.artisanId = ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-        AND NOT EXISTS (
-          SELECT 1 FROM exports_comptables e
-           WHERE e.artisanId = f.artisanId
-             AND e.statut = 'termine'
-             AND f.dateFacture BETWEEN e.periodeDebut AND e.periodeFin
-        )
-      ORDER BY f.dateFacture DESC
-      LIMIT 200`,
-    [artisanId]
-  );
-  return (rows as any[]) || [];
+  const dbi = await getDb();
+  // Factures de l'artisan non couvertes par un export 'termine' chevauchant leur date.
+  // NOT EXISTS corrélé porté en Drizzle (la corrélation f.dateFacture BETWEEN
+  // e.periodeDebut AND e.periodeFin reste en sql brut, neutre dialecte).
+  return await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalTTC: factures.totalTTC, statut: factures.statut,
+  }).from(factures)
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+      notExists(
+        dbi.select({ x: sql`1` }).from(exportsComptables).where(and(
+          eq(exportsComptables.artisanId, factures.artisanId),
+          eq(exportsComptables.statut, "termine" as any),
+          sql`${factures.dateFacture} BETWEEN ${exportsComptables.periodeDebut} AND ${exportsComptables.periodeFin}`,
+        )),
+      ),
+    ))
+    .orderBy(desc(factures.dateFacture))
+    .limit(200);
 }
 
 export async function getSyncLogsComptables(artisanId: number): Promise<ExportComptable[]> {
@@ -6646,14 +6647,10 @@ export async function lancerSynchronisationComptable(
     nombreEcritures: items.length,
     statut: "termine",
   });
-  // Met a jour derniereSync.
-  const pool = getPool();
-  if (pool) {
-    await pool.execute(
-      `UPDATE configurations_comptables SET derniereSync = NOW() WHERE artisanId = ?`,
-      [artisanId]
-    );
-  }
+  // Met a jour derniereSync (NOW() -> Date JS).
+  const dbi = await getDb();
+  await dbi.update(configurationsComptables).set({ derniereSync: new Date() })
+    .where(eq(configurationsComptables.artisanId, artisanId));
   return { success: true, nbItems: items.length, message: `${items.length} ecritures synchronisees` };
 }
 
