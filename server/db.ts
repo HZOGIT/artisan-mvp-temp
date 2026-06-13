@@ -4133,6 +4133,12 @@ export async function getRdvPendingCount(artisanId: number): Promise<number> {
 
 export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Date): Promise<{ dateDebut: Date; dateFin: Date | null }[]> {
   const db = await getDb();
+  // OPE-251 — élargir la borne BASSE de récupération : une occupation qui COMMENCE
+  // avant la fenêtre mais DÉBORDE dedans doit être prise en compte (sinon créneaux
+  // faussement disponibles à la frontière). On récupère un sur-ensemble (jusqu'à 48h
+  // avant `debut`) puis le test de chevauchement précis (côté getCreneauxDisponibles)
+  // filtre exactement. 48h couvre toutes les durées réalistes d'intervention/RDV.
+  const lookback = new Date(debut.getTime() - 48 * 60 * 60 * 1000);
   const interventionsList = await db.select({
     dateDebut: interventions.dateDebut,
     dateFin: interventions.dateFin,
@@ -4140,7 +4146,7 @@ export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Da
     .where(and(
       eq(interventions.artisanId, artisanId),
       ne(interventions.statut, "annulee"),
-      gte(interventions.dateDebut, debut),
+      gte(interventions.dateDebut, lookback),
       lte(interventions.dateDebut, fin)
     ));
 
@@ -4151,7 +4157,7 @@ export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Da
     .where(and(
       eq(rdvEnLigne.artisanId, artisanId),
       inArray(rdvEnLigne.statut, ["en_attente", "confirme"]),
-      gte(rdvEnLigne.dateProposee, debut),
+      gte(rdvEnLigne.dateProposee, lookback),
       lte(rdvEnLigne.dateProposee, fin)
     ));
 
