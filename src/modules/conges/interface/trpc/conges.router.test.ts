@@ -116,4 +116,36 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     expect((await callMutation(server, "conges.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "conges.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("id inexistant du même tenant : getById / update / delete → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "conges.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "conges.update", { id: 999999999, motif: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "conges.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : type invalide, motif > 2000, technicienId non int → 400", async () => {
+    const tA = await token(UA);
+    const base = { technicienId: techA, dateDebut: "2026-07-01", dateFin: "2026-07-02" };
+    expect((await callMutation(server, "conges.create", { ...base, type: "vacances" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "conges.create", { ...base, type: "rtt", motif: "x".repeat(2001) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "conges.create", { technicienId: 1.5, type: "rtt", dateDebut: "2026-07-01", dateFin: "2026-07-02" }, tA)).statusCode).toBe(400);
+  });
+
+  it("update : dateFin < dateDebut (fournies ensemble) → 400", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2026-10-01", dateFin: "2026-10-02" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "conges.update", { id, dateDebut: "2026-10-10", dateFin: "2026-10-05" }, tA)).statusCode).toBe(400);
+  });
+
+  it("update ne peut PAS passer statut/validePar (zod strip) — la demande reste en_attente", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2026-11-01", dateFin: "2026-11-02" }, tA)).json().result.data.id as number;
+    // tente d'auto-approuver via update : les clés hors schéma sont retirées par zod
+    await callMutation(server, "conges.update", { id, statut: "approuve", validePar: 999, motif: "Tentative" }, tA);
+    const after = (await callQuery(server, "conges.getById", { id }, tA)).json().result.data as { statut: string; validePar: number | null; motif: string };
+    expect(after.statut).toBe("en_attente"); // workflow inviolé
+    expect(after.validePar).toBeNull();
+    expect(after.motif).toBe("Tentative"); // seul le champ légitime a été appliqué
+  });
 });
