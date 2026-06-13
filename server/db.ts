@@ -6160,6 +6160,18 @@ export async function getConfigurationComptable(
   return r[0];
 }
 
+// Colonnes autorisées de configurations_comptables — les noms sont interpolés en
+// SQL brut (upsert), donc whitelist explicite (defense-in-depth : la sûreté ne
+// dépend plus du stripping Zod de l'appelant). Cf. audit injection SQL 2026-06-13.
+const CONFIG_COMPTABLE_COLS = new Set([
+  "artisanId", "logiciel", "formatExport", "compteVentes", "compteTVACollectee",
+  "compteClients", "compteAchats", "compteTVADeductible", "compteFournisseurs",
+  "compteBanque", "compteCaisse", "journalVentes", "journalAchats", "journalBanque",
+  "prefixeFacture", "prefixeAvoir", "exerciceDebut", "actif", "syncAutoFactures",
+  "syncAutoPaiements", "frequenceSync", "heureSync", "notifierErreurs",
+  "notifierSucces", "derniereSync", "prochainSync",
+]);
+
 export async function saveConfigurationComptable(
   data: InsertConfigurationComptable
 ): Promise<ConfigurationComptable | undefined> {
@@ -6167,7 +6179,7 @@ export async function saveConfigurationComptable(
   // gerer la cle unique artisanId.
   const pool = getPool();
   if (!pool) return undefined;
-  const keys = Object.keys(data);
+  const keys = Object.keys(data).filter((k) => CONFIG_COMPTABLE_COLS.has(k));
   const cols = keys.join(", ");
   const placeholders = keys.map(() => "?").join(", ");
   const updates = keys.filter((k) => k !== "artisanId").map((k) => `${k} = VALUES(${k})`).join(", ");
@@ -6737,13 +6749,21 @@ export async function getConfigAlertePrevision(
   return r[0];
 }
 
+// Colonnes autorisées de config_alertes_previsions — whitelist explicite (noms
+// interpolés en SQL brut). Cf. audit injection SQL 2026-06-13.
+const CONFIG_ALERTE_COLS = new Set([
+  "artisanId", "seuilAlertePositif", "seuilAlerteNegatif", "alerteEmail",
+  "alerteSms", "emailDestination", "telephoneDestination", "frequenceVerification",
+  "actif",
+]);
+
 export async function saveConfigAlertePrevision(
   data: InsertConfigAlertePrevision
 ): Promise<ConfigAlertePrevision | undefined> {
   // Upsert sur artisanId (cle unique dans le schema).
   const pool = getPool();
   if (!pool) return undefined;
-  const keys = Object.keys(data);
+  const keys = Object.keys(data).filter((k) => CONFIG_ALERTE_COLS.has(k));
   const cols = keys.join(", ");
   const placeholders = keys.map(() => "?").join(", ");
   const updates = keys.filter((k) => k !== "artisanId").map((k) => `${k} = VALUES(${k})`).join(", ");
