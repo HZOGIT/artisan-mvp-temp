@@ -6573,8 +6573,10 @@ const devisOptionsRouter = router({
   create: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      nom: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `devis_options` (nom varchar 100, description TEXT) —
+      // defense-in-depth : évite une erreur/troncature MySQL (mode strict). OPE-24.
+      nom: z.string().max(100),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
       recommandee: z.boolean().optional(),
     }))
@@ -6586,8 +6588,9 @@ const devisOptionsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
+      // Bornes alignées sur `devis_options` (nom varchar 100, description TEXT). OPE-24.
+      nom: z.string().max(100).optional(),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
       recommandee: z.boolean().optional(),
     }))
