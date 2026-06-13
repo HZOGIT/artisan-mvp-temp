@@ -100,13 +100,36 @@ describe("bascule du domaine techniciens (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine notifications (flag gateway)", () => {
+  it("notifications routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("notifications", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { notifications: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("notifications", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("notifications", 8, canary)).toBe(false);
+    const global: FeatureFlags = { notifications: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("notifications", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("notifications", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine notifications extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("notifications.markAsRead")).toBe("notifications");
+    expect(domainFromTrpcPath("/notifications.generateOverdueReminders")).toBe("notifications");
+  });
+
+  it("parse env : notifications enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "notifications" } as NodeJS.ProcessEnv).notifications).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_NOTIFICATIONS: "7" } as NodeJS.ProcessEnv).notifications?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("avis/vehicules/badges/techniciens sont éligibles à la bascule, pas un domaine non porté", () => {
+  it("avis/vehicules/badges/techniciens/notifications sont éligibles à la bascule, pas un domaine non porté", () => {
     expect(MIGRATED_DOMAINS).toContain("avis");
     expect(MIGRATED_DOMAINS).toContain("vehicules");
     expect(MIGRATED_DOMAINS).toContain("badges");
     expect(MIGRATED_DOMAINS).toContain("techniciens");
-    expect(isMigratedDomainAvailable("techniciens")).toBe(true);
+    expect(MIGRATED_DOMAINS).toContain("notifications");
+    expect(isMigratedDomainAvailable("notifications")).toBe(true);
     expect(isMigratedDomainAvailable("factures")).toBe(false);
   });
 });
