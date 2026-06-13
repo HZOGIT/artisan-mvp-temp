@@ -44,6 +44,9 @@ import type { INoteDeFraisRepository } from "./modules/notes-de-frais/applicatio
 import { createChantiersModule } from "./modules/chantiers/chantiers.module";
 import { ChantierRepositoryDrizzle } from "./modules/chantiers/infra/chantier-repository-drizzle";
 import type { IChantierRepository } from "./modules/chantiers/application/chantier-repository";
+import { createDepensesModule } from "./modules/depenses/depenses.module";
+import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
+import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -68,6 +71,7 @@ export interface AppDeps extends ContextDeps {
   readonly congeRepo?: ICongeRepository;
   readonly noteDeFraisRepo?: INoteDeFraisRepository;
   readonly chantierRepo?: IChantierRepository;
+  readonly depenseRepo?: IDepenseRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -121,7 +125,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const chantiers = createChantiersModule({
     repository: deps.chantierRepo ?? new ChantierRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers });
+  const depenses = createDepensesModule({
+    repository: deps.depenseRepo ?? new DepenseRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
