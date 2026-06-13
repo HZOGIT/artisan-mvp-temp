@@ -1459,7 +1459,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       quantite: z.number().default(1),
       unite: z.string().max(20).default("unité"),
       prixUnitaireHT: z.number().default(0),
-      tauxTVA: z.number().default(20),
+      tauxTVA: z.number().min(0).max(100).default(20),
       remise: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -4067,7 +4067,7 @@ Reponds UNIQUEMENT en JSON pur :
         quantite: z.number(),
         unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
-        tauxTVA: z.number().optional(),
+        tauxTVA: z.number().min(0).max(100).optional(),
       })).max(500, "Trop de lignes (max 500 par commande)") // OPE-24 — anti-DoS (boucle d'INSERT)
     }))
     .mutation(async ({ ctx, input }) => {
@@ -4148,7 +4148,7 @@ Reponds UNIQUEMENT en JSON pur :
         quantite: z.number(),
         unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
-        tauxTVA: z.number().optional(),
+        tauxTVA: z.number().min(0).max(100).optional(),
       })).max(500, "Trop de lignes (max 500 par commande)").optional(), // OPE-24 — anti-DoS
     }))
     .mutation(async ({ ctx, input }) => {
@@ -9913,7 +9913,7 @@ const depensesRouter = router({
       sousCategorie: z.string().max(100).optional(),
       description: z.string().max(2000).optional(),
       montantHt: z.number(),
-      tauxTva: z.number().default(20),
+      tauxTva: z.number().min(0).max(100).default(20),
       modePaiement: z.string().default("carte"),
       statut: z.string().optional(),
       remboursable: z.boolean().default(true),
