@@ -188,9 +188,31 @@ describe("bascule du domaine stocks (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine clients (flag gateway)", () => {
+  it("clients routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("clients", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { clients: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("clients", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("clients", 8, canary)).toBe(false);
+    const global: FeatureFlags = { clients: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("clients", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("clients", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine clients extraient bien le domaine (dont search / encours)", () => {
+    expect(domainFromTrpcPath("clients.search")).toBe("clients");
+    expect(domainFromTrpcPath("/clients.getEncours")).toBe("clients");
+  });
+
+  it("parse env : clients enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "clients" } as NodeJS.ProcessEnv).clients).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_CLIENTS: "7" } as NodeJS.ProcessEnv).clients?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 8 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks"]) {
+  it("les 9 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
