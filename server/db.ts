@@ -6189,20 +6189,24 @@ const CONFIG_COMPTABLE_COLS = new Set([
 export async function saveConfigurationComptable(
   data: InsertConfigurationComptable
 ): Promise<ConfigurationComptable | undefined> {
-  // Une seule config par artisan : on fait un upsert via raw SQL pour
-  // gerer la cle unique artisanId.
-  const pool = getPool();
-  if (!pool) return undefined;
-  const keys = Object.keys(data).filter((k) => CONFIG_COMPTABLE_COLS.has(k));
-  const cols = keys.join(", ");
-  const placeholders = keys.map(() => "?").join(", ");
-  const updates = keys.filter((k) => k !== "artisanId").map((k) => `${k} = VALUES(${k})`).join(", ");
-  const values = keys.map((k) => (data as any)[k]);
-  await pool.execute(
-    `INSERT INTO configurations_comptables (${cols}) VALUES (${placeholders})
-     ON DUPLICATE KEY UPDATE ${updates || "updatedAt = CURRENT_TIMESTAMP"}`,
-    values
-  );
+  // Une seule config par artisan (cle unique artisanId) : upsert neutre dialecte
+  // (select-puis-insert/update), PG ne supporte pas ON DUPLICATE KEY.
+  const dbi = await getDb();
+  // Whitelist defense-in-depth conservee (cf. audit injection SQL 2026-06-13) :
+  // ne laisse passer que les colonnes autorisees.
+  const filtered: Record<string, any> = {};
+  for (const k of Object.keys(data)) if (CONFIG_COMPTABLE_COLS.has(k)) filtered[k] = (data as any)[k];
+  const existing = await dbi.select({ id: configurationsComptables.id }).from(configurationsComptables)
+    .where(eq(configurationsComptables.artisanId, data.artisanId)).limit(1);
+  if (existing[0]) {
+    const { artisanId: _aid, ...updates } = filtered;
+    if (Object.keys(updates).length > 0) {
+      await dbi.update(configurationsComptables).set(updates)
+        .where(eq(configurationsComptables.artisanId, data.artisanId));
+    }
+  } else {
+    await dbi.insert(configurationsComptables).values(filtered as any);
+  }
   return getConfigurationComptable(data.artisanId);
 }
 
