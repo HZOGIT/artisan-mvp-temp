@@ -1,7 +1,7 @@
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICommandeRepository, ReceptionLigne } from "./commande-repository";
-import type { Commande, CommandeStatut } from "../domain/commande";
+import type { Commande, CommandeStatut, CommandeStatutFacturation } from "../domain/commande";
 
 // Use-cases dérivés (transitions de statut + retard) — purs, repository injecté. Scopés
 // tenant ; une opération sur une commande hors tenant lève NotFoundError.
@@ -48,6 +48,20 @@ export async function recevoirCommande(
   }
 
   const updated = await repo.recevoir(ctx, commandeId, receptions);
+  if (!updated) throw new NotFoundError("Commande introuvable");
+  return updated;
+}
+
+// Définit le statut de facturation (+ lien dépense optionnel, posé seulement si la dépense
+// appartient au tenant — anti-IDOR-FK). Commande hors tenant → NotFoundError.
+export async function definirStatutFacturation(
+  repo: ICommandeRepository,
+  ctx: TenantContext,
+  id: number,
+  statutFacturation: CommandeStatutFacturation,
+  depenseId?: number | null,
+): Promise<Commande> {
+  const updated = await repo.setStatutFacturation(ctx, id, statutFacturation, depenseId);
   if (!updated) throw new NotFoundError("Commande introuvable");
   return updated;
 }

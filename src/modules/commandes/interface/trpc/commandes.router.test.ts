@@ -48,6 +48,7 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     for (const uid of [UA, UB]) {
       await admin.query('delete from mouvements_stock where "stockId" in (select id from stocks where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
       await admin.query('delete from stocks where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+      await admin.query('delete from depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
       await admin.query('delete from commandes_fournisseurs where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from fournisseurs where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
@@ -67,6 +68,7 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     for (const aId of [artisanA, artisanB]) {
       await admin.query('delete from mouvements_stock where "stockId" in (select id from stocks where "artisanId"=$1)', [aId]);
       await admin.query('delete from stocks where "artisanId"=$1', [aId]);
+      await admin.query('delete from depenses where artisan_id=$1', [aId]);
       await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId"=$1)', [aId]);
       await admin.query('delete from commandes_fournisseurs where "artisanId"=$1', [aId]);
       await admin.query('delete from fournisseurs where "artisanId"=$1', [aId]);
@@ -222,6 +224,32 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     await callMutation(server, "commandes.recevoir", { id: cmd2, lignes: [{ ligneId: ligne2, quantiteRecue: 5 }] }, tA);
     const qB = (await admin.query('select "quantiteEnStock" as q from stocks where id=$1', [stockB])).rows[0].q;
     expect(Number(qB)).toBeCloseTo(50, 2); // inchangé (stock d'un autre tenant)
+  });
+
+  it("setStatutFacturation : facturee + lien dépense owned ; dépense d'un autre tenant non liée ; cross-tenant → 404", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
+    const depA = (await admin.query(
+      `insert into depenses (artisan_id, user_id, numero, date_depense, categorie, montant_ht, montant_ttc) values ($1,$2,$3, now(), 'achats','100.00','120.00') returning id`,
+      [artisanA, UA, `DEP-${Date.now()}`],
+    )).rows[0].id as number;
+    const depB = (await admin.query(
+      `insert into depenses (artisan_id, user_id, numero, date_depense, categorie, montant_ht, montant_ttc) values ($1,$2,$3, now(), 'achats','50.00','60.00') returning id`,
+      [artisanB, UB, `DEPB-${Date.now()}`],
+    )).rows[0].id as number;
+    // facturée + dépense de A → liée
+    const f1 = await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "facturee", depenseId: depA }, tA);
+    expect(f1.json().result.data.statutFacturation).toBe("facturee");
+    expect(f1.json().result.data.depenseId).toBe(depA);
+    // facturée + dépense de B → non liée (anti-IDOR-FK)
+    const f2 = await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "facturee", depenseId: depB }, tA);
+    expect(f2.json().result.data.depenseId).toBeNull();
+    // a_facturer → délie
+    const f3 = await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "a_facturer" }, tA);
+    expect(f3.json().result.data.depenseId).toBeNull();
+    // cross-tenant → 404
+    expect((await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "facturee" }, tB)).statusCode).toBe(404);
   });
 
   it("getEnRetard : commandes échéance dépassée non livrées, scopé tenant", async () => {

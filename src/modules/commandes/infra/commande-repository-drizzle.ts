@@ -5,6 +5,7 @@ import {
   fournisseurs,
   stocks,
   mouvementsStock,
+  depenses,
 } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -17,6 +18,7 @@ import type {
   CreateLigneInput,
   UpdateCommandeInput,
   CommandeStatut,
+  CommandeStatutFacturation,
 } from "../domain/commande";
 
 type CommandeRow = typeof commandesFournisseurs.$inferSelect;
@@ -40,6 +42,7 @@ function toCommande(r: CommandeRow): Commande {
     adresseLivraison: r.adresseLivraison ?? null,
     notes: r.notes ?? null,
     statutFacturation: (r.statutFacturation ?? "a_facturer") as Commande["statutFacturation"],
+    depenseId: r.depenseId ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -325,6 +328,34 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         .update(commandesFournisseurs)
         .set(set)
         .where(and(eq(commandesFournisseurs.id, commandeId), eq(commandesFournisseurs.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toCommande(row) : null;
+    });
+  }
+
+  setStatutFacturation(
+    ctx: TenantContext,
+    id: number,
+    statutFacturation: CommandeStatutFacturation,
+    depenseId?: number | null,
+  ): Promise<Commande | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsCommande(tx, ctx, id))) return null;
+      // Lien dépense posé UNIQUEMENT si la dépense appartient au tenant (anti-IDOR-FK) ;
+      // `a_facturer` délie (depenseId = null).
+      let lien: number | null = null;
+      if (statutFacturation === "facturee" && depenseId != null) {
+        const [dep] = await tx
+          .select({ id: depenses.id })
+          .from(depenses)
+          .where(and(eq(depenses.id, depenseId), eq(depenses.artisan_id, ctx.artisanId)))
+          .limit(1);
+        lien = dep ? depenseId : null;
+      }
+      const [row] = await tx
+        .update(commandesFournisseurs)
+        .set({ statutFacturation, depenseId: lien, updatedAt: new Date() })
+        .where(and(eq(commandesFournisseurs.id, id), eq(commandesFournisseurs.artisanId, ctx.artisanId)))
         .returning();
       return row ? toCommande(row) : null;
     });

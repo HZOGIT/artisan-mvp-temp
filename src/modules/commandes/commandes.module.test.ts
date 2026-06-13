@@ -12,6 +12,7 @@ const stubRepo: ICommandeRepository = {
   updateStatut: async () => null,
   listEnRetard: async () => [],
   recevoir: async () => null,
+  setStatutFacturation: async () => null,
 };
 
 describe("commandes.module", () => {
@@ -29,6 +30,7 @@ describe("commandes.module", () => {
       "listEnRetard",
       "listLignes",
       "recevoir",
+      "setStatutFacturation",
       "update",
       "updateStatut",
     ]);
@@ -45,6 +47,7 @@ describe("commandes.module", () => {
       "getLignes",
       "list",
       "recevoir",
+      "setStatutFacturation",
       "update",
       "updateStatut",
     ]);

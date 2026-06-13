@@ -7,6 +7,7 @@ import type {
   CreateLigneInput,
   UpdateCommandeInput,
   CommandeStatut,
+  CommandeStatutFacturation,
 } from "../domain/commande";
 
 function calculerTotaux(lignes: readonly CreateLigneInput[]): { totalHT: number; totalTVA: number; lignesHT: number[] } {
@@ -28,6 +29,7 @@ export class FakeCommandeRepository implements ICommandeRepository {
   private store: Commande[] = [];
   private lignesStore: LigneCommande[] = [];
   private fournisseurs: Array<{ id: number; artisanId: number }> = [];
+  private depenses: Array<{ id: number; artisanId: number }> = [];
   private seq = 0;
   private ligneSeq = 0;
 
@@ -35,8 +37,15 @@ export class FakeCommandeRepository implements ICommandeRepository {
   seedFournisseur(id: number, artisanId: number): void {
     this.fournisseurs.push({ id, artisanId });
   }
+  // Utilitaire de test (hors port) : déclare une dépense appartenant à un tenant.
+  seedDepense(id: number, artisanId: number): void {
+    this.depenses.push({ id, artisanId });
+  }
   private ownsFournisseur(ctx: TenantContext, id: number): boolean {
     return this.fournisseurs.some((f) => f.id === id && f.artisanId === ctx.artisanId);
+  }
+  private ownsDepense(ctx: TenantContext, id: number): boolean {
+    return this.depenses.some((d) => d.id === id && d.artisanId === ctx.artisanId);
   }
 
   async list(ctx: TenantContext): Promise<Commande[]> {
@@ -74,6 +83,7 @@ export class FakeCommandeRepository implements ICommandeRepository {
       adresseLivraison: input.adresseLivraison ?? null,
       notes: input.notes ?? null,
       statutFacturation: "a_facturer",
+      depenseId: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -182,6 +192,23 @@ export class FakeCommandeRepository implements ICommandeRepository {
       updatedAt: new Date(),
     };
     this.store = this.store.map((x) => (x.id === commandeId ? updated : x));
+    return updated;
+  }
+
+  async setStatutFacturation(
+    ctx: TenantContext,
+    id: number,
+    statutFacturation: CommandeStatutFacturation,
+    depenseId?: number | null,
+  ): Promise<Commande | null> {
+    const c = await this.getById(ctx, id);
+    if (!c) return null;
+    let lien: number | null = null;
+    if (statutFacturation === "facturee" && depenseId != null && this.ownsDepense(ctx, depenseId)) {
+      lien = depenseId;
+    }
+    const updated: Commande = { ...c, statutFacturation, depenseId: lien, updatedAt: new Date() };
+    this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;
   }
 }

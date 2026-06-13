@@ -44,6 +44,7 @@ export interface Commande {
   readonly adresseLivraison: string | null;
   readonly notes: string | null;
   readonly statutFacturation: CommandeStatutFacturation;
+  readonly depenseId: number | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

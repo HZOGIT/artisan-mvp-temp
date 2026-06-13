@@ -3,7 +3,12 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ICommandeRepository } from "../../application/commande-repository";
 import { listCommandes, getCommande, listLignesCommande } from "../../application/read-use-cases";
 import { creerCommande, modifierCommande, supprimerCommande } from "../../application/write-use-cases";
-import { changerStatutCommande, listerCommandesEnRetard, recevoirCommande } from "../../application/statut-use-cases";
+import {
+  changerStatutCommande,
+  listerCommandesEnRetard,
+  recevoirCommande,
+  definirStatutFacturation,
+} from "../../application/statut-use-cases";
 import type { CreateLigneInput } from "../../domain/commande";
 
 const statutEnum = z.enum(["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]);
@@ -121,6 +126,18 @@ export function createCommandesRouter(repo: ICommandeRepository) {
           input.id,
           input.lignes.map((l) => ({ ligneId: l.ligneId, quantiteRecue: l.quantiteRecue })),
         ),
+      ),
+
+    setStatutFacturation: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int(),
+          statutFacturation: z.enum(["a_facturer", "facturee"]),
+          depenseId: z.number().int().nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        definirStatutFacturation(repo, ctx.tenant, input.id, input.statutFacturation, input.depenseId ?? null),
       ),
   });
 }

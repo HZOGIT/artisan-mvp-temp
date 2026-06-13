@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeCommandeRepository } from "../infra/commande-repository-fake";
-import { changerStatutCommande, listerCommandesEnRetard, recevoirCommande } from "./statut-use-cases";
+import { changerStatutCommande, listerCommandesEnRetard, recevoirCommande, definirStatutFacturation } from "./statut-use-cases";
 import { listLignesCommande } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
@@ -74,5 +74,25 @@ describe("commandes — use-cases dérivés statut/retard (repo mocké)", () => 
   it("recevoirCommande : commande d'un autre tenant → NotFound (anti-IDOR)", async () => {
     await expect(recevoirCommande(repo, B, cmdA, [])).rejects.toBeInstanceOf(NotFoundError);
     await expectCrossTenantDenied(() => recevoirCommande(repo, B, cmdA, []));
+  });
+
+  it("definirStatutFacturation : facturee + lien dépense owned ; a_facturer délie ; depense hors tenant non liée", async () => {
+    repo.seedDepense(500, 1); // dépense de A
+    repo.seedDepense(600, 2); // dépense de B
+    // facturée avec dépense de A → liée
+    const f1 = await definirStatutFacturation(repo, A, cmdA, "facturee", 500);
+    expect(f1.statutFacturation).toBe("facturee");
+    expect(f1.depenseId).toBe(500);
+    // facturée avec dépense de B → non liée (anti-IDOR-FK)
+    const f2 = await definirStatutFacturation(repo, A, cmdA, "facturee", 600);
+    expect(f2.depenseId).toBeNull();
+    // a_facturer → délie
+    const f3 = await definirStatutFacturation(repo, A, cmdA, "a_facturer");
+    expect(f3.statutFacturation).toBe("a_facturer");
+    expect(f3.depenseId).toBeNull();
+  });
+
+  it("definirStatutFacturation : commande d'un autre tenant → NotFound", async () => {
+    await expect(definirStatutFacturation(repo, B, cmdA, "facturee")).rejects.toBeInstanceOf(NotFoundError);
   });
 });

@@ -5,6 +5,7 @@ import type {
   CreateCommandeInput,
   UpdateCommandeInput,
   CommandeStatut,
+  CommandeStatutFacturation,
 } from "../domain/commande";
 
 // Port du repository commandes fournisseurs. Chaque méthode exige le TenantContext (scope
@@ -43,6 +44,15 @@ export interface ICommandeRepository {
   // null si la commande n'appartient pas au tenant. ⚠️ L'invariant `quantiteRecue ≤ quantite`
   // est garanti (clamp) ; la validation stricte (rejet) est portée par le use-case.
   recevoir(ctx: TenantContext, commandeId: number, receptions: ReceptionLigne[]): Promise<Commande | null>;
+
+  // Définit le statut de facturation (+ lien dépense optionnel). Le lien n'est posé que si
+  // la dépense appartient au tenant (anti-IDOR-FK) ; `a_facturer` délie. null hors tenant.
+  setStatutFacturation(
+    ctx: TenantContext,
+    id: number,
+    statutFacturation: CommandeStatutFacturation,
+    depenseId?: number | null,
+  ): Promise<Commande | null>;
 }
 
 export interface ReceptionLigne {
