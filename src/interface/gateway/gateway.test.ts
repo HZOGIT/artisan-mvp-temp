@@ -344,12 +344,12 @@ describe("bascule du domaine devis (flag gateway)", () => {
 });
 
 describe("registre des domaines migrés", () => {
-  it("les 15 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis"]) {
+  it("les 16 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
-    expect(isMigratedDomainAvailable("factures")).toBe(false);
+    expect(isMigratedDomainAvailable("support")).toBe(false);
   });
 });
 

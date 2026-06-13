@@ -31,7 +31,7 @@ describe("app Fastify (scaffold + tRPC)", () => {
 
   // Garde-fou bascule : chaque domaine du registre MIGRATED_DOMAINS est réellement monté
   // dans le nouveau stack (procédure `list` présente → 401 auth requise, pas 404 inexistant).
-  const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list", badges: "badges.list", techniciens: "techniciens.list", notifications: "notifications.list", fournisseurs: "fournisseurs.list", commandes: "commandes.list", stocks: "stocks.list", clients: "clients.list", interventions: "interventions.list", conges: "conges.list", notesDeFrais: "notesDeFrais.list", chantiers: "chantiers.list", depenses: "depenses.list", devis: "devis.list" };
+  const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list", badges: "badges.list", techniciens: "techniciens.list", notifications: "notifications.list", fournisseurs: "fournisseurs.list", commandes: "commandes.list", stocks: "stocks.list", clients: "clients.list", interventions: "interventions.list", conges: "conges.list", notesDeFrais: "notesDeFrais.list", chantiers: "chantiers.list", depenses: "depenses.list", devis: "devis.list", factures: "factures.list" };
   for (const domain of MIGRATED_DOMAINS) {
     it(`domaine migré « ${domain} » monté dans le nouveau stack (≠ 404)`, async () => {
       const res = await app.inject({ method: "GET", url: `/api/trpc/${sampleProcedure[domain]}` });
@@ -39,8 +39,8 @@ describe("app Fastify (scaffold + tRPC)", () => {
     });
   }
 
-  it("un domaine non migré (factures) n'est PAS monté → 404", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/trpc/factures.list" });
+  it("un domaine non migré (support) n'est PAS monté → 404", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/trpc/support.list" });
     expect(res.statusCode).toBe(404);
   });
 });

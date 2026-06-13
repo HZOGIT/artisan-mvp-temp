@@ -43,4 +43,20 @@ describe("factures.module", () => {
       "updateLigne",
     ]);
   });
+
+  it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes)", () => {
+    const module = createFacturesModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual([
+      "addLigne",
+      "create",
+      "delete",
+      "deleteLigne",
+      "getById",
+      "getLignes",
+      "list",
+      "update",
+      "updateLigne",
+    ]);
+  });
 });

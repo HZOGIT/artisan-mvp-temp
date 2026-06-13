@@ -50,6 +50,9 @@ import type { IDepenseRepository } from "./modules/depenses/application/depense-
 import { createDevisModule } from "./modules/devis/devis.module";
 import { DevisRepositoryDrizzle } from "./modules/devis/infra/devis-repository-drizzle";
 import type { IDevisRepository } from "./modules/devis/application/devis-repository";
+import { createFacturesModule } from "./modules/factures/factures.module";
+import { FactureRepositoryDrizzle } from "./modules/factures/infra/facture-repository-drizzle";
+import type { IFactureRepository } from "./modules/factures/application/facture-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -76,6 +79,7 @@ export interface AppDeps extends ContextDeps {
   readonly chantierRepo?: IChantierRepository;
   readonly depenseRepo?: IDepenseRepository;
   readonly devisRepo?: IDevisRepository;
+  readonly factureRepo?: IFactureRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -135,7 +139,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const devis = createDevisModule({
     repository: deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis });
+  const factures = createFacturesModule({
+    repository: deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
