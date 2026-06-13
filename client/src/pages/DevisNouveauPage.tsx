@@ -69,9 +69,42 @@ export default function DevisNouveauPage() {
     { clientId },
     { enabled: clientId > 0 }
   );
-  const { data: modeles = [] } = trpc.devis.getModeles.useQuery();
+  const { data: modeles = [], refetch: refetchModeles } = trpc.devis.getModeles.useQuery();
   const createMutation = trpc.devis.create.useMutation();
   const addLigneMutation = trpc.devis.addLigne.useMutation();
+  // OPE-128 — enregistrer le devis courant comme MODÈLE réutilisable (la création de
+  // modèle n'existait nulle part côté UI ; on réutilise createModele + addLigneToModele).
+  const createModeleMutation = trpc.devis.createModele.useMutation();
+  const addLigneModeleMutation = trpc.devis.addLigneToModele.useMutation();
+  const [modeleNom, setModeleNom] = useState("");
+  const [showSaveModele, setShowSaveModele] = useState(false);
+  const [savingModele, setSavingModele] = useState(false);
+  const handleSaveAsModele = async () => {
+    if (!modeleNom.trim()) { toast.error("Donnez un nom au modèle"); return; }
+    if (lignes.length === 0) { toast.error("Ajoutez au moins une ligne"); return; }
+    setSavingModele(true);
+    try {
+      const modele = await createModeleMutation.mutateAsync({ nom: modeleNom.trim() });
+      for (const l of lignes) {
+        await addLigneModeleMutation.mutateAsync({
+          modeleId: modele.id,
+          designation: l.description,
+          quantite: l.quantite,
+          prixUnitaireHT: l.prixUnitaireHT,
+          tauxTVA: l.tauxTVA,
+          unite: l.unite || "unité",
+        });
+      }
+      toast.success("Modèle enregistré");
+      setModeleNom("");
+      setShowSaveModele(false);
+      refetchModeles();
+    } catch (e: any) {
+      toast.error(e?.message || "Erreur lors de l'enregistrement du modèle");
+    } finally {
+      setSavingModele(false);
+    }
+  };
   const getModeleQuery = trpc.devis.getModeleWithLignes.useQuery(
     { modeleId: selectedModeleId || 0 },
     { enabled: selectedModeleId !== null }
@@ -404,6 +437,35 @@ export default function DevisNouveauPage() {
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* OPE-128 — Enregistrer le devis courant comme modèle réutilisable */}
+        {lignes.length > 0 && (
+          <div>
+            {!showSaveModele ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowSaveModele(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Enregistrer comme modèle
+              </Button>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <Input
+                  placeholder="Nom du modèle (ex. Entretien chaudière)"
+                  value={modeleNom}
+                  onChange={(e) => setModeleNom(e.target.value)}
+                  className="sm:w-72"
+                  maxLength={255}
+                />
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" onClick={handleSaveAsModele} disabled={savingModele}>
+                    {savingModele ? "Enregistrement..." : "Enregistrer"}
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setShowSaveModele(false); setModeleNom(""); }}>
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
