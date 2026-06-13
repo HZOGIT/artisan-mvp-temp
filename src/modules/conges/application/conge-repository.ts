@@ -1,5 +1,15 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
+import type { SoldeCongeType } from "./solde";
+
+// Ajustement additif du solde de congés d'un technicien (décompte si deltaJours > 0,
+// recrédit si < 0), pour une année et un type donnés.
+export interface AjustementSolde {
+  readonly technicienId: number;
+  readonly type: SoldeCongeType;
+  readonly annee: number;
+  readonly deltaJours: number;
+}
 
 // Port du repository conges. Chaque méthode exige le TenantContext (scope tenant + RLS).
 // `conges` possède un `artisanId` → double cloisonnement RLS + filtre. ⚠️ Les invariants
@@ -30,4 +40,9 @@ export interface ICongeRepository {
     validePar: number,
     commentaire?: string | null,
   ): Promise<Conge | null>;
+  // Ajuste (additivement) le solde de congés du technicien, scopé tenant. Check-then-act :
+  // ligne présente → update ; absente + décompte (>0) → insert ; absente + recrédit (≤0) →
+  // no-op (rien à recréditer). ⚠️ Idempotence garantie par l'appelant (décompte uniquement à
+  // la transition en_attente→approuve, recrédit uniquement en quittant approuve).
+  ajusterSolde(ctx: TenantContext, ajustement: AjustementSolde): Promise<void>;
 }

@@ -13,6 +13,7 @@ const stubRepo: ICongeRepository = {
   ownsTechnicien: async () => false,
   findTechnicienIdForUser: async () => null,
   setStatut: async () => null,
+  ajusterSolde: async () => undefined,
 };
 
 describe("conges.module", () => {
@@ -23,6 +24,7 @@ describe("conges.module", () => {
 
   it("le port expose les opérations CRUD attendues", () => {
     expect(Object.keys(stubRepo).sort()).toEqual([
+      "ajusterSolde",
       "create",
       "delete",
       "findTechnicienIdForUser",

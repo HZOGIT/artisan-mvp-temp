@@ -2,6 +2,21 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import type { TenantContext } from "../../../shared/tenant";
 import type { ICongeRepository } from "./conge-repository";
 import type { Conge, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
+import { calculerJoursConge, typeAffecteSolde } from "./solde";
+
+// Décompte (signe +) ou recrédit (signe −) du solde pour un congé conge_paye/rtt. Sans effet
+// pour les autres types. Imputé sur l'année de dateDebut (parité legacy, anti-corruption
+// inter-exercices). `signe` = +1 (approbation : on prend des jours) / −1 (annulation : on rend).
+async function ajusterSoldePourConge(
+  repo: ICongeRepository,
+  ctx: TenantContext,
+  conge: Conge,
+  signe: 1 | -1,
+): Promise<void> {
+  if (!typeAffecteSolde(conge.type)) return;
+  const { jours, annee } = calculerJoursConge(conge);
+  await repo.ajusterSolde(ctx, { technicienId: conge.technicienId, type: conge.type, annee, deltaJours: signe * jours });
+}
 
 // Use-cases d'écriture — purs, repository injecté. Validation des dates + ⚠️ **garde
 // anti-IDOR-FK** : une demande ne peut viser qu'un technicien (demandeur) du tenant.
@@ -36,6 +51,10 @@ export async function modifierConge(
 }
 
 export async function supprimerConge(repo: ICongeRepository, ctx: TenantContext, id: number): Promise<void> {
+  const conge = await repo.getById(ctx, id);
+  if (!conge) throw new NotFoundError("Demande de congé introuvable");
+  // Recrédit du solde si on supprime un congé approuvé (qui avait décompté) — parité legacy.
+  if (conge.statut === "approuve") await ajusterSoldePourConge(repo, ctx, conge, -1);
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Demande de congé introuvable");
 }
@@ -70,6 +89,9 @@ export async function approuverConge(
   if (conge.statut === "approuve") return conge; // idempotent (pas de re-décompte de solde)
   if (conge.statut !== "en_attente") throw new ConflictError("Cette demande a déjà été traitée");
   await assertPasSelfApprobation(repo, ctx, conge);
+  // Décompte du solde UNIQUEMENT à la transition en_attente→approuve (idempotence garantie
+  // par le garde ci-dessus).
+  await ajusterSoldePourConge(repo, ctx, conge, 1);
   const updated = await repo.setStatut(ctx, id, "approuve", ctx.userId, commentaire);
   if (!updated) throw new NotFoundError("Demande de congé introuvable");
   return updated;
@@ -96,6 +118,8 @@ export async function annulerConge(repo: ICongeRepository, ctx: TenantContext, i
   const conge = await chargerCongeDuTenant(repo, ctx, id);
   if (conge.statut === "annule") return conge; // idempotent (pas de double recrédit de solde)
   if (conge.statut === "refuse") throw new ConflictError("Une demande refusée ne peut pas être annulée");
+  // Recrédit du solde UNIQUEMENT si on QUITTE l'état approuve (qui avait décompté).
+  if (conge.statut === "approuve") await ajusterSoldePourConge(repo, ctx, conge, -1);
   const updated = await repo.setStatut(ctx, id, "annule", ctx.userId);
   if (!updated) throw new NotFoundError("Demande de congé introuvable");
   return updated;

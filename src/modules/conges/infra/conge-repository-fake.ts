@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICongeRepository } from "../application/conge-repository";
+import type { ICongeRepository, AjustementSolde } from "../application/conge-repository";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -12,6 +12,13 @@ export class FakeCongeRepository implements ICongeRepository {
   private ownedTechniciens = new Set<string>();
   // Lien utilisateur → fiche technicien (injectable) : clé `${artisanId}:${userId}` → technicienId.
   private userTechnicien = new Map<string, number>();
+  // Solde décompté (joursPris) : clé `${artisanId}:${technicienId}:${type}:${annee}` → jours.
+  private joursPris = new Map<string, number>();
+
+  // Aide de test : lit le total de jours pris (décompté) pour une clé de solde.
+  getJoursPris(artisanId: number, technicienId: number, type: string, annee: number): number {
+    return this.joursPris.get(`${artisanId}:${technicienId}:${type}:${annee}`) ?? 0;
+  }
 
   // Aide de test : déclare qu'un technicien appartient au tenant.
   registerTechnicien(artisanId: number, technicienId: number): void {
@@ -97,5 +104,16 @@ export class FakeCongeRepository implements ICongeRepository {
     };
     this.store = this.store.map((x) => (x.id === id ? updated : x));
     return updated;
+  }
+
+  async ajusterSolde(ctx: TenantContext, { technicienId, type, annee, deltaJours }: AjustementSolde): Promise<void> {
+    const key = `${ctx.artisanId}:${technicienId}:${type}:${annee}`;
+    const present = this.joursPris.has(key);
+    if (present) {
+      this.joursPris.set(key, (this.joursPris.get(key) ?? 0) + deltaJours);
+    } else if (deltaJours > 0) {
+      this.joursPris.set(key, deltaJours);
+    }
+    // absente + recrédit (≤0) → no-op
   }
 }

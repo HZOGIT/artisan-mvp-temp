@@ -46,10 +46,19 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
 
   const purge = async (uid: number) => {
     await admin.query('delete from conges where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from soldes_conges where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from techniciens where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
     await admin.query("delete from users where id=$1", [uid]);
   };
+
+  async function joursPris(artisanId: number, technicienId: number, annee: number): Promise<number> {
+    const r = await admin.query(
+      'select "joursPris" from soldes_conges where "artisanId"=$1 and "technicienId"=$2 and type=\'conge_paye\' and annee=$3',
+      [artisanId, technicienId, annee],
+    );
+    return r.rows[0] ? Number(r.rows[0].joursPris) : 0;
+  }
 
   beforeAll(async () => {
     for (const uid of [UA, UB]) {
@@ -172,5 +181,21 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     expect((await callQuery(server, "conges.getById", { id }, tA)).json().result.data.statut).toBe("en_attente");
     // nettoyage : délier la fiche
     await admin.query('update techniciens set "userId"=null where id=$1', [techA]);
+  });
+
+  it("SOLDE e2e : approuver décompte (5 j), ré-approuver idempotent, annuler recrédite", async () => {
+    const tA = await token(UA);
+    await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
+    const id = (await callMutation(server, "conges.create", { technicienId: techA, type: "conge_paye", dateDebut: "2027-03-01", dateFin: "2027-03-05" }, tA)).json().result.data.id as number;
+    // approuver → décompte 5 jours sur l'année 2027 (année de dateDebut)
+    expect((await callMutation(server, "conges.approuver", { id }, tA)).statusCode).toBe(200);
+    expect(await joursPris(artisanA, techA, 2027)).toBe(5);
+    // ré-approuver → idempotent (toujours 5, pas 10)
+    await callMutation(server, "conges.approuver", { id }, tA);
+    expect(await joursPris(artisanA, techA, 2027)).toBe(5);
+    // annuler un congé approuvé → recrédit (retour à 0)
+    expect((await callMutation(server, "conges.annuler", { id }, tA)).statusCode).toBe(200);
+    expect(await joursPris(artisanA, techA, 2027)).toBe(0);
+    await admin.query('delete from soldes_conges where "artisanId"=$1 and "technicienId"=$2', [artisanA, techA]);
   });
 });

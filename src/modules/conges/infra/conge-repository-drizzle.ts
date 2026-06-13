@@ -1,9 +1,9 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { conges, techniciens } from "../../../../drizzle/schema.pg";
+import { conges, techniciens, soldesConges } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { ICongeRepository } from "../application/conge-repository";
+import type { ICongeRepository, AjustementSolde } from "../application/conge-repository";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
 type CongeRow = typeof conges.$inferSelect;
@@ -131,6 +131,47 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
         .where(and(eq(conges.id, id), eq(conges.artisanId, ctx.artisanId)))
         .returning();
       return row ? toConge(row) : null;
+    });
+  }
+
+  ajusterSolde(ctx: TenantContext, { technicienId, type, annee, deltaJours }: AjustementSolde): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Check-then-act scopé tenant (pas de clé unique sur (technicien,type,annee)).
+      const [existing] = await tx
+        .select({ id: soldesConges.id })
+        .from(soldesConges)
+        .where(
+          and(
+            eq(soldesConges.technicienId, technicienId),
+            eq(soldesConges.artisanId, ctx.artisanId),
+            eq(soldesConges.type, type),
+            eq(soldesConges.annee, annee),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        await tx
+          .update(soldesConges)
+          .set({
+            joursPris: sql`${soldesConges.joursPris} + ${deltaJours}`,
+            soldeRestant: sql`GREATEST(0, ${soldesConges.soldeRestant} - ${deltaJours})`,
+            updatedAt: new Date(),
+          })
+          .where(eq(soldesConges.id, existing.id));
+      } else if (deltaJours > 0) {
+        // Absente + décompte → insert (trace le décompte ; soldeRestant planché à 0).
+        await tx.insert(soldesConges).values({
+          technicienId,
+          artisanId: ctx.artisanId,
+          type,
+          annee,
+          soldeInitial: "0.00",
+          soldeRestant: "0.00",
+          joursAcquis: "0.00",
+          joursPris: String(deltaJours),
+        });
+      }
+      // Absente + recrédit (≤0) → no-op (rien n'avait été décompté).
     });
   }
 }
