@@ -2935,8 +2935,8 @@ export async function getPointagesByChantier(chantierId: number, artisanId: numb
 
 export async function createPointageChantier(data: InsertPointageChantier): Promise<PointageChantier> {
   const db = await getDb();
-  const [result] = await db.insert(pointagesChantier).values(data);
-  const [created] = await db.select().from(pointagesChantier).where(eq(pointagesChantier.id, result.insertId));
+  const newId = await insertReturningId(pointagesChantier, data);
+  const [created] = await db.select().from(pointagesChantier).where(eq(pointagesChantier.id, newId));
   return created;
 }
 
@@ -3921,8 +3921,7 @@ export async function getFacturesRecurrentesByContratId(contratId: number): Prom
 
 export async function createFactureRecurrente(data: InsertFactureRecurrente): Promise<FactureRecurrente> {
   const db = await getDb();
-  const result = await db.insert(facturesRecurrentes).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(facturesRecurrentes, data);
   const created = await db.select().from(facturesRecurrentes).where(eq(facturesRecurrentes.id, insertId)).limit(1);
   return created[0];
 }
@@ -3946,8 +3945,7 @@ export async function getInterventionContratById(id: number): Promise<Interventi
 
 export async function createInterventionContrat(data: InsertInterventionContrat): Promise<InterventionContrat> {
   const db = await getDb();
-  const result = await db.insert(interventionsContrat).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(interventionsContrat, data);
   const created = await db.select().from(interventionsContrat).where(eq(interventionsContrat.id, insertId)).limit(1);
   return created[0];
 }
@@ -3996,10 +3994,10 @@ export async function getOrCreateConversation(artisanId: number, clientId: numbe
   if (existing[0] && !sujet) return existing[0];
 
   // Create new conversation
-  const result = await db.insert(conversations).values({
+  const newId = await insertReturningId(conversations, {
     artisanId, clientId, sujet: sujet || null, statut: "ouverte",
   });
-  const created = await db.select().from(conversations).where(eq(conversations.id, result[0].insertId)).limit(1);
+  const created = await db.select().from(conversations).where(eq(conversations.id, newId)).limit(1);
   return created[0];
 }
 
@@ -4019,8 +4017,7 @@ export async function getMessagesByConversationId(conversationId: number): Promi
 
 export async function createMessage(data: InsertMessage): Promise<Message> {
   const db = await getDb();
-  const result = await db.insert(messages).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(messages, data);
 
   // Update conversation
   const apercu = data.contenu.substring(0, 100);
@@ -4032,12 +4029,14 @@ export async function createMessage(data: InsertMessage): Promise<Message> {
   if (data.auteur === "artisan") {
     await db.update(conversations).set({
       ...updateData,
-      nonLuClient: sql`nonLuClient + 1`,
+      // OPE-184 : colonne interpolée (quotée par dialecte) — `nonLuClient` nu était
+      // minusculé par Postgres → "column nonluclient does not exist".
+      nonLuClient: sql`${conversations.nonLuClient} + 1`,
     }).where(eq(conversations.id, data.conversationId));
   } else {
     await db.update(conversations).set({
       ...updateData,
-      nonLuArtisan: sql`nonLuArtisan + 1`,
+      nonLuArtisan: sql`${conversations.nonLuArtisan} + 1`,
     }).where(eq(conversations.id, data.conversationId));
   }
 
@@ -4144,8 +4143,7 @@ export async function seedTestData(): Promise<void> {
 
 export async function createRdvEnLigne(data: InsertRdvEnLigne): Promise<RdvEnLigne> {
   const db = await getDb();
-  const result = await db.insert(rdvEnLigne).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(rdvEnLigne, data);
   const created = await db.select().from(rdvEnLigne).where(eq(rdvEnLigne.id, insertId)).limit(1);
   return created[0];
 }

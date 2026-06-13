@@ -80,10 +80,14 @@ Tests db-direct sur PG : `fournisseurs.test.ts` **17/17 ✓**, `security.test.ts
 
 **P0.7a EN COURS** — helper `insertReturningId(table, values)` dialect-aware ajouté dans db.ts (PG `.returning({id})`, mysql `insertId`).
 - **7a-1 FAIT** (8 fn Drizzle) : createActivite, createClientPortalAccess, createTechnicien, createHabilitationTechnicien, setDisponibilite, updatePositionTechnicien, createHistoriqueDeplacement, createContrat. **Validé sur PG ET mysql** (créent une ligne avec id correct ; tsc neuf vert).
-- **7a-2 À FAIRE** : createFactureRecurrente, createInterventionContrat, getOrCreateConversation, createMessage, createRdvEnLigne, getOrCreateAiThread, createPointageChantier (mêmes patterns famille A/B).
-- ⚠️ Les inserts **raw `pool.execute`** (createDepense, createNoteFrais, createInterventionMobile, createPhotoIntervention) NE sont PAS 7a → traités en 7b/7c (getPool).
+- **7a-2 FAIT** (6 fn Drizzle : createFactureRecurrente, createInterventionContrat, getOrCreateConversation, createMessage, createRdvEnLigne, createPointageChantier). Validé **PG 6/6** + **mysql** (hors conversations, non-régression) ; filet PG 37/39 (2 échecs = pollution data). **→ 7a COMPLET.**
+- Bonus : corrigé un vrai **bug PG** dans createMessage — `sql\`nonLuClient + 1\`` (identifiant nu → minusculé par PG en `nonluclient` inexistant) → interpolé via la colonne Drizzle.
+- ⚠️ `getOrCreateAiThread` n'était PAS Drizzle (raw `ensurePool()`) → reclassé en 7b/7c.
+- ⚠️ **2e accesseur de pool brut `ensurePool()`** = 27 occurrences (en plus des 73 `getPool()`) → **scope raw élargi** pour 7b/7c.
+- 🔎 **Drift découvert** : mysql `conversations.statut` = `enum('active','archivee')` alors que schéma/code = `['ouverte','fermee','archivee']` → `getOrCreateConversation` **déjà cassé sur le mysql live** (pré-existant, pas une régression du port). Sur PG cohérent. À tracer (schema.ts ≠ base live par endroits — possible source d'autres surprises au cutover).
+- Inserts raw `pool.execute` (createDepense, createNoteFrais, createInterventionMobile, createPhotoIntervention, getOrCreateAiThread) → 7b/7c.
 
-**Prochaine action : P0.7a-2.**
+**Prochaine action : P0.7b** — getPool/ensurePool lectures simples (couleurs calendrier, mobile/photos, stats chantier, getOrCreateAiThread). Stratégie : réécrire en Drizzle au cas par cas OU fournir un `pgPool` (placeholders `$1`, résultat `rows`) quand DB_DIALECT=postgresql. ⚠️ Le SQL brut mysql (`?`, `NOW()`, ``backticks``, `[rows]`) n'est PAS pg-compatible.
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
