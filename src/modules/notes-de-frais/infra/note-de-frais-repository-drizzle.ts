@@ -3,7 +3,7 @@ import { notesDeFrais } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { INoteDeFraisRepository } from "../application/note-de-frais-repository";
+import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch } from "../application/note-de-frais-repository";
 import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
 
 type NoteRow = typeof notesDeFrais.$inferSelect;
@@ -112,6 +112,22 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
         .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, ctx.artisanId)))
         .returning({ id: notesDeFrais.id });
       return deleted.length > 0;
+    });
+  }
+
+  setWorkflow(ctx: TenantContext, id: number, patch: NoteDeFraisWorkflowPatch): Promise<NoteDeFrais | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const set: Partial<typeof notesDeFrais.$inferInsert> = { statut: patch.statut };
+      if (patch.dateSoumission !== undefined) set.date_soumission = patch.dateSoumission;
+      if (patch.dateApprobation !== undefined) set.date_approbation = patch.dateApprobation;
+      if (patch.datePaiement !== undefined) set.date_paiement = patch.datePaiement;
+      if (patch.commentaireApprobateur !== undefined) set.commentaire_approbateur = patch.commentaireApprobateur;
+      const [row] = await tx
+        .update(notesDeFrais)
+        .set(set)
+        .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, ctx.artisanId)))
+        .returning();
+      return row ? toNoteDeFrais(row) : null;
     });
   }
 }

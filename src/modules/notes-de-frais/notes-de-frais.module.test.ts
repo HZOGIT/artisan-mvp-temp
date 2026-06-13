@@ -10,6 +10,7 @@ const stubRepo: INoteDeFraisRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  setWorkflow: async () => null,
 };
 
 describe("notes-de-frais.module", () => {
@@ -19,12 +20,22 @@ describe("notes-de-frais.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "setWorkflow", "update"]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createNotesDeFraisModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual([
+      "approuver",
+      "create",
+      "delete",
+      "getById",
+      "list",
+      "payer",
+      "rejeter",
+      "soumettre",
+      "update",
+    ]);
   });
 });

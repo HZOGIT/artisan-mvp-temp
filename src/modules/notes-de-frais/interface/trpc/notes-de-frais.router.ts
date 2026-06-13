@@ -6,6 +6,10 @@ import {
   creerNoteDeFrais,
   modifierNoteDeFrais,
   supprimerNoteDeFrais,
+  soumettreNoteDeFrais,
+  approuverNoteDeFrais,
+  rejeterNoteDeFrais,
+  payerNoteDeFrais,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -58,5 +62,22 @@ export function createNotesDeFraisRouter(repo: INoteDeFraisRepository) {
         await supprimerNoteDeFrais(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self).
+    soumettre: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => soumettreNoteDeFrais(repo, ctx.tenant, input.id)),
+
+    approuver: protectedProcedure
+      .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
+      .mutation(({ ctx, input }) => approuverNoteDeFrais(repo, ctx.tenant, input.id, input.commentaire)),
+
+    rejeter: protectedProcedure
+      .input(z.object({ id: z.number().int(), commentaire: z.string().min(1).max(2000) }))
+      .mutation(({ ctx, input }) => rejeterNoteDeFrais(repo, ctx.tenant, input.id, input.commentaire)),
+
+    payer: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => payerNoteDeFrais(repo, ctx.tenant, input.id)),
   });
 }

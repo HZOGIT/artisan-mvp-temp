@@ -14,6 +14,7 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 
 const UA = 9899001;
 const UB = 9899002;
+const UEMP = 9899050; // un « salarié » du tenant A, demandeur d'une note (≠ approbateur owner)
 let seq = 0;
 const numero = () => `NDF-R-${++seq}`;
 
@@ -57,12 +58,16 @@ describe.skipIf(!URL)("notesDeFrais.router e2e (HTTP → tRPC → use-case → r
     }
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
+    // salarié du tenant A (demandeur, sans artisan propre)
+    await admin.query("delete from users where id=$1", [UEMP]);
+    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','technicien')", [UEMP, `u${UEMP}@t.fr`]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), noteDeFraisRepo: new NoteDeFraisRepositoryDrizzle(app.db) });
   });
 
   afterAll(async () => {
     await server.close();
     for (const uid of [UA, UB]) await purge(uid);
+    await admin.query("delete from users where id=$1", [UEMP]);
     await app.close();
     await admin.end();
   });
@@ -141,5 +146,35 @@ describe.skipIf(!URL)("notesDeFrais.router e2e (HTTP → tRPC → use-case → r
     expect(after.statut).toBe("brouillon"); // workflow inviolé
     expect(after.userId).toBe(UA); // demandeur inchangé
     expect(after.titre).toBe("Toujours"); // seul le champ légitime appliqué
+  });
+
+  it("ANTI SELF-APPROBATION e2e : l'owner ne peut pas approuver sa propre note (userId = lui) → 403", async () => {
+    const tA = await token(UA);
+    // create force userId = UA → UA est le demandeur
+    const id = (await callMutation(server, "notesDeFrais.create", { numero: numero(), titre: "Self", periodeDebut: "2026-12-01", periodeFin: "2026-12-31" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "notesDeFrais.soumettre", { id }, tA)).json().result.data.statut).toBe("soumise");
+    // UA = demandeur tente d'approuver sa propre note → 403
+    expect((await callMutation(server, "notesDeFrais.approuver", { id }, tA)).statusCode).toBe(403);
+    expect((await callQuery(server, "notesDeFrais.getById", { id }, tA)).json().result.data.statut).toBe("soumise");
+  });
+
+  it("workflow e2e : note d'un salarié → soumise → approuvée (owner ≠ demandeur) → payée", async () => {
+    const tA = await token(UA);
+    // note demandée par le salarié UEMP (≠ owner UA), seedée via admin
+    const ins = await admin.query(
+      "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin) values ($1,$2,$3,'Frais salarié','2027-01-01','2027-01-31') returning id",
+      [artisanA, UEMP, `NDF-EMP-${++seq}`],
+    );
+    const id = ins.rows[0].id as number;
+    expect((await callMutation(server, "notesDeFrais.soumettre", { id }, tA)).json().result.data.statut).toBe("soumise");
+    // owner UA approuve (UA ≠ UEMP demandeur) → OK
+    const appr = await callMutation(server, "notesDeFrais.approuver", { id, commentaire: "Validé" }, tA);
+    expect(appr.statusCode).toBe(200);
+    expect(appr.json().result.data.statut).toBe("approuvee");
+    expect(appr.json().result.data.dateApprobation).not.toBeNull();
+    // payer
+    expect((await callMutation(server, "notesDeFrais.payer", { id }, tA)).json().result.data.statut).toBe("payee");
+    // transition invalide : re-soumettre une note payée → 409
+    expect((await callMutation(server, "notesDeFrais.soumettre", { id }, tA)).statusCode).toBe(409);
   });
 });

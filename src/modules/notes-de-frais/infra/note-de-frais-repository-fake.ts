@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { INoteDeFraisRepository } from "../application/note-de-frais-repository";
+import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch } from "../application/note-de-frais-repository";
 import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -53,5 +53,21 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
     if (!n) return false;
     this.store = this.store.filter((x) => x.id !== id);
     return true;
+  }
+
+  async setWorkflow(ctx: TenantContext, id: number, patch: NoteDeFraisWorkflowPatch): Promise<NoteDeFrais | null> {
+    const n = await this.getById(ctx, id);
+    if (!n) return null;
+    const updated: NoteDeFrais = {
+      ...n,
+      statut: patch.statut,
+      dateSoumission: patch.dateSoumission ?? n.dateSoumission,
+      dateApprobation: patch.dateApprobation ?? n.dateApprobation,
+      datePaiement: patch.datePaiement ?? n.datePaiement,
+      commentaireApprobateur:
+        patch.commentaireApprobateur !== undefined ? patch.commentaireApprobateur : n.commentaireApprobateur,
+    };
+    this.store = this.store.map((x) => (x.id === id ? updated : x));
+    return updated;
   }
 }
