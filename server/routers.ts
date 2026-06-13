@@ -2499,7 +2499,9 @@ const notificationsRouter = router({
     .input(z.object({
       includeArchived: z.boolean().default(false),
       nonLuesUniquement: z.boolean().default(false),
-      page: z.number().min(1).default(1),
+      // OPE-24 — borne page : offset = (page-1)*limit poussé en SQL ; un page géant
+      // = OFFSET énorme (scan coûteux). Cap defense-in-depth (offset max ~5M lignes).
+      page: z.number().min(1).max(100000).default(1),
       limit: z.number().min(1).max(100).default(50),
     }).optional())
     .query(async ({ ctx, input }) => {
