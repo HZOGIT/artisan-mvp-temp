@@ -1070,7 +1070,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   sendByEmail: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      customMessage: z.string().optional(),
+      customMessage: z.string().max(5000).optional(),
       attachPdf: z.boolean().optional().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1259,7 +1259,9 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   envoyerRelance: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      message: z.string().optional()
+      // Borne defense-in-depth (OPE-24) : message libre injecté (échappé) dans le
+      // corps de l'email de relance — un message légitime est court.
+      message: z.string().max(5000).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -1816,7 +1818,7 @@ const facturesRouter = router({
   sendByEmail: protectedProcedure
     .input(z.object({
       factureId: z.number(),
-      customMessage: z.string().optional(),
+      customMessage: z.string().max(5000).optional(),
       attachPdf: z.boolean().optional().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
