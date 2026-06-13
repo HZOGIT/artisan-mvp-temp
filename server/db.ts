@@ -6783,19 +6783,22 @@ const CONFIG_ALERTE_COLS = new Set([
 export async function saveConfigAlertePrevision(
   data: InsertConfigAlertePrevision
 ): Promise<ConfigAlertePrevision | undefined> {
-  // Upsert sur artisanId (cle unique dans le schema).
-  const pool = getPool();
-  if (!pool) return undefined;
-  const keys = Object.keys(data).filter((k) => CONFIG_ALERTE_COLS.has(k));
-  const cols = keys.join(", ");
-  const placeholders = keys.map(() => "?").join(", ");
-  const updates = keys.filter((k) => k !== "artisanId").map((k) => `${k} = VALUES(${k})`).join(", ");
-  const values = keys.map((k) => (data as any)[k]);
-  await pool.execute(
-    `INSERT INTO config_alertes_previsions (${cols}) VALUES (${placeholders})
-     ON DUPLICATE KEY UPDATE ${updates || "updatedAt = CURRENT_TIMESTAMP"}`,
-    values
-  );
+  // Upsert sur artisanId (clé unique) : select-puis-insert/update neutre dialecte.
+  // Whitelist CONFIG_ALERTE_COLS conservée (defense-in-depth audit injection SQL).
+  const dbi = await getDb();
+  const filtered: Record<string, any> = {};
+  for (const k of Object.keys(data)) if (CONFIG_ALERTE_COLS.has(k)) filtered[k] = (data as any)[k];
+  const existing = await dbi.select({ id: configAlertesPrevisions.id }).from(configAlertesPrevisions)
+    .where(eq(configAlertesPrevisions.artisanId, data.artisanId)).limit(1);
+  if (existing[0]) {
+    const { artisanId: _aid, ...updates } = filtered;
+    if (Object.keys(updates).length > 0) {
+      await dbi.update(configAlertesPrevisions).set(updates)
+        .where(eq(configAlertesPrevisions.artisanId, data.artisanId));
+    }
+  } else {
+    await dbi.insert(configAlertesPrevisions).values(filtered as any);
+  }
   return getConfigAlertePrevision(data.artisanId);
 }
 
@@ -6836,19 +6839,16 @@ export async function verifierEcartsEtEnvoyerAlertes(
   const caPrev = Number(prev.caPrevisionnel || 0);
   if (caPrev <= 0) return [];
 
-  // CA realise pour le mois (factures payees).
-  const pool = getPool();
-  if (!pool) return [];
+  // CA realise pour le mois (factures payees). dateFacture timestamp → sql BETWEEN brut.
   const debutMois = new Date(annee, mois - 1, 1).toISOString().slice(0, 10);
   const finMois = new Date(annee, mois, 0).toISOString().slice(0, 10);
-  const [rRows]: any = await pool.execute(
-    `SELECT COALESCE(SUM(totalTTC), 0) AS ca
-       FROM factures
-      WHERE artisanId = ? AND statut = 'payee'
-        AND dateFacture BETWEEN ? AND ?`,
-    [artisanId, debutMois, finMois]
-  );
-  const caReel = Number(rRows[0]?.ca || 0);
+  const [rRow] = await dbi.select({ ca: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` })
+    .from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, "payee" as any),
+      sql`${factures.dateFacture} BETWEEN ${debutMois} AND ${finMois}`,
+    ));
+  const caReel = Number(rRow?.ca || 0);
 
   // Calcul ecart en %.
   const ecart = ((caReel - caPrev) / caPrev) * 100;
@@ -6863,13 +6863,14 @@ export async function verifierEcartsEtEnvoyerAlertes(
 
   // Verifier si une alerte du meme type a deja ete envoyee ce mois pour
   // eviter le spam.
-  const [existsRows]: any = await pool.execute(
-    `SELECT id FROM historique_alertes_previsions
-      WHERE artisanId = ? AND mois = ? AND annee = ? AND typeAlerte = ?
-      LIMIT 1`,
-    [artisanId, mois, annee, typeAlerte]
-  );
-  if ((existsRows as any[]).length > 0) return [];
+  const existsRows = await dbi.select({ id: historiqueAlertesPrevisions.id }).from(historiqueAlertesPrevisions)
+    .where(and(
+      eq(historiqueAlertesPrevisions.artisanId, artisanId),
+      eq(historiqueAlertesPrevisions.mois, mois),
+      eq(historiqueAlertesPrevisions.annee, annee),
+      eq(historiqueAlertesPrevisions.typeAlerte, typeAlerte as any),
+    )).limit(1);
+  if (existsRows.length > 0) return [];
 
   const canal: "email" | "sms" | "les_deux" =
     config.alerteEmail && config.alerteSms ? "les_deux" :

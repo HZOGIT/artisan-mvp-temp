@@ -166,7 +166,11 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 - **7d-4 FAIT** (2026-06-13) : push subscriptions → Drizzle. `savePushSubscription` `ON DUPLICATE KEY UPDATE` → **check-then-act** sur (technicienId, endpoint). ⚠️ Même découverte que 7d-2 : `push_subscriptions` n'a PAS de clé unique (seul `id` PK, base live) → l'ancien upsert ne déclenchait jamais l'update (bug latent : ré-abonnement = doublon). Corrigé (idempotent, `actif` forcé TRUE à la réactivation, `updatedAt` via $onUpdate). **Validé PG** (`scripts/test-push-pg.mjs`, 12/12) : insert, upsert (KEY mis à jour, **pas de doublon**), soft-delete (actif=false, ligne conservée), **réabonnement réactive** (actif=true), endpoint différent → nouvelle ligne. tsc neuf vert.
 
-**Prochaine action : P0.7d-5** (alertes prévisions : `saveConfigAlertePrevision` ~L6798, `verifierEcartsEtEnvoyerAlertes` ~L6827 — dernières fn `getPool()` hors compta). Puis **P0.7d COMPLET** → P0.8 (copie data staging) + P0.9 (tests sur PG) avant cutover.
+- **7d-5 FAIT** (2026-06-13) : alertes prévisions → Drizzle. `saveConfigAlertePrevision` (`ON DUPLICATE KEY` sur artisanId unique → select-puis-insert/update + whitelist `CONFIG_ALERTE_COLS`), `verifierEcartsEtEnvoyerAlertes` (CA réel `SUM(totalTTC)` factures payées `dateFacture BETWEEN` sql brut + anti-spam exists-check → Drizzle). **Validé PG** (`scripts/test-alertes-pg.mjs`, 13/13) : config upsert (whitelist, idempotent), **écart -50% → depassement_negatif** (caPrev=1000, caReel=500), montants/ecart enregistrés, **anti-spam** (2e appel = 0 alerte, historique=1), config inactive → 0 alerte. tsc neuf vert.
+
+**→ Reste UN seul `getPool()` dans db.ts** : helper `ensurePool()` (L4430) utilisé par la section **modules** raw-SQL (`ModuleRow`, getModules/setArtisanModule…). = **P0.7d-6** (dernier batch raw-SQL de db.ts).
+
+**Prochaine action : P0.7d-6** (modules : recenser les fn utilisant `ensurePool()` → porter en Drizzle tables modules/artisanModules). Puis **P0.7 (db.ts) raw-SQL COMPLET** → vérifier routers.ts/index.ts (5+8 getPool d'après l'audit initial). Puis P0.8 (copie data staging) + P0.9 (tests PG) avant cutover.
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
