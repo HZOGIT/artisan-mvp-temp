@@ -609,12 +609,23 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
   // Tableau des lignes
-  const tableData = facture.lignes.map((ligne) => [
-    ligne.designation,
-    (Number(ligne.quantite) || 0).toString(),
-    `${Number(ligne.prixUnitaireHT).toFixed(2)} €`,
-    `${(Number(ligne.prixUnitaireHT) * (Number(ligne.quantite) || 0)).toFixed(2)} €`,
-  ]);
+  const tableData = facture.lignes.map((ligne) => {
+    // OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
+    // en pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+    const type = (ligne as any).type ?? "produit";
+    if (type === "section") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+    }
+    if (type === "note") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+    }
+    return [
+      ligne.designation,
+      (Number(ligne.quantite) || 0).toString(),
+      `${Number(ligne.prixUnitaireHT).toFixed(2)} €`,
+      `${(Number(ligne.prixUnitaireHT) * (Number(ligne.quantite) || 0)).toFixed(2)} €`,
+    ];
+  });
 
   autoTable(doc, {
     head: [["Désignation", "Quantité", "P.U. HT", "Total HT"]],

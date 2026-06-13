@@ -190,6 +190,13 @@
       "when": 1781324051990,
       "tag": "0026_funny_drax",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1781325178186,
+      "tag": "0027_lazy_thunderbolts",
+      "breakpoints": true
     }
   ]
 }

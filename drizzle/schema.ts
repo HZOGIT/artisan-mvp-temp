@@ -307,6 +307,11 @@ export const facturesLignes = mysqlTable("factures_lignes", {
   montantHT: decimal("montantHT", { precision: 10, scale: 2 }).default("0.00"),
   montantTVA: decimal("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: decimal("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  // OPE-168 (volet 2) — typage de ligne, symétrique des lignes de devis : `section`
+  // (en-tête de lot) / `note` (texte libre), sans montant, exclues des totaux. Défaut
+  // `produit` → lignes existantes inchangées. Permet de reporter la structure d'un
+  // devis sectionné sur la facture issue de conversion. Additif/non destructif.
+  type: mysqlEnum("type", ["produit", "section", "note"]).default("produit"),
 });
 
 export type FactureLigne = typeof facturesLignes.$inferSelect;

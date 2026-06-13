@@ -915,12 +915,12 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
   
   // Copy lignes
   for (const ligne of lignesDevis) {
-    // OPE-168 — les lignes d'affichage (section/note) du devis ne sont PAS reportées
-    // sur la facture (le modèle facture ne porte pas ce typage). Seules les lignes
-    // `produit` (vraies lignes chiffrées) sont copiées → facture inchangée vs avant.
-    if (((ligne as any).type ?? "produit") !== "produit") continue;
+    // OPE-168 (volet 2) — la structure du devis (sections/notes) est désormais
+    // REPORTÉE sur la facture (les lignes de facture portent aussi `type`). Les
+    // section/note ont des montants à 0 → n'impactent pas les totaux de la facture.
     await db.insert(facturesLignes).values({
       factureId: facture.id,
+      type: (ligne as any).type ?? "produit",
       ordre: ligne.ordre,
       reference: ligne.reference,
       designation: ligne.designation,

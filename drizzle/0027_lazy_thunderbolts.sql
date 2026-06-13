@@ -1,0 +1,1 @@
+ALTER TABLE `factures_lignes` ADD `type` enum('produit','section','note') DEFAULT 'produit';

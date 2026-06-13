@@ -1707,8 +1707,11 @@ const facturesRouter = router({
       description: z.string().max(5000).optional(),
       quantite: z.string().max(20).default("1"),
       unite: z.string().max(20).optional(),
-      prixUnitaireHT: z.string().max(20),
+      prixUnitaireHT: z.string().max(20).default("0"),
       tauxTVA: z.string().max(10).default("20.00"),
+      // OPE-168 (volet 2) — type de ligne. `section`/`note` = lignes d'affichage
+      // (sans prix) → montants forcés à 0, exclues des totaux. Symétrique du devis.
+      type: z.enum(["produit", "section", "note"]).default("produit"),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : ownership de la facture + check brouillon (conformite fiscale).
@@ -1720,28 +1723,32 @@ const facturesRouter = router({
       if (factureCheck.statut !== "brouillon") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Document fiscal verrouillé — impossible d'ajouter des lignes." });
       }
-      const quantite = parseFloat(input.quantite);
-      const prixUnitaireHT = parseFloat(input.prixUnitaireHT);
-      const tauxTVA = parseFloat(input.tauxTVA);
-      
+      // OPE-168 — une section/note n'a ni quantité ni prix : montants neutralisés (0)
+      // → n'impacte jamais les totaux (HT/TVA/TTC sommés depuis les montants de ligne).
+      const isDisplay = input.type === "section" || input.type === "note";
+      const quantite = isDisplay ? 0 : parseFloat(input.quantite);
+      const prixUnitaireHT = isDisplay ? 0 : parseFloat(input.prixUnitaireHT);
+      const tauxTVA = isDisplay ? 0 : parseFloat(input.tauxTVA);
+
       const montantHT = quantite * prixUnitaireHT;
       const montantTVA = montantHT * (tauxTVA / 100);
       const montantTTC = montantHT + montantTVA;
-      
+
       const ligne = await db.createLigneFacture({
         factureId: input.factureId,
-        reference: input.reference,
+        type: input.type,
+        reference: isDisplay ? undefined : input.reference,
         designation: input.designation,
         description: input.description,
-        quantite: input.quantite,
-        unite: input.unite,
-        prixUnitaireHT: input.prixUnitaireHT,
-        tauxTVA: input.tauxTVA,
+        quantite: isDisplay ? "0" : input.quantite,
+        unite: isDisplay ? undefined : input.unite,
+        prixUnitaireHT: isDisplay ? "0" : input.prixUnitaireHT,
+        tauxTVA: isDisplay ? "0" : input.tauxTVA,
         montantHT: montantHT.toFixed(2),
         montantTVA: montantTVA.toFixed(2),
         montantTTC: montantTTC.toFixed(2),
       });
-      
+
       await db.recalculateFactureTotals(input.factureId);
       return ligne;
     }),

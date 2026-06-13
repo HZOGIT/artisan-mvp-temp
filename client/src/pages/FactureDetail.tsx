@@ -295,8 +295,12 @@ export default function FactureDetail() {
   const handleCreateAvoir = () => {
     if (!facture) return;
     if (avoirType === "total") {
-      // Avoir total : reprendre toutes les lignes de la facture
-      const lignes = (facture.lignes || []).map((l: any) => ({
+      // Avoir total : reprendre toutes les lignes de la facture.
+      // OPE-168 — exclure les lignes d'affichage (section/note) : un avoir ne crédite
+      // que des montants ; les section/note n'en portent pas (sinon lignes parasites).
+      const lignes = (facture.lignes || [])
+        .filter((l: any) => (l.type ?? "produit") === "produit")
+        .map((l: any) => ({
         designation: l.designation,
         quantite: l.quantite?.toString() || "1",
         prixUnitaireHT: l.prixUnitaireHT?.toString() || "0",
@@ -337,6 +341,7 @@ export default function FactureDetail() {
       unite: l.unite,
       prixUnitaire: parseFloat(l.prixUnitaireHT) || 0,
       tauxTva: parseFloat(l.tauxTVA) || 20,
+      type: l.type, // OPE-168 — section/note rendues en pleine largeur dans le PDF
     }));
     const isAvoir = (facture as any).typeDocument === "avoir";
     generateFacturePDF(
@@ -970,7 +975,19 @@ export default function FactureDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {facture.lignes.map((ligne: any) => (
+                  {facture.lignes.map((ligne: any) => {
+                    // OPE-168 — section (en-tête de lot) / note (texte libre) :
+                    // affichées en pleine largeur, sans colonnes de prix.
+                    if (ligne.type === "section" || ligne.type === "note") {
+                      return (
+                        <tr key={ligne.id} className={ligne.type === "section" ? "bg-muted/50" : ""}>
+                          <td colSpan={6} className={ligne.type === "section" ? "font-semibold" : "italic text-muted-foreground"}>
+                            {ligne.type === "section" ? "§ " : ""}{ligne.designation}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
                     <tr key={ligne.id}>
                       <td>{ligne.reference || "-"}</td>
                       <td>{ligne.designation}</td>
@@ -979,7 +996,8 @@ export default function FactureDetail() {
                       <td className="text-right">{ligne.tauxTVA}%</td>
                       <td className="text-right font-medium">{formatCurrency(ligne.montantTTC)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2">
