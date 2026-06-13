@@ -33,5 +33,13 @@
 - [ ] P0.9 — Vitest sur PG jetable. P0.10/11/12 — TenantContext + withTenant + RLS.
 - [ ] P0.13 ports · P0.14/15 CI · P0.16 migrate hors boot · P0.17 gateway · P0.18 scaffold Fastify · P0.19 flags · P0.20 harnais isolation · P0.QW deps mortes.
 
+### ▶️ STATUT : ACTIF — reprise 2026-06-13 ~06:10
+**Gate qualité du loop (décidé)** : `pnpm test` vert + `tsc` scopé au code **NEUF `src/**` uniquement** (tsconfig dédié `tsconfig.src.json`, à créer en P0.18 quand `src/` existe). On **NE corrige PAS** les 672 erreurs tsc legacy (build réel = esbuild sans typecheck ; dette suivie via issue dédiée). Pour les itérations infra/legacy sans `src/`, le gate = pas de régression runtime + conteneurs healthy.
+
+- **P0.2 (OPE-188)** : ✅ **fait** — `pg` 8.21 + `@types/pg`, service `postgres:18` up & **healthy** (PG 18.4), dialect Drizzle env-gated (`DB_DIALECT`, défaut mysql). Bonus : fixes baseline `trpc.ts` (narrowing user) + `routers.ts:10022` (z.record zod v4).
+- **BLOCAGE (chiffre corrigé)** : `pnpm check` (tsc) renvoie **672 erreurs** sur `staging`, pré-existantes (premier rapport « 7 » erroné = troncature `tail -8`). Répartition : **561 dans `server/db.ts`** (dont **542× TS18047 « possibly null »** = pattern `getDb()` nullable non narrowé), 25 dans `routers.ts`, ~80 dans le front.
+- **Cause racine** : le projet build via **esbuild** (`build:server`) qui **ne typecheck pas** → l'app tourne malgré les 672 erreurs ; `tsc --noEmit` n'a jamais été vert (pas de CI). Le gate « tsc vert sur tout le repo » est donc **irréaliste** comme préalable.
+- Fixes déjà appliqués (corrects, à garder) : `trpc.ts` (narrowing user dans requireRole/requirePermission) + `routers.ts:10022` (z.record zod v4). Ils réduisent le total mais ne le rendent pas vert (legacy massif).
+
 ### Prochaine action
-→ **P0.2 (OPE-188)** : ajouter `pg`/`@types/pg`, service `postgres:18` au docker-compose dev, préparer dialect `pg`.
+→ **P0.3 (OPE-189)** : conversion schéma Drizzle `mysqlTable`→`pgTable` batch 1 (plateforme + cœur facturation), en appliquant `ope-184-mapping-types-mysql-pg.md`. Rappel pièges : 71 enums → pgEnum, 32 onUpdateNow (gérer en repo / trigger), pas de FK à convertir.

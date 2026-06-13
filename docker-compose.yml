@@ -18,6 +18,27 @@ services:
       retries: 10
       start_period: 30s
 
+  # OPE-184 — cible de la migration (coexiste avec MySQL le temps de la bascule PG-first).
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: artisan_mvp
+      POSTGRES_USER: ${POSTGRES_USER:-artisan_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-artisan_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      # PG18+ : monter /var/lib/postgresql (données dans un sous-dossier par version),
+      # PAS /var/lib/postgresql/data (cf. docker-library/postgres#1259).
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-artisan_user} -d artisan_mvp"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   app:
     image: node:22-slim
     working_dir: /app
@@ -43,4 +64,5 @@ services:
 
 volumes:
   mysql_data:
+  pg_data:
   app_node_modules:
