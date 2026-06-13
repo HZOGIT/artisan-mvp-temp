@@ -3,7 +3,10 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ICommandeRepository } from "../../application/commande-repository";
 import { listCommandes, getCommande, listLignesCommande } from "../../application/read-use-cases";
 import { creerCommande, modifierCommande, supprimerCommande } from "../../application/write-use-cases";
+import { changerStatutCommande, listerCommandesEnRetard } from "../../application/statut-use-cases";
 import type { CreateLigneInput } from "../../domain/commande";
+
+const statutEnum = z.enum(["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]);
 
 // Lignes en entrée : montants en number (transport) → mappés en string pour le repo.
 const ligneSchema = z.object({
@@ -86,5 +89,20 @@ export function createCommandesRouter(repo: ICommandeRepository) {
         await supprimerCommande(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // ── Transitions de statut + indicateur retard ──
+    updateStatut: protectedProcedure
+      .input(z.object({ id: z.number().int(), statut: statutEnum, dateLivraisonReelle: z.string().datetime().nullish() }))
+      .mutation(({ ctx, input }) =>
+        changerStatutCommande(
+          repo,
+          ctx.tenant,
+          input.id,
+          input.statut,
+          input.dateLivraisonReelle ? new Date(input.dateLivraisonReelle) : undefined,
+        ),
+      ),
+
+    getEnRetard: protectedProcedure.query(({ ctx }) => listerCommandesEnRetard(repo, ctx.tenant)),
   });
 }

@@ -4,6 +4,7 @@ import type {
   LigneCommande,
   CreateCommandeInput,
   UpdateCommandeInput,
+  CommandeStatut,
 } from "../domain/commande";
 
 // Port du repository commandes fournisseurs. Chaque méthode exige le TenantContext (scope
@@ -24,4 +25,15 @@ export interface ICommandeRepository {
   update(ctx: TenantContext, id: number, input: UpdateCommandeInput): Promise<Commande | null>;
   // false si la commande n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+
+  // Change le statut d'une commande (+ date de livraison réelle optionnelle) — null si
+  // la commande n'appartient pas au tenant.
+  updateStatut(
+    ctx: TenantContext,
+    id: number,
+    statut: CommandeStatut,
+    dateLivraisonReelle?: Date | null,
+  ): Promise<Commande | null>;
+  // Commandes du tenant en retard de livraison (échéance dépassée, non livrées/annulées).
+  listEnRetard(ctx: TenantContext): Promise<Commande[]>;
 }

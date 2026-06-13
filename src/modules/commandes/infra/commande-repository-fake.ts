@@ -6,6 +6,7 @@ import type {
   CreateCommandeInput,
   CreateLigneInput,
   UpdateCommandeInput,
+  CommandeStatut,
 } from "../domain/commande";
 
 function calculerTotaux(lignes: readonly CreateLigneInput[]): { totalHT: number; totalTVA: number; lignesHT: number[] } {
@@ -110,5 +111,35 @@ export class FakeCommandeRepository implements ICommandeRepository {
     this.store = this.store.filter((x) => x.id !== id);
     this.lignesStore = this.lignesStore.filter((l) => l.commandeId !== id);
     return true;
+  }
+
+  async updateStatut(
+    ctx: TenantContext,
+    id: number,
+    statut: CommandeStatut,
+    dateLivraisonReelle?: Date | null,
+  ): Promise<Commande | null> {
+    const c = await this.getById(ctx, id);
+    if (!c) return null;
+    const updated: Commande = {
+      ...c,
+      statut,
+      dateLivraisonReelle: dateLivraisonReelle !== undefined ? dateLivraisonReelle : c.dateLivraisonReelle,
+      updatedAt: new Date(),
+    };
+    this.store = this.store.map((x) => (x.id === id ? updated : x));
+    return updated;
+  }
+
+  async listEnRetard(ctx: TenantContext): Promise<Commande[]> {
+    const now = Date.now();
+    return this.store.filter(
+      (c) =>
+        c.artisanId === ctx.artisanId &&
+        c.dateLivraisonPrevue != null &&
+        c.dateLivraisonPrevue.getTime() < now &&
+        c.statut !== "livree" &&
+        c.statut !== "annulee",
+    );
   }
 }

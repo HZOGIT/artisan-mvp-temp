@@ -9,6 +9,8 @@ const stubRepo: ICommandeRepository = {
   create: async () => null,
   update: async () => null,
   delete: async () => false,
+  updateStatut: async () => null,
+  listEnRetard: async () => [],
 };
 
 describe("commandes.module", () => {
@@ -18,12 +20,30 @@ describe("commandes.module", () => {
   });
 
   it("le port expose les opérations attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listLignes", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "create",
+      "delete",
+      "getById",
+      "list",
+      "listEnRetard",
+      "listLignes",
+      "update",
+      "updateStatut",
+    ]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createCommandesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "getLignes", "list", "update"]);
+    expect(procedures).toEqual([
+      "create",
+      "delete",
+      "getById",
+      "getEnRetard",
+      "getLignes",
+      "list",
+      "update",
+      "updateStatut",
+    ]);
   });
 });

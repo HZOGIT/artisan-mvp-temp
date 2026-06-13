@@ -148,4 +148,39 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     expect(lignes[0].montantTotal).toBe("10.00"); // 4 × 2.5
     expect(lignes[0].quantiteRecue).toBe("0.00");
   });
+
+  it("updateStatut : transition scopée ; cross-tenant → 404", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "commandes.updateStatut", { id, statut: "confirmee" }, tA)).json().result.data.statut).toBe("confirmee");
+    expect((await callMutation(server, "commandes.updateStatut", { id, statut: "annulee" }, tB)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandes.updateStatut", { id, statut: "x_invalide" as unknown as string }, tA)).statusCode).toBe(400);
+  });
+
+  it("getEnRetard : commandes échéance dépassée non livrées, scopé tenant", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // commande A en retard via SQL (dateLivraisonPrevue passée)
+    const cmdRetard = (await admin.query(
+      `insert into commandes_fournisseurs ("artisanId","fournisseurId",statut,"dateLivraisonPrevue") values ($1,$2,'envoyee', now() - interval '3 days') returning id`,
+      [artisanA, fournA],
+    )).rows[0].id as number;
+    // commande A livrée en retard → exclue
+    await admin.query(
+      `insert into commandes_fournisseurs ("artisanId","fournisseurId",statut,"dateLivraisonPrevue") values ($1,$2,'livree', now() - interval '3 days')`,
+      [artisanA, fournA],
+    );
+    // commande B en retard → ne compte pas pour A
+    await admin.query(
+      `insert into commandes_fournisseurs ("artisanId","fournisseurId",statut,"dateLivraisonPrevue") values ($1,$2,'envoyee', now() - interval '3 days')`,
+      [artisanB, fournB],
+    );
+    const retardsA = (await callQuery(server, "commandes.getEnRetard", undefined, tA)).json().result.data as Array<{ id: number }>;
+    expect(retardsA.map((c) => c.id)).toContain(cmdRetard);
+    expect(retardsA.every((c) => c.id !== undefined)).toBe(true);
+    // B ne voit pas les retards de A
+    const retardsB = (await callQuery(server, "commandes.getEnRetard", undefined, tB)).json().result.data as Array<{ id: number }>;
+    expect(retardsB.some((c) => c.id === cmdRetard)).toBe(false);
+  });
 });

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, lt, isNotNull, notInArray, sql } from "drizzle-orm";
 import {
   commandesFournisseurs,
   lignesCommandesFournisseurs,
@@ -14,6 +14,7 @@ import type {
   CreateCommandeInput,
   CreateLigneInput,
   UpdateCommandeInput,
+  CommandeStatut,
 } from "../domain/commande";
 
 type CommandeRow = typeof commandesFournisseurs.$inferSelect;
@@ -195,6 +196,43 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         .where(and(eq(commandesFournisseurs.id, id), eq(commandesFournisseurs.artisanId, ctx.artisanId)))
         .returning({ id: commandesFournisseurs.id });
       return deleted.length > 0;
+    });
+  }
+
+  updateStatut(
+    ctx: TenantContext,
+    id: number,
+    statut: CommandeStatut,
+    dateLivraisonReelle?: Date | null,
+  ): Promise<Commande | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const set: Record<string, unknown> = { statut, updatedAt: new Date() };
+      if (dateLivraisonReelle !== undefined) set.dateLivraisonReelle = dateLivraisonReelle;
+      const [row] = await tx
+        .update(commandesFournisseurs)
+        .set(set)
+        .where(and(eq(commandesFournisseurs.id, id), eq(commandesFournisseurs.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toCommande(row) : null;
+    });
+  }
+
+  listEnRetard(ctx: TenantContext): Promise<Commande[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await tx
+        .select()
+        .from(commandesFournisseurs)
+        .where(
+          and(
+            eq(commandesFournisseurs.artisanId, ctx.artisanId),
+            isNotNull(commandesFournisseurs.dateLivraisonPrevue),
+            lt(sql`${commandesFournisseurs.dateLivraisonPrevue}::date`, today),
+            notInArray(commandesFournisseurs.statut, ["livree", "annulee"]),
+          ),
+        )
+        .orderBy(asc(commandesFournisseurs.dateLivraisonPrevue));
+      return rows.map(toCommande);
     });
   }
 
