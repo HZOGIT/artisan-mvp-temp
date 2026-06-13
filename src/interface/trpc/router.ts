@@ -14,6 +14,7 @@ import type { CongesModule } from "../../modules/conges/conges.module";
 import type { NotesDeFraisModule } from "../../modules/notes-de-frais/notes-de-frais.module";
 import type { ChantiersModule } from "../../modules/chantiers/chantiers.module";
 import type { DepensesModule } from "../../modules/depenses/depenses.module";
+import type { DevisModule } from "../../modules/devis/devis.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -31,6 +32,7 @@ export interface AppRouterDeps {
   readonly notesDeFrais: NotesDeFraisModule;
   readonly chantiers: ChantiersModule;
   readonly depenses: DepensesModule;
+  readonly devis: DevisModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -57,6 +59,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     notesDeFrais: deps.notesDeFrais.router,
     chantiers: deps.chantiers.router,
     depenses: deps.depenses.router,
+    devis: deps.devis.router,
   });
 }
 
