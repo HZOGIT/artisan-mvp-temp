@@ -232,9 +232,31 @@ describe("bascule du domaine interventions (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine conges (flag gateway)", () => {
+  it("conges routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("conges", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { conges: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("conges", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("conges", 8, canary)).toBe(false);
+    const global: FeatureFlags = { conges: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("conges", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("conges", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine conges extraient bien le domaine (dont le workflow approuver)", () => {
+    expect(domainFromTrpcPath("conges.approuver")).toBe("conges");
+    expect(domainFromTrpcPath("/conges.annuler")).toBe("conges");
+  });
+
+  it("parse env : conges enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "conges" } as NodeJS.ProcessEnv).conges).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_CONGES: "7" } as NodeJS.ProcessEnv).conges?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 10 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions"]) {
+  it("les 11 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
