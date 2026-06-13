@@ -280,7 +280,9 @@ const artisanRouter = router({
       const persistMetier = async (id: number) => {
         if (typeof metierVal !== "string") return;
         try {
-          await pool.execute(`UPDATE artisans SET metier = ? WHERE id = ?`, [metierVal.trim() || null, id]);
+          // OPE-184 — `metier` est désormais une colonne Drizzle (artisans) : on réutilise
+          // le helper porté plutôt qu'un raw SQL via un `pool` hors scope.
+          await db.updateArtisanOnboarding(id, { metier: metierVal.trim() || null });
         } catch (e: any) { console.warn("[updateProfile] metier persist:", String(e?.message || e)); }
       };
 
@@ -4730,12 +4732,12 @@ const clientPortalRouter = router({
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes, reessayez plus tard" });
       }
 
-      // Lit le metier hors-schema (colonne ajoutee via fix-duplicates).
+      // Lit le metier (colonne Drizzle artisans) via le helper porté (OPE-184),
+      // avec fallback sur `specialite`. Plus de raw SQL via un `pool` hors scope.
       let metier: string | null = null;
       try {
-        const [rows] = await pool.execute(`SELECT metier FROM artisans WHERE id = ?`, [artisan.id]);
-        const r: any = Array.isArray(rows) ? rows[0] : null;
-        metier = r?.metier || (artisan as any).specialite || null;
+        const st = await db.getArtisanOnboardingStatus(artisan.id);
+        metier = st?.metier || (artisan as any).specialite || null;
       } catch {
         metier = (artisan as any).specialite || null;
       }

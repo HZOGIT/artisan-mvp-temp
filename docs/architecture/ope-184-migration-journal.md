@@ -185,7 +185,11 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ 🎯🎯 `server/db.ts` = 100% Drizzle, ZÉRO raw-SQL via pool.** Tous les domaines portés + validés PG (compta/FEC, NDF, banque, couleurs, congés, gamification, push, alertes, modules, onboarding, subscriptions, devices, sessions, dashboard).
 
-**Prochaine action : P0.7e — audit `server/routers.ts` + `server/_core/index.ts`** (`grep -nE "getPool|\.execute\(|insertId" server/routers.ts server/_core/index.ts` — audit initial estimait 5+8 getPool). Porter les éventuels raw-SQL restants en Drizzle (sous-batchs). Puis **P0.8** (copie data staging) + **P0.9** (suite de tests sur PG) avant cutover.
+**P0.7e — raw-SQL `routers.ts` (11 `.execute`) + `index.ts` (16 `.execute`).** Recensé : routers.ts metier (283/4736), routers.ts ~9552 (5 execute, bloc à identifier), ~10275/10457/10470/10485 (4 blocs) ; index.ts = bootstrap/seed (parametres_artisan, notifications, rdv_en_ligne) + ~1636-1789 (plusieurs). Découpé par bloc, 1/firing.
+
+- **7e-1 FAIT** (2026-06-13) : routers.ts **metier** (L283 persistMetier + L4736 lecture). ⚠️ Les 2 référençaient un `pool` **hors scope** (latent : aurait planté à l'exécution). Remplacés par les helpers **déjà portés+validés 7d-7** : `db.updateArtisanOnboarding(id,{metier})` et `db.getArtisanOnboardingStatus(id)` (fallback `specialite` conservé). **Validé PG** : re-run `test-onboarding-pg.mjs` 11/11 (couvre metier set/get). tsc neuf vert.
+
+**Prochaine action : P0.7e-2** (routers.ts L~9552 : `const pool = db.getPool()` + 5 `pool.execute` — identifier le bloc/endpoint et porter). Puis 7e-3 (routers.ts 10275/10457/10470/10485), 7e-4..n (index.ts bootstrap/seed). Puis **P0.8** (copie data staging) + **P0.9** (tests sur PG) avant cutover.
 
 _(Rappel règle : commentaire Linear OPE-193 par itération.)_
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
