@@ -3,11 +3,6 @@
 -- Le rôle applicatif du nouveau stack DOIT être NON-superuser (les superusers/BYPASSRLS
 -- ignorent RLS). Le legacy (rôle superuser) bypass → non impacté.
 
-alter table "active_sessions" enable row level security;
-alter table "active_sessions" force row level security;
-drop policy if exists tenant_isolation on "active_sessions";
-create policy tenant_isolation on "active_sessions" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
-
 alter table "activites" enable row level security;
 alter table "activites" force row level security;
 drop policy if exists tenant_isolation on "activites";
@@ -132,11 +127,6 @@ alter table "depenses" enable row level security;
 alter table "depenses" force row level security;
 drop policy if exists tenant_isolation on "depenses";
 create policy tenant_isolation on "depenses" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
-
-alter table "devices" enable row level security;
-alter table "devices" force row level security;
-drop policy if exists tenant_isolation on "devices";
-create policy tenant_isolation on "devices" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
 
 alter table "devis" enable row level security;
 alter table "devis" force row level security;
@@ -298,11 +288,6 @@ alter table "stocks" force row level security;
 drop policy if exists tenant_isolation on "stocks";
 create policy tenant_isolation on "stocks" using ("artisanId" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisanId" = nullif(current_setting('app.tenant', true), '')::int);
 
-alter table "subscriptions" enable row level security;
-alter table "subscriptions" force row level security;
-drop policy if exists tenant_isolation on "subscriptions";
-create policy tenant_isolation on "subscriptions" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
-
 alter table "techniciens" enable row level security;
 alter table "techniciens" force row level security;
 drop policy if exists tenant_isolation on "techniciens";
@@ -313,12 +298,23 @@ alter table "transactions_bancaires" force row level security;
 drop policy if exists tenant_isolation on "transactions_bancaires";
 create policy tenant_isolation on "transactions_bancaires" using ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisan_id" = nullif(current_setting('app.tenant', true), '')::int);
 
-alter table "users" enable row level security;
-alter table "users" force row level security;
-drop policy if exists tenant_isolation on "users";
-create policy tenant_isolation on "users" using ("artisanId" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisanId" = nullif(current_setting('app.tenant', true), '')::int);
-
 alter table "vehicules" enable row level security;
 alter table "vehicules" force row level security;
 drop policy if exists tenant_isolation on "vehicules";
 create policy tenant_isolation on "vehicules" using ("artisanId" = nullif(current_setting('app.tenant', true), '')::int) with check ("artisanId" = nullif(current_setting('app.tenant', true), '')::int);
+
+drop policy if exists tenant_isolation on "active_sessions";
+alter table "active_sessions" no force row level security;
+alter table "active_sessions" disable row level security;
+
+drop policy if exists tenant_isolation on "devices";
+alter table "devices" no force row level security;
+alter table "devices" disable row level security;
+
+drop policy if exists tenant_isolation on "subscriptions";
+alter table "subscriptions" no force row level security;
+alter table "subscriptions" disable row level security;
+
+drop policy if exists tenant_isolation on "users";
+alter table "users" no force row level security;
+alter table "users" disable row level security;

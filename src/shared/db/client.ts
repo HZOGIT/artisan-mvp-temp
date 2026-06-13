@@ -18,12 +18,14 @@ export function createDbClient(connectionString: string, max = 10): DbHandle {
   return { db, pool, close: () => pool.end() };
 }
 
-// Client par défaut (lazy) lu depuis DATABASE_URL — pour le runtime de l'app.
+// Client par défaut (lazy). Le nouveau stack utilise en priorité APP_DATABASE_URL
+// (rôle applicatif NON-superuser soumis à la RLS) ; à défaut DATABASE_URL. Le legacy,
+// lui, garde DATABASE_URL (rôle superuser qui bypasse la RLS) — non impacté.
 let defaultHandle: DbHandle | null = null;
 export function getDbHandle(): DbHandle {
   if (defaultHandle) return defaultHandle;
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL manquant");
+  const url = process.env.APP_DATABASE_URL || process.env.DATABASE_URL;
+  if (!url) throw new Error("APP_DATABASE_URL / DATABASE_URL manquant");
   defaultHandle = createDbClient(url);
   return defaultHandle;
 }

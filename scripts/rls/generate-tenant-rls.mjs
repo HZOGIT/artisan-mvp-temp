@@ -13,12 +13,19 @@ const PG_URL = process.env.PG_URL || process.env.DATABASE_URL || "postgres://art
 const c = new pg.Client({ connectionString: PG_URL });
 await c.connect();
 
-const { rows } = await c.query(`
+// Tables identité/auth/plateforme lues HORS contexte tenant (auth, session, device,
+// billing par customerId Stripe) → exclues de la RLS tenant (sinon le nouveau stack
+// ne pourrait plus authentifier / résoudre le tenant / traiter les webhooks).
+const DENYLIST = new Set(["users", "active_sessions", "devices", "subscriptions"]);
+
+const { rows: allRows } = await c.query(`
   select table_name, column_name
   from information_schema.columns
   where table_schema = 'public' and column_name in ('artisan_id', 'artisanId')
   order by table_name
 `);
+const rows = allRows.filter((r) => !DENYLIST.has(r.table_name));
+const excluded = allRows.filter((r) => DENYLIST.has(r.table_name)).map((r) => r.table_name);
 await c.end();
 
 const tenantExpr = `nullif(current_setting('app.tenant', true), '')::int`;
@@ -39,6 +46,15 @@ for (const r of rows) {
   lines.push("");
 }
 
+// Sécurité dual-stack : sur les tables exclues, désactiver explicitement la RLS
+// tenant (au cas où elle aurait été activée par une exécution antérieure).
+for (const t of excluded) {
+  lines.push(`drop policy if exists tenant_isolation on "${t}";`);
+  lines.push(`alter table "${t}" no force row level security;`);
+  lines.push(`alter table "${t}" disable row level security;`);
+  lines.push("");
+}
+
 mkdirSync("drizzle/rls", { recursive: true });
 writeFileSync("drizzle/rls/tenant-isolation.sql", lines.join("\n"));
-console.log(`tenant-isolation.sql généré : ${rows.length} tables tenant.`);
+console.log(`tenant-isolation.sql généré : ${rows.length} tables tenant ; exclues (auth/plateforme) : ${excluded.join(", ") || "—"}.`);
