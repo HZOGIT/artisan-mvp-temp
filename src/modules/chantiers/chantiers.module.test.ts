@@ -10,6 +10,7 @@ const stubRepo: IChantierRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  ownsClient: async () => false,
 };
 
 describe("chantiers.module", () => {
@@ -19,6 +20,6 @@ describe("chantiers.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsClient", "update"]);
   });
 });

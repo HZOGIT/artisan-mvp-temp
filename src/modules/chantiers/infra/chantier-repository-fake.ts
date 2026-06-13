@@ -8,6 +8,13 @@ import type { Chantier, CreateChantierInput, UpdateChantierInput } from "../doma
 export class FakeChantierRepository implements IChantierRepository {
   private store: Chantier[] = [];
   private seq = 0;
+  // Clients appartenant à un tenant (injectable) : clé `${artisanId}:${clientId}`.
+  private ownedClients = new Set<string>();
+
+  // Aide de test : déclare qu'un client appartient au tenant.
+  registerClient(artisanId: number, clientId: number): void {
+    this.ownedClients.add(`${artisanId}:${clientId}`);
+  }
 
   async list(ctx: TenantContext): Promise<Chantier[]> {
     return this.store.filter((c) => c.artisanId === ctx.artisanId);
@@ -59,5 +66,9 @@ export class FakeChantierRepository implements IChantierRepository {
     if (!c) return false;
     this.store = this.store.filter((x) => x.id !== id);
     return true;
+  }
+
+  async ownsClient(ctx: TenantContext, clientId: number): Promise<boolean> {
+    return this.ownedClients.has(`${ctx.artisanId}:${clientId}`);
   }
 }

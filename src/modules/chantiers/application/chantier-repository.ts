@@ -14,4 +14,7 @@ export interface IChantierRepository {
   update(ctx: TenantContext, id: number, input: UpdateChantierInput): Promise<Chantier | null>;
   // false si le chantier n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  // true si le client (FK) appartient au tenant. Garde anti-IDOR-FK : interdit de rattacher un
+  // chantier à un client d'un autre tenant.
+  ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
 }

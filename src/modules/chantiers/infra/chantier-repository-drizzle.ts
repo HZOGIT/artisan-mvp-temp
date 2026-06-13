@@ -1,5 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
-import { chantiers } from "../../../../drizzle/schema.pg";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { chantiers, clients } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -90,6 +90,16 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
         .where(and(eq(chantiers.id, id), eq(chantiers.artisanId, ctx.artisanId)))
         .returning({ id: chantiers.id });
       return deleted.length > 0;
+    });
+  }
+
+  ownsClient(ctx: TenantContext, clientId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(clients)
+        .where(and(eq(clients.id, clientId), eq(clients.artisanId, ctx.artisanId)));
+      return (row?.n ?? 0) > 0;
     });
   }
 }

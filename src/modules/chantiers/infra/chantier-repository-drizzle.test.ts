@@ -76,4 +76,10 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.delete(ctx(A), c.id)).toBe(true);
     expect(await repo.getById(ctx(A), c.id)).toBeNull();
   });
+
+  it("ownsClient (anti-IDOR-FK) : un client est reconnu pour son tenant, pas pour un autre", async () => {
+    expect(await repo.ownsClient(ctx(A), clientA)).toBe(true);
+    expect(await repo.ownsClient(ctx(B), clientA)).toBe(false); // client de A, vu depuis B
+    expect(await repo.ownsClient(ctx(A), 987654321)).toBe(false); // inexistant
+  });
 });
