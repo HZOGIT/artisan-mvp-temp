@@ -108,4 +108,36 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
     expect((await callMutation(server, "stocks.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "stocks.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("getById / update / delete sur un id inexistant du même tenant → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "stocks.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "stocks.update", { id: 999999999, designation: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "stocks.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : reference > 50, designation > 500, quantité non décimale, articleType invalide → 400", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "stocks.create", { reference: "x".repeat(51), designation: "D" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "stocks.create", { reference: "R", designation: "x".repeat(501) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "stocks.create", { reference: "R", designation: "D", quantiteEnStock: "abc" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "stocks.create", { reference: "R", designation: "D", articleType: "inconnu" }, tA)).statusCode).toBe(400);
+  });
+
+  it("update : quantiteEnStock dans l'input est rejeté (zod strict) ou ignoré (jamais appliqué)", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "stocks.create", { reference: "QZ", designation: "Garde", quantiteEnStock: "30" }, tA)).json().result.data.id as number;
+    // tente de pousser quantiteEnStock via update → la quantité ne doit PAS changer
+    await callMutation(server, "stocks.update", { id, quantiteEnStock: "999", designation: "Toujours" }, tA);
+    expect((await callQuery(server, "stocks.getById", { id }, tA)).json().result.data.quantiteEnStock).toBe("30.00");
+  });
+
+  it("update partiel : ne touche pas les champs non fournis", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "stocks.create", { reference: "PART", designation: "Garder", emplacement: "Allée 1" }, tA)).json().result.data.id as number;
+    const maj = (await callMutation(server, "stocks.update", { id, designation: "Renommé" }, tA)).json().result.data as { reference: string; designation: string; emplacement: string | null };
+    expect(maj.designation).toBe("Renommé");
+    expect(maj.reference).toBe("PART");
+    expect(maj.emplacement).toBe("Allée 1");
+  });
 });
