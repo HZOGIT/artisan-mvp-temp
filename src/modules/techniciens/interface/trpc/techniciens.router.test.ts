@@ -105,4 +105,36 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     expect((await callMutation(server, "techniciens.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "techniciens.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("getById / update / delete sur un id inexistant du même tenant → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "techniciens.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "techniciens.update", { id: 999999999, nom: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "techniciens.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : nom > 255, couleur non #RRGGBB, coutHoraire non décimal → 400", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "techniciens.create", { nom: "x".repeat(256) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "techniciens.create", { nom: "C", couleur: "rouge" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "techniciens.create", { nom: "C", coutHoraire: "abc" }, tA)).statusCode).toBe(400);
+  });
+
+  it("getAll renvoie le même résultat que list (parité legacy)", async () => {
+    const tA = await token(UA);
+    await callMutation(server, "techniciens.create", { nom: "Parité" }, tA);
+    const list = (await callQuery(server, "techniciens.list", undefined, tA)).json().result.data as Array<{ id: number }>;
+    const getAll = (await callQuery(server, "techniciens.getAll", undefined, tA)).json().result.data as Array<{ id: number }>;
+    expect(getAll.map((t) => t.id).sort()).toEqual(list.map((t) => t.id).sort());
+  });
+
+  it("update partiel : ne touche pas les champs non fournis", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "techniciens.create", { nom: "Garder", specialite: "Élec", statut: "actif" }, tA)).json().result.data.id as number;
+    // update du seul statut → specialite préservée
+    const maj = (await callMutation(server, "techniciens.update", { id, statut: "inactif" }, tA)).json().result.data as { specialite: string | null; statut: string; nom: string };
+    expect(maj.statut).toBe("inactif");
+    expect(maj.specialite).toBe("Élec");
+    expect(maj.nom).toBe("Garder");
+  });
 });
