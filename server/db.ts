@@ -90,7 +90,7 @@ import {
   interventionsMobile, photosInterventions,
   depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
   relevesBancaires, transactionsBancaires, reglesCategorisation,
-  couleursInterventions, modules, artisanModules,
+  couleursInterventions, modules, artisanModules, subscriptions,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -4602,12 +4602,10 @@ function rowToSubscription(r: any): SubscriptionRow | null {
 
 export async function getSubscription(artisanId: number): Promise<SubscriptionRow | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM subscriptions WHERE artisan_id = ? LIMIT 1',
-      [artisanId]
-    ) as any;
-    return rowToSubscription((rows as any[])[0]);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(subscriptions)
+      .where(eq(subscriptions.artisan_id, artisanId)).limit(1);
+    return rowToSubscription(rows[0]);
   } catch (e) {
     // Table pas encore migree : on renvoie null, l'appelant traitera comme
     // un essai gratuit (= ne bloque personne).
@@ -4647,53 +4645,30 @@ const SUB_COL_MAP: Record<keyof UpdateSubscriptionInput, string> = {
 };
 
 export async function updateSubscription(artisanId: number, data: UpdateSubscriptionInput): Promise<void> {
-  const pool = await ensurePool();
-  const cols: string[] = [];
-  const vals: any[] = [];
+  // Set keyé par les noms de colonnes Drizzle (snake_case, = valeurs de SUB_COL_MAP).
+  const setObj: Record<string, any> = {};
   for (const [key, val] of Object.entries(data)) {
     if (val === undefined) continue;
     const sqlCol = SUB_COL_MAP[key as keyof UpdateSubscriptionInput];
     if (!sqlCol) continue;
-    cols.push(`${sqlCol} = ?`);
-    vals.push(val instanceof Date ? val : val);
+    setObj[sqlCol] = val;
   }
-  if (cols.length === 0) return;
-  vals.push(artisanId);
+  if (Object.keys(setObj).length === 0) return;
 
-  // INSERT-or-UPDATE : si l'artisan n'a pas encore de ligne (race avec le
-  // seed initial), on cree avec les valeurs par defaut + les overrides.
-  const [updateRes] = await pool.execute(
-    `UPDATE subscriptions SET ${cols.join(', ')} WHERE artisan_id = ?`,
-    vals
-  ) as any;
-
-  if (updateRes.affectedRows === 0) {
-    // Ligne absente -> on insere avec defaults trial 30j + overrides.
-    const insertCols = ['artisan_id'];
-    const insertVals: any[] = [artisanId];
-    for (const [key, val] of Object.entries(data)) {
-      if (val === undefined) continue;
-      const sqlCol = SUB_COL_MAP[key as keyof UpdateSubscriptionInput];
-      if (!sqlCol) continue;
-      insertCols.push(sqlCol);
-      insertVals.push(val instanceof Date ? val : val);
-    }
-    const placeholders = insertVals.map(() => '?').join(', ');
-    await pool.execute(
-      `INSERT IGNORE INTO subscriptions (${insertCols.join(', ')}) VALUES (${placeholders})`,
-      insertVals
-    );
-  }
+  // INSERT-or-UPDATE atomique sur la clé unique artisan_id (remplace l'ancien
+  // UPDATE-puis-INSERT IGNORE, sujet à une race). Les colonnes non fournies
+  // prennent leur défaut de schéma à l'insert (plan='trial', max_users=1, …).
+  const dbi = await getDb();
+  await dbi.insert(subscriptions).values({ artisan_id: artisanId, ...setObj } as any)
+    .onConflictDoUpdate({ target: subscriptions.artisan_id, set: setObj });
 }
 
 export async function getSubscriptionByCustomerId(customerId: string): Promise<SubscriptionRow | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM subscriptions WHERE stripe_customer_id = ? LIMIT 1',
-      [customerId]
-    ) as any;
-    return rowToSubscription((rows as any[])[0]);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(subscriptions)
+      .where(eq(subscriptions.stripe_customer_id, customerId)).limit(1);
+    return rowToSubscription(rows[0]);
   } catch {
     return null;
   }
