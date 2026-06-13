@@ -34,6 +34,11 @@ import { TopClientsWidget } from "@/components/dashboard/widgets/TopClients";
 import { RecentActivityWidget } from "@/components/dashboard/widgets/RecentActivity";
 import { UpcomingInterventionsWidget } from "@/components/dashboard/widgets/UpcomingInterventions";
 import { ObjectifsWidget } from "@/components/dashboard/widgets/Objectifs";
+import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesAFaire";
+import { TresoreriePrevisionnelleWidget } from "@/components/dashboard/widgets/TresoreriePrevisionnelle";
+import { LivraisonsEnRetardWidget } from "@/components/dashboard/widgets/LivraisonsEnRetard";
+import { ContratsAFacturerWidget } from "@/components/dashboard/widgets/ContratsAFacturer";
+import { StockBasWidget } from "@/components/dashboard/widgets/StockBas";
 
 // ============================================================================
 // Définition des widgets disponibles dans le dashboard
@@ -46,6 +51,36 @@ interface WidgetDef extends CustomizableWidget {
 function useWidgetDefinitions(): WidgetDef[] {
   return useMemo(
     () => [
+      {
+        id: "activitesAFaire",
+        label: "À faire (activités & rappels)",
+        description: "Vos rappels en retard, du jour et à venir (CRM next-action)",
+        render: () => <ActivitesAFaireWidget />,
+      },
+      {
+        id: "tresoreriePrevisionnelle",
+        label: "Trésorerie prévisionnelle",
+        description: "Encaissements − décaissements projetés sur 8 semaines (alerte découvert)",
+        render: () => <TresoreriePrevisionnelleWidget />,
+      },
+      {
+        id: "livraisonsEnRetard",
+        label: "Livraisons fournisseurs en retard",
+        description: "Commandes attendues dont la date de livraison prévue est dépassée",
+        render: () => <LivraisonsEnRetardWidget />,
+      },
+      {
+        id: "contratsAFacturer",
+        label: "Contrats à facturer",
+        description: "Contrats de maintenance dont l'échéance de facturation est atteinte",
+        render: () => <ContratsAFacturerWidget />,
+      },
+      {
+        id: "stockBas",
+        label: "Stock à réapprovisionner",
+        description: "Articles dont la quantité est passée sous le seuil d'alerte",
+        render: () => <StockBasWidget />,
+      },
       {
         id: "revenue",
         label: "Évolution du CA",
@@ -88,6 +123,11 @@ function useWidgetDefinitions(): WidgetDef[] {
 }
 
 const DEFAULT_ORDER = [
+  "activitesAFaire",
+  "tresoreriePrevisionnelle",
+  "livraisonsEnRetard",
+  "contratsAFacturer",
+  "stockBas",
   "revenue",
   "devisRepartition",
   "topClients",
@@ -552,6 +592,30 @@ export default function Dashboard() {
             Ouvrir
           </Button>
         </div>
+
+        {/* Personnaliser le dashboard — dispo des le demarrage (pas seulement
+            en STATE 3). Meme panneau que l'etat confirme. */}
+        <div className="flex justify-center pt-2">
+          <Button variant="outline" size="sm" onClick={() => setCustomizeOpen(true)}>
+            <Settings2 className="h-3.5 w-3.5 mr-2" />
+            Personnaliser le dashboard
+          </Button>
+        </div>
+        <CustomizePanel
+          isOpen={customizeOpen}
+          onClose={() => setCustomizeOpen(false)}
+          widgets={widgetDefs.map((w) => ({
+            id: w.id,
+            label: w.label,
+            description: w.description,
+          }))}
+          hiddenIds={hidden}
+          onToggle={handleToggleHidden}
+          onReset={() => {
+            handleReset();
+            setCustomizeOpen(false);
+          }}
+        />
       </div>
     );
   }

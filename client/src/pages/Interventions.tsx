@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation, useSearch } from "wouter";
-import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Calendar, MoreHorizontal, Eye, Pencil, Trash2, FileDown, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { StatutBadge } from "@/components/StatutBadge";
@@ -100,6 +100,38 @@ export default function Interventions() {
     onError: () => {
       toast.error("Erreur lors de la suppression");
     },
+  });
+
+  // OPE-111 — équipe d'intervention (plusieurs intervenants additionnels)
+  const { data: techniciensList } = trpc.techniciens.getAll.useQuery();
+  // OPE-111 — toutes les équipes (1 requête) → map interventionId → membres, pour
+  // afficher l'équipe sur chaque ligne du planning sans N+1.
+  const { data: equipesByArtisan } = trpc.interventions.getEquipesByArtisan.useQuery();
+  const equipeParIntervention = new Map<number, any[]>();
+  for (const m of equipesByArtisan || []) {
+    const arr = equipeParIntervention.get(m.interventionId) || [];
+    arr.push(m);
+    equipeParIntervention.set(m.interventionId, arr);
+  }
+  const [membreToAdd, setMembreToAdd] = useState<string>("");
+  const { data: equipe } = trpc.interventions.getEquipe.useQuery(
+    { interventionId: selectedIntervention?.id ?? 0 },
+    { enabled: isEditDialogOpen && !!selectedIntervention?.id },
+  );
+  const addMembreMutation = trpc.interventions.ajouterMembreEquipe.useMutation({
+    onSuccess: () => {
+      utils.interventions.getEquipe.invalidate();
+      setMembreToAdd("");
+      toast.success("Membre ajouté à l'équipe");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const removeMembreMutation = trpc.interventions.retirerMembreEquipe.useMutation({
+    onSuccess: () => {
+      utils.interventions.getEquipe.invalidate();
+      toast.success("Membre retiré de l'équipe");
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const resetForm = () => {
@@ -347,6 +379,61 @@ export default function Interventions() {
                   rows={3}
                 />
               </div>
+              {/* OPE-111 — Équipe : intervenants supplémentaires (binôme, aide…) */}
+              <div className="space-y-2">
+                <Label>Équipe (intervenants supplémentaires)</Label>
+                {equipe && equipe.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {equipe.map((m) => (
+                      <Badge key={m.id} variant="secondary" className="gap-1 pr-1">
+                        {[m.prenom, m.nom].filter(Boolean).join(" ") || `Technicien #${m.technicienId}`}
+                        {m.role ? <span className="text-[10px] opacity-70">({m.role})</span> : null}
+                        <button
+                          type="button"
+                          aria-label="Retirer de l'équipe"
+                          className="ml-0.5 rounded hover:bg-muted-foreground/20"
+                          onClick={() => removeMembreMutation.mutate({ id: m.id })}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Aucun intervenant supplémentaire.</p>
+                )}
+                <div className="flex gap-2">
+                  <Select value={membreToAdd} onValueChange={setMembreToAdd}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Ajouter un technicien…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(techniciensList || [])
+                        .filter((t: any) => !equipe?.some((m) => m.technicienId === t.id))
+                        .map((t: any) => (
+                          <SelectItem key={t.id} value={String(t.id)}>
+                            {[t.prenom, t.nom].filter(Boolean).join(" ") || `Technicien #${t.id}`}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!membreToAdd || !selectedIntervention?.id || addMembreMutation.isPending}
+                    onClick={() =>
+                      selectedIntervention?.id &&
+                      membreToAdd &&
+                      addMembreMutation.mutate({
+                        interventionId: selectedIntervention.id,
+                        technicienId: parseInt(membreToAdd),
+                      })
+                    }
+                  >
+                    Ajouter
+                  </Button>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
@@ -400,13 +487,27 @@ export default function Interventions() {
                 <th>Titre</th>
                 <th className="whitespace-nowrap">Date</th>
                 <th className="whitespace-nowrap">Statut</th>
+                <th className="whitespace-nowrap">Durée réelle</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {filteredInterventions.map((intervention: any) => (
                 <tr key={intervention.id}>
-                  <td className="font-medium">{intervention.titre}</td>
+                  <td className="font-medium">
+                    {intervention.titre}
+                    {/* OPE-111 — équipe (intervenants additionnels) */}
+                    {(equipeParIntervention.get(intervention.id)?.length ?? 0) > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {equipeParIntervention.get(intervention.id)!.map((m: any) => (
+                          <Badge key={m.technicienId} variant="secondary" className="text-[10px] font-normal gap-1">
+                            <Users className="h-2.5 w-2.5" />
+                            {[m.prenom, m.nom].filter(Boolean).join(" ") || `Tech #${m.technicienId}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap">
                     {intervention.dateDebut
                       ? format(new Date(intervention.dateDebut), "dd/MM/yyyy HH:mm", { locale: fr })
@@ -414,6 +515,14 @@ export default function Interventions() {
                   </td>
                   <td className="whitespace-nowrap">
                     <StatutBadge statut={intervention.statut || 'planifiee'} />
+                  </td>
+                  {/* OPE-173 — durée réelle sur site captée par l'app mobile (arrivée→départ) */}
+                  <td className="whitespace-nowrap text-muted-foreground">
+                    {intervention.dureeReelleMinutes != null
+                      ? (intervention.dureeReelleMinutes >= 60
+                          ? `${Math.floor(intervention.dureeReelleMinutes / 60)} h ${String(intervention.dureeReelleMinutes % 60).padStart(2, "0")}`
+                          : `${intervention.dureeReelleMinutes} min`)
+                      : "-"}
                   </td>
                   <td className="whitespace-nowrap">
                     <DropdownMenu>
@@ -427,6 +536,19 @@ export default function Interventions() {
                           <Pencil className="h-4 w-4 mr-2" />
                           Modifier
                         </DropdownMenuItem>
+                        {/* OPE-161 — bon d'intervention signé (disponible dès qu'elle est terminée) */}
+                        {intervention.statut === "terminee" && (
+                          <DropdownMenuItem asChild>
+                            <a
+                              href={`/api/interventions/${intervention.id}/bon-pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Bon d'intervention
+                            </a>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => handleDelete(intervention.id)}
                           className="text-destructive"

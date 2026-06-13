@@ -43,6 +43,7 @@ import {
   Globe,
   HardHat,
   HelpCircle,
+  History,
   Info,
   Layers,
   LayoutDashboard,
@@ -205,6 +206,7 @@ const NAV_GROUPS: NavGroup[] = [
     color: "violet",
     items: [
       { icon: Sparkles, label: "MonAssistant", path: "/assistant" },
+      { icon: History, label: "Mes conversations", path: "/assistant/conversations" },
       { icon: ScanLine, label: "Analyse photos IA", path: "/analyses-photos" },
     ],
   },
@@ -312,6 +314,7 @@ const NAV_GROUPS: NavGroup[] = [
       { icon: Globe, label: "Ma Vitrine", path: "/ma-vitrine" },
       { icon: Mail, label: "Modèles Email", path: "/modeles-email" },
       { icon: Mail, label: "Modèles Transactionnels", path: "/modeles-email-transactionnels" },
+      { icon: History, label: "Historique emails", path: "/historique-emails" },
       { icon: Users, label: "Utilisateurs", path: "/utilisateurs" },
     ],
   },
@@ -1390,7 +1393,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         hidden={isAssistantPage || isAssistantOpen}
       />
       <AssistantDrawer
-        isOpen={isAssistantOpen}
+        isOpen={isAssistantOpen && !isAssistantPage}
         onClose={() => setIsAssistantOpen(false)}
         messages={assistant.messages}
         isStreaming={assistant.isStreaming}

@@ -1,0 +1,10 @@
+{
+  "//": "OPE-184 — gate typecheck du CODE NEUF clean archi uniquement (src/** + schéma PG). Le legacy (server/, client/) garde sa dette tsc (OPE-253), hors scope. Lancer : pnpm exec tsc -p tsconfig.src.json",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "tsBuildInfoFile": null
+  },
+  "include": ["src/**/*", "drizzle/schema.pg.ts"]
+}

@@ -50,9 +50,34 @@ export const PhoneSchema = z
  * - Identifiant unique d'un établissement
  * - Format : SIREN (9 chiffres) + NIC (5 chiffres)
  */
+/**
+ * Validation de la clé de contrôle d'un SIRET (Luhn, base INSEE).
+ * Un SIRET valide (14 chiffres) vérifie la clé de Luhn. Exception : La Poste
+ * (SIREN 356000000) dont la somme des chiffres est divisible par 5.
+ * → un SIRET légitime passe inchangé ; seules les saisies erronées sont rejetées.
+ */
+export function isValidSiret(value: string): boolean {
+  if (!/^\d{14}$/.test(value)) return false;
+  if (value.startsWith("356000000")) {
+    const sum = value.split("").reduce((s, d) => s + Number(d), 0);
+    return sum % 5 === 0;
+  }
+  let sum = 0;
+  for (let i = 0; i < 14; i++) {
+    let digit = Number(value[i]);
+    if ((14 - i) % 2 === 0) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+  }
+  return sum % 10 === 0;
+}
+
 export const SiretSchema = z
   .string()
   .regex(/^\d{14}$/, "SIRET invalide (14 chiffres requis)")
+  .refine(isValidSiret, "SIRET invalide (clé de contrôle incorrecte)")
   .optional()
   .or(z.literal(""));
 
@@ -182,10 +207,36 @@ export const ClientInputSchema = z.object({
     .string()
     .max(100, "La ville est trop longue")
     .optional(),
+  // Adresse de facturation distincte (OPE-93) — optionnelle, fallback adresse principale.
+  adresseFacturation: z
+    .string()
+    .max(255, "L'adresse de facturation est trop longue")
+    .optional(),
+  codePostalFacturation: CodePostalSchema,
+  villeFacturation: z
+    .string()
+    .max(100, "La ville de facturation est trop longue")
+    .optional(),
+  // Identité B2B (OPE-92) — additifs, optionnels (un client reste « particulier »).
+  type: z.enum(["particulier", "professionnel"]).optional(),
+  raisonSociale: z
+    .string()
+    .max(255, "La raison sociale est trop longue")
+    .optional(),
   siret: SiretSchema,
+  numeroTVA: z
+    .string()
+    .max(20, "Le n° de TVA est trop long")
+    .optional()
+    .or(z.literal("")),
   notes: z
     .string()
     .max(1000, "Les notes sont trop longues")
+    .optional(),
+  // Étiquettes / tags de segmentation (OPE-120) — liste libre séparée par des virgules.
+  etiquettes: z
+    .string()
+    .max(500, "Les étiquettes sont trop longues")
     .optional(),
 });
 

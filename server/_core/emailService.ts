@@ -7,6 +7,39 @@ export interface EmailPayload {
   body: string;
   attachmentName?: string;
   attachmentContent?: string; // Base64 encoded
+  // OPE-157 — identité d'expédition par artisan (optionnels ; défaut = identité Operioz).
+  // `fromName` = nom AFFICHÉ de l'expéditeur (le DOMAINE d'enveloppe reste operioz.com →
+  // DKIM/SPF préservés, pas d'usurpation). `replyTo` = adresse de réponse (email de
+  // l'artisan) pour que les réponses du client arrivent à l'artisan.
+  fromName?: string;
+  replyTo?: string;
+  // OPE-114 — contexte de journalisation (optionnel ; sans incidence sur l'envoi).
+  // Permet de tracer l'email dans `emails_log` et de le rattacher à une entité.
+  artisanId?: number;
+  emailType?: string; // devis | facture | relance | avis | portail | systeme…
+  entiteType?: string; // devis | facture | intervention…
+  entiteId?: number;
+}
+
+// OPE-114 — journalisation best-effort d'un envoi (ne casse JAMAIS l'envoi).
+// Import dynamique de la couche DB pour éviter tout cycle d'import au boot.
+async function logEmail(payload: EmailPayload, statut: "envoye" | "echec" | "simule", resendId: string | null, erreur?: string): Promise<void> {
+  try {
+    const { createEmailLog } = await import("../db");
+    await createEmailLog({
+      artisanId: payload.artisanId ?? null,
+      destinataire: String(payload.to).slice(0, 320),
+      sujet: String(payload.subject).slice(0, 500),
+      type: payload.emailType ?? null,
+      resendId,
+      statut,
+      erreur: erreur ? String(erreur).slice(0, 2000) : null,
+      entiteType: payload.entiteType ?? null,
+      entiteId: payload.entiteId ?? null,
+    });
+  } catch (e) {
+    console.error("[Email] Journalisation emails_log échouée (non bloquant):", e);
+  }
 }
 
 const resendConfigured = !!ENV.resendApiKey;
@@ -36,13 +69,23 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
   // Mode simulation si Resend non configuré
   if (!resend) {
     console.log(`[Email][SIM] → ${to} | ${subject}`);
+    await logEmail(payload, "simule", null);
     return { success: true, message: `Email simulé avec succès à ${to}` };
   }
 
+  // OPE-157 — identité d'expédition par artisan, domaine d'enveloppe INCHANGÉ.
+  // Sanitisation CRLF + retrait de <>" (anti header-injection, display name RFC 5322 sûr).
+  const sanitizeHeader = (s: string) => String(s).replace(/[\r\n<>"]+/g, " ").trim();
+  const defaultFrom = ENV.emailFrom || "Operioz <noreply@operioz.com>";
+  const cleanFromName = payload.fromName ? sanitizeHeader(payload.fromName) : "";
+  const from = cleanFromName ? `"${cleanFromName}" <noreply@operioz.com>` : defaultFrom;
+  const replyToClean = payload.replyTo ? payload.replyTo.trim() : "";
+  const replyTo = replyToClean && emailRegex.test(replyToClean) ? replyToClean : "support@operioz.com";
+
   try {
     const emailOptions: Parameters<typeof resend.emails.send>[0] = {
-      from: ENV.emailFrom || "Operioz <noreply@operioz.com>",
-      replyTo: "support@operioz.com",
+      from,
+      replyTo,
       to,
       subject,
       html: body,
@@ -57,17 +100,20 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
       ];
     }
 
-    const { error } = await resend.emails.send(emailOptions);
+    const { data, error } = await resend.emails.send(emailOptions);
 
     if (error) {
       console.error("[Email] Erreur Resend:", error);
+      await logEmail(payload, "echec", null, error.message);
       return { success: false, message: `Erreur lors de l'envoi: ${error.message}` };
     }
 
     console.log(`[Email] Envoyé à ${to} — ${subject}`);
+    await logEmail(payload, "envoye", data?.id ?? null);
     return { success: true, message: `Email envoyé avec succès à ${to}` };
   } catch (error) {
     console.error("[Email] Erreur:", error);
+    await logEmail(payload, "echec", null, error instanceof Error ? error.message : String(error));
     return { success: false, message: "Erreur lors de l'envoi de l'email" };
   }
 }
@@ -98,15 +144,15 @@ export function generateDevisEmailContent(params: {
         <!-- Header -->
         <tr>
           <td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${artisanName}</h1>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${escapeHtml(artisanName)}</h1>
           </td>
         </tr>
 
         <!-- Body -->
         <tr>
           <td style="padding:36px 40px 16px 40px;">
-            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
-            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${devisNumero}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${devisObjet}&nbsp;&raquo;</em>` : ''}.</p>
+            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${escapeHtml(clientName)},</p>
+            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${escapeHtml(devisNumero)}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${escapeHtml(devisObjet)}&nbsp;&raquo;</em>` : ''}.</p>
           </td>
         </tr>
 
@@ -119,7 +165,7 @@ export function generateDevisEmailContent(params: {
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro du devis</td>
-                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${devisNumero}</td>
+                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${escapeHtml(devisNumero)}</td>
                     </tr>
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Montant TTC</td>
@@ -141,7 +187,7 @@ export function generateDevisEmailContent(params: {
           <td style="padding:0 40px 36px 40px;">
             <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Pour accepter ce devis, vous pouvez nous contacter par retour d'email ou par téléphone.</p>
             <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
-            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
+            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${escapeHtml(artisanName)}</p>
           </td>
         </tr>
 
@@ -187,15 +233,15 @@ export function generateFactureEmailContent(params: {
         <!-- Header -->
         <tr>
           <td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${artisanName}</h1>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${escapeHtml(artisanName)}</h1>
           </td>
         </tr>
 
         <!-- Body -->
         <tr>
           <td style="padding:36px 40px 16px 40px;">
-            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
-            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint la facture <strong>${factureNumero}</strong>${factureObjet ? ` concernant <em>&laquo;&nbsp;${factureObjet}&nbsp;&raquo;</em>` : ''}.</p>
+            <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${escapeHtml(clientName)},</p>
+            <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint la facture <strong>${escapeHtml(factureNumero)}</strong>${factureObjet ? ` concernant <em>&laquo;&nbsp;${escapeHtml(factureObjet)}&nbsp;&raquo;</em>` : ''}.</p>
           </td>
         </tr>
 
@@ -208,7 +254,7 @@ export function generateFactureEmailContent(params: {
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;width:45%;">Numéro de facture</td>
-                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${factureNumero}</td>
+                      <td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;">${escapeHtml(factureNumero)}</td>
                     </tr>
                     <tr>
                       <td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Montant TTC</td>
@@ -230,7 +276,7 @@ export function generateFactureEmailContent(params: {
           <td style="padding:0 40px 36px 40px;">
             <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Nous vous remercions de procéder au règlement dans les meilleurs délais.</p>
             <p style="margin:0 0 4px 0;font-size:15px;color:#374151;">Cordialement,</p>
-            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${artisanName}</p>
+            <p style="margin:0;font-size:15px;color:#111827;font-weight:600;">${escapeHtml(artisanName)}</p>
           </td>
         </tr>
 
@@ -325,6 +371,14 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]!));
+}
+
+// Échappement HTML centralisé pour interpolation de texte utilisateur dans les
+// bodies d'email (HTML brut). Échappe d'abord (& < > " ') puis convertit les
+// retours à la ligne en <br> pour préserver la mise en forme. Null-safe.
+export function safeHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return escapeHtml(String(value)).replace(/\r?\n/g, "<br>");
 }
 
 function baseTemplate(opts: {

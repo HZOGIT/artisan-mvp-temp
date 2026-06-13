@@ -314,6 +314,16 @@ export default function Devis() {
                     <td className="font-medium text-right whitespace-nowrap">{formatCurrency(devis.totalTTC)}</td>
                     <td className="whitespace-nowrap">
                       <StatutBadge statut={devis.statut} />
+                      {/* OPE-152 — read-receipt : « vu » par le client (sur devis envoyé) */}
+                      {devis.statut === "envoye" && (
+                        devis.dateVue ? (
+                          <div className="text-xs text-green-600 mt-1">
+                            Vu le {format(new Date(devis.dateVue), "dd/MM/yyyy", { locale: fr })}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground mt-1">Non vu</div>
+                        )
+                      )}
                     </td>
                     <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>

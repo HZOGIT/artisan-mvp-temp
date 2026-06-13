@@ -68,6 +68,8 @@ interface ArticleForm {
   description: string;
   unite: string;
   prix_base: string;
+  prixRevient: string;
+  tauxTVA: string;
   categorie: string;
   sous_categorie: string;
   metier: string;
@@ -78,6 +80,8 @@ const defaultForm: ArticleForm = {
   description: "",
   unite: "unité",
   prix_base: "",
+  prixRevient: "",
+  tauxTVA: "20",
   categorie: "fourniture",
   sous_categorie: "",
   metier: "plombier",
@@ -154,6 +158,8 @@ export default function Articles() {
       description: article.description || "",
       unite: article.unite || "unité",
       prix_base: article.prix_base?.toString() || "",
+      prixRevient: article.prixRevient?.toString() || "",
+      tauxTVA: article.tauxTVA?.toString() || "20",
       categorie: article.categorie || "fourniture",
       sous_categorie: article.sous_categorie || "",
       metier: article.metier || "plombier",
@@ -355,6 +361,7 @@ export default function Articles() {
                 <th className="whitespace-nowrap">Sous-catégorie</th>
                 <th className="whitespace-nowrap">Unité</th>
                 <th className="whitespace-nowrap text-right">Prix HT</th>
+                <th className="whitespace-nowrap text-right">Marge</th>
                 <th></th>
               </tr>
             </thead>
@@ -382,6 +389,17 @@ export default function Articles() {
                   </td>
                   <td className="whitespace-nowrap">{article.unite}</td>
                   <td className="text-right font-medium whitespace-nowrap">{formatCurrency(article.prix_base)}</td>
+                  <td className="text-right whitespace-nowrap text-sm">
+                    {(() => {
+                      const pv = parseFloat(article.prix_base);
+                      const pr = article.prixRevient != null ? parseFloat(article.prixRevient) : NaN;
+                      if (!isNaN(pv) && !isNaN(pr) && pv > 0) {
+                        const pct = Math.round(((pv - pr) / pv) * 100);
+                        return <span className={pv - pr >= 0 ? "text-green-600" : "text-red-600"}>{pct}&nbsp;%</span>;
+                      }
+                      return <span className="text-muted-foreground">—</span>;
+                    })()}
+                  </td>
                   <td className="whitespace-nowrap">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -476,6 +494,51 @@ export default function Articles() {
                     <SelectItem value="boîte">Boîte</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            {/* OPE-143 — prix de revient + marge indicative (purement informatif) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Prix de revient HT</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={form.prixRevient}
+                  onChange={(e) => setForm({ ...form, prixRevient: e.target.value })}
+                  placeholder="Coût d'achat (optionnel)"
+                />
+              </div>
+              <div className="flex items-end">
+                {(() => {
+                  const pv = parseFloat(form.prix_base);
+                  const pr = parseFloat(form.prixRevient);
+                  if (!isNaN(pv) && !isNaN(pr) && pv > 0 && form.prixRevient !== "") {
+                    const marge = pv - pr;
+                    const pct = Math.round((marge / pv) * 100);
+                    return (
+                      <p className={`text-sm ${marge >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        Marge : <strong>{formatCurrency(marge)}</strong> ({pct}&nbsp;%)
+                      </p>
+                    );
+                  }
+                  return <p className="text-xs text-muted-foreground">Renseignez le coût pour voir la marge.</p>;
+                })()}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Taux de TVA</Label>
+                <Select value={form.tauxTVA} onValueChange={(v) => setForm({ ...form, tauxTVA: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="20">20 % (taux normal)</SelectItem>
+                    <SelectItem value="10">10 % (rénovation logement &gt; 2 ans)</SelectItem>
+                    <SelectItem value="5.5">5,5 % (amélioration énergétique)</SelectItem>
+                    <SelectItem value="2.1">2,1 %</SelectItem>
+                    <SelectItem value="0">0 % (exonéré)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">Pré-rempli sur la ligne de devis/facture à la sélection de l'article.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

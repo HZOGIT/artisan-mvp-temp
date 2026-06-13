@@ -45,13 +45,22 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     return res.status(400).json({ error: 'Missing signature' });
   }
 
+  // OPE-79 — fail-closed : sans secret configuré, `|| ''` passerait la clé VIDE
+  // (publiquement connue) à la vérification → un attaquant pourrait forger une
+  // signature valide (HMAC clé vide) et faire accepter un webhook (premium gratuit /
+  // facture marquée payée). On REFUSE explicitement plutôt que de vérifier à vide.
+  if (!ENV.stripeWebhookSecret) {
+    console.error('[Stripe Webhook] STRIPE_WEBHOOK_SECRET non configuré — refus (fail-closed)');
+    return res.status(500).json({ error: 'Webhook not configured' });
+  }
+
   let event;
 
   try {
     event = constructWebhookEvent(
       req.body,
       signature,
-      ENV.stripeWebhookSecret || ''
+      ENV.stripeWebhookSecret
     );
   } catch (err: any) {
     console.error('[Stripe Webhook] Signature verification failed:', err.message);

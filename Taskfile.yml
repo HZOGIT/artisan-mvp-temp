@@ -1,0 +1,197 @@
+version: '3'
+
+vars:
+  DOCKER: docker
+  COMPOSE: docker compose
+  DB_USER: '{{.MYSQL_USER | default "artisan_user"}}'
+  DB_PASS: '{{.MYSQL_PASSWORD | default "artisan_password"}}'
+  DB_NAME: artisan_mvp
+  # Consolidé : on développe directement sur la branche `staging` dans ce dépôt
+  # (plus de worktree séparé). Le déploiement rebuild le conteneur depuis ce checkout.
+  STAGING_DIR: /home/developer/artisan-mvp-temp
+  STAGING_COMPOSE: docker compose -f docker-compose.staging.yml --env-file .env.staging
+
+env:
+  DOCKER_HOST: unix:///run/user/1001/docker.sock
+
+dotenv:
+  - .env
+  - .env.local
+
+tasks:
+  dev:up:
+    desc: Start all dev containers in background
+    cmds:
+      - '{{.COMPOSE}} up -d'
+      - '{{.COMPOSE}} ps'
+
+  dev:down:
+    desc: Stop all dev containers
+    cmds:
+      - '{{.COMPOSE}} down'
+
+  dev:logs:
+    desc: Follow dev container logs
+    cmds:
+      - '{{.COMPOSE}} logs -f'
+
+  dev:logs:app:
+    desc: Follow app container logs only
+    cmds:
+      - '{{.COMPOSE}} logs -f app'
+
+  dev:restart:
+    desc: Restart all dev containers
+    cmds:
+      - '{{.COMPOSE}} restart'
+
+  db:generate:
+    desc: Generate a new migration from schema.ts changes (does NOT touch the DB)
+    cmds:
+      - '{{.COMPOSE}} exec app sh -c "cd /app && pnpm exec drizzle-kit generate"'
+
+  db:migrate:
+    desc: Apply pending migrations + verify no drift (the ONLY safe way to change the schema)
+    cmds:
+      - '{{.COMPOSE}} exec app sh -c "cd /app && pnpm exec drizzle-kit generate && pnpm exec drizzle-kit migrate"'
+      - task: db:check
+
+  db:check:
+    desc: Fail if drizzle/schema.ts and the live DB have drifted (run after any schema change)
+    cmds:
+      - '{{.COMPOSE}} exec app sh -c "cd /app && node scripts/check-schema-drift.mjs"'
+
+  pg:copy-data:
+    desc: "OPE-184 — copie les données MySQL -> PostgreSQL (bascule PG-first). Idempotent."
+    cmds:
+      - '{{.COMPOSE}} exec app sh -c "cd /app && MYSQL_URL=mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp PG_URL=postgres://${POSTGRES_USER:-artisan_user}:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp node scripts/pg-data-copy.mjs"'
+
+  # Deprecated alias — kept so old muscle memory still works. Use db:migrate.
+  dev:migrate:
+    desc: "(deprecated) → use db:migrate"
+    cmds:
+      - task: db:migrate
+
+  dev:seed:
+    desc: Seed dev user dev@operioz.com / Operioz
+    cmds:
+      - |
+        {{.COMPOSE}} exec mysql mysql \
+          -u {{.DB_USER}} \
+          -p{{.DB_PASS}} \
+          {{.DB_NAME}} \
+          < scripts/seed-dev-user.sql
+
+  dev:seed:show:
+    desc: Show seeded dev users
+    cmds:
+      - |
+        {{.COMPOSE}} exec mysql mysql \
+          -u {{.DB_USER}} \
+          -p{{.DB_PASS}} \
+          {{.DB_NAME}} \
+          -e "SELECT u.id, u.email, u.role, u.actif, a.nomEntreprise FROM users u LEFT JOIN artisans a ON a.userId = u.id;"
+
+  dev:db:shell:
+    desc: Open MySQL shell
+    cmds:
+      - '{{.COMPOSE}} exec mysql mysql -u {{.DB_USER}} -p{{.DB_PASS}} {{.DB_NAME}}'
+
+  dev:status:
+    desc: Show container status
+    cmds:
+      - '{{.COMPOSE}} ps'
+
+  tf:plan:
+    desc: Run terraform plan (with tfsec) — Cloudflare
+    dir: terraform
+    cmds:
+      - ./run.sh plan
+
+  tf:apply:
+    desc: Run terraform apply (with tfsec) — Cloudflare
+    dir: terraform
+    cmds:
+      - ./run.sh apply
+
+  gcp:init:
+    desc: Init terraform GCP provider
+    dir: terraform/gcp
+    cmds:
+      - terraform init
+
+  gcp:plan:
+    desc: Plan GCP infra (Gemini API key)
+    dir: terraform/gcp
+    cmds:
+      - ./run.sh plan
+
+  gcp:apply:
+    desc: Apply GCP infra + write GEMINI_API_KEY to .env.local
+    dir: terraform/gcp
+    cmds:
+      - ./run.sh apply
+
+  gcp:key:
+    desc: Print current Gemini API key
+    dir: terraform/gcp
+    cmds:
+      - ./run.sh output
+
+  # ─── STAGING (public, prod build) ──────────────────────────────────────────
+  # We develop ON the `staging` branch (this working dir = dev env, live).
+  # staging.operioz.com is a separate worktree that builds a snapshot of
+  # origin/staging, redeployed ONLY on demand (task staging:deploy).
+  # The worktree uses a DETACHED checkout so it never conflicts with the
+  # `staging` branch checked out here.
+  staging:bootstrap:
+    desc: "(obsolète) Le worktree séparé a été consolidé — on développe sur `staging` ici."
+    cmds:
+      - echo "Worktree consolidé. Develop on branch 'staging' in this repo, then 'task staging:deploy'."
+
+  staging:up:
+    desc: Start the staging stack (mysql + prod app + cloudflared)
+    dir: '{{.STAGING_DIR}}'
+    cmds:
+      - '{{.STAGING_COMPOSE}} up -d'
+      - '{{.STAGING_COMPOSE}} ps'
+
+  staging:deploy:
+    desc: Deploy the local `staging` branch to staging.operioz.com (rebuild + restart app)
+    dir: '{{.STAGING_DIR}}'
+    cmds:
+      - '{{.STAGING_COMPOSE}} up -d --build --force-recreate app'
+      - '{{.STAGING_COMPOSE}} ps'
+
+  staging:down:
+    desc: Stop the staging stack
+    dir: '{{.STAGING_DIR}}'
+    cmds:
+      - '{{.STAGING_COMPOSE}} down'
+
+  staging:logs:
+    desc: Follow staging app logs
+    dir: '{{.STAGING_DIR}}'
+    cmds:
+      - '{{.STAGING_COMPOSE}} logs -f app'
+
+  staging:status:
+    desc: Show staging container status
+    dir: '{{.STAGING_DIR}}'
+    cmds:
+      - '{{.STAGING_COMPOSE}} ps'
+
+  staging:seed:
+    desc: Seed the staging DB with the dev user (dev@operioz.com / Operioz)
+    dir: '{{.STAGING_DIR}}'
+    cmds:
+      - |
+        {{.STAGING_COMPOSE}} exec -T mysql mysql \
+          -u {{.DB_USER}} -p"$MYSQL_PASSWORD" {{.DB_NAME}} \
+          < scripts/seed-dev-user.sql
+
+  staging:db:shell:
+    desc: Open a MySQL shell on the staging DB
+    dir: '{{.STAGING_DIR}}'
+    cmds:
+      - '{{.STAGING_COMPOSE}} exec mysql mysql -u {{.DB_USER}} -p"$MYSQL_PASSWORD" {{.DB_NAME}}'

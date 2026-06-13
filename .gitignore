@@ -10,6 +10,10 @@ build/
 # Environment variables
 .env
 .env.local
+.env.staging
+.env.save
+.env.*.save
+.env.bak
 .env.development.local
 .env.test.local
 .env.production.local
@@ -105,3 +109,11 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+.env

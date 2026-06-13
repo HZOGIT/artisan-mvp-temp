@@ -187,6 +187,21 @@ function renderArtisanBlock(doc: jsPDF, artisan: Artisan, yStart: number): numbe
     doc.text(`SIRET: ${artisan.siret}`, 20, yPos);
     yPos += 5;
   }
+  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné).
+  const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
+  if (artisan.formeJuridique && SOCIETES.includes(artisan.formeJuridique)) {
+    const siren = artisan.siret ? String(artisan.siret).replace(/\D/g, "").slice(0, 9) : "";
+    const cap = artisan.capitalSocial != null && String(artisan.capitalSocial) !== ""
+      ? `au capital de ${Number(artisan.capitalSocial).toLocaleString("fr-FR")} €` : "";
+    const head = [artisan.formeJuridique, cap].filter(Boolean).join(" ");
+    const rcs = artisan.villeRCS && siren ? `RCS ${artisan.villeRCS} ${siren}` : "";
+    const line = [head, rcs].filter(Boolean).join(" — ");
+    if (line) { doc.text(line, 20, yPos); yPos += 5; }
+  }
+  if (artisan.numeroRM) {
+    doc.text(`RM ${artisan.numeroRM}`, 20, yPos);
+    yPos += 5;
+  }
 
   return yPos;
 }
@@ -204,6 +219,11 @@ interface Artisan {
   telephone?: string | null;
   email?: string | null;
   logo?: string | null;
+  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM)
+  formeJuridique?: string | null;
+  capitalSocial?: string | null;
+  villeRCS?: string | null;
+  numeroRM?: string | null;
 }
 
 interface Client {
@@ -213,8 +233,17 @@ interface Client {
   adresse?: string | null;
   codePostal?: string | null;
   ville?: string | null;
+  // OPE-93 — adresse de facturation distincte (fallback adresse principale)
+  adresseFacturation?: string | null;
+  codePostalFacturation?: string | null;
+  villeFacturation?: string | null;
   telephone?: string | null;
   email?: string | null;
+  // OPE-92 — identité B2B (rappelée sur le document si client professionnel)
+  type?: string | null;
+  raisonSociale?: string | null;
+  siret?: string | null;
+  numeroTVA?: string | null;
 }
 
 interface LigneDocument {
@@ -224,6 +253,9 @@ interface LigneDocument {
   unite?: string | null;
   prixUnitaire: number;
   tauxTva?: number | null;
+  // OPE-168 — `section` (en-tête de lot) / `note` (texte libre) rendues en pleine
+  // largeur, sans colonnes de prix, exclues des totaux. Absent/`produit` = ligne normale.
+  type?: string | null;
 }
 
 interface DevisData {
@@ -232,6 +264,7 @@ interface DevisData {
   dateValidite?: Date | string | null;
   statut: string;
   objet?: string | null;
+  referenceClient?: string | null;
   lignes: LigneDocument[];
   totalHT: number;
   totalTVA: number;
@@ -245,6 +278,7 @@ interface FactureData {
   dateEcheance?: Date | string | null;
   statut: string;
   objet?: string | null;
+  referenceClient?: string | null;
   lignes: LigneDocument[];
   totalHT: number;
   totalTVA: number;
@@ -317,29 +351,43 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
-  const clientName = client.entreprise || `${client.prenom || ""} ${client.nom}`.trim();
+  // OPE-92 — client pro : raison sociale comme intitulé + mentions SIRET / TVA.
+  const isPro = client.type === "professionnel";
+  const clientName = (isPro && client.raisonSociale) || client.entreprise || `${client.prenom || ""} ${client.nom}`.trim();
   doc.text(clientName, pageWidth - 85, yPos);
   yPos += 5;
 
-  if (client.adresse) {
-    doc.text(client.adresse, pageWidth - 85, yPos);
+  // OPE-93 — adresse de facturation si renseignée (fallback par champ vers principale).
+  const adrFact = client.adresseFacturation || client.adresse;
+  const cpFact = client.codePostalFacturation || client.codePostal;
+  const villeFact = client.villeFacturation || client.ville;
+  if (adrFact) {
+    doc.text(adrFact, pageWidth - 85, yPos);
     yPos += 5;
   }
-  if (client.codePostal || client.ville) {
-    doc.text(`${client.codePostal || ""} ${client.ville || ""}`.trim(), pageWidth - 85, yPos);
+  if (cpFact || villeFact) {
+    doc.text(`${cpFact || ""} ${villeFact || ""}`.trim(), pageWidth - 85, yPos);
     yPos += 5;
   }
   if (client.telephone) {
     doc.text(`Tél: ${client.telephone}`, pageWidth - 85, yPos);
     yPos += 5;
   }
+  if (isPro && client.siret) {
+    doc.text(`SIRET: ${client.siret}`, pageWidth - 85, yPos);
+    yPos += 5;
+  }
+  if (isPro && client.numeroTVA) {
+    doc.text(`TVA: ${client.numeroTVA}`, pageWidth - 85, yPos);
+    yPos += 5;
+  }
 
-  return yStart + 50;
+  return Math.max(yStart + 50, yPos + 5);
 }
 
 function addDocumentInfo(
   doc: jsPDF,
-  data: { dateCreation: Date | string; dateValidite?: Date | string | null; dateEcheance?: Date | string | null; statut: string; objet?: string | null },
+  data: { dateCreation: Date | string; dateValidite?: Date | string | null; dateEcheance?: Date | string | null; statut: string; objet?: string | null; referenceClient?: string | null },
   type: "devis" | "facture",
   yStart: number
 ): number {
@@ -373,6 +421,15 @@ function addDocumentInfo(
   doc.setFont("Roboto", "normal");
   doc.text(getStatutLabel(data.statut, type), 65, yPos);
 
+  // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+  if (data.referenceClient) {
+    yPos += 6;
+    doc.setFont("Roboto", "bold");
+    doc.text("Votre réf.:", 20, yPos);
+    doc.setFont("Roboto", "normal");
+    doc.text(String(data.referenceClient), 65, yPos);
+  }
+
   if (data.objet) {
     yPos += 10;
     doc.setFont("Roboto", "bold");
@@ -387,14 +444,37 @@ function addDocumentInfo(
 }
 
 function addLignesTable(doc: jsPDF, lignes: LigneDocument[], yStart: number): number {
-  const tableData = lignes.map((ligne) => [
-    ligne.designation,
-    ligne.quantite.toString(),
-    ligne.unite || "u",
-    formatCurrency(ligne.prixUnitaire),
-    `${ligne.tauxTva || 20}%`,
-    formatCurrency(ligne.quantite * ligne.prixUnitaire),
-  ]);
+  // OPE-168 — une ligne `section`/`note` occupe toute la largeur (titre de lot en
+  // gras / texte libre en italique) sans colonnes chiffrées ; les autres restent des
+  // lignes produit normales. autoTable accepte des cellules { content, colSpan, styles }.
+  const tableData = lignes.map((ligne) => {
+    if (ligne.type === "section") {
+      return [
+        {
+          content: ligne.designation,
+          colSpan: 6,
+          styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] },
+        },
+      ];
+    }
+    if (ligne.type === "note") {
+      return [
+        {
+          content: ligne.designation,
+          colSpan: 6,
+          styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] },
+        },
+      ];
+    }
+    return [
+      ligne.designation,
+      ligne.quantite.toString(),
+      ligne.unite || "u",
+      formatCurrency(ligne.prixUnitaire),
+      `${ligne.tauxTva || 20}%`,
+      formatCurrency(ligne.quantite * ligne.prixUnitaire),
+    ];
+  });
 
   autoTable(doc, {
     startY: yStart,
@@ -585,7 +665,27 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
-  addFooter(doc, facture.conditions, options?.mentionsLegales);
+  // OPE-164/95 — sur une facture (pas un avoir) : conditions réelles + mentions légales.
+  // OPE-95 ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
+  // de 40 €, Art. L441-10 / D441-5 C. com.) — obligatoires et sanctionnées si absentes.
+  // Parité avec le générateur PDF serveur (portail) qui les affiche déjà : le PDF client
+  // (téléchargé/envoyé par l'artisan) les omettait → divergence corrigée.
+  const factureConditions = isAvoir
+    ? facture.conditions
+    : [
+        facture.conditions,
+        "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée, ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C. com.).",
+        "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
+      ]
+        .filter(Boolean)
+        .join("\n");
+  addFooter(doc, factureConditions, options?.mentionsLegales);
+
+  // OPE-127 — CGV réutilisables sur une page dédiée (comme le devis). Pas sur un avoir
+  // (document d'annulation). N'apparaît que si l'artisan a renseigné ses CGV.
+  if (!isAvoir && options?.cgv) {
+    addCgvPage(doc, options.cgv);
+  }
 
   const prefix = isAvoir ? "Avoir" : "Facture";
   doc.save(`${prefix}_${facture.numero}.pdf`);

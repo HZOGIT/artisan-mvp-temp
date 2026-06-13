@@ -1,24 +1,25 @@
-import type { Tool } from "@anthropic-ai/sdk/resources/messages";
+import { Type, type FunctionDeclaration } from '@google/genai';
 import * as db from "../db";
 import {
   sendEmail,
   generateFactureEmailContent,
+  safeHtml,
 } from "./emailService";
 
 // ============================================================================
 // Tool definitions exposées à Claude (function calling)
 // ============================================================================
 
-export const AGENT_TOOLS: Tool[] = [
+export const AGENT_TOOLS: FunctionDeclaration[] = [
   {
     name: "chercher_client",
     description:
       "Recherche un client par nom, prénom, entreprise ou email. Insensible à la casse et aux accents. Accepte une requête multi-mots (ex: 'Michel dad' trouve DAD Michel) : matche TOUS les mots dans n'importe quel ordre, et tombe en mode partiel scoré si aucun match strict. Retourne jusqu'à 5 résultats. À utiliser AVANT toute action liée à un client si tu n'as pas son ID.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
         nom: {
-          type: "string",
+          type: Type.STRING,
           description: "Mots à chercher (nom, prénom, entreprise, email). Peut contenir plusieurs mots séparés par des espaces.",
         },
       },
@@ -29,29 +30,29 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_devis",
     description:
       "Crée un nouveau devis en brouillon pour un client avec ses lignes. Retourne le numéro et l'ID du devis créé. Calcule automatiquement les totaux HT/TVA/TTC.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number", description: "ID du client (obtenu via chercher_client)" },
-        objet: { type: "string", description: "Objet/titre du devis" },
+        clientId: { type: Type.NUMBER, description: "ID du client (obtenu via chercher_client)" },
+        objet: { type: Type.STRING, description: "Objet/titre du devis" },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           description: "Lignes du devis avec leurs montants",
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string", description: "Ex: u, h, m, m², forfait" },
-              prixUnitaireHT: { type: "number" },
-              tauxTVA: { type: "number", description: "En pourcentage, ex: 20" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING, description: "Ex: u, h, m, m², forfait" },
+              prixUnitaireHT: { type: Type.NUMBER },
+              tauxTVA: { type: Type.NUMBER, description: "En pourcentage, ex: 20" },
             },
             required: ["designation", "quantite", "prixUnitaireHT"],
           },
         },
-        notes: { type: "string", description: "Notes ou conditions particulières (optionnel)" },
+        notes: { type: Type.STRING, description: "Notes ou conditions particulières (optionnel)" },
         validiteDays: {
-          type: "number",
+          type: Type.NUMBER,
           description: "Nombre de jours de validité du devis (défaut: 30)",
         },
       },
@@ -62,12 +63,12 @@ export const AGENT_TOOLS: Tool[] = [
     name: "envoyer_devis",
     description:
       "Envoie un devis existant par email au client. Le PDF est généré et joint automatiquement. Le statut du devis passe à 'envoye'.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        devisId: { type: "number" },
+        devisId: { type: Type.NUMBER },
         messagePersonnalise: {
-          type: "string",
+          type: Type.STRING,
           description: "Message libre ajouté au corps de l'email (optionnel)",
         },
       },
@@ -78,26 +79,26 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_et_envoyer_devis",
     description:
       "Crée un devis ET l'envoie immédiatement par email au client. Combine creer_devis et envoyer_devis en une seule action.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number" },
-        objet: { type: "string" },
+        clientId: { type: Type.NUMBER },
+        objet: { type: Type.STRING },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string" },
-              prixUnitaireHT: { type: "number" },
-              tauxTVA: { type: "number" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING },
+              prixUnitaireHT: { type: Type.NUMBER },
+              tauxTVA: { type: Type.NUMBER },
             },
             required: ["designation", "quantite", "prixUnitaireHT"],
           },
         },
-        messageEmail: { type: "string", description: "Message personnalisé pour l'email (optionnel)" },
+        messageEmail: { type: Type.STRING, description: "Message personnalisé pour l'email (optionnel)" },
       },
       required: ["clientId", "objet", "lignes"],
     },
@@ -106,23 +107,23 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_facture",
     description:
       "Crée une facture pour un client. Si devisId est fourni, la facture est créée à partir du devis (recopie clientId, lignes, totaux). Sinon, crée la facture avec les lignes fournies.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number", description: "Requis si pas de devisId" },
-        devisId: { type: "number", description: "ID du devis source (optionnel)" },
-        objet: { type: "string" },
+        clientId: { type: Type.NUMBER, description: "Requis si pas de devisId" },
+        devisId: { type: Type.NUMBER, description: "ID du devis source (optionnel)" },
+        objet: { type: Type.STRING },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           description: "Requis si pas de devisId",
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string" },
-              prixUnitaireHT: { type: "number" },
-              tauxTVA: { type: "number" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING },
+              prixUnitaireHT: { type: Type.NUMBER },
+              tauxTVA: { type: Type.NUMBER },
             },
             required: ["designation", "quantite", "prixUnitaireHT"],
           },
@@ -134,11 +135,11 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "envoyer_facture",
     description: "Envoie une facture par email au client avec son PDF en pièce jointe.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        factureId: { type: "number" },
-        messagePersonnalise: { type: "string" },
+        factureId: { type: Type.NUMBER },
+        messagePersonnalise: { type: Type.STRING },
       },
       required: ["factureId"],
     },
@@ -147,11 +148,11 @@ export const AGENT_TOOLS: Tool[] = [
     name: "envoyer_relance",
     description:
       "Envoie une relance pour une facture impayée. Utilise un message de rappel adapté avec le nombre de jours de retard.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        factureId: { type: "number" },
-        messagePersonnalise: { type: "string" },
+        factureId: { type: Type.NUMBER },
+        messagePersonnalise: { type: Type.STRING },
       },
       required: ["factureId"],
     },
@@ -160,20 +161,20 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_intervention",
     description:
       "Planifie une intervention dans le calendrier. Les dates doivent être au format ISO 8601 (ex: 2026-05-13T08:00:00). Le titre doit décrire la nature du travail (ex: 'Débouchage WC', 'Réparation fuite', 'Entretien chaudière') — pas un libellé générique. L'adresse est facultative : si non fournie, l'adresse postale du client est utilisée automatiquement.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        clientId: { type: "number" },
+        clientId: { type: Type.NUMBER },
         titre: {
-          type: "string",
+          type: Type.STRING,
           description:
             "Nature du travail à effectuer, déduite de la demande de l'artisan. Exemples : 'Débouchage WC', 'Réparation fuite cuisine', 'Entretien chaudière annuel', 'Installation chauffe-eau'. Utilise 'Intervention' uniquement si aucun détail n'a été donné.",
         },
-        description: { type: "string", description: "Notes ou détails complémentaires (optionnel)." },
-        dateDebut: { type: "string", description: "Date/heure ISO 8601" },
-        dateFin: { type: "string", description: "Date/heure ISO 8601" },
+        description: { type: Type.STRING, description: "Notes ou détails complémentaires (optionnel)." },
+        dateDebut: { type: Type.STRING, description: "Date/heure ISO 8601" },
+        dateFin: { type: Type.STRING, description: "Date/heure ISO 8601" },
         adresse: {
-          type: "string",
+          type: Type.STRING,
           description:
             "Adresse de l'intervention (optionnel). Si vide, l'adresse postale du client est utilisée automatiquement.",
         },
@@ -185,13 +186,41 @@ export const AGENT_TOOLS: Tool[] = [
     name: "lister_factures_impayees",
     description:
       "Liste toutes les factures non payées (statut envoyée ou en retard). Retourne id, numéro, client, montantTTC, date échéance, jours de retard.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
   },
   {
     name: "lister_devis_en_attente",
     description:
       "Liste les devis envoyés en attente de réponse du client (statut envoye). Retourne id, numéro, client, montantTTC, date du devis.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
+  },
+  {
+    name: "lister_factures",
+    description:
+      "Liste TOUTES les factures de l'artisan, TOUS STATUTS confondus (brouillon, envoyée, payée, annulée), de la plus récente à la plus ancienne. À utiliser pour répondre à toute question générale sur les factures : « mes factures », « la dernière / la première facture », « combien de factures », « la plus grosse facture », ou un statut autre qu'impayées. N'utilise lister_factures_impayees QUE pour le sous-ensemble impayé. Retourne count + id, numéro, client, statut, montantTTC, dateFacture, dateEcheance.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        statut: {
+          type: Type.STRING,
+          description: "Filtre optionnel : brouillon | envoyee | payee | annulee. Omettre pour TOUTES les factures.",
+        },
+      },
+    },
+  },
+  {
+    name: "lister_devis",
+    description:
+      "Liste TOUS les devis de l'artisan, TOUS STATUTS confondus (brouillon, envoye, accepte, refuse), du plus récent au plus ancien. À utiliser pour toute question générale sur les devis : « mes devis », « le dernier devis », « combien de devis », « le plus gros devis ». N'utilise lister_devis_en_attente QUE pour le sous-ensemble envoyé/en attente. Retourne count + id, numéro, client, statut, montantTTC, dateDevis.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        statut: {
+          type: Type.STRING,
+          description: "Filtre optionnel : brouillon | envoye | accepte | refuse. Omettre pour TOUS les devis.",
+        },
+      },
+    },
   },
 
   // ── Stocks & commandes fournisseurs ────────────────────────────────────
@@ -199,31 +228,31 @@ export const AGENT_TOOLS: Tool[] = [
     name: "verifier_stocks",
     description:
       "Vérifie tous les niveaux de stock. Retourne la liste des articles avec leur quantité, seuil d'alerte et statut (rupture | alerte | ok), ainsi qu'un récapitulatif des articles à réapprovisionner.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
   },
   {
     name: "creer_commande_fournisseur",
     description:
       "Crée un bon de commande fournisseur en brouillon pour réapprovisionner des articles. Retourne le numéro et l'id de la commande créée.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        fournisseurId: { type: "number", description: "ID du fournisseur (obtenu via chercher_fournisseur ou lister_fournisseurs)" },
+        fournisseurId: { type: Type.NUMBER, description: "ID du fournisseur (obtenu via chercher_fournisseur ou lister_fournisseurs)" },
         lignes: {
-          type: "array",
+          type: Type.ARRAY,
           items: {
-            type: "object",
+            type: Type.OBJECT,
             properties: {
-              designation: { type: "string" },
-              quantite: { type: "number" },
-              unite: { type: "string" },
-              prixUnitaireHT: { type: "number" },
+              designation: { type: Type.STRING },
+              quantite: { type: Type.NUMBER },
+              unite: { type: Type.STRING },
+              prixUnitaireHT: { type: Type.NUMBER },
             },
             required: ["designation", "quantite"],
           },
         },
-        notes: { type: "string" },
-        delaiLivraison: { type: "string", description: "Texte libre, ex: '2 semaines'" },
+        notes: { type: Type.STRING },
+        delaiLivraison: { type: Type.STRING, description: "Texte libre, ex: '2 semaines'" },
       },
       required: ["fournisseurId", "lignes"],
     },
@@ -231,11 +260,11 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "envoyer_commande_fournisseur",
     description: "Envoie un bon de commande par email au fournisseur avec le PDF en pièce jointe.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        commandeId: { type: "number" },
-        messagePersonnalise: { type: "string" },
+        commandeId: { type: Type.NUMBER },
+        messagePersonnalise: { type: Type.STRING },
       },
       required: ["commandeId"],
     },
@@ -246,10 +275,10 @@ export const AGENT_TOOLS: Tool[] = [
     name: "lister_clients",
     description:
       "Liste les clients de l'artisan. Filtre optionnel par substring sur le nom/prénom/entreprise. Limite à 50 résultats.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        filtre: { type: "string", description: "Texte de filtrage (optionnel)" },
+        filtre: { type: Type.STRING, description: "Texte de filtrage (optionnel)" },
       },
     },
   },
@@ -257,17 +286,17 @@ export const AGENT_TOOLS: Tool[] = [
     name: "creer_client",
     description:
       "Crée un nouveau client dans la base. Retourne l'id et le nom du client créé.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        nom: { type: "string" },
-        prenom: { type: "string" },
-        email: { type: "string" },
-        telephone: { type: "string" },
-        adresse: { type: "string" },
-        ville: { type: "string" },
-        codePostal: { type: "string" },
-        type: { type: "string", enum: ["particulier", "professionnel"] },
+        nom: { type: Type.STRING },
+        prenom: { type: Type.STRING },
+        email: { type: Type.STRING },
+        telephone: { type: Type.STRING },
+        adresse: { type: Type.STRING },
+        ville: { type: Type.STRING },
+        codePostal: { type: Type.STRING },
+        type: { type: Type.STRING },
       },
       required: ["nom"],
     },
@@ -278,12 +307,11 @@ export const AGENT_TOOLS: Tool[] = [
     name: "get_statistiques",
     description:
       "Récupère les statistiques complètes de l'activité : CA du mois, CA de l'année, nombre de clients, devis en cours, factures impayées, interventions à venir, articles en rupture.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
         periode: {
-          type: "string",
-          enum: ["jour", "semaine", "mois", "annee"],
+          type: Type.STRING,
           description: "Optionnel — par défaut renvoie un récapitulatif complet incluant mois et année.",
         },
       },
@@ -294,15 +322,15 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "lister_fournisseurs",
     description: "Liste tous les fournisseurs enregistrés avec leurs coordonnées.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: Type.OBJECT, properties: {} },
   },
   {
     name: "chercher_fournisseur",
     description: "Recherche un fournisseur par nom. Insensible à la casse, retourne jusqu'à 5 résultats.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        nom: { type: "string" },
+        nom: { type: Type.STRING },
       },
       required: ["nom"],
     },
@@ -313,12 +341,12 @@ export const AGENT_TOOLS: Tool[] = [
     name: "lister_interventions",
     description:
       "Liste les interventions planifiées. Filtres optionnels par statut, dateDebut (>=), dateFin (<=).",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        statut: { type: "string", enum: ["planifiee", "en_cours", "terminee", "annulee"] },
-        dateDebut: { type: "string", description: "ISO 8601" },
-        dateFin: { type: "string", description: "ISO 8601" },
+        statut: { type: Type.STRING, description: "planifiee | en_cours | terminee | annulee" },
+        dateDebut: { type: Type.STRING, description: "ISO 8601" },
+        dateFin: { type: Type.STRING, description: "ISO 8601" },
       },
     },
   },
@@ -326,15 +354,15 @@ export const AGENT_TOOLS: Tool[] = [
     name: "modifier_intervention",
     description:
       "Modifie une intervention existante. Seuls les champs fournis sont mis à jour.",
-    input_schema: {
-      type: "object",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
-        interventionId: { type: "number" },
-        titre: { type: "string" },
-        dateDebut: { type: "string" },
-        dateFin: { type: "string" },
-        statut: { type: "string", enum: ["planifiee", "en_cours", "terminee", "annulee"] },
-        notes: { type: "string" },
+        interventionId: { type: Type.NUMBER },
+        titre: { type: Type.STRING },
+        dateDebut: { type: Type.STRING },
+        dateFin: { type: Type.STRING },
+        statut: { type: Type.STRING, description: "planifiee | en_cours | terminee | annulee" },
+        notes: { type: Type.STRING },
       },
       required: ["interventionId"],
     },
@@ -344,36 +372,32 @@ export const AGENT_TOOLS: Tool[] = [
   {
     name: "naviguer_vers",
     description:
-      "Redirige l'artisan vers une page de l'application avec un filtre optionnel pour afficher des données spécifiques. À appeler APRÈS avoir listé des données pour que l'artisan puisse voir tous les résultats filtrés dans la page concernée. Le résumé court reste affiché dans le panneau de chat.",
-    input_schema: {
-      type: "object",
+      "Ouvre une page de l'application pour l'artisan (avec un filtre optionnel). Deux usages : (1) après avoir listé des données, ouvrir la page liste filtrée ; (2) après une ACTION de création/modification, ouvrir le DEEP-LINK du document créé (ex. /devis/<id>). Le résumé court reste dans le panneau de chat. N'invente JAMAIS de chemin : utilise uniquement une page connue ou un deep-link vers un id réel retourné par un outil.",
+    parameters: {
+      type: Type.OBJECT,
       properties: {
         page: {
-          type: "string",
-          enum: ["/factures", "/devis", "/clients", "/interventions", "/stocks", "/commandes"],
-          description: "Page de destination",
+          type: Type.STRING,
+          description:
+            "Chemin de destination. DEEP-LINKS vers un document précis (utilise l'id réel retourné par l'outil de création) : /devis/<id>, /factures/<id>, /clients/<id>, /contrats/<id>, /commandes/<id>. " +
+            "PAGES LISTE / SECTIONS (liste non exhaustive, choisis la plus pertinente) : " +
+            "cœur métier → /dashboard, /clients, /devis, /factures, /interventions, /calendrier, /stocks, /articles, /fournisseurs, /commandes, /contrats ; " +
+            "compta & dépenses → /comptabilite (TVA, FEC, écritures), /depenses, /notes-de-frais, /tableau-bord-depenses, /budgets-depenses, /regles-depenses, /import-releve, /integrations-comptables, /tableau-bord-sync-comptable ; " +
+            "chantiers & planning → /chantiers (rentabilité chantier), /calendrier-chantiers, /planification, /previsions, /alertes-previsions ; " +
+            "équipe & véhicules → /techniciens, /conges, /utilisateurs, /vehicules, /flotte, /geolocalisation, /classement, /badges ; " +
+            "commercial & IA → /devis-ia, /devis-options, /relances, /avis, /analyses-photos, /rdv-en-ligne ; " +
+            "stats & rapports → /statistiques, /rapports, /rapport-commande, /performances-fournisseurs ; " +
+            "vitrine & comm → /ma-vitrine, /portail-gestion, /notifications, /modeles-email, /modeles-email-transactionnels ; " +
+            "compte & réglages → /profil, /parametres, /modules, /import, /documentation, /support. " +
+            "Pas de /interventions/<id> (la nav intervention va sur /interventions ou /calendrier).",
         },
         filtre: {
-          type: "string",
-          enum: [
-            "impayees",
-            "en_retard",
-            "brouillon",
-            "envoye",
-            "envoyee",
-            "accepte",
-            "refuse",
-            "planifiee",
-            "en_cours",
-            "terminee",
-            "rupture",
-            "alerte",
-          ],
+          type: Type.STRING,
           description:
-            "Filtre à appliquer sur la page. Valeurs valides selon la page : factures → impayees, en_retard, brouillon ; devis → brouillon, envoye, accepte, refuse ; interventions → planifiee, en_cours, terminee ; stocks → rupture, alerte ; commandes → brouillon, envoyee.",
+            "Filtre à appliquer sur la page liste (ignoré pour un deep-link). Valeurs valides selon la page : factures → impayees, en_retard, brouillon ; devis → brouillon, envoye, accepte, refuse ; interventions → planifiee, en_cours, terminee ; stocks → rupture, alerte ; commandes → brouillon, envoyee.",
         },
         message: {
-          type: "string",
+          type: Type.STRING,
           description: "Message court affiché à l'artisan pour confirmer la navigation (optionnel).",
         },
       },
@@ -420,7 +444,7 @@ export type ToolResult =
   | { ok: true; data: unknown }
   | { ok: false; error: string };
 
-const PUBLIC_BASE_URL = "https://www.operioz.com";
+const PUBLIC_BASE_URL = process.env.APP_URL || "https://www.operioz.com";
 
 /**
  * Construit le corps HTML d'un email de devis avec lien de signature électronique.
@@ -437,8 +461,13 @@ function buildDevisSignatureEmailBody(params: {
   dateValidite?: string;
   signatureUrl: string;
 }): { subject: string; body: string } {
-  const { artisanName, clientName, devisNumero, devisObjet, totalTTC, dateValidite, signatureUrl } = params;
-  const subject = `Devis ${devisNumero}${devisObjet ? ` - ${devisObjet}` : ""} de ${artisanName}`;
+  const { artisanName: rawArtisanName, clientName: rawClientName, devisNumero, devisObjet, totalTTC, dateValidite, signatureUrl } = params;
+  const subject = `Devis ${devisNumero}${devisObjet ? ` - ${devisObjet}` : ""} de ${rawArtisanName}`;
+  // OPE-12/36/59 (échappement HTML emails) — les champs user (nom artisan/client, objet)
+  // sont interpolés dans du HTML brut : échapper pour éviter une injection HTML stockée.
+  const artisanName = safeHtml(rawArtisanName);
+  const clientName = safeHtml(rawClientName);
+  const objetHtml = devisObjet ? safeHtml(devisObjet) : "";
   const body = `<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"></head>
@@ -453,7 +482,7 @@ function buildDevisSignatureEmailBody(params: {
 
         <tr><td style="padding:36px 40px 16px 40px;">
           <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
-          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${devisNumero}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${devisObjet}&nbsp;&raquo;</em>` : ""} d'un montant de <strong>${totalTTC}</strong>${dateValidite ? `, valable jusqu'au <strong>${dateValidite}</strong>` : ""}. Vous pouvez le consulter et le signer électroniquement en un clic.</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Veuillez trouver ci-joint le devis <strong>${devisNumero}</strong>${devisObjet ? ` concernant <em>&laquo;&nbsp;${objetHtml}&nbsp;&raquo;</em>` : ""} d'un montant de <strong>${totalTTC}</strong>${dateValidite ? `, valable jusqu'au <strong>${dateValidite}</strong>` : ""}. Vous pouvez le consulter et le signer électroniquement en un clic.</p>
         </td></tr>
 
         <tr><td style="padding:0 40px 24px 40px;">
@@ -512,8 +541,11 @@ function buildRelanceEmailBody(params: {
   totalTTC: string;
   joursRetard: number;
 }): { subject: string; body: string } {
-  const { artisanName, clientName, factureNumero, totalTTC, joursRetard } = params;
+  const { artisanName: rawArtisanName, clientName: rawClientName, factureNumero, totalTTC, joursRetard } = params;
   const subject = `Rappel : facture ${factureNumero} en attente de règlement`;
+  // OPE-12/36/59 — échappement HTML des champs user dans le corps de l'email.
+  const artisanName = safeHtml(rawArtisanName);
+  const clientName = safeHtml(rawClientName);
   const body = `<!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="utf-8"></head>
@@ -1044,6 +1076,8 @@ async function sendFactureEmailHelper(factureId: number, customMessage: string |
 
   const result = await sendEmail({
     to: client.email,
+    fromName: artisan.nomEntreprise || undefined, // OPE-157
+    replyTo: (artisan as any).email || undefined,
     subject,
     body: finalBody,
     attachmentName: `Facture_${factureData.numero}.pdf`,
@@ -1258,6 +1292,58 @@ async function execListerDevisEnAttente(_input: any, ctx: ToolContext): Promise<
     }))
     .sort((a, b) => b.joursDepuisEnvoi - a.joursDepuisEnvoi);
   return ok({ count: enAttente.length, devis: enAttente });
+}
+
+// Construit une map clientId -> "Prénom Nom" pour enrichir les listes.
+async function buildClientNameMap(ctx: ToolContext): Promise<Map<number, string>> {
+  const clients = await db.getClientsByArtisanId(ctx.artisanId);
+  const map = new Map<number, string>();
+  for (const c of clients as any[]) {
+    map.set(c.id, `${c.prenom || ""} ${c.nom || ""}`.trim() || `#${c.id}`);
+  }
+  return map;
+}
+
+async function execListerFactures(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const [factures, names] = await Promise.all([
+    db.getFacturesByArtisanId(ctx.artisanId),
+    buildClientNameMap(ctx),
+  ]);
+  const wantStatut = input?.statut ? String(input.statut).trim() : undefined;
+  let list = (factures as any[]).map((f) => ({
+    id: f.id,
+    numero: f.numero,
+    client: names.get(f.clientId) || `#${f.clientId}`,
+    statut: f.statut,
+    totalTTC: f.totalTTC,
+    dateFacture: f.dateFacture,
+    dateEcheance: f.dateEcheance,
+  }));
+  if (wantStatut) list = list.filter((f) => f.statut === wantStatut);
+  // La plus récente d'abord (pour « la dernière facture »).
+  list.sort((a, b) => new Date(b.dateFacture).getTime() - new Date(a.dateFacture).getTime());
+  return ok({ count: list.length, factures: list });
+}
+
+async function execListerDevis(input: any, ctx: ToolContext): Promise<ToolResult> {
+  const [devisList, names] = await Promise.all([
+    db.getDevisByArtisanId(ctx.artisanId),
+    buildClientNameMap(ctx),
+  ]);
+  const wantStatut = input?.statut ? String(input.statut).trim() : undefined;
+  let list = (devisList as any[]).map((d) => ({
+    id: d.id,
+    numero: d.numero,
+    client: names.get(d.clientId) || `#${d.clientId}`,
+    objet: d.objet,
+    statut: d.statut,
+    totalTTC: d.totalTTC,
+    dateDevis: d.dateDevis,
+  }));
+  if (wantStatut) list = list.filter((d) => d.statut === wantStatut);
+  // Le plus récent d'abord (pour « le dernier devis »).
+  list.sort((a, b) => new Date(b.dateDevis).getTime() - new Date(a.dateDevis).getTime());
+  return ok({ count: list.length, devis: list });
 }
 
 // ============================================================================
@@ -1629,19 +1715,91 @@ async function execModifierIntervention(input: any, ctx: ToolContext): Promise<T
 // Navigation UI
 // ============================================================================
 
+// Carte complète des pages navigables de l'app (miroir de client/src/App.tsx).
+// Sert de garde anti-hallucination : toute page hors de cette liste (ou hors
+// des deep-links autorisés ci-dessous) est rejetée pour éviter un 404.
 const VALID_NAV_PAGES = [
-  "/factures",
-  "/devis",
+  // Cœur métier
+  "/dashboard",
   "/clients",
+  "/devis",
+  "/factures",
   "/interventions",
+  "/calendrier",
   "/stocks",
+  "/articles",
+  "/fournisseurs",
   "/commandes",
+  "/contrats",
+  // Compta / dépenses / finances
+  "/comptabilite",
+  "/integrations-comptables",
+  "/tableau-bord-sync-comptable",
+  "/depenses",
+  "/notes-de-frais",
+  "/tableau-bord-depenses",
+  "/import-releve",
+  "/budgets-depenses",
+  "/regles-depenses",
+  // Chantiers / planification / rentabilité
+  "/chantiers",
+  "/calendrier-chantiers",
+  "/planification",
+  "/previsions",
+  "/alertes-previsions",
+  // Équipe / RH / véhicules
+  "/techniciens",
+  "/conges",
+  "/utilisateurs",
+  "/vehicules",
+  "/flotte",
+  "/geolocalisation",
+  "/classement",
+  "/badges",
+  // Commercial / IA / relances / avis
+  "/devis-ia",
+  "/devis-options",
+  "/relances",
+  "/avis",
+  "/analyses-photos",
+  "/rdv-en-ligne",
+  // Stats & rapports
+  "/statistiques",
+  "/rapports",
+  "/rapport-commande",
+  "/performances-fournisseurs",
+  // Vitrine / portail / divers
+  "/ma-vitrine",
+  "/portail-gestion",
+  "/notifications",
+  "/modeles-email",
+  "/modeles-email-transactionnels",
+  // Paramétrage / compte
+  "/profil",
+  "/parametres",
+  "/modules",
+  "/import",
+  "/documentation",
+  "/support",
 ];
+
+// Deep-links autorisés : /<ressource>/<id numérique>. Le front (Assistant.tsx)
+// fait setLocation pour n'importe quel chemin, donc ces deep-links ouvrent
+// directement la vue détail du document (ex. le devis qu'on vient de créer).
+// NB : pas de /interventions/:id côté front (cf. App.tsx) → la nav intervention
+// va sur /interventions ou /calendrier, jamais sur un deep-link détail.
+const DEEP_LINK_RE = /^\/(devis|factures|clients|contrats|commandes)\/\d+$/;
+
+function isValidNavPage(page: string): boolean {
+  return VALID_NAV_PAGES.includes(page) || DEEP_LINK_RE.test(page);
+}
 
 async function execNaviguerVers(input: any, _ctx: ToolContext): Promise<ToolResult> {
   const page = String(input?.page || "").trim();
-  if (!VALID_NAV_PAGES.includes(page)) {
-    return fail(`Page invalide : ${page || "(vide)"}. Valeurs autorisées : ${VALID_NAV_PAGES.join(", ")}`);
+  if (!isValidNavPage(page)) {
+    return fail(
+      `Page invalide : ${page || "(vide)"}. Utilise une page connue (ex. /devis, /comptabilite, /chantiers) ou un deep-link vers un document existant (/devis/<id>, /factures/<id>, /clients/<id>, /contrats/<id>, /commandes/<id>).`
+    );
   }
   const filtre = input?.filtre ? String(input.filtre).trim() : undefined;
   const message = input?.message ? String(input.message).trim() : undefined;
@@ -1685,6 +1843,10 @@ export async function executeTool(
       return execListerFacturesImpayees(input as any, ctx);
     case "lister_devis_en_attente":
       return execListerDevisEnAttente(input as any, ctx);
+    case "lister_factures":
+      return execListerFactures(input as any, ctx);
+    case "lister_devis":
+      return execListerDevis(input as any, ctx);
     // Stocks & commandes fournisseurs
     case "verifier_stocks":
       return execVerifierStocks(input as any, ctx);

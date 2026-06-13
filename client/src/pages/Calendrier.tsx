@@ -29,6 +29,15 @@ export default function Calendrier() {
   const utils = trpc.useUtils();
   const { data: interventions, isLoading } = trpc.interventions.list.useQuery();
   const { data: clients } = trpc.clients.list.useQuery();
+  // OPE-111 — équipes (1 requête) → map interventionId → membres, pour les afficher
+  // dans le détail d'une journée du calendrier.
+  const { data: equipesByArtisan } = trpc.interventions.getEquipesByArtisan.useQuery();
+  const equipeParIntervention = new Map<number, any[]>();
+  for (const m of equipesByArtisan || []) {
+    const arr = equipeParIntervention.get(m.interventionId) || [];
+    arr.push(m);
+    equipeParIntervention.set(m.interventionId, arr);
+  }
 
   const createMutation = trpc.interventions.create.useMutation({
     onSuccess: () => {
@@ -141,6 +150,7 @@ export default function Calendrier() {
     statut: i.statut,
     adresse: i.adresse,
     client: i.client,
+    equipe: equipeParIntervention.get(i.id) || undefined,
   }));
 
   return (

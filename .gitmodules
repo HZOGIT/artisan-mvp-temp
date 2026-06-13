@@ -1,0 +1,6 @@
+[submodule "odoo-ref"]
+	path = odoo-ref
+	url = https://github.com/odoo/odoo.git
+	branch = 19.0
+	update = none
+	shallow = true

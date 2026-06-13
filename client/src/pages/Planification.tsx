@@ -51,8 +51,19 @@ export default function Planification() {
   );
 
   const assignerMutation = trpc.interventions.assignerTechnicien.useMutation({
-    onSuccess: () => {
-      toast.success("Technicien assigné avec succès");
+    onSuccess: (data: any) => {
+      // OPE-110 — avertissement non bloquant si conflit (double-booking / congé approuvé).
+      const c = data?.conflits;
+      const nbInter = c?.interventions?.length || 0;
+      const nbConge = c?.conges?.length || 0;
+      if (nbInter > 0 || nbConge > 0) {
+        const parts: string[] = [];
+        if (nbInter > 0) parts.push(`${nbInter} intervention(s) en chevauchement`);
+        if (nbConge > 0) parts.push(`congé approuvé sur la période`);
+        toast.warning(`Technicien assigné — ⚠ conflit : ${parts.join(" + ")}`);
+      } else {
+        toast.success("Technicien assigné avec succès");
+      }
       setSelectedTechnicien(null);
     },
     onError: (error) => {

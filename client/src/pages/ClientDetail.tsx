@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, Phone, Mail, MapPin, FileText, Receipt, Calendar, TrendingUp, Euro, Clock, Globe, Loader2, Copy, ShieldOff, RefreshCw } from "lucide-react";
+import { ArrowLeft, User, Phone, Mail, MapPin, FileText, Receipt, Calendar, TrendingUp, Euro, Clock, Globe, Loader2, Copy, ShieldOff, RefreshCw, Bell, Plus, Trash2, CheckCircle2, Circle, AlarmClock } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
@@ -122,6 +125,37 @@ export default function ClientDetail() {
   const devisClient = (clientDevis || []).filter((d: any) => d.clientId === parseInt(id || "0"));
   const facturesClient = (clientFactures || []).filter((f: any) => f.clientId === parseInt(id || "0"));
   const interventionsClient = (clientInterventions || []).filter((i: any) => i.clientId === parseInt(id || "0"));
+
+  // OPE-121 — activités/rappels rattachés à CE client (next-action CRM).
+  const clientIdNum = parseInt(id || "0");
+  const { data: allActivites, refetch: refetchActivites } = trpc.activites.list.useQuery();
+  const activitesClient = (allActivites || []).filter(
+    (a: any) => a.entiteType === "client" && a.entiteId === clientIdNum,
+  );
+  const [activiteTitre, setActiviteTitre] = useState("");
+  const [activiteEcheance, setActiviteEcheance] = useState("");
+  const [activiteType, setActiviteType] = useState("appel");
+  const createActivite = trpc.activites.create.useMutation({
+    onSuccess: () => {
+      toast.success("Rappel ajouté");
+      setActiviteTitre("");
+      setActiviteEcheance("");
+      setActiviteType("appel");
+      refetchActivites();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const toggleActivite = trpc.activites.toggleFait.useMutation({
+    onSuccess: () => refetchActivites(),
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteActivite = trpc.activites.delete.useMutation({
+    onSuccess: () => refetchActivites(),
+    onError: (e) => toast.error(e.message),
+  });
+  const activiteTypeLabels: Record<string, string> = {
+    appel: "Appel", email: "Email", rdv: "RDV", relance: "Relance", autre: "À faire",
+  };
 
   // Calculs des statistiques
   const totalFacture = facturesClient
@@ -358,7 +392,7 @@ export default function ClientDetail() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="devis">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="devis">
                   Devis ({devisClient.length})
                 </TabsTrigger>
@@ -367,6 +401,9 @@ export default function ClientDetail() {
                 </TabsTrigger>
                 <TabsTrigger value="interventions">
                   Interventions ({interventionsClient.length})
+                </TabsTrigger>
+                <TabsTrigger value="activites">
+                  Rappels ({activitesClient.filter((a: any) => !a.fait).length})
                 </TabsTrigger>
               </TabsList>
 
@@ -480,6 +517,100 @@ export default function ClientDetail() {
                   <div className="text-center py-8 text-muted-foreground">
                     <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>Aucune intervention pour ce client</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* OPE-121 — Rappels / activités CRM rattachés à ce client */}
+              <TabsContent value="activites" className="mt-4">
+                <form
+                  className="flex flex-col sm:flex-row gap-2 mb-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!activiteTitre.trim()) { toast.error("Le titre est requis"); return; }
+                    if (!activiteEcheance) { toast.error("L'échéance est requise"); return; }
+                    createActivite.mutate({
+                      titre: activiteTitre.trim(),
+                      echeance: activiteEcheance,
+                      type: activiteType as any,
+                      entiteType: "client",
+                      entiteId: clientIdNum,
+                    });
+                  }}
+                >
+                  <Input
+                    placeholder="Rappeler ce client, envoyer un devis…"
+                    value={activiteTitre}
+                    onChange={(e) => setActiviteTitre(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    type="date"
+                    value={activiteEcheance}
+                    onChange={(e) => setActiviteEcheance(e.target.value)}
+                    className="sm:w-40"
+                  />
+                  <Select value={activiteType} onValueChange={setActiviteType}>
+                    <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="appel">Appel</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="rdv">RDV</SelectItem>
+                      <SelectItem value="relance">Relance</SelectItem>
+                      <SelectItem value="autre">À faire</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button type="submit" disabled={createActivite.isPending}>
+                    <Plus className="h-4 w-4 mr-1" /> Ajouter
+                  </Button>
+                </form>
+
+                {activitesClient.length > 0 ? (
+                  <div className="space-y-2">
+                    {activitesClient
+                      .slice()
+                      .sort((a: any, b: any) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime())
+                      .map((a: any) => (
+                        <div key={a.id} className="flex items-start gap-2 p-3 rounded-lg border">
+                          <button
+                            type="button"
+                            title={a.fait ? "Marquer à faire" : "Marquer fait"}
+                            onClick={() => toggleActivite.mutate({ id: a.id, fait: !a.fait })}
+                            className="mt-0.5 shrink-0"
+                          >
+                            {a.fait
+                              ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              : <Circle className="h-4 w-4 text-muted-foreground" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium ${a.fait ? "line-through text-muted-foreground" : ""}`}>
+                              {a.titre}
+                            </p>
+                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <AlarmClock className="h-3 w-3" />
+                                {format(new Date(a.echeance), "dd MMM yyyy", { locale: fr })}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-semibold">
+                                {activiteTypeLabels[a.type] || a.type}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            title="Supprimer"
+                            onClick={() => deleteActivite.mutate({ id: a.id })}
+                            className="mt-0.5 shrink-0 text-muted-foreground hover:text-rose-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Aucun rappel pour ce client</p>
                   </div>
                 )}
               </TabsContent>

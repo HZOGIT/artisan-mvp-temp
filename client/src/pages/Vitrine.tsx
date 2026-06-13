@@ -19,6 +19,7 @@ import {
   Send,
   Sparkles,
   Star,
+  BadgeCheck,
   TrendingUp,
   Users as UsersIcon,
   Wrench,
@@ -197,9 +198,56 @@ export default function Vitrine() {
   const ThemeIcon = theme.icon;
   const hasRating = avisStats.total > 0;
 
+  // OPE-113 — données structurées schema.org (rich snippet « étoiles » Google) à partir
+  // des stats d'avis DÉJÀ calculées. `aggregateRating` uniquement s'il existe au moins
+  // 1 avis publié (règle Google : pas de faux agrégat). Adresse au niveau localité
+  // (ville/CP, pas la rue) pour limiter l'exposition. Aucune nouvelle donnée ni backend.
+  const a: any = artisan;
+  const jsonLd: Record<string, any> = {
+    "@context": "https://schema.org",
+    "@type": "HomeAndConstructionBusiness",
+    name: a.nomEntreprise || "Artisan",
+    ...(a.telephone ? { telephone: a.telephone } : {}),
+    ...(a.logo ? { image: a.logo } : {}),
+    ...((a.ville || a.codePostal)
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            ...(a.codePostal ? { postalCode: a.codePostal } : {}),
+            ...(a.ville ? { addressLocality: a.ville } : {}),
+            addressCountry: "FR",
+          },
+        }
+      : {}),
+    ...(typeof window !== "undefined" ? { url: window.location.href } : {}),
+    ...(hasRating
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: avisStats.moyenne,
+            reviewCount: avisStats.total,
+            bestRating: 5,
+            worstRating: 1,
+          },
+          // OPE-113 (volet 2) — quelques avis individuels en `Review` schema.org (données
+          // DÉJÀ publiques sur la vitrine : auteur affiché, commentaire, note) pour enrichir
+          // le rich snippet. Limité aux 5 plus récents. Aucune nouvelle donnée exposée.
+          review: (avis || []).slice(0, 5).map((r: any) => ({
+            "@type": "Review",
+            author: { "@type": "Person", name: r.clientNom || "Client" },
+            reviewRating: { "@type": "Rating", ratingValue: r.note, bestRating: 5, worstRating: 1 },
+            ...(r.createdAt ? { datePublished: new Date(r.createdAt).toISOString().slice(0, 10) } : {}),
+            ...(r.commentaire ? { reviewBody: String(r.commentaire) } : {}),
+          })),
+        }
+      : {}),
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <DocTitle title={`${artisan.nomEntreprise} — ${theme.label} | Operioz`} />
+      {/* OPE-113 — JSON-LD AggregateRating (étoiles Google) injecté depuis avisStats. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* ─────────── NAV FIXE ─────────── */}
       <nav className="fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
@@ -507,8 +555,18 @@ export default function Vitrine() {
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
-                        <p className="font-semibold text-sm text-slate-900">{clientNameShort(a.clientNom)}</p>
-                        <p className="text-[11px] text-slate-500">{relativeDate(a.createdAt)}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-sm text-slate-900">{clientNameShort(a.clientNom)}</p>
+                          {/* OPE-112 — L111-7-2 : avis rattaché à une intervention réelle = vérifié */}
+                          {a.interventionId && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-700">
+                              <BadgeCheck className="h-3.5 w-3.5" /> Vérifié
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          {a.createdAt ? new Date(a.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) : relativeDate(a.createdAt)}
+                        </p>
                       </div>
                       <StarRating note={a.note} size="sm" color={theme.hex} />
                     </div>
@@ -527,6 +585,16 @@ export default function Vitrine() {
                     )}
                   </motion.article>
                 ))}
+              </div>
+              {/* OPE-112 — transparence légale des avis (Code de la consommation art. L111-7-2) */}
+              <div className="mt-6 flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-500 leading-relaxed">
+                <BadgeCheck className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                <p>
+                  <span className="font-semibold text-slate-600">Comment nous gérons les avis.</span>{" "}
+                  Chaque avis « Vérifié » provient d'un client ayant bénéficié d'une intervention réelle
+                  (avis recueilli par lien sécurisé, sans contrepartie). Les avis sont publiés après
+                  modération et affichés avec leur date. Aucun avis n'est acheté.
+                </p>
               </div>
             </>
           ) : (

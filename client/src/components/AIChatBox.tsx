@@ -7,6 +7,8 @@ import { useState, useEffect, useRef } from "react";
 import { Streamdown } from "streamdown";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { toast } from "sonner";
+import { ToolCallBubble } from "./ToolCallBubble";
+import type { ToolCall } from "@/hooks/useAssistantStream";
 
 /**
  * Message type matching server-side LLM Message interface
@@ -14,6 +16,7 @@ import { toast } from "sonner";
 export type Message = {
   role: "system" | "user" | "assistant";
   content: string;
+  toolCalls?: ToolCall[];
 };
 
 export type AIChatBoxProps = {
@@ -390,8 +393,19 @@ export function AIChatBox({
                       )}
                     >
                       {message.role === "assistant" ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <Streamdown>{message.content}</Streamdown>
+                        <div className="flex flex-col gap-1">
+                          {message.toolCalls && message.toolCalls.length > 0 && (
+                            <div className="flex flex-col gap-0.5 pb-1">
+                              {message.toolCalls.map((tc, i) => (
+                                <ToolCallBubble key={`${tc.name}-${i}`} toolCall={tc} />
+                              ))}
+                            </div>
+                          )}
+                          {message.content && (
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                              <Streamdown>{message.content}</Streamdown>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap text-sm">

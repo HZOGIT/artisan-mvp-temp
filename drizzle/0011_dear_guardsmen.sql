@@ -1,0 +1,1 @@
+ALTER TABLE `bibliotheque_articles` ADD `tauxTVA` decimal(5,2) DEFAULT '20.00';

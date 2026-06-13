@@ -35,7 +35,9 @@ export async function verifyToken(
   token: string
 ): Promise<{ userId: number; email: string } | null> {
   try {
-    const verified = await jwtVerify(token, SECRET_KEY);
+    // Épingle l'algorithme (HS256) : defense-in-depth contre toute confusion d'algo /
+    // alg:none. jose limite déjà aux HMAC pour une clé symétrique, on est explicite.
+    const verified = await jwtVerify(token, SECRET_KEY, { algorithms: ["HS256"] });
     return verified.payload as { userId: number; email: string };
   } catch (error) {
     return null;
@@ -132,7 +134,11 @@ export async function getUserFromRequest(req: Request) {
       email: user.email || "",
       name: user.name || null,
       prenom: user.prenom || null,
-      role: user.role || "admin",
+      // Défaut au MOINDRE PRIVILÈGE (jamais "admin") si le rôle est absent.
+      // En pratique no-op : users.role est `enum NOT NULL default "artisan"`, donc
+      // toujours renseigné — mais on supprime le footgun d'escalade si le schéma
+      // évoluait ou si un user était construit sans rôle. (Cf. audit transport/auth.)
+      role: user.role || "technicien",
       artisanId: user.artisanId || null,
       actif: user.actif,
       permissions,

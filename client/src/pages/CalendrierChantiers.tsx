@@ -124,8 +124,19 @@ export default function CalendrierChantiers() {
   });
 
   const assignerTechnicienMutation = trpc.interventions.assignerTechnicien.useMutation({
-    onSuccess: () => {
-      toast.success("Technicien réassigné avec succès");
+    onSuccess: (data: any) => {
+      // OPE-110 — avertissement non bloquant si conflit (double-booking / congé approuvé).
+      const c = data?.conflits;
+      const nbInter = c?.interventions?.length || 0;
+      const nbConge = c?.conges?.length || 0;
+      if (nbInter > 0 || nbConge > 0) {
+        const parts: string[] = [];
+        if (nbInter > 0) parts.push(`${nbInter} intervention(s) en chevauchement`);
+        if (nbConge > 0) parts.push(`congé approuvé sur la période`);
+        toast.warning(`Technicien réassigné — ⚠ conflit : ${parts.join(" + ")}`);
+      } else {
+        toast.success("Technicien réassigné avec succès");
+      }
       utils.interventions.list.invalidate();
       setShowConfirmDialog(false);
       setPendingChange(null);
@@ -652,6 +663,13 @@ export default function CalendrierChantiers() {
       return;
     }
 
+    // OPE-87 — échappe les noms (chantier/technicien) injectés dans le HTML de la
+    // fenêtre d'impression (document.write). Un nom contenant <img onerror=...>
+    // (créable par un collaborateur via chantiers.gerer) s'exécuterait sinon dans
+    // la session de l'utilisateur qui imprime.
+    const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error("Veuillez autoriser les pop-ups pour imprimer");
@@ -790,8 +808,8 @@ export default function CalendrierChantiers() {
         ${selectedChantierId || selectedTechnicienId ? `
           <div class="filters-info">
             Filtres actifs: 
-            ${selectedChantierId ? `Chantier: ${chantiers?.find(c => c.id === selectedChantierId)?.nom || ''}` : ''}
-            ${selectedTechnicienId ? `Technicien: ${(techniciens as any[])?.find((t: any) => t.id === selectedTechnicienId)?.nom || ''}` : ''}
+            ${selectedChantierId ? `Chantier: ${esc(chantiers?.find(c => c.id === selectedChantierId)?.nom || '')}` : ''}
+            ${selectedTechnicienId ? `Technicien: ${esc((techniciens as any[])?.find((t: any) => t.id === selectedTechnicienId)?.nom || '')}` : ''}
           </div>
         ` : ''}
         <div class="calendar-grid">
@@ -815,7 +833,7 @@ export default function CalendrierChantiers() {
                 <div class="day-number">${date.getDate()}</div>
                 ${dayInterventions.slice(0, 3).map((i: Intervention, idx: number) => `
                   <div class="event ${colorClassToName(getInterventionColor(i, idx))}">
-                    ${i.chantierNom}
+                    ${esc(i.chantierNom)}
                   </div>
                 `).join('')}
                 ${dayInterventions.length > 3 ? `<div style="font-size: 10px; color: #666;">+${dayInterventions.length - 3} autres</div>` : ''}
@@ -835,14 +853,14 @@ export default function CalendrierChantiers() {
               (techniciens as any[] || []).slice(0, 5).map((t: any, i: number) => `
                 <div class="legend-item">
                   <div class="legend-color" style="background: ${COLORS[i % COLORS.length].hex};"></div>
-                  ${t.prenom || ''} ${t.nom}
+                  ${esc(t.prenom || '')} ${esc(t.nom)}
                 </div>
               `).join('')
             : 
               (chantiers || []).slice(0, 5).map((c, i) => `
                 <div class="legend-item">
                   <div class="legend-color" style="background: ${COLORS[c.id % COLORS.length].hex};"></div>
-                  ${c.nom}
+                  ${esc(c.nom)}
                 </div>
               `).join('')
             }

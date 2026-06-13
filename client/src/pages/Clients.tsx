@@ -1,14 +1,15 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { matchSearch } from "@/lib/normalize";
+import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
 
 interface ClientFormData {
   nom: string;
@@ -18,7 +19,15 @@ interface ClientFormData {
   adresse: string;
   codePostal: string;
   ville: string;
+  adresseFacturation: string;
+  codePostalFacturation: string;
+  villeFacturation: string;
+  type: "particulier" | "professionnel";
+  raisonSociale: string;
+  siret: string;
+  numeroTVA: string;
   notes: string;
+  etiquettes: string;
 }
 
 const initialFormData: ClientFormData = {
@@ -29,7 +38,15 @@ const initialFormData: ClientFormData = {
   adresse: "",
   codePostal: "",
   ville: "",
+  adresseFacturation: "",
+  codePostalFacturation: "",
+  villeFacturation: "",
+  type: "particulier",
+  raisonSociale: "",
+  siret: "",
+  numeroTVA: "",
   notes: "",
+  etiquettes: "",
 };
 
 export function Clients() {
@@ -53,7 +70,63 @@ export function Clients() {
 
   // Queries
   const { data: clients = [], isLoading } = trpc.clients.list.useQuery();
-  
+  // OPE-144 — encours impayé par client (badge « à risque » de la liste).
+  const { data: encoursMap = {} } = trpc.clients.getEncoursMap.useQuery();
+
+  // OPE-130 — détection de doublons potentiels (lecture seule, calculée depuis la liste
+  // déjà chargée) : même email OU même prénom+nom (normalisés). Purement informatif pour
+  // que l'artisan nettoie manuellement ; la FUSION reste à faire (volet OPE-130).
+  const [dupesDismissed, setDupesDismissed] = useState(false);
+  const duplicateGroups = useMemo(() => {
+    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const push = (m: Map<string, any[]>, k: string, c: any) => {
+      const a = m.get(k); if (a) a.push(c); else m.set(k, [c]);
+    };
+    const byEmail = new Map<string, any[]>();
+    const byName = new Map<string, any[]>();
+    for (const c of clients as any[]) {
+      const email = norm(c.email);
+      if (email) push(byEmail, email, c);
+      const name = `${norm(c.prenom)} ${norm(c.nom)}`.trim();
+      if (name && name !== "") push(byName, name, c);
+    }
+    const groups: { reason: string; clients: any[] }[] = [];
+    const seen = new Set<string>(); // dédoublonne les groupes par ensemble d'ids
+    const addGroup = (reason: string, list: any[]) => {
+      if (list.length < 2) return;
+      const key = list.map((c) => c.id).sort((a, b) => a - b).join(",");
+      if (seen.has(key)) return;
+      seen.add(key);
+      groups.push({ reason, clients: list });
+    };
+    for (const [email, list] of byEmail) addGroup(`même email (${email})`, list);
+    for (const [, list] of byName) addGroup("même nom", list);
+    return groups;
+  }, [clients]);
+
+  // OPE-130 (volet préventif) — avertissement NON BLOQUANT à la création : si l'email,
+  // le téléphone ou le nom+prénom saisi correspond à un client existant, on le signale
+  // (sans empêcher l'enregistrement). Calculé depuis la liste déjà chargée. Uniquement
+  // en création (editingClientId nul) pour ne pas alerter sur le client en cours d'édition.
+  const createDuplicateMatch = useMemo(() => {
+    if (editingClientId) return null;
+    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const digits = (s: any) => String(s || "").replace(/[\s.\-()+]/g, "");
+    const email = norm(formData.email);
+    const phone = digits(formData.telephone);
+    const name = `${norm(formData.prenom)} ${norm(formData.nom)}`.trim();
+    for (const c of clients as any[]) {
+      if (email && norm(c.email) === email) return { client: c, reason: "le même email" };
+      if (phone && phone.length >= 6 && digits(c.telephone) === phone) return { client: c, reason: "le même téléphone" };
+    }
+    if (name) {
+      for (const c of clients as any[]) {
+        if (`${norm(c.prenom)} ${norm(c.nom)}`.trim() === name) return { client: c, reason: "le même nom" };
+      }
+    }
+    return null;
+  }, [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients]);
+
   // Mutations
   const updateMutation = trpc.clients.update.useMutation({
     onSuccess: () => {
@@ -109,7 +182,15 @@ export function Clients() {
       adresse: client.adresse || "",
       codePostal: client.codePostal || "",
       ville: client.ville || "",
+      adresseFacturation: client.adresseFacturation || "",
+      codePostalFacturation: client.codePostalFacturation || "",
+      villeFacturation: client.villeFacturation || "",
+      type: (client.type === "professionnel" ? "professionnel" : "particulier"),
+      raisonSociale: client.raisonSociale || "",
+      siret: client.siret || "",
+      numeroTVA: client.numeroTVA || "",
       notes: client.notes || "",
+      etiquettes: client.etiquettes || "",
     });
     setEditingClientId(client.id);
     setIsEditModalOpen(true);
@@ -148,8 +229,26 @@ export function Clients() {
     matchSearch(client.prenom, searchQuery) ||
     matchSearch(client.email, searchQuery) ||
     matchSearch(client.ville, searchQuery) ||
+    // OPE-120 — recherche/segmentation par étiquette.
+    matchSearch((client as any).etiquettes, searchQuery) ||
     (client.telephone ? client.telephone.includes(searchQuery) : false)
   );
+
+  // Export CSV des clients (portabilité RGPD — OPE-158/OPE-175). Exporte la
+  // sélection courante (après filtre de recherche), sinon l'ensemble.
+  const handleExportCSV = () => {
+    const data = filteredClients;
+    if (!data || data.length === 0) {
+      toast.error("Aucun client à exporter");
+      return;
+    }
+    const headers = ["Nom", "Prénom", "Type", "Raison sociale", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "N° TVA", "Étiquettes", "Notes"];
+    const rows = data.map((c: any) => [
+      c.nom, c.prenom, c.type, c.raisonSociale, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.numeroTVA, c.etiquettes, c.notes,
+    ]);
+    exportToCsv(`clients_${csvDateSuffix()}.csv`, headers, rows);
+    toast.success(`${data.length} client(s) exporté(s)`);
+  };
 
   return (
     <div className="space-y-6">
@@ -159,10 +258,16 @@ export function Clients() {
           <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
           <p className="text-muted-foreground mt-1">Gérez votre base de clients</p>
         </div>
-        <Button onClick={() => navigate('/clients/nouveau')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouveau client
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Exporter (CSV)
+          </Button>
+          <Button onClick={() => navigate('/clients/nouveau')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nouveau client
+          </Button>
+        </div>
       </div>
 
       {/* Barre de recherche */}
@@ -176,6 +281,41 @@ export function Clients() {
           className="pl-10"
         />
       </div>
+
+      {/* OPE-130 — bandeau doublons potentiels (informatif, dismissable) */}
+      {!isLoading && !dupesDismissed && duplicateGroups.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-800">
+                    {duplicateGroups.length} doublon{duplicateGroups.length > 1 ? "s" : ""} potentiel{duplicateGroups.length > 1 ? "s" : ""} détecté{duplicateGroups.length > 1 ? "s" : ""}
+                  </p>
+                  <ul className="mt-1 space-y-1 text-amber-700">
+                    {duplicateGroups.slice(0, 5).map((g, i) => (
+                      <li key={i}>
+                        <span className="text-amber-600">{g.reason}</span>{" : "}
+                        {g.clients
+                          .map((c: any) => `${(c.prenom || "")} ${c.nom}`.trim() + (c.ville ? ` (${c.ville})` : ""))
+                          .join(" · ")}
+                      </li>
+                    ))}
+                    {duplicateGroups.length > 5 && (
+                      <li className="text-amber-600">+ {duplicateGroups.length - 5} autre(s)…</li>
+                    )}
+                  </ul>
+                  <p className="mt-1 text-xs text-amber-600">Vérifiez et nettoyez ces fiches en double pour garder un historique propre.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" className="text-amber-700 hover:text-amber-900" onClick={() => setDupesDismissed(true)}>
+                Masquer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Liste des clients */}
       {isLoading ? (
@@ -191,7 +331,18 @@ export function Clients() {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
+                      {/* OPE-144 — badge « à risque » : impayés en cours */}
+                      {(encoursMap as any)[client.id] && parseFloat((encoursMap as any)[client.id].encoursTotal) > 0 && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                          title={`${(encoursMap as any)[client.id].echu} € échus sur ${(encoursMap as any)[client.id].nbFacturesImpayees} facture(s)`}
+                        >
+                          ⚠️ {(encoursMap as any)[client.id].encoursTotal} € impayés
+                        </span>
+                      )}
+                    </div>
                     <div className="space-y-1 text-sm text-gray-600 mt-2">
                       {client.email && (
                         <div className="flex items-center gap-2">
@@ -212,6 +363,16 @@ export function Clients() {
                         </div>
                       )}
                     </div>
+                    {/* OPE-120 — étiquettes de segmentation */}
+                    {(client as any).etiquettes && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {String((client as any).etiquettes).split(",").map((t: string) => t.trim()).filter(Boolean).map((tag: string, i: number) => (
+                          <span key={i} className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -251,6 +412,23 @@ export function Clients() {
 
             <div className="p-6">
               <form onSubmit={handleSubmitEdit} className="space-y-4">
+                {/* Type de client (OPE-92) */}
+                <div>
+                  <Label htmlFor="edit-type" className="block text-sm font-medium mb-1">
+                    Type de client
+                  </Label>
+                  <select
+                    id="edit-type"
+                    name="type"
+                    value={formData.type}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="particulier">Particulier</option>
+                    <option value="professionnel">Professionnel (entreprise, syndic…)</option>
+                  </select>
+                </div>
+
                 {/* Nom */}
                 <div>
                   <Label htmlFor="edit-nom" className="block text-sm font-medium mb-1">
@@ -312,6 +490,17 @@ export function Clients() {
                   />
                 </div>
 
+                {/* OPE-130 — avertissement doublon (non bloquant) à la création */}
+                {createDuplicateMatch && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">
+                    ⚠️ Un client avec {createDuplicateMatch.reason} existe déjà :{" "}
+                    <strong>
+                      {createDuplicateMatch.client.prenom} {createDuplicateMatch.client.nom}
+                    </strong>
+                    . Vérifiez qu'il ne s'agit pas d'un doublon (vous pouvez tout de même enregistrer).
+                  </div>
+                )}
+
                 {/* Adresse */}
                 <div>
                   <Label htmlFor="edit-adresse" className="block text-sm font-medium mb-1">
@@ -356,6 +545,121 @@ export function Clients() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
+                </div>
+
+                {/* Adresse de facturation distincte (OPE-93) */}
+                <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                  <p className="text-sm font-medium text-gray-700">
+                    Adresse de facturation <span className="font-normal text-muted-foreground">(si différente — vide = adresse principale)</span>
+                  </p>
+                  <div>
+                    <Label htmlFor="edit-adresseFacturation" className="block text-sm font-medium mb-1">
+                      Adresse de facturation
+                    </Label>
+                    <input
+                      id="edit-adresseFacturation"
+                      type="text"
+                      name="adresseFacturation"
+                      value={formData.adresseFacturation}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="edit-codePostalFacturation" className="block text-sm font-medium mb-1">
+                        CP (facturation)
+                      </Label>
+                      <input
+                        id="edit-codePostalFacturation"
+                        type="text"
+                        name="codePostalFacturation"
+                        value={formData.codePostalFacturation}
+                        onChange={handleInputChange}
+                        maxLength={5}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-villeFacturation" className="block text-sm font-medium mb-1">
+                        Ville (facturation)
+                      </Label>
+                      <input
+                        id="edit-villeFacturation"
+                        type="text"
+                        name="villeFacturation"
+                        value={formData.villeFacturation}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Champs professionnels (OPE-92) */}
+                {formData.type === "professionnel" && (
+                  <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-sm font-medium text-gray-700">Informations professionnelles</p>
+                    <div>
+                      <Label htmlFor="edit-raisonSociale" className="block text-sm font-medium mb-1">
+                        Raison sociale
+                      </Label>
+                      <input
+                        id="edit-raisonSociale"
+                        type="text"
+                        name="raisonSociale"
+                        value={formData.raisonSociale}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="edit-siret" className="block text-sm font-medium mb-1">
+                          SIRET
+                        </Label>
+                        <input
+                          id="edit-siret"
+                          type="text"
+                          name="siret"
+                          value={formData.siret}
+                          onChange={handleInputChange}
+                          maxLength={14}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-numeroTVA" className="block text-sm font-medium mb-1">
+                          N° TVA intracom.
+                        </Label>
+                        <input
+                          id="edit-numeroTVA"
+                          type="text"
+                          name="numeroTVA"
+                          value={formData.numeroTVA}
+                          onChange={handleInputChange}
+                          maxLength={20}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Étiquettes (OPE-120) */}
+                <div>
+                  <Label htmlFor="edit-etiquettes" className="block text-sm font-medium mb-1">
+                    Étiquettes
+                  </Label>
+                  <input
+                    id="edit-etiquettes"
+                    name="etiquettes"
+                    type="text"
+                    value={formData.etiquettes}
+                    onChange={handleInputChange}
+                    placeholder="Ex : VIP, chantier neuf, syndic (séparées par des virgules)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
 
                 {/* Notes */}

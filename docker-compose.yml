@@ -1,0 +1,68 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: artisan_mvp
+      MYSQL_USER: ${MYSQL_USER:-artisan_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-artisan_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # OPE-184 — cible de la migration (coexiste avec MySQL le temps de la bascule PG-first).
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: artisan_mvp
+      POSTGRES_USER: ${POSTGRES_USER:-artisan_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-artisan_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      # PG18+ : monter /var/lib/postgresql (données dans un sous-dossier par version),
+      # PAS /var/lib/postgresql/data (cf. docker-library/postgres#1259).
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-artisan_user} -d artisan_mvp"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  app:
+    image: node:22-slim
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - app_node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp
+    env_file:
+      - .env.local
+    command: >
+      sh -c "npm install -g pnpm@10.4.1 --silent &&
+             pnpm install --frozen-lockfile &&
+             pnpm exec drizzle-kit migrate &&
+             pnpm dev"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  pg_data:
+  app_node_modules:

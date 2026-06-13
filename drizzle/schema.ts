@@ -14,6 +14,10 @@ export const users = mysqlTable("users", {
   role: mysqlEnum("role", ["admin", "artisan", "secretaire", "technicien"]).default("artisan").notNull(),
   artisanId: int("artisanId"),
   actif: boolean("actif").default(true).notNull(),
+  // Reset mot de passe (OPE-8). On stocke le SHA-256 du token (jamais le token
+  // en clair) + sa date d'expiration. NULL quand aucun reset en cours.
+  resetToken: varchar("resetToken", { length: 64 }),
+  resetTokenExpiry: timestamp("resetTokenExpiry"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -54,8 +58,20 @@ export const artisans = mysqlTable("artisans", {
   numeroTVA: varchar("numeroTVA", { length: 20 }),
   iban: varchar("iban", { length: 34 }),
   codeAPE: varchar("codeAPE", { length: 10 }),
+  // Mentions légales émetteur (OPE-151, Code de commerce R123-237) — pour une société :
+  // forme juridique + capital + RCS (ville du greffe ; le n° = SIREN dérivé du SIRET).
+  // numeroRM pour les artisans au Répertoire des Métiers. Tous nullables/additifs →
+  // comportement inchangé pour un EI/micro (SIRET + « EI » suffisent).
+  formeJuridique: mysqlEnum("formeJuridique", ["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"]),
+  capitalSocial: decimal("capitalSocial", { precision: 12, scale: 2 }),
+  villeRCS: varchar("villeRCS", { length: 100 }),
+  numeroRM: varchar("numeroRM", { length: 50 }),
   logo: mediumtext("logo"),
   slug: varchar("slug", { length: 255 }).unique(),
+  // Jeton secret du flux iCal (OPE-156) : permet de s'abonner aux interventions
+  // depuis un agenda externe (Google/Apple) via une URL non devinable. Nullable,
+  // généré à la demande → comportement inchangé tant qu'il n'est pas activé.
+  icalToken: varchar("icalToken", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -76,6 +92,23 @@ export const clients = mysqlTable("clients", {
   adresse: text("adresse"),
   codePostal: varchar("codePostal", { length: 10 }),
   ville: varchar("ville", { length: 100 }),
+  // Adresse de FACTURATION distincte (OPE-93) — optionnelle. Si vide, les documents
+  // facture/devis retombent sur l'adresse principale (= adresse de chantier). Additif,
+  // nullable → comportement inchangé pour les clients existants.
+  adresseFacturation: text("adresseFacturation"),
+  codePostalFacturation: varchar("codePostalFacturation", { length: 10 }),
+  villeFacturation: varchar("villeFacturation", { length: 100 }),
+  // Identité B2B (OPE-92) — distinction particulier/professionnel + identifiants
+  // légaux du client, requis sur une facture B2B (mentions + TVA intracom).
+  // Tous additifs/nullables : un client existant reste « particulier » par défaut.
+  type: mysqlEnum("type", ["particulier", "professionnel"]).default("particulier"),
+  raisonSociale: varchar("raisonSociale", { length: 255 }),
+  siret: varchar("siret", { length: 14 }),
+  numeroTVA: varchar("numeroTVA", { length: 20 }),
+  // Étiquettes / tags de segmentation (OPE-120) — liste libre séparée par des
+  // virgules (≈ Odoo res.partner.category_id, version simplifiée MVP). Additif,
+  // nullable → comportement inchangé pour les clients existants.
+  etiquettes: varchar("etiquettes", { length: 500 }),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -96,6 +129,15 @@ export const bibliothequeArticles = mysqlTable("bibliotheque_articles", {
   description: text("description"),
   prix_base: decimal("prix_base", { precision: 10, scale: 2 }).notNull(),
   unite: varchar("unite", { length: 50 }).notNull(),
+  // Taux de TVA par défaut de l'article de bibliothèque (OPE-167) : pré-rempli sur
+  // la ligne de devis/facture à la sélection (symétrique d'articles_artisan.tauxTVA,
+  // consommé par getTauxTVA côté front). Default 20.00 → comportement inchangé pour
+  // les articles existants (additif, non destructif).
+  tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  // Coût / prix de revient de référence (OPE-143, ≈ Odoo product.template.standard_price).
+  // Nullable, purement informatif (sert à afficher la MARGE = prix_base − prixRevient ;
+  // n'affecte AUCUN montant facturé). Additif → articles existants inchangés.
+  prixRevient: decimal("prixRevient", { precision: 10, scale: 2 }),
   duree_moyenne_minutes: int("duree_moyenne_minutes"),
   visible: boolean("visible").default(true),
   created_at: timestamp("created_at").defaultNow(),
@@ -116,6 +158,10 @@ export const articlesArtisan = mysqlTable("articles_artisan", {
   description: text("description"),
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaireHT: decimal("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
+  // Taux de TVA par défaut de l'article (OPE-167) : pré-rempli sur la ligne de
+  // devis/facture à la sélection. Default 20.00 → comportement inchangé pour les
+  // articles existants (additif, non destructif).
+  tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
   categorie: varchar("categorie", { length: 100 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -123,6 +169,31 @@ export const articlesArtisan = mysqlTable("articles_artisan", {
 
 export type ArticleArtisan = typeof articlesArtisan.$inferSelect;
 export type InsertArticleArtisan = typeof articlesArtisan.$inferInsert;
+
+// ============================================================================
+// ACTIVITES / RAPPELS PLANIFIES — CRM next-action (OPE-121)
+// ============================================================================
+// Activité/rappel manuel générique (≈ Odoo mail.activity) : « rappeler M. X jeudi »,
+// « relancer la facture FA-012 lundi ». Rattachable (de façon souple) à un client/
+// devis/facture/chantier. Table additive ; aucune donnée existante impactée.
+export const activites = mysqlTable("activites", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  type: mysqlEnum("type", ["appel", "email", "rdv", "relance", "autre"]).default("autre").notNull(),
+  titre: varchar("titre", { length: 500 }).notNull(),
+  echeance: date("echeance").notNull(),
+  // Rattachement souple (pas de FK dure) : l'entité reste optionnelle.
+  entiteType: mysqlEnum("entiteType", ["client", "devis", "facture", "chantier", "aucun"]).default("aucun"),
+  entiteId: int("entiteId"),
+  responsableUserId: int("responsableUserId"),
+  fait: boolean("fait").default(false).notNull(),
+  faitAt: timestamp("faitAt"),
+  note: text("note"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Activite = typeof activites.$inferSelect;
+export type InsertActivite = typeof activites.$inferInsert;
 
 // ============================================================================
 // DEVIS (Quotes)
@@ -134,8 +205,15 @@ export const devis = mysqlTable("devis", {
   numero: varchar("numero", { length: 50 }).notNull(),
   dateDevis: timestamp("dateDevis").defaultNow().notNull(),
   dateValidite: timestamp("dateValidite"),
+  // Date de PREMIÈRE consultation du devis par le client (portail/signature) — OPE-152.
+  // Nullable, positionnée une seule fois (read-receipt) pour piloter la relance.
+  dateVue: timestamp("dateVue"),
   statut: mysqlEnum("statut", ["brouillon", "envoye", "accepte", "refuse", "expire"]).default("brouillon"),
   objet: text("objet"),
+  // Référence/N° de commande fourni par le client (B2B : syndic, entreprise,
+  // marché public) — OPE-158. Reportée sur la facture à la conversion et rappelée
+  // sur le PDF pour que le client rapproche la facture de son bon de commande.
+  referenceClient: varchar("referenceClient", { length: 100 }),
   conditionsPaiement: text("conditionsPaiement"),
   notes: text("notes"),
   totalHT: decimal("totalHT", { precision: 10, scale: 2 }).default("0.00"),
@@ -165,6 +243,11 @@ export const devisLignes = mysqlTable("devis_lignes", {
   montantHT: decimal("montantHT", { precision: 10, scale: 2 }).default("0.00"),
   montantTVA: decimal("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: decimal("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  // OPE-168 — typage de ligne pour structurer un devis (BTP par lot/pièce) :
+  // `section` = en-tête de lot (titre, sans prix), `note` = texte libre. Défaut
+  // `produit` → lignes existantes inchangées. Les lignes section/note portent des
+  // montants à 0 et sont exclues des totaux (sommés depuis montantHT/TVA). Additif.
+  type: mysqlEnum("type", ["produit", "section", "note"]).default("produit"),
 });
 
 export type DevisLigne = typeof devisLignes.$inferSelect;
@@ -185,6 +268,13 @@ export const factures = mysqlTable("factures", {
   typeDocument: mysqlEnum("typeDocument", ["facture", "avoir"]).default("facture"),
   factureOrigineId: int("factureOrigineId"),
   objet: text("objet"),
+  // Référence/N° de commande du client (B2B) — OPE-158. Reportée depuis le devis
+  // à la conversion ; rappelée sur le PDF (« Votre référence : … »).
+  referenceClient: varchar("referenceClient", { length: 100 }),
+  // SIRET du destinataire figé à l'émission — readiness facturation électronique
+  // 2026 (OPE-122, volet 1). Identifiant de routage PDP, capturé depuis la fiche
+  // client (professionnel) au moment de la création pour valeur probante/immuabilité.
+  siretDestinataire: varchar("siretDestinataire", { length: 14 }),
   conditionsPaiement: text("conditionsPaiement"),
   notes: text("notes"),
   totalHT: decimal("totalHT", { precision: 10, scale: 2 }).default("0.00"),
@@ -217,6 +307,11 @@ export const facturesLignes = mysqlTable("factures_lignes", {
   montantHT: decimal("montantHT", { precision: 10, scale: 2 }).default("0.00"),
   montantTVA: decimal("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
   montantTTC: decimal("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  // OPE-168 (volet 2) — typage de ligne, symétrique des lignes de devis : `section`
+  // (en-tête de lot) / `note` (texte libre), sans montant, exclues des totaux. Défaut
+  // `produit` → lignes existantes inchangées. Permet de reporter la structure d'un
+  // devis sectionné sur la facture issue de conversion. Additif/non destructif.
+  type: mysqlEnum("type", ["produit", "section", "note"]).default("produit"),
 });
 
 export type FactureLigne = typeof facturesLignes.$inferSelect;
@@ -245,6 +340,26 @@ export const interventions = mysqlTable("interventions", {
 
 export type Intervention = typeof interventions.$inferSelect;
 export type InsertIntervention = typeof interventions.$inferInsert;
+
+// ============================================================================
+// ÉQUIPE D'INTERVENTION (OPE-111) — plusieurs intervenants sur une intervention
+// ----------------------------------------------------------------------------
+// Table de liaison ADDITIVE (Many2many) ↔ Odoo project.task.user_ids. Compat
+// ascendante : `interventions.technicienId` reste le technicien RESPONSABLE ;
+// cette table ajoute le RESTE de l'équipe (binôme, aide…). Nullable `role`.
+// Le code existant (assignation simple) reste inchangé.
+// ============================================================================
+export const interventionsTechniciens = mysqlTable("interventions_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  interventionId: int("interventionId").notNull(),
+  technicienId: int("technicienId").notNull(),
+  role: varchar("role", { length: 50 }), // ex. « responsable » / « aide » — informatif
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InterventionTechnicien = typeof interventionsTechniciens.$inferSelect;
+export type InsertInterventionTechnicien = typeof interventionsTechniciens.$inferInsert;
 
 // ============================================================================
 // NOTIFICATIONS
@@ -292,6 +407,12 @@ export const parametresArtisan = mysqlTable("parametres_artisan", {
   couleurPrincipale: varchar("couleurPrincipale", { length: 20 }).default("#4F46E5"),
   couleurSecondaire: varchar("couleurSecondaire", { length: 20 }).default("#6366F1"),
   conditionsPaiementDefaut: text("conditionsPaiementDefaut"),
+  // Délai de paiement structuré (OPE-94) — sert à CALCULER dateEcheance à la création
+  // d'une facture (≈ Odoo account.payment.term). Nullable → tant que l'artisan ne le
+  // configure pas, aucune échéance n'est dérivée (comportement inchangé). `net` = date
+  // facture + N jours ; `fin_de_mois` = puis fin du mois de l'échéance.
+  delaiPaiementJours: int("delaiPaiementJours"),
+  delaiPaiementType: mysqlEnum("delaiPaiementType", ["net", "fin_de_mois"]).default("net"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -466,7 +587,9 @@ export const commandesFournisseurs = mysqlTable("commandes_fournisseurs", {
   dateCommande: timestamp("dateCommande").defaultNow().notNull(),
   dateLivraisonPrevue: timestamp("dateLivraisonPrevue"),
   dateLivraisonReelle: timestamp("dateLivraisonReelle"),
-  statut: mysqlEnum("statut", ["brouillon", "envoyee", "confirmee", "livree", "annulee"]).default("brouillon"),
+  // `partiellement_livree` (OPE-100) : extension d'enum additive (valeur ajoutée en fin,
+  // non destructive) pour les réceptions partielles. Statut dérivé des quantités reçues.
+  statut: mysqlEnum("statut", ["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]).default("brouillon"),
   montantTotal: decimal("montantTotal", { precision: 10, scale: 2 }),
   totalHT: decimal("totalHT", { precision: 10, scale: 2 }),
   totalTVA: decimal("totalTVA", { precision: 10, scale: 2 }),
@@ -474,6 +597,11 @@ export const commandesFournisseurs = mysqlTable("commandes_fournisseurs", {
   delaiLivraison: varchar("delaiLivraison", { length: 100 }),
   adresseLivraison: text("adresseLivraison"),
   notes: text("notes"),
+  // OPE-101 — suivi de facturation de la commande (a-t-on reçu/saisi la facture du
+  // fournisseur ?) : évite de payer deux fois / d'oublier une facture. Additif, default
+  // 'a_facturer'. `depenseId` = lien optionnel vers la dépense fournisseur correspondante.
+  statutFacturation: mysqlEnum("statutFacturation", ["a_facturer", "facturee"]).default("a_facturer"),
+  depenseId: int("depenseId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -492,6 +620,9 @@ export const lignesCommandesFournisseurs = mysqlTable("lignes_commandes_fourniss
   designation: varchar("designation", { length: 255 }).notNull(),
   reference: varchar("reference", { length: 50 }),
   quantite: decimal("quantite", { precision: 10, scale: 2 }).notNull(),
+  // Quantité effectivement reçue par ligne (réception partielle — OPE-100). Default 0
+  // → comportement inchangé pour les commandes existantes (rien de reçu enregistré).
+  quantiteRecue: decimal("quantiteRecue", { precision: 10, scale: 2 }).default("0.00"),
   unite: varchar("unite", { length: 20 }).default("unité"),
   prixUnitaire: decimal("prixUnitaire", { precision: 10, scale: 2 }),
   tauxTVA: decimal("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
@@ -719,6 +850,12 @@ export const techniciens = mysqlTable("techniciens", {
   specialite: varchar("specialite", { length: 100 }),
   couleur: varchar("couleur", { length: 7 }).default("#3b82f6"),
   statut: mysqlEnum("statut", ["actif", "inactif", "conge"]).default("actif"),
+  // Coût horaire chargé du technicien (OPE-123) — base du coût main-d'œuvre des
+  // chantiers (Σ heures × coutHoraire, cf. OPE-106/107). Nullable/additif.
+  coutHoraire: decimal("coutHoraire", { precision: 8, scale: 2 }),
+  // OPE-124 — lien optionnel vers le compte de connexion (users) du salarié : unifie
+  // la ressource de planning et le compte (base du filtrage « mes interventions »). Additif.
+  userId: int("userId"),
   notes: text("notes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -726,6 +863,27 @@ export const techniciens = mysqlTable("techniciens", {
 
 export type Technicien = typeof techniciens.$inferSelect;
 export type InsertTechnicien = typeof techniciens.$inferInsert;
+
+// ============================================================================
+// HABILITATIONS / CERTIFICATIONS DES TECHNICIENS (OPE-162)
+// ============================================================================
+// Suivi des habilitations BTP (habilitation électrique NF C18-510, CACES, travail
+// en hauteur, amiante SS4…) avec date d'expiration → conformité sécurité/légale.
+// Table additive, nullable sur les dates (une habilitation sans échéance reste valide).
+export const habilitationsTechniciens = mysqlTable("habilitations_techniciens", {
+  id: int("id").autoincrement().primaryKey(),
+  technicienId: int("technicienId").notNull(),
+  artisanId: int("artisanId").notNull(),
+  type: varchar("type", { length: 255 }).notNull(),
+  numero: varchar("numero", { length: 100 }),
+  organisme: varchar("organisme", { length: 255 }),
+  dateObtention: date("dateObtention"),
+  dateExpiration: date("dateExpiration"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type HabilitationTechnicien = typeof habilitationsTechniciens.$inferSelect;
+export type InsertHabilitationTechnicien = typeof habilitationsTechniciens.$inferInsert;
 
 // ============================================================================
 // DISPONIBILITES TECHNICIENS (Availability schedule)
@@ -762,6 +920,25 @@ export const avisClients = mysqlTable("avis_clients", {
 });
 
 export type AvisClient = typeof avisClients.$inferSelect;
+
+// OPE-172 — demandes de contact entrantes (vitrine) persistées (≈ Odoo crm.lead).
+// Auparavant fire-and-forget (email seul) → leads perdus. Additif, non destructif.
+export const demandesContact = mysqlTable("demandes_contact", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  nom: varchar("nom", { length: 200 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  telephone: varchar("telephone", { length: 30 }),
+  message: text("message"),
+  source: varchar("source", { length: 50 }).default("vitrine"),
+  statut: mysqlEnum("statut_demande_contact", ["nouveau", "contacte", "converti", "perdu"]).default("nouveau"),
+  clientId: int("clientId"), // posé à la conversion en client
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DemandeContact = typeof demandesContact.$inferSelect;
+export type InsertDemandeContact = typeof demandesContact.$inferInsert;
 export type InsertAvisClient = typeof avisClients.$inferInsert;
 
 // ============================================================================
@@ -1101,6 +1278,9 @@ export const vehicules = mysqlTable("vehicules", {
   modele: varchar("modele", { length: 100 }),
   annee: int("annee"),
   typeCarburant: mysqlEnum("typeCarburant", ["essence", "diesel", "electrique", "hybride", "gpl"]).default("diesel"),
+  // Puissance fiscale (CV) — prérequis du barème kilométrique FR (indemnité = km × tarif,
+  // fonction de la puissance fiscale). Nullable, additif → véhicules existants inchangés (OPE-169).
+  puissanceFiscale: int("puissanceFiscale"),
   kilometrageActuel: int("kilometrageActuel").default(0),
   dateAchat: date("dateAchat"),
   prixAchat: decimal("prixAchat", { precision: 10, scale: 2 }),
@@ -1327,11 +1507,36 @@ export const phasesChantier = mysqlTable("phases_chantier", {
   avancement: int("avancement").default(0),
   budgetPhase: decimal("budgetPhase", { precision: 10, scale: 2 }),
   coutReel: decimal("coutReel", { precision: 10, scale: 2 }).default("0.00"),
+  // Heures de main-d'œuvre PRÉVUES pour la phase (OPE-106) — additif, nullable.
+  // Comparées aux heures réellement pointées (Σ pointages_chantier de la phase/chantier).
+  heuresPrevues: decimal("heuresPrevues", { precision: 7, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type PhaseChantier = typeof phasesChantier.$inferSelect;
 export type InsertPhaseChantier = typeof phasesChantier.$inferInsert;
+
+// ============================================================================
+// POINTAGES DE MAIN-D'ŒUVRE SUR CHANTIER (OPE-106)
+// ============================================================================
+// Saisie légère des heures réalisées par un technicien sur un chantier (≈ Odoo
+// account.analytic.line / timesheets, version MVP). Comparées aux heures prévues
+// (phases_chantier.heuresPrevues) → pilotage de la main-d'œuvre prévu vs réalisé.
+// Table additive ; aucune donnée existante impactée.
+export const pointagesChantier = mysqlTable("pointages_chantier", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  chantierId: int("chantierId").notNull(),
+  phaseId: int("phaseId"),
+  technicienId: int("technicienId"),
+  date: date("date").notNull(),
+  heures: decimal("heures", { precision: 6, scale: 2 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PointageChantier = typeof pointagesChantier.$inferSelect;
+export type InsertPointageChantier = typeof pointagesChantier.$inferInsert;
 
 // Association interventions-chantiers
 export const interventionsChantier = mysqlTable("interventions_chantier", {
@@ -1642,3 +1847,57 @@ export const auditLog = mysqlTable("audit_log", {
 
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = typeof auditLog.$inferInsert;
+
+// ============================================================================
+// AI CHAT — threads and messages (text + voice, shared store)
+// ============================================================================
+export const aiThreads = mysqlTable("ai_threads", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId").notNull(),
+  mode: varchar("mode", { length: 50 }).notNull().default("general"),
+  parcoursId: varchar("parcoursId", { length: 255 }),
+  title: text("title").notNull(),
+  lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AiThread = typeof aiThreads.$inferSelect;
+export type InsertAiThread = typeof aiThreads.$inferInsert;
+
+export const aiMessages = mysqlTable("ai_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  threadId: int("threadId").notNull(),
+  role: varchar("role", { length: 20 }).notNull(), // 'user' | 'assistant'
+  transcript: text("transcript").notNull(),
+  attachments: json("attachments"),
+  metadata: json("metadata"),
+  pricingMetadata: json("pricingMetadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AiMessage = typeof aiMessages.$inferSelect;
+export type InsertAiMessage = typeof aiMessages.$inferInsert;
+
+// ============================================================================
+// EMAILS LOG — journal des envois transactionnels (OPE-114)
+// Trace chaque email envoyé via emailService.sendEmail : statut, id Resend
+// (pour corréler les futurs webhooks de délivrabilité — OPE-115), et lien
+// optionnel vers l'entité (devis/facture/avis…). Additif, lecture seule côté UI.
+// ============================================================================
+export const emailsLog = mysqlTable("emails_log", {
+  id: int("id").autoincrement().primaryKey(),
+  artisanId: int("artisanId"), // nullable : certains envois système ne sont pas rattachés à un artisan
+  destinataire: varchar("destinataire", { length: 320 }).notNull(),
+  sujet: varchar("sujet", { length: 500 }).notNull(),
+  type: varchar("type", { length: 50 }), // devis | facture | relance | avis | portail | systeme…
+  resendId: varchar("resendId", { length: 255 }), // id du message renvoyé par Resend (null si échec/simulation)
+  statut: varchar("statut", { length: 20 }).notNull(), // envoye | echec | simule
+  erreur: text("erreur"), // message d'erreur si statut = echec
+  entiteType: varchar("entiteType", { length: 50 }), // devis | facture | intervention…
+  entiteId: int("entiteId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EmailLog = typeof emailsLog.$inferSelect;
+export type InsertEmailLog = typeof emailsLog.$inferInsert;

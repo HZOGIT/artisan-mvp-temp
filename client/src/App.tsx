@@ -13,6 +13,8 @@ import { trpc } from "./lib/trpc";
 import Home from "./pages/Home";
 import SignInPage from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
@@ -45,6 +47,7 @@ const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
 const SignatureDevis = lazy(() => import("./pages/SignatureDevis"));
 const ModelesEmail = lazy(() => import("./pages/ModelesEmail"));
 const ModelesEmailTransactionnels = lazy(() => import("./pages/ModelesEmailTransactionnels"));
+const HistoriqueEmails = lazy(() => import("./pages/HistoriqueEmails"));
 const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFournisseurs"));
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
@@ -69,6 +72,7 @@ const Chantiers = lazy(() => import("./pages/Chantiers"));
 const IntegrationsComptables = lazy(() => import("./pages/IntegrationsComptables"));
 const DevisIA = lazy(() => import("./pages/DevisIA"));
 const Assistant = lazy(() => import("./pages/Assistant"));
+const AssistantConversations = lazy(() => import("./pages/AssistantConversations"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const RdvEnLigne = lazy(() => import("./pages/RdvEnLigne"));
 const Vitrine = lazy(() => import("./pages/Vitrine"));
@@ -119,6 +123,7 @@ const ONBOARDING_BYPASS = new Set([
   "/profil",
   "/parametres",
   "/assistant",
+  "/assistant/conversations",
   "/notifications",
 ]);
 
@@ -199,6 +204,7 @@ function AuthenticatedRoutes() {
           <Route path="/relances" component={RelancesDevis} />
           <Route path="/modeles-email" component={ModelesEmail} />
           <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
+          <Route path="/historique-emails" component={HistoriqueEmails} />
           <Route path="/commandes/nouvelle" component={CommandeFournisseurForm} />
           <Route path="/commandes/:id/modifier" component={CommandeFournisseurForm} />
           <Route path="/commandes/:id" component={CommandeFournisseurDetail} />
@@ -206,6 +212,7 @@ function AuthenticatedRoutes() {
           <Route path="/rapport-commande" component={RapportCommande} />
           <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
           <Route path="/portail-gestion" component={PortailGestion} />
+          <Route path="/assistant/conversations" component={AssistantConversations} />
           <Route path="/assistant" component={Assistant} />
           <Route path="/notifications" component={Notifications} />
           <Route path="/rdv-en-ligne" component={RdvEnLigne} />
@@ -237,6 +244,8 @@ function Router() {
         <Route path="/signin" component={SignInPage} />
         <Route path="/sign-in" component={SignInPage} />
         <Route path="/signup" component={SignUp} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/mentions-legales" component={PageEnConstruction} />
         <Route path="/cgv" component={PageEnConstruction} />
         <Route path="/confidentialite" component={PageEnConstruction} />

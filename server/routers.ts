@@ -3,16 +3,16 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, adminOnlyProcedure, router, devisVoirProcedure, devisCreerProcedure, devisSupprimerProcedure, facturesVoirProcedure, facturesCreerProcedure, facturesSupprimerProcedure, comptaVoirProcedure, utilisateursGererProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { createHash, randomBytes, randomInt } from "crypto";
 import * as db from "./db";
 import * as dbSecure from "./db-secure";
 import { createUserWithPassword, authenticateUser, hashPassword } from "./_core/auth";
 import { createToken, setAuthCookie, clearAuthCookie } from "./_core/auth-simple";
 import { COOKIE_NAME } from "../shared/const";
-import { sendEmail, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
+import { sendEmail, safeHtml, generateDevisEmailContent, generateFactureEmailContent, generateRappelFactureContent, generateRappelInterventionContent } from "./_core/emailService";
 import { sendVerificationCode, isTwilioConfigured, isValidPhoneNumber } from "./_core/smsService";
 import { ClientInputSchema, ClientSearchSchema, ArticleSearchSchema, DevisInputSchema, FactureInputSchema, InterventionInputSchema, StockInputSchema, FournisseurInputSchema } from "../shared/validation";
 import { ROLE_TEMPLATES, ALL_PERMISSIONS } from "../shared/permissions";
-import Anthropic from "@anthropic-ai/sdk";
 import { buildSystemPrompt } from "./_core/assistantContext";
 import { getContexteMetier } from "./_core/contexteMetier";
 
@@ -35,7 +35,9 @@ function sanitizeIaError(e: any, fallback = "Erreur IA"): string {
 
 // Rate limiter for AI endpoints
 const rateLimitMap = new Map<number, { count: number; resetTime: number }>();
-function checkRateLimit(artisanId: number): boolean {
+// Exporté pour être réutilisé par les endpoints Express IA (index.ts :
+// /api/assistant/stream, /api/voice/token) -> budget Gemini partagé par tenant.
+export function checkRateLimit(artisanId: number): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(artisanId);
   if (!entry || now > entry.resetTime) {
@@ -45,6 +47,166 @@ function checkRateLimit(artisanId: number): boolean {
   if (entry.count >= 30) return false;
   entry.count++;
   return true;
+}
+
+// OPE-23 — anti SMS-bombing : borne le nombre d'envois de code de signature par
+// (signature, téléphone). Public + token-gated, mais sans throttle un même lien
+// permettait des envois SMS illimités (coûts Twilio + harcèlement du destinataire).
+// Fenêtre généreuse : un signataire légitime envoie 1 code, éventuellement 1-2 renvois.
+const smsSendRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkSmsSendRate(key: string): boolean {
+  const now = Date.now();
+  const entry = smsSendRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    smsSendRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
+// OPE-22 — anti brute-force OTP : borne les tentatives de vérification du code de
+// signature par signature. Sans cette garde, un code à 6 chiffres (900K combinaisons,
+// expiration 10 min) est énumérable. Fenêtre généreuse : un signataire légitime saisit
+// le bon code en 1-2 essais ; au-delà de 10 essais/15 min → 429.
+const smsVerifyRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkSmsVerifyRate(key: string): boolean {
+  const now = Date.now();
+  const entry = smsVerifyRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    smsVerifyRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count++;
+  return true;
+}
+
+// Anti-flood des emails de réinitialisation de mot de passe (par adresse) : sans
+// borne, `forgotPassword` (public) permet d'inonder la boîte d'une victime + de
+// gonfler les coûts Resend. Fenêtre généreuse : un utilisateur légitime demande 1-2
+// réinitialisations. La réponse reste constante (anti-énumération) : au-delà du seuil
+// on court-circuite *silencieusement* l'envoi, sans changer la sortie.
+const passwordResetRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkPasswordResetRate(key: string): boolean {
+  const now = Date.now();
+  const entry = passwordResetRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    passwordResetRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 3) return false;
+  entry.count++;
+  return true;
+}
+
+// Anti-flood du formulaire de contact public de la vitrine (par IP) : sans borne,
+// `submitContact` (public, sans token) permet d'inonder la boîte de l'artisan +
+// de gonfler les coûts Resend. Fenêtre généreuse (5 msg / 15 min par IP) : un
+// visiteur légitime envoie 1 message ; seul l'abus depuis une même IP est borné
+// (des visiteurs distincts ne se bloquent pas mutuellement).
+const publicContactRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkPublicContactRate(key: string): boolean {
+  const now = Date.now();
+  const entry = publicContactRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    publicContactRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
+// Throttle des actions ponctuelles du portail client (demande de modification,
+// demande de RDV) : token-gated mais envoie un email/crée un enregistrement à
+// chaque appel -> un porteur de token (ou un token fuité) pourrait inonder
+// l'artisan. Limite généreuse (un client légitime fait 1-2 demandes), clé par
+// (artisan, client) pour rester stable malgré une rotation de token. (OPE-24)
+const portalActionRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkPortalActionRate(key: string): boolean {
+  const now = Date.now();
+  const entry = portalActionRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    portalActionRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count++;
+  return true;
+}
+
+// Throttle dédié au chat portail (`sendClientMessage`) : token-gated mais crée un
+// message + une notification artisan à chaque appel -> sans limite, un porteur de
+// token pourrait spammer (flood de notifications). Limite GÉNÉREUSE (30 messages /
+// 5 min ≈ 6/min) — invisible pour un humain, bloque un script. Clé propre pour ne
+// pas partager le budget avec demanderRdv (même paire artisan:client). (OPE-24)
+const chatRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkChatRate(key: string): boolean {
+  const now = Date.now();
+  const entry = chatRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    chatRateMap.set(key, { count: 1, resetTime: now + 5 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 30) return false;
+  entry.count++;
+  return true;
+}
+
+// Throttle du formulaire de support (par utilisateur) : `support.contact` envoie un
+// email à support@operioz.com à chaque appel -> un compte authentifié pourrait
+// inonder la boîte support + gonfler les coûts Resend. Limite généreuse (5 / 15 min
+// par user) : un usage légitime fait 1-2 demandes. (classe rate-limit OPE-24)
+const supportContactRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkSupportContactRate(key: string): boolean {
+  const now = Date.now();
+  const entry = supportContactRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    supportContactRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
+// Throttle des envois d'email de DOCUMENT (bon de commande fournisseur…) par artisan :
+// chaque envoi génère un PDF + un email Resend. Sans borne, un compte authentifié/compromis
+// (ou un collaborateur) pourrait spammer le destinataire + gonfler les coûts Resend/CPU.
+// Limite généreuse (20 / 15 min par artisan) : un usage légitime ne l'atteint jamais.
+// (classe rate-limit OPE-24, même pattern que checkSupportContactRate)
+const documentEmailRateMap = new Map<string, { count: number; resetTime: number }>();
+function checkDocumentEmailRate(key: string): boolean {
+  const now = Date.now();
+  const entry = documentEmailRateMap.get(key);
+  if (!entry || now > entry.resetTime) {
+    documentEmailRateMap.set(key, { count: 1, resetTime: now + 15 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 20) return false;
+  entry.count++;
+  return true;
+}
+
+// Validation format IBAN (ISO 13616 + clé de contrôle ISO 7064 MOD-97-10).
+// Accepte la valeur vide (champ optionnel / effacé). Normalise espaces et casse
+// pour le calcul sans muter la valeur stockée (le formatage utilisateur est conservé).
+function isValidIban(value: string | undefined | null): boolean {
+  if (!value) return true;
+  const s = value.replace(/\s+/g, "").toUpperCase();
+  if (s === "") return true;
+  if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{10,30}$/.test(s)) return false;
+  // Déplace les 4 premiers caractères en fin, convertit lettres -> chiffres (A=10..Z=35).
+  const rearranged = s.slice(4) + s.slice(0, 4);
+  const numeric = rearranged.replace(/[A-Z]/g, (c) => (c.charCodeAt(0) - 55).toString());
+  // MOD-97 par blocs pour rester dans les bornes des nombres JS.
+  let remainder = 0;
+  for (let i = 0; i < numeric.length; i += 7) {
+    remainder = Number(String(remainder) + numeric.slice(i, i + 7)) % 97;
+  }
+  return remainder === 1;
 }
 
 // buildSystemPrompt déplacé dans ./_core/assistantContext.ts pour être partagé
@@ -61,15 +223,15 @@ const artisanRouter = router({
   
   createProfile: protectedProcedure
     .input(z.object({
-      siret: z.string().optional(),
-      nomEntreprise: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      telephone: z.string().optional(),
-      email: z.string().email().optional(),
+      siret: z.string().max(20).optional(),
+      nomEntreprise: z.string().max(200).optional(),
+      adresse: z.string().max(300).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      telephone: z.string().max(30).optional(),
+      email: z.string().email().max(320).optional(),
       specialite: z.enum(["plomberie", "electricite", "chauffage", "multi-services"]).optional(),
-      tauxTVA: z.string().optional(),
+      tauxTVA: z.string().max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const existing = await db.getArtisanByUserId(ctx.user.id);
@@ -81,20 +243,29 @@ const artisanRouter = router({
   
   updateProfile: protectedProcedure
     .input(z.object({
-      siret: z.string().optional(),
-      nomEntreprise: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      telephone: z.string().optional(),
-      email: z.string().email().optional(),
+      // Bornes .max() généreuses : aucune valeur légitime ne les approche (champs au
+      // format court) -> behavior-preserving + borne le surface DoS/stockage. `logo`
+      // (data-URI base64) est le vecteur clé : par tRPC il contournerait la limite
+      // multer 2 Mo de /api/upload-logo, d'où ~3 Mo (≈ image 2,2 Mo).
+      siret: z.string().max(20).optional(),
+      nomEntreprise: z.string().max(200).optional(),
+      adresse: z.string().max(300).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      telephone: z.string().max(30).optional(),
+      email: z.string().email().max(320).optional(),
       specialite: z.enum(["plomberie", "electricite", "chauffage", "multi-services"]).optional(),
-      tauxTVA: z.string().optional(),
-      numeroTVA: z.string().optional(),
-      iban: z.string().optional(),
-      codeAPE: z.string().optional(),
-      logo: z.string().optional(),
-      slug: z.string().optional(),
+      tauxTVA: z.string().max(10).optional(),
+      numeroTVA: z.string().max(20).optional(),
+      iban: z.string().max(40).optional().refine(isValidIban, { message: "IBAN invalide (format ou clé de contrôle)" }),
+      codeAPE: z.string().max(10).optional(),
+      // Mentions légales émetteur (OPE-151) — additifs/optionnels.
+      formeJuridique: z.enum(["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"]).optional(),
+      capitalSocial: z.string().max(20).optional(),
+      villeRCS: z.string().max(100).optional(),
+      numeroRM: z.string().max(50).optional(),
+      logo: z.string().max(3_000_000).optional(),
+      slug: z.string().max(100).optional(),
       // T9 : metier libre (12 valeurs cote UI) hors enum drizzle, persiste raw SQL.
       metier: z.string().max(50).optional(),
     }))
@@ -109,7 +280,9 @@ const artisanRouter = router({
       const persistMetier = async (id: number) => {
         if (typeof metierVal !== "string") return;
         try {
-          await pool.execute(`UPDATE artisans SET metier = ? WHERE id = ?`, [metierVal.trim() || null, id]);
+          // OPE-184 — `metier` est désormais une colonne Drizzle (artisans) : on réutilise
+          // le helper porté plutôt qu'un raw SQL via un `pool` hors scope.
+          await db.updateArtisanOnboarding(id, { metier: metierVal.trim() || null });
         } catch (e: any) { console.warn("[updateProfile] metier persist:", String(e?.message || e)); }
       };
 
@@ -149,7 +322,15 @@ const clientsRouter = router({
     // Utiliser la version sécurisée
     return await dbSecure.getClientsByArtisanIdSecure(artisan.id);
   }),
-  
+
+  // OPE-144 — encours impayé par client (1 requête) pour le badge « à risque » de la liste.
+  // Seuls les clients réellement débiteurs sont présents. Scopé tenant.
+  getEncoursMap: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return {} as Record<number, { encoursTotal: string; echu: string; nbFacturesImpayees: number }>;
+    return await db.getEncoursByClient(artisan.id);
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -164,7 +345,24 @@ const clientsRouter = router({
       }
       return client;
     }),
-  
+
+  // OPE-144 — encours impayé d'un client (lecture seule). Sert l'alerte non
+  // bloquante « client à risque » avant d'émettre un nouveau devis/facture.
+  getEncours: protectedProcedure
+    .input(z.object({ clientId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      }
+      // Ownership : le client doit appartenir à l'artisan.
+      const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
+      return await db.getEncoursClient(input.clientId, artisan.id);
+    }),
+
   create: protectedProcedure
     .input(ClientInputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -221,19 +419,22 @@ const clientsRouter = router({
   importFromExcel: protectedProcedure
     .input(z.object({
       clients: z.array(z.object({
-        nom: z.string(),
-        prenom: z.string().optional(),
-        email: z.string().email().optional(),
-        telephone: z.string().optional(),
-        adresse: z.string().optional(),
-        codePostal: z.string().optional(),
-        ville: z.string().optional(),
-        notes: z.string().optional(),
-      }))
+        // OPE-24 — bornes raisonnables par champ (defense-in-depth) : avec le cap
+        // de 5000 lignes, elles bornent la charge mémoire d'un import sans rejeter
+        // aucune donnée client légitime (comportement inchangé pour les imports réels).
+        nom: z.string().max(200),
+        prenom: z.string().max(200).optional(),
+        email: z.string().email().max(320).optional(),
+        telephone: z.string().max(40).optional(),
+        adresse: z.string().max(500).optional(),
+        codePostal: z.string().max(20).optional(),
+        ville: z.string().max(200).optional(),
+        notes: z.string().max(5000).optional(),
+      })).max(5000, "Import limité à 5000 clients par envoi"),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
-      
+
       let imported = 0;
       let skipped = 0;
       
@@ -276,8 +477,8 @@ const articlesRouter = router({
 
   search: publicProcedure
     .input(z.object({
-      query: z.string(),
-      metier: z.string().optional(),
+      query: z.string().max(200),
+      metier: z.string().max(100).optional(),
     }))
     .query(async ({ input }) => {
       return await db.searchArticles(input.query, input.metier);
@@ -289,8 +490,8 @@ const articlesRouter = router({
   // au metier de l'artisan (contexte specialise injecte en prompt).
   suggererArticlesIA: protectedProcedure
     .input(z.object({
-      query: z.string().min(2),
-      contexte: z.string().optional(),
+      query: z.string().min(2).max(200),
+      contexte: z.string().max(2000).optional(),
     }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -300,27 +501,20 @@ const articlesRouter = router({
       const contexteMetier = getContexteMetier(metier);
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          temperature: 0.4,
-          system: contexteMetier,
-          messages: [{
-            role: "user",
-            content: `L'artisan cherche : "${input.query}"
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: `L'artisan cherche : "${input.query}"
 Contexte : ${input.contexte || "creation de devis"}.
 
 Propose 5 articles pertinents pour un artisan ${metier || "du bâtiment"} en France avec prix realistes marche 2024.
 
 Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
-{"articles":[{"designation":"nom","reference":"REF-XXX","unite":"u|m|m²|ml|kg|L|h","prixUnitaire":0,"description":"courte","categorie":"cat"}]}`,
-          }],
+{"articles":[{"designation":"nom","reference":"REF-XXX","unite":"u|m|m²|ml|kg|L|h","prixUnitaire":0,"description":"courte","categorie":"cat"}]}` }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return [];
         const data = JSON.parse(jsonMatch[0]);
@@ -339,27 +533,31 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   
   createArtisanArticle: protectedProcedure
     .input(z.object({
-      reference: z.string().min(1),
-      designation: z.string().min(1),
-      description: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      categorie: z.string().optional(),
+      // Bornes alignées sur les colonnes de `articles_artisan` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      reference: z.string().min(1).max(50),
+      designation: z.string().min(1).max(500),
+      description: z.string().max(5000).optional(),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20),
+      tauxTVA: z.string().max(10).optional(),
+      categorie: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
       return await db.createArticleArtisan({ artisanId: artisan.id, ...input });
     }),
-  
+
   updateArtisanArticle: protectedProcedure
     .input(z.object({
       id: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().optional(),
-      description: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string().optional(),
-      categorie: z.string().optional(),
+      reference: z.string().max(50).optional(),
+      designation: z.string().max(500).optional(),
+      description: z.string().max(5000).optional(),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20).optional(),
+      tauxTVA: z.string().max(10).optional(),
+      categorie: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : verifier que l'article appartient bien a cet artisan.
@@ -391,13 +589,15 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   // ne pas qu'un artisan pollue/efface les articles vus par les autres.
   createBibliothequeArticle: adminOnlyProcedure
     .input(z.object({
-      nom: z.string().min(1),
+      nom: z.string().min(1).max(255),
       description: z.string().optional(),
-      unite: z.string(),
+      unite: z.string().max(50),
       prix_base: z.string(),
-      categorie: z.string(),
-      sous_categorie: z.string(),
-      metier: z.string(),
+      tauxTVA: z.string().max(10).optional(),
+      prixRevient: z.string().max(20).optional(),
+      categorie: z.string().max(50),
+      sous_categorie: z.string().max(100),
+      metier: z.string().max(50),
     }))
     .mutation(async ({ input }) => {
       return await db.createBibliothequeArticle(input);
@@ -406,13 +606,15 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
   updateBibliothequeArticle: adminOnlyProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
+      nom: z.string().max(255).optional(),
       description: z.string().optional(),
-      unite: z.string().optional(),
+      unite: z.string().max(50).optional(),
       prix_base: z.string().optional(),
-      categorie: z.string().optional(),
-      sous_categorie: z.string().optional(),
-      metier: z.string().optional(),
+      tauxTVA: z.string().max(10).optional(),
+      prixRevient: z.string().max(20).optional(),
+      categorie: z.string().max(50).optional(),
+      sous_categorie: z.string().max(100).optional(),
+      metier: z.string().max(50).optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
@@ -426,16 +628,21 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
       return { success: true };
     }),
 
-  importBibliothequeArticles: protectedProcedure
+  // OPE-181 — admin-only (aligné sur create/update/deleteBibliothequeArticle) : la
+  // bibliothèque est un catalogue GLOBAL servi à tous les tenants, ses écritures sont
+  // réservées aux admins Operioz. Auparavant `protectedProcedure` → un artisan/collaborateur
+  // pouvait polluer le catalogue vu par tous (bypass de l'admin-only du create unitaire) et
+  // déclencher un DoS via un array non borné. + `.max(2000)` (defense-in-depth).
+  importBibliothequeArticles: adminOnlyProcedure
     .input(z.array(z.object({
-      nom: z.string(),
-      description: z.string().optional(),
-      unite: z.string(),
-      prix_base: z.string(),
-      categorie: z.string(),
-      sous_categorie: z.string(),
-      metier: z.string(),
-    })))
+      nom: z.string().max(255),
+      description: z.string().max(5000).optional(),
+      unite: z.string().max(50),
+      prix_base: z.string().max(20),
+      categorie: z.string().max(50),
+      sous_categorie: z.string().max(100),
+      metier: z.string().max(50),
+    })).max(2000, "Import limité à 2000 articles par envoi"))
     .mutation(async ({ input }) => {
       let imported = 0;
       for (const article of input) {
@@ -484,15 +691,11 @@ const devisRouter = router({
     const moisLabel = new Date().toLocaleDateString("fr-FR", { month: "long" });
 
     try {
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 800,
-        temperature: 0.6,
-        system: contexteMetier,
-        messages: [{
-          role: "user",
-          content: `Tu es le conseiller IA d'Operioz pour ${artisan.nomEntreprise || "cet artisan"} (${metier || "batiment"}).
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const response = await ai.models.generateContent({
+        model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: `Tu es le conseiller IA d'Operioz pour ${artisan.nomEntreprise || "cet artisan"} (${metier || "batiment"}).
 
 Etat actuel :
 - ${nbDevisEnAttente} devis en attente de reponse
@@ -505,13 +708,10 @@ Donne 3 conseils personnalises ET actionnables (pas de generalites). Chaque cons
 Liens disponibles : /devis, /factures, /relances, /clients, /interventions, /stocks, /tableau-bord-depenses, /alertes-previsions, /depenses, /budgets-depenses.
 
 Reponds UNIQUEMENT en JSON pur :
-{"conseils":[{"icone":"💡","titre":"court","message":"phrase","actionLabel":"texte bouton","actionLien":"/devis"}]}`,
-        }],
+{"conseils":[{"icone":"💡","titre":"court","message":"phrase","actionLabel":"texte bouton","actionLien":"/devis"}]}` }] }],
+        config: { systemInstruction: contexteMetier, temperature: 0.6, maxOutputTokens: 800 },
       });
-      const text = response.content
-        .filter((b: any) => b.type === "text")
-        .map((b: any) => b.text)
-        .join("");
+      const text = response.text || '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return { conseils: [] };
       const data = JSON.parse(jsonMatch[0]);
@@ -532,7 +732,7 @@ Reponds UNIQUEMENT en JSON pur :
   // l'utilisateur valide ensuite avant la creation effective du devis.
   genererLignesIA: protectedProcedure
     .input(z.object({
-      description: z.string().min(5),
+      description: z.string().min(5).max(5000),
       surface: z.number().optional(),
       budget: z.number().optional(),
     }))
@@ -556,18 +756,14 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 {"objet":"objet court","dureeEstimee":"X jours","lignes":[{"designation":"description","quantite":1,"unite":"u|m|m²|h|forfait","prixUnitaire":0,"tauxTva":10,"type":"fourniture|main_oeuvre|forfait"}],"notes":"remarques","conseilsArtisan":"conseils"}`;
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2500,
-          temperature: 0.3,
-          system: contexteMetier,
-          messages: [{ role: "user", content: userPrompt }],
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.3, maxOutputTokens: 2500 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
           return { lignes: [], objet: input.description.slice(0, 80) };
@@ -633,9 +829,12 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   create: devisCreerProcedure
     .input(z.object({
       clientId: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes raisonnables (champs TEXT) : borne le stockage + erreur 400 claire
+      // au lieu d'un 500 au-delà de la capacité TEXT. Defense-in-depth (OPE-24).
+      objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateValidite: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -650,6 +849,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       return await dbSecure.createDevisSecure(artisan.id, input.clientId, {
         numero,
         objet: input.objet,
+        referenceClient: input.referenceClient,
         conditionsPaiement: input.conditionsPaiement,
         notes: input.notes,
         dateValidite: input.dateValidite ? new Date(input.dateValidite) : undefined,
@@ -664,9 +864,10 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   update: devisCreerProcedure
     .input(z.object({
       id: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateValidite: z.string().optional(),
       statut: z.enum(["brouillon", "envoye", "accepte", "refuse", "expire"]).optional(),
     }))
@@ -709,13 +910,19 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   addLigne: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().min(1),
-      description: z.string().optional(),
-      quantite: z.string().default("1"),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      tauxTVA: z.string().default("20.00"),
+      // Bornes texte alignées sur `devis_lignes` (reference 50, designation 500,
+      // unite 20) — évite qu'une désignation surdimensionnée fasse échouer toute
+      // la création de ligne (erreur/troncature MySQL en mode strict).
+      reference: z.string().max(50).optional(),
+      designation: z.string().min(1).max(500),
+      description: z.string().max(5000).optional(),
+      quantite: z.string().max(20).default("1"),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20).default("0"),
+      tauxTVA: z.string().max(10).default("20.00"),
+      // OPE-168 — type de ligne. `section`/`note` = lignes d'affichage (titre de
+      // lot / texte libre), sans prix → montants forcés à 0, exclues des totaux.
+      type: z.enum(["produit", "section", "note"]).default("produit"),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : verifier l'ownership du devis avant d'ajouter une ligne.
@@ -725,9 +932,12 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
       }
 
-      const quantite = parseFloat(input.quantite);
-      const prixUnitaireHT = parseFloat(input.prixUnitaireHT);
-      const tauxTVA = parseFloat(input.tauxTVA);
+      // OPE-168 — une section/note ne porte ni quantité ni prix : on neutralise
+      // ses montants (0) pour qu'elle n'impacte JAMAIS les totaux (HT/TVA/TTC).
+      const isDisplay = input.type === "section" || input.type === "note";
+      const quantite = isDisplay ? 0 : parseFloat(input.quantite);
+      const prixUnitaireHT = isDisplay ? 0 : parseFloat(input.prixUnitaireHT);
+      const tauxTVA = isDisplay ? 0 : parseFloat(input.tauxTVA);
 
       const montantHT = quantite * prixUnitaireHT;
       const montantTVA = montantHT * (tauxTVA / 100);
@@ -735,13 +945,14 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
       const ligne = await db.createLigneDevis({
         devisId: input.devisId,
-        reference: input.reference,
+        type: input.type,
+        reference: isDisplay ? undefined : input.reference,
         designation: input.designation,
         description: input.description,
-        quantite: input.quantite,
-        unite: input.unite,
-        prixUnitaireHT: input.prixUnitaireHT,
-        tauxTVA: input.tauxTVA,
+        quantite: isDisplay ? "0" : input.quantite,
+        unite: isDisplay ? undefined : input.unite,
+        prixUnitaireHT: isDisplay ? "0" : input.prixUnitaireHT,
+        tauxTVA: isDisplay ? "0" : input.tauxTVA,
         montantHT: montantHT.toFixed(2),
         montantTVA: montantTVA.toFixed(2),
         montantTTC: montantTTC.toFixed(2),
@@ -755,13 +966,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
     .input(z.object({
       id: z.number(),
       devisId: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().optional(),
-      description: z.string().optional(),
-      quantite: z.string().optional(),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string().optional(),
-      tauxTVA: z.string().optional(),
+      reference: z.string().max(50).optional(),
+      designation: z.string().max(500).optional(),
+      description: z.string().max(5000).optional(),
+      quantite: z.string().max(20).optional(),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20).optional(),
+      tauxTVA: z.string().max(10).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : ownership du devis parent.
@@ -769,6 +980,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       const devisOwned = artisan ? await db.getDevisById(input.devisId) : null;
       if (!devisOwned || !artisan || devisOwned.artisanId !== artisan.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
+      }
+
+      // SECURITE (OPE-9) : la ligne doit appartenir au devis vérifié (sinon update
+      // cross-tenant via une ligne d'un autre devis découplée du parent).
+      const lignesOwned = await db.getLignesDevisByDevisId(input.devisId);
+      if (!lignesOwned.some((l) => l.id === input.id)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Ligne non trouvée" });
       }
 
       const { id, devisId, ...data } = input;
@@ -806,6 +1024,11 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       const devisOwned = artisan ? await db.getDevisById(input.devisId) : null;
       if (!devisOwned || !artisan || devisOwned.artisanId !== artisan.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouve" });
+      }
+      // SECURITE (OPE-9) : la ligne doit appartenir au devis vérifié.
+      const lignesOwned = await db.getLignesDevisByDevisId(input.devisId);
+      if (!lignesOwned.some((l) => l.id === input.id)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Ligne non trouvée" });
       }
       await db.deleteLigneDevis(input.id);
       await db.recalculateDevisTotals(input.devisId);
@@ -856,7 +1079,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   sendByEmail: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      customMessage: z.string().optional(),
+      customMessage: z.string().max(5000).optional(),
       attachPdf: z.boolean().optional().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -871,6 +1094,12 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       const client = await db.getClientById(devis.clientId);
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+      // OPE-24 — anti-abus : borne l'envoi du devis par email (génère un PDF + email
+      // Resend au client). Sans ça, un compte authentifié peut spammer le client et
+      // brûler le quota Resend. Même limiteur que bon de commande/avis (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`devis:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois de devis par email. Réessayez dans quelques minutes." });
       }
 
       const artisanName = artisan.nomEntreprise || "Votre artisan";
@@ -891,7 +1120,7 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       });
 
       const finalBody = input.customMessage
-        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${input.customMessage.replace(/\n/g, '<br>')}</div></body>`)
+        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${safeHtml(input.customMessage)}</div></body>`)
         : body;
 
       // Générer le PDF si demandé
@@ -905,10 +1134,17 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
       const result = await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject,
         body: finalBody,
         attachmentName: input.attachPdf ? `Devis_${devis.numero}.pdf` : undefined,
         attachmentContent,
+        // OPE-114 — traçabilité de l'envoi
+        artisanId: artisan.id,
+        emailType: "devis",
+        entiteType: "devis",
+        entiteId: devis.id,
       });
 
       if (result.success) {
@@ -1032,7 +1268,9 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   envoyerRelance: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      message: z.string().optional()
+      // Borne defense-in-depth (OPE-24) : message libre injecté (échappé) dans le
+      // corps de l'email de relance — un message légitime est court.
+      message: z.string().max(5000).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -1049,23 +1287,31 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
       }
-      
+      // OPE-24 — anti-abus : borne l'envoi de relances de devis par email (envoi Resend
+      // au client). Sans ça, un compte authentifié peut spammer le client. Même limiteur
+      // que les autres envois de documents (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`relance:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de relances envoyées. Réessayez dans quelques minutes." });
+      }
+
       // Générer le contenu de l'email de relance
       const messageRelance = input.message || `Bonjour,\n\nNous vous rappelons que le devis n°${devisData.numero} est toujours en attente de votre signature.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\n${artisan.nomEntreprise || 'Votre artisan'}`;
       
       // Envoyer l'email
       const emailResult = await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `Relance - Devis n°${devisData.numero}`,
         body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2c3e50;">Relance - Devis n°${devisData.numero}</h2>
-          <p style="white-space: pre-line;">${messageRelance}</p>
+          <p>${safeHtml(messageRelance)}</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
           <p style="color: #7f8c8d; font-size: 12px;">
-            ${artisan.nomEntreprise || ''}<br>
-            ${artisan.adresse || ''}<br>
-            ${artisan.codePostal || ''} ${artisan.ville || ''}<br>
-            ${artisan.telephone || ''}
+            ${safeHtml(artisan.nomEntreprise || '')}<br>
+            ${safeHtml(artisan.adresse || '')}<br>
+            ${safeHtml(artisan.codePostal || '')} ${safeHtml(artisan.ville || '')}<br>
+            ${safeHtml(artisan.telephone || '')}
           </p>
         </div>`
       });
@@ -1103,7 +1349,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
-      
+      // OPE-24 — anti-abus : borne l'opération de relance en masse (envoie N emails Resend).
+      // Le throttle par devis (joursEntreRelances) peut être contourné via joursEntreRelances=0 ;
+      // cette borne par appel (20 / 15 min / artisan) empêche les envois en masse répétés.
+      if (!checkDocumentEmailRate(`relance-auto:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de relances en masse. Réessayez dans quelques minutes." });
+      }
+
       const joursMinimum = input.joursMinimum || 7;
       const joursEntreRelances = input.joursEntreRelances || 7;
       
@@ -1134,10 +1386,12 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
         const emailResult = await sendEmail({
           to: client.email,
+          fromName: artisan.nomEntreprise || undefined, // OPE-157
+          replyTo: artisan.email || undefined,
           subject: `Relance - Devis n°${d.numero}`,
           body: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #2c3e50;">Relance - Devis n°${d.numero}</h2>
-            <p style="white-space: pre-line;">${messageRelance}</p>
+            <p>${safeHtml(messageRelance)}</p>
           </div>`
         });
 
@@ -1176,9 +1430,11 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
 
   createModele: protectedProcedure
     .input(z.object({
-      nom: z.string().min(1),
-      description: z.string().optional(),
-      notes: z.string().optional(),
+      nom: z.string().min(1).max(255),
+      // Bornes texte (champs TEXT de modeles_devis) — defense-in-depth, alignées
+      // sur la convention devis/facture (notes 5000) ; addLigneToModele déjà borné.
+      description: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -1205,12 +1461,14 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
     .input(z.object({
       modeleId: z.number(),
       articleId: z.number().optional(),
-      designation: z.string().min(1),
-      description: z.string().optional(),
+      // Bornes texte alignées sur `modeles_devis_lignes` (designation 255, unite 20)
+      // — évite qu'une désignation surdimensionnée fasse échouer l'ajout (MySQL strict).
+      designation: z.string().min(1).max(255),
+      description: z.string().max(5000).optional(),
       quantite: z.number().default(1),
-      unite: z.string().default("unité"),
+      unite: z.string().max(20).default("unité"),
       prixUnitaireHT: z.number().default(0),
-      tauxTVA: z.number().default(20),
+      tauxTVA: z.number().min(0).max(100).default(20),
       remise: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1281,9 +1539,12 @@ const facturesRouter = router({
   create: facturesCreerProcedure
     .input(z.object({
       clientId: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes raisonnables (champs TEXT) : borne le stockage + 400 clair au lieu d'un
+      // 500 au-delà de la capacité TEXT. Defense-in-depth, idem devis (OPE-24).
+      objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateEcheance: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1294,16 +1555,30 @@ const facturesRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
       }
       const numero = await db.getNextFactureNumber(artisan.id);
+      // OPE-94 — si pas d'échéance saisie, la dériver du délai de paiement par défaut
+      // de l'artisan (si configuré). Sinon undefined (comportement inchangé).
+      const dateFacture = new Date();
+      const dateEcheance = input.dateEcheance
+        ? new Date(input.dateEcheance)
+        : await db.defaultDateEcheance(artisan.id, dateFacture);
       // Utiliser la version sécurisée (créer une fonction si nécessaire)
+      // OPE-122 (volet 1) — readiness facturation électronique 2026 : figer le SIRET
+      // du destinataire à l'émission, depuis la fiche client (uniquement pro avec SIRET).
+      // Valeur probante/immuabilité : le SIRET de routage PDP ne doit pas suivre une
+      // modification ultérieure de la fiche client. Additif, sans effet sur le flux actuel.
+      const siretDestinataire =
+        client.type === "professionnel" && client.siret ? client.siret : undefined;
       const newFacture = await db.createFacture(artisan.id, {
         clientId: input.clientId,
         numero,
         objet: input.objet,
+        referenceClient: input.referenceClient,
+        siretDestinataire,
         conditionsPaiement: input.conditionsPaiement,
         notes: input.notes,
-        dateEcheance: input.dateEcheance ? new Date(input.dateEcheance) : undefined,
+        dateEcheance,
         statut: "brouillon",
-        dateFacture: new Date(),
+        dateFacture,
         totalHT: "0.00",
         totalTVA: "0.00",
         totalTTC: "0.00",
@@ -1322,9 +1597,10 @@ const facturesRouter = router({
   update: facturesCreerProcedure
     .input(z.object({
       id: z.number(),
-      objet: z.string().optional(),
-      conditionsPaiement: z.string().optional(),
-      notes: z.string().optional(),
+      objet: z.string().max(500).optional(),
+      referenceClient: z.string().max(100).optional(),
+      conditionsPaiement: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
       dateEcheance: z.string().optional(),
       statut: z.enum(["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]).optional(),
       montantPaye: z.string().optional(),
@@ -1346,7 +1622,7 @@ const facturesRouter = router({
 
       // Si la facture est verrouillée, seul le changement de statut est autorisé (et dans le bon sens)
       if (isLocked) {
-        const hasContentChanges = data.objet !== undefined || data.conditionsPaiement !== undefined || data.notes !== undefined || dateEcheance !== undefined;
+        const hasContentChanges = data.objet !== undefined || data.referenceClient !== undefined || data.conditionsPaiement !== undefined || data.notes !== undefined || dateEcheance !== undefined;
         if (hasContentChanges) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Document fiscal verrouillé — modification interdite. Émettez un avoir pour corriger." });
         }
@@ -1425,13 +1701,19 @@ const facturesRouter = router({
   addLigne: protectedProcedure
     .input(z.object({
       factureId: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().min(1),
-      description: z.string().optional(),
-      quantite: z.string().default("1"),
-      unite: z.string().optional(),
-      prixUnitaireHT: z.string(),
-      tauxTVA: z.string().default("20.00"),
+      // Bornes texte alignées sur `factures_lignes` (reference 50, designation 500,
+      // unite 20) — symétrique des lignes de devis ; évite qu'une désignation
+      // surdimensionnée fasse échouer l'ajout (erreur/troncature MySQL strict).
+      reference: z.string().max(50).optional(),
+      designation: z.string().min(1).max(500),
+      description: z.string().max(5000).optional(),
+      quantite: z.string().max(20).default("1"),
+      unite: z.string().max(20).optional(),
+      prixUnitaireHT: z.string().max(20).default("0"),
+      tauxTVA: z.string().max(10).default("20.00"),
+      // OPE-168 (volet 2) — type de ligne. `section`/`note` = lignes d'affichage
+      // (sans prix) → montants forcés à 0, exclues des totaux. Symétrique du devis.
+      type: z.enum(["produit", "section", "note"]).default("produit"),
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : ownership de la facture + check brouillon (conformite fiscale).
@@ -1443,28 +1725,32 @@ const facturesRouter = router({
       if (factureCheck.statut !== "brouillon") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Document fiscal verrouillé — impossible d'ajouter des lignes." });
       }
-      const quantite = parseFloat(input.quantite);
-      const prixUnitaireHT = parseFloat(input.prixUnitaireHT);
-      const tauxTVA = parseFloat(input.tauxTVA);
-      
+      // OPE-168 — une section/note n'a ni quantité ni prix : montants neutralisés (0)
+      // → n'impacte jamais les totaux (HT/TVA/TTC sommés depuis les montants de ligne).
+      const isDisplay = input.type === "section" || input.type === "note";
+      const quantite = isDisplay ? 0 : parseFloat(input.quantite);
+      const prixUnitaireHT = isDisplay ? 0 : parseFloat(input.prixUnitaireHT);
+      const tauxTVA = isDisplay ? 0 : parseFloat(input.tauxTVA);
+
       const montantHT = quantite * prixUnitaireHT;
       const montantTVA = montantHT * (tauxTVA / 100);
       const montantTTC = montantHT + montantTVA;
-      
+
       const ligne = await db.createLigneFacture({
         factureId: input.factureId,
-        reference: input.reference,
+        type: input.type,
+        reference: isDisplay ? undefined : input.reference,
         designation: input.designation,
         description: input.description,
-        quantite: input.quantite,
-        unite: input.unite,
-        prixUnitaireHT: input.prixUnitaireHT,
-        tauxTVA: input.tauxTVA,
+        quantite: isDisplay ? "0" : input.quantite,
+        unite: isDisplay ? undefined : input.unite,
+        prixUnitaireHT: isDisplay ? "0" : input.prixUnitaireHT,
+        tauxTVA: isDisplay ? "0" : input.tauxTVA,
         montantHT: montantHT.toFixed(2),
         montantTVA: montantTVA.toFixed(2),
         montantTTC: montantTTC.toFixed(2),
       });
-      
+
       await db.recalculateFactureTotals(input.factureId);
       return ligne;
     }),
@@ -1484,11 +1770,29 @@ const facturesRouter = router({
       if (!artisan || facture.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acces non autorise" });
       }
+      // Garde de validité (classe « date invalide ») : une date de paiement malformée
+      // -> Invalid Date rejetée par MySQL (500) + écritures comptables générées sur une
+      // base incohérente. On rejette proprement AVANT toute écriture.
+      const datePaiement = new Date(input.datePaiement);
+      if (isNaN(datePaiement.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de paiement invalide" });
+      }
       const result = await db.updateFacture(input.id, {
         montantPaye: input.montantPaye,
-        datePaiement: new Date(input.datePaiement),
+        datePaiement,
         statut: "payee",
       });
+      // OPE-52 : générer les écritures comptables (411 Client / 706 Ventes /
+      // 44571 TVA collectée) pour que Balance / Grand Livre / Journal des ventes
+      // affichent la facture. Idempotent (delete-then-insert par factureId).
+      // En try/catch : un échec de génération ne doit jamais casser le paiement.
+      try {
+        await db.genererEcrituresFacture(input.id);
+        // Écritures d'encaissement (journal Banque : 512 / 411 lettré) au paiement.
+        await db.genererEcrituresEncaissement(input.id);
+      } catch (e: any) {
+        console.error(`[Compta] génération écritures (${input.id}) failed:`, e?.message);
+      }
       await db.createAuditLog({
         artisanId: artisan.id,
         userId: ctx.user.id,
@@ -1530,7 +1834,7 @@ const facturesRouter = router({
   sendByEmail: protectedProcedure
     .input(z.object({
       factureId: z.number(),
-      customMessage: z.string().optional(),
+      customMessage: z.string().max(5000).optional(),
       attachPdf: z.boolean().optional().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1545,6 +1849,11 @@ const facturesRouter = router({
       const client = await db.getClientById(facture.clientId);
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
+      }
+      // OPE-24 — anti-abus : borne l'envoi de la facture par email (génère un PDF + email
+      // Resend au client). Même limiteur que bon de commande/avis (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`facture:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois de facture par email. Réessayez dans quelques minutes." });
       }
 
       const artisanName = artisan.nomEntreprise || "Votre artisan";
@@ -1564,7 +1873,7 @@ const facturesRouter = router({
       });
 
       const finalBody = input.customMessage
-        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${input.customMessage.replace(/\n/g, '<br>')}</div></body>`)
+        ? body.replace('</body>', `<div style="padding:0 40px 24px 40px;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;margin:0 40px;padding-top:16px;">${safeHtml(input.customMessage)}</div></body>`)
         : body;
 
       // Générer le PDF si demandé
@@ -1578,10 +1887,17 @@ const facturesRouter = router({
 
       const result = await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject,
         body: finalBody,
         attachmentName: input.attachPdf ? `Facture_${facture.numero}.pdf` : undefined,
         attachmentContent,
+        // OPE-114 — traçabilité de l'envoi
+        artisanId: artisan.id,
+        emailType: facture.typeDocument === "avoir" ? "avoir" : "facture",
+        entiteType: "facture",
+        entiteId: facture.id,
       });
 
       if (result.success) {
@@ -1634,6 +1950,10 @@ const facturesRouter = router({
       if (!artisan || facture.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // OPE-67 : ne pas générer de lien de paiement pour une facture brouillon/annulée/payée.
+      if (facture.statut === 'brouillon' || facture.statut === 'annulee' || facture.statut === 'payee') {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cette facture n'est pas payable (brouillon, annulée ou déjà payée)" });
+      }
       const client = await db.getClientById(facture.clientId);
       if (!client) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
@@ -1645,8 +1965,12 @@ const facturesRouter = router({
       // Générer un token unique pour le paiement
       const tokenPaiement = crypto.randomUUID();
       
-      // Créer la session Stripe
-      const origin = ctx.req.headers.origin || 'http://localhost:3000';
+      // Créer la session Stripe.
+      // OPE-76 (alignement robustesse) : repli sur APP_URL (domaine serveur de confiance)
+      // au lieu de 'http://localhost:3000' si le header Origin est absent — évite des
+      // success_url/cancel_url Stripe pointant vers localhost en production. Le chemin
+      // nominal (Origin présent = navigateur de l'artisan authentifié) est inchangé.
+      const origin = ctx.req.headers.origin || process.env.APP_URL || 'https://www.operioz.com';
       const session = await createCheckoutSession({
         factureId: facture.id,
         numeroFacture: facture.numero,
@@ -1694,15 +2018,17 @@ const facturesRouter = router({
     .input(z.object({
       factureOrigineId: z.number(),
       lignes: z.array(z.object({
-        designation: z.string(),
-        description: z.string().optional(),
+        designation: z.string().max(500),
+        description: z.string().max(5000).optional(),
         quantite: z.string(),
-        unite: z.string().optional(),
+        unite: z.string().max(20).optional(),
         prixUnitaireHT: z.string(),
         tauxTVA: z.string().default("20.00"),
-      })),
-      objet: z.string().optional(),
-      notes: z.string().optional(),
+      })).max(500, "Trop de lignes (max 500 par avoir)"), // OPE-24 — anti-DoS (boucle d'INSERT)
+      // Bornes alignées sur factures.create/devis.create (champs TEXT) — OPE-24,
+      // defense-in-depth : borne le stockage + 400 clair au lieu d'un débordement.
+      objet: z.string().max(500).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -1856,7 +2182,21 @@ const interventionsRouter = router({
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
     // Utiliser la version sécurisée
-    return await dbSecure.getInterventionsByArtisanIdSecure(artisan.id);
+    const interventions = await dbSecure.getInterventionsByArtisanIdSecure(artisan.id);
+    // OPE-173 — durée réelle sur site (heureDépart − heureArrivée), captée par l'app mobile.
+    // 1 requête batch (pas de N+1) ; null si la pointe terrain est incomplète.
+    const mobiles = await db.getInterventionsMobileByArtisanId(artisan.id);
+    const mobileByIntervention = new Map<number, { heureArrivee: any; heureDepart: any }>();
+    for (const m of mobiles) mobileByIntervention.set(m.interventionId, m);
+    return (interventions as any[]).map((i) => {
+      const m = mobileByIntervention.get(i.id);
+      let dureeReelleMinutes: number | null = null;
+      if (m?.heureArrivee && m?.heureDepart) {
+        const diff = new Date(m.heureDepart).getTime() - new Date(m.heureArrivee).getTime();
+        if (diff > 0) dureeReelleMinutes = Math.round(diff / 60000);
+      }
+      return { ...i, dureeReelleMinutes };
+    });
   }),
   
   getById: protectedProcedure
@@ -1878,12 +2218,14 @@ const interventionsRouter = router({
   create: protectedProcedure
     .input(z.object({
       clientId: z.number(),
-      titre: z.string().min(1),
-      description: z.string().optional(),
+      // Bornes alignées sur les colonnes `interventions` (titre VARCHAR(255)) : évite
+      // un ER_DATA_TOO_LONG (500) sur un titre trop long ; TEXT borné en defense-in-depth.
+      titre: z.string().min(1).max(255),
+      description: z.string().max(5000).optional(),
       dateDebut: z.string(),
       dateFin: z.string().optional(),
-      adresse: z.string().optional(),
-      notes: z.string().optional(),
+      adresse: z.string().max(500).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -1892,13 +2234,27 @@ const interventionsRouter = router({
       if (!client) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
       }
+      // Garde de validité des dates : `new Date("garbage")` -> Invalid Date qui finit dans
+      // `interventions.dateDebut` (timestamp NOT NULL) -> 500 MySQL strict. Rejet propre en 400.
+      // Behavior-preserving : une date valide (sélecteur front) passe à l'identique.
+      const dateDebut = new Date(input.dateDebut);
+      if (isNaN(dateDebut.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de début invalide" });
+      }
+      let dateFin: Date | undefined;
+      if (input.dateFin) {
+        dateFin = new Date(input.dateFin);
+        if (isNaN(dateFin.getTime())) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Date de fin invalide" });
+        }
+      }
       return await db.createIntervention({
         artisanId: artisan.id,
         clientId: input.clientId,
         titre: input.titre,
         description: input.description,
-        dateDebut: new Date(input.dateDebut),
-        dateFin: input.dateFin ? new Date(input.dateFin) : undefined,
+        dateDebut,
+        dateFin,
         adresse: input.adresse,
         notes: input.notes,
         statut: "planifiee",
@@ -1908,12 +2264,12 @@ const interventionsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      titre: z.string().optional(),
-      description: z.string().optional(),
+      titre: z.string().max(255).optional(),
+      description: z.string().max(5000).optional(),
       dateDebut: z.string().optional(),
       dateFin: z.string().optional(),
-      adresse: z.string().optional(),
-      notes: z.string().optional(),
+      adresse: z.string().max(500).optional(),
+      notes: z.string().max(5000).optional(),
       statut: z.enum(["planifiee", "en_cours", "terminee", "annulee"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1951,7 +2307,7 @@ const interventionsRouter = router({
     }),
   
   getUpcoming: protectedProcedure
-    .input(z.object({ limit: z.number().default(5) }).optional())
+    .input(z.object({ limit: z.number().max(100).default(5) }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -2014,9 +2370,84 @@ const interventionsRouter = router({
       if (!tech || tech.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Technicien non autorise" });
       }
-      return await db.updateIntervention(input.interventionId, {
+      // OPE-110 — détection NON bloquante des conflits (double-booking + congés approuvés)
+      // sur la fenêtre de l'intervention. L'affectation reste effectuée ; les conflits
+      // éventuels sont renvoyés au front pour avertissement (comportement préservé).
+      const updated = await db.updateIntervention(input.interventionId, {
         technicienId: input.technicienId
       });
+      let conflits: { interventions: any[]; conges: any[] } = { interventions: [], conges: [] };
+      try {
+        const debut = intervention.dateDebut ? new Date(intervention.dateDebut) : null;
+        if (debut && !isNaN(debut.getTime())) {
+          const fin = intervention.dateFin ? new Date(intervention.dateFin) : debut;
+          conflits = await db.getConflitsTechnicien(
+            artisan.id, input.technicienId, debut,
+            isNaN(fin.getTime()) ? debut : fin,
+            input.interventionId,
+          );
+        }
+      } catch (e: any) {
+        console.warn("[assignerTechnicien] détection conflits:", e?.message);
+      }
+      return { ...updated, conflits };
+    }),
+
+  // OPE-111 — Équipe d'intervention (plusieurs intervenants). Le « responsable »
+  // reste interventions.technicienId ; ces endpoints gèrent le reste de l'équipe.
+  getEquipe: protectedProcedure
+    .input(z.object({ interventionId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      return await db.getEquipeIntervention(input.interventionId, artisan.id);
+    }),
+
+  // OPE-111 — toutes les équipes de l'artisan en 1 requête (affichage liste/planning).
+  getEquipesByArtisan: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getEquipesByArtisan(artisan.id);
+  }),
+
+  ajouterMembreEquipe: protectedProcedure
+    .input(z.object({
+      interventionId: z.number(),
+      technicienId: z.number(),
+      role: z.string().max(50).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const intervention = await db.getInterventionById(input.interventionId);
+      if (!intervention || intervention.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      // SECURITE : le technicien doit appartenir à cet artisan (multi-tenant).
+      const tech = await db.getTechnicienById(input.technicienId);
+      if (!tech || tech.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Technicien non autorisé" });
+      }
+      return await db.addMembreEquipe({
+        artisanId: artisan.id,
+        interventionId: input.interventionId,
+        technicienId: input.technicienId,
+        role: input.role,
+      });
+    }),
+
+  retirerMembreEquipe: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      // removeMembreEquipe est scopé par artisanId → pas de retrait cross-tenant.
+      await db.removeMembreEquipe(input.id, artisan.id);
+      return { success: true };
     }),
 
   // Gestion des couleurs personnalisées du calendrier
@@ -2029,7 +2460,10 @@ const interventionsRouter = router({
   setCouleurIntervention: protectedProcedure
     .input(z.object({
       interventionId: z.number(),
-      couleur: z.string(),
+      // Borne alignée sur couleurs_interventions.couleur VARCHAR(20). La valeur est
+      // une classe Tailwind (« bg-blue-500 »), pas un hex → pas de regex #RRGGBB ici
+      // (casserait l'entrée légitime) ; un simple .max() évite l'ER_DATA_TOO_LONG.
+      couleur: z.string().max(20),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -2053,7 +2487,11 @@ const interventionsRouter = router({
 
   setCouleursMultiples: protectedProcedure
     .input(z.object({
-      couleurs: z.record(z.string(), z.string()),
+      // Bornes alignées sur le endpoint unitaire `setCouleurIntervention` et la colonne
+      // `couleurs_interventions.couleur` VARCHAR(20) : valeur = classe Tailwind (« bg-blue-500 »),
+      // bornée à 20 (sinon ER_DATA_TOO_LONG -> 500). Clés = interventionId numériques (sinon
+      // `parseInt` -> NaN inséré). Comportement inchangé pour les entrées légitimes.
+      couleurs: z.record(z.string().regex(/^\d+$/), z.string().max(20)),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -2077,20 +2515,22 @@ const notificationsRouter = router({
     .input(z.object({
       includeArchived: z.boolean().default(false),
       nonLuesUniquement: z.boolean().default(false),
-      page: z.number().min(1).default(1),
+      // OPE-24 — borne page : offset = (page-1)*limit poussé en SQL ; un page géant
+      // = OFFSET énorme (scan coûteux). Cap defense-in-depth (offset max ~5M lignes).
+      page: z.number().min(1).max(100000).default(1),
       limit: z.number().min(1).max(100).default(50),
     }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
-      const all = await db.getNotificationsByArtisanId(artisan.id, input?.includeArchived || false);
-      let filtered = all;
-      if (input?.nonLuesUniquement) {
-        filtered = all.filter((n: any) => !n.lu);
-      }
       const page = input?.page || 1;
       const limit = input?.limit || 50;
-      return filtered.slice((page - 1) * limit, page * limit);
+      // Filtre (nonLues) + pagination poussés en SQL (cf. getNotificationsByArtisanId).
+      return await db.getNotificationsByArtisanId(artisan.id, input?.includeArchived || false, {
+        nonLuesUniquement: input?.nonLuesUniquement || false,
+        limit,
+        offset: (page - 1) * limit,
+      });
     }),
   
   getUnreadCount: protectedProcedure.query(async ({ ctx }) => {
@@ -2317,7 +2757,7 @@ const dashboardRouter = router({
   }),
 
   getRecentActivity: protectedProcedure
-    .input(z.object({ limit: z.number().optional() }).optional())
+    .input(z.object({ limit: z.number().max(500).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -2386,7 +2826,7 @@ const dashboardRouter = router({
   }),
   
   getTopClients: protectedProcedure
-    .input(z.object({ limit: z.number().optional() }).optional())
+    .input(z.object({ limit: z.number().max(500).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -2530,13 +2970,15 @@ const signatureRouter = router({
       const client = await db.getClientById(devisData.clientId);
       if (client?.email) {
         const { sendEmail } = await import('./_core/emailService');
-        const signatureUrl = `https://www.operioz.com/devis-public/${token}`;
+        const signatureUrl = `${process.env.APP_URL || 'https://www.operioz.com'}/devis-public/${token}`;
         const artisanName = artisan.nomEntreprise || 'Votre artisan';
         const clientName = `${client.prenom || ''} ${client.nom || ''}`.trim() || 'Client';
         const totalTTC = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(parseFloat(devisData.totalTTC as any) || 0);
 
         await sendEmail({
           to: client.email,
+          fromName: artisan.nomEntreprise || undefined, // OPE-157
+          replyTo: artisan.email || undefined,
           subject: `Devis ${devisData.numero} à signer - ${artisanName}`,
           body: `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"></head>
@@ -2545,11 +2987,11 @@ const signatureRouter = router({
 <tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 <tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-<h1 style="margin:0;color:#ffffff;font-size:22px;">${artisanName}</h1>
+<h1 style="margin:0;color:#ffffff;font-size:22px;">${safeHtml(artisanName)}</h1>
 </td></tr>
 <tr><td style="padding:36px 40px 16px 40px;">
-<p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;">Bonjour ${clientName},</p>
-<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Vous avez reçu le devis <strong>${devisData.numero}</strong>${devisData.objet ? ` pour <em>${devisData.objet}</em>` : ''} d'un montant de <strong>${totalTTC}</strong>.</p>
+<p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;">Bonjour ${safeHtml(clientName)},</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Vous avez reçu le devis <strong>${devisData.numero}</strong>${devisData.objet ? ` pour <em>${safeHtml(devisData.objet)}</em>` : ''} d'un montant de <strong>${totalTTC}</strong>.</p>
 <p style="margin:0 0 24px 0;font-size:15px;color:#374151;">Cliquez sur le bouton ci-dessous pour consulter le devis et le signer électroniquement :</p>
 </td></tr>
 <tr><td style="padding:0 40px 28px 40px;text-align:center;">
@@ -2607,19 +3049,62 @@ const signatureRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
       }
 
+      // OPE-152 — read-receipt : 1ʳᵉ consultation client du devis. Idempotent (no-op
+      // si déjà vu) et best-effort (n'altère jamais la réponse en cas d'échec).
+      if (!devisData.dateVue) {
+        try { await db.markDevisVu(devisData.id); } catch { /* best-effort */ }
+      }
+
       const artisan = await db.getArtisanById(devisData.artisanId);
       const client = await db.getClientById(devisData.clientId);
       const lignes = await db.getLignesDevisByDevisId(devisData.id);
+
+      // OPE-146 — options/variantes du devis (Standard/Premium…) que le client peut
+      // CHOISIR avant signature. Chargées avec leurs lignes pour l'affichage portail.
+      const optionsRaw = await db.getDevisOptionsByDevisId(devisData.id);
+      const options = await Promise.all(optionsRaw.map(async (o) => ({
+        ...o,
+        lignes: await db.getDevisOptionLignesByOptionId(o.id),
+      })));
 
       return {
         devis: devisData,
         artisan,
         client,
         lignes,
+        options,
         signature
       };
     }),
-  
+
+  // OPE-146 — le client sélectionne une option/variante du devis depuis le lien de
+  // signature, AVANT de signer. Scopé au devis de la signature + throttlé.
+  selectDevisOption: publicProcedure
+    .input(z.object({ token: z.string(), optionId: z.number() }))
+    .mutation(async ({ input }) => {
+      const signature = await db.getSignatureByToken(input.token);
+      if (!signature) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
+      }
+      if (signature.signedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été signé" });
+      }
+      if (new Date() > signature.expiresAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Ce lien a expiré" });
+      }
+      // L'option doit appartenir AU devis de cette signature (pas une option d'un autre devis).
+      const option = await db.getDevisOptionById(input.optionId);
+      if (!option || option.devisId !== signature.devisId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Option non trouvée" });
+      }
+      // Anti-flood (le porteur du lien pourrait basculer en boucle).
+      if (!checkPortalActionRate(`sig:${signature.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de requêtes. Réessayez dans quelques minutes." });
+      }
+      await db.selectDevisOption(input.optionId);
+      return { success: true, optionId: input.optionId };
+    }),
+
   // Demander l'envoi d'un code SMS pour validation
   requestSmsCode: publicProcedure
     .input(z.object({
@@ -2644,9 +3129,14 @@ const signatureRouter = router({
       if (!isValidPhoneNumber(input.telephone)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Numéro de téléphone invalide" });
       }
-      
-      // Générer un code à 6 chiffres
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // OPE-23 — throttle anti SMS-bombing (5 envois / 15 min par signature+téléphone).
+      if (!checkSmsSendRate(`${signature.id}:${input.telephone}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes de code. Réessayez dans quelques minutes." });
+      }
+
+      // Générer un code à 6 chiffres (OPE-18 — RNG crypto-sûr, non prévisible)
+      const code = randomInt(100000, 1000000).toString();
       
       // Expiration dans 10 minutes
       const expiresAt = new Date();
@@ -2693,7 +3183,12 @@ const signatureRouter = router({
       if (!signature) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Lien de signature invalide" });
       }
-      
+
+      // OPE-22 — throttle anti brute-force OTP (10 tentatives / 15 min par signature).
+      if (!checkSmsVerifyRate(String(signature.id))) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de tentatives. Réessayez dans quelques minutes." });
+      }
+
       const isValid = await db.verifySmsCode(signature.id, input.code);
       
       if (!isValid) {
@@ -2724,9 +3219,9 @@ const signatureRouter = router({
   signDevis: publicProcedure
     .input(z.object({
       token: z.string(),
-      signatureData: z.string(),
-      signataireName: z.string(),
-      signataireEmail: z.string().email(),
+      signatureData: z.string().max(500000), // image base64 d'une signature manuscrite (~500 Ko)
+      signataireName: z.string().max(200),
+      signataireEmail: z.string().email().max(320),
       smsVerified: z.boolean().optional()
     }))
     .mutation(async ({ input, ctx }) => {
@@ -2742,7 +3237,14 @@ const signatureRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Ce lien de signature a expiré" });
       }
 
-      const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
+      // OPE-80 — IP de signature à valeur probante : prioriser CF-Connecting-IP (posé par
+      // Cloudflare, non falsifiable) plutôt que X-Forwarded-For[0] (que le signataire peut
+      // usurper). On ne garde qu'UNE IP (pas toute la chaîne XFF) — sinon dépassement de
+      // signaturesDevis.ipAddress VARCHAR(45) -> ER_DATA_TOO_LONG (500) à la signature.
+      const ipAddress = (ctx.req.headers['cf-connecting-ip'] as string)?.trim()
+        || (ctx.req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+        || ctx.req.socket?.remoteAddress
+        || 'unknown';
       const userAgent = ctx.req.headers['user-agent'] || 'unknown';
 
       const signature = await db.signDevis(
@@ -2777,7 +3279,7 @@ const signatureRouter = router({
           await sendEmail({
             to: artisanEmail,
             subject: `Devis ${devisData.numero} accepté et signé`,
-            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${input.signataireName}</strong> (${input.signataireEmail}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${safeHtml(input.signataireName)}</strong> (${safeHtml(input.signataireEmail)}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
           });
         } else {
           console.warn(`[Signature] No email found for artisan id=${devisData.artisanId} — notification email NOT sent`);
@@ -2790,7 +3292,7 @@ const signatureRouter = router({
   refuseDevis: publicProcedure
     .input(z.object({
       token: z.string(),
-      motifRefus: z.string().optional(),
+      motifRefus: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       // Validate token exists first
@@ -2802,7 +3304,14 @@ const signatureRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Ce devis a déjà été traité" });
       }
 
-      const ipAddress = ctx.req.headers['x-forwarded-for'] as string || ctx.req.socket?.remoteAddress || 'unknown';
+      // OPE-80 — IP de signature à valeur probante : prioriser CF-Connecting-IP (posé par
+      // Cloudflare, non falsifiable) plutôt que X-Forwarded-For[0] (que le signataire peut
+      // usurper). On ne garde qu'UNE IP (pas toute la chaîne XFF) — sinon dépassement de
+      // signaturesDevis.ipAddress VARCHAR(45) -> ER_DATA_TOO_LONG (500) à la signature.
+      const ipAddress = (ctx.req.headers['cf-connecting-ip'] as string)?.trim()
+        || (ctx.req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+        || ctx.req.socket?.remoteAddress
+        || 'unknown';
       const userAgent = ctx.req.headers['user-agent'] || 'unknown';
 
       const signature = await db.refuserDevis(
@@ -2835,7 +3344,7 @@ const signatureRouter = router({
           await sendEmail({
             to: artisanEmail,
             subject: `Devis ${devisData.numero} refusé par ${clientName}`,
-            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${clientName}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${input.motifRefus}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
+            body: `<p>Bonjour,</p><p>Le devis <strong>${devisData.numero}</strong> a été <strong style="color:red">refusé</strong> par ${safeHtml(clientName)}.</p>${input.motifRefus ? `<p><strong>Motif :</strong> ${safeHtml(input.motifRefus)}</p>` : ''}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`
           });
         }
       }
@@ -2854,7 +3363,35 @@ const stocksRouter = router({
     // Utiliser la version sécurisée
     return await dbSecure.getStocksByArtisanIdSecure(artisan.id);
   }),
-  
+
+  // OPE-133 — articles dont le stock est sous le seuil d'alerte (lecture seule, scopé tenant).
+  // Volet « visibilité » : surface le réappro nécessaire (le widget dashboard l'affiche) ;
+  // la génération de commande fournisseur (cœur d'OPE-133) reste à faire. Active
+  // `getLowStockItems` (jusqu'ici sans endpoint). Manque calculé = seuilAlerte − quantité.
+  getLowStock: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const items = await db.getLowStockItems(artisan.id);
+    return items.map((s: any) => {
+      const qte = parseFloat(s.quantiteEnStock || "0");
+      const seuil = parseFloat(s.seuilAlerte || "0");
+      return {
+        ...s,
+        manque: Math.max(0, +(seuil - qte).toFixed(2)),
+        enRupture: qte <= 0,
+      };
+    });
+  }),
+
+  // OPE-105 — quantité entrante (commandes fournisseurs en cours, par fiche stock) →
+  // permet d'afficher le « stock prévisionnel » = physique + entrant. Lecture seule,
+  // scopée tenant. N'altère PAS l'alerte de seuil (reste sur le stock physique).
+  getEntrant: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getStockEntrantByArtisan(artisan.id);
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -2868,14 +3405,17 @@ const stocksRouter = router({
   
   create: protectedProcedure
     .input(z.object({
-      reference: z.string(),
-      designation: z.string(),
-      quantiteEnStock: z.string().optional(),
-      seuilAlerte: z.string().optional(),
-      unite: z.string().optional(),
-      prixAchat: z.string().optional(),
-      emplacement: z.string().optional(),
-      fournisseur: z.string().optional(),
+      // Bornes alignées sur les colonnes VARCHAR de `stocks` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      // Behavior-preserving : une référence/désignation réelle reste sous ces bornes.
+      reference: z.string().max(50),
+      designation: z.string().max(500),
+      quantiteEnStock: z.string().max(20).optional(),
+      seuilAlerte: z.string().max(20).optional(),
+      unite: z.string().max(20).optional(),
+      prixAchat: z.string().max(20).optional(),
+      emplacement: z.string().max(100).optional(),
+      fournisseur: z.string().max(255).optional(),
       articleId: z.number().optional(),
       articleType: z.enum(["bibliotheque", "artisan"]).optional()
     }))
@@ -2890,13 +3430,13 @@ const stocksRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      reference: z.string().optional(),
-      designation: z.string().optional(),
-      seuilAlerte: z.string().optional(),
-      unite: z.string().optional(),
-      prixAchat: z.string().optional(),
-      emplacement: z.string().optional(),
-      fournisseur: z.string().optional()
+      reference: z.string().max(50).optional(),
+      designation: z.string().max(500).optional(),
+      seuilAlerte: z.string().max(20).optional(),
+      unite: z.string().max(20).optional(),
+      prixAchat: z.string().max(20).optional(),
+      emplacement: z.string().max(100).optional(),
+      fournisseur: z.string().max(255).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -2929,10 +3469,14 @@ const stocksRouter = router({
   adjustQuantity: protectedProcedure
     .input(z.object({
       stockId: z.number(),
-      quantite: z.number(),
+      // Quantité du mouvement bornée >= 0 (le front pose déjà min=0, mais l'API ne
+      // l'enforçait pas) : sans cette borne, une quantité NÉGATIVE passée à une `sortie`
+      // INVERSE l'opération (`currentQty - (-5)` = +5) et fausse le stock. Borne haute
+      // raisonnable contre les saisies aberrantes. Behavior-preserving (mouvements légitimes >= 0).
+      quantite: z.number().min(0).max(100_000_000),
       type: z.enum(["entree", "sortie", "ajustement"]),
-      motif: z.string().optional(),
-      reference: z.string().optional()
+      motif: z.string().max(255).optional(),
+      reference: z.string().max(100).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -3012,21 +3556,30 @@ const parametresRouter = router({
   
   update: protectedProcedure
     .input(z.object({
-      prefixeDevis: z.string().optional(),
-      prefixeFacture: z.string().optional(),
-      mentionsLegales: z.string().optional(),
-      conditionsGenerales: z.string().optional(),
+      // Bornes alignées sur les colonnes `prefixeDevis`/`prefixeFacture` = VARCHAR(10)
+      // (OPE-24) : sans .max, un préfixe > 10 car. -> ER_DATA_TOO_LONG (500) à
+      // l'enregistrement des paramètres, et risque d'overflow du `numero` VARCHAR(50)
+      // (préfixe concaténé). Behavior-preserving : « DEV »/« FAC » (≤ 3 car.) passent.
+      prefixeDevis: z.string().max(10).optional(),
+      prefixeFacture: z.string().max(10).optional(),
+      // Bornes raisonnables (OPE-24) : vitrineZone est VARCHAR(500) -> .max(500) évite un
+      // ER_DATA_TOO_LONG (500) ; les champs TEXT sont bornés en defense-in-depth.
+      mentionsLegales: z.string().max(5000).optional(),
+      conditionsGenerales: z.string().max(10000).optional(),
       notificationsEmail: z.boolean().optional(),
       rappelDevisJours: z.number().optional(),
       rappelFactureJours: z.number().optional(),
       vitrineActive: z.boolean().optional(),
-      vitrineDescription: z.string().optional(),
-      vitrineZone: z.string().optional(),
-      vitrineServices: z.string().optional(),
+      vitrineDescription: z.string().max(5000).optional(),
+      vitrineZone: z.string().max(500).optional(),
+      vitrineServices: z.string().max(5000).optional(),
       vitrineExperience: z.number().optional(),
-      couleurPrincipale: z.string().optional(),
-      couleurSecondaire: z.string().optional(),
-      conditionsPaiementDefaut: z.string().optional(),
+      couleurPrincipale: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      couleurSecondaire: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      conditionsPaiementDefaut: z.string().max(2000).optional(),
+      // OPE-94 — délai de paiement structuré (calcul d'échéance des factures).
+      delaiPaiementJours: z.number().int().min(0).max(365).nullable().optional(),
+      delaiPaiementType: z.enum(["net", "fin_de_mois"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -3066,14 +3619,16 @@ const fournisseursRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      nom: z.string(),
-      contact: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes alignées sur les colonnes de `fournisseurs` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      nom: z.string().max(255),
+      contact: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      adresse: z.string().max(500).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -3086,14 +3641,14 @@ const fournisseursRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      contact: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
-      notes: z.string().optional(),
+      nom: z.string().max(255).optional(),
+      contact: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      adresse: z.string().max(500).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -3125,15 +3680,29 @@ const fournisseursRouter = router({
     }),
 
   // Article-Fournisseur associations
+  // SECURITE (OPE-90) : les associations sont des données tenant-privées (prix d'achat,
+  // références fournisseur). L'ownership se dérive via fournisseurs.artisanId. Sans
+  // contrôle, ces routes étaient des IDOR (lecture prix + write/delete cross-tenant).
   getArticleFournisseurs: protectedProcedure
     .input(z.object({ articleId: z.number() }))
-    .query(async ({ input }) => {
-      return await db.getArticleFournisseurs(input.articleId);
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      // Filtrer aux associations dont le fournisseur appartient à l'artisan.
+      const assocs = await db.getArticleFournisseurs(input.articleId);
+      if (assocs.length === 0) return assocs;
+      const mesFournisseurs = await db.getFournisseursByArtisanId(artisan.id);
+      const mesIds = new Set(mesFournisseurs.map((f) => f.id));
+      return assocs.filter((a) => mesIds.has(a.fournisseurId));
     }),
 
   getFournisseurArticles: protectedProcedure
     .input(z.object({ fournisseurId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      const fournisseur = await db.getFournisseurById(input.fournisseurId);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) return [];
       return await db.getFournisseurArticles(input.fournisseurId);
     }),
 
@@ -3145,13 +3714,29 @@ const fournisseursRouter = router({
       prixAchat: z.string().optional(),
       delaiLivraison: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      // Le fournisseur cible doit appartenir à l'artisan appelant.
+      const fournisseur = await db.getFournisseurById(input.fournisseurId);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur non trouvé" });
+      }
       return await db.createArticleFournisseur(input);
     }),
 
   dissociateArticle: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      // Vérifier que l'association cible un fournisseur de l'artisan avant suppression.
+      const assoc = await db.getArticleFournisseurById(input.id);
+      if (!assoc) throw new TRPCError({ code: "NOT_FOUND", message: "Association non trouvée" });
+      const fournisseur = await db.getFournisseurById(assoc.fournisseurId);
+      if (!fournisseur || fournisseur.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Association non trouvée" });
+      }
       await db.deleteArticleFournisseur(input.id);
       return { success: true };
     })});
@@ -3207,11 +3792,13 @@ const modelesEmailRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      nom: z.string(),
+      // Bornes alignées sur `modeles_email` (nom VARCHAR(100), sujet VARCHAR(255)) ;
+      // contenu/variables TEXT bornés en defense-in-depth (OPE-24).
+      nom: z.string().max(100),
       type: z.enum(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]),
-      sujet: z.string(),
-      contenu: z.string(),
-      variables: z.string().optional(),
+      sujet: z.string().max(255),
+      contenu: z.string().max(10000),
+      variables: z.string().max(2000).optional(),
       isDefault: z.boolean().optional()
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3225,11 +3812,11 @@ const modelesEmailRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
+      nom: z.string().max(100).optional(),
       type: z.enum(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]).optional(),
-      sujet: z.string().optional(),
-      contenu: z.string().optional(),
-      variables: z.string().optional(),
+      sujet: z.string().max(255).optional(),
+      contenu: z.string().max(10000).optional(),
+      variables: z.string().max(2000).optional(),
       isDefault: z.boolean().optional()
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3268,8 +3855,15 @@ const modelesEmailRouter = router({
     }))
     .query(({ input }) => {
       let preview = input.contenu;
+      // Échappe les métacaractères regex de la clé (nom de variable, contrôlé par
+      // l'utilisateur) avant de l'injecter dans `new RegExp` : sans cela une clé
+      // malformée (parenthèses déséquilibrées) fait throw -> 500, et une clé piégée
+      // (ex. « (a+)+ ») peut provoquer un ReDoS (backtracking catastrophique).
+      // Behavior-preserving : un nom de variable normal (« nom », « date ») ne contient
+      // aucun métacaractère, l'échappement est alors un no-op.
+      const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       for (const [key, value] of Object.entries(input.variables)) {
-        preview = preview.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+        preview = preview.replace(new RegExp(`\\{\\{${escapeRegex(key)}\\}\\}`, 'g'), value);
       }
       return preview;
     }),
@@ -3376,18 +3970,14 @@ Reponds UNIQUEMENT en JSON pur :
 {"lignes":[{"designation":"texte","reference":"","quantite":1,"unite":"u|m|m2|kg|ml","prixUnitaire":0,"tauxTVA":20}],"notes":"remarques optionnelles"}`;
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2500,
-          temperature: 0.3,
-          system: contexteMetier,
-          messages: [{ role: "user", content: userPrompt }],
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.3, maxOutputTokens: 2500 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) return { lignes: [], notes: "" };
         const data = JSON.parse(jsonMatch[0]);
@@ -3443,6 +4033,30 @@ Reponds UNIQUEMENT en JSON pur :
     }));
   }),
 
+  // OPE-150 — alerte (lecture seule) des commandes en retard de livraison.
+  // Réutilise la donnée existante (dateLivraisonPrevue/Reelle + statut) ; enrichit
+  // avec le nom du fournisseur et le nombre de jours de retard. Aucune écriture,
+  // aucun scheduler/notification automatique (volet « indicateur » de l'alerte).
+  getEnRetard: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const commandes = await db.getCommandesFournisseursEnRetard(artisan.id);
+    const fournisseurIds = [...new Set(commandes.map(c => c.fournisseurId))];
+    const fournisseursMap = new Map<number, string>();
+    for (const fid of fournisseurIds) {
+      const f = await db.getFournisseurById(fid);
+      if (f) fournisseursMap.set(fid, f.nom);
+    }
+    const now = Date.now();
+    return commandes.map(c => ({
+      ...c,
+      fournisseurNom: fournisseursMap.get(c.fournisseurId) || 'Inconnu',
+      joursRetard: c.dateLivraisonPrevue
+        ? Math.max(0, Math.floor((now - new Date(c.dateLivraisonPrevue).getTime()) / 86_400_000))
+        : 0,
+    }));
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -3455,31 +4069,42 @@ Reponds UNIQUEMENT en JSON pur :
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
       const lignes = await db.getLignesCommandeFournisseur(commande.id);
-      const fournisseur = await db.getFournisseurById(commande.fournisseurId);
+      // OPE-47 (défense en profondeur) — ne pas exposer un fournisseur d'un autre tenant si
+      // la commande pointait (données héritées) un fournisseurId étranger.
+      const fournisseurRow = await db.getFournisseurById(commande.fournisseurId);
+      const fournisseur = fournisseurRow && fournisseurRow.artisanId === artisan.id ? fournisseurRow : null;
       return { ...commande, lignes, fournisseur };
     }),
 
   create: protectedProcedure
     .input(z.object({
       fournisseurId: z.number(),
-      reference: z.string().optional(),
+      reference: z.string().max(50).optional(),
       dateLivraisonPrevue: z.string().optional(),
-      delaiLivraison: z.string().optional(),
+      delaiLivraison: z.string().max(100).optional(),
       adresseLivraison: z.string().optional(),
       notes: z.string().optional(),
       lignes: z.array(z.object({
         articleId: z.number().nullable().optional(),
         stockId: z.number().optional(),
-        designation: z.string(),
-        reference: z.string().optional(),
+        designation: z.string().max(255),
+        reference: z.string().max(50).optional(),
         quantite: z.number(),
-        unite: z.string().optional(),
+        unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
-        tauxTVA: z.number().optional(),
-      }))
+        tauxTVA: z.number().min(0).max(100).optional(),
+      })).max(500, "Trop de lignes (max 500 par commande)") // OPE-24 — anti-DoS (boucle d'INSERT)
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+
+      // OPE-47 (classe IDOR-FK) — valider que le fournisseur appartient au tenant avant de
+      // créer une commande qui le référence. Sinon une commande pointant un fournisseurId
+      // étranger fuite, à la relecture (getById), les données complètes du fournisseur d'autrui.
+      const fournisseurOwner = await db.getFournisseurById(input.fournisseurId);
+      if (!fournisseurOwner || fournisseurOwner.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Fournisseur introuvable" });
+      }
 
       // Generate numero CMD-XXXXX
       const numero = await db.getNextCommandeNumero(artisan.id);
@@ -3535,21 +4160,21 @@ Reponds UNIQUEMENT en JSON pur :
     .input(z.object({
       id: z.number(),
       fournisseurId: z.number().optional(),
-      reference: z.string().optional(),
+      reference: z.string().max(50).optional(),
       dateLivraisonPrevue: z.string().nullable().optional(),
-      delaiLivraison: z.string().nullable().optional(),
+      delaiLivraison: z.string().max(100).nullable().optional(),
       adresseLivraison: z.string().nullable().optional(),
       notes: z.string().nullable().optional(),
       lignes: z.array(z.object({
         articleId: z.number().nullable().optional(),
         stockId: z.number().optional(),
-        designation: z.string(),
-        reference: z.string().optional(),
+        designation: z.string().max(255),
+        reference: z.string().max(50).optional(),
         quantite: z.number(),
-        unite: z.string().optional(),
+        unite: z.string().max(20).optional(),
         prixUnitaire: z.number().optional(),
-        tauxTVA: z.number().optional(),
-      })).optional(),
+        tauxTVA: z.number().min(0).max(100).optional(),
+      })).max(500, "Trop de lignes (max 500 par commande)").optional(), // OPE-24 — anti-DoS
     }))
     .mutation(async ({ ctx, input }) => {
       const commande = await db.getCommandeFournisseurById(input.id);
@@ -3611,7 +4236,7 @@ Reponds UNIQUEMENT en JSON pur :
   updateStatut: protectedProcedure
     .input(z.object({
       id: z.number(),
-      statut: z.enum(["brouillon", "envoyee", "confirmee", "livree", "annulee"]),
+      statut: z.enum(["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]),
       dateLivraisonReelle: z.string().optional()
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3630,6 +4255,127 @@ Reponds UNIQUEMENT en JSON pur :
       }
 
       return await db.updateCommandeFournisseur(input.id, updateData);
+    }),
+
+  // OPE-101 — suivi de facturation : marque une commande comme « facturée » (facture
+  // fournisseur reçue/saisie) ou la repasse « à facturer ». Lien optionnel vers la dépense.
+  setStatutFacturation: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      statutFacturation: z.enum(["a_facturer", "facturee"]),
+      depenseId: z.number().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      const updateData: any = { statutFacturation: input.statutFacturation };
+      // Si on fournit un depenseId, on vérifie qu'elle appartient au tenant avant de lier.
+      if (input.depenseId != null) {
+        const dep = await db.getDepenseById(input.depenseId, artisan.id);
+        updateData.depenseId = dep ? input.depenseId : null;
+      } else if (input.statutFacturation === "a_facturer") {
+        updateData.depenseId = null; // on délie en repassant à facturer
+      }
+      return await db.updateCommandeFournisseur(input.id, updateData);
+    }),
+
+  // OPE-100 — réception partielle : enregistre la quantité reçue par ligne et DÉRIVE le
+  // statut de la commande (confirmee / partiellement_livree / livree). Additif : une
+  // commande non réceptionnée garde quantiteRecue=0 et son statut inchangé.
+  recevoir: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      lignes: z.array(z.object({
+        ligneId: z.number(),
+        quantiteRecue: z.number().min(0).max(1_000_000),
+      })).max(500),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const commande = await db.getCommandeFournisseurById(input.id);
+      if (!commande) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Commande non trouvée" });
+      }
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan || commande.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
+      }
+      // Met à jour la quantité reçue des lignes appartenant À CETTE commande (les autres
+      // ligneId sont ignorées → pas d'écriture cross-commande).
+      const lignesCommande = await db.getLignesCommandeFournisseur(input.id);
+      const idsCommande = new Set(lignesCommande.map((l: any) => l.id));
+      // OPE-166 — quantité reçue AVANT cette opération (pour entrer en stock le DELTA).
+      const avantById = new Map<number, { recue: number; stockId: number | null }>(
+        lignesCommande.map((l: any) => [l.id, {
+          recue: parseFloat(String(l.quantiteRecue ?? "0")) || 0,
+          stockId: l.stockId ?? null,
+        }]),
+      );
+      // OPE-166 (durcissement) — dédoublonne les lignes par ligneId (dernière valeur retenue) :
+      // un ligneId envoyé en double ne doit pas appliquer DEUX fois l'entrée de stock pour la
+      // même variation. Chaque ligne n'est donc traitée qu'une seule fois.
+      const recueParLigne = new Map<number, number>();
+      for (const r of input.lignes) {
+        if (idsCommande.has(r.ligneId)) recueParLigne.set(r.ligneId, r.quantiteRecue);
+      }
+      for (const [ligneId, quantiteRecue] of recueParLigne) {
+        await db.updateLigneCommandeRecue(ligneId, input.id, quantiteRecue);
+        // OPE-166 — entrée en stock automatique du DELTA reçu pour les lignes liées à un
+        // article suivi en stock. On n'injecte que la VARIATION (réceptions partielles/
+        // incrémentales gérées : pas de double-comptage du cumul). Best-effort (un échec
+        // stock ne casse pas la réception) + vérif d'appartenance (adjustStock non scopé).
+        const avant = avantById.get(ligneId);
+        if (avant?.stockId) {
+          const delta = quantiteRecue - avant.recue;
+          if (Math.abs(delta) > 1e-9) {
+            try {
+              const stock = await db.getStockById(avant.stockId);
+              if (stock && (stock as any).artisanId === artisan.id) {
+                await db.adjustStock(
+                  avant.stockId,
+                  Math.abs(delta),
+                  delta > 0 ? "entree" : "sortie",
+                  `Réception commande ${commande.numero || commande.id}`,
+                  String(commande.numero || commande.id),
+                );
+              }
+            } catch (e: any) {
+              console.warn("[recevoir] adjustStock:", e?.message || e);
+            }
+          }
+        }
+      }
+      // Recalcule le statut depuis les quantités reçues (source de vérité = lignes).
+      const apres = await db.getLignesCommandeFournisseur(input.id);
+      let totalCommande = 0;
+      let totalRecu = 0;
+      let toutRecu = true;
+      for (const l of apres) {
+        const cmd = parseFloat(String(l.quantite)) || 0;
+        const recu = parseFloat(String((l as any).quantiteRecue)) || 0;
+        totalCommande += cmd;
+        totalRecu += recu;
+        if (recu < cmd) toutRecu = false;
+      }
+      const updateData: any = {};
+      // On ne sort pas d'un état terminal (annulee) ni du brouillon via la réception.
+      if (commande.statut !== "annulee" && commande.statut !== "brouillon") {
+        if (totalCommande > 0 && toutRecu) updateData.statut = "livree";
+        else if (totalRecu > 0) updateData.statut = "partiellement_livree";
+        else updateData.statut = "confirmee";
+      }
+      if (totalRecu > 0 && !commande.dateLivraisonReelle) {
+        updateData.dateLivraisonReelle = new Date();
+      }
+      if (Object.keys(updateData).length > 0) {
+        await db.updateCommandeFournisseur(input.id, updateData);
+      }
+      return { success: true, statut: updateData.statut || commande.statut };
     }),
 
   delete: protectedProcedure
@@ -3658,6 +4404,11 @@ Reponds UNIQUEMENT en JSON pur :
       if (!artisan || commande.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // OPE-24 — anti-abus : borne l'envoi du bon de commande (PDF + email Resend) par
+      // artisan ; sans ça un compte authentifié pourrait spammer le fournisseur.
+      if (!checkDocumentEmailRate(`bc:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois de bons de commande. Réessayez dans quelques minutes." });
+      }
       const fournisseur = await db.getFournisseurById(commande.fournisseurId);
       if (!fournisseur?.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le fournisseur n'a pas d'adresse email" });
@@ -3682,11 +4433,11 @@ Reponds UNIQUEMENT en JSON pur :
         to: fournisseur.email,
         subject: `Bon de commande ${commande.numero || ''} - ${artisan.nomEntreprise || 'Artisan'}`,
         html: `
-          <p>Bonjour ${fournisseur.contact || fournisseur.nom},</p>
-          <p>Veuillez trouver ci-joint notre bon de commande <strong>${commande.numero || ''}</strong>.</p>
-          ${commande.delaiLivraison ? `<p>Délai de livraison souhaité : ${commande.delaiLivraison}</p>` : ''}
-          ${commande.notes ? `<p>Notes : ${commande.notes}</p>` : ''}
-          <p>Cordialement,<br/>${artisan.nomEntreprise || 'Artisan'}</p>
+          <p>Bonjour ${safeHtml(fournisseur.contact || fournisseur.nom)},</p>
+          <p>Veuillez trouver ci-joint notre bon de commande <strong>${safeHtml(commande.numero || '')}</strong>.</p>
+          ${commande.delaiLivraison ? `<p>Délai de livraison souhaité : ${safeHtml(commande.delaiLivraison)}</p>` : ''}
+          ${commande.notes ? `<p>Notes : ${safeHtml(commande.notes)}</p>` : ''}
+          <p>Cordialement,<br/>${safeHtml(artisan.nomEntreprise || 'Artisan')}</p>
         `,
         attachments: [{
           filename: `bon-commande-${commande.numero || commande.id}.pdf`,
@@ -3728,7 +4479,13 @@ const clientPortalRouter = router({
       if (!client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'adresse email" });
       }
-      
+      // OPE-24 — anti-abus : borne l'envoi de l'email d'accès portail (génère un token +
+      // email Resend au client). Sans ça, un compte authentifié peut spammer le client.
+      // Même limiteur que les autres envois de documents (20 / 15 min / artisan).
+      if (!checkDocumentEmailRate(`portal:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d'envois d'accès portail. Réessayez dans quelques minutes." });
+      }
+
       // Générer un token unique
       const token = crypto.randomUUID();
       const expiresAt = new Date();
@@ -3742,7 +4499,7 @@ const clientPortalRouter = router({
         expiresAt,
       });
 
-      const origin = ctx.req.headers.origin || 'https://www.operioz.com';
+      const origin = process.env.APP_URL || ctx.req.headers.origin || 'https://www.operioz.com';
       const portalUrl = `${origin}/portail/${token}`;
 
       // Envoyer l'email au client
@@ -3750,6 +4507,8 @@ const clientPortalRouter = router({
       const artisanName = artisan.nomEntreprise || 'Votre artisan';
       await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `${artisanName} — Accès à votre espace client`,
         body: `<!DOCTYPE html>
 <html lang="fr">
@@ -3759,10 +4518,10 @@ const clientPortalRouter = router({
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
         <tr><td style="background-color:#1e40af;padding:28px 40px;text-align:center;">
-          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${artisanName}</h1>
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">${safeHtml(artisanName)}</h1>
         </td></tr>
         <tr><td style="padding:36px 40px 16px 40px;">
-          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${clientName},</p>
+          <p style="margin:0 0 20px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour ${safeHtml(clientName)},</p>
           <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">Vous pouvez désormais consulter vos devis, factures et interventions depuis votre espace client en ligne.</p>
         </td></tr>
         <tr><td style="padding:0 40px 28px 40px;text-align:center;">
@@ -3814,7 +4573,7 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      const devisList = await db.getDevisByClientId(access.clientId);
+      const devisList = await db.getDevisByClientId(access.clientId, access.artisanId);
       return devisList.map(d => ({
         id: d.id,
         numero: d.numero,
@@ -3834,7 +4593,7 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      const facturesList = await db.getFacturesByClientId(access.clientId);
+      const facturesList = await db.getFacturesByClientId(access.clientId, access.artisanId);
       // Récupérer les paiements pour chaque facture
       const facturesWithPayments = await Promise.all(facturesList.map(async (f) => {
         const paiements = await db.getPaiementsByFactureId(f.id);
@@ -3861,7 +4620,7 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      const interventionsList = await db.getInterventionsByClientId(access.clientId);
+      const interventionsList = await db.getInterventionsByClientId(access.clientId, access.artisanId);
       return interventionsList.map(i => ({
         id: i.id,
         titre: i.titre,
@@ -3880,7 +4639,26 @@ const clientPortalRouter = router({
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
       }
-      return await db.getContratsByClientId(access.clientId);
+      // Scoper par artisan (défense en profondeur + corrige l'argument manquant)
+      // et ne renvoyer qu'un sous-ensemble client-safe : on EXCLUT `notes`
+      // (notes internes de l'artisan) comme les autres endpoints du portail.
+      const contrats = await db.getContratsByClientId(access.clientId, access.artisanId);
+      return contrats.map((c) => ({
+        id: c.id,
+        reference: c.reference,
+        titre: c.titre,
+        description: c.description,
+        type: c.type,
+        montantHT: c.montantHT,
+        tauxTVA: c.tauxTVA,
+        periodicite: c.periodicite,
+        dateDebut: c.dateDebut,
+        dateFin: c.dateFin,
+        reconduction: c.reconduction,
+        prochainPassage: c.prochainPassage,
+        conditionsParticulieres: c.conditionsParticulieres,
+        statut: c.statut,
+      }));
     }),
 
   // Récupérer les informations du client (public avec token)
@@ -3908,11 +4686,15 @@ const clientPortalRouter = router({
 
   // Demander une modification d'infos (public avec token)
   demanderModification: publicProcedure
-    .input(z.object({ token: z.string(), message: z.string().min(1) }))
+    .input(z.object({ token: z.string(), message: z.string().min(1).max(5000) }))
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Accès non autorisé" });
+      }
+      // OPE-24 — throttle anti-flood (l'endpoint envoie un email à l'artisan).
+      if (!checkPortalActionRate(`${access.artisanId}:${access.clientId}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes. Réessayez dans quelques minutes." });
       }
       const client = await db.getClientById(access.clientId);
       const artisan = await db.getArtisanById(access.artisanId);
@@ -3923,7 +4705,7 @@ const clientPortalRouter = router({
       await sendEmail({
         to: artisan.email,
         subject: `Demande de modification — ${clientName}`,
-        body: `<p>Le client <strong>${clientName}</strong> (${client.email || 'pas d\'email'}) demande une modification de ses informations via le portail client :</p><blockquote style="border-left:3px solid #2563eb;padding:12px;margin:16px 0;background:#f8fafc;">${input.message}</blockquote>`,
+        body: `<p>Le client <strong>${safeHtml(clientName)}</strong> (${safeHtml(client.email || 'pas d\'email')}) demande une modification de ses informations via le portail client :</p><blockquote style="border-left:3px solid #2563eb;padding:12px;margin:16px 0;background:#f8fafc;">${safeHtml(input.message)}</blockquote>`,
       });
       return { success: true };
     }),
@@ -3950,12 +4732,12 @@ const clientPortalRouter = router({
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes, reessayez plus tard" });
       }
 
-      // Lit le metier hors-schema (colonne ajoutee via fix-duplicates).
+      // Lit le metier (colonne Drizzle artisans) via le helper porté (OPE-184),
+      // avec fallback sur `specialite`. Plus de raw SQL via un `pool` hors scope.
       let metier: string | null = null;
       try {
-        const [rows] = await pool.execute(`SELECT metier FROM artisans WHERE id = ?`, [artisan.id]);
-        const r: any = Array.isArray(rows) ? rows[0] : null;
-        metier = r?.metier || (artisan as any).specialite || null;
+        const st = await db.getArtisanOnboardingStatus(artisan.id);
+        metier = st?.metier || (artisan as any).specialite || null;
       } catch {
         metier = (artisan as any).specialite || null;
       }
@@ -3982,15 +4764,11 @@ const clientPortalRouter = router({
       };
 
       try {
-        const aClient = new Anthropic();
-        const response = await aClient.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1200,
-          temperature: 0.4,
-          system: contexteMetier,
-          messages: [{
-            role: "user",
-            content: `Un client (${clientName}) decrit son besoin sur le portail :
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: `Un client (${clientName}) decrit son besoin sur le portail :
 """
 ${input.description}
 """
@@ -3998,13 +4776,10 @@ ${input.description}
 Tache : structure cette demande pour l'artisan. Donne un titre court, reformule clairement, identifie le type de travaux, estime l'urgence (faible/normale/urgente), donne une fourchette de prix realiste marche francais 2024 (estimation_min et estimation_max en euros TTC) et propose 2 a 3 questions de precision a poser au client pour pouvoir chiffrer.
 
 Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
-{"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}`,
-          }],
+{"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}` }] }],
+          config: { systemInstruction: contexteMetier, temperature: 0.4, maxOutputTokens: 1200 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const data = JSON.parse(jsonMatch[0]);
@@ -4044,17 +4819,17 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
       if (artisan.email) {
         try {
           const questionsHtml = structured.questions.length
-            ? `<p style="margin-top:16px;"><strong>Questions a poser au client :</strong></p><ul>${structured.questions.map(q => `<li>${q}</li>`).join("")}</ul>`
+            ? `<p style="margin-top:16px;"><strong>Questions a poser au client :</strong></p><ul>${structured.questions.map(q => `<li>${safeHtml(q)}</li>`).join("")}</ul>`
             : "";
           await sendEmail({
             to: artisan.email,
             subject: `Nouvelle demande portail : ${structured.titre}`,
-            body: `<p>Nouvelle demande de <strong>${clientName}</strong> (${client.email || "pas d'email"} - ${client.telephone || "pas de tel"}) via le portail client.</p>
-<p><strong>Type :</strong> ${structured.typeTravaux} &nbsp;|&nbsp; <strong>Urgence :</strong> ${urgenceLabel} &nbsp;|&nbsp; <strong>Devis estime :</strong> ${fourchette}</p>
+            body: `<p>Nouvelle demande de <strong>${safeHtml(clientName)}</strong> (${safeHtml(client.email || "pas d'email")} - ${safeHtml(client.telephone || "pas de tel")}) via le portail client.</p>
+<p><strong>Type :</strong> ${safeHtml(structured.typeTravaux)} &nbsp;|&nbsp; <strong>Urgence :</strong> ${urgenceLabel} &nbsp;|&nbsp; <strong>Devis estime :</strong> ${fourchette}</p>
 <p><strong>Description reformulee par l'IA :</strong></p>
-<blockquote style="border-left:3px solid #8b5cf6;padding:12px;margin:16px 0;background:#f8fafc;">${structured.descriptionReformulee}</blockquote>
+<blockquote style="border-left:3px solid #8b5cf6;padding:12px;margin:16px 0;background:#f8fafc;">${safeHtml(structured.descriptionReformulee)}</blockquote>
 <p><strong>Texte original du client :</strong></p>
-<blockquote style="border-left:3px solid #cbd5e1;padding:12px;margin:16px 0;background:#f8fafc;color:#475569;">${input.description}</blockquote>
+<blockquote style="border-left:3px solid #cbd5e1;padding:12px;margin:16px 0;background:#f8fafc;color:#475569;">${safeHtml(input.description)}</blockquote>
 ${questionsHtml}`,
           });
         } catch (e) { console.error("[soumettreDemandeIA] email:", e); }
@@ -4117,10 +4892,14 @@ ${questionsHtml}`,
     }),
 
   sendClientMessage: publicProcedure
-    .input(z.object({ token: z.string(), conversationId: z.number(), contenu: z.string().min(1) }))
+    .input(z.object({ token: z.string(), conversationId: z.number(), contenu: z.string().min(1).max(5000) }))
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      // OPE-24 — anti-flood : message + notification artisan à chaque appel.
+      if (!checkChatRate(`${access.artisanId}:${access.clientId}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de messages envoyés. Réessayez dans quelques minutes." });
+      }
       const conv = await db.getConversationById(input.conversationId);
       if (!conv || conv.clientId !== access.clientId || conv.artisanId !== access.artisanId)
         throw new TRPCError({ code: "FORBIDDEN" });
@@ -4149,6 +4928,13 @@ ${questionsHtml}`,
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED" });
+      // OPE-246 — vérifier l'appartenance de la conversation au client du token (comme
+      // getConversationMessages/sendClientMessage) : sans ça, n'importe quel token de
+      // portail pouvait marquer comme lu / remettre à zéro le compteur de N'IMPORTE
+      // quelle conversation (IDOR cross-tenant sur le statut de lecture).
+      const conv = await db.getConversationById(input.conversationId);
+      if (!conv || conv.clientId !== access.clientId || conv.artisanId !== access.artisanId)
+        throw new TRPCError({ code: "FORBIDDEN" });
       await db.markMessagesAsRead(input.conversationId, 'client');
       return { success: true };
     }),
@@ -4198,19 +4984,35 @@ ${questionsHtml}`,
   demanderRdv: publicProcedure
     .input(z.object({
       token: z.string(),
-      titre: z.string().min(1),
-      description: z.string().optional(),
+      titre: z.string().min(1).max(200),
+      description: z.string().max(5000).optional(),
       urgence: z.enum(["normale", "urgente", "tres_urgente"]).default("normale"),
-      dateProposee: z.string(),
+      dateProposee: z.string().max(40),
     }))
     .mutation(async ({ input }) => {
       const access = await db.getClientPortalAccessByToken(input.token);
       if (!access) throw new TRPCError({ code: "UNAUTHORIZED", message: "Acces non autorise" });
 
+      // OPE-24 — throttle anti-flood (crée un RDV + notifie l'artisan à chaque appel).
+      if (!checkPortalActionRate(`${access.artisanId}:${access.clientId}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes. Réessayez dans quelques minutes." });
+      }
+
       const dateProposee = new Date(input.dateProposee);
+      // Date invalide : `NaN < minDate` est toujours faux → sans ce garde, une date
+      // malformée contournerait le contrôle des 24h et serait insérée (colonne notNull).
+      if (isNaN(dateProposee.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date proposée invalide" });
+      }
       const minDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
       if (dateProposee < minDate) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le creneau doit etre au moins 24h a l'avance" });
+      }
+      // Borne supérieure : rejette un futur absurde (année 9999) → pollution de données.
+      // 2 ans dépasse tout créneau d'intervention légitime, aucun RDV réel n'est concerné.
+      const maxDate = new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000);
+      if (dateProposee > maxDate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La date proposée est trop éloignée" });
       }
 
       const rdv = await db.createRdvEnLigne({
@@ -4277,6 +5079,32 @@ const contratsRouter = router({
     }));
   }),
 
+  // OPE-140 — indicateur (lecture seule) des contrats à facturer (échéance atteinte).
+  // Réutilise la donnée existante (prochainFacturation + statut). Enrichit avec le nom
+  // du client, le montant TTC et le nombre de jours depuis l'échéance. Aucune écriture,
+  // aucune génération automatique de facture (volet « indicateur » de l'alerte).
+  getAFacturer: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const contrats = await db.getContratsAFacturer(artisan.id);
+    const now = Date.now();
+    return Promise.all(contrats.map(async (c) => {
+      const client = await db.getClientById(c.clientId);
+      const clientNom = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : '';
+      const montantHT = parseFloat(c.montantHT || '0');
+      const tauxTVA = parseFloat(c.tauxTVA || '0');
+      const montantTTC = montantHT * (1 + tauxTVA / 100);
+      return {
+        ...c,
+        clientNom: clientNom || 'Client',
+        montantTTC: montantTTC.toFixed(2),
+        joursRetard: c.prochainFacturation
+          ? Math.max(0, Math.floor((now - new Date(c.prochainFacturation).getTime()) / 86_400_000))
+          : 0,
+      };
+    }));
+  }),
+
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -4304,7 +5132,7 @@ const contratsRouter = router({
   create: protectedProcedure
     .input(z.object({
       clientId: z.number(),
-      titre: z.string(),
+      titre: z.string().max(255),
       description: z.string().optional(),
       type: z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]).optional(),
       montantHT: z.string(),
@@ -4319,9 +5147,33 @@ const contratsRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+
+      // OPE-25 — vérifier l'ownership du client (IDOR) : sans ce contrôle, un artisan
+      // pouvait créer un contrat sur le `clientId` d'un AUTRE tenant, puis exposer les
+      // données de ce client (email/adresse) via la facture générée. Même pattern que
+      // interventions.create / devis.create. Behavior-preserving : un client légitime passe.
+      const client = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!client) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
+
       const reference = await db.getNextContratNumber(artisan.id);
 
+      // Garde de validité des dates : `new Date("garbage")` -> Invalid Date, qui finit
+      // dans `contrats_maintenance.dateDebut` (timestamp NOT NULL) -> 500 MySQL en mode
+      // strict, et casse silencieusement `prochainFacturation`. On rejette proprement en 400.
+      // Behavior-preserving : une date valide (sélecteur front) passe à l'identique.
       const dateDebut = new Date(input.dateDebut);
+      if (isNaN(dateDebut.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de début invalide" });
+      }
+      let dateFin: Date | undefined;
+      if (input.dateFin) {
+        dateFin = new Date(input.dateFin);
+        if (isNaN(dateFin.getTime())) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Date de fin invalide" });
+        }
+      }
       let prochainFacturation = new Date(dateDebut);
 
       return await db.createContrat({
@@ -4335,7 +5187,7 @@ const contratsRouter = router({
         tauxTVA: input.tauxTVA || "20.00",
         periodicite: input.periodicite,
         dateDebut,
-        dateFin: input.dateFin ? new Date(input.dateFin) : undefined,
+        dateFin,
         reconduction: input.reconduction ?? true,
         preavisResiliation: input.preavisResiliation ?? 1,
         conditionsParticulieres: input.conditionsParticulieres,
@@ -4348,7 +5200,7 @@ const contratsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      titre: z.string().optional(),
+      titre: z.string().max(255).optional(),
       description: z.string().optional(),
       type: z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]).optional(),
       montantHT: z.string().optional(),
@@ -4434,18 +5286,21 @@ const contratsRouter = router({
         prixUnitaireHT: contrat.montantHT || "0",
         tauxTVA: contrat.tauxTVA || "20.00",
         montantHT: contrat.montantHT || "0",
+        // OPE-250 — renseigner montantTVA (sinon défaut 0 → ligne incohérente +
+        // ventilation TVA du FEC repliée à tort sur 445711 pour les taux réduits).
+        // Valeur déjà calculée (= totalTVA de la facture, ligne unique).
+        montantTVA: montantTVA.toFixed(2),
         montantTTC: montantTTC.toFixed(2),
       });
       
       // Enregistrer la facture récurrente
       const now = new Date();
-      let periodeFin = new Date(now);
-      switch (contrat.periodicite) {
-        case 'mensuel': periodeFin.setMonth(periodeFin.getMonth() + 1); break;
-        case 'trimestriel': periodeFin.setMonth(periodeFin.getMonth() + 3); break;
-        case 'semestriel': periodeFin.setMonth(periodeFin.getMonth() + 6); break;
-        case 'annuel': periodeFin.setFullYear(periodeFin.getFullYear() + 1); break;
-      }
+      // OPE-249 — ajout de mois avec clamp de fin de mois (équivalent relativedelta).
+      // Évite le débordement (31 jan + 1 mois → 3 mars) sur periodeFin/prochainFacturation.
+      const moisParPeriodicite: Record<string, number> = {
+        mensuel: 1, trimestriel: 3, semestriel: 6, annuel: 12,
+      };
+      const periodeFin = db.addMonthsClamped(now, moisParPeriodicite[contrat.periodicite || ''] ?? 1);
       
       await db.createFactureRecurrente({
         contratId: contrat.id,
@@ -4495,12 +5350,17 @@ const contratsRouter = router({
       if (!artisan || contrat.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // Garde de validité (classe « date invalide ») : dateIntervention est NOT NULL.
+      const dateIntervention = new Date(input.dateIntervention);
+      if (isNaN(dateIntervention.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date d'intervention invalide" });
+      }
       return db.createInterventionContrat({
         contratId: input.contratId,
         artisanId: artisan.id,
         titre: input.titre,
         description: input.description,
-        dateIntervention: new Date(input.dateIntervention),
+        dateIntervention,
         duree: input.duree,
         technicienNom: input.technicienNom,
         notes: input.notes,
@@ -4530,6 +5390,14 @@ const contratsRouter = router({
       if (!artisan || contrat.artisanId !== artisan.id) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Accès non autorisé" });
       }
+      // SECURITE (OPE-89) : verifier que l'intervention appartient bien au contrat
+      // verifie ci-dessus (le contrat appartient a l'artisan). Sans ce controle,
+      // input.id (intervention) est decouple de input.contratId (parent) -> IDOR
+      // cross-tenant (modification de l'intervention d'un autre tenant).
+      const interventionExistante = await db.getInterventionContratById(input.id);
+      if (!interventionExistante || interventionExistante.contratId !== contrat.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Intervention non trouvée" });
+      }
       const { id, contratId, ...updateData } = input;
       return db.updateInterventionContrat(id, {
         ...updateData,
@@ -4552,7 +5420,15 @@ const interventionsMobileRouter = router({
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
     
-    const interventionsList = await db.getInterventionsByArtisanId(artisan.id);
+    const allInterventions = await db.getInterventionsByArtisanId(artisan.id);
+    // OPE-124 (data-minimisation RGPD) — un utilisateur de rôle « technicien » LIÉ à une fiche
+    // (techniciens.userId) ne voit que SES interventions assignées (+ PII de SES clients).
+    // Owner/secrétaire, ou technicien non encore lié : vue complète inchangée (behavior-preserving).
+    let interventionsList = allInterventions;
+    if ((ctx.user as any).role === "technicien") {
+      const monTech = await db.getTechnicienByUserId(ctx.user.id, artisan.id);
+      if (monTech) interventionsList = allInterventions.filter((i: any) => i.technicienId === monTech.id);
+    }
     const todayInterventions = interventionsList.filter(i => {
       const date = new Date(i.dateDebut);
       return date >= today && date < tomorrow;
@@ -4611,8 +5487,11 @@ const interventionsMobileRouter = router({
   endIntervention: protectedProcedure
     .input(z.object({
       interventionId: z.number(),
-      notes: z.string().optional(),
-      signatureClient: z.string().optional(),
+      // Bornes (classe « entrées non bornées ») : `notes` ~5 000 car, `signatureClient`
+      // = image base64 (~500 Ko, même borne que signDevis). Évite qu'une entrée géante
+      // (jusqu'à la limite body 50 Mo) sature/overflow la colonne TEXT.
+      notes: z.string().max(5000).optional(),
+      signatureClient: z.string().max(500000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const intervention = await db.getInterventionById(input.interventionId);
@@ -4645,8 +5524,11 @@ const interventionsMobileRouter = router({
   addPhoto: protectedProcedure
     .input(z.object({
       interventionId: z.number(),
-      url: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `photos_interventions` (url varchar 500, description
+      // varchar 255) — defense-in-depth : une entrée surdimensionnée provoquait une
+      // erreur/troncature MySQL (mode strict) au lieu d'un 400 clair. OPE-24.
+      url: z.string().max(500),
+      description: z.string().max(255).optional(),
       type: z.enum(["avant", "pendant", "apres"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -4722,7 +5604,7 @@ const chatRouter = router({
     }),
 
   sendMessage: protectedProcedure
-    .input(z.object({ conversationId: z.number(), contenu: z.string().min(1) }))
+    .input(z.object({ conversationId: z.number(), contenu: z.string().min(1).max(5000) }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
@@ -4735,23 +5617,28 @@ const chatRouter = router({
         contenu: input.contenu,
       });
 
-      // Email notification au client
+      // Email notification au client (best-effort). OPE-24 — classe email : borne
+      // anti-spam (20 / 15 min / artisan). Le message reste créé en in-app ; au-delà
+      // du quota, seule la notification email est sautée (pas d'erreur côté UI), pour
+      // empêcher un compte authentifié d'inonder la boîte du client via le chat.
       try {
         const client = await db.getClientById(conv.clientId);
-        if (client?.email) {
+        if (client?.email && checkDocumentEmailRate(`chat:${artisan.id}`)) {
           const portalAccess = await db.getPortalAccessByClientId(conv.clientId, artisan.id);
           const portalLink = portalAccess?.token
-            ? `https://www.operioz.com/portail/${portalAccess.token}`
+            ? `${process.env.APP_URL || 'https://www.operioz.com'}/portail/${portalAccess.token}`
             : null;
           await sendEmail({
             to: client.email,
+            fromName: artisan.nomEntreprise || undefined, // OPE-157
+            replyTo: artisan.email || undefined,
             subject: `Nouveau message de ${artisan.nomEntreprise || 'votre artisan'}`,
             body: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
               <h2 style="color:#2980b9">Nouveau message</h2>
-              <p>Bonjour ${client.prenom || client.nom},</p>
-              <p><strong>${artisan.nomEntreprise || 'Votre artisan'}</strong> vous a envoyé un message :</p>
+              <p>Bonjour ${safeHtml(client.prenom || client.nom)},</p>
+              <p><strong>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</strong> vous a envoyé un message :</p>
               <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:15px 0;border-left:4px solid #2980b9">
-                <p style="margin:0">${input.contenu.substring(0, 300)}${input.contenu.length > 300 ? '...' : ''}</p>
+                <p style="margin:0">${safeHtml(input.contenu.substring(0, 300))}${input.contenu.length > 300 ? '...' : ''}</p>
               </div>
               ${portalLink ? `<p><a href="${portalLink}" style="background:#2980b9;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;display:inline-block">Répondre sur le portail</a></p>` : ''}
               <p style="color:#999;font-size:12px">Cet email a été envoyé automatiquement.</p>
@@ -4828,6 +5715,15 @@ const chatRouter = router({
 // ============================================================================
 // TECHNICIENS ROUTER
 // ============================================================================
+// OPE-124 — valide qu'un `userId` à lier à une fiche technicien appartient bien au tenant
+// (collaborateur ou propriétaire). `null`/absent = délier / non fourni (autorisé).
+async function assertUserLinkable(userId: number | null | undefined, artisan: { id: number; userId: number | null }) {
+  if (userId == null) return;
+  const u = await db.getUserById(userId);
+  const belongs = !!u && ((u as any).artisanId === artisan.id || u.id === artisan.userId);
+  if (!belongs) throw new TRPCError({ code: "NOT_FOUND", message: "Utilisateur introuvable" });
+}
+
 const techniciensRouter = router({
   // Récupérer tous les techniciens
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -4856,19 +5752,26 @@ const techniciensRouter = router({
   // Créer un technicien
   create: protectedProcedure
     .input(z.object({
-      nom: z.string().min(1),
-      prenom: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      specialite: z.string().optional(),
-      couleur: z.string().optional(),
+      // Bornes alignées sur les colonnes de `techniciens` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      nom: z.string().min(1).max(255),
+      prenom: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      specialite: z.string().max(100).optional(),
+      couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      // OPE-123 — coût horaire chargé (decimal stocké en string). Borné, optionnel.
+      coutHoraire: z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12).optional(),
+      // OPE-124 — compte de connexion lié (collaborateur du même tenant). Optionnel.
+      userId: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
       }
-      
+      await assertUserLinkable(input.userId, artisan);
+
       return await db.createTechnicien({
         artisanId: artisan.id,
         ...input,
@@ -4879,29 +5782,47 @@ const techniciensRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().min(1).optional(),
-      prenom: z.string().optional(),
-      email: z.string().email().optional(),
-      telephone: z.string().optional(),
-      specialite: z.string().optional(),
-      couleur: z.string().optional(),
+      nom: z.string().min(1).max(255).optional(),
+      prenom: z.string().max(255).optional(),
+      email: z.string().email().max(320).optional(),
+      telephone: z.string().max(20).optional(),
+      specialite: z.string().max(100).optional(),
+      couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      coutHoraire: z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12).optional(),
       statut: z.enum(["actif", "inactif", "conge"]).optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
+      // OPE-124 — compte de connexion lié (null pour délier). Optionnel.
+      userId: z.number().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
       }
-      
+
       const technicien = await db.getTechnicienById(input.id);
       if (!technicien || technicien.artisanId !== artisan.id) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Technicien non trouvé" });
       }
-      
+      await assertUserLinkable(input.userId, artisan);
+
       const { id, ...data } = input;
       return await db.updateTechnicien(id, data);
     }),
+
+  // OPE-124 — utilisateurs du tenant liables à une fiche technicien (sélecteur du formulaire).
+  // Lecture légère scopée tenant (id/nom/rôle), accessible à qui gère les techniciens.
+  getLinkableUsers: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    const users = await db.getUsersByArtisanId(artisan.id);
+    return users.map((u: any) => ({
+      id: u.id,
+      nom: [u.prenom, u.name].filter(Boolean).join(" ").trim() || u.email,
+      email: u.email,
+      role: u.role,
+    }));
+  }),
 
   // Supprimer un technicien
   delete: protectedProcedure
@@ -4995,6 +5916,53 @@ const techniciensRouter = router({
       
       return { total, terminees, enCours, planifiees };
     }),
+
+  // ── Habilitations / certifications (OPE-162) ────────────────────────────────
+  // Suivi des habilitations BTP avec échéance. Chaque endpoint vérifie d'abord
+  // que le technicien appartient bien à l'artisan authentifié (assertTechnicienOwner).
+  getHabilitations: protectedProcedure
+    .input(z.object({ technicienId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
+      return await db.getHabilitationsByTechnicienId(input.technicienId);
+    }),
+
+  addHabilitation: protectedProcedure
+    .input(z.object({
+      technicienId: z.number(),
+      type: z.string().trim().min(1).max(255),
+      numero: z.string().trim().max(100).optional(),
+      organisme: z.string().trim().max(255).optional(),
+      dateObtention: z.string().optional(),
+      dateExpiration: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id);
+      // Garde-fous date : on ignore les valeurs invalides plutôt que d'insérer une
+      // date NaN (cohérent avec le reste de la codebase, cf. sweep dates invalides).
+      const parseDate = (s?: string): Date | null => {
+        if (!s) return null;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+      };
+      return await db.createHabilitationTechnicien({
+        technicienId: input.technicienId,
+        artisanId: artisan.id,
+        type: input.type,
+        numero: input.numero || null,
+        organisme: input.organisme || null,
+        dateObtention: parseDate(input.dateObtention),
+        dateExpiration: parseDate(input.dateExpiration),
+      });
+    }),
+
+  deleteHabilitation: protectedProcedure
+    .input(z.object({ technicienId: z.number(), id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
+      await db.deleteHabilitationTechnicien(input.id, input.technicienId);
+      return { success: true };
+    }),
 });
 
 // ============================================================================
@@ -5055,7 +6023,13 @@ const avisRouter = router({
       if (!client || !client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'email" });
       }
-      
+      // OPE-24 — anti-abus : borne l'envoi de demandes d'avis (crée une demande + email
+      // Resend au client) par artisan ; sans ça un compte authentifié pourrait spammer le
+      // client. Clé dédiée (distincte du bon de commande pour ne pas partager le quota).
+      if (!checkDocumentEmailRate(`avis:${artisan.id}`)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de demandes d'avis envoyées. Réessayez dans quelques minutes." });
+      }
+
       // Générer un token unique
       const token = crypto.randomUUID();
       const expiresAt = new Date();
@@ -5072,22 +6046,28 @@ const avisRouter = router({
       });
       
       // Envoyer l'email
-      const baseUrl = ctx.req.headers.origin || 'http://localhost:3000';
+      // OPE-76 (même classe) — le lien d'avis vient d'une source de confiance
+      // (APP_URL), pas du header Origin (contrôlable). Corrige aussi le repli erroné
+      // sur http://localhost:3000. Pour une requête légitime, Origin == APP_URL.
+      const baseUrl = process.env.APP_URL || 'https://www.operioz.com';
       const lienAvis = `${baseUrl}/avis/${token}`;
       
       await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `Votre avis sur notre intervention - ${artisan.nomEntreprise || 'Artisan'}`,
         body: `
-          <h2>Bonjour ${client.nom},</h2>
+          <h2>Bonjour ${safeHtml(client.nom)},</h2>
           <p>Suite à notre intervention du ${new Date(intervention.dateDebut).toLocaleDateString('fr-FR')}, nous aimerions connaître votre avis.</p>
           <p>Votre retour est précieux et nous aide à améliorer nos services.</p>
           <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
           <p>Ce lien est valable pendant 14 jours.</p>
-          <p>Merci de votre confiance,<br>${artisan.nomEntreprise || 'Votre artisan'}</p>
+          <p>Merci de votre confiance,<br>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</p>
         `,
+        artisanId: artisan.id, emailType: "avis", entiteType: "intervention", entiteId: intervention.id, // OPE-114
       });
-      
+
       return demande;
     }),
 
@@ -5100,13 +6080,20 @@ const avisRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Artisan non trouvé" });
       }
 
+      // Scoper le client au tenant appelant (comme `envoyerDemande`/`chat`) :
+      // sans ce contrôle, un `clientId` d'un autre artisan donnait un message
+      // d'erreur DIFFÉRENT selon que le client existe (oracle d'énumération
+      // cross-tenant). NOT_FOUND uniforme pour « inexistant OU pas à moi ».
       const client = await db.getClientById(input.clientId);
-      if (!client || !client.email) {
+      if (!client || client.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client non trouvé" });
+      }
+      if (!client.email) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Le client n'a pas d'email" });
       }
 
       // Trouver la dernière intervention pour ce client
-      const interventions = await db.getInterventionsByClientId(input.clientId);
+      const interventions = await db.getInterventionsByClientId(input.clientId, artisan.id);
       const artisanInterventions = interventions.filter(i => i.artisanId === artisan.id);
 
       // Utiliser la dernière intervention, ou créer une demande sans intervention spécifique
@@ -5128,20 +6115,26 @@ const avisRouter = router({
         expiresAt,
       });
 
-      const baseUrl = ctx.req.headers.origin || 'http://localhost:3000';
+      // OPE-76 (même classe) — le lien d'avis vient d'une source de confiance
+      // (APP_URL), pas du header Origin (contrôlable). Corrige aussi le repli erroné
+      // sur http://localhost:3000. Pour une requête légitime, Origin == APP_URL.
+      const baseUrl = process.env.APP_URL || 'https://www.operioz.com';
       const lienAvis = `${baseUrl}/avis/${token}`;
 
       await sendEmail({
         to: client.email,
+        fromName: artisan.nomEntreprise || undefined, // OPE-157
+        replyTo: artisan.email || undefined,
         subject: `Votre avis nous intéresse - ${artisan.nomEntreprise || 'Artisan'}`,
         body: `
-          <h2>Bonjour ${client.nom},</h2>
+          <h2>Bonjour ${safeHtml(client.nom)},</h2>
           <p>Nous espérons que vous êtes satisfait de nos services.</p>
           <p>Votre avis est précieux et nous aide à améliorer nos prestations. Pourriez-vous prendre quelques instants pour nous laisser un retour ?</p>
           <p><a href="${lienAvis}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Donner mon avis</a></p>
           <p>Ce lien est valable pendant 14 jours.</p>
-          <p>Merci de votre confiance,<br>${artisan.nomEntreprise || 'Votre artisan'}</p>
+          <p>Merci de votre confiance,<br>${safeHtml(artisan.nomEntreprise || 'Votre artisan')}</p>
         `,
+        artisanId: artisan.id, emailType: "avis", entiteType: "intervention", entiteId: intervention.id, // OPE-114
       });
 
       return demande;
@@ -5151,7 +6144,7 @@ const avisRouter = router({
   repondre: protectedProcedure
     .input(z.object({
       avisId: z.number(),
-      reponse: z.string().min(1),
+      reponse: z.string().min(1).max(5000),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -5195,7 +6188,7 @@ const avisRouter = router({
     .input(z.object({
       token: z.string(),
       note: z.number().min(1).max(5),
-      commentaire: z.string().optional(),
+      commentaire: z.string().max(5000).optional(),
     }))
     .mutation(async ({ input }) => {
       const demande = await db.getDemandeAvisByToken(input.token);
@@ -5457,7 +6450,14 @@ const comptabiliteRouter = router({
 
   genererEcrituresFacture: comptaVoirProcedure
     .input(z.object({ factureId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-38) : la facture doit appartenir au tenant appelant (sinon
+      // génération/écrasement d'écritures comptables cross-tenant).
+      const artisan = ctx.user ? await db.getArtisanByUserId(ctx.user.id) : null;
+      const facture = artisan ? await db.getFactureById(input.factureId) : null;
+      if (!artisan || !facture || facture.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Facture non trouvée" });
+      }
       return await db.genererEcrituresFacture(input.factureId);
     }),
 
@@ -5482,96 +6482,145 @@ const comptabiliteRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) return { lines: [], totalFactures: 0, siret: '' };
+      if (!artisan) return { lines: [], totalFactures: 0, siret: '', conformite: null };
 
-      const allFactures = await db.getFacturesByArtisanId(artisan.id);
       const dateFin = new Date(input.dateFin);
       dateFin.setHours(23, 59, 59, 999);
-      const factures = allFactures.filter(f => {
-        const d = new Date(f.dateFacture);
-        return d >= input.dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
+      // Aperçu = mêmes données que le fichier téléchargé (générateur FEC unique).
+      const { content, conformite } = await db.genererFEC(artisan.id, input.dateDebut, dateFin);
+      const rows = content.split('\n').filter((r) => r.length > 0);
+      const header = (rows[0] || '').split('\t');
+      const col = (name: string) => header.indexOf(name);
+      const lines = rows.slice(1, 16).map((r) => {
+        const c = r.split('\t');
+        return {
+          ecritureNum: c[col('EcritureNum')] || '',
+          ecritureDate: c[col('EcritureDate')] || '',
+          compteNum: c[col('CompteNum')] || '',
+          compteLib: c[col('CompteLib')] || '',
+          pieceRef: c[col('PieceRef')] || '',
+          ecritureLib: c[col('EcritureLib')] || '',
+          debit: c[col('Debit')] || '0,00',
+          credit: c[col('Credit')] || '0,00',
+        };
       });
+      return { lines, totalFactures: conformite.nbEcritures, siret: artisan.siret || '', conformite };
+    }),
 
-      const lines: { ecritureNum: string; ecritureDate: string; compteNum: string; compteLib: string; pieceRef: string; ecritureLib: string; debit: string; credit: string }[] = [];
-      let num = 1;
-      for (const facture of factures.slice(0, 10)) { // Limit preview to 10 factures
-        const client = await db.getClientById(facture.clientId);
-        const clientNom = client?.nom || 'Client';
-        const ecritureDate = new Date(facture.dateFacture).toISOString().slice(0, 10).replace(/-/g, '');
-        const numStr = String(num).padStart(6, '0');
-        const ttc = parseFloat(facture.totalTTC?.toString() || '0');
-        const ht = parseFloat(facture.totalHT?.toString() || '0');
-        const tva = parseFloat(facture.totalTVA?.toString() || '0');
+  // Contrôle de conformité FEC (pour badge UI) — sans télécharger le fichier.
+  getFecConformite: comptaVoirProcedure
+    .input(z.object({ dateDebut: z.date(), dateFin: z.date() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return null;
+      const dateFin = new Date(input.dateFin);
+      dateFin.setHours(23, 59, 59, 999);
+      const { conformite } = await db.genererFEC(artisan.id, input.dateDebut, dateFin);
+      return conformite;
+    }),
 
-        lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '411000', compteLib: 'Clients', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: ttc.toFixed(2).replace('.', ','), credit: '0,00' });
-        lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '701000', compteLib: 'Ventes', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: '0,00', credit: ht.toFixed(2).replace('.', ',') });
-        if (tva > 0) {
-          lines.push({ ecritureNum: numStr, ecritureDate, compteNum: '445710', compteLib: 'TVA collectée', pieceRef: facture.numero, ecritureLib: `Facture ${facture.numero} - ${clientNom}`, debit: '0,00', credit: tva.toFixed(2).replace('.', ',') });
-        }
-        num++;
-      }
-
-      return { lines, totalFactures: factures.length, siret: artisan.siret || '' };
+  // Déclaration TVA détaillée (CA3) : base imposable + TVA par taux.
+  getDeclarationTVADetail: comptaVoirProcedure
+    .input(z.object({ dateDebut: z.date(), dateFin: z.date() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { parTaux: [], tvaCollectee: 0, tvaDeductible: 0, tvaNette: 0 };
+      const dateFin = new Date(input.dateFin);
+      dateFin.setHours(23, 59, 59, 999);
+      return await db.getDeclarationTVADetail(artisan.id, input.dateDebut, dateFin);
     }),
 });
 
 // ============================================================================
 // DEVIS OPTIONS ROUTER
 // ============================================================================
+// SECURITE (OPE-10) : les options/lignes de devis n'ont pas d'artisanId direct ;
+// l'ownership se dérive via le devis parent (devis.artisanId). Les helpers DB ne
+// scopent que par id -> sans ces gardes, IDOR cross-tenant (lecture/écriture/
+// suppression/conversion des options & lignes d'un autre tenant).
+async function assertDevisOwner(devisId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const devis = artisan ? await db.getDevisById(devisId) : null;
+  if (!artisan || !devis || (devis as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Devis non trouvé" });
+  }
+  return { devis, artisan };
+}
+
+async function assertOptionOwner(optionId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const option = artisan ? await db.getDevisOptionById(optionId) : null;
+  const devis = option ? await db.getDevisById((option as any).devisId) : null;
+  if (!artisan || !option || !devis || (devis as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Option non trouvée" });
+  }
+  return { option, devis, artisan };
+}
+
 const devisOptionsRouter = router({
   getByDevisId: protectedProcedure
     .input(z.object({ devisId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertDevisOwner(input.devisId, ctx.user.id);
       return await db.getDevisOptionsByDevisId(input.devisId);
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertOptionOwner(input.id, ctx.user.id);
       return await db.getDevisOptionById(input.id);
     }),
 
   create: protectedProcedure
     .input(z.object({
       devisId: z.number(),
-      nom: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `devis_options` (nom varchar 100, description TEXT) —
+      // defense-in-depth : évite une erreur/troncature MySQL (mode strict). OPE-24.
+      nom: z.string().max(100),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
       recommandee: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertDevisOwner(input.devisId, ctx.user.id);
       return await db.createDevisOption(input);
     }),
 
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
+      // Bornes alignées sur `devis_options` (nom varchar 100, description TEXT). OPE-24.
+      nom: z.string().max(100).optional(),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
       recommandee: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.id, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateDevisOption(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.id, ctx.user.id);
       await db.deleteDevisOption(input.id);
       return { success: true };
     }),
 
   select: protectedProcedure
     .input(z.object({ optionId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       return await db.selectDevisOption(input.optionId);
     }),
 
   convertirEnDevis: protectedProcedure
     .input(z.object({ optionId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       await db.convertirOptionEnDevis(input.optionId);
       return { success: true };
     }),
@@ -5579,7 +6628,8 @@ const devisOptionsRouter = router({
   // Lignes d'option
   getLignes: protectedProcedure
     .input(z.object({ optionId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       return await db.getDevisOptionLignesByOptionId(input.optionId);
     }),
 
@@ -5587,21 +6637,22 @@ const devisOptionsRouter = router({
     .input(z.object({
       optionId: z.number(),
       articleId: z.number().optional(),
-      designation: z.string(),
-      description: z.string().optional(),
+      designation: z.string().max(255),
+      description: z.string().max(5000).optional(),
       quantite: z.string().optional(),
-      unite: z.string().optional(),
+      unite: z.string().max(20).optional(),
       prixUnitaireHT: z.string().optional(),
       tauxTVA: z.string().optional(),
       remise: z.string().optional(),
       ordre: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       const quantite = parseFloat(input.quantite || '1');
       const prixUnitaireHT = parseFloat(input.prixUnitaireHT || '0');
       const tauxTVA = parseFloat(input.tauxTVA || '20');
       const remise = parseFloat(input.remise || '0');
-      
+
       const montantHTBrut = quantite * prixUnitaireHT;
       const montantRemise = montantHTBrut * (remise / 100);
       const montantHT = montantHTBrut - montantRemise;
@@ -5632,9 +6683,10 @@ const devisOptionsRouter = router({
       remise: z.string().optional(),
       ordre: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       const { id, optionId, ...data } = input;
-      
+
       if (data.quantite || data.prixUnitaireHT || data.tauxTVA || data.remise) {
         const quantite = parseFloat(data.quantite || '1');
         const prixUnitaireHT = parseFloat(data.prixUnitaireHT || '0');
@@ -5661,7 +6713,8 @@ const devisOptionsRouter = router({
 
   deleteLigne: protectedProcedure
     .input(z.object({ id: z.number(), optionId: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertOptionOwner(input.optionId, ctx.user.id);
       await db.deleteDevisOptionLigne(input.id);
       await db.recalculerTotauxOption(input.optionId);
       return { success: true };
@@ -5671,6 +6724,18 @@ const devisOptionsRouter = router({
 // ============================================================================
 // RAPPORTS PERSONNALISABLES ROUTER
 // ============================================================================
+// SECURITE (OPE-46) : les rapports portent un artisanId ; les helpers DB ne scopent
+// que par id -> sans cette garde, IDOR (executer fuit les données du tenant
+// propriétaire du rapport ; getById/update/delete/toggleFavori/historique cross-tenant).
+async function assertRapportOwner(rapportId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const rapport = artisan ? await db.getRapportPersonnaliseById(rapportId) : null;
+  if (!rapport || !artisan || (rapport as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Rapport non trouvé" });
+  }
+  return { rapport, artisan };
+}
+
 const rapportsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -5680,19 +6745,23 @@ const rapportsRouter = router({
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       return await db.getRapportPersonnaliseById(input.id);
     }),
 
   create: protectedProcedure
     .input(z.object({
-      nom: z.string().min(1),
-      description: z.string().optional(),
+      // Bornes alignées sur les colonnes `rapports_personnalises` (nom varchar(100),
+      // groupement/tri varchar(50)) : évite un ER_DATA_TOO_LONG (500) sur une entrée
+      // surdimensionnée. Behavior-preserving (un nom/tri de rapport légitime est court).
+      nom: z.string().min(1).max(100),
+      description: z.string().max(2000).optional(),
       type: z.enum(["ventes", "clients", "interventions", "stocks", "fournisseurs", "techniciens", "financier"]),
       filtres: z.record(z.string(), z.unknown()).optional(),
-      colonnes: z.array(z.string()).optional(),
-      groupement: z.string().optional(),
-      tri: z.string().optional(),
+      colonnes: z.array(z.string().max(100)).max(100).optional(),
+      groupement: z.string().max(50).optional(),
+      tri: z.string().max(50).optional(),
       format: z.enum(["tableau", "graphique", "liste"]).optional(),
       graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
     }))
@@ -5707,31 +6776,34 @@ const rapportsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
+      nom: z.string().min(1).max(100).optional(),
+      description: z.string().max(2000).optional(),
       filtres: z.record(z.string(), z.unknown()).optional(),
-      colonnes: z.array(z.string()).optional(),
-      groupement: z.string().optional(),
-      tri: z.string().optional(),
+      colonnes: z.array(z.string().max(100)).max(100).optional(),
+      groupement: z.string().max(50).optional(),
+      tri: z.string().max(50).optional(),
       format: z.enum(["tableau", "graphique", "liste"]).optional(),
       graphiqueType: z.enum(["bar", "line", "pie", "doughnut"]).optional(),
       favori: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateRapportPersonnalise(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       await db.deleteRapportPersonnalise(input.id);
       return { success: true };
     }),
 
   toggleFavori: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertRapportOwner(input.id, ctx.user.id);
       return await db.toggleRapportFavori(input.id);
     }),
 
@@ -5740,13 +6812,17 @@ const rapportsRouter = router({
       rapportId: z.number(),
       parametres: z.record(z.string(), z.unknown()).optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // OPE-46 : sans cette garde, executerRapport exécute la requête scopée sur
+      // rapport.artisanId (le propriétaire = la victime) -> fuite cross-tenant.
+      await assertRapportOwner(input.rapportId, ctx.user.id);
       return await db.executerRapport(input.rapportId, input.parametres);
     }),
 
   historique: protectedProcedure
-    .input(z.object({ rapportId: z.number(), limit: z.number().default(10) }))
-    .query(async ({ input }) => {
+    .input(z.object({ rapportId: z.number(), limit: z.number().max(500).default(10) }))
+    .query(async ({ ctx, input }) => {
+      await assertRapportOwner(input.rapportId, ctx.user.id);
       return await db.getHistoriqueExecutions(input.rapportId, input.limit);
     }),
 });
@@ -5754,6 +6830,20 @@ const rapportsRouter = router({
 // ============================================================================
 // NOTIFICATIONS PUSH ROUTER
 // ============================================================================
+// SECURITE (OPE-31) : vérifie que le technicien ciblé appartient bien au tenant de
+// l'appelant. Les helpers DB ne scopent que par technicienId -> sans cette garde,
+// un artisan peut cibler les techniciens d'un autre tenant (push hijack, lecture
+// historique/congés). Pattern déjà utilisé dans techniciensRouter.
+async function assertTechnicienOwnership(technicienId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+  const tech = await db.getTechnicienById(technicienId);
+  if (!tech || tech.artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Technicien introuvable" });
+  }
+  return { artisan, tech };
+}
+
 const notificationsPushRouter = router({
   subscribe: protectedProcedure
     .input(z.object({
@@ -5763,20 +6853,27 @@ const notificationsPushRouter = router({
       auth: z.string(),
       userAgent: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.savePushSubscription(input);
     }),
 
   unsubscribe: protectedProcedure
     .input(z.object({ endpoint: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-31) : ne désactiver l'abonnement que s'il appartient à un
+      // technicien du tenant appelant (résolution endpoint -> technicienId).
+      const sub = await db.getPushSubscriptionByEndpoint(input.endpoint);
+      if (!sub) throw new TRPCError({ code: "NOT_FOUND", message: "Abonnement non trouvé" });
+      await assertTechnicienOwner(sub.technicienId, ctx.user.id);
       await db.deletePushSubscription(input.endpoint);
       return { success: true };
     }),
 
   getPreferences: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.getPreferencesNotifications(input.technicienId);
     }),
 
@@ -5792,19 +6889,26 @@ const notificationsPushRouter = router({
       heureDebutNotif: z.string().optional(),
       heureFinNotif: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.savePreferencesNotifications(input);
     }),
 
   getHistorique: protectedProcedure
-    .input(z.object({ technicienId: z.number(), limit: z.number().default(50) }))
-    .query(async ({ input }) => {
+    .input(z.object({ technicienId: z.number(), limit: z.number().max(500).default(50) }))
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.getHistoriqueNotificationsPush(input.technicienId, input.limit);
     }),
 
   markAsRead: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-31) : l'entrée d'historique doit appartenir à un technicien
+      // du tenant appelant (résolution id -> technicienId).
+      const entry = await db.getHistoriqueNotificationPushById(input.id);
+      if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: "Notification non trouvée" });
+      await assertTechnicienOwner(entry.technicienId, ctx.user.id);
       await db.markNotificationPushAsRead(input.id);
       return { success: true };
     }),
@@ -5819,7 +6923,8 @@ const notificationsPushRouter = router({
       referenceId: z.number().optional(),
       referenceType: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       // Enregistrer dans l'historique
       return await db.createHistoriqueNotificationPush(input);
     }),
@@ -5843,7 +6948,9 @@ const congesRouter = router({
 
   byTechnicien: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // SECURITE (OPE-31) : congés (dont arrêts maladie) = données salariés sensibles.
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.getCongesByTechnicien(input.technicienId);
     }),
 
@@ -5865,12 +6972,44 @@ const congesRouter = router({
       motif: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // OPE-45 (classe IDOR/intégrité) — valider que le technicien appartient au tenant
+      // appelant AVANT de créer un congé : sinon un artisan peut créer un congé référençant
+      // un technicien d'un autre tenant (intégrité cassée + nom du technicien étranger
+      // potentiellement exposé à l'affichage). Les sœurs (byTechnicien, geoloc, badges…)
+      // valident déjà ; `create` était le trou. NOT_FOUND uniforme si étranger/inexistant.
+      await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // Garde de validité des dates (classe « date invalide ») : `new Date("garbage")` ->
+      // Invalid Date insérée dans conges.dateDebut/dateFin (NOT NULL) -> 500 MySQL en mode
+      // strict + décompte de solde faussé. On rejette proprement en 400. Behavior-preserving :
+      // une date valide (sélecteur front) passe à l'identique.
+      const dateDebut = new Date(input.dateDebut);
+      const dateFin = new Date(input.dateFin);
+      if (isNaN(dateDebut.getTime()) || isNaN(dateFin.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date invalide" });
+      }
+      if (dateFin < dateDebut) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La date de fin doit être postérieure à la date de début" });
+      }
+      // OPE-97 — anti-chevauchement : un même technicien ne peut pas avoir deux congés
+      // (en_attente ou approuvé) sur des dates qui se recouvrent (double décompte + conflit
+      // de planning). ↔ Odoo hr_leave (« time off which overlaps with this period »).
+      const chevauchements = await db.getCongesChevauchants(
+        input.technicienId, artisan.id, dateDebut, dateFin,
+      );
+      if (chevauchements.length > 0) {
+        const c = chevauchements[0];
+        const fmt = (d: any) => new Date(d).toLocaleDateString("fr-FR");
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Ce technicien a déjà un congé sur cette période (du ${fmt(c.dateDebut)} au ${fmt(c.dateFin)}).`,
+        });
+      }
       return await db.createConge({
         ...input,
         artisanId: artisan.id,
-        dateDebut: new Date(input.dateDebut),
-        dateFin: new Date(input.dateFin),
+        dateDebut,
+        dateFin,
       });
     }),
 
@@ -5878,7 +7017,16 @@ const congesRouter = router({
     .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const conge = await db.getCongeById(input.id);
-      if (conge) {
+      // SECURITE (OPE-45) : le congé doit appartenir au tenant appelant (sinon
+      // approbation cross-tenant). conges.artisanId est NOT NULL.
+      const congeArtisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !congeArtisan || conge.artisanId !== congeArtisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
+      // Garde d'idempotence : ne décompter le solde QUE lors de la transition vers
+      // "approuve". Sans ce garde, une ré-approbation (double-clic / re-jeu) re-décompte
+      // le solde (updateSoldeConges est additif) -> jours de congé perdus pour le salarié.
+      if (conge && conge.statut !== 'approuve') {
         // Calculer le nombre de jours
         const debut = new Date(conge.dateDebut);
         const fin = new Date(conge.dateFin);
@@ -5886,10 +7034,13 @@ const congesRouter = router({
         let jours = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
         if (conge.demiJourneeDebut) jours -= 0.5;
         if (conge.demiJourneeFin) jours -= 0.5;
-        
+
         // Mettre à jour le solde si c'est un congé payé ou RTT
         if (conge.type === 'conge_paye' || conge.type === 'rtt') {
-          await db.updateSoldeConges(conge.technicienId, conge.type, new Date().getFullYear(), jours);
+          // OPE-126 — indexer le solde sur l'année DU CONGÉ (dateDebut), pas l'année
+          // courante : sinon un congé approuvé en N et annulé/supprimé en N+1 décompte
+          // soldes(N) mais recrédite soldes(N+1) → corruption inter-exercices.
+          await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, debut.getFullYear(), jours);
         }
       }
       return await db.updateCongeStatut(input.id, 'approuve', ctx.user.id, input.commentaire);
@@ -5898,25 +7049,67 @@ const congesRouter = router({
   refuser: protectedProcedure
     .input(z.object({ id: z.number(), commentaire: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
+      // SECURITE (OPE-45) : ownership du congé avant refus.
+      const conge = await db.getCongeById(input.id);
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !artisan || conge.artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
       return await db.updateCongeStatut(input.id, 'refuse', ctx.user.id, input.commentaire);
     }),
 
   annuler: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      const conge = await db.getCongeById(input.id);
+      // SECURITE (OPE-45) : ownership du congé avant annulation.
+      const congeArtisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !congeArtisan || conge.artisanId !== congeArtisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
+      // Recréditer le solde si on annule un congé APPROUVÉ (qui avait décompté le solde).
+      // Le garde statut === 'approuve' évite tout recrédit sur un congé non décompté
+      // (en_attente/refuse) et tout double-recrédit (après annulation, statut = 'annule').
+      if (conge && conge.statut === 'approuve' && (conge.type === 'conge_paye' || conge.type === 'rtt')) {
+        const debut = new Date(conge.dateDebut);
+        const fin = new Date(conge.dateFin);
+        let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (conge.demiJourneeDebut) jours -= 0.5;
+        if (conge.demiJourneeFin) jours -= 0.5;
+        // OPE-126 — recrédit sur l'année DU CONGÉ (dateDebut), symétrique du décompte.
+        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, debut.getFullYear(), -jours);
+      }
       return await db.updateCongeStatut(input.id, 'annule', ctx.user.id);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const conge = await db.getCongeById(input.id);
+      // SECURITE (OPE-45) : ownership du congé avant hard-delete.
+      const congeArtisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!conge || !congeArtisan || conge.artisanId !== congeArtisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Congé non trouvé" });
+      }
+      // Recréditer le solde si on supprime un congé APPROUVÉ (même logique qu'annuler).
+      if (conge && conge.statut === 'approuve' && (conge.type === 'conge_paye' || conge.type === 'rtt')) {
+        const debut = new Date(conge.dateDebut);
+        const fin = new Date(conge.dateFin);
+        let jours = Math.ceil(Math.abs(fin.getTime() - debut.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (conge.demiJourneeDebut) jours -= 0.5;
+        if (conge.demiJourneeFin) jours -= 0.5;
+        // OPE-126 — recrédit sur l'année DU CONGÉ (dateDebut), symétrique du décompte.
+        await db.updateSoldeConges(conge.technicienId, conge.artisanId, conge.type, debut.getFullYear(), -jours);
+      }
       await db.deleteConge(input.id);
       return { success: true };
     }),
 
   getSoldes: protectedProcedure
     .input(z.object({ technicienId: z.number(), annee: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      // SECURITE (OPE-31/OPE-45) : solde de congés = donnée RH d'un salarié.
+      await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.getSoldesConges(input.technicienId, input.annee);
     }),
 
@@ -5928,7 +7121,8 @@ const congesRouter = router({
       soldeInitial: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-31/OPE-45 : le technicien doit appartenir au tenant appelant.
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.initSoldeConges({
         ...input,
         artisanId: artisan.id,
@@ -5974,6 +7168,15 @@ const previsionsRouter = router({
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
       const annee = input?.annee || new Date().getFullYear();
       return await db.getPrevisionsCA(artisan.id, annee);
+    }),
+
+  // OPE-155 — trésorerie prévisionnelle (flux net par semaine, encaissements − décaissements).
+  getTresoreriePrevisionnelle: protectedProcedure
+    .input(z.object({ semaines: z.number().int().min(1).max(26).default(8) }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return { semaines: [], totalEntrees: 0, totalSorties: 0, totalNet: 0 };
+      return await db.getTresoreriePrevisionnelle(artisan.id, input?.semaines ?? 8);
     }),
 
   calculer: protectedProcedure
@@ -6022,6 +7225,19 @@ const previsionsRouter = router({
 // ============================================================================
 // VEHICULES ROUTER
 // ============================================================================
+// SECURITE (OPE-47) : vérifie que le véhicule appartient au tenant appelant. Les
+// helpers DB (getVehiculeById/update/delete + sous-ressources kilométrage/entretien/
+// assurance) ne scopent que par id -> sans cette garde, IDOR cross-tenant (lecture,
+// écriture, suppression en cascade).
+async function assertVehiculeOwner(vehiculeId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const veh = artisan ? await db.getVehiculeById(vehiculeId) : null;
+  if (!veh || !artisan || (veh as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Véhicule non trouvé" });
+  }
+  return { veh, artisan };
+}
+
 const vehiculesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -6030,17 +7246,20 @@ const vehiculesRouter = router({
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.id, ctx.user.id);
       return await db.getVehiculeById(input.id);
     }),
 
   create: protectedProcedure
     .input(z.object({
-      immatriculation: z.string(),
-      marque: z.string().optional(),
-      modele: z.string().optional(),
+      immatriculation: z.string().max(20),
+      marque: z.string().max(100).optional(),
+      modele: z.string().max(100).optional(),
       annee: z.number().optional(),
       typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
+      // OPE-169 — puissance fiscale (CV) pour le barème kilométrique. Bornée 1..99.
+      puissanceFiscale: z.number().int().min(1).max(99).optional(),
       kilometrageActuel: z.number().optional(),
       dateAchat: z.string().optional(),
       prixAchat: z.string().optional(),
@@ -6049,6 +7268,9 @@ const vehiculesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-47 (classe IDOR/intégrité) — si un technicien est affecté au véhicule, valider
+      // qu'il appartient au tenant (sinon véhicule pointant un technicien d'un autre tenant).
+      if (input.technicienId != null) await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       return await db.createVehicule({
         artisanId: artisan.id,
         ...input,
@@ -6059,24 +7281,30 @@ const vehiculesRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      immatriculation: z.string().optional(),
-      marque: z.string().optional(),
-      modele: z.string().optional(),
+      immatriculation: z.string().max(20).optional(),
+      marque: z.string().max(100).optional(),
+      modele: z.string().max(100).optional(),
       annee: z.number().optional(),
       typeCarburant: z.enum(["essence", "diesel", "electrique", "hybride", "gpl"]).optional(),
+      // OPE-169 — puissance fiscale (CV) pour le barème kilométrique. Bornée 1..99.
+      puissanceFiscale: z.number().int().min(1).max(99).nullable().optional(),
       kilometrageActuel: z.number().optional(),
       technicienId: z.number().nullable().optional(),
       statut: z.enum(["actif", "en_maintenance", "hors_service", "vendu"]).optional(),
       notes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.id, ctx.user.id);
+      // OPE-47 — réaffectation à un technicien : valider l'appartenance au tenant (non null).
+      if (input.technicienId != null) await assertTechnicienOwnership(input.technicienId, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateVehicule(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.id, ctx.user.id);
       return await db.deleteVehicule(input.id);
     }),
 
@@ -6085,19 +7313,28 @@ const vehiculesRouter = router({
       vehiculeId: z.number(),
       kilometrage: z.number(),
       dateReleve: z.string(),
-      motif: z.string().optional(),
+      motif: z.string().max(255).optional(),
       technicienId: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
+      // OPE-47 — relevé attribué à un technicien : valider l'appartenance au tenant (non null).
+      if (input.technicienId != null) await assertTechnicienOwnership(input.technicienId, ctx.user.id);
+      // Garde de validité (classe « date invalide ») : dateReleve est NOT NULL.
+      const dateReleve = new Date(input.dateReleve);
+      if (isNaN(dateReleve.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de relevé invalide" });
+      }
       return await db.addHistoriqueKilometrage({
         ...input,
-        dateReleve: new Date(input.dateReleve),
+        dateReleve,
       });
     }),
 
   getHistoriqueKilometrage: protectedProcedure
     .input(z.object({ vehiculeId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.getHistoriqueKilometrageByVehicule(input.vehiculeId);
     }),
 
@@ -6108,22 +7345,34 @@ const vehiculesRouter = router({
       dateEntretien: z.string(),
       kilometrageEntretien: z.number().optional(),
       cout: z.string().optional(),
-      prestataire: z.string().optional(),
+      prestataire: z.string().max(255).optional(),
       description: z.string().optional(),
       prochainEntretienKm: z.number().optional(),
       prochainEntretienDate: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
+      // Garde de validité (classe « date invalide ») : dateEntretien est NOT NULL ;
+      // prochainEntretienDate est optionnelle (gardée seulement si fournie).
+      const dateEntretien = new Date(input.dateEntretien);
+      if (isNaN(dateEntretien.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date d'entretien invalide" });
+      }
+      const prochainEntretienDate = input.prochainEntretienDate ? new Date(input.prochainEntretienDate) : undefined;
+      if (prochainEntretienDate && isNaN(prochainEntretienDate.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de prochain entretien invalide" });
+      }
       return await db.createEntretienVehicule({
         ...input,
-        dateEntretien: new Date(input.dateEntretien),
-        prochainEntretienDate: input.prochainEntretienDate ? new Date(input.prochainEntretienDate) : undefined,
+        dateEntretien,
+        prochainEntretienDate,
       });
     }),
 
   getEntretiens: protectedProcedure
     .input(z.object({ vehiculeId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.getEntretiensByVehicule(input.vehiculeId);
     }),
 
@@ -6136,15 +7385,16 @@ const vehiculesRouter = router({
   addAssurance: protectedProcedure
     .input(z.object({
       vehiculeId: z.number(),
-      compagnie: z.string(),
-      numeroContrat: z.string().optional(),
+      compagnie: z.string().max(255),
+      numeroContrat: z.string().max(100).optional(),
       typeAssurance: z.enum(["tiers", "tiers_plus", "tous_risques"]).optional(),
       dateDebut: z.string(),
       dateFin: z.string(),
       primeAnnuelle: z.string().optional(),
       franchise: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.createAssuranceVehicule({
         ...input,
         dateDebut: new Date(input.dateDebut),
@@ -6154,7 +7404,8 @@ const vehiculesRouter = router({
 
   getAssurances: protectedProcedure
     .input(z.object({ vehiculeId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertVehiculeOwner(input.vehiculeId, ctx.user.id);
       return await db.getAssurancesByVehicule(input.vehiculeId);
     }),
 
@@ -6174,6 +7425,20 @@ const vehiculesRouter = router({
 // ============================================================================
 // BADGES ET GAMIFICATION ROUTER
 // ============================================================================
+// OPE-47 — appartenance d'un badge au tenant appelant. `update`/`delete`
+// prenaient un id de badge sans vérifier le propriétaire (handler `async ({ input })`
+// sans `ctx`) → un artisan pouvait modifier/supprimer le badge d'un autre tenant
+// (IDOR, cf. audit 2026-06-07-badges-gamification-idor). Même schéma que
+// assertVehiculeOwner : NOT_FOUND si le badge n'appartient pas à l'appelant.
+async function assertBadgeOwner(badgeId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const badge = artisan ? await db.getBadgeById(badgeId) : null;
+  if (!badge || !artisan || (badge as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Badge non trouvé" });
+  }
+  return { badge, artisan };
+}
+
 const badgesRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -6182,13 +7447,15 @@ const badgesRouter = router({
 
   create: protectedProcedure
     .input(z.object({
-      code: z.string(),
-      nom: z.string(),
-      description: z.string().optional(),
-      icone: z.string().optional(),
-      couleur: z.string().optional(),
+      // Bornes alignées sur la table `badges` (code 50, nom 100, icone 50, couleur 20)
+      // — defense-in-depth contre une entrée surdimensionnée (erreur MySQL strict).
+      code: z.string().max(50),
+      nom: z.string().max(100),
+      description: z.string().max(2000).optional(),
+      icone: z.string().max(50).optional(),
+      couleur: z.string().max(20).optional(),
       categorie: z.enum(["interventions", "avis", "ca", "anciennete", "special"]).optional(),
-      condition: z.string().optional(),
+      condition: z.string().max(2000).optional(),
       seuil: z.number().optional(),
       points: z.number().optional(),
     }))
@@ -6200,28 +7467,31 @@ const badgesRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
-      icone: z.string().optional(),
-      couleur: z.string().optional(),
+      nom: z.string().max(100).optional(),
+      description: z.string().max(2000).optional(),
+      icone: z.string().max(50).optional(),
+      couleur: z.string().max(20).optional(),
       seuil: z.number().optional(),
       points: z.number().optional(),
       actif: z.boolean().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertBadgeOwner(input.id, ctx.user.id);
       const { id, ...data } = input;
       return await db.updateBadge(id, data);
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertBadgeOwner(input.id, ctx.user.id);
       return await db.deleteBadge(input.id);
     }),
 
   getBadgesTechnicien: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.getBadgesTechnicien(input.technicienId);
     }),
 
@@ -6231,15 +7501,15 @@ const badgesRouter = router({
       badgeId: z.number(),
       valeurAtteinte: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.attribuerBadge(input.technicienId, input.badgeId, input.valeurAtteinte);
     }),
 
   verifierBadges: protectedProcedure
     .input(z.object({ technicienId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getArtisanByUserId(ctx.user.id);
-      if (!artisan) return [];
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.verifierEtAttribuerBadges(input.technicienId, artisan.id);
     }),
 
@@ -6261,7 +7531,8 @@ const badgesRouter = router({
 
   getObjectifsTechnicien: protectedProcedure
     .input(z.object({ technicienId: z.number(), annee: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      await assertTechnicienOwner(input.technicienId, ctx.user.id); // OPE-31
       return await db.getObjectifsTechnicien(input.technicienId, input.annee);
     }),
 
@@ -6275,7 +7546,8 @@ const badgesRouter = router({
       objectifAvisPositifs: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-31 : le technicien ciblé doit appartenir au tenant appelant.
+      const { artisan } = await assertTechnicienOwner(input.technicienId, ctx.user.id);
       return await db.createObjectifTechnicien({ artisanId: artisan.id, ...input });
     }),
 });
@@ -6313,20 +7585,26 @@ const chantiersRouter = router({
   create: protectedProcedure
     .input(z.object({
       clientId: z.number(),
-      reference: z.string(),
-      nom: z.string(),
-      description: z.string().optional(),
-      adresse: z.string().optional(),
-      codePostal: z.string().optional(),
-      ville: z.string().optional(),
+      // Bornes texte alignées sur les colonnes de `chantiers` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      reference: z.string().max(50),
+      nom: z.string().max(255),
+      description: z.string().max(2000).optional(),
+      adresse: z.string().max(500).optional(),
+      codePostal: z.string().max(10).optional(),
+      ville: z.string().max(100).optional(),
       dateDebut: z.string().optional(),
       dateFinPrevue: z.string().optional(),
       budgetPrevisionnel: z.string().optional(),
       priorite: z.enum(["basse", "normale", "haute", "urgente"]).optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — valider que le client appartient au tenant avant de créer
+      // un chantier qui le référence (sinon FK cliente d'un autre tenant). NOT_FOUND si étranger.
+      const clientChantier = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!clientChantier) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
       return await db.createChantier({
         artisanId: artisan.id,
         ...input,
@@ -6338,13 +7616,13 @@ const chantiersRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      description: z.string().optional(),
+      nom: z.string().max(255).optional(),
+      description: z.string().max(2000).optional(),
       statut: z.enum(["planifie", "en_cours", "en_pause", "termine", "annule"]).optional(),
       avancement: z.number().optional(),
       dateFinReelle: z.string().optional(),
       budgetRealise: z.string().optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertChantierOwner(input.id, ctx.user.id);
@@ -6370,15 +7648,67 @@ const chantiersRouter = router({
       return await db.getPhasesByChantier(input.chantierId);
     }),
 
+  // ── Pointages de main-d'œuvre (OPE-106) — heures réalisées vs prévues ────────
+  getPointages: protectedProcedure
+    .input(z.object({ chantierId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const { artisan } = await assertChantierOwner(input.chantierId, ctx.user.id);
+      return await db.getPointagesByChantier(input.chantierId, artisan.id);
+    }),
+
+  addPointage: protectedProcedure
+    .input(z.object({
+      chantierId: z.number(),
+      phaseId: z.number().optional(),
+      technicienId: z.number().optional(),
+      date: z.string().min(1),
+      heures: z.number().positive().max(24, "Maximum 24 h par pointage"),
+      description: z.string().trim().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { artisan } = await assertChantierOwner(input.chantierId, ctx.user.id);
+      // Garde « date invalide » : date est NOT NULL en base.
+      const d = new Date(input.date);
+      if (isNaN(d.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date de pointage invalide" });
+      }
+      // Le technicien fourni doit appartenir au tenant (sinon on l'ignore plutôt que de lier hors tenant).
+      let technicienId: number | null = null;
+      if (input.technicienId) {
+        const tech = await db.getTechnicienById(input.technicienId);
+        technicienId = tech && tech.artisanId === artisan.id ? input.technicienId : null;
+      }
+      return await db.createPointageChantier({
+        artisanId: artisan.id,
+        chantierId: input.chantierId,
+        phaseId: input.phaseId ?? null,
+        technicienId,
+        date: d,
+        heures: input.heures.toFixed(2),
+        description: input.description || null,
+      });
+    }),
+
+  deletePointage: protectedProcedure
+    .input(z.object({ chantierId: z.number(), id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const { artisan } = await assertChantierOwner(input.chantierId, ctx.user.id);
+      await db.deletePointageChantier(input.id, input.chantierId, artisan.id);
+      return { success: true };
+    }),
+
   createPhase: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
-      nom: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `phases_chantier` (nom varchar 255, description TEXT) —
+      // defense-in-depth : évite une erreur/troncature MySQL (mode strict). OPE-24.
+      nom: z.string().max(255),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
       dateDebutPrevue: z.string().optional(),
       dateFinPrevue: z.string().optional(),
       budgetPhase: z.string().optional(),
+      heuresPrevues: z.string().optional(), // OPE-106 — heures de main-d'œuvre prévues
     }))
     .mutation(async ({ ctx, input }) => {
       await assertChantierOwner(input.chantierId, ctx.user.id);
@@ -6392,12 +7722,13 @@ const chantiersRouter = router({
   updatePhase: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
+      nom: z.string().max(255).optional(), // borne alignée sur phases_chantier.nom (OPE-24)
       statut: z.enum(["a_faire", "en_cours", "termine", "annule"]).optional(),
       avancement: z.number().optional(),
       dateDebutReelle: z.string().optional(),
       dateFinReelle: z.string().optional(),
       coutReel: z.string().optional(),
+      heuresPrevues: z.string().optional(), // OPE-106 — heures de main-d'œuvre prévues
     }))
     .mutation(async ({ ctx, input }) => {
       // SECURITE : on charge la phase pour recuperer son chantierId puis on check.
@@ -6475,9 +7806,10 @@ const chantiersRouter = router({
   addDocument: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
-      nom: z.string(),
+      // Bornes alignées sur `documents_chantier` (nom varchar 255, url TEXT) — OPE-24.
+      nom: z.string().max(255),
       type: z.enum(["plan", "photo", "permis", "contrat", "facture", "autre"]).optional(),
-      url: z.string(),
+      url: z.string().max(65535),
       taille: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -6520,15 +7852,17 @@ const chantiersRouter = router({
   createSuivi: protectedProcedure
     .input(z.object({
       chantierId: z.number(),
-      titre: z.string(),
-      description: z.string().optional(),
+      // Bornes texte alignées sur `suivi_chantier` (titre VARCHAR 255 ; description/
+      // commentaire TEXT) — évite qu'un titre surdimensionné fasse échouer l'insert.
+      titre: z.string().max(255),
+      description: z.string().max(5000).optional(),
       statut: z.enum(["a_faire", "en_cours", "termine"]).optional(),
       pourcentage: z.number().min(0).max(100).optional(),
       ordre: z.number().optional(),
       visibleClient: z.boolean().optional(),
       dateDebut: z.string().optional(),
       dateFin: z.string().optional(),
-      commentaire: z.string().optional(),
+      commentaire: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertChantierOwner(input.chantierId, ctx.user.id);
@@ -6644,7 +7978,9 @@ const integrationsComptablesRouter = router({
       // Générer le contenu selon le format
       let contenu = '';
       if (input.formatExport === 'fec') {
-        contenu = await db.genererExportFEC(artisan.id, dateDebut, dateFin);
+        // Générateur FEC unique et conforme (18 colonnes, journaux VE/AC/BQ,
+        // TVA par taux, ValidDate) — même source que /api/comptabilite/fec.
+        contenu = (await db.genererFEC(artisan.id, dateDebut, dateFin)).content;
       } else if (input.formatExport === 'iif') {
         contenu = await db.genererExportIIF(artisan.id, dateDebut, dateFin);
       }
@@ -6721,6 +8057,19 @@ const integrationsComptablesRouter = router({
 // ============================================================================
 // DEVIS IA ROUTER
 // ============================================================================
+// SECURITE (OPE-30) : analyses_photos_chantier porte un artisanId ; les helpers
+// (getAnalysePhotoById/getPhotosByAnalyse/updateAnalysePhoto/addPhotoToAnalyse) ne
+// scopent que par id -> sans cette garde, IDOR (lecture/écriture/analyse des photos
+// d'un autre tenant).
+async function assertAnalyseOwner(analyseId: number, userId: number) {
+  const artisan = await db.getArtisanByUserId(userId);
+  const analyse = artisan ? await db.getAnalysePhotoById(analyseId) : null;
+  if (!analyse || !artisan || (analyse as any).artisanId !== artisan.id) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Analyse non trouvée" });
+  }
+  return { analyse, artisan };
+}
+
 const devisIARouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -6730,9 +8079,8 @@ const devisIARouter = router({
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ input }) => {
-      const analyse = await db.getAnalysePhotoById(input.id);
-      if (!analyse) return null;
+    .query(async ({ ctx, input }) => {
+      const { analyse } = await assertAnalyseOwner(input.id, ctx.user.id);
 
       const photos = await db.getPhotosByAnalyse(input.id);
       const resultats = await db.getResultatsAnalyse(input.id);
@@ -6756,17 +8104,25 @@ const devisIARouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — si un client est rattaché, valider son appartenance au tenant.
+      if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
+      }
       return await db.createAnalysePhoto({ artisanId: artisan.id, ...input });
     }),
 
   addPhoto: protectedProcedure
     .input(z.object({
       analyseId: z.number(),
-      url: z.string(),
-      description: z.string().optional(),
+      // Bornes alignées sur `photos_analyse` (url/description = colonnes TEXT, 65535
+      // octets) — defense-in-depth : au-delà, MySQL tronque/erre (mode strict) au lieu
+      // d'un 400 clair. OPE-24.
+      url: z.string().max(65535),
+      description: z.string().max(65535).optional(),
       ordre: z.number().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertAnalyseOwner(input.analyseId, ctx.user.id);
       return await db.addPhotoToAnalyse(input);
     }),
 
@@ -6776,6 +8132,18 @@ const devisIARouter = router({
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
+      }
+      // OPE-24 — rate-limit IA (vision multimodale = l'appel le plus coûteux) ;
+      // était le seul endpoint IA sans borne, contrairement à tous ses pairs.
+      if (!checkRateLimit(artisan.id)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
+      }
+
+      // SECURITE (OPE-30) : l'analyse doit appartenir au tenant appelant (sinon
+      // analyse/altération du statut des photos d'un autre tenant).
+      const analyseOwn = await db.getAnalysePhotoById(input.analyseId);
+      if (!analyseOwn || (analyseOwn as any).artisanId !== artisan.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Analyse non trouvée" });
       }
 
       // Sanitizer global : enleve toute data: URL et tronque a 200 chars pour
@@ -6797,23 +8165,16 @@ const devisIARouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Aucune photo à analyser" });
       }
 
-      // Appel direct au SDK Anthropic (claude-sonnet-4 multimodal).
-      // Le SDK lit ANTHROPIC_API_KEY automatiquement.
-      // Supporte les 2 formes d'image acceptees par Anthropic :
-      // - URL HTTP(S) publique  -> source: { type: 'url', url }
-      // - Data URL (upload local b64) -> source: { type: 'base64', ... }
+      // Build image parts for Gemini multimodal.
+      // Supporte les 2 formes d'image :
+      // - Data URL (base64) -> inlineData
+      // - URL HTTP(S) publique -> fileData
       const imageBlocks = photos.map((p: any) => {
         const m = String(p.url || "").match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
         if (m) {
-          return {
-            type: "image" as const,
-            source: { type: "base64" as const, media_type: m[1] as any, data: m[2] },
-          };
+          return { inlineData: { mimeType: m[1], data: m[2] } };
         }
-        return {
-          type: "image" as const,
-          source: { type: "url" as const, url: p.url },
-        };
+        return { fileData: { mimeType: 'image/jpeg', fileUri: p.url } };
       });
 
       // T4 : prompt specialise par metier — l'IA devient un expert
@@ -6853,32 +8214,23 @@ Pour chaque type de travaux detecte, fournis :
 Reponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour) :
 {"travaux":[{"type":"string","description":"string","urgence":"faible|moyenne|haute|critique","confiance":0,"articles":[{"nom":"string","description":"string","quantite":0,"unite":"string","prixEstime":0}]}]}`;
 
-      // Appel Anthropic dans try/catch pour ne JAMAIS laisser remonter
+      // Appel Gemini multimodal dans try/catch pour ne JAMAIS laisser remonter
       // le payload d'image base64 dans la stack d'erreur tRPC.
       let responseText = '';
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 4000,
-          temperature: 0.3,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: [
-                ...imageBlocks,
-                { type: "text", text: "Analyse ces photos de chantier et identifie les travaux nécessaires." },
-              ],
-            },
-          ],
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [
+            ...imageBlocks,
+            { text: "Analyse ces photos de chantier et identifie les travaux nécessaires." },
+          ] }],
+          config: { systemInstruction: systemPrompt, temperature: 0.3, maxOutputTokens: 4000 },
         });
-        responseText = response.content
-          .filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text)
-          .join('');
+        responseText = response.text || '';
       } catch (e: any) {
-        console.warn('[analyserPhotos] Anthropic call failed:', e?.status, e?.name);
+        console.warn('[analyserPhotos] Gemini call failed:', e?.status, e?.name);
         await db.updateAnalysePhoto(input.analyseId, { statut: 'erreur' });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -6982,6 +8334,11 @@ Reponds UNIQUEMENT avec un objet JSON brut (pas de markdown, pas de texte autour
       if (!artisan) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Profil artisan non trouvé" });
       }
+      // OPE-25/OPE-30 (classe clientId) — valider l'appartenance du client AVANT de générer
+      // le devis : sinon un devis créé avec un clientId étranger fuite la PII du client via
+      // la relecture du devis (getClientById non scopé). C'est le seul vecteur de fuite résiduel.
+      const clientIA = await dbSecure.getClientByIdSecure(input.clientId, artisan.id);
+      if (!clientIA) throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
       return await db.creerDevisDepuisAnalyseIA({
         analyseId: input.analyseId,
         clientId: input.clientId,
@@ -7040,16 +8397,16 @@ const assistantRouter = router({
       if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
       if (!checkRateLimit(artisan.id)) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite de 30 requêtes/heure atteinte" });
 
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const model = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
       const systemPrompt = await buildSystemPrompt(artisan.id);
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        temperature: 0.7,
-        system: systemPrompt,
-        messages: [{ role: "user", content: input.message }],
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{ role: 'user', parts: [{ text: input.message }] }],
+        config: { systemInstruction: systemPrompt, maxOutputTokens: 2000, temperature: 0.7 },
       });
-      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      const text = response.text || '';
       return { response: text };
     }),
 
@@ -7065,17 +8422,20 @@ const assistantRouter = router({
       const catalogue = [...articles.map(a => `${a.designation || a.nom} - ${a.prixUnitaireHT || a.prixBase}€/${a.unite}`),
         ...biblio.slice(0, 50).map((a: any) => `${a.nom} - ${a.prix_base}€/${a.unite}`)].join('\n');
 
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        temperature: 0.3,
-        system: `Tu es un assistant spécialisé dans la génération de devis pour artisans. Tu dois générer des lignes de devis au format JSON.
+      const { GoogleGenAI: GenAI2 } = await import('@google/genai');
+      const ai2 = new GenAI2({ apiKey: process.env.GEMINI_API_KEY! });
+      const response = await ai2.models.generateContent({
+        model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: `Génère les lignes de devis pour : ${input.description}` }] }],
+        config: {
+          systemInstruction: `Tu es un assistant spécialisé dans la génération de devis pour artisans. Tu dois générer des lignes de devis au format JSON.
 Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un tableau JSON (pas de texte autour) au format :
 [{"designation":"...","quantite":1,"unite":"u","prixUnitaireHT":0,"tauxTVA":20}]`,
-        messages: [{ role: "user", content: `Génère les lignes de devis pour : ${input.description}` }],
+          temperature: 0.3,
+          maxOutputTokens: 2000,
+        },
       });
-      const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      const text = response.text || '';
       try {
         const jsonMatch = text.match(/\[[\s\S]*\]/);
         const lignes = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
@@ -7101,15 +8461,18 @@ Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un 
     if (devisARelancer.length === 0) return [];
 
     const liste = devisARelancer.map(d => `- Devis ${d.numero} (${d.objet || 'sans objet'}) : ${d.totalTTC}€ TTC, envoyé il y a ${d.jours} jours à ${d.client}`).join('\n');
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      temperature: 0.7,
-      system: `Tu es un assistant qui génère des emails de relance professionnels et personnalisés pour un artisan. Pour chaque devis, génère un email court et cordial. Réponds en JSON : [{"numero":"...","objet":"...","email":{"sujet":"...","corps":"..."}}]`,
-      messages: [{ role: "user", content: `Génère des emails de relance pour ces devis :\n${liste}` }],
+    const { GoogleGenAI: GenAI3 } = await import('@google/genai');
+    const ai3 = new GenAI3({ apiKey: process.env.GEMINI_API_KEY! });
+    const response = await ai3.models.generateContent({
+      model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: `Génère des emails de relance pour ces devis :\n${liste}` }] }],
+      config: {
+        systemInstruction: `Tu es un assistant qui génère des emails de relance professionnels et personnalisés pour un artisan. Pour chaque devis, génère un email court et cordial. Réponds en JSON : [{"numero":"...","objet":"...","email":{"sujet":"...","corps":"..."}}]`,
+        temperature: 0.7,
+        maxOutputTokens: 2000,
+      },
     });
-    const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    const text = response.text || '';
     try {
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
@@ -7134,15 +8497,18 @@ Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un 
       const detailLignes = lignes.map(l => `- ${l.designation}: ${l.quantite} ${l.unite} x ${l.prixUnitaireHT}€ HT (TVA ${l.tauxTVA}%)`).join('\n');
       const prixRef = articles.slice(0, 30).map(a => `${a.designation || a.nom}: ${a.prixUnitaireHT || a.prixBase}€/${a.unite}`).join('\n');
 
-      const client = new Anthropic();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        temperature: 0.5,
-        system: `Tu es un expert en analyse de rentabilité pour artisans. Analyse ce devis, compare les prix aux tarifs habituels, estime la marge, et donne des recommandations concrètes. Réponds en français avec du markdown.`,
-        messages: [{ role: "user", content: `Analyse ce devis :\nDevis ${devisData.numero} pour ${cl ? `${cl.prenom || ''} ${cl.nom}`.trim() : 'client'}\nTotal HT: ${devisData.totalHT}€ | Total TTC: ${devisData.totalTTC}€\n\nLignes :\n${detailLignes}\n\nTarifs habituels de l'artisan :\n${prixRef || 'Non disponibles'}` }],
+      const { GoogleGenAI: GenAI4 } = await import('@google/genai');
+      const ai4 = new GenAI4({ apiKey: process.env.GEMINI_API_KEY! });
+      const response = await ai4.models.generateContent({
+        model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: `Analyse ce devis :\nDevis ${devisData.numero} pour ${cl ? `${cl.prenom || ''} ${cl.nom}`.trim() : 'client'}\nTotal HT: ${devisData.totalHT}€ | Total TTC: ${devisData.totalTTC}€\n\nLignes :\n${detailLignes}\n\nTarifs habituels de l'artisan :\n${prixRef || 'Non disponibles'}` }] }],
+        config: {
+          systemInstruction: `Tu es un expert en analyse de rentabilité pour artisans. Analyse ce devis, compare les prix aux tarifs habituels, estime la marge, et donne des recommandations concrètes. Réponds en français avec du markdown.`,
+          temperature: 0.5,
+          maxOutputTokens: 2000,
+        },
       });
-      return { analyse: response.content.filter(b => b.type === 'text').map(b => b.text).join('') };
+      return { analyse: response.text || '' };
     }),
 
   predictionTresorerie: protectedProcedure.query(async ({ ctx }) => {
@@ -7157,16 +8523,36 @@ Catalogue d'articles disponibles :\n${catalogue}\n\nRéponds UNIQUEMENT avec un 
     const facturesImpayees = factures.filter(f => f.statut !== 'payee' && f.statut !== 'annulee').map(f => `FAC ${f.numero}: ${f.totalTTC}€ (${f.statut}) échéance ${f.dateEcheance || 'non définie'}`).join('\n');
     const devisAcceptes = devisList.filter(d => d.statut === 'accepte').map(d => `DEV ${d.numero}: ${d.totalTTC}€`).join('\n');
 
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      temperature: 0.5,
-      system: `Tu es un expert en gestion de trésorerie pour artisans. Analyse les données financières et prédit les entrées/sorties sur les 3 prochains mois. Donne des alertes si tension de trésorerie. Réponds en français avec du markdown.`,
-      messages: [{ role: "user", content: `Données financières :\n\nFactures payées récentes :\n${facturesPayees || 'Aucune'}\n\nFactures impayées :\n${facturesImpayees || 'Aucune'}\n\nDevis acceptés (à facturer) :\n${devisAcceptes || 'Aucun'}` }],
+    const { GoogleGenAI: GenAI5 } = await import('@google/genai');
+    const ai5 = new GenAI5({ apiKey: process.env.GEMINI_API_KEY! });
+    const response = await ai5.models.generateContent({
+      model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: `Données financières :\n\nFactures payées récentes :\n${facturesPayees || 'Aucune'}\n\nFactures impayées :\n${facturesImpayees || 'Aucune'}\n\nDevis acceptés (à facturer) :\n${devisAcceptes || 'Aucun'}` }] }],
+      config: {
+        systemInstruction: `Tu es un expert en gestion de trésorerie pour artisans. Analyse les données financières et prédit les entrées/sorties sur les 3 prochains mois. Donne des alertes si tension de trésorerie. Réponds en français avec du markdown.`,
+        temperature: 0.5,
+        maxOutputTokens: 2000,
+      },
     });
-    return { prediction: response.content.filter(b => b.type === 'text').map(b => b.text).join('') };
+    return { prediction: response.text || '' };
   }),
+
+  getThreads: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return db.listAiThreads(artisan.id, 20);
+  }),
+
+  getMessages: protectedProcedure
+    .input(z.object({ threadId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      // Verify thread belongs to artisan
+      const thread = await db.getAiThread(input.threadId, artisan.id);
+      if (!thread) return [];
+      return db.getAiMessages(input.threadId, 100);
+    }),
 });
 
 // ============================================================================
@@ -7211,7 +8597,7 @@ const statistiquesRouter = router({
     }),
 
   getTopClients: protectedProcedure
-    .input(z.object({ limit: z.number().optional() }).optional())
+    .input(z.object({ limit: z.number().max(500).optional() }).optional())
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -7291,6 +8677,28 @@ const portailRouter = router({
 // CALENDRIER ROUTER
 // ============================================================================
 const calendrierRouter = router({
+  // OPE-156 — flux iCal : renvoie (en le générant à la 1ʳᵉ fois) le chemin d'abonnement
+  // au calendrier des interventions. Le front préfixe l'origine pour l'URL complète.
+  getIcalFeed: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+    let token = (artisan as any).icalToken as string | null;
+    if (!token) {
+      token = randomBytes(24).toString("hex"); // 48 hex chars, non devinable
+      await db.updateArtisan(artisan.id, { icalToken: token } as any);
+    }
+    return { path: `/api/calendar/${token}.ics` };
+  }),
+
+  // Régénère le jeton (révoque l'ancien lien d'abonnement).
+  regenerateIcalFeed: protectedProcedure.mutation(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+    const token = randomBytes(24).toString("hex");
+    await db.updateArtisan(artisan.id, { icalToken: token } as any);
+    return { path: `/api/calendar/${token}.ics` };
+  }),
+
   getEvents: protectedProcedure
     .input(z.object({
       dateDebut: z.string().optional(),
@@ -7378,7 +8786,7 @@ const rdvRouter = router({
         await sendEmail({
           to: client.email,
           subject: `${artisanName} — Votre RDV est confirme`,
-          body: `<p>Bonjour ${clientName},</p><p>Votre rendez-vous <strong>${rdv.titre}</strong> du <strong>${dateStr}</strong> a ete confirme.</p><p>Cordialement,<br/>${artisanName}</p>`,
+          body: `<p>Bonjour ${safeHtml(clientName)},</p><p>Votre rendez-vous <strong>${safeHtml(rdv.titre)}</strong> du <strong>${dateStr}</strong> a ete confirme.</p><p>Cordialement,<br/>${safeHtml(artisanName)}</p>`,
         });
       }
 
@@ -7405,7 +8813,7 @@ const rdvRouter = router({
         await sendEmail({
           to: client.email,
           subject: `${artisanName} — RDV non disponible`,
-          body: `<p>Bonjour ${clientName},</p><p>Votre demande de rendez-vous <strong>${rdv.titre}</strong> n'a malheureusement pas pu etre acceptee.</p><p><strong>Motif :</strong> ${input.motif}</p><p>N'hesitez pas a proposer un autre creneau.</p><p>Cordialement,<br/>${artisanName}</p>`,
+          body: `<p>Bonjour ${safeHtml(clientName)},</p><p>Votre demande de rendez-vous <strong>${safeHtml(rdv.titre)}</strong> n'a malheureusement pas pu etre acceptee.</p><p><strong>Motif :</strong> ${safeHtml(input.motif)}</p><p>N'hesitez pas a proposer un autre creneau.</p><p>Cordialement,<br/>${safeHtml(artisanName)}</p>`,
         });
       }
 
@@ -7423,6 +8831,28 @@ const rdvRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "RDV non trouve" });
       }
 
+      // Garde de validité (classe « date invalide ») AVANT toute mutation : dateProposee est
+      // NOT NULL. Sans ce garde et placée ici, on refuserait l'ancien RDV puis on planterait
+      // sur la création du nouveau (état incohérent : RDV refusé sans remplaçant).
+      const nouvelleDate = new Date(input.nouvelleDateProposee);
+      if (isNaN(nouvelleDate.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Date proposée invalide" });
+      }
+      // Bornes de date (cohérence avec `demanderRdv` :4996-5005) : on ne propose pas un
+      // créneau dans un jour passé (RDV incohérent côté client) ni à un futur absurde
+      // (pollution de la colonne NOT NULL `dateProposee`, ex. année 9999). Behavior-preserving :
+      // aucune contre-proposition légitime n'est antérieure à aujourd'hui ni à plus de 2 ans.
+      // Borne basse = début du jour courant → autorise toute heure d'aujourd'hui.
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      if (nouvelleDate < startOfToday) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le créneau proposé ne peut pas être dans le passé" });
+      }
+      const maxDateRdv = new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000);
+      if (nouvelleDate > maxDateRdv) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La date proposée est trop éloignée" });
+      }
+
       await db.updateRdvStatut(rdv.id, "refuse", {
         motifRefus: "Creneau non disponible — un autre creneau a ete propose",
       });
@@ -7432,7 +8862,7 @@ const rdvRouter = router({
         clientId: rdv.clientId,
         titre: rdv.titre,
         description: rdv.description,
-        dateProposee: new Date(input.nouvelleDateProposee),
+        dateProposee: nouvelleDate,
         dureeEstimee: rdv.dureeEstimee,
         urgence: rdv.urgence || "normale",
       });
@@ -7445,7 +8875,7 @@ const rdvRouter = router({
         await sendEmail({
           to: client.email,
           subject: `${artisanName} — Nouveau creneau propose`,
-          body: `<p>Bonjour ${clientName},</p><p>Le creneau initialement demande n'est pas disponible. Un nouveau creneau vous est propose :</p><p><strong>${newDateStr}</strong></p><p>Connectez-vous a votre espace client pour confirmer.</p><p>Cordialement,<br/>${artisanName}</p>`,
+          body: `<p>Bonjour ${safeHtml(clientName)},</p><p>Le creneau initialement demande n'est pas disponible. Un nouveau creneau vous est propose :</p><p><strong>${newDateStr}</strong></p><p>Connectez-vous a votre espace client pour confirmer.</p><p>Cordialement,<br/>${safeHtml(artisanName)}</p>`,
         });
       }
 
@@ -7524,26 +8954,44 @@ const vitrineRouter = router({
 
   submitContact: publicProcedure
     .input(z.object({
-      slug: z.string().min(1),
-      nom: z.string().min(1),
-      email: z.string().email(),
-      telephone: z.string().optional(),
-      message: z.string().min(10),
+      slug: z.string().min(1).max(200),
+      nom: z.string().min(1).max(200),
+      email: z.string().email().max(320),
+      telephone: z.string().max(30).optional(),
+      message: z.string().min(10).max(5000),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const artisan = await db.getArtisanBySlug(input.slug);
       if (!artisan || !artisan.email) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouve" });
+
+      // Cohérence avec getBySlug : pas de formulaire de contact pour une vitrine DÉSACTIVÉE
+      // (un slug connu ne doit pas permettre d'inonder un artisan dont la page publique est
+      // éteinte). Behavior-preserving : une vitrine active passe à l'identique.
+      const parametresVitrine = await db.getParametresArtisan(artisan.id);
+      if (!parametresVitrine?.vitrineActive) throw new TRPCError({ code: "NOT_FOUND", message: "Cette vitrine n'est pas active" });
+
+      // OPE-36 — anti-flood par IP (5 msg / 15 min) : borne l'inondation de la boîte
+      // artisan + les coûts Resend depuis un même émetteur (l'injection HTML est déjà
+      // traitée via safeHtml ci-dessous). Un visiteur légitime (1 message) n'est pas affecté.
+      const contactIp = String(
+        (ctx.req?.headers?.['cf-connecting-ip'] as string)
+        || ((ctx.req?.headers?.['x-forwarded-for'] as string) || '').split(',')[0].trim()
+        || ctx.req?.socket?.remoteAddress || 'unknown'
+      );
+      if (!checkPublicContactRate(contactIp)) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de messages envoyés. Réessayez dans quelques minutes." });
+      }
 
       await sendEmail({
         to: artisan.email,
         subject: `Nouveau contact via votre vitrine - ${input.nom}`,
         body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:20px;">
           <h2 style="color:#1e40af;">Nouveau message depuis votre page vitrine</h2>
-          <p><strong>Nom :</strong> ${input.nom}</p>
-          <p><strong>Email :</strong> ${input.email}</p>
-          ${input.telephone ? `<p><strong>Telephone :</strong> ${input.telephone}</p>` : ''}
+          <p><strong>Nom :</strong> ${safeHtml(input.nom)}</p>
+          <p><strong>Email :</strong> ${safeHtml(input.email)}</p>
+          ${input.telephone ? `<p><strong>Telephone :</strong> ${safeHtml(input.telephone)}</p>` : ''}
           <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
-          <p style="white-space:pre-wrap;">${input.message}</p>
+          <p>${safeHtml(input.message)}</p>
           <hr style="border:1px solid #e5e7eb;margin:20px 0;" />
           <p style="color:#6b7280;font-size:12px;">Message envoye depuis votre page vitrine Operioz</p>
         </body></html>`,
@@ -7556,7 +9004,57 @@ const vitrineRouter = router({
         lien: '/parametres',
       });
 
+      // OPE-172 — persiste le lead (best-effort : ne casse pas l'envoi si l'insert échoue).
+      try {
+        await db.createDemandeContact({
+          artisanId: artisan.id,
+          nom: input.nom,
+          email: input.email,
+          telephone: input.telephone || null,
+          message: input.message,
+          source: 'vitrine',
+        });
+      } catch (e) { console.error('[submitContact] persist lead:', e); }
+
       return { success: true };
+    }),
+
+  // OPE-172 — liste des demandes de contact (leads) de l'artisan.
+  getDemandesContact: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getDemandesContactByArtisanId(artisan.id);
+  }),
+
+  // OPE-172 — met à jour le statut d'un lead (suivi nouveau → contacté/perdu). Scopé artisan.
+  updateDemandeContactStatut: protectedProcedure
+    .input(z.object({ id: z.number(), statut: z.enum(["nouveau", "contacte", "converti", "perdu"]) }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const demande = await db.getDemandeContactById(input.id, artisan.id);
+      if (!demande) throw new TRPCError({ code: "NOT_FOUND", message: "Demande non trouvée" });
+      await db.updateDemandeContactStatut(input.id, artisan.id, input.statut);
+      return { success: true };
+    }),
+
+  // OPE-172 — convertit un lead en client (réutilise createClientSecure) + lie la demande.
+  convertirDemandeEnClient: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      const demande = await db.getDemandeContactById(input.id, artisan.id);
+      if (!demande) throw new TRPCError({ code: "NOT_FOUND", message: "Demande non trouvée" });
+      if (demande.clientId) throw new TRPCError({ code: "BAD_REQUEST", message: "Demande déjà convertie" });
+      // Nom : « Prénom Nom » du formulaire → on met tout dans `nom` (champ requis), le reste vide.
+      const client = await dbSecure.createClientSecure(artisan.id, {
+        nom: demande.nom,
+        email: demande.email || undefined,
+        telephone: demande.telephone || undefined,
+      } as any);
+      await db.updateDemandeContactStatut(input.id, artisan.id, "converti", client.id);
+      return { success: true, clientId: client.id };
     }),
 
   checkSlug: protectedProcedure
@@ -7583,9 +9081,11 @@ const utilisateursRouter = router({
 
   invite: utilisateursGererProcedure
     .input(z.object({
-      email: z.string().email(),
-      nom: z.string().min(1),
-      prenom: z.string().optional(),
+      email: z.string().email().max(320),
+      // Bornes alignées sur les colonnes `users` (prenom VARCHAR(255)) : évite une
+      // entrée surdimensionnée -> ER_DATA_TOO_LONG (500) au lieu d'un 400 propre.
+      nom: z.string().min(1).max(255),
+      prenom: z.string().max(255).optional(),
       role: z.enum(["artisan", "secretaire", "technicien"]),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -7595,7 +9095,8 @@ const utilisateursRouter = router({
       const existing = await db.getUserByEmail(input.email);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "Cet email est déjà utilisé" });
 
-      const tempPassword = Math.random().toString(36).slice(-10);
+      // OPE-18 — mot de passe temporaire généré avec un RNG crypto-sûr (10 car. alphanum.)
+      const tempPassword = Array.from(randomBytes(10), (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
       const passwordHash = await hashPassword(tempPassword);
 
       const newUser = await db.createCollaborator({
@@ -7622,7 +9123,7 @@ const utilisateursRouter = router({
           subject: `Invitation à rejoindre ${artisan.nomEntreprise || 'Operioz'}`,
           body: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:20px;">
             <h2 style="color:#4F46E5;">Bienvenue sur Operioz !</h2>
-            <p>Vous avez été invité(e) à rejoindre <strong>${artisan.nomEntreprise || 'l\'entreprise'}</strong> en tant que <strong>${roleFr[input.role] || input.role}</strong>.</p>
+            <p>Vous avez été invité(e) à rejoindre <strong>${safeHtml(artisan.nomEntreprise || 'l\'entreprise')}</strong> en tant que <strong>${roleFr[input.role] || input.role}</strong>.</p>
             <p>Vos identifiants de connexion :</p>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:16px 0;">
               <p style="margin:4px 0;"><strong>Email :</strong> ${input.email}</p>
@@ -7684,7 +9185,10 @@ const utilisateursRouter = router({
   updatePermissions: utilisateursGererProcedure
     .input(z.object({
       userId: z.number(),
-      permissions: z.array(z.string()),
+      // OPE-24 — borne defense-in-depth : un tableau non borne est filtre via
+      // ALL_PERMISSIONS.includes() (O(n)) ; cap l'entree pour eviter un filter sur
+      // un tableau geant. Une selection legitime a < 200 codes courts.
+      permissions: z.array(z.string().max(100)).max(200),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -7780,7 +9284,9 @@ const modulesRouter = router({
       z.object({
         metier: z.string().optional(),
         plan: z.string().optional(),
-        moduleSlugs: z.array(z.string()).optional(),
+        // OPE-24 — borne defense-in-depth : moduleSlugs est parcouru via includes()
+        // pour chaque module du catalogue ; cap l'entree (catalogue << 200 slugs courts).
+        moduleSlugs: z.array(z.string().max(100)).max(200).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -8041,101 +9547,10 @@ const searchRouter = router({
 
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return { results: [] };
-      const artisanId = artisan.id;
-      const like = `%${q}%`;
 
-      // Lazy import du pool pour eviter un cycle avec db.ts.
-      const pool = db.getPool();
-      if (!pool) return { results: [] };
-
-      // 5 queries en parallele, chacune limitee a 5 lignes max.
-      const [
-        [clientsRows],
-        [devisRows],
-        [facturesRows],
-        [interventionsRows],
-        [fournisseursRows],
-      ] = await Promise.all([
-        pool.execute(
-          // COLLATE utf8mb4_general_ci : recherche insensible aux accents
-          // ET a la casse (ex : "evi" trouve "Evrard" ET "Évrard").
-          `SELECT id, TRIM(CONCAT(COALESCE(prenom, ''), ' ', nom)) AS title,
-                  COALESCE(email, telephone, ville, '') AS subtitle
-           FROM clients
-           WHERE artisanId = ?
-             AND (nom COLLATE utf8mb4_general_ci LIKE ?
-                  OR prenom COLLATE utf8mb4_general_ci LIKE ?
-                  OR email COLLATE utf8mb4_general_ci LIKE ?
-                  OR telephone COLLATE utf8mb4_general_ci LIKE ?
-                  OR ville COLLATE utf8mb4_general_ci LIKE ?)
-           ORDER BY id DESC
-           LIMIT 5`,
-          [artisanId, like, like, like, like, like]
-        ),
-        pool.execute(
-          `SELECT id, CONCAT(numero, COALESCE(CONCAT(' — ', objet), '')) AS title,
-                  CONCAT(IFNULL(statut, ''), ' — ', FORMAT(COALESCE(totalTTC, 0), 2), ' €') AS subtitle
-           FROM devis
-           WHERE artisanId = ?
-             AND (numero COLLATE utf8mb4_general_ci LIKE ?
-                  OR objet COLLATE utf8mb4_general_ci LIKE ?)
-           ORDER BY id DESC
-           LIMIT 5`,
-          [artisanId, like, like]
-        ),
-        pool.execute(
-          `SELECT id, CONCAT(numero, COALESCE(CONCAT(' — ', objet), '')) AS title,
-                  CONCAT(IFNULL(statut, ''), ' — ', FORMAT(COALESCE(totalTTC, 0), 2), ' €') AS subtitle
-           FROM factures
-           WHERE artisanId = ?
-             AND (numero COLLATE utf8mb4_general_ci LIKE ?
-                  OR objet COLLATE utf8mb4_general_ci LIKE ?)
-           ORDER BY id DESC
-           LIMIT 5`,
-          [artisanId, like, like]
-        ),
-        pool.execute(
-          `SELECT id, titre AS title,
-                  CONCAT(IFNULL(statut, ''), ' — ', DATE_FORMAT(dateDebut, '%d/%m/%Y')) AS subtitle
-           FROM interventions
-           WHERE artisanId = ?
-             AND (titre COLLATE utf8mb4_general_ci LIKE ?
-                  OR description COLLATE utf8mb4_general_ci LIKE ?)
-           ORDER BY dateDebut DESC
-           LIMIT 5`,
-          [artisanId, like, like]
-        ),
-        pool.execute(
-          `SELECT id, nom AS title,
-                  COALESCE(email, telephone, '') AS subtitle
-           FROM fournisseurs
-           WHERE artisanId = ?
-             AND (nom COLLATE utf8mb4_general_ci LIKE ?
-                  OR email COLLATE utf8mb4_general_ci LIKE ?)
-           ORDER BY id DESC
-           LIMIT 3`,
-          [artisanId, like, like]
-        ),
-      ]) as any;
-
-      const toResults = (rows: any[], type: string, basePath: string) =>
-        (rows as Array<{ id: number; title: string; subtitle: string }>).map((r) => ({
-          id: Number(r.id),
-          type,
-          title: String(r.title || ''),
-          subtitle: String(r.subtitle || ''),
-          url: `${basePath}/${r.id}`,
-        }));
-
-      return {
-        results: [
-          ...toResults(clientsRows as any[], 'client', '/clients'),
-          ...toResults(devisRows as any[], 'devis', '/devis'),
-          ...toResults(facturesRows as any[], 'facture', '/factures'),
-          ...toResults(interventionsRows as any[], 'intervention', '/interventions'),
-          ...toResults(fournisseursRows as any[], 'fournisseur', '/fournisseurs'),
-        ],
-      };
+      // OPE-184 — recherche globale portée en Drizzle (db.searchGlobal), scopée artisan.
+      const results = await db.searchGlobal(artisan.id, q);
+      return { results };
     }),
 });
 
@@ -8366,6 +9781,10 @@ const supportRouter = router({
       message: z.string().min(10).max(5000),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Anti-flood : borne l'envoi d'emails support depuis un même compte.
+      if (!checkSupportContactRate(String(ctx.user.id))) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de messages envoyés. Réessayez dans quelques minutes." });
+      }
       const subjectLabels: Record<string, string> = {
         technique: "Probleme technique",
         facturation: "Question facturation",
@@ -8376,13 +9795,11 @@ const supportRouter = router({
       const body = `<html><body style="font-family:Arial,sans-serif;color:#1f2937;">
         <h2 style="color:#2563eb;">Nouveau message support (${subjectLabel})</h2>
         <table cellpadding="6" style="border-collapse:collapse;">
-          <tr><td><strong>De :</strong></td><td>${input.nom} &lt;${input.email}&gt;</td></tr>
+          <tr><td><strong>De :</strong></td><td>${safeHtml(input.nom)} &lt;${safeHtml(input.email)}&gt;</td></tr>
           <tr><td><strong>User ID :</strong></td><td>${ctx.user.id} (artisanId ${ctx.user.artisanId ?? "—"})</td></tr>
           <tr><td><strong>Sujet :</strong></td><td>${subjectLabel}</td></tr>
         </table>
-        <div style="background:#f9fafb;border-left:3px solid #2563eb;padding:12px 16px;margin-top:16px;white-space:pre-wrap;">
-          ${input.message.replace(/[<>]/g, (c) => c === "<" ? "&lt;" : "&gt;")}
-        </div>
+        <div style="background:#f9fafb;border-left:3px solid #2563eb;padding:12px 16px;margin-top:16px;white-space:pre-wrap;">${safeHtml(input.message)}</div>
       </body></html>`;
       await sendEmail({
         to: process.env.SUPPORT_EMAIL || "support@operioz.com",
@@ -8422,24 +9839,50 @@ const depensesRouter = router({
       return await db.getDepenseById(input.id, artisan.id);
     }),
 
+  // OPE-99 — détection (non bloquante) de doublons probables d'une dépense, à la saisie.
+  checkDoublons: protectedProcedure
+    .input(z.object({
+      montantTtc: z.number(),
+      dateDepense: z.string().min(1),
+      fournisseur: z.string().max(255).optional(),
+      excludeId: z.number().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      // Pas de détection sur un montant nul / date invalide (évite des faux positifs en masse).
+      if (!(input.montantTtc > 0)) return [];
+      const d = new Date(input.dateDepense);
+      if (isNaN(d.getTime())) return [];
+      return await db.findDepensesDoublons(artisan.id, {
+        montantTtc: input.montantTtc,
+        dateDepense: input.dateDepense,
+        fournisseur: input.fournisseur,
+        excludeId: input.excludeId,
+      });
+    }),
+
   create: protectedProcedure
     .input(z.object({
       dateDepense: z.string(),
-      fournisseur: z.string().optional(),
-      categorie: z.string(),
-      sousCategorie: z.string().optional(),
-      description: z.string().optional(),
+      // Bornes texte alignées sur les colonnes de `depenses` (defense-in-depth :
+      // évite une entrée surdimensionnée -> erreur/troncature MySQL en mode strict).
+      // Montants (number) et justificatifUrl (MEDIUMTEXT base64) non touchés.
+      fournisseur: z.string().max(255).optional(),
+      categorie: z.string().max(50),
+      sousCategorie: z.string().max(100).optional(),
+      description: z.string().max(2000).optional(),
       montantHt: z.number(),
-      tauxTva: z.number().default(20),
+      tauxTva: z.number().min(0).max(100).default(20),
       modePaiement: z.string().default("carte"),
       statut: z.string().optional(),
       remboursable: z.boolean().default(true),
       chantierId: z.number().optional(),
       interventionId: z.number().optional(),
       clientId: z.number().optional(),
-      notes: z.string().optional(),
+      notes: z.string().max(5000).optional(),
       justificatifUrl: z.string().optional(),
-      justificatifNom: z.string().optional(),
+      justificatifNom: z.string().max(255).optional(),
       tvaDeductible: z.boolean().default(true),
       recurrente: z.boolean().optional(),
       frequenceRecurrence: z.enum(["hebdomadaire", "mensuelle", "trimestrielle", "annuelle"]).optional(),
@@ -8447,6 +9890,20 @@ const depensesRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — si la dépense est rattachée à un client, valider l'appartenance.
+      if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
+      }
+      // OPE-25 (même classe, FK chantier/intervention) — si la dépense est rattachée à un
+      // chantier ou une intervention, valider qu'ils appartiennent au tenant (FK pendante sinon).
+      if (input.chantierId != null) {
+        const ch = await db.getChantierById(input.chantierId);
+        if (!ch || ch.artisanId !== artisan.id) throw new TRPCError({ code: "NOT_FOUND", message: "Chantier introuvable" });
+      }
+      if (input.interventionId != null) {
+        const itv = await db.getInterventionById(input.interventionId);
+        if (!itv || itv.artisanId !== artisan.id) throw new TRPCError({ code: "NOT_FOUND", message: "Intervention introuvable" });
+      }
       const numero = await db.getNextDepenseNumero(artisan.id);
       const montantTva = +(input.montantHt * (input.tauxTva / 100)).toFixed(2);
       const montantTtc = +(input.montantHt + montantTva).toFixed(2);
@@ -8473,7 +9930,7 @@ const depensesRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      data: z.record(z.any()),
+      data: z.record(z.string(), z.any()),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -8512,40 +9969,37 @@ const depensesRouter = router({
         throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Limite atteinte" });
       }
 
+      // SECURITE (OPE-91) : si depenseId fourni, vérifier qu'elle appartient au tenant
+      // AVANT l'OCR (évite un appel Gemini gaspillé + l'écriture cross-tenant de
+      // markDepenseOcrTraite, qui ne scopait que par id).
+      if (input.depenseId) {
+        const dep = await db.getDepenseById(input.depenseId, artisan.id);
+        if (!dep) throw new TRPCError({ code: "NOT_FOUND", message: "Dépense non trouvée" });
+      }
+
       // Detecter le format data URL et extraire le base64 brut.
       const dataMatch = input.imageBase64.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
       const mediaType = (dataMatch?.[1] || "image/jpeg") as any;
       const base64Data = dataMatch ? dataMatch[2] : input.imageBase64;
 
       try {
-        const client = new Anthropic();
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: mediaType, data: base64Data },
-              },
-              {
-                type: "text",
-                text: `Analyse cette facture / note de frais. Extrais les informations en JSON :
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+        const response = await ai.models.generateContent({
+          model: process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [
+            { inlineData: { mimeType: mediaType, data: base64Data } },
+            { text: `Analyse cette facture / note de frais. Extrais les informations en JSON :
 {"fournisseur":"nom","date":"YYYY-MM-DD","montantHT":0,"tauxTVA":20,"montantTTC":0,"categorie":"materiaux|carburant|outillage|repas|deplacement|telephone|sous-traitance|assurance|loyer|formation|bancaire|autre","description":"description courte","numeroFacture":"numero si visible"}
-Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
-              },
-            ],
-          }],
+Reponds UNIQUEMENT avec le JSON, pas de texte autour.` },
+          ] }],
+          config: { maxOutputTokens: 1000 },
         });
-        const text = response.content
-          .filter((b: any) => b.type === "text")
-          .map((b: any) => b.text)
-          .join("");
+        const text = response.text || '';
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         const data = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
         if (input.depenseId) {
-          await db.markDepenseOcrTraite(input.depenseId, data);
+          await db.markDepenseOcrTraite(input.depenseId, artisan.id, data);
         }
         return { success: true, data };
       } catch (e: any) {
@@ -8563,10 +10017,13 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
 
   createCategorie: protectedProcedure
     .input(z.object({
-      nom: z.string(),
-      couleur: z.string().optional(),
-      icone: z.string().optional(),
-      compteComptable: z.string().optional(),
+      // Bornes alignées sur `categories_depenses` (nom 100, icone 50, compte 10) +
+      // validation du format couleur #RRGGBB (rendue en `style backgroundColor`,
+      // defense-in-depth ; behavior-preserving : le sélecteur envoie du #RRGGBB).
+      nom: z.string().max(100),
+      couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      icone: z.string().max(50).optional(),
+      compteComptable: z.string().max(10).optional(),
       plafondMensuel: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -8577,10 +10034,10 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
   updateCategorie: protectedProcedure
     .input(z.object({
       id: z.number(),
-      nom: z.string().optional(),
-      couleur: z.string().optional(),
-      icone: z.string().optional(),
-      compteComptable: z.string().optional(),
+      nom: z.string().max(100).optional(),
+      couleur: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal("")).optional(),
+      icone: z.string().max(50).optional(),
+      compteComptable: z.string().max(10).optional(),
       plafondMensuel: z.number().optional(),
       actif: z.boolean().optional(),
     }))
@@ -8621,7 +10078,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       titre: z.string(),
       periodeDebut: z.string(),
       periodeFin: z.string(),
-      depenseIds: z.array(z.number()).optional(),
+      depenseIds: z.array(z.number()).max(1000, "Trop de dépenses (max 1000)").optional(), // OPE-24 — anti-DoS
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
@@ -8658,7 +10115,7 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
-      await db.removeDepenseFromNoteFrais(input.noteId, input.depenseId);
+      await db.removeDepenseFromNoteFrais(input.noteId, input.depenseId, artisan.id);
       await db.calculerTotalNoteFrais(input.noteId, artisan.id);
       return { success: true };
     }),
@@ -8697,7 +10154,9 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
 
   // === Budgets ===
   getBudgets: protectedProcedure
-    .input(z.object({ mois: z.string() }))
+    // mois = colonne VARCHAR(7), le front envoie toujours "YYYY-MM" (toISOString().slice(0,7)).
+    // La regex est behavior-preserving et évite un ER_DATA_TOO_LONG / une valeur incohérente (OPE-24).
+    .input(z.object({ mois: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)") }))
     .query(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) return [];
@@ -8706,8 +10165,8 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
 
   setBudget: protectedProcedure
     .input(z.object({
-      categorie: z.string(),
-      mois: z.string(),
+      categorie: z.string().max(100),
+      mois: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
       budget: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -8717,29 +10176,23 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
     }),
 
   copierBudgetsMois: protectedProcedure
-    .input(z.object({ moisSource: z.string(), moisCible: z.string() }))
+    .input(z.object({
+      moisSource: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
+      moisCible: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
+    }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
-      const pool = (db as any).getPool();
-      if (pool) {
-        await pool.execute(
-          `INSERT INTO budgets_categories (artisan_id, categorie, mois, budget)
-           SELECT artisan_id, categorie, ?, budget
-             FROM budgets_categories
-            WHERE artisan_id = ? AND mois = ?
-           ON DUPLICATE KEY UPDATE budget = VALUES(budget)`,
-          [input.moisCible, artisan.id, input.moisSource]
-        );
-      }
+      // OPE-184 — copie de budgets portée en Drizzle (db.copierBudgetsMois).
+      await db.copierBudgetsMois(artisan.id, input.moisSource, input.moisCible);
       return { success: true };
     }),
 
   // === Import relevé bancaire ===
   importReleve: protectedProcedure
     .input(z.object({
-      nomFichier: z.string(),
-      contenuCsv: z.string(),
+      nomFichier: z.string().max(255),
+      contenuCsv: z.string().max(5_000_000, "Fichier trop volumineux (max ~5 Mo)"),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
@@ -8748,6 +10201,11 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       const lignes = input.contenuCsv.split(/\r?\n/).filter((l) => l.trim());
       if (lignes.length < 2) {
         return { releveId: 0, nbImportees: 0, message: "CSV vide ou invalide" };
+      }
+      // Borne le nombre de lignes parsées/insérées (anti-DoS) — erreur claire plutôt
+      // que troncature silencieuse. Un relevé bancaire légitime reste très en deçà.
+      if (lignes.length - 1 > 5000) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Relevé trop volumineux (max 5000 lignes par import)" });
       }
       const sep = (lignes[0].match(/;/g)?.length || 0) > (lignes[0].match(/,/g)?.length || 0) ? ";" : ",";
       const transactions: any[] = [];
@@ -8801,6 +10259,12 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
       const trxs = await db.getTransactionsBancaires(artisan.id);
       const t = trxs.find((x: any) => x.id === input.transactionId);
       if (!t) throw new TRPCError({ code: "NOT_FOUND" });
+      // Garde d'idempotence : une transaction déjà liée à une dépense (depense_id)
+      // ne doit pas être re-convertie (double-clic / re-visite) -> évite des dépenses
+      // dupliquées dans les livres (impact FEC/TVA).
+      if (t.depense_id) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Transaction déjà convertie en dépense" });
+      }
       const numero = await db.getNextDepenseNumero(artisan.id);
       const montantTtc = Number(t.montant || 0);
       const tauxTva = 20;
@@ -8856,6 +10320,15 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
     }))
     .mutation(async ({ ctx, input }) => {
       let artisan = await db.getOrCreateArtisan(ctx.user.id);
+      // OPE-25 (classe clientId) — si l'indemnité est rattachée à un client, valider l'appartenance.
+      if (input.clientId != null && !(await dbSecure.getClientByIdSecure(input.clientId, artisan.id))) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Client introuvable" });
+      }
+      // OPE-25 (même classe, FK chantier) — valider l'appartenance du chantier rattaché.
+      if (input.chantierId != null) {
+        const ch = await db.getChantierById(input.chantierId);
+        if (!ch || ch.artisanId !== artisan.id) throw new TRPCError({ code: "NOT_FOUND", message: "Chantier introuvable" });
+      }
       const numero = await db.getNextDepenseNumero(artisan.id);
       // Indemnites km : sans TVA recuperable (regime fiscal forfait).
       const montant = +(input.kilometres * input.tarifKm).toFixed(2);
@@ -8883,26 +10356,14 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
   getRegles: protectedProcedure.query(async ({ ctx }) => {
     const artisan = await db.getArtisanByUserId(ctx.user.id);
     if (!artisan) return [];
-    const pool = (db as any).getPool();
-    if (!pool) return [];
-    const [rows]: any = await pool.execute(
-      `SELECT * FROM regles_categorisation WHERE artisan_id = ? AND actif = TRUE ORDER BY id DESC`,
-      [artisan.id]
-    );
-    return rows as any[];
+    return await db.getReglesCategorisation(artisan.id);
   }),
 
   createRegle: protectedProcedure
     .input(z.object({ motifLibelle: z.string(), categorie: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      let artisan = await db.getOrCreateArtisan(ctx.user.id);
-      const pool = (db as any).getPool();
-      if (pool) {
-        await pool.execute(
-          `INSERT INTO regles_categorisation (artisan_id, motif_libelle, categorie) VALUES (?, ?, ?)`,
-          [artisan.id, input.motifLibelle, input.categorie]
-        );
-      }
+      const artisan = await db.getOrCreateArtisan(ctx.user.id);
+      await db.createRegleCategorisation(artisan.id, input.motifLibelle, input.categorie);
       return { success: true };
     }),
 
@@ -8911,18 +10372,110 @@ Reponds UNIQUEMENT avec le JSON, pas de texte autour.`,
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
       if (!artisan) throw new TRPCError({ code: "FORBIDDEN" });
-      const pool = (db as any).getPool();
-      if (pool) {
-        await pool.execute(
-          `UPDATE regles_categorisation SET actif = FALSE WHERE id = ? AND artisan_id = ?`,
-          [input.id, artisan.id]
-        );
-      }
+      await db.deleteRegleCategorisation(input.id, artisan.id);
       return { success: true };
     }),
 });
 
+// ============================================================================
+// ACTIVITES / RAPPELS PLANIFIES — CRM next-action (OPE-121)
+// ============================================================================
+// Activités/rappels manuels génériques. Toutes les procédures sont scopées
+// `artisan.id` (multi-tenant) ; aucune logique financière. Le « state »
+// (en retard / aujourd'hui / à venir) est dérivé côté front à partir de `echeance`.
+const activitesRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const artisan = await db.getArtisanByUserId(ctx.user.id);
+    if (!artisan) return [];
+    return await db.getActivitesByArtisanId(artisan.id);
+  }),
+
+  create: protectedProcedure
+    .input(z.object({
+      type: z.enum(["appel", "email", "rdv", "relance", "autre"]).default("autre"),
+      titre: z.string().trim().min(1).max(500),
+      echeance: z.string().min(1), // date ISO (YYYY-MM-DD)
+      entiteType: z.enum(["client", "devis", "facture", "chantier", "aucun"]).optional(),
+      entiteId: z.number().int().positive().optional(),
+      note: z.string().max(5000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      // Garde « date invalide » : echeance est NOT NULL en base.
+      const echeance = new Date(input.echeance);
+      if (isNaN(echeance.getTime())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Échéance invalide" });
+      }
+      // Garde FK : si un rattachement est fourni, l'entité doit appartenir à
+      // l'artisan (évite une référence pendante vers une entité d'un autre tenant ;
+      // cohérent avec le pattern *ByIdSecure systémique). Behavior-preserving : un
+      // rattachement légitime (entité du tenant) passe à l'identique.
+      if (input.entiteId != null && input.entiteType && input.entiteType !== "aucun") {
+        let owned: unknown;
+        if (input.entiteType === "client") owned = await dbSecure.getClientByIdSecure(input.entiteId, artisan.id);
+        else if (input.entiteType === "devis") owned = await dbSecure.getDevisByIdSecure(input.entiteId, artisan.id);
+        else if (input.entiteType === "facture") owned = await dbSecure.getFactureByIdSecure(input.entiteId, artisan.id);
+        else if (input.entiteType === "chantier") {
+          const ch = await db.getChantierById(input.entiteId);
+          owned = ch && ch.artisanId === artisan.id ? ch : undefined;
+        }
+        if (!owned) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Entité rattachée non autorisée" });
+        }
+      }
+      return await db.createActivite({
+        artisanId: artisan.id,
+        type: input.type,
+        titre: input.titre,
+        echeance,
+        entiteType: input.entiteType ?? "aucun",
+        entiteId: input.entiteId ?? null,
+        note: input.note || null,
+      });
+    }),
+
+  toggleFait: protectedProcedure
+    .input(z.object({ id: z.number(), fait: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      await db.setActiviteFait(input.id, artisan.id, input.fait);
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) throw new TRPCError({ code: "NOT_FOUND", message: "Artisan non trouvé" });
+      await db.deleteActivite(input.id, artisan.id);
+      return { success: true };
+    }),
+});
+
+// OPE-114 — journal des envois d'emails (lecture seule, scopée tenant)
+const emailsRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      entiteType: z.enum(["devis", "facture", "intervention"]).optional(),
+      entiteId: z.number().int().positive().optional(),
+      limit: z.number().int().min(1).max(500).optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const artisan = await db.getArtisanByUserId(ctx.user.id);
+      if (!artisan) return [];
+      return await db.getEmailsLog(artisan.id, {
+        entiteType: input?.entiteType,
+        entiteId: input?.entiteId,
+        limit: input?.limit,
+      });
+    }),
+});
+
 export const appRouter = router({system: systemRouter,
+  emails: emailsRouter,
+  activites: activitesRouter,
   depenses: depensesRouter,
   search: searchRouter,
   subscription: subscriptionRouter,
@@ -8944,6 +10497,12 @@ export const appRouter = router({system: systemRouter,
       .mutation(async ({ input, ctx }) => {
         try {
           const user = await createUserWithPassword(input.email, input.password, input.name);
+
+          // OPE-7 : provisionner le compte (artisan + subscription d'essai +
+          // permissions proprietaire). Sans ca, l'app est inutilisable apres
+          // inscription (FORBIDDEN/NOT_FOUND partout, checkout impossible).
+          await db.bootstrapArtisanAccount(user.id);
+
           const token = await createToken({ id: user.id, email: user.email });
           setAuthCookie(ctx.res, token, ctx.req);
 
@@ -8961,7 +10520,7 @@ export const appRouter = router({system: systemRouter,
           <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">Bienvenue sur Operioz ! 🎉</h1>
         </td></tr>
         <tr><td style="padding:32px 40px;">
-          <p style="margin:0 0 16px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour${input.name ? ` ${input.name}` : ""},</p>
+          <p style="margin:0 0 16px 0;font-size:16px;color:#1f2937;line-height:1.6;">Bonjour${input.name ? ` ${safeHtml(input.name)}` : ""},</p>
           <p style="margin:0 0 16px 0;font-size:15px;color:#374151;line-height:1.6;">
             Votre compte Operioz a été créé avec succès. Vous bénéficiez de 14 jours d'essai gratuit sur toutes les fonctionnalités.
           </p>
@@ -8972,7 +10531,7 @@ export const appRouter = router({system: systemRouter,
             <li>Créez votre premier devis avec MonAssistant IA</li>
           </ol>
           <p style="margin:24px 0;text-align:center;">
-            <a href="https://www.operioz.com/dashboard" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
+            <a href="${process.env.APP_URL || 'https://www.operioz.com'}/dashboard" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
               Accéder à mon espace →
             </a>
           </p>
@@ -9010,6 +10569,22 @@ export const appRouter = router({system: systemRouter,
         const user = await authenticateUser(input.email, input.password);
         if (!user) {
           throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid email or password' });
+        }
+        // OPE-7 : auto-reparation des comptes crees avant le fix (artisan /
+        // subscription / permissions manquants). Idempotent et best-effort :
+        // ne seed que ce qui manque, ne bloque jamais le login.
+        // IMPORTANT : on ne provisionne QUE les proprietaires. Un collaborateur
+        // (secretaire/technicien) a toujours users.artisanId renseigne vers
+        // l'entreprise du proprietaire ; bootstrapper lui creerait a tort sa
+        // propre entreprise + toutes les permissions. Donc on ne declenche que
+        // si artisanId est null (= proprietaire dont le signup a echoue).
+        try {
+          const dbUser = await db.getUserById(user.id);
+          if (dbUser && !dbUser.artisanId) {
+            await db.bootstrapArtisanAccount(user.id);
+          }
+        } catch (e: any) {
+          console.error('[Signin] bootstrap self-heal failed (non-blocking):', e?.message);
         }
         const token = await createToken({ id: user.id, email: user.email });
         setAuthCookie(ctx.res, token, ctx.req);
@@ -9051,6 +10626,107 @@ export const appRouter = router({system: systemRouter,
         }
         const hashed = await hashPassword(input.newPassword);
         await db.updateUser(ctx.user.id, { password: hashed });
+        return { success: true };
+      }),
+
+    /**
+     * OPE-8 — Demande de reinitialisation du mot de passe.
+     * Genere un token aleatoire (envoye par email), stocke uniquement son
+     * hash SHA-256 + expiry 1h. Reponse TOUJOURS identique (success) pour ne
+     * pas reveler si l'email existe (anti-enumeration).
+     */
+    forgotPassword: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .mutation(async ({ ctx, input }) => {
+        // Anti-flood par adresse (réponse constante préservée : on retourne le même
+        // success sans envoyer au-delà du seuil). Ne révèle pas l'existence du compte.
+        if (!checkPasswordResetRate(input.email.toLowerCase().trim())) {
+          return { success: true };
+        }
+        const user = await db.getUserByEmail(input.email);
+        // On ne traite que les comptes actifs disposant d'un mot de passe
+        // (les comptes OAuth-only n'ont pas de password a reinitialiser).
+        if (user && user.actif !== false && user.password) {
+          const rawToken = randomBytes(32).toString('hex');
+          const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+          const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1h
+          await db.updateUser(user.id, {
+            resetToken: tokenHash,
+            resetTokenExpiry: expiry,
+          } as any);
+
+          // OPE-76 — l'URL de réinitialisation DOIT provenir d'une source de confiance
+          // (APP_URL), jamais du header `Origin` (contrôlable par l'attaquant) : sinon
+          // un reset déclenché pour la victime avec `Origin: attaquant.tld` lui envoie un
+          // lien pointant vers le domaine de l'attaquant AVEC un token valide → vol de
+          // token / prise de contrôle du compte. Pour une requête légitime, Origin ==
+          // APP_URL, donc le lien est identique (comportement préservé).
+          const baseUrl = process.env.APP_URL || 'https://www.operioz.com';
+          const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
+          try {
+            await sendEmail({
+              to: input.email,
+              subject: 'Réinitialisation de votre mot de passe Operioz',
+              body: `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f5f7;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr><td style="background-color:#2563eb;padding:28px 40px;text-align:center;">
+          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Réinitialisation du mot de passe</h1>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <p style="margin:0 0 16px 0;font-size:15px;color:#374151;line-height:1.6;">Bonjour,</p>
+          <p style="margin:0 0 24px 0;font-size:15px;color:#374151;line-height:1.6;">
+            Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau. Ce lien est valable <strong>1 heure</strong>.
+          </p>
+          <p style="margin:0 0 24px 0;text-align:center;">
+            <a href="${resetUrl}" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:15px;font-weight:600;">
+              Réinitialiser mon mot de passe →
+            </a>
+          </p>
+          <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.6;">
+            Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe restera inchangé.
+          </p>
+        </td></tr>
+        <tr><td style="background-color:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">© ${new Date().getFullYear()} Operioz</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`,
+            });
+          } catch (mailErr) {
+            console.error('[ForgotPassword] Email failed (non-blocking):', mailErr);
+          }
+        }
+        // Reponse constante : ne jamais reveler l'existence de l'email.
+        return { success: true };
+      }),
+
+    /**
+     * OPE-8 — Applique le nouveau mot de passe a partir d'un token valide.
+     * Hash le token recu, cherche un user dont le hash correspond et dont
+     * l'expiry est dans le futur, met a jour le password et invalide le token.
+     */
+    resetPassword: publicProcedure
+      .input(z.object({
+        token: z.string().min(1),
+        newPassword: z.string().min(6, 'Le mot de passe doit faire au moins 6 caractères'),
+      }))
+      .mutation(async ({ input }) => {
+        const tokenHash = createHash('sha256').update(input.token).digest('hex');
+        const user = await db.getUserByValidResetToken(tokenHash);
+        if (!user) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Lien invalide ou expiré. Veuillez refaire une demande.' });
+        }
+        const hashed = await hashPassword(input.newPassword);
+        await db.updateUser(user.id, {
+          password: hashed,
+          resetToken: null,
+          resetTokenExpiry: null,
+        } as any);
         return { success: true };
       }),
 

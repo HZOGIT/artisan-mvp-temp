@@ -76,6 +76,11 @@ export default function Stocks() {
   const utils = trpc.useUtils();
   const { data: stocks, isLoading } = trpc.stocks.list.useQuery();
   const { data: lowStockItems } = trpc.stocks.getLowStock.useQuery();
+  // OPE-105 — quantité entrante (commandes fournisseurs en cours) par fiche stock,
+  // pour afficher le « stock prévisionnel » = physique + entrant. Map stockId → entrant.
+  const { data: stockEntrant } = trpc.stocks.getEntrant.useQuery();
+  const entrantByStock: Record<number, number> = {};
+  (stockEntrant || []).forEach((e: any) => { entrantByStock[e.stockId] = e.entrant; });
   const { data: mouvements, isLoading: loadingMouvements } = trpc.stocks.getMouvements.useQuery(
     { stockId: selectedStock?.id || 0 },
     { enabled: !!selectedStock && isHistoryDialogOpen }
@@ -387,6 +392,34 @@ export default function Stocks() {
           </div>
         </div>
 
+        {/* OPE-105 — KPIs stock : nombre d'articles, valorisation (Σ quantité × prix d'achat)
+            et nombre d'articles bas. Lecture seule, calculé depuis les données déjà chargées. */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Articles en stock</CardDescription>
+              <CardTitle className="text-2xl">{stocks?.length ?? 0}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Valeur du stock</CardDescription>
+              <CardTitle className="text-2xl">
+                {(stocks || []).reduce(
+                  (sum, s) => sum + (parseFloat(s.quantiteEnStock || "0") || 0) * (parseFloat(s.prixAchat || "0") || 0),
+                  0,
+                ).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              </CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Articles en stock bas</CardDescription>
+              <CardTitle className="text-2xl text-orange-600">{lowStockItems?.length ?? 0}</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+
         {/* Alertes de stock bas */}
         {lowStockItems && lowStockItems.length > 0 && (
           <Card className="border-orange-200 bg-orange-50">
@@ -459,6 +492,17 @@ export default function Stocks() {
                           <span className={isLowStock(stock) ? 'text-orange-600 font-bold' : ''}>
                             {stock.quantiteEnStock} {stock.unite}
                           </span>
+                          {/* OPE-105 — quantité entrante (commandes fournisseurs en cours) :
+                              affiche le prévisionnel sans changer le stock physique ni l'alerte. */}
+                          {entrantByStock[stock.id] > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 border-blue-300 text-blue-700 bg-blue-50"
+                              title={`Prévisionnel : ${(parseFloat(stock.quantiteEnStock || '0') + entrantByStock[stock.id]).toFixed(2)} ${stock.unite} (physique + commandes en cours)`}
+                            >
+                              +{entrantByStock[stock.id]} en commande
+                            </Badge>
+                          )}
                         </td>
                         <td className="text-right p-2 text-muted-foreground whitespace-nowrap">{stock.seuilAlerte}</td>
                         <td className="text-right p-2 whitespace-nowrap">
@@ -666,7 +710,7 @@ export default function Stocks() {
                     <SelectItem value="ajustement">
                       <div className="flex items-center gap-2">
                         <Edit className="h-4 w-4 text-blue-500" />
-                        Ajustement (inventaire)
+                        Correction (+)
                       </div>
                     </SelectItem>
                   </SelectContent>

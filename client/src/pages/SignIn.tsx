@@ -95,8 +95,19 @@ export default function SignIn() {
                 />
               </div>
 
-              <Button 
-                type="submit" 
+              <div className="text-right">
+                <Button
+                  type="button"
+                  variant="link"
+                  className="p-0 h-auto text-sm"
+                  onClick={() => setLocation("/forgot-password")}
+                >
+                  Mot de passe oublié ?
+                </Button>
+              </div>
+
+              <Button
+                type="submit"
                 className="w-full"
                 disabled={signinMutation.isPending}
               >

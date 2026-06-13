@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle, Bell, Circle, AlarmClock } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -119,6 +119,34 @@ export default function FactureDetail() {
   const { data: articles } = trpc.articles.getBibliotheque.useQuery();
   const { data: artisan } = trpc.artisan.getProfile.useQuery();
   const { data: parametresData } = trpc.parametres.get.useQuery();
+
+  // OPE-121 — rappels/activités CRM rattachés à CETTE facture (suivi recouvrement).
+  const { data: allActivitesFc, refetch: refetchActivitesFc } = trpc.activites.list.useQuery();
+  const activitesFacture = (allActivitesFc || []).filter(
+    (a: any) => a.entiteType === "facture" && a.entiteId === factureId,
+  );
+  const [rappelTitre, setRappelTitre] = useState("");
+  const [rappelEcheance, setRappelEcheance] = useState("");
+  const [rappelType, setRappelType] = useState("relance");
+  const createRappel = trpc.activites.create.useMutation({
+    onSuccess: () => {
+      toast.success("Rappel ajouté");
+      setRappelTitre(""); setRappelEcheance(""); setRappelType("relance");
+      refetchActivitesFc();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const toggleRappel = trpc.activites.toggleFait.useMutation({
+    onSuccess: () => refetchActivitesFc(),
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteRappel = trpc.activites.delete.useMutation({
+    onSuccess: () => refetchActivitesFc(),
+    onError: (e) => toast.error(e.message),
+  });
+  const rappelTypeLabels: Record<string, string> = {
+    appel: "Appel", email: "Email", rdv: "RDV", relance: "Relance", autre: "À faire",
+  };
   const { data: avoirs } = trpc.factures.getAvoirsByFacture.useQuery(
     { factureId },
     { enabled: !!id && !!facture }
@@ -258,6 +286,8 @@ export default function FactureDetail() {
         description: article.description || "",
         unite: article.unite || "unité",
         prixUnitaireHT: String(article.prixUnitaireHT),
+        // OPE-142/167 : pré-remplir le taux de TVA porté par l'article (fallback : valeur courante).
+        tauxTVA: article.tauxTVA != null && article.tauxTVA !== "" ? String(parseFloat(article.tauxTVA)) : lineFormData.tauxTVA,
       });
     }
   };
@@ -265,8 +295,12 @@ export default function FactureDetail() {
   const handleCreateAvoir = () => {
     if (!facture) return;
     if (avoirType === "total") {
-      // Avoir total : reprendre toutes les lignes de la facture
-      const lignes = (facture.lignes || []).map((l: any) => ({
+      // Avoir total : reprendre toutes les lignes de la facture.
+      // OPE-168 — exclure les lignes d'affichage (section/note) : un avoir ne crédite
+      // que des montants ; les section/note n'en portent pas (sinon lignes parasites).
+      const lignes = (facture.lignes || [])
+        .filter((l: any) => (l.type ?? "produit") === "produit")
+        .map((l: any) => ({
         designation: l.designation,
         quantite: l.quantite?.toString() || "1",
         prixUnitaireHT: l.prixUnitaireHT?.toString() || "0",
@@ -307,6 +341,7 @@ export default function FactureDetail() {
       unite: l.unite,
       prixUnitaire: parseFloat(l.prixUnitaireHT) || 0,
       tauxTva: parseFloat(l.tauxTVA) || 20,
+      type: l.type, // OPE-168 — section/note rendues en pleine largeur dans le PDF
     }));
     const isAvoir = (facture as any).typeDocument === "avoir";
     generateFacturePDF(
@@ -318,16 +353,19 @@ export default function FactureDetail() {
         dateEcheance: facture.dateEcheance,
         statut: facture.statut || "brouillon",
         objet: facture.objet,
+        referenceClient: (facture as any).referenceClient,
         lignes,
         totalHT: parseFloat(facture.totalHT as any) || 0,
         totalTVA: parseFloat(facture.totalTVA as any) || 0,
         totalTTC: parseFloat(facture.totalTTC as any) || 0,
         montantPaye: parseFloat(facture.montantPaye as any) || 0,
-        conditions: (facture as any).conditions || null,
+        conditions: (facture as any).conditionsPaiement || null,
         isAvoir,
       },
       {
         mentionsLegales: parametresData?.mentionsLegales || null,
+        // OPE-127 — CGV réutilisables (même source que le devis : conditionsGenerales).
+        cgv: parametresData?.conditionsGenerales || null,
       }
     );
     toast.success("PDF généré avec succès");
@@ -840,6 +878,8 @@ export default function FactureDetail() {
                                     description: article.description || "",
                                     prixUnitaireHT: article.prix_base,
                                     unite: article.unite || "unité",
+                                    // OPE-142/167 : taux de TVA par défaut de l'article (fallback valeur courante).
+                                    tauxTVA: (article as any).tauxTVA != null && (article as any).tauxTVA !== "" ? String(parseFloat((article as any).tauxTVA)) : lineFormData.tauxTVA,
                                   });
                                   setShowDropdown(false);
                                   toast.success(`${article.nom} sélectionné`);
@@ -935,7 +975,19 @@ export default function FactureDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {facture.lignes.map((ligne: any) => (
+                  {facture.lignes.map((ligne: any) => {
+                    // OPE-168 — section (en-tête de lot) / note (texte libre) :
+                    // affichées en pleine largeur, sans colonnes de prix.
+                    if (ligne.type === "section" || ligne.type === "note") {
+                      return (
+                        <tr key={ligne.id} className={ligne.type === "section" ? "bg-muted/50" : ""}>
+                          <td colSpan={6} className={ligne.type === "section" ? "font-semibold" : "italic text-muted-foreground"}>
+                            {ligne.type === "section" ? "§ " : ""}{ligne.designation}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
                     <tr key={ligne.id}>
                       <td>{ligne.reference || "-"}</td>
                       <td>{ligne.designation}</td>
@@ -944,7 +996,8 @@ export default function FactureDetail() {
                       <td className="text-right">{ligne.tauxTVA}%</td>
                       <td className="text-right font-medium">{formatCurrency(ligne.montantTTC)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2">
@@ -1031,6 +1084,107 @@ export default function FactureDetail() {
           </CardContent>
         </Card>
       )}
+
+      {/* OPE-121 — Rappels / activités CRM rattachés à cette facture (suivi recouvrement) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Rappels ({activitesFacture.filter((a: any) => !a.fait).length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="flex flex-col sm:flex-row gap-2 mb-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!rappelTitre.trim()) { toast.error("Le titre est requis"); return; }
+              if (!rappelEcheance) { toast.error("L'échéance est requise"); return; }
+              createRappel.mutate({
+                titre: rappelTitre.trim(),
+                echeance: rappelEcheance,
+                type: rappelType as any,
+                entiteType: "facture",
+                entiteId: factureId,
+              });
+            }}
+          >
+            <Input
+              placeholder={`Relancer ${facture?.numero || "la facture"}…`}
+              value={rappelTitre}
+              onChange={(e) => setRappelTitre(e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              type="date"
+              value={rappelEcheance}
+              onChange={(e) => setRappelEcheance(e.target.value)}
+              className="sm:w-40"
+            />
+            <Select value={rappelType} onValueChange={setRappelType}>
+              <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="relance">Relance</SelectItem>
+                <SelectItem value="appel">Appel</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="rdv">RDV</SelectItem>
+                <SelectItem value="autre">À faire</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="submit" disabled={createRappel.isPending}>
+              <Plus className="h-4 w-4 mr-1" /> Ajouter
+            </Button>
+          </form>
+
+          {activitesFacture.length > 0 ? (
+            <div className="space-y-2">
+              {activitesFacture
+                .slice()
+                .sort((a: any, b: any) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime())
+                .map((a: any) => (
+                  <div key={a.id} className="flex items-start gap-2 p-3 rounded-lg border">
+                    <button
+                      type="button"
+                      title={a.fait ? "Marquer à faire" : "Marquer fait"}
+                      onClick={() => toggleRappel.mutate({ id: a.id, fait: !a.fait })}
+                      className="mt-0.5 shrink-0"
+                    >
+                      {a.fait
+                        ? <CheckCircle className="h-4 w-4 text-emerald-500" />
+                        : <Circle className="h-4 w-4 text-muted-foreground" />}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${a.fait ? "line-through text-muted-foreground" : ""}`}>
+                        {a.titre}
+                      </p>
+                      <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <AlarmClock className="h-3 w-3" />
+                          {format(new Date(a.echeance), "dd MMM yyyy", { locale: fr })}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-semibold">
+                          {rappelTypeLabels[a.type] || a.type}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      title="Supprimer"
+                      onClick={() => deleteRappel.mutate({ id: a.id })}
+                      className="mt-0.5 shrink-0 text-muted-foreground hover:text-rose-500"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className="text-center py-6 text-sm text-muted-foreground">
+              Aucun rappel pour cette facture.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

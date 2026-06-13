@@ -60,6 +60,17 @@ export default function SignatureDevis() {
     }
   });
 
+  const utils = trpc.useUtils();
+  const selectOptionMutation = trpc.signature.selectDevisOption.useMutation({
+    onSuccess: () => {
+      utils.signature.getDevisForSignature.invalidate({ token: token || "" });
+      toast.success("Formule selectionnee");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
   // Canvas setup
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -245,6 +256,7 @@ export default function SignatureDevis() {
   if (!data) return null;
 
   const { devis, artisan, client, lignes, signature } = data;
+  const options = (data as any).options || [];
   const isAlreadyProcessed = signature.statut === "accepte" || signature.statut === "refuse";
 
   return (
@@ -383,6 +395,61 @@ export default function SignatureDevis() {
             )}
           </CardContent>
         </Card>
+
+        {/* Devis options / formules — let the client choose before signing */}
+        {options.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Choisissez votre formule</CardTitle>
+              <CardDescription>
+                Ce devis propose plusieurs formules. Selectionnez celle qui vous convient
+                {!isAlreadyProcessed ? " avant de signer." : "."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {options.map((option: any) => (
+                <div
+                  key={option.id}
+                  className={`border rounded-lg p-4 ${option.selectionnee ? "border-primary bg-primary/5" : "border-muted"}`}
+                >
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold">{option.nom}</p>
+                        {option.recommandee && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                            Recommandee
+                          </span>
+                        )}
+                        {option.selectionnee && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary inline-flex items-center gap-1">
+                            <Check className="h-3 w-3" /> Selectionnee
+                          </span>
+                        )}
+                      </div>
+                      {option.description && (
+                        <p className="text-sm text-muted-foreground">{option.description}</p>
+                      )}
+                      <p className="text-sm font-medium text-primary">
+                        {formatCurrency(option.totalTTC || 0)} TTC
+                      </p>
+                    </div>
+                    {!isAlreadyProcessed && (
+                      <Button
+                        variant={option.selectionnee ? "secondary" : "outline"}
+                        size="sm"
+                        disabled={option.selectionnee || selectOptionMutation.isPending}
+                        onClick={() => selectOptionMutation.mutate({ token: token || "", optionId: option.id })}
+                      >
+                        {option.selectionnee ? "Choisie" : "Choisir cette formule"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Signature / Action block — only if not already processed */}
         {!isAlreadyProcessed && !showRefuseForm && (

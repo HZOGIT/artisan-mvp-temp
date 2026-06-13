@@ -1,17 +1,22 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { eq, and, or, like, desc, asc, sql, inArray, gte, lte, isNull, between, ne } from "drizzle-orm";
+// OPE-184 P0.7 — bascule PG-first : pool/driver Postgres optionnel (DB_DIALECT=postgresql).
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
+import { Pool as PgPool } from "pg";
+import { eq, and, or, like, ilike, desc, asc, sql, inArray, gte, lte, lt, isNull, isNotNull, between, ne, getTableColumns, notExists } from "drizzle-orm";
 import { 
   users, User, InsertUser,
   artisans, Artisan, InsertArtisan,
   clients, Client, InsertClient,
   bibliothequeArticles, BibliothequeArticle, InsertBibliothequeArticle,
   articlesArtisan, ArticleArtisan, InsertArticleArtisan,
+  activites, Activite, InsertActivite,
   devis, Devis, InsertDevis,
   devisLignes, DevisLigne, InsertDevisLigne,
   factures, Facture, InsertFacture,
   facturesLignes, FactureLigne, InsertFactureLigne,
   interventions, Intervention, InsertIntervention,
+  interventionsTechniciens, InterventionTechnicien, InsertInterventionTechnicien,
   notifications, Notification, InsertNotification,
   parametresArtisan, ParametresArtisan, InsertParametresArtisan,
   signaturesDevis, SignatureDevis, InsertSignatureDevis,
@@ -28,13 +33,16 @@ import {
   modelesDevis, ModeleDevis, InsertModeleDevis,
   modelesDevisLignes, ModeleDevisLigne, InsertModeleDevisLigne,
   avisClients, AvisClient, InsertAvisClient,
+  demandesContact, DemandeContact, InsertDemandeContact,
   demandesAvis, DemandeAvis, InsertDemandeAvis,
   techniciens, Technicien, InsertTechnicien,
+  habilitationsTechniciens, HabilitationTechnicien, InsertHabilitationTechnicien,
   positionsTechniciens, PositionTechnicien, InsertPositionTechnicien,
   disponibilitesTechniciens, DisponibiliteTechnicien,
   historiqueDeplacements,
   chantiers, Chantier, InsertChantier,
   phasesChantier, PhaseChantier, InsertPhaseChantier,
+  pointagesChantier, PointageChantier, InsertPointageChantier,
   interventionsChantier, InterventionChantier, InsertInterventionChantier,
   documentsChantier, DocumentChantier, InsertDocumentChantier,
   rapportsPersonnalises, RapportPersonnalise, InsertRapportPersonnalise,
@@ -77,7 +85,14 @@ import {
   preferencesNotifications, PreferenceNotification, InsertPreferenceNotification,
   configAlertesPrevisions, ConfigAlertePrevision, InsertConfigAlertePrevision,
   historiqueAlertesPrevisions, HistoriqueAlertePrevision, InsertHistoriqueAlertePrevision,
-} from "../drizzle/schema";
+  emailsLog, EmailLog, InsertEmailLog,
+  aiThreads, aiMessages,
+  interventionsMobile, photosInterventions,
+  depenses, budgetsCategories, categoriesDepenses, notesFraisDepenses, notesDeFrais,
+  relevesBancaires, transactionsBancaires, reglesCategorisation,
+  couleursInterventions, modules, artisanModules, subscriptions, devices, activeSessions,
+} from "../drizzle/schema.active";
+import { ALL_PERMISSIONS } from "../shared/permissions";
 
 // ============================================================================
 // DATABASE CONNECTION
@@ -123,7 +138,23 @@ export async function getDb() {
     if (!databaseUrl) {
       throw new Error('DATABASE_URL is not defined');
     }
-    
+
+    // OPE-184 P0.7 — chemin Postgres (PG-first). node-postgres accepte la
+    // connectionString directement ; les objets-tables proviennent de schema.active
+    // (sélectionnés par DB_DIALECT). Le chemin mysql ci-dessous reste inchangé.
+    if (process.env.DB_DIALECT === "postgresql") {
+      const pgPool = new PgPool({ connectionString: databaseUrl, max: 10 });
+      pgPool.on("error", (err: any) => {
+        console.error("[PG pool] error (non-fatal):", err?.code, err?.message);
+      });
+      const conn = await pgPool.connect();
+      await conn.query("select 1");
+      conn.release();
+      _db = drizzlePg(pgPool) as any;
+      console.log("[Database] Connected successfully (postgres)");
+      return _db;
+    }
+
     const dbConfig = parseDatabaseUrl(databaseUrl);
     
     _pool = mysql.createPool({
@@ -141,6 +172,14 @@ export async function getDb() {
       keepAliveInitialDelayMs: 0,
     });
 
+    // OPE-82 — Le Pool mysql2 est un EventEmitter : un evenement 'error' sans
+    // listener (coupure DB, PROTOCOL_CONNECTION_LOST, failover) est relancé par
+    // Node → uncaughtException → crash. On l'ecoute pour le rendre non-fatal
+    // (mysql2 reconnecte les connexions du pool a la demande).
+    (_pool as any).on("error", (err: any) => {
+      console.error("[MySQL pool] error (non-fatal):", err?.code, err?.message);
+    });
+
     const connection = await _pool.getConnection();
     await connection.ping();
     connection.release();
@@ -155,6 +194,20 @@ export async function getDb() {
   } finally {
     _connectionInProgress = false;
   }
+}
+
+// OPE-184 P0.7a — insert dialect-aware renvoyant l'id généré.
+// Postgres : `.returning({id})` (drizzle-mysql2 ne supporte PAS returning).
+// MySQL : forme historique mysql2 (ResultSetHeader.insertId). Remplace le pattern
+// `const [result] = await db.insert(X).values(Y); ... result.insertId`.
+export async function insertReturningId(table: any, values: any): Promise<number> {
+  const db: any = await getDb();
+  if (process.env.DB_DIALECT === "postgresql") {
+    const [row]: any = await db.insert(table).values(values).returning({ id: table.id });
+    return row.id;
+  }
+  const [result]: any = await db.insert(table).values(values);
+  return result.insertId;
 }
 
 export function getPool() {
@@ -190,6 +243,19 @@ export async function updateUser(id: number, data: Partial<InsertUser>): Promise
   return getUserById(id);
 }
 
+// OPE-8 : recupere l'utilisateur dont le token de reset (hash SHA-256) est
+// valide et non expire. Retourne undefined si aucun match / expire.
+export async function getUserByValidResetToken(tokenHash: string): Promise<User | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(users)
+    .where(and(
+      eq(users.resetToken, tokenHash),
+      gte(users.resetTokenExpiry, new Date()),
+    ))
+    .limit(1);
+  return result[0];
+}
+
 // ============================================================================
 // ARTISANS
 // ============================================================================
@@ -216,6 +282,43 @@ export async function getArtisanByUserId(userId: number): Promise<Artisan | unde
 export async function getArtisanBySlug(slug: string): Promise<Artisan | undefined> {
   const db = await getDb();
   const result = await db.select().from(artisans).where(eq(artisans.slug, slug)).limit(1);
+  return result[0];
+}
+
+// OPE-156 — flux iCal : résolution de l'artisan par son jeton secret de calendrier.
+export async function getArtisanByIcalToken(token: string): Promise<Artisan | undefined> {
+  const db = await getDb();
+  if (!token) return undefined;
+  const result = await db.select().from(artisans).where(eq(artisans.icalToken, token)).limit(1);
+  return result[0];
+}
+
+// OPE-172 — demandes de contact (vitrine) : persistance + suivi.
+export async function createDemandeContact(data: InsertDemandeContact): Promise<void> {
+  const db = await getDb();
+  await db.insert(demandesContact).values(data);
+}
+
+export async function getDemandesContactByArtisanId(artisanId: number): Promise<DemandeContact[]> {
+  const db = await getDb();
+  return await db.select().from(demandesContact)
+    .where(eq(demandesContact.artisanId, artisanId))
+    .orderBy(desc(demandesContact.createdAt));
+}
+
+// Met à jour le statut d'une demande, SCOPÉ par artisanId (pas d'IDOR).
+export async function updateDemandeContactStatut(id: number, artisanId: number, statut: "nouveau" | "contacte" | "converti" | "perdu", clientId?: number): Promise<void> {
+  const db = await getDb();
+  const data: any = { statut };
+  if (clientId !== undefined) data.clientId = clientId;
+  await db.update(demandesContact).set(data)
+    .where(and(eq(demandesContact.id, id), eq(demandesContact.artisanId, artisanId)));
+}
+
+export async function getDemandeContactById(id: number, artisanId: number): Promise<DemandeContact | undefined> {
+  const db = await getDb();
+  const result = await db.select().from(demandesContact)
+    .where(and(eq(demandesContact.id, id), eq(demandesContact.artisanId, artisanId))).limit(1);
   return result[0];
 }
 
@@ -357,8 +460,14 @@ export async function searchArticles(query: string, metier?: string): Promise<Bi
 export async function createBibliothequeArticle(data: InsertBibliothequeArticle): Promise<BibliothequeArticle> {
   const db = await getDb();
   await db.insert(bibliothequeArticles).values(data);
+  // `bibliotheque_articles` n'a PAS de colonne `reference` : l'ancienne relecture
+  // `eq(bibliothequeArticles.reference, data.reference)` portait sur une colonne
+  // inexistante (-> undefined -> throw) et cassait cet endpoint admin. On relit par
+  // `nom` (réel, NOT NULL) en prenant la ligne la plus récente (= celle qu'on vient
+  // d'insérer), idiome déjà utilisé par createBadge/createNotification.
   const result = await db.select().from(bibliothequeArticles)
-    .where(eq(bibliothequeArticles.reference, data.reference))
+    .where(eq(bibliothequeArticles.nom, data.nom))
+    .orderBy(desc(bibliothequeArticles.id))
     .limit(1);
   return result[0];
 }
@@ -417,6 +526,37 @@ export async function deleteArticleArtisan(id: number): Promise<void> {
   await db.delete(articlesArtisan).where(eq(articlesArtisan.id, id));
 }
 
+// ── Activités / rappels planifiés — CRM next-action (OPE-121) ─────────────────
+// Toujours scopé par artisanId (multi-tenant). Tri par échéance croissante pour
+// que le widget « À faire » regroupe naturellement en retard / aujourd'hui / à venir.
+export async function getActivitesByArtisanId(artisanId: number): Promise<Activite[]> {
+  const db = await getDb();
+  return await db.select().from(activites)
+    .where(eq(activites.artisanId, artisanId))
+    .orderBy(asc(activites.fait), asc(activites.echeance));
+}
+
+export async function createActivite(data: InsertActivite): Promise<Activite> {
+  const db = await getDb();
+  const newId = await insertReturningId(activites, data);
+  const [created] = await db.select().from(activites).where(eq(activites.id, newId));
+  return created;
+}
+
+// Bascule fait/à-faire, scopée artisan : positionne faitAt à la complétion, le
+// remet à null si on rouvre l'activité.
+export async function setActiviteFait(id: number, artisanId: number, fait: boolean): Promise<void> {
+  const db = await getDb();
+  await db.update(activites)
+    .set({ fait, faitAt: fait ? new Date() : null })
+    .where(and(eq(activites.id, id), eq(activites.artisanId, artisanId)));
+}
+
+export async function deleteActivite(id: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(activites).where(and(eq(activites.id, id), eq(activites.artisanId, artisanId)));
+}
+
 // ============================================================================
 // DEVIS (Quotes)
 // ============================================================================
@@ -432,9 +572,12 @@ export async function getDevisById(id: number): Promise<Devis | undefined> {
   return result[0];
 }
 
-export async function getDevisByClientId(clientId: number): Promise<Devis[]> {
+export async function getDevisByClientId(clientId: number, artisanId?: number): Promise<Devis[]> {
   const db = await getDb();
-  return await db.select().from(devis).where(eq(devis.clientId, clientId)).orderBy(desc(devis.createdAt));
+  // artisanId optionnel : scope tenant defense-in-depth (portail public notamment).
+  const conds = [eq(devis.clientId, clientId)];
+  if (artisanId !== undefined) conds.push(eq(devis.artisanId, artisanId));
+  return await db.select().from(devis).where(and(...conds)).orderBy(desc(devis.createdAt));
 }
 
 export async function getNextDevisNumber(artisanId: number): Promise<string> {
@@ -480,9 +623,28 @@ export async function updateDevis(id: number, data: Partial<InsertDevis>): Promi
   return getDevisById(id);
 }
 
+// OPE-152 — marque le devis comme « vu » à la PREMIÈRE consultation client (read-receipt).
+// Idempotent : `WHERE dateVue IS NULL` → ne réécrit jamais la 1ʳᵉ date de vue.
+export async function markDevisVu(id: number): Promise<void> {
+  const db = await getDb();
+  await db.update(devis).set({ dateVue: new Date() }).where(and(eq(devis.id, id), isNull(devis.dateVue)));
+}
+
 export async function deleteDevis(id: number): Promise<void> {
   const db = await getDb();
   await db.delete(devisLignes).where(eq(devisLignes.devisId, id));
+  // Cascade des enfants PUREMENT opérationnels du devis (aucun document légal) qui
+  // n'étaient pas nettoyés → lignes orphelines (pas de contrainte FK en base) :
+  //  - relances_devis : rappels de relance du devis
+  //  - devis_options (+ devis_options_lignes) : variantes/options proposées
+  // (signatures_devis = valeur probante, hors périmètre — cf. OPE-50 sur la
+  //  suppressibilité d'un devis signé.)
+  const opts = await db.select({ id: devisOptions.id }).from(devisOptions).where(eq(devisOptions.devisId, id));
+  if (opts.length > 0) {
+    await db.delete(devisOptionsLignes).where(inArray(devisOptionsLignes.optionId, opts.map((o) => o.id)));
+  }
+  await db.delete(devisOptions).where(eq(devisOptions.devisId, id));
+  await db.delete(relancesDevis).where(eq(relancesDevis.devisId, id));
   await db.delete(devis).where(eq(devis.id, id));
 }
 
@@ -567,9 +729,117 @@ export async function getFactureById(id: number): Promise<Facture | undefined> {
   return result[0];
 }
 
-export async function getFacturesByClientId(clientId: number): Promise<Facture[]> {
+export async function getFacturesByClientId(clientId: number, artisanId?: number): Promise<Facture[]> {
   const db = await getDb();
-  return await db.select().from(factures).where(eq(factures.clientId, clientId)).orderBy(desc(factures.createdAt));
+  // artisanId optionnel : scope tenant defense-in-depth (portail public notamment).
+  const conds = [eq(factures.clientId, clientId)];
+  if (artisanId !== undefined) conds.push(eq(factures.artisanId, artisanId));
+  return await db.select().from(factures).where(and(...conds)).orderBy(desc(factures.createdAt));
+}
+
+// OPE-144 — encours client (lecture seule, sans migration). Somme du reste dû
+// (totalTTC − montantPaye) des factures émises non soldées, avec la part échue.
+// Scopé par `artisanId` (sécurité multi-tenant) en plus du `clientId`. Seules les
+// factures `envoyee`/`en_retard` comptent (pas brouillon/validee = pas encore une
+// créance ; pas payee/annulee).
+//
+// La part « échue » est dérivée de `dateEcheance < NOW()` (aligné Odoo
+// `account.move.invoice_date_due` : le retard se calcule depuis la date, sans
+// dépendre d'un statut stocké). En effet le statut `en_retard` n'est jamais
+// positionné automatiquement (cf. OPE-61 : `runScheduler` ne bascule aucune
+// facture) → s'appuyer dessus donnerait un échu toujours nul. On garde malgré
+// tout `statut === 'en_retard'` comme échu (cas d'une bascule manuelle).
+export async function getEncoursClient(clientId: number, artisanId: number): Promise<{ encoursTotal: string; echu: string; nbFacturesImpayees: number }> {
+  const db = await getDb();
+  const rows = await db.select({
+    statut: factures.statut,
+    totalTTC: factures.totalTTC,
+    montantPaye: factures.montantPaye,
+    dateEcheance: factures.dateEcheance,
+    typeDocument: factures.typeDocument,
+  }).from(factures)
+    .where(and(eq(factures.clientId, clientId), eq(factures.artisanId, artisanId)));
+
+  const now = Date.now();
+  let encoursTotal = 0;
+  let echu = 0;
+  let nb = 0;
+  // OPE-247 — les avoirs validés (notes de crédit) RÉDUISENT ce que le client doit.
+  // Ils sont stockés `typeDocument='avoir'`, `totalTTC` négatif → on accumule leur
+  // valeur absolue comme crédit à déduire de l'encours (nette globale, sans lettrage fin).
+  let creditAvoirs = 0;
+  for (const f of rows) {
+    if ((f.typeDocument || "facture") === "avoir") {
+      if (f.statut !== "annulee" && f.statut !== "brouillon") {
+        creditAvoirs += Math.abs(parseFloat(String(f.totalTTC ?? "0")) || 0);
+      }
+      continue;
+    }
+    if (f.statut !== "envoyee" && f.statut !== "en_retard") continue;
+    const reste = (parseFloat(String(f.totalTTC ?? "0")) || 0) - (parseFloat(String(f.montantPaye ?? "0")) || 0);
+    if (reste <= 0) continue;
+    encoursTotal += reste;
+    nb += 1;
+    const echeance = f.dateEcheance ? new Date(f.dateEcheance).getTime() : NaN;
+    const estEchue = f.statut === "en_retard" || (!isNaN(echeance) && echeance < now);
+    if (estEchue) echu += reste;
+  }
+  // Déduit le crédit des avoirs (planché à 0), et borne l'échu au net total dû.
+  encoursTotal = Math.max(0, encoursTotal - creditAvoirs);
+  echu = Math.min(echu, encoursTotal);
+  return { encoursTotal: encoursTotal.toFixed(2), echu: echu.toFixed(2), nbFacturesImpayees: nb };
+}
+
+// OPE-144 — encours impayé de TOUS les clients en UNE requête (badge « à risque » de la liste
+// clients). Même logique que getEncoursClient (reste des factures envoyee/en_retard, avoirs
+// validés déduits par client, échu borné au net), agrégée par clientId. Scopé tenant.
+export async function getEncoursByClient(
+  artisanId: number,
+): Promise<Record<number, { encoursTotal: string; echu: string; nbFacturesImpayees: number }>> {
+  const db = await getDb();
+  const rows = await db.select({
+    clientId: factures.clientId,
+    statut: factures.statut,
+    totalTTC: factures.totalTTC,
+    montantPaye: factures.montantPaye,
+    dateEcheance: factures.dateEcheance,
+    typeDocument: factures.typeDocument,
+  }).from(factures).where(eq(factures.artisanId, artisanId));
+
+  const now = Date.now();
+  const enc: Record<number, number> = {};
+  const ech: Record<number, number> = {};
+  const credit: Record<number, number> = {};
+  const nb: Record<number, number> = {};
+  for (const f of rows) {
+    const cid = f.clientId;
+    if ((f.typeDocument || "facture") === "avoir") {
+      if (f.statut !== "annulee" && f.statut !== "brouillon") {
+        credit[cid] = (credit[cid] || 0) + Math.abs(parseFloat(String(f.totalTTC ?? "0")) || 0);
+      }
+      continue;
+    }
+    if (f.statut !== "envoyee" && f.statut !== "en_retard") continue;
+    const reste = (parseFloat(String(f.totalTTC ?? "0")) || 0) - (parseFloat(String(f.montantPaye ?? "0")) || 0);
+    if (reste <= 0) continue;
+    enc[cid] = (enc[cid] || 0) + reste;
+    nb[cid] = (nb[cid] || 0) + 1;
+    const echeance = f.dateEcheance ? new Date(f.dateEcheance).getTime() : NaN;
+    const estEchue = f.statut === "en_retard" || (!isNaN(echeance) && echeance < now);
+    if (estEchue) ech[cid] = (ech[cid] || 0) + reste;
+  }
+  const out: Record<number, { encoursTotal: string; echu: string; nbFacturesImpayees: number }> = {};
+  const clientIds = new Set<number>([...Object.keys(enc), ...Object.keys(credit)].map(Number));
+  for (const cid of clientIds) {
+    const total = Math.max(0, (enc[cid] || 0) - (credit[cid] || 0));
+    if (total <= 0) continue; // seuls les clients réellement débiteurs sont retournés
+    out[cid] = {
+      encoursTotal: total.toFixed(2),
+      echu: Math.min(ech[cid] || 0, total).toFixed(2),
+      nbFacturesImpayees: nb[cid] || 0,
+    };
+  }
+  return out;
 }
 
 export async function getNextFactureNumber(artisanId: number): Promise<string> {
@@ -598,6 +868,41 @@ export async function getNextFactureNumber(artisanId: number): Promise<string> {
   return `${prefix}-${String(compteur).padStart(5, '0')}`;
 }
 
+// OPE-249 — ajoute N mois en CLAMPANT la fin de mois (équivalent de
+// `dateutil.relativedelta(months=N)` d'Odoo). `Date.setMonth(getMonth()+N)` brut
+// déborde (31 jan + 1 mois → 3 mars) ; ce helper clampe au dernier jour du mois
+// cible si le jour d'origine n'existe pas (→ 28/29 fév). Fonction pure (testable).
+// N peut être négatif. Behavior-preserving pour les jours 1–28 (inchangés).
+export function addMonthsClamped(base: Date, n: number): Date {
+  const day = base.getDate();
+  const r = new Date(base);
+  r.setDate(1);
+  r.setMonth(r.getMonth() + n);
+  const lastDayOfTargetMonth = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+  r.setDate(Math.min(day, lastDayOfTargetMonth));
+  return r;
+}
+
+// OPE-94 — calcule la date d'échéance d'une facture depuis un délai de paiement
+// structuré (≈ Odoo account.payment.term). `net` = base + N jours ; `fin_de_mois`
+// = base + N jours, puis dernier jour de ce mois. Fonction pure (testable).
+export function computeDateEcheance(base: Date, jours: number, type: "net" | "fin_de_mois" = "net"): Date {
+  const d = new Date(base);
+  d.setDate(d.getDate() + (jours || 0));
+  if (type === "fin_de_mois") {
+    d.setMonth(d.getMonth() + 1, 0); // jour 0 du mois suivant = dernier jour du mois courant
+  }
+  return d;
+}
+
+// OPE-94 — échéance par défaut dérivée des paramètres de l'artisan, si configurée.
+// Renvoie `undefined` si aucun délai n'est paramétré (→ comportement inchangé).
+export async function defaultDateEcheance(artisanId: number, base: Date): Promise<Date | undefined> {
+  const params = await getParametresArtisan(artisanId);
+  if (params?.delaiPaiementJours == null) return undefined;
+  return computeDateEcheance(base, params.delaiPaiementJours, (params.delaiPaiementType as any) || "net");
+}
+
 export async function createFacture(artisanId: number, data: Omit<InsertFacture, 'artisanId'>): Promise<Facture> {
   const db = await getDb();
   const numero = data.numero || await getNextFactureNumber(artisanId);
@@ -615,7 +920,9 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
   
   const lignesDevis = await getLignesDevisByDevisId(devisId);
   const numero = await getNextFactureNumber(devisData.artisanId);
-  
+  // OPE-94 — échéance dérivée du délai de paiement par défaut de l'artisan (si configuré).
+  const dateEcheance = await defaultDateEcheance(devisData.artisanId, new Date());
+
   // Create facture
   await db.insert(factures).values({
     artisanId: devisData.artisanId,
@@ -623,22 +930,35 @@ export async function createFactureFromDevis(devisId: number): Promise<Facture> 
     devisId: devisData.id,
     numero,
     objet: devisData.objet,
+    // OPE-158 — report de la référence client (n° de commande) du devis vers la facture.
+    referenceClient: devisData.referenceClient,
     conditionsPaiement: devisData.conditionsPaiement,
     notes: devisData.notes,
+    dateEcheance,
     totalHT: devisData.totalHT,
     totalTVA: devisData.totalTVA,
     totalTTC: devisData.totalTTC,
   });
   
+  // OPE-176 — relire la facture qu'on vient d'insérer EN SCOPANT sur l'artisan.
+  // La numérotation est par artisan (FAC-0000N pour tous) et `factures.numero` n'a
+  // pas de contrainte UNIQUE : un lookup par `numero` seul pouvait renvoyer la facture
+  // d'un AUTRE artisan (collision) -> lignes rattachées + facture renvoyée cross-tenant.
+  // On scope par artisanId et on prend la plus récente (= celle qu'on vient de créer).
   const factureResult = await db.select().from(factures)
-    .where(eq(factures.numero, numero))
+    .where(and(eq(factures.artisanId, devisData.artisanId), eq(factures.numero, numero)))
+    .orderBy(desc(factures.id))
     .limit(1);
   const facture = factureResult[0];
   
   // Copy lignes
   for (const ligne of lignesDevis) {
+    // OPE-168 (volet 2) — la structure du devis (sections/notes) est désormais
+    // REPORTÉE sur la facture (les lignes de facture portent aussi `type`). Les
+    // section/note ont des montants à 0 → n'impactent pas les totaux de la facture.
     await db.insert(facturesLignes).values({
       factureId: facture.id,
+      type: (ligne as any).type ?? "produit",
       ordre: ligne.ordre,
       reference: ligne.reference,
       designation: ligne.designation,
@@ -708,6 +1028,27 @@ export async function getAuditLogsByEntity(entityType: string, entityId: number)
     .orderBy(desc(auditLog.createdAt));
 }
 
+// OPE-114 — journal des envois d'emails (traçabilité + socle webhooks délivrabilité)
+export async function createEmailLog(data: InsertEmailLog): Promise<void> {
+  const db = await getDb();
+  await db.insert(emailsLog).values(data);
+}
+
+// Liste scopée tenant ; filtre optionnel par entité (devis/facture…).
+export async function getEmailsLog(
+  artisanId: number,
+  opts?: { entiteType?: string; entiteId?: number; limit?: number },
+): Promise<EmailLog[]> {
+  const db = await getDb();
+  const conds = [eq(emailsLog.artisanId, artisanId)];
+  if (opts?.entiteType) conds.push(eq(emailsLog.entiteType, opts.entiteType));
+  if (opts?.entiteId !== undefined) conds.push(eq(emailsLog.entiteId, opts.entiteId));
+  return await db.select().from(emailsLog)
+    .where(and(...conds))
+    .orderBy(desc(emailsLog.createdAt))
+    .limit(Math.min(Math.max(opts?.limit ?? 100, 1), 500));
+}
+
 export async function getAvoirsByFactureId(factureOrigineId: number): Promise<Facture[]> {
   const db = await getDb();
   return await db.select().from(factures)
@@ -772,9 +1113,57 @@ export async function getInterventionById(id: number): Promise<Intervention | un
   return result[0];
 }
 
-export async function getInterventionsByClientId(clientId: number): Promise<Intervention[]> {
+// OPE-110 — détection (non bloquante) des conflits d'affectation d'un technicien sur
+// une fenêtre [dateDebut, dateFin] : (1) interventions actives qui chevauchent,
+// (2) congés APPROUVÉS qui couvrent la période. Toujours scopé `artisanId`.
+export async function getConflitsTechnicien(
+  artisanId: number,
+  technicienId: number,
+  dateDebut: Date,
+  dateFin: Date,
+  excludeInterventionId?: number,
+): Promise<{
+  interventions: { id: number; titre: string; dateDebut: Date; dateFin: Date | null }[];
+  conges: { id: number; type: string; dateDebut: any; dateFin: any }[];
+}> {
   const db = await getDb();
-  return await db.select().from(interventions).where(eq(interventions.clientId, clientId)).orderBy(desc(interventions.dateDebut));
+  // Chevauchement : existante.dateDebut < nouvelleFin ET COALESCE(fin, debut) > nouvelleDebut.
+  const conds: any[] = [
+    eq(interventions.artisanId, artisanId),
+    eq(interventions.technicienId, technicienId),
+    inArray(interventions.statut, ["planifiee", "en_cours"] as any),
+    lt(interventions.dateDebut, dateFin),
+    sql`COALESCE(${interventions.dateFin}, ${interventions.dateDebut}) > ${dateDebut}`,
+  ];
+  if (excludeInterventionId) conds.push(ne(interventions.id, excludeInterventionId));
+  const inter = await db.select({
+    id: interventions.id, titre: interventions.titre,
+    dateDebut: interventions.dateDebut, dateFin: interventions.dateFin,
+  }).from(interventions).where(and(...conds)).limit(20);
+
+  // Congés approuvés du technicien recouvrant la période (colonnes `date`, comparaison YMD).
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+  const congesList = await db.select({
+    id: conges.id, type: conges.type, dateDebut: conges.dateDebut, dateFin: conges.dateFin,
+  }).from(conges).where(and(
+    // Defense-in-depth : scope tenant explicite (cohérent avec le pattern systémique).
+    // technicienId est déjà propre à un artisan, mais on ne dépend pas de cet invariant.
+    eq(conges.artisanId, artisanId),
+    eq(conges.technicienId, technicienId),
+    eq(conges.statut, "approuve" as any),
+    lte(conges.dateDebut, ymd(dateFin)),
+    gte(conges.dateFin, ymd(dateDebut)),
+  )).limit(20);
+
+  return { interventions: inter as any, conges: congesList as any };
+}
+
+export async function getInterventionsByClientId(clientId: number, artisanId?: number): Promise<Intervention[]> {
+  const db = await getDb();
+  // artisanId optionnel : scope tenant defense-in-depth (portail public notamment).
+  const conds = [eq(interventions.clientId, clientId)];
+  if (artisanId !== undefined) conds.push(eq(interventions.artisanId, artisanId));
+  return await db.select().from(interventions).where(and(...conds)).orderBy(desc(interventions.dateDebut));
 }
 
 export async function getUpcomingInterventions(artisanId: number, days: number = 7): Promise<Intervention[]> {
@@ -814,29 +1203,132 @@ export async function updateIntervention(id: number, data: Partial<InsertInterve
 
 export async function deleteIntervention(id: number): Promise<void> {
   const db = await getDb();
+  // OPE-111 — nettoie les liaisons d'équipe (enfant purement opérationnel) pour
+  // éviter des lignes orphelines (pas de FK dure en base).
+  await db.delete(interventionsTechniciens).where(eq(interventionsTechniciens.interventionId, id));
   await db.delete(interventions).where(eq(interventions.id, id));
+}
+
+// OPE-111 — Équipe d'intervention (Many2many additif). Le technicien « responsable »
+// reste `interventions.technicienId` ; ces helpers gèrent le RESTE de l'équipe.
+
+// Liste l'équipe d'une intervention, jointe aux fiches techniciens (nom/prénom).
+export async function getEquipeIntervention(
+  interventionId: number,
+  artisanId: number,
+): Promise<Array<{ id: number; technicienId: number; role: string | null; nom: string | null; prenom: string | null }>> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      id: interventionsTechniciens.id,
+      technicienId: interventionsTechniciens.technicienId,
+      role: interventionsTechniciens.role,
+      nom: techniciens.nom,
+      prenom: techniciens.prenom,
+    })
+    .from(interventionsTechniciens)
+    .leftJoin(techniciens, eq(interventionsTechniciens.technicienId, techniciens.id))
+    .where(and(
+      eq(interventionsTechniciens.interventionId, interventionId),
+      eq(interventionsTechniciens.artisanId, artisanId),
+    ))
+    .orderBy(asc(interventionsTechniciens.id));
+  return rows;
+}
+
+// OPE-111 — toutes les liaisons d'équipe de l'artisan (1 requête), pour afficher
+// l'équipe sur la liste/planning sans N+1. Scopé tenant.
+export async function getEquipesByArtisan(
+  artisanId: number,
+): Promise<Array<{ interventionId: number; technicienId: number; role: string | null; nom: string | null; prenom: string | null }>> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      interventionId: interventionsTechniciens.interventionId,
+      technicienId: interventionsTechniciens.technicienId,
+      role: interventionsTechniciens.role,
+      nom: techniciens.nom,
+      prenom: techniciens.prenom,
+    })
+    .from(interventionsTechniciens)
+    .leftJoin(techniciens, eq(interventionsTechniciens.technicienId, techniciens.id))
+    .where(eq(interventionsTechniciens.artisanId, artisanId))
+    .orderBy(asc(interventionsTechniciens.id));
+  return rows;
+}
+
+// Ajoute un membre à l'équipe (idempotent : ignore un doublon intervention+technicien).
+export async function addMembreEquipe(data: {
+  artisanId: number;
+  interventionId: number;
+  technicienId: number;
+  role?: string | null;
+}): Promise<InterventionTechnicien | null> {
+  const db = await getDb();
+  const existing = await db.select().from(interventionsTechniciens).where(and(
+    eq(interventionsTechniciens.interventionId, data.interventionId),
+    eq(interventionsTechniciens.technicienId, data.technicienId),
+  )).limit(1);
+  if (existing[0]) return existing[0];
+  await db.insert(interventionsTechniciens).values({
+    artisanId: data.artisanId,
+    interventionId: data.interventionId,
+    technicienId: data.technicienId,
+    role: data.role ?? null,
+  });
+  const result = await db.select().from(interventionsTechniciens).where(and(
+    eq(interventionsTechniciens.interventionId, data.interventionId),
+    eq(interventionsTechniciens.technicienId, data.technicienId),
+  )).limit(1);
+  return result[0] ?? null;
+}
+
+// Retire un membre de l'équipe (par id de liaison), scopé tenant.
+export async function removeMembreEquipe(id: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(interventionsTechniciens).where(and(
+    eq(interventionsTechniciens.id, id),
+    eq(interventionsTechniciens.artisanId, artisanId),
+  ));
 }
 
 // ============================================================================
 // NOTIFICATIONS
 // ============================================================================
 
-export async function getNotificationsByArtisanId(artisanId: number): Promise<Notification[]> {
+export async function getNotificationsByArtisanId(
+  artisanId: number,
+  includeArchived = false,
+  opts?: { nonLuesUniquement?: boolean; limit?: number; offset?: number },
+): Promise<Notification[]> {
   const db = await getDb();
-  return await db.select().from(notifications)
-    .where(and(eq(notifications.artisanId, artisanId), eq(notifications.archived, false)))
+  const conds = [eq(notifications.artisanId, artisanId)];
+  // includeArchived=false (défaut) : on exclut les archivées (comportement historique).
+  // includeArchived=true : la vue « archivées » du front fonctionne enfin.
+  if (!includeArchived) conds.push(eq(notifications.archived, false));
+  // Filtre + pagination poussés en SQL (au lieu de tout ramener en mémoire puis
+  // filtrer/slicer côté Node) — cet endpoint est listé fréquemment.
+  if (opts?.nonLuesUniquement) conds.push(eq(notifications.lu, false));
+  const query = db.select().from(notifications)
+    .where(and(...conds))
     .orderBy(desc(notifications.createdAt));
+  if (opts?.limit != null) {
+    return await query.limit(opts.limit).offset(opts.offset ?? 0);
+  }
+  return await query;
 }
 
 export async function getUnreadNotificationsCount(artisanId: number): Promise<number> {
   const db = await getDb();
-  const result = await db.select().from(notifications)
+  // Perf : COUNT(*) cote SQL au lieu de ramener toutes les lignes non-lues en
+  // memoire Node puis .length (cet endpoint est pollé toutes les 30s).
+  const result = await db.select({ count: sql<number>`COUNT(*)` }).from(notifications)
     .where(and(
       eq(notifications.artisanId, artisanId),
       eq(notifications.lu, false),
       eq(notifications.archived, false)
     ));
-  return result.length;
+  return Number(result[0]?.count ?? 0);
 }
 
 export async function createNotification(data: InsertNotification): Promise<Notification> {
@@ -950,6 +1442,10 @@ export async function updateStock(id: number, data: Partial<InsertStock>): Promi
 
 export async function deleteStock(id: number): Promise<void> {
   const db = await getDb();
+  // Cascade : supprimer l'historique de mouvements (opérationnel, sans valeur
+  // légale/comptable) avant l'article -> évite des `mouvements_stock` orphelins
+  // pointant vers un stockId supprimé. Même pattern que deleteChantier/deleteFacture.
+  await db.delete(mouvementsStock).where(eq(mouvementsStock.stockId, id));
   await db.delete(stocks).where(eq(stocks.id, id));
 }
 
@@ -982,6 +1478,37 @@ export async function getMouvementsStock(stockId: number): Promise<MouvementStoc
   return await db.select().from(mouvementsStock)
     .where(eq(mouvementsStock.stockId, stockId))
     .orderBy(desc(mouvementsStock.createdAt));
+}
+
+// OPE-105 — quantité ENTRANTE par fiche stock = reste à recevoir (`quantite − quantiteRecue`,
+// planché à 0) des lignes de commandes fournisseurs ENCORE en cours (envoyée / confirmée /
+// partiellement livrée), liées à la fiche stock via `stockId`. Lecture seule, scopée tenant
+// (jointure sur `commandes_fournisseurs.artisanId`), une requête (pas de N+1, pas de migration).
+// Sert à afficher le « stock prévisionnel » = physique + entrant SANS modifier l'alerte de seuil.
+export async function getStockEntrantByArtisan(
+  artisanId: number,
+): Promise<Array<{ stockId: number; entrant: number }>> {
+  const db = await getDb();
+  const entrantExpr = sql<string>`COALESCE(SUM(GREATEST(${lignesCommandesFournisseurs.quantite} - ${lignesCommandesFournisseurs.quantiteRecue}, 0)), 0)`;
+  try {
+    const rows = await db.select({
+      stockId: lignesCommandesFournisseurs.stockId,
+      entrant: entrantExpr,
+    })
+      .from(lignesCommandesFournisseurs)
+      .innerJoin(commandesFournisseurs, eq(commandesFournisseurs.id, lignesCommandesFournisseurs.commandeId))
+      .where(and(
+        eq(commandesFournisseurs.artisanId, artisanId),
+        inArray(commandesFournisseurs.statut, ["envoyee", "confirmee", "partiellement_livree"]),
+        isNotNull(lignesCommandesFournisseurs.stockId),
+      ))
+      .groupBy(lignesCommandesFournisseurs.stockId)
+      .having(sql`${entrantExpr} > 0`);
+    return rows.map((r) => ({ stockId: Number(r.stockId), entrant: Number(r.entrant) || 0 }));
+  } catch (e: any) {
+    console.warn("[getStockEntrantByArtisan]", e?.message || e);
+    return [];
+  }
 }
 
 // ============================================================================
@@ -1017,6 +1544,18 @@ export async function updateFournisseur(id: number, data: Partial<InsertFourniss
 
 export async function deleteFournisseur(id: number): Promise<void> {
   const db = await getDb();
+  // Cascade des données OPÉRATIONNELLES du fournisseur (pas de document légal/comptable :
+  // les commandes fournisseurs sont des bons de commande, pas des écritures ; la compta
+  // passe par `depenses`). Évite des orphelins : liens article-fournisseur + commandes +
+  // leurs lignes. Même pattern que deleteChantier/deleteVehicule (qui cascadent déjà leurs
+  // enfants opérationnels — documents, entretiens, assurances…).
+  await db.delete(articlesFournisseurs).where(eq(articlesFournisseurs.fournisseurId, id));
+  const cmds = await db.select({ id: commandesFournisseurs.id })
+    .from(commandesFournisseurs).where(eq(commandesFournisseurs.fournisseurId, id));
+  for (const c of cmds) {
+    await db.delete(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.commandeId, c.id));
+  }
+  await db.delete(commandesFournisseurs).where(eq(commandesFournisseurs.fournisseurId, id));
   await db.delete(fournisseurs).where(eq(fournisseurs.id, id));
 }
 
@@ -1028,6 +1567,13 @@ export async function getFournisseurArticles(fournisseurId: number): Promise<Art
 export async function getArticleFournisseurs(articleId: number): Promise<ArticleFournisseur[]> {
   const db = await getDb();
   return await db.select().from(articlesFournisseurs).where(eq(articlesFournisseurs.articleId, articleId));
+}
+
+export async function getArticleFournisseurById(id: number): Promise<ArticleFournisseur | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(articlesFournisseurs).where(eq(articlesFournisseurs.id, id)).limit(1);
+  return result[0];
 }
 
 export async function createArticleFournisseur(data: InsertArticleFournisseur): Promise<ArticleFournisseur> {
@@ -1052,16 +1598,79 @@ export async function deleteArticleFournisseur(id: number): Promise<void> {
   await db.delete(articlesFournisseurs).where(eq(articlesFournisseurs.id, id));
 }
 
+// OPE-135 — indicateurs de performance fournisseur CALCULÉS depuis les commandes
+// (auparavant données factices 0 / 100 %). Forme alignée sur ce qu'attend la page
+// PerformancesFournisseurs.tsx. Scopé par `artisanId` (la requête commandes filtre
+// sur artisanId → pas de fuite cross-tenant). Aucune migration.
 export async function getPerformancesFournisseurs(artisanId: number): Promise<any[]> {
   const db = await getDb();
   const fournisseursList = await getFournisseursByArtisanId(artisanId);
-  // Simplified performance data
-  return fournisseursList.map(f => ({
-    fournisseur: f,
-    totalCommandes: 0,
-    delaiMoyen: 0,
-    tauxConformite: 100,
-  }));
+  const cmds = await db.select().from(commandesFournisseurs)
+    .where(eq(commandesFournisseurs.artisanId, artisanId));
+
+  const byFournisseur = new Map<number, any[]>();
+  for (const c of cmds) {
+    const arr = byFournisseur.get(c.fournisseurId) || [];
+    arr.push(c);
+    byFournisseur.set(c.fournisseurId, arr);
+  }
+  const now = Date.now();
+  const jour = 86_400_000;
+
+  return fournisseursList.map((f) => {
+    // Commandes « réelles » (hors brouillon).
+    const list = (byFournisseur.get(f.id) || []).filter((c) => c.statut !== "brouillon");
+    const totalCommandes = list.length;
+    const livrees = list.filter((c) => c.statut === "livree");
+    const commandesLivrees = livrees.length;
+
+    // En retard : livrée après l'échéance, OU non livrée/annulée dont l'échéance est dépassée.
+    const commandesEnRetard = list.filter((c) => {
+      const prevu = c.dateLivraisonPrevue ? new Date(c.dateLivraisonPrevue).getTime() : null;
+      if (prevu == null) return false;
+      if (c.statut === "livree") {
+        return c.dateLivraisonReelle ? new Date(c.dateLivraisonReelle).getTime() > prevu : false;
+      }
+      if (c.statut === "annulee") return false;
+      return prevu < now; // en cours et échéance dépassée
+    }).length;
+
+    // Délai moyen de livraison (jours) sur les commandes livrées datées.
+    const livreesDatees = livrees.filter((c) => c.dateLivraisonReelle && c.createdAt);
+    let delaiMoyenLivraison: number | null = null;
+    if (livreesDatees.length > 0) {
+      const somme = livreesDatees.reduce((s, c) => {
+        const d = (new Date(c.dateLivraisonReelle).getTime() - new Date(c.createdAt).getTime()) / jour;
+        return s + Math.max(0, d);
+      }, 0);
+      delaiMoyenLivraison = Math.round(somme / livreesDatees.length);
+    }
+
+    // Taux de fiabilité : % de commandes livrées « à temps » (avec date d'échéance).
+    const livreesAvecPrevu = livrees.filter((c) => c.dateLivraisonPrevue && c.dateLivraisonReelle);
+    let tauxFiabilite = 100;
+    if (livreesAvecPrevu.length > 0) {
+      const aTemps = livreesAvecPrevu.filter(
+        (c) => new Date(c.dateLivraisonReelle).getTime() <= new Date(c.dateLivraisonPrevue).getTime()
+      ).length;
+      tauxFiabilite = Math.round((aTemps / livreesAvecPrevu.length) * 100);
+    }
+
+    const montantTotal = list.reduce(
+      (s, c) => s + (parseFloat(String(c.totalTTC ?? c.montantTotal ?? "0")) || 0),
+      0
+    );
+
+    return {
+      fournisseur: { id: f.id, nom: f.nom, contact: f.contact, email: f.email, telephone: f.telephone },
+      totalCommandes,
+      commandesLivrees,
+      commandesEnRetard,
+      delaiMoyenLivraison,
+      tauxFiabilite,
+      montantTotal,
+    };
+  });
 }
 
 // ============================================================================
@@ -1073,6 +1682,22 @@ export async function getCommandesFournisseursByArtisanId(artisanId: number): Pr
   return await db.select().from(commandesFournisseurs)
     .where(eq(commandesFournisseurs.artisanId, artisanId))
     .orderBy(desc(commandesFournisseurs.createdAt));
+}
+
+// OPE-150 — commandes fournisseurs en retard de livraison (lecture seule, scopé tenant).
+// Une commande est « en retard » si elle est encore attendue (envoyée/confirmée/partielle),
+// que sa date de livraison prévue est dépassée, et qu'aucune livraison réelle n'est saisie.
+// (Le filtre `< NOW()` exclut naturellement les `dateLivraisonPrevue` NULL.)
+export async function getCommandesFournisseursEnRetard(artisanId: number): Promise<CommandeFournisseur[]> {
+  const db = await getDb();
+  return await db.select().from(commandesFournisseurs)
+    .where(and(
+      eq(commandesFournisseurs.artisanId, artisanId),
+      inArray(commandesFournisseurs.statut, ["envoyee", "confirmee", "partiellement_livree"]),
+      isNull(commandesFournisseurs.dateLivraisonReelle),
+      lt(commandesFournisseurs.dateLivraisonPrevue, new Date()),
+    ))
+    .orderBy(asc(commandesFournisseurs.dateLivraisonPrevue));
 }
 
 export async function getCommandeFournisseurById(id: number): Promise<CommandeFournisseur | undefined> {
@@ -1120,6 +1745,16 @@ export async function createLigneCommandeFournisseur(data: InsertLigneCommandeFo
 export async function deleteLignesCommandeFournisseur(commandeId: number): Promise<void> {
   const db = await getDb();
   await db.delete(lignesCommandesFournisseurs).where(eq(lignesCommandesFournisseurs.commandeId, commandeId));
+}
+
+// OPE-100 — enregistre la quantité reçue d'une ligne. Scopé par `commandeId` (la propriété
+// tenant est vérifiée au niveau routeur sur la commande) pour éviter d'écrire une ligne
+// d'une autre commande.
+export async function updateLigneCommandeRecue(ligneId: number, commandeId: number, quantiteRecue: number): Promise<void> {
+  const db = await getDb();
+  await db.update(lignesCommandesFournisseurs)
+    .set({ quantiteRecue: quantiteRecue.toFixed(2) })
+    .where(and(eq(lignesCommandesFournisseurs.id, ligneId), eq(lignesCommandesFournisseurs.commandeId, commandeId)));
 }
 
 export async function getNextCommandeNumero(artisanId: number): Promise<string> {
@@ -1412,7 +2047,9 @@ export async function getDashboardStats(artisanId: number): Promise<any> {
   //
   // Note : colonnes en camelCase (artisanId, totalTTC, datePaiement,
   // dateDebut, createdAt), confirmees via drizzle/schema.ts.
-  const pool = await ensurePool();
+  const dbi = await getDb();
+  // MySQL MONTH()/YEAR()/CURRENT_DATE()/NOW() → PG EXTRACT(... FROM CURRENT_DATE) / NOW().
+  const moisCourant = sql`COALESCE(${factures.datePaiement}, ${factures.createdAt})`;
 
   // Toutes les queries lancees en parallele pour minimiser la latence totale.
   const [
@@ -1426,62 +2063,35 @@ export async function getDashboardStats(artisanId: number): Promise<any> {
     [totalFacturesRow],
     [totalInterventionsRow],
   ] = await Promise.all([
-    pool.execute(
-      `SELECT COALESCE(SUM(totalTTC), 0) AS total
-       FROM factures
-       WHERE artisanId = ?
-         AND statut = 'payee'
-         AND MONTH(COALESCE(datePaiement, createdAt)) = MONTH(CURRENT_DATE())
-         AND YEAR(COALESCE(datePaiement, createdAt))  = YEAR(CURRENT_DATE())`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COALESCE(SUM(totalTTC), 0) AS total
-       FROM factures
-       WHERE artisanId = ?
-         AND statut = 'payee'
-         AND YEAR(COALESCE(datePaiement, createdAt)) = YEAR(CURRENT_DATE())`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt
-       FROM devis
-       WHERE artisanId = ?
-         AND statut IN ('brouillon', 'envoye')`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt, COALESCE(SUM(totalTTC), 0) AS total
-       FROM factures
-       WHERE artisanId = ?
-         AND statut NOT IN ('payee', 'annulee', 'brouillon')`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM clients WHERE artisanId = ?`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt
-       FROM interventions
-       WHERE artisanId = ?
-         AND statut = 'planifiee'
-         AND dateDebut >= NOW()`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM devis WHERE artisanId = ?`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM factures WHERE artisanId = ?`,
-      [artisanId]
-    ),
-    pool.execute(
-      `SELECT COUNT(*) AS cnt FROM interventions WHERE artisanId = ?`,
-      [artisanId]
-    ),
-  ]) as any;
+    dbi.select({ total: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` }).from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, 'payee' as any),
+      sql`EXTRACT(MONTH FROM ${moisCourant}) = EXTRACT(MONTH FROM CURRENT_DATE)`,
+      sql`EXTRACT(YEAR FROM ${moisCourant}) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+    )),
+    dbi.select({ total: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` }).from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, 'payee' as any),
+      sql`EXTRACT(YEAR FROM ${moisCourant}) = EXTRACT(YEAR FROM CURRENT_DATE)`,
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(devis).where(and(
+      eq(devis.artisanId, artisanId),
+      inArray(devis.statut, ['brouillon', 'envoye'] as any),
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)`, total: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` }).from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      sql`${factures.statut} NOT IN ('payee', 'annulee', 'brouillon')`,
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(clients).where(eq(clients.artisanId, artisanId)),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(interventions).where(and(
+      eq(interventions.artisanId, artisanId),
+      eq(interventions.statut, 'planifiee' as any),
+      sql`${interventions.dateDebut} >= NOW()`,
+    )),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(devis).where(eq(devis.artisanId, artisanId)),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(factures).where(eq(factures.artisanId, artisanId)),
+    dbi.select({ cnt: sql<number>`COUNT(*)` }).from(interventions).where(eq(interventions.artisanId, artisanId)),
+  ].map((q) => q.then((rows: any[]) => [rows] as any))) as any;
 
   const caMonth = Number(caMonthRow?.[0]?.total ?? 0);
   const caYear = Number(caYearRow?.[0]?.total ?? 0);
@@ -1509,6 +2119,56 @@ export async function getDashboardStats(artisanId: number): Promise<any> {
     totalFactures,
     totalInterventions,
   };
+}
+
+// OPE-184 — recherche globale (5 entités) portée en Drizzle. L'ancien raw SQL
+// MySQL utilisait COLLATE utf8mb4_general_ci (insensible casse + accents) + CONCAT/
+// FORMAT/DATE_FORMAT. PG : `ilike` (insensible à la casse ; l'insensibilité aux
+// accents nécessiterait l'extension unaccent, non requise ici) ; title/subtitle
+// construits en JS (FORMAT → toLocaleString, DATE_FORMAT → dd/mm/yyyy).
+export interface SearchResult { id: number; type: string; title: string; subtitle: string; url: string }
+
+export async function searchGlobal(artisanId: number, query: string): Promise<SearchResult[]> {
+  const dbi = await getDb();
+  const like = `%${query}%`;
+  const fmtEur = (v: any) => `${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  const fmtDate = (d: any) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
+  };
+
+  const [clientsRows, devisRows, facturesRows, interventionsRows, fournisseursRows] = await Promise.all([
+    dbi.select({ id: clients.id, nom: clients.nom, prenom: clients.prenom, email: clients.email, telephone: clients.telephone, ville: clients.ville })
+      .from(clients).where(and(eq(clients.artisanId, artisanId), or(
+        ilike(clients.nom, like), ilike(clients.prenom, like), ilike(clients.email, like),
+        ilike(clients.telephone, like), ilike(clients.ville, like),
+      ))).orderBy(desc(clients.id)).limit(5),
+    dbi.select({ id: devis.id, numero: devis.numero, objet: devis.objet, statut: devis.statut, totalTTC: devis.totalTTC })
+      .from(devis).where(and(eq(devis.artisanId, artisanId), or(
+        ilike(devis.numero, like), ilike(devis.objet, like),
+      ))).orderBy(desc(devis.id)).limit(5),
+    dbi.select({ id: factures.id, numero: factures.numero, objet: factures.objet, statut: factures.statut, totalTTC: factures.totalTTC })
+      .from(factures).where(and(eq(factures.artisanId, artisanId), or(
+        ilike(factures.numero, like), ilike(factures.objet, like),
+      ))).orderBy(desc(factures.id)).limit(5),
+    dbi.select({ id: interventions.id, titre: interventions.titre, statut: interventions.statut, dateDebut: interventions.dateDebut })
+      .from(interventions).where(and(eq(interventions.artisanId, artisanId), or(
+        ilike(interventions.titre, like), ilike(interventions.description, like),
+      ))).orderBy(desc(interventions.dateDebut)).limit(5),
+    dbi.select({ id: fournisseurs.id, nom: fournisseurs.nom, email: fournisseurs.email, telephone: fournisseurs.telephone })
+      .from(fournisseurs).where(and(eq(fournisseurs.artisanId, artisanId), or(
+        ilike(fournisseurs.nom, like), ilike(fournisseurs.email, like),
+      ))).orderBy(desc(fournisseurs.id)).limit(3),
+  ]);
+
+  const out: SearchResult[] = [];
+  for (const r of clientsRows) out.push({ id: r.id, type: 'client', title: `${r.prenom || ''} ${r.nom}`.trim(), subtitle: r.email || r.telephone || r.ville || '', url: `/clients/${r.id}` });
+  for (const r of devisRows) out.push({ id: r.id, type: 'devis', title: `${r.numero}${r.objet ? ' — ' + r.objet : ''}`, subtitle: `${r.statut || ''} — ${fmtEur(r.totalTTC)}`, url: `/devis/${r.id}` });
+  for (const r of facturesRows) out.push({ id: r.id, type: 'facture', title: `${r.numero}${r.objet ? ' — ' + r.objet : ''}`, subtitle: `${r.statut || ''} — ${fmtEur(r.totalTTC)}`, url: `/factures/${r.id}` });
+  for (const r of interventionsRows) out.push({ id: r.id, type: 'intervention', title: r.titre, subtitle: `${r.statut || ''} — ${fmtDate(r.dateDebut)}`, url: `/interventions/${r.id}` });
+  for (const r of fournisseursRows) out.push({ id: r.id, type: 'fournisseur', title: r.nom, subtitle: r.email || r.telephone || '', url: `/fournisseurs/${r.id}` });
+  return out;
 }
 
 export async function getMonthlyCAStats(artisanId: number, months: number = 12): Promise<any[]> {
@@ -1653,35 +2313,35 @@ export async function deleteModeleDevis(id: number): Promise<void> {
 // EXPORTS
 // ============================================================================
 
-export { User, InsertUser } from "../drizzle/schema";
-export { Artisan, InsertArtisan } from "../drizzle/schema";
-export { Client, InsertClient } from "../drizzle/schema";
-export { BibliothequeArticle, InsertBibliothequeArticle } from "../drizzle/schema";
-export { ArticleArtisan, InsertArticleArtisan } from "../drizzle/schema";
-export { Devis, InsertDevis } from "../drizzle/schema";
-export { DevisLigne, InsertDevisLigne } from "../drizzle/schema";
-export { Facture, InsertFacture } from "../drizzle/schema";
-export { FactureLigne, InsertFactureLigne } from "../drizzle/schema";
-export { Intervention, InsertIntervention } from "../drizzle/schema";
-export { Notification, InsertNotification } from "../drizzle/schema";
-export { ParametresArtisan, InsertParametresArtisan } from "../drizzle/schema";
-export { SignatureDevis, InsertSignatureDevis } from "../drizzle/schema";
-export { Stock, InsertStock } from "../drizzle/schema";
-export { MouvementStock, InsertMouvementStock } from "../drizzle/schema";
-export { Fournisseur, InsertFournisseur } from "../drizzle/schema";
-export { ArticleFournisseur, InsertArticleFournisseur } from "../drizzle/schema";
-export { SmsVerification, InsertSmsVerification } from "../drizzle/schema";
-export { RelanceDevis, InsertRelanceDevis } from "../drizzle/schema";
-export { ModeleEmail, InsertModeleEmail } from "../drizzle/schema";
-export { CommandeFournisseur, InsertCommandeFournisseur } from "../drizzle/schema";
-export { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../drizzle/schema";
-export { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
-export { ModeleDevis, InsertModeleDevis } from "../drizzle/schema";
-export { ModeleDevisLigne, InsertModeleDevisLigne } from "../drizzle/schema";
-export { AvisClient, InsertAvisClient } from "../drizzle/schema";
-export { DemandeAvis, InsertDemandeAvis } from "../drizzle/schema";
-export { Technicien } from "../drizzle/schema";
-export { PositionTechnicien } from "../drizzle/schema";
+export type { User, InsertUser } from "../drizzle/schema";
+export type { Artisan, InsertArtisan } from "../drizzle/schema";
+export type { Client, InsertClient } from "../drizzle/schema";
+export type { BibliothequeArticle, InsertBibliothequeArticle } from "../drizzle/schema";
+export type { ArticleArtisan, InsertArticleArtisan } from "../drizzle/schema";
+export type { Devis, InsertDevis } from "../drizzle/schema";
+export type { DevisLigne, InsertDevisLigne } from "../drizzle/schema";
+export type { Facture, InsertFacture } from "../drizzle/schema";
+export type { FactureLigne, InsertFactureLigne } from "../drizzle/schema";
+export type { Intervention, InsertIntervention } from "../drizzle/schema";
+export type { Notification, InsertNotification } from "../drizzle/schema";
+export type { ParametresArtisan, InsertParametresArtisan } from "../drizzle/schema";
+export type { SignatureDevis, InsertSignatureDevis } from "../drizzle/schema";
+export type { Stock, InsertStock } from "../drizzle/schema";
+export type { MouvementStock, InsertMouvementStock } from "../drizzle/schema";
+export type { Fournisseur, InsertFournisseur } from "../drizzle/schema";
+export type { ArticleFournisseur, InsertArticleFournisseur } from "../drizzle/schema";
+export type { SmsVerification, InsertSmsVerification } from "../drizzle/schema";
+export type { RelanceDevis, InsertRelanceDevis } from "../drizzle/schema";
+export type { ModeleEmail, InsertModeleEmail } from "../drizzle/schema";
+export type { CommandeFournisseur, InsertCommandeFournisseur } from "../drizzle/schema";
+export type { LigneCommandeFournisseur, InsertLigneCommandeFournisseur } from "../drizzle/schema";
+export type { PaiementStripe, InsertPaiementStripe } from "../drizzle/schema";
+export type { ModeleDevis, InsertModeleDevis } from "../drizzle/schema";
+export type { ModeleDevisLigne, InsertModeleDevisLigne } from "../drizzle/schema";
+export type { AvisClient, InsertAvisClient } from "../drizzle/schema";
+export type { DemandeAvis, InsertDemandeAvis } from "../drizzle/schema";
+export type { Technicien } from "../drizzle/schema";
+export type { PositionTechnicien } from "../drizzle/schema";
 
 // ============================================================================
 // AVIS CLIENTS
@@ -1800,9 +2460,9 @@ export async function createClientPortalAccess(data: InsertClientPortalAccess): 
       eq(clientPortalAccess.artisanId, data.artisanId),
       eq(clientPortalAccess.isActive, true)
     ));
-  const [result] = await db.insert(clientPortalAccess).values(data);
+  const newId = await insertReturningId(clientPortalAccess, data);
   const [created] = await db.select().from(clientPortalAccess)
-    .where(eq(clientPortalAccess.id, result.insertId));
+    .where(eq(clientPortalAccess.id, newId));
   return created;
 }
 
@@ -1865,10 +2525,20 @@ export async function getTechnicienById(id: number): Promise<Technicien | undefi
   return result;
 }
 
+// OPE-124 — fiche technicien liée à un compte utilisateur (scopée tenant). Base du filtrage
+// « mes interventions » : résout l'utilisateur connecté vers SA ressource de planning.
+export async function getTechnicienByUserId(userId: number, artisanId: number): Promise<Technicien | undefined> {
+  const db = await getDb();
+  const [result] = await db.select().from(techniciens)
+    .where(and(eq(techniciens.userId, userId), eq(techniciens.artisanId, artisanId)))
+    .limit(1);
+  return result;
+}
+
 export async function createTechnicien(data: InsertTechnicien): Promise<Technicien> {
   const db = await getDb();
-  const [result] = await db.insert(techniciens).values(data);
-  const [created] = await db.select().from(techniciens).where(eq(techniciens.id, result.insertId));
+  const newId = await insertReturningId(techniciens, data);
+  const [created] = await db.select().from(techniciens).where(eq(techniciens.id, newId));
   return created;
 }
 
@@ -1881,7 +2551,42 @@ export async function updateTechnicien(id: number, data: Partial<InsertTechnicie
 
 export async function deleteTechnicien(id: number): Promise<void> {
   const db = await getDb();
+  // OPE-162 — les habilitations/certifications sont des enfants PUREMENT opérationnels
+  // du technicien (suivi de ses certifs, aucune valeur légale/historique propre) : sans
+  // ce nettoyage, supprimer un technicien laisse des lignes habilitations_techniciens
+  // orphelines. (Le reste des références — interventions/congés — relève d'une décision
+  // de rétention distincte, cf. audit 2026-06-08-technicien-hard-delete-orphelins.)
+  await db.delete(habilitationsTechniciens).where(eq(habilitationsTechniciens.technicienId, id));
   await db.delete(techniciens).where(eq(techniciens.id, id));
+}
+
+// ── Habilitations / certifications des techniciens (OPE-162) ──────────────────
+// Suivi des habilitations BTP avec échéance (habilitation électrique, CACES,
+// travail en hauteur, amiante SS4…). Toujours scopé par technicien (ownership
+// vérifié en amont dans le routeur via assertTechnicienOwner).
+export async function getHabilitationsByTechnicienId(technicienId: number): Promise<HabilitationTechnicien[]> {
+  const db = await getDb();
+  return await db.select().from(habilitationsTechniciens)
+    .where(eq(habilitationsTechniciens.technicienId, technicienId))
+    .orderBy(desc(habilitationsTechniciens.dateExpiration));
+}
+
+export async function createHabilitationTechnicien(data: InsertHabilitationTechnicien): Promise<HabilitationTechnicien> {
+  const db = await getDb();
+  const newId = await insertReturningId(habilitationsTechniciens, data);
+  const [created] = await db.select().from(habilitationsTechniciens)
+    .where(eq(habilitationsTechniciens.id, newId));
+  return created;
+}
+
+// Suppression scopée : exige que l'habilitation appartienne bien au technicien
+// fourni (lui-même déjà vérifié comme appartenant à l'artisan dans le routeur).
+export async function deleteHabilitationTechnicien(id: number, technicienId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(habilitationsTechniciens).where(and(
+    eq(habilitationsTechniciens.id, id),
+    eq(habilitationsTechniciens.technicienId, technicienId),
+  ));
 }
 
 export async function getTechniciensDisponibles(artisanId: number, date: Date): Promise<Technicien[]> {
@@ -1945,9 +2650,9 @@ export async function setDisponibilite(data: {
       .where(eq(disponibilitesTechniciens.id, existing.id));
     return updated;
   } else {
-    const [result] = await db.insert(disponibilitesTechniciens).values(data);
+    const newId = await insertReturningId(disponibilitesTechniciens, data);
     const [created] = await db.select().from(disponibilitesTechniciens)
-      .where(eq(disponibilitesTechniciens.id, result.insertId));
+      .where(eq(disponibilitesTechniciens.id, newId));
     return created;
   }
 }
@@ -1968,7 +2673,7 @@ export async function updatePositionTechnicien(data: {
   interventionEnCoursId?: number;
 }): Promise<PositionTechnicien> {
   const db = await getDb();
-  const [result] = await db.insert(positionsTechniciens).values({
+  const newId = await insertReturningId(positionsTechniciens, {
     technicienId: data.technicienId,
     latitude: data.latitude,
     longitude: data.longitude,
@@ -1980,7 +2685,7 @@ export async function updatePositionTechnicien(data: {
     interventionEnCoursId: data.interventionEnCoursId,
   });
   const [created] = await db.select().from(positionsTechniciens)
-    .where(eq(positionsTechniciens.id, result.insertId));
+    .where(eq(positionsTechniciens.id, newId));
   return created;
 }
 
@@ -2049,9 +2754,9 @@ export async function getStatistiquesDeplacements(
 
 export async function createHistoriqueDeplacement(data: any): Promise<any> {
   const db = await getDb();
-  const [result] = await db.insert(historiqueDeplacements).values(data);
+  const newId = await insertReturningId(historiqueDeplacements, data);
   const [created] = await db.select().from(historiqueDeplacements)
-    .where(eq(historiqueDeplacements.id, result.insertId));
+    .where(eq(historiqueDeplacements.id, newId));
   return created;
 }
 
@@ -2230,10 +2935,16 @@ export async function updateChantier(id: number, data: any): Promise<Chantier | 
 
 export async function deleteChantier(id: number): Promise<void> {
   const db = await getDb();
-  // Delete related data first
+  // Delete related data first — children PUREMENT opérationnels du chantier
+  // (aucun document légal/fiscal). suivi_chantier (avancement/jalons) référence
+  // chantierId mais n'était pas cascadé → lignes orphelines à la suppression.
   await db.delete(documentsChantier).where(eq(documentsChantier.chantierId, id));
   await db.delete(interventionsChantier).where(eq(interventionsChantier.chantierId, id));
   await db.delete(phasesChantier).where(eq(phasesChantier.chantierId, id));
+  await db.delete(suiviChantier).where(eq(suiviChantier.chantierId, id));
+  // OPE-106 — pointages de main-d'œuvre du chantier (heures, opérationnel) : sinon
+  // lignes orphelines de pointages_chantier à la suppression du chantier.
+  await db.delete(pointagesChantier).where(eq(pointagesChantier.chantierId, id));
   await db.delete(chantiers).where(eq(chantiers.id, id));
 }
 
@@ -2241,6 +2952,33 @@ export async function deleteChantier(id: number): Promise<void> {
 export async function getPhasesByChantier(chantierId: number): Promise<PhaseChantier[]> {
   const db = await getDb();
   return await db.select().from(phasesChantier).where(eq(phasesChantier.chantierId, chantierId)).orderBy(asc(phasesChantier.ordre));
+}
+
+// ── Pointages de main-d'œuvre sur chantier (OPE-106) ─────────────────────────
+// Toujours scopé `artisanId` ; l'ownership du chantier est vérifié en amont dans
+// le routeur (assertChantierOwner). Tri par date décroissante (récents en tête).
+export async function getPointagesByChantier(chantierId: number, artisanId: number): Promise<PointageChantier[]> {
+  const db = await getDb();
+  return await db.select().from(pointagesChantier)
+    .where(and(eq(pointagesChantier.chantierId, chantierId), eq(pointagesChantier.artisanId, artisanId)))
+    .orderBy(desc(pointagesChantier.date), desc(pointagesChantier.id));
+}
+
+export async function createPointageChantier(data: InsertPointageChantier): Promise<PointageChantier> {
+  const db = await getDb();
+  const newId = await insertReturningId(pointagesChantier, data);
+  const [created] = await db.select().from(pointagesChantier).where(eq(pointagesChantier.id, newId));
+  return created;
+}
+
+// Suppression scopée (chantier + artisan) — défense en profondeur en plus de l'ownership routeur.
+export async function deletePointageChantier(id: number, chantierId: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  await db.delete(pointagesChantier).where(and(
+    eq(pointagesChantier.id, id),
+    eq(pointagesChantier.chantierId, chantierId),
+    eq(pointagesChantier.artisanId, artisanId),
+  ));
 }
 
 export async function createPhaseChantier(data: any): Promise<PhaseChantier> {
@@ -2339,8 +3077,23 @@ export async function getStatistiquesChantier(chantierId: number): Promise<any> 
   const documents = await getDocumentsByChantier(chantierId);
 
   const phasesTerminees = phases.filter(p => p.statut === 'termine').length;
-  const budgetConsomme = parseFloat(String(chantier.budgetRealise || '0'));
   const budgetTotal = parseFloat(String(chantier.budgetPrevisionnel || '0'));
+
+  // OPE-107 — coût réel AGRÉGÉ depuis les dépenses rattachées au chantier
+  // (`depenses.chantier_id`) au lieu du champ `budgetRealise` statique (jamais
+  // calculé, toujours 0). Scopé par `artisan_id` du chantier (multi-tenant).
+  let coutReel = 0;
+  try {
+    const [agg] = await db.select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+      .from(depenses)
+      .where(and(eq(depenses.chantier_id, chantierId), eq(depenses.artisan_id, chantier.artisanId)));
+    coutReel = parseFloat(String(agg?.total ?? '0')) || 0;
+  } catch (e: any) { console.warn('[getStatistiquesChantier] coutReel:', String(e?.message || e)); }
+  // Repli sur le champ manuel `budgetRealise` s'il a été saisi et qu'aucune dépense
+  // n'est rattachée (rétro-compat).
+  const budgetRealiseManuel = parseFloat(String(chantier.budgetRealise || '0'));
+  const budgetConsomme = coutReel > 0 ? coutReel : budgetRealiseManuel;
+  const marge = budgetTotal > 0 ? budgetTotal - budgetConsomme : null;
 
   return {
     nombrePhases: phases.length,
@@ -2349,6 +3102,9 @@ export async function getStatistiquesChantier(chantierId: number): Promise<any> 
     nombreDocuments: documents.length,
     budgetConsomme,
     budgetTotal,
+    coutReel,
+    marge,
+    margePct: budgetTotal > 0 ? Math.round(((budgetTotal - budgetConsomme) / budgetTotal) * 100) : null,
     pourcentageBudget: budgetTotal > 0 ? Math.round((budgetConsomme / budgetTotal) * 100) : 0,
     avancement: chantier.avancement || 0,
   };
@@ -2609,36 +3365,140 @@ export async function getRapportTVA(artisanId: number, dateDebut: Date, dateFin:
   return { tvaCollectee, tvaDeductible, tvaNette: tvaCollectee - tvaDeductible };
 }
 
+// Déclaration TVA détaillée (type CA3) : base HT et TVA collectée ventilées par
+// taux (depuis les lignes de factures non brouillon/annulées), + TVA déductible.
+export async function getDeclarationTVADetail(
+  artisanId: number, dateDebut: Date, dateFin: Date,
+): Promise<{ parTaux: { taux: number; baseHT: number; tvaCollectee: number }[]; tvaCollectee: number; tvaDeductible: number; tvaNette: number }> {
+  const dbi = await getDb();
+  const dStr = dateDebut.toISOString().slice(0, 10);
+  const fStr = dateFin.toISOString().slice(0, 10);
+  // Base + TVA collectée par taux, depuis les lignes de factures émises.
+  // DATE(dateFacture) conservé en sql brut (timestamp ; neutre dialecte).
+  const rows: any[] = await dbi.select({
+    taux: facturesLignes.tauxTVA,
+    baseHT: sql<string>`SUM(${facturesLignes.montantHT})`,
+    tva: sql<string>`SUM(${facturesLignes.montantTVA})`,
+  }).from(facturesLignes)
+    .innerJoin(factures, eq(factures.id, facturesLignes.factureId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`DATE(${factures.dateFacture}) BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .groupBy(facturesLignes.tauxTVA)
+    .orderBy(desc(facturesLignes.tauxTVA));
+  const parTaux = (rows as any[]).map((r) => ({
+    taux: Number(r.taux || 0),
+    baseHT: Math.round(Number(r.baseHT || 0) * 100) / 100,
+    tvaCollectee: Math.round(Number(r.tva || 0) * 100) / 100,
+  }));
+  const tvaCollectee = Math.round(parTaux.reduce((s, t) => s + t.tvaCollectee, 0) * 100) / 100;
+  // TVA déductible depuis les dépenses déductibles (date_depense = colonne date).
+  const [ded] = await dbi.select({
+    tva: sql<string>`COALESCE(SUM(${depenses.montant_tva}), 0)`,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, dStr, fStr),
+      eq(depenses.tva_deductible, true),
+    ));
+  const tvaDeductible = Math.round(Number(ded?.tva || 0) * 100) / 100;
+  return { parTaux, tvaCollectee, tvaDeductible, tvaNette: Math.round((tvaCollectee - tvaDeductible) * 100) / 100 };
+}
+
 export async function genererEcrituresFacture(factureId: number): Promise<any> {
   const db = await getDb();
+  if (!db) throw new Error("Base de données indisponible");
   const [facture] = await db.select().from(factures).where(eq(factures.id, factureId)).limit(1);
   if (!facture) throw new Error("Facture non trouvée");
 
   const dateEcriture = facture.dateFacture || new Date();
-  const totalHT = parseFloat(String(facture.totalHT || '0'));
-  const totalTVA = parseFloat(String(facture.totalTVA || '0'));
-  const totalTTC = parseFloat(String(facture.totalTTC || '0'));
+  // OPE-136 — un avoir (note de credit) stocke des montants NEGATIFS ; on enregistre
+  // l'ecriture en INVERSANT le sens des comptes, en valeur absolue (jamais de negatif,
+  // coherent avec le FEC). Facture : 411 debit / 706 credit / 445 credit.
+  // Avoir : 411 credit / 706 debit / 445 debit.
+  const isAvoir = facture.typeDocument === 'avoir' || parseFloat(String(facture.totalTTC || '0')) < 0;
+  const totalHT = Math.abs(parseFloat(String(facture.totalHT || '0')));
+  const totalTVA = Math.abs(parseFloat(String(facture.totalTVA || '0')));
+  const totalTTC = Math.abs(parseFloat(String(facture.totalTTC || '0')));
   const pieceRef = facture.numero || `F-${factureId}`;
 
   // Delete existing entries for this invoice
   await db.delete(ecrituresComptables).where(eq(ecrituresComptables.factureId, factureId));
 
+  const lib = `${isAvoir ? 'Avoir' : 'Facture'} ${pieceRef}`;
   const entries = [
-    // Débit 411 - Client
-    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: `Facture ${pieceRef}`, pieceRef, debit: String(totalTTC), credit: '0.00', factureId },
-    // Crédit 706 - Ventes
-    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '706000', libelleCompte: 'Prestations de services', libelle: `Facture ${pieceRef}`, pieceRef, debit: '0.00', credit: String(totalHT), factureId },
+    // 411 - Client (TTC) : debit pour une facture, credit pour un avoir
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: lib, pieceRef, debit: isAvoir ? '0.00' : totalTTC.toFixed(2), credit: isAvoir ? totalTTC.toFixed(2) : '0.00', factureId },
+    // 706 - Ventes de prestations (HT) : credit pour une facture, debit pour un avoir
+    { artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '706000', libelleCompte: 'Prestations de services', libelle: lib, pieceRef, debit: isAvoir ? totalHT.toFixed(2) : '0.00', credit: isAvoir ? '0.00' : totalHT.toFixed(2), factureId },
   ];
 
   if (totalTVA > 0) {
-    // Crédit 44571 - TVA collectée
-    entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '445710', libelleCompte: 'TVA collectée', libelle: `Facture ${pieceRef}`, pieceRef, debit: '0.00', credit: String(totalTVA), factureId });
+    // TVA collectée ventilée par taux (445711=20% / 445712=10% / 445713=5,5%),
+    // depuis les lignes de facture. Repli sur le total si lignes indisponibles.
+    // Les lignes d'avoir sont negatives : on prend la valeur absolue.
+    const lignes = await db.select({ tauxTVA: facturesLignes.tauxTVA, montantTVA: facturesLignes.montantTVA })
+      .from(facturesLignes).where(eq(facturesLignes.factureId, factureId));
+    const parTaux = new Map<string, { compte: string; lib: string; montant: number }>();
+    let sommeLignes = 0;
+    for (const l of lignes) {
+      const m = Math.abs(parseFloat(String(l.montantTVA || '0')));
+      if (m <= 0) continue;
+      sommeLignes += m;
+      const t = compteTvaCollectee(parseFloat(String(l.tauxTVA || '20')));
+      const cur = parTaux.get(t.compte) || { compte: t.compte, lib: t.lib, montant: 0 };
+      cur.montant += m;
+      parTaux.set(t.compte, cur);
+    }
+    if (parTaux.size > 0 && Math.abs(sommeLignes - totalTVA) < 0.02) {
+      for (const t of Array.from(parTaux.values())) {
+        entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: t.compte, libelleCompte: t.lib, libelle: lib, pieceRef, debit: isAvoir ? t.montant.toFixed(2) : '0.00', credit: isAvoir ? '0.00' : t.montant.toFixed(2), factureId });
+      }
+    } else {
+      entries.push({ artisanId: facture.artisanId, dateEcriture, journal: 'VE' as const, numeroCompte: '445711', libelleCompte: 'TVA collectée', libelle: lib, pieceRef, debit: isAvoir ? totalTVA.toFixed(2) : '0.00', credit: isAvoir ? '0.00' : totalTVA.toFixed(2), factureId });
+    }
   }
 
   for (const entry of entries) {
     await db.insert(ecrituresComptables).values(entry);
   }
 
+  return { success: true, nombreEcritures: entries.length };
+}
+
+// Ecritures d'encaissement (journal BANQUE) lors du reglement d'une facture :
+// Debit 512 (Banque) / Credit 411 (Clients), lettre avec l'ecriture de vente.
+// Idempotent : on purge d'abord les ecritures BQ existantes de la facture.
+export async function genererEcrituresEncaissement(factureId: number): Promise<{ success: boolean; nombreEcritures: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("Base de données indisponible");
+  const [facture] = await db.select().from(factures).where(eq(factures.id, factureId)).limit(1);
+  if (!facture) throw new Error("Facture non trouvée");
+
+  // Purge des ecritures de banque precedentes de cette facture (idempotence).
+  await db.delete(ecrituresComptables).where(and(
+    eq(ecrituresComptables.factureId, factureId),
+    eq(ecrituresComptables.journal, 'BQ'),
+  ));
+
+  if (facture.statut !== 'payee') return { success: true, nombreEcritures: 0 };
+
+  const dateEcriture = facture.datePaiement || facture.dateFacture || new Date();
+  const ttc = parseFloat(String(facture.totalTTC || '0'));
+  if (ttc <= 0) return { success: true, nombreEcritures: 0 };
+  const pieceRef = facture.numero || `F-${factureId}`;
+  const lib = `Règlement ${pieceRef}`;
+  const lettre = `VL${factureId}`;
+
+  const entries = [
+    { artisanId: facture.artisanId, dateEcriture, journal: 'BQ' as const, numeroCompte: '512000', libelleCompte: 'Banque', libelle: lib, pieceRef, debit: ttc.toFixed(2), credit: '0.00', factureId, lettrage: lettre },
+    { artisanId: facture.artisanId, dateEcriture, journal: 'BQ' as const, numeroCompte: '411000', libelleCompte: 'Clients', libelle: lib, pieceRef, debit: '0.00', credit: ttc.toFixed(2), factureId, lettrage: lettre },
+  ];
+  for (const entry of entries) {
+    await db.insert(ecrituresComptables).values(entry);
+  }
   return { success: true, nombreEcritures: entries.length };
 }
 
@@ -2653,15 +3513,34 @@ export async function initPlanComptable(artisanId: number): Promise<void> {
   const existing = await db.select().from(planComptable).where(eq(planComptable.artisanId, artisanId)).limit(1);
   if (existing.length > 0) return;
 
+  // PCG aligné sur TOUS les comptes que le FEC/les écritures émettent réellement
+  // (OPE-139) — sinon des comptes apparaissent dans le FEC sans exister dans le plan.
   const comptesParDefaut = [
+    // Classe 4 — Tiers
+    { numeroCompte: '401000', libelle: 'Fournisseurs', classe: 4, type: 'passif' as const },
     { numeroCompte: '411000', libelle: 'Clients', classe: 4, type: 'actif' as const },
     { numeroCompte: '445660', libelle: 'TVA déductible', classe: 4, type: 'actif' as const },
     { numeroCompte: '445710', libelle: 'TVA collectée', classe: 4, type: 'passif' as const },
+    { numeroCompte: '445711', libelle: 'TVA collectée 20%', classe: 4, type: 'passif' as const },
+    { numeroCompte: '445712', libelle: 'TVA collectée 10%', classe: 4, type: 'passif' as const },
+    { numeroCompte: '445713', libelle: 'TVA collectée 5,5%', classe: 4, type: 'passif' as const },
+    // Classe 5 — Financiers
     { numeroCompte: '512000', libelle: 'Banque', classe: 5, type: 'actif' as const },
     { numeroCompte: '530000', libelle: 'Caisse', classe: 5, type: 'actif' as const },
+    // Classe 6 — Charges (alignées sur les catégories de dépense)
+    { numeroCompte: '601000', libelle: 'Achats de matières premières', classe: 6, type: 'charge' as const },
+    { numeroCompte: '604000', libelle: 'Achats de sous-traitance', classe: 6, type: 'charge' as const },
+    { numeroCompte: '606100', libelle: 'Carburants', classe: 6, type: 'charge' as const },
     { numeroCompte: '607000', libelle: 'Achats de marchandises', classe: 6, type: 'charge' as const },
+    { numeroCompte: '613000', libelle: 'Locations', classe: 6, type: 'charge' as const },
     { numeroCompte: '615000', libelle: 'Entretien et réparations', classe: 6, type: 'charge' as const },
+    { numeroCompte: '616000', libelle: 'Primes d\'assurance', classe: 6, type: 'charge' as const },
+    { numeroCompte: '623000', libelle: 'Formation', classe: 6, type: 'charge' as const },
     { numeroCompte: '625000', libelle: 'Déplacements', classe: 6, type: 'charge' as const },
+    { numeroCompte: '625100', libelle: 'Voyages et déplacements', classe: 6, type: 'charge' as const },
+    { numeroCompte: '626000', libelle: 'Frais postaux et télécom', classe: 6, type: 'charge' as const },
+    { numeroCompte: '627000', libelle: 'Services bancaires', classe: 6, type: 'charge' as const },
+    // Classe 7 — Produits
     { numeroCompte: '706000', libelle: 'Prestations de services', classe: 7, type: 'produit' as const },
     { numeroCompte: '707000', libelle: 'Ventes de marchandises', classe: 7, type: 'produit' as const },
   ];
@@ -2738,6 +3617,113 @@ export async function getPrevisionsCA(artisanId: number, annee: number): Promise
   return await db.select().from(previsionsCA)
     .where(and(eq(previsionsCA.artisanId, artisanId), eq(previsionsCA.annee, annee)))
     .orderBy(asc(previsionsCA.mois));
+}
+
+// OPE-155 — trésorerie prévisionnelle : projette par SEMAINE les ENCAISSEMENTS attendus
+// (factures à encaisser, reste dû, par date d'échéance) − les DÉCAISSEMENTS attendus
+// (dépenses récurrentes, expansées sur la période selon leur fréquence). Lecture seule,
+// scopé `artisanId`, réutilise des données existantes (aucune nouvelle table). Le solde
+// bancaire initial n'est pas intégré (hors MVP) → le « cumulatif » est un flux net relatif.
+export async function getTresoreriePrevisionnelle(
+  artisanId: number,
+  semaines: number,
+): Promise<{
+  semaines: { debut: string; entrees: number; sorties: number; net: number; cumulatif: number }[];
+  totalEntrees: number;
+  totalSorties: number;
+  totalNet: number;
+}> {
+  const db = await getDb();
+  const WEEK_MS = 7 * 24 * 3600 * 1000;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const windowEnd = new Date(start.getTime() + semaines * WEEK_MS);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  const buckets = Array.from({ length: semaines }, (_, i) => ({
+    debut: new Date(start.getTime() + i * WEEK_MS),
+    entrees: 0,
+    sorties: 0,
+  }));
+  // Une date passée (en retard / échue) retombe dans la semaine 0 ; hors fenêtre = ignorée.
+  const weekIndex = (d: Date): number => {
+    const diff = d.getTime() - start.getTime();
+    if (diff < 0) return 0;
+    const idx = Math.floor(diff / WEEK_MS);
+    return idx < semaines ? idx : -1;
+  };
+
+  // ── Encaissements attendus : factures à encaisser (reste dû) par date d'échéance ──
+  const creances = await db.select({
+    dateEcheance: factures.dateEcheance, totalTTC: factures.totalTTC, montantPaye: factures.montantPaye,
+  }).from(factures).where(and(
+    eq(factures.artisanId, artisanId),
+    inArray(factures.statut, ["envoyee", "en_retard"] as any),
+  ));
+  for (const f of creances) {
+    if (!f.dateEcheance) continue;
+    const reste = (parseFloat(String(f.totalTTC || "0")) || 0) - (parseFloat(String(f.montantPaye || "0")) || 0);
+    if (reste <= 0) continue;
+    const ech = new Date(f.dateEcheance);
+    if (isNaN(ech.getTime()) || ech >= windowEnd) continue;
+    const idx = weekIndex(ech);
+    if (idx >= 0) buckets[idx].entrees += reste;
+  }
+
+  // OPE-247 — les avoirs validés (crédits client non appliqués) réduisent les encaissements
+  // attendus : on les nette globalement contre les entrées les plus PROCHES (semaine par
+  // semaine), planché à 0. Sans ça la trésorerie côté créances est sur-optimiste.
+  const avoirsRows = await db.select({ totalTTC: factures.totalTTC }).from(factures).where(and(
+    eq(factures.artisanId, artisanId),
+    eq(factures.typeDocument, "avoir"),
+    inArray(factures.statut, ["validee", "envoyee", "en_retard", "payee"] as any),
+  ));
+  let creditAvoirs = avoirsRows.reduce((s, a) => s + Math.abs(parseFloat(String(a.totalTTC ?? "0")) || 0), 0);
+  for (const b of buckets) {
+    if (creditAvoirs <= 0) break;
+    const use = Math.min(b.entrees, creditAvoirs);
+    b.entrees -= use;
+    creditAvoirs -= use;
+  }
+
+  // ── Décaissements attendus : dépenses récurrentes, expansées selon leur fréquence ──
+  {
+    const deps = await db.select({
+      montant_ttc: depenses.montant_ttc,
+      frequence_recurrence: depenses.frequence_recurrence,
+      prochaine_occurrence: depenses.prochaine_occurrence,
+    }).from(depenses).where(and(
+      eq(depenses.artisan_id, artisanId),
+      eq(depenses.recurrente, true),
+      isNotNull(depenses.prochaine_occurrence),
+    ));
+    const stepMonths: Record<string, number> = { mensuelle: 1, trimestrielle: 3, annuelle: 12 };
+    for (const d of deps as any[]) {
+      const montant = parseFloat(String(d.montant_ttc || "0")) || 0;
+      if (montant <= 0) continue;
+      const step = stepMonths[String(d.frequence_recurrence)] || 0;
+      let occ = new Date(d.prochaine_occurrence);
+      let guard = 0;
+      while (!isNaN(occ.getTime()) && occ < windowEnd && guard++ < 60) {
+        const idx = weekIndex(occ);
+        if (idx >= 0) buckets[idx].sorties += montant;
+        if (step === 0) break; // fréquence inconnue → on ne compte qu'une occurrence
+        occ = addMonthsClamped(occ, step); // OPE-249 — clamp fin de mois (pas de débordement)
+      }
+    }
+  }
+
+  let cumul = 0;
+  let totalEntrees = 0;
+  let totalSorties = 0;
+  const out = buckets.map((b) => {
+    const net = b.entrees - b.sorties;
+    cumul += net;
+    totalEntrees += b.entrees;
+    totalSorties += b.sorties;
+    return { debut: b.debut.toISOString().slice(0, 10), entrees: r2(b.entrees), sorties: r2(b.sorties), net: r2(net), cumulatif: r2(cumul) };
+  });
+  return { semaines: out, totalEntrees: r2(totalEntrees), totalSorties: r2(totalSorties), totalNet: r2(totalEntrees - totalSorties) };
 }
 
 export async function calculerPrevisionsCA(artisanId: number, methode: string): Promise<any> {
@@ -2897,6 +3883,23 @@ export async function getContratsByClientId(clientId: number, artisanId: number)
     .orderBy(desc(contratsMaintenance.createdAt));
 }
 
+// OPE-140 — contrats actifs dont l'échéance de facturation est atteinte (à facturer).
+// Volet INDICATEUR (lecture seule) : aide l'artisan à ne pas oublier de facturer un
+// contrat récurrent — la génération automatique n'est volontairement PAS faite ici.
+// (Le filtre `<= fin de journée` exclut naturellement les `prochainFacturation` NULL.)
+export async function getContratsAFacturer(artisanId: number): Promise<ContratMaintenance[]> {
+  const db = await getDb();
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return db.select().from(contratsMaintenance)
+    .where(and(
+      eq(contratsMaintenance.artisanId, artisanId),
+      eq(contratsMaintenance.statut, "actif"),
+      lte(contratsMaintenance.prochainFacturation, endOfToday),
+    ))
+    .orderBy(asc(contratsMaintenance.prochainFacturation));
+}
+
 export async function getContratById(id: number): Promise<ContratMaintenance | undefined> {
   const db = await getDb();
   const result = await db.select().from(contratsMaintenance)
@@ -2916,8 +3919,7 @@ export async function getNextContratNumber(artisanId: number): Promise<string> {
 
 export async function createContrat(data: InsertContratMaintenance): Promise<ContratMaintenance> {
   const db = await getDb();
-  const result = await db.insert(contratsMaintenance).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(contratsMaintenance, data);
   const created = await db.select().from(contratsMaintenance).where(eq(contratsMaintenance.id, insertId)).limit(1);
   return created[0];
 }
@@ -2931,6 +3933,14 @@ export async function updateContrat(id: number, data: Partial<InsertContratMaint
 
 export async function deleteContrat(id: number): Promise<void> {
   const db = await getDb();
+  // OPE-177 — le schéma n'a pas de FK ON DELETE CASCADE : on nettoie manuellement les
+  // enfants PUREMENT opérationnels du contrat, sinon ils restent orphelins (pointant un
+  // contrat supprimé). On NE touche PAS aux factures elles-mêmes :
+  //  - factures_recurrentes = table de LIAISON contrat↔facture (la facture générée reste) ;
+  //  - interventions_contrat = visites de maintenance opérationnelles du contrat.
+  // (Le routeur a déjà vérifié l'ownership artisan du contrat avant cet appel.)
+  await db.delete(facturesRecurrentes).where(eq(facturesRecurrentes.contratId, id));
+  await db.delete(interventionsContrat).where(eq(interventionsContrat.contratId, id));
   await db.delete(contratsMaintenance).where(eq(contratsMaintenance.id, id));
 }
 
@@ -2946,8 +3956,7 @@ export async function getFacturesRecurrentesByContratId(contratId: number): Prom
 
 export async function createFactureRecurrente(data: InsertFactureRecurrente): Promise<FactureRecurrente> {
   const db = await getDb();
-  const result = await db.insert(facturesRecurrentes).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(facturesRecurrentes, data);
   const created = await db.select().from(facturesRecurrentes).where(eq(facturesRecurrentes.id, insertId)).limit(1);
   return created[0];
 }
@@ -2962,10 +3971,16 @@ export async function getInterventionsContratByContratId(contratId: number): Pro
     .orderBy(desc(interventionsContrat.dateIntervention));
 }
 
+export async function getInterventionContratById(id: number): Promise<InterventionContrat | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(interventionsContrat).where(eq(interventionsContrat.id, id)).limit(1);
+  return result[0];
+}
+
 export async function createInterventionContrat(data: InsertInterventionContrat): Promise<InterventionContrat> {
   const db = await getDb();
-  const result = await db.insert(interventionsContrat).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(interventionsContrat, data);
   const created = await db.select().from(interventionsContrat).where(eq(interventionsContrat.id, insertId)).limit(1);
   return created[0];
 }
@@ -3014,10 +4029,10 @@ export async function getOrCreateConversation(artisanId: number, clientId: numbe
   if (existing[0] && !sujet) return existing[0];
 
   // Create new conversation
-  const result = await db.insert(conversations).values({
+  const newId = await insertReturningId(conversations, {
     artisanId, clientId, sujet: sujet || null, statut: "ouverte",
   });
-  const created = await db.select().from(conversations).where(eq(conversations.id, result[0].insertId)).limit(1);
+  const created = await db.select().from(conversations).where(eq(conversations.id, newId)).limit(1);
   return created[0];
 }
 
@@ -3037,8 +4052,7 @@ export async function getMessagesByConversationId(conversationId: number): Promi
 
 export async function createMessage(data: InsertMessage): Promise<Message> {
   const db = await getDb();
-  const result = await db.insert(messages).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(messages, data);
 
   // Update conversation
   const apercu = data.contenu.substring(0, 100);
@@ -3050,12 +4064,14 @@ export async function createMessage(data: InsertMessage): Promise<Message> {
   if (data.auteur === "artisan") {
     await db.update(conversations).set({
       ...updateData,
-      nonLuClient: sql`nonLuClient + 1`,
+      // OPE-184 : colonne interpolée (quotée par dialecte) — `nonLuClient` nu était
+      // minusculé par Postgres → "column nonluclient does not exist".
+      nonLuClient: sql`${conversations.nonLuClient} + 1`,
     }).where(eq(conversations.id, data.conversationId));
   } else {
     await db.update(conversations).set({
       ...updateData,
-      nonLuArtisan: sql`nonLuArtisan + 1`,
+      nonLuArtisan: sql`${conversations.nonLuArtisan} + 1`,
     }).where(eq(conversations.id, data.conversationId));
   }
 
@@ -3162,8 +4178,7 @@ export async function seedTestData(): Promise<void> {
 
 export async function createRdvEnLigne(data: InsertRdvEnLigne): Promise<RdvEnLigne> {
   const db = await getDb();
-  const result = await db.insert(rdvEnLigne).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(rdvEnLigne, data);
   const created = await db.select().from(rdvEnLigne).where(eq(rdvEnLigne.id, insertId)).limit(1);
   return created[0];
 }
@@ -3217,6 +4232,12 @@ export async function getRdvPendingCount(artisanId: number): Promise<number> {
 
 export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Date): Promise<{ dateDebut: Date; dateFin: Date | null }[]> {
   const db = await getDb();
+  // OPE-251 — élargir la borne BASSE de récupération : une occupation qui COMMENCE
+  // avant la fenêtre mais DÉBORDE dedans doit être prise en compte (sinon créneaux
+  // faussement disponibles à la frontière). On récupère un sur-ensemble (jusqu'à 48h
+  // avant `debut`) puis le test de chevauchement précis (côté getCreneauxDisponibles)
+  // filtre exactement. 48h couvre toutes les durées réalistes d'intervention/RDV.
+  const lookback = new Date(debut.getTime() - 48 * 60 * 60 * 1000);
   const interventionsList = await db.select({
     dateDebut: interventions.dateDebut,
     dateFin: interventions.dateFin,
@@ -3224,7 +4245,7 @@ export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Da
     .where(and(
       eq(interventions.artisanId, artisanId),
       ne(interventions.statut, "annulee"),
-      gte(interventions.dateDebut, debut),
+      gte(interventions.dateDebut, lookback),
       lte(interventions.dateDebut, fin)
     ));
 
@@ -3235,7 +4256,7 @@ export async function getCreneauxOccupes(artisanId: number, debut: Date, fin: Da
     .where(and(
       eq(rdvEnLigne.artisanId, artisanId),
       inArray(rdvEnLigne.statut, ["en_attente", "confirme"]),
-      gte(rdvEnLigne.dateProposee, debut),
+      gte(rdvEnLigne.dateProposee, lookback),
       lte(rdvEnLigne.dateProposee, fin)
     ));
 
@@ -3341,6 +4362,64 @@ export async function setUserPermissions(userId: number, permissions: string[], 
 }
 
 // ============================================================================
+// BOOTSTRAP COMPTE ARTISAN (OPE-7)
+// ----------------------------------------------------------------------------
+// A l'inscription (auth.signup), le user etait cree seul : ni artisan, ni
+// subscription, ni permissions. Resultat : 100% des endpoints metier en
+// FORBIDDEN/NOT_FOUND et le checkout d'abonnement (ctx.user.artisanId null)
+// impossible. Cette fonction provisionne tout ce qu'un compte proprietaire
+// doit avoir, de facon IDEMPOTENTE (ne re-seed que ce qui manque) pour
+// pouvoir aussi reparer un compte existant au prochain signin.
+// ============================================================================
+export async function bootstrapArtisanAccount(
+  userId: number,
+  opts?: { nomEntreprise?: string | null },
+): Promise<Artisan> {
+  // 1. Ligne artisans (idempotent via getOrCreateArtisan / UNIQUE(userId)).
+  const artisan = await getOrCreateArtisan(
+    userId,
+    opts?.nomEntreprise ? { nomEntreprise: opts.nomEntreprise } : undefined,
+  );
+
+  // 2. Lier le proprietaire a sa propre entreprise. Requis par :
+  //    - subscriptionRouter (ctx.user.artisanId) -> sinon checkout impossible
+  //    - setUserPermissions (verifie users.artisanId === artisanId)
+  const u = await getUserById(userId);
+  if (u && u.artisanId !== artisan.id) {
+    await updateUser(userId, { artisanId: artisan.id } as any);
+  }
+
+  // 3. Subscription d'essai (14 jours), seulement si absente.
+  try {
+    const existingSub = await getSubscription(artisan.id);
+    if (!existingSub) {
+      const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      await updateSubscription(artisan.id, {
+        plan: 'trial',
+        status: 'trialing',
+        trialEndsAt,
+        maxUsers: 1,
+      });
+    }
+  } catch (e: any) {
+    console.error('[Bootstrap] Subscription seed failed (non-blocking):', e?.message);
+  }
+
+  // 4. Permissions du proprietaire = TOUTES (y compris utilisateurs.gerer
+  //    pour pouvoir inviter des collaborateurs). Seulement si aucune presente.
+  try {
+    const existingPerms = await getUserPermissions(userId);
+    if (existingPerms.length === 0) {
+      await setUserPermissions(userId, [...ALL_PERMISSIONS], artisan.id);
+    }
+  } catch (e: any) {
+    console.error('[Bootstrap] Permission seed failed (non-blocking):', e?.message);
+  }
+
+  return artisan;
+}
+
+// ============================================================================
 // Cache en memoire (TTL) pour les queries lues frequemment.
 // Map<string, {data, expiresAt}> avec invalidation manuelle.
 // ============================================================================
@@ -3370,13 +4449,8 @@ export function invalidateCache(prefix: string): void {
 // divergence entre schema.ts et la DB, ce qui avait causer le hang Railway.
 // ============================================================================
 
-async function ensurePool() {
-  // Garantit que _pool est initialise avant tout raw query.
-  await getDb();
-  const p = getPool();
-  if (!p) throw new Error('mysql pool unavailable');
-  return p;
-}
+// (OPE-184) `ensurePool()` retiré : plus aucun raw-SQL dans db.ts, tout est en Drizzle.
+// `getPool()` reste exporté pour routers.ts/index.ts (pas encore portés).
 
 export interface ModuleRow {
   id: number;
@@ -3390,19 +4464,25 @@ export interface ModuleRow {
   ordre: number;
 }
 
+// Mappe une ligne Drizzle `modules` (actif_par_defaut: boolean PG) vers ModuleRow
+// (actif_par_defaut: number 1/0) — préserve le contrat consommé par routers.ts (=== 1).
+function toModuleRow(r: any): ModuleRow {
+  return { ...r, actif_par_defaut: r.actif_par_defaut ? 1 : 0 } as ModuleRow;
+}
+
 export async function getModules(): Promise<ModuleRow[]> {
   // Catalogue tres statique → cache 5 min, partage entre tous les artisans.
   return getCached("modules:all", 5 * 60 * 1000, async () => {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute('SELECT * FROM modules ORDER BY ordre ASC') as any;
-    return rows as ModuleRow[];
+    const dbi = await getDb();
+    const rows = await dbi.select().from(modules).orderBy(asc(modules.ordre));
+    return rows.map(toModuleRow);
   });
 }
 
 export async function getModuleBySlug(slug: string): Promise<ModuleRow | undefined> {
-  const pool = await ensurePool();
-  const [rows] = await pool.execute('SELECT * FROM modules WHERE slug = ? LIMIT 1', [slug]) as any;
-  return (rows as ModuleRow[])[0];
+  const dbi = await getDb();
+  const rows = await dbi.select().from(modules).where(eq(modules.slug, slug)).limit(1);
+  return rows[0] ? toModuleRow(rows[0]) : undefined;
 }
 
 /**
@@ -3414,19 +4494,15 @@ export async function getModuleBySlug(slug: string): Promise<ModuleRow | undefin
 export async function getArtisanModulesActifs(artisanId: number): Promise<string[]> {
   // TTL 60s : les toggles modules invalident via invalidateCache("modules:actifs:").
   return getCached(`modules:actifs:${artisanId}`, 60 * 1000, async () => {
-    const pool = await ensurePool();
-    const [prefs] = await pool.execute(
-      'SELECT module_slug, actif FROM artisan_modules WHERE artisan_id = ?',
-      [artisanId]
-    ) as any;
-    const arr = prefs as Array<{ module_slug: string; actif: number }>;
+    const dbi = await getDb();
+    const arr = await dbi.select({ module_slug: artisanModules.module_slug, actif: artisanModules.actif })
+      .from(artisanModules).where(eq(artisanModules.artisan_id, artisanId));
     if (arr.length === 0) {
-      const [defaults] = await pool.execute(
-        'SELECT slug FROM modules WHERE actif_par_defaut = TRUE'
-      ) as any;
-      return (defaults as Array<{ slug: string }>).map((r) => r.slug);
+      const defaults = await dbi.select({ slug: modules.slug }).from(modules)
+        .where(eq(modules.actif_par_defaut, true));
+      return defaults.map((r) => r.slug);
     }
-    return arr.filter((r) => r.actif === 1 || (r.actif as any) === true).map((r) => r.module_slug);
+    return arr.filter((r) => r.actif === true).map((r) => r.module_slug);
   });
 }
 
@@ -3435,13 +4511,13 @@ export async function setArtisanModule(
   moduleSlug: string,
   actif: boolean
 ): Promise<void> {
-  const pool = await ensurePool();
-  await pool.execute(
-    `INSERT INTO artisan_modules (artisan_id, module_slug, actif)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE actif = VALUES(actif)`,
-    [artisanId, moduleSlug, actif ? 1 : 0]
-  );
+  const dbi = await getDb();
+  // Upsert sur la clé unique (artisan_id, module_slug) → onConflictDoUpdate.
+  await dbi.insert(artisanModules).values({ artisan_id: artisanId, module_slug: moduleSlug, actif })
+    .onConflictDoUpdate({
+      target: [artisanModules.artisan_id, artisanModules.module_slug],
+      set: { actif },
+    });
   // Invalide le cache : la liste de modules actifs vient de changer.
   invalidateCache(`modules:actifs:${artisanId}`);
 }
@@ -3463,27 +4539,14 @@ export async function updateArtisanOnboarding(
   artisanId: number,
   data: { onboardingCompleted?: boolean; metier?: string; plan?: string }
 ): Promise<void> {
-  const sets: string[] = [];
-  const values: any[] = [];
-  if (data.onboardingCompleted !== undefined) {
-    sets.push('onboarding_completed = ?');
-    values.push(data.onboardingCompleted ? 1 : 0);
-  }
-  if (data.metier !== undefined) {
-    sets.push('metier = ?');
-    values.push(data.metier);
-  }
-  if (data.plan !== undefined) {
-    sets.push('plan = ?');
-    values.push(data.plan);
-  }
-  if (sets.length === 0) return;
-  values.push(artisanId);
-  const pool = await ensurePool();
-  await pool.execute(
-    `UPDATE artisans SET ${sets.join(', ')} WHERE id = ?`,
-    values
-  );
+  // Set partiel dynamique (seuls les champs fournis sont mis à jour).
+  const set: Record<string, any> = {};
+  if (data.onboardingCompleted !== undefined) set.onboardingCompleted = data.onboardingCompleted;
+  if (data.metier !== undefined) set.metier = data.metier;
+  if (data.plan !== undefined) set.plan = data.plan;
+  if (Object.keys(set).length === 0) return;
+  const dbi = await getDb();
+  await dbi.update(artisans).set(set).where(eq(artisans.id, artisanId));
 }
 
 /**
@@ -3495,15 +4558,16 @@ export async function getArtisanOnboardingStatus(
   artisanId: number
 ): Promise<{ onboardingCompleted: boolean; metier: string | null; plan: string | null } | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT onboarding_completed, metier, plan FROM artisans WHERE id = ? LIMIT 1',
-      [artisanId]
-    ) as any;
-    const r = (rows as any[])[0];
+    const dbi = await getDb();
+    const rows = await dbi.select({
+      onboardingCompleted: artisans.onboardingCompleted,
+      metier: artisans.metier,
+      plan: artisans.plan,
+    }).from(artisans).where(eq(artisans.id, artisanId)).limit(1);
+    const r = rows[0];
     if (!r) return null;
     return {
-      onboardingCompleted: r.onboarding_completed === 1 || r.onboarding_completed === true,
+      onboardingCompleted: r.onboardingCompleted === true,
       metier: r.metier ?? null,
       plan: r.plan ?? null,
     };
@@ -3558,12 +4622,10 @@ function rowToSubscription(r: any): SubscriptionRow | null {
 
 export async function getSubscription(artisanId: number): Promise<SubscriptionRow | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM subscriptions WHERE artisan_id = ? LIMIT 1',
-      [artisanId]
-    ) as any;
-    return rowToSubscription((rows as any[])[0]);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(subscriptions)
+      .where(eq(subscriptions.artisan_id, artisanId)).limit(1);
+    return rowToSubscription(rows[0]);
   } catch (e) {
     // Table pas encore migree : on renvoie null, l'appelant traitera comme
     // un essai gratuit (= ne bloque personne).
@@ -3603,53 +4665,30 @@ const SUB_COL_MAP: Record<keyof UpdateSubscriptionInput, string> = {
 };
 
 export async function updateSubscription(artisanId: number, data: UpdateSubscriptionInput): Promise<void> {
-  const pool = await ensurePool();
-  const cols: string[] = [];
-  const vals: any[] = [];
+  // Set keyé par les noms de colonnes Drizzle (snake_case, = valeurs de SUB_COL_MAP).
+  const setObj: Record<string, any> = {};
   for (const [key, val] of Object.entries(data)) {
     if (val === undefined) continue;
     const sqlCol = SUB_COL_MAP[key as keyof UpdateSubscriptionInput];
     if (!sqlCol) continue;
-    cols.push(`${sqlCol} = ?`);
-    vals.push(val instanceof Date ? val : val);
+    setObj[sqlCol] = val;
   }
-  if (cols.length === 0) return;
-  vals.push(artisanId);
+  if (Object.keys(setObj).length === 0) return;
 
-  // INSERT-or-UPDATE : si l'artisan n'a pas encore de ligne (race avec le
-  // seed initial), on cree avec les valeurs par defaut + les overrides.
-  const [updateRes] = await pool.execute(
-    `UPDATE subscriptions SET ${cols.join(', ')} WHERE artisan_id = ?`,
-    vals
-  ) as any;
-
-  if (updateRes.affectedRows === 0) {
-    // Ligne absente -> on insere avec defaults trial 30j + overrides.
-    const insertCols = ['artisan_id'];
-    const insertVals: any[] = [artisanId];
-    for (const [key, val] of Object.entries(data)) {
-      if (val === undefined) continue;
-      const sqlCol = SUB_COL_MAP[key as keyof UpdateSubscriptionInput];
-      if (!sqlCol) continue;
-      insertCols.push(sqlCol);
-      insertVals.push(val instanceof Date ? val : val);
-    }
-    const placeholders = insertVals.map(() => '?').join(', ');
-    await pool.execute(
-      `INSERT IGNORE INTO subscriptions (${insertCols.join(', ')}) VALUES (${placeholders})`,
-      insertVals
-    );
-  }
+  // INSERT-or-UPDATE atomique sur la clé unique artisan_id (remplace l'ancien
+  // UPDATE-puis-INSERT IGNORE, sujet à une race). Les colonnes non fournies
+  // prennent leur défaut de schéma à l'insert (plan='trial', max_users=1, …).
+  const dbi = await getDb();
+  await dbi.insert(subscriptions).values({ artisan_id: artisanId, ...setObj } as any)
+    .onConflictDoUpdate({ target: subscriptions.artisan_id, set: setObj });
 }
 
 export async function getSubscriptionByCustomerId(customerId: string): Promise<SubscriptionRow | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM subscriptions WHERE stripe_customer_id = ? LIMIT 1',
-      [customerId]
-    ) as any;
-    return rowToSubscription((rows as any[])[0]);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(subscriptions)
+      .where(eq(subscriptions.stripe_customer_id, customerId)).limit(1);
+    return rowToSubscription(rows[0]);
   } catch {
     return null;
   }
@@ -3687,12 +4726,10 @@ function rowToDevice(r: any): DeviceRow {
 
 export async function getDevices(userId: number): Promise<DeviceRow[]> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM devices WHERE user_id = ? ORDER BY last_active_at DESC',
-      [userId]
-    ) as any;
-    return (rows as any[]).map(rowToDevice);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(devices)
+      .where(eq(devices.user_id, userId)).orderBy(desc(devices.last_active_at));
+    return rows.map(rowToDevice);
   } catch {
     return [];
   }
@@ -3700,13 +4737,10 @@ export async function getDevices(userId: number): Promise<DeviceRow[]> {
 
 export async function getDevice(userId: number, fingerprint: string): Promise<DeviceRow | null> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM devices WHERE user_id = ? AND device_fingerprint = ? LIMIT 1',
-      [userId, fingerprint]
-    ) as any;
-    const r = (rows as any[])[0];
-    return r ? rowToDevice(r) : null;
+    const dbi = await getDb();
+    const rows = await dbi.select().from(devices)
+      .where(and(eq(devices.user_id, userId), eq(devices.device_fingerprint, fingerprint))).limit(1);
+    return rows[0] ? rowToDevice(rows[0]) : null;
   } catch {
     return null;
   }
@@ -3722,27 +4756,19 @@ export async function registerDevice(params: {
   ip: string;
 }): Promise<void> {
   try {
-    const pool = await ensurePool();
-    await pool.execute(
-      `INSERT INTO devices
-         (user_id, artisan_id, device_fingerprint, device_type, browser, os, last_ip)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         device_type = VALUES(device_type),
-         browser = VALUES(browser),
-         os = VALUES(os),
-         last_ip = VALUES(last_ip),
-         last_active_at = CURRENT_TIMESTAMP`,
-      [
-        params.userId,
-        params.artisanId,
-        params.fingerprint,
-        params.deviceType,
-        params.browser,
-        params.os,
-        params.ip,
-      ]
-    );
+    const dbi = await getDb();
+    // Upsert sur l'unique (user_id, device_fingerprint). last_active_at rafraîchi
+    // explicitement à CURRENT_TIMESTAMP en cas de conflit (le device se reconnecte).
+    await dbi.insert(devices).values({
+      user_id: params.userId, artisan_id: params.artisanId, device_fingerprint: params.fingerprint,
+      device_type: params.deviceType, browser: params.browser, os: params.os, last_ip: params.ip,
+    }).onConflictDoUpdate({
+      target: [devices.user_id, devices.device_fingerprint],
+      set: {
+        device_type: params.deviceType, browser: params.browser, os: params.os,
+        last_ip: params.ip, last_active_at: sql`CURRENT_TIMESTAMP`,
+      },
+    });
   } catch (e: any) {
     // On ne bloque jamais la requete utilisateur sur un fail d'enregistrement
     // device. On loggue et on continue.
@@ -3752,30 +4778,27 @@ export async function registerDevice(params: {
 
 export async function countActiveDevices(userId: number): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT COUNT(DISTINCT device_fingerprint) AS cnt FROM devices WHERE user_id = ?',
-      [userId]
-    ) as any;
-    return Number((rows as any[])[0]?.cnt || 0);
+    const dbi = await getDb();
+    const [row] = await dbi.select({ cnt: sql<number>`COUNT(DISTINCT ${devices.device_fingerprint})` })
+      .from(devices).where(eq(devices.user_id, userId));
+    return Number(row?.cnt || 0);
   } catch {
     return 0;
   }
 }
 
 export async function deleteDevice(deviceId: number, userId: number): Promise<void> {
-  const pool = await ensurePool();
-  await pool.execute('DELETE FROM devices WHERE id = ? AND user_id = ?', [deviceId, userId]);
+  const dbi = await getDb();
+  await dbi.delete(devices).where(and(eq(devices.id, deviceId), eq(devices.user_id, userId)));
 }
 
 export async function deleteOtherDevices(userId: number, currentFingerprint: string): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [r] = await pool.execute(
-      'DELETE FROM devices WHERE user_id = ? AND device_fingerprint != ?',
-      [userId, currentFingerprint]
-    ) as any;
-    return Number(r.affectedRows || 0);
+    const dbi = await getDb();
+    const deleted = await dbi.delete(devices)
+      .where(and(eq(devices.user_id, userId), ne(devices.device_fingerprint, currentFingerprint)))
+      .returning({ id: devices.id });
+    return deleted.length;
   } catch {
     return 0;
   }
@@ -3811,12 +4834,11 @@ function rowToSession(r: any): SessionRow {
 
 export async function getActiveSessions(userId: number): Promise<SessionRow[]> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT * FROM active_sessions WHERE user_id = ? AND expires_at > NOW() ORDER BY last_active_at DESC',
-      [userId]
-    ) as any;
-    return (rows as any[]).map(rowToSession);
+    const dbi = await getDb();
+    const rows = await dbi.select().from(activeSessions)
+      .where(and(eq(activeSessions.user_id, userId), sql`${activeSessions.expires_at} > NOW()`))
+      .orderBy(desc(activeSessions.last_active_at));
+    return rows.map(rowToSession);
   } catch {
     return [];
   }
@@ -3824,12 +4846,10 @@ export async function getActiveSessions(userId: number): Promise<SessionRow[]> {
 
 export async function countActiveSessions(userId: number): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [rows] = await pool.execute(
-      'SELECT COUNT(*) AS cnt FROM active_sessions WHERE user_id = ? AND expires_at > NOW()',
-      [userId]
-    ) as any;
-    return Number((rows as any[])[0]?.cnt || 0);
+    const dbi = await getDb();
+    const [row] = await dbi.select({ cnt: sql<number>`COUNT(*)` }).from(activeSessions)
+      .where(and(eq(activeSessions.user_id, userId), sql`${activeSessions.expires_at} > NOW()`));
+    return Number(row?.cnt || 0);
   } catch {
     return 0;
   }
@@ -3844,15 +4864,18 @@ export async function createSession(params: {
   ttlDays?: number;
 }): Promise<void> {
   try {
-    const pool = await ensurePool();
+    const dbi = await getDb();
     const ttl = params.ttlDays || 7;
-    await pool.execute(
-      `INSERT INTO active_sessions
-         (user_id, artisan_id, session_token, device_fingerprint, ip, expires_at)
-       VALUES (?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))
-       ON DUPLICATE KEY UPDATE last_active_at = CURRENT_TIMESTAMP, expires_at = DATE_ADD(NOW(), INTERVAL ? DAY)`,
-      [params.userId, params.artisanId, params.token, params.fingerprint, params.ip, ttl, ttl]
-    );
+    // DATE_ADD(NOW(), INTERVAL ttl DAY) → calcul de date en JS (neutre dialecte).
+    const expiresAt = new Date(Date.now() + ttl * 24 * 3600 * 1000);
+    // Upsert sur l'unique (user_id, session_token) : prolonge la session si re-login.
+    await dbi.insert(activeSessions).values({
+      user_id: params.userId, artisan_id: params.artisanId, session_token: params.token,
+      device_fingerprint: params.fingerprint, ip: params.ip, expires_at: expiresAt,
+    }).onConflictDoUpdate({
+      target: [activeSessions.user_id, activeSessions.session_token],
+      set: { last_active_at: sql`CURRENT_TIMESTAMP`, expires_at: expiresAt },
+    });
   } catch (e: any) {
     console.warn('[createSession] failed:', e?.message || e);
   }
@@ -3860,17 +4883,13 @@ export async function createSession(params: {
 
 export async function deleteOldestSession(userId: number): Promise<void> {
   try {
-    const pool = await ensurePool();
-    // MySQL ne supporte pas DELETE ... ORDER BY LIMIT dans toutes les
-    // configurations. On selectionne d'abord l'id, puis on delete.
-    const [rows] = await pool.execute(
-      `SELECT id FROM active_sessions WHERE user_id = ? AND expires_at > NOW()
-       ORDER BY last_active_at ASC LIMIT 1`,
-      [userId]
-    ) as any;
-    const oldId = (rows as any[])[0]?.id;
-    if (oldId) {
-      await pool.execute('DELETE FROM active_sessions WHERE id = ?', [oldId]);
+    const dbi = await getDb();
+    // Select-puis-delete : la plus ancienne session active (last_active_at ASC).
+    const [oldest] = await dbi.select({ id: activeSessions.id }).from(activeSessions)
+      .where(and(eq(activeSessions.user_id, userId), sql`${activeSessions.expires_at} > NOW()`))
+      .orderBy(asc(activeSessions.last_active_at)).limit(1);
+    if (oldest?.id) {
+      await dbi.delete(activeSessions).where(eq(activeSessions.id, oldest.id));
     }
   } catch (e: any) {
     console.warn('[deleteOldestSession] failed:', e?.message || e);
@@ -3879,11 +4898,10 @@ export async function deleteOldestSession(userId: number): Promise<void> {
 
 export async function cleanExpiredSessions(): Promise<number> {
   try {
-    const pool = await ensurePool();
-    const [r] = await pool.execute(
-      'DELETE FROM active_sessions WHERE expires_at < NOW()'
-    ) as any;
-    return Number(r.affectedRows || 0);
+    const dbi = await getDb();
+    const deleted = await dbi.delete(activeSessions)
+      .where(sql`${activeSessions.expires_at} < NOW()`).returning({ id: activeSessions.id });
+    return deleted.length;
   } catch {
     return 0;
   }
@@ -3908,13 +4926,10 @@ export const PLAN_LIMITS: Record<string, { maxUsers: number; maxDevices: number;
 export async function getCouleursCalendrier(
   artisanId: number
 ): Promise<Record<number, string>> {
-  const pool = getPool();
-  if (!pool) return {};
+  const dbi = await getDb();
   try {
-    const [rows] = await pool.execute(
-      `SELECT interventionId, couleur FROM couleurs_interventions WHERE artisanId = ?`,
-      [artisanId]
-    );
+    const rows = await dbi.select({ interventionId: couleursInterventions.interventionId, couleur: couleursInterventions.couleur })
+      .from(couleursInterventions).where(eq(couleursInterventions.artisanId, artisanId));
     const out: Record<number, string> = {};
     for (const r of rows as any[]) {
       out[r.interventionId] = r.couleur;
@@ -3931,49 +4946,38 @@ export async function setCouleurIntervention(
   interventionId: number,
   couleur: string
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  // INSERT ... ON DUPLICATE KEY UPDATE : idempotent.
-  await pool.execute(
-    `INSERT INTO couleurs_interventions (artisanId, interventionId, couleur)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE couleur = VALUES(couleur)`,
-    [artisanId, interventionId, couleur]
-  );
+  const dbi = await getDb();
+  // Upsert idempotent sur la PK composite (artisanId, interventionId).
+  await dbi.insert(couleursInterventions).values({ artisanId, interventionId, couleur })
+    .onConflictDoUpdate({
+      target: [couleursInterventions.artisanId, couleursInterventions.interventionId],
+      set: { couleur },
+    });
 }
 
 export async function deleteCouleurIntervention(
   artisanId: number,
   interventionId: number
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `DELETE FROM couleurs_interventions WHERE artisanId = ? AND interventionId = ?`,
-    [artisanId, interventionId]
-  );
+  const dbi = await getDb();
+  await dbi.delete(couleursInterventions)
+    .where(and(eq(couleursInterventions.artisanId, artisanId), eq(couleursInterventions.interventionId, interventionId)));
 }
 
 export async function setCouleursMultiples(
   artisanId: number,
   couleurs: Record<number, string>
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
+  const dbi = await getDb();
   const entries = Object.entries(couleurs);
   if (entries.length === 0) return;
-  // Batch via 1 seul INSERT multi-rows + ON DUPLICATE KEY UPDATE.
-  const placeholders = entries.map(() => "(?, ?, ?)").join(", ");
-  const values: any[] = [];
-  for (const [k, v] of entries) {
-    values.push(artisanId, parseInt(k, 10), v);
-  }
-  await pool.execute(
-    `INSERT INTO couleurs_interventions (artisanId, interventionId, couleur)
-     VALUES ${placeholders}
-     ON DUPLICATE KEY UPDATE couleur = VALUES(couleur)`,
-    values
-  );
+  // Batch : 1 seul INSERT multi-rows + upsert sur la PK composite.
+  const rows = entries.map(([k, v]) => ({ artisanId, interventionId: parseInt(k, 10), couleur: v }));
+  await dbi.insert(couleursInterventions).values(rows)
+    .onConflictDoUpdate({
+      target: [couleursInterventions.artisanId, couleursInterventions.interventionId],
+      set: { couleur: sql`excluded.couleur` },
+    });
 }
 
 // ============================================================================
@@ -3999,24 +5003,33 @@ type InterventionMobileRow = {
   updatedAt: Date;
 };
 
+// OPE-173 — récupère en UNE requête les horodatages mobiles (arrivée/départ) de toutes
+// les interventions d'un artisan, pour afficher la durée réelle sur site côté desktop sans
+// N+1. Scopé tenant. Retourne une map interventionId -> { heureArrivee, heureDepart }.
+export async function getInterventionsMobileByArtisanId(
+  artisanId: number
+): Promise<Array<{ interventionId: number; heureArrivee: any; heureDepart: any }>> {
+  const db = await getDb();
+  try {
+    return await db.select({
+      interventionId: interventionsMobile.interventionId,
+      heureArrivee: interventionsMobile.heureArrivee,
+      heureDepart: interventionsMobile.heureDepart,
+    }).from(interventionsMobile).where(eq(interventionsMobile.artisanId, artisanId));
+  } catch (e: any) {
+    console.warn("[getInterventionsMobileByArtisanId]", e?.message || e);
+    return [];
+  }
+}
+
 export async function getInterventionMobileByInterventionId(
   interventionId: number
 ): Promise<InterventionMobileRow | null> {
-  const pool = getPool();
-  if (!pool) return null;
+  const db = await getDb();
   try {
-    const [rows] = await pool.execute(
-      `SELECT id, interventionId, artisanId, latitude, longitude,
-              heureArrivee, heureDepart, notesIntervention,
-              signatureClient, signatureDate, syncStatus, lastSyncAt,
-              createdAt, updatedAt
-         FROM interventions_mobile
-        WHERE interventionId = ?
-        LIMIT 1`,
-      [interventionId]
-    );
-    const r = (rows as any[])[0];
-    return r || null;
+    const [r] = await db.select().from(interventionsMobile)
+      .where(eq(interventionsMobile.interventionId, interventionId)).limit(1);
+    return (r as any) || null;
   } catch (e: any) {
     console.warn("[getInterventionMobileByInterventionId]", e?.message || e);
     return null;
@@ -4038,95 +5051,39 @@ type InterventionMobileWritable = Partial<{
 export async function createInterventionMobile(
   data: { interventionId: number; artisanId: number } & InterventionMobileWritable
 ): Promise<InterventionMobileRow | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const cols = ["interventionId", "artisanId"];
-  const vals: any[] = [data.interventionId, data.artisanId];
+  const db = await getDb();
+  const values: any = { interventionId: data.interventionId, artisanId: data.artisanId };
   for (const k of [
-    "heureArrivee",
-    "heureDepart",
-    "latitude",
-    "longitude",
-    "notesIntervention",
-    "signatureClient",
-    "signatureDate",
-    "syncStatus",
-    "lastSyncAt",
+    "heureArrivee", "heureDepart", "latitude", "longitude",
+    "notesIntervention", "signatureClient", "signatureDate", "syncStatus", "lastSyncAt",
   ] as const) {
-    if (data[k] !== undefined) {
-      cols.push(k);
-      vals.push(data[k]);
-    }
+    if (data[k] !== undefined) values[k] = data[k];
   }
-  const placeholders = cols.map(() => "?").join(", ");
-  const [r]: any = await pool.execute(
-    `INSERT INTO interventions_mobile (${cols.join(", ")}) VALUES (${placeholders})`,
-    vals
-  );
-  const insertId = r?.insertId;
+  const insertId = await insertReturningId(interventionsMobile, values);
   if (!insertId) return null;
-  // Lecture du record cree pour retour standardise.
-  const [rows] = await pool.execute(
-    `SELECT id, interventionId, artisanId, latitude, longitude,
-            heureArrivee, heureDepart, notesIntervention,
-            signatureClient, signatureDate, syncStatus, lastSyncAt,
-            createdAt, updatedAt
-       FROM interventions_mobile WHERE id = ? LIMIT 1`,
-    [insertId]
-  );
-  return (rows as any[])[0] || null;
+  const [row] = await db.select().from(interventionsMobile)
+    .where(eq(interventionsMobile.id, insertId)).limit(1);
+  return (row as any) || null;
 }
 
 export async function updateInterventionMobile(
   mobileId: number,
   data: InterventionMobileWritable
 ): Promise<InterventionMobileRow | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const sets: string[] = [];
-  const vals: any[] = [];
+  const db = await getDb();
+  const sets: any = {};
   for (const k of [
-    "heureArrivee",
-    "heureDepart",
-    "latitude",
-    "longitude",
-    "notesIntervention",
-    "signatureClient",
-    "signatureDate",
-    "syncStatus",
-    "lastSyncAt",
+    "heureArrivee", "heureDepart", "latitude", "longitude",
+    "notesIntervention", "signatureClient", "signatureDate", "syncStatus", "lastSyncAt",
   ] as const) {
-    if (data[k] !== undefined) {
-      sets.push(`${k} = ?`);
-      vals.push(data[k]);
-    }
+    if (data[k] !== undefined) sets[k] = data[k];
   }
-  if (sets.length === 0) {
-    // Rien a mettre a jour : juste relire le record.
-    const [rows] = await pool.execute(
-      `SELECT id, interventionId, artisanId, latitude, longitude,
-              heureArrivee, heureDepart, notesIntervention,
-              signatureClient, signatureDate, syncStatus, lastSyncAt,
-              createdAt, updatedAt
-         FROM interventions_mobile WHERE id = ? LIMIT 1`,
-      [mobileId]
-    );
-    return (rows as any[])[0] || null;
+  if (Object.keys(sets).length > 0) {
+    await db.update(interventionsMobile).set(sets).where(eq(interventionsMobile.id, mobileId));
   }
-  vals.push(mobileId);
-  await pool.execute(
-    `UPDATE interventions_mobile SET ${sets.join(", ")} WHERE id = ?`,
-    vals
-  );
-  const [rows] = await pool.execute(
-    `SELECT id, interventionId, artisanId, latitude, longitude,
-            heureArrivee, heureDepart, notesIntervention,
-            signatureClient, signatureDate, syncStatus, lastSyncAt,
-            createdAt, updatedAt
-       FROM interventions_mobile WHERE id = ? LIMIT 1`,
-    [mobileId]
-  );
-  return (rows as any[])[0] || null;
+  const [row] = await db.select().from(interventionsMobile)
+    .where(eq(interventionsMobile.id, mobileId)).limit(1);
+  return (row as any) || null;
 }
 
 // ============================================================================
@@ -4140,41 +5097,33 @@ export async function createPhotoIntervention(data: {
   description?: string | null;
   type?: "avant" | "pendant" | "apres";
 }): Promise<{ id: number; url: string; description: string | null; type: string } | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT INTO photos_interventions (interventionMobileId, url, description, type)
-     VALUES (?, ?, ?, ?)`,
-    [
-      data.interventionMobileId,
-      data.url,
-      data.description ?? null,
-      data.type ?? "pendant",
-    ]
-  );
-  const insertId = r?.insertId;
+  const db = await getDb();
+  const insertId = await insertReturningId(photosInterventions, {
+    interventionMobileId: data.interventionMobileId,
+    url: data.url,
+    description: data.description ?? null,
+    type: data.type ?? "pendant",
+  });
   if (!insertId) return null;
-  const [rows] = await pool.execute(
-    `SELECT id, url, description, type, takenAt, createdAt
-       FROM photos_interventions WHERE id = ? LIMIT 1`,
-    [insertId]
-  );
-  return (rows as any[])[0] || null;
+  const [row] = await db.select({
+    id: photosInterventions.id, url: photosInterventions.url,
+    description: photosInterventions.description, type: photosInterventions.type,
+    takenAt: photosInterventions.takenAt, createdAt: photosInterventions.createdAt,
+  }).from(photosInterventions).where(eq(photosInterventions.id, insertId)).limit(1);
+  return (row as any) || null;
 }
 
 export async function getPhotosByInterventionMobileId(
   mobileId: number
 ): Promise<Array<{ id: number; url: string; description: string | null; type: string }>> {
-  const pool = getPool();
-  if (!pool) return [];
-  const [rows] = await pool.execute(
-    `SELECT id, url, description, type, takenAt, createdAt
-       FROM photos_interventions
-      WHERE interventionMobileId = ?
-      ORDER BY takenAt DESC`,
-    [mobileId]
-  );
-  return (rows as any[]) || [];
+  const db = await getDb();
+  return await db.select({
+    id: photosInterventions.id, url: photosInterventions.url,
+    description: photosInterventions.description, type: photosInterventions.type,
+    takenAt: photosInterventions.takenAt, createdAt: photosInterventions.createdAt,
+  }).from(photosInterventions)
+    .where(eq(photosInterventions.interventionMobileId, mobileId))
+    .orderBy(desc(photosInterventions.takenAt));
 }
 
 // ============================================================================
@@ -4438,6 +5387,29 @@ export async function getCongeById(id: number): Promise<Conge | undefined> {
   return r[0];
 }
 
+// OPE-97 — congés du même technicien (statut en_attente/approuvé) chevauchant la période
+// [dateDebut, dateFin]. Deux intervalles se chevauchent ssi début_existant <= fin_demandée
+// ET fin_existant >= début_demandée. Scopé tenant + technicien. `excludeId` permet d'ignorer
+// le congé en cours d'édition. Dates au format 'YYYY-MM-DD'.
+export async function getCongesChevauchants(
+  technicienId: number,
+  artisanId: number,
+  dateDebut: Date,
+  dateFin: Date,
+  excludeId?: number,
+): Promise<Conge[]> {
+  const dbi = await getDb();
+  const conds = [
+    eq(conges.artisanId, artisanId),
+    eq(conges.technicienId, technicienId),
+    inArray(conges.statut, ["en_attente", "approuve"]),
+    lte(conges.dateDebut, dateFin),
+    gte(conges.dateFin, dateDebut),
+  ];
+  if (excludeId !== undefined) conds.push(ne(conges.id, excludeId));
+  return await dbi.select().from(conges).where(and(...conds)).orderBy(asc(conges.dateDebut));
+}
+
 export async function createConge(data: InsertConge): Promise<Conge | undefined> {
   const dbi = await getDb();
   await dbi.insert(conges).values(data);
@@ -4484,29 +5456,31 @@ export async function initSoldeConges(
   data: InsertSoldeConge
 ): Promise<SoldeConge | undefined> {
   const dbi = await getDb();
-  // INSERT ... ON DUPLICATE KEY UPDATE via raw SQL pour gerer la clef
-  // composite (technicien, type, annee) eventuellement existante.
-  const pool = getPool();
-  if (pool) {
-    await pool.execute(
-      `INSERT INTO soldes_conges
-        (technicienId, artisanId, type, annee, soldeInitial, soldeRestant, joursAcquis, joursPris)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE soldeInitial = VALUES(soldeInitial),
-                               soldeRestant = VALUES(soldeRestant),
-                               joursAcquis = VALUES(joursAcquis),
-                               joursPris = VALUES(joursPris)`,
-      [
-        data.technicienId,
-        data.artisanId,
-        data.type,
-        data.annee,
-        data.soldeInitial ?? "0.00",
-        data.soldeRestant ?? "0.00",
-        data.joursAcquis ?? "0.00",
-        data.joursPris ?? "0.00",
-      ]
-    );
+  // Upsert idempotent sur (technicien, type, annee) via check-then-act (neutre dialecte).
+  // NB OPE-184 : `soldes_conges` n'a PAS de clé unique sur (technicienId,type,annee)
+  // (seul `id` est PK, vérifié sur la base live) → l'ancien `ON DUPLICATE KEY UPDATE`
+  // ne déclenchait JAMAIS la branche UPDATE en mysql (bug latent : ré-init = doublon).
+  // Le check-then-act corrige ce comportement et le rend réellement idempotent,
+  // aligné sur `updateSoldeConges` (OPE-178).
+  const vals = {
+    soldeInitial: data.soldeInitial ?? "0.00",
+    soldeRestant: data.soldeRestant ?? "0.00",
+    joursAcquis: data.joursAcquis ?? "0.00",
+    joursPris: data.joursPris ?? "0.00",
+  };
+  const existing = await dbi.select({ id: soldesConges.id }).from(soldesConges)
+    .where(and(
+      eq(soldesConges.technicienId, data.technicienId),
+      eq(soldesConges.type, data.type),
+      eq(soldesConges.annee, data.annee),
+    )).limit(1);
+  if (existing[0]) {
+    await dbi.update(soldesConges).set(vals).where(eq(soldesConges.id, existing[0].id));
+  } else {
+    await dbi.insert(soldesConges).values({
+      technicienId: data.technicienId, artisanId: data.artisanId,
+      type: data.type, annee: data.annee, ...vals,
+    });
   }
   const r = await dbi.select().from(soldesConges)
     .where(and(
@@ -4519,20 +5493,39 @@ export async function initSoldeConges(
 
 export async function updateSoldeConges(
   technicienId: number,
+  artisanId: number,
   type: "conge_paye" | "rtt",
   annee: number,
   joursPrisDelta: number
 ): Promise<void> {
-  // Decremente le solde restant et incremente joursPris.
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `UPDATE soldes_conges
-        SET joursPris = joursPris + ?,
-            soldeRestant = GREATEST(0, soldeRestant - ?)
-      WHERE technicienId = ? AND type = ? AND annee = ?`,
-    [joursPrisDelta, joursPrisDelta, technicienId, type, annee]
-  );
+  // OPE-178 — l'UPDATE seul PERDAIT silencieusement le décompte si la ligne
+  // (technicien, type, année) n'existait pas (solde non initialisé / changement
+  // d'année). Pas de clé unique sur (technicienId,type,annee) → on ne peut pas
+  // s'appuyer sur ON DUPLICATE KEY ; on fait donc un check-then-act :
+  //  - ligne présente            -> UPDATE (comportement INCHANGÉ).
+  //  - absente + décompte (>0)   -> INSERT (trace le décompte ; solde acquis = 0).
+  //  - absente + recrédit (<=0)  -> no-op (rien n'avait été décompté à recréditer).
+  const dbi = await getDb();
+  const existing = await dbi.select({ id: soldesConges.id }).from(soldesConges)
+    .where(and(
+      eq(soldesConges.technicienId, technicienId),
+      eq(soldesConges.type, type),
+      eq(soldesConges.annee, annee),
+    )).limit(1);
+  if (existing[0]) {
+    // GREATEST(0, …) : supporté par PG et mysql ; arithmétique sur colonnes en sql brut.
+    await dbi.update(soldesConges).set({
+      joursPris: sql`${soldesConges.joursPris} + ${joursPrisDelta}`,
+      soldeRestant: sql`GREATEST(0, ${soldesConges.soldeRestant} - ${joursPrisDelta})`,
+    }).where(eq(soldesConges.id, existing[0].id));
+  } else if (joursPrisDelta > 0) {
+    // Absente + décompte (>0) → INSERT (trace le décompte ; soldeRestant planché à 0).
+    await dbi.insert(soldesConges).values({
+      technicienId, artisanId, type, annee,
+      soldeInitial: "0.00", soldeRestant: "0.00", joursAcquis: "0.00",
+      joursPris: String(joursPrisDelta),
+    });
+  }
 }
 
 // ============================================================================
@@ -4552,6 +5545,12 @@ export async function createBadge(data: InsertBadge): Promise<Badge | undefined>
   const r = await dbi.select().from(badges)
     .where(and(eq(badges.artisanId, data.artisanId), eq(badges.code, data.code)))
     .orderBy(desc(badges.id)).limit(1);
+  return r[0];
+}
+
+export async function getBadgeById(id: number): Promise<Badge | undefined> {
+  const dbi = await getDb();
+  const r = await dbi.select().from(badges).where(eq(badges.id, id)).limit(1);
   return r[0];
 }
 
@@ -4618,26 +5617,22 @@ export async function verifierEtAttribuerBadges(
   // les badges atteints. Retourne la liste des badges nouvellement
   // obtenus dans ce passage.
   const dbi = await getDb();
-  const pool = getPool();
-  if (!pool) return [];
 
   // Calculs statistiques pour ce technicien chez cet artisan.
-  const [intRows]: any = await pool.execute(
-    `SELECT COUNT(*) AS n FROM interventions
-      WHERE technicienId = ? AND artisanId = ? AND statut = 'terminee'`,
-    [technicienId, artisanId]
-  );
-  const nbInterventions = Number(intRows[0]?.n || 0);
+  const [intRow] = await dbi.select({ n: sql<number>`COUNT(*)` }).from(interventions)
+    .where(and(
+      eq(interventions.technicienId, technicienId),
+      eq(interventions.artisanId, artisanId),
+      eq(interventions.statut, "terminee" as any),
+    ));
+  const nbInterventions = Number(intRow?.n || 0);
 
   // Avis positifs (note >= 4) — on tolere l'absence de la table.
   let nbAvisPositifs = 0;
   try {
-    const [aRows]: any = await pool.execute(
-      `SELECT COUNT(*) AS n FROM avis_clients
-        WHERE artisanId = ? AND note >= 4`,
-      [artisanId]
-    );
-    nbAvisPositifs = Number(aRows[0]?.n || 0);
+    const [aRow] = await dbi.select({ n: sql<number>`COUNT(*)` }).from(avisClients)
+      .where(and(eq(avisClients.artisanId, artisanId), gte(avisClients.note, 4)));
+    nbAvisPositifs = Number(aRow?.n || 0);
   } catch {
     /* table absente */
   }
@@ -4677,8 +5672,7 @@ export async function calculerClassement(
   periode: "semaine" | "mois" | "trimestre" | "annee"
 ): Promise<ClassementTechnicien[]> {
   // Calcule le classement pour la periode courante et l'enregistre.
-  const pool = getPool();
-  if (!pool) return [];
+  const dbi = await getDb();
   const today = new Date();
   let dateDebut: Date;
   const dateFin = today;
@@ -4698,38 +5692,37 @@ export async function calculerClassement(
 
   // Agreger par technicien : nb interventions terminees + CA factures
   // payees attache aux interventions de ce technicien.
-  const [rows]: any = await pool.execute(
-    `SELECT i.technicienId AS technicienId,
-            COUNT(*) AS interventions,
-            COALESCE(SUM(f.totalTTC), 0) AS ca
-       FROM interventions i
-       LEFT JOIN factures f
-         ON f.id = i.factureId AND f.statut = 'payee'
-      WHERE i.artisanId = ?
-        AND i.statut = 'terminee'
-        AND i.technicienId IS NOT NULL
-        AND i.dateDebut BETWEEN ? AND ?
-      GROUP BY i.technicienId
-      ORDER BY interventions DESC, ca DESC`,
-    [artisanId, dStr, fStr]
-  );
+  // LEFT JOIN avec condition `f.statut='payee'` portée dans le ON (pas le WHERE)
+  // pour préserver la sémantique LEFT JOIN. dateDebut = timestamp → sql BETWEEN brut.
+  const rows: any[] = await dbi.select({
+    technicienId: interventions.technicienId,
+    interventions: sql<number>`COUNT(*)`,
+    ca: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)`,
+  }).from(interventions)
+    .leftJoin(factures, and(eq(factures.id, interventions.factureId), eq(factures.statut, "payee" as any)))
+    .where(and(
+      eq(interventions.artisanId, artisanId),
+      eq(interventions.statut, "terminee" as any),
+      isNotNull(interventions.technicienId),
+      sql`${interventions.dateDebut} BETWEEN ${dStr} AND ${fStr}`,
+    ))
+    .groupBy(interventions.technicienId)
+    .orderBy(sql`COUNT(*) DESC`, sql`COALESCE(SUM(${factures.totalTTC}), 0) DESC`);
 
   // Insert classements (purge prealable pour ce couple artisan+periode).
-  await pool.execute(
-    `DELETE FROM classement_techniciens
-      WHERE artisanId = ? AND periode = ? AND dateDebut = ?`,
-    [artisanId, periode, dStr]
-  );
+  await dbi.delete(classementTechniciens)
+    .where(and(
+      eq(classementTechniciens.artisanId, artisanId),
+      eq(classementTechniciens.periode, periode),
+      eq(classementTechniciens.dateDebut, dStr),
+    ));
   let rang = 1;
-  for (const r of rows as any[]) {
+  for (const r of rows) {
     const points = Number(r.interventions) * 10 + Math.floor(Number(r.ca) / 100);
-    await pool.execute(
-      `INSERT INTO classement_techniciens
-         (technicienId, artisanId, periode, dateDebut, dateFin, rang,
-          pointsTotal, interventions, ca)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [r.technicienId, artisanId, periode, dStr, fStr, rang, points, r.interventions, r.ca]
-    );
+    await dbi.insert(classementTechniciens).values({
+      technicienId: r.technicienId, artisanId, periode, dateDebut: dStr, dateFin: fStr,
+      rang, pointsTotal: points, interventions: Number(r.interventions), ca: String(r.ca),
+    });
     rang++;
   }
   return getClassementTechniciens(artisanId, periode);
@@ -5135,23 +6128,39 @@ export async function getConfigurationComptable(
   return r[0];
 }
 
+// Colonnes autorisées de configurations_comptables — les noms sont interpolés en
+// SQL brut (upsert), donc whitelist explicite (defense-in-depth : la sûreté ne
+// dépend plus du stripping Zod de l'appelant). Cf. audit injection SQL 2026-06-13.
+const CONFIG_COMPTABLE_COLS = new Set([
+  "artisanId", "logiciel", "formatExport", "compteVentes", "compteTVACollectee",
+  "compteClients", "compteAchats", "compteTVADeductible", "compteFournisseurs",
+  "compteBanque", "compteCaisse", "journalVentes", "journalAchats", "journalBanque",
+  "prefixeFacture", "prefixeAvoir", "exerciceDebut", "actif", "syncAutoFactures",
+  "syncAutoPaiements", "frequenceSync", "heureSync", "notifierErreurs",
+  "notifierSucces", "derniereSync", "prochainSync",
+]);
+
 export async function saveConfigurationComptable(
   data: InsertConfigurationComptable
 ): Promise<ConfigurationComptable | undefined> {
-  // Une seule config par artisan : on fait un upsert via raw SQL pour
-  // gerer la cle unique artisanId.
-  const pool = getPool();
-  if (!pool) return undefined;
-  const keys = Object.keys(data);
-  const cols = keys.join(", ");
-  const placeholders = keys.map(() => "?").join(", ");
-  const updates = keys.filter((k) => k !== "artisanId").map((k) => `${k} = VALUES(${k})`).join(", ");
-  const values = keys.map((k) => (data as any)[k]);
-  await pool.execute(
-    `INSERT INTO configurations_comptables (${cols}) VALUES (${placeholders})
-     ON DUPLICATE KEY UPDATE ${updates || "updatedAt = CURRENT_TIMESTAMP"}`,
-    values
-  );
+  // Une seule config par artisan (cle unique artisanId) : upsert neutre dialecte
+  // (select-puis-insert/update), PG ne supporte pas ON DUPLICATE KEY.
+  const dbi = await getDb();
+  // Whitelist defense-in-depth conservee (cf. audit injection SQL 2026-06-13) :
+  // ne laisse passer que les colonnes autorisees.
+  const filtered: Record<string, any> = {};
+  for (const k of Object.keys(data)) if (CONFIG_COMPTABLE_COLS.has(k)) filtered[k] = (data as any)[k];
+  const existing = await dbi.select({ id: configurationsComptables.id }).from(configurationsComptables)
+    .where(eq(configurationsComptables.artisanId, data.artisanId)).limit(1);
+  if (existing[0]) {
+    const { artisanId: _aid, ...updates } = filtered;
+    if (Object.keys(updates).length > 0) {
+      await dbi.update(configurationsComptables).set(updates)
+        .where(eq(configurationsComptables.artisanId, data.artisanId));
+    }
+  } else {
+    await dbi.insert(configurationsComptables).values(filtered as any);
+  }
   return getConfigurationComptable(data.artisanId);
 }
 
@@ -5200,6 +6209,249 @@ function fecAmount(val: string | number | null | undefined): string {
   return n.toFixed(2).replace(".", ",");
 }
 
+// ============================================================================
+// FEC — Fichier des Ecritures Comptables (arrete du 29 juillet 2013, DGFiP)
+// Generateur unique, conforme 18 colonnes, equilibre par construction.
+// Couvre 3 journaux : VENTES (factures), ACHATS (depenses), BANQUE (encaissements).
+// ============================================================================
+export interface FecConformite {
+  nbEcritures: number;       // nombre d'ecritures (groupes equilibres)
+  nbLignes: number;          // nombre de lignes de detail (hors entete)
+  totalDebit: number;
+  totalCredit: number;
+  ecart: number;             // totalDebit - totalCredit (doit etre 0)
+  equilibre: boolean;
+  erreurs: string[];         // controles de conformite non passes
+  comptesUtilises: string[];
+}
+
+export interface FecResultat {
+  content: string;
+  conformite: FecConformite;
+}
+
+// Compte de TVA collectee selon le taux (PCG francais).
+function compteTvaCollectee(taux: number): { compte: string; lib: string } {
+  if (taux >= 19.5) return { compte: "445711", lib: "TVA collectee 20%" };
+  if (taux >= 9.5) return { compte: "445712", lib: "TVA collectee 10%" };
+  if (taux >= 5) return { compte: "445713", lib: "TVA collectee 5,5%" };
+  if (taux >= 2) return { compte: "445714", lib: "TVA collectee 2,1%" };
+  return { compte: "445711", lib: "TVA collectee" };
+}
+
+// Compte de charge (classe 6) selon la categorie de depense (PCG).
+function compteChargeDepense(categorie: string | null | undefined): { compte: string; lib: string } {
+  const c = (categorie || "").toLowerCase();
+  if (/(materiau|fournitur|consommable)/.test(c)) return { compte: "601000", lib: "Achats de matieres premieres" };
+  if (/(sous.?trait)/.test(c)) return { compte: "604000", lib: "Sous-traitance" };
+  if (/(carburant|essence|gazole|diesel)/.test(c)) return { compte: "606100", lib: "Carburants" };
+  if (/(outil)/.test(c)) return { compte: "615000", lib: "Entretien, reparations, outillage" };
+  if (/(loyer|location)/.test(c)) return { compte: "613000", lib: "Locations" };
+  if (/(assurance)/.test(c)) return { compte: "616000", lib: "Primes d'assurance" };
+  if (/(telephone|internet|telecom)/.test(c)) return { compte: "626000", lib: "Frais postaux et telecom" };
+  if (/(formation)/.test(c)) return { compte: "623000", lib: "Formation" };
+  if (/(bancaire|banque|commission)/.test(c)) return { compte: "627000", lib: "Services bancaires" };
+  if (/(repas|restaurant|deplacement|hotel|peage)/.test(c)) return { compte: "625100", lib: "Voyages et deplacements" };
+  return { compte: "607000", lib: "Achats" };
+}
+
+export async function genererFEC(
+  artisanId: number,
+  dateDebut: Date,
+  dateFin: Date,
+): Promise<FecResultat> {
+  const vide: FecConformite = { nbEcritures: 0, nbLignes: 0, totalDebit: 0, totalCredit: 0, ecart: 0, equilibre: true, erreurs: [], comptesUtilises: [] };
+  const dbi = await getDb();
+
+  const config = await getConfigurationComptable(artisanId);
+  const cVentes = config?.compteVentes || "706000";
+  const cClients = config?.compteClients || "411000";
+  const cTvaDed = config?.compteTVADeductible || "445660";
+  const cFourn = config?.compteFournisseurs || "401000";
+  const cBanque = config?.compteBanque || "512000";
+  const jVE = (config?.journalVentes || "VE").slice(0, 3);
+  const jAC = (config?.journalAchats || "AC").slice(0, 3);
+  const jBQ = (config?.journalBanque || "BQ").slice(0, 3);
+
+  const SEP = "\t";
+  const clean = (v: any) => String(v ?? "").replace(/[\t\r\n]+/g, " ").trim();
+  const amt = (v: any) => Number(v || 0).toFixed(2).replace(".", ",");
+  const ymd = (d: any) => {
+    const dt = new Date(d);
+    return `${dt.getFullYear()}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+  };
+
+  const header = [
+    "JournalCode", "JournalLib", "EcritureNum", "EcritureDate", "CompteNum",
+    "CompteLib", "CompAuxNum", "CompAuxLib", "PieceRef", "PieceDate",
+    "EcritureLib", "Debit", "Credit", "EcritureLet", "DateLet",
+    "ValidDate", "Montantdevise", "Idevise",
+  ];
+  const lines: string[] = [header.join(SEP)];
+  let totalDebit = 0, totalCredit = 0, nbEcritures = 0;
+  const comptes = new Set<string>();
+
+  type Line = {
+    journal: string; journalLib: string; num: number; date: any;
+    compte: string; compteLib: string; auxNum?: string; auxLib?: string;
+    piece: string; pieceDate: any; lib: string; debit?: number; credit?: number;
+    lettre?: string; dateLet?: any; valid: any;
+  };
+  const push = (f: Line) => {
+    // 18 colonnes ; Montantdevise/Idevise vides (operations en EUR domestiques).
+    const row = [
+      clean(f.journal), clean(f.journalLib), String(f.num), ymd(f.date),
+      clean(f.compte), clean(f.compteLib), clean(f.auxNum || ""), clean(f.auxLib || ""),
+      clean(f.piece), ymd(f.pieceDate), clean(f.lib),
+      amt(f.debit), amt(f.credit), clean(f.lettre || ""), f.dateLet ? ymd(f.dateLet) : "",
+      ymd(f.valid), "", "",
+    ];
+    if (row.length !== 18) throw new Error("FEC: ligne non conforme (18 colonnes attendues)");
+    lines.push(row.join(SEP));
+    totalDebit += Number(f.debit || 0);
+    totalCredit += Number(f.credit || 0);
+    comptes.add(f.compte);
+  };
+
+  const dStr = dateDebut.toISOString().slice(0, 10);
+  const fStr = dateFin.toISOString().slice(0, 10);
+  let num = 0;
+
+  // ---- 1) JOURNAL DES VENTES (VE) : 1 ecriture equilibree par facture ----
+  // DATE(dateFacture) (cast jour) conservé en sql brut : neutre dialecte (PG+mysql
+  // supportent DATE() + BETWEEN) → mêmes bornes qu'avant (ignore l'heure).
+  const facts: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalHT: factures.totalHT, totalTVA: factures.totalTVA, totalTTC: factures.totalTTC,
+    statut: factures.statut, datePaiement: factures.datePaiement, typeDocument: factures.typeDocument,
+    clientId: factures.clientId, clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`DATE(${factures.dateFacture}) BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .orderBy(asc(factures.dateFacture), asc(factures.id));
+  for (const f of facts as any[]) {
+    num++;
+    const auxNum = `C${String(f.clientId).padStart(5, "0")}`;
+    const auxLib = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client ${f.clientId}`;
+    // OPE-136 — un avoir (note de credit) stocke des montants NEGATIFS. Le FEC
+    // (arrete 29/07/2013) interdit les montants negatifs : une note de credit
+    // s'enregistre en INVERSANT le sens des comptes, en valeur absolue. Une facture
+    // normale : 411 debit TTC / 706 credit HT / 445 credit TVA. Un avoir : on inverse
+    // (411 credit / 706 debit / 445 debit), montants en |valeur absolue|.
+    const isAvoir = f.typeDocument === "avoir" || Number(f.totalTTC || 0) < 0;
+    const piece = f.numero || `F-${f.id}`;
+    const lib = `${isAvoir ? "Avoir" : "Facture"} ${piece}`;
+    const ht = Math.abs(Number(f.totalHT || 0)), tva = Math.abs(Number(f.totalTVA || 0)), ttc = Math.abs(Number(f.totalTTC || 0));
+    // Lettrage si reglee : meme code sur le 411 (debit VE) et le 411 (credit BQ).
+    const paid = f.statut === "payee" && f.datePaiement;
+    const lettre = paid ? `VL${f.id}` : "";
+    // Sens des comptes selon facture vs avoir (jamais de montant negatif).
+    const clientDebit = isAvoir ? 0 : ttc, clientCredit = isAvoir ? ttc : 0;
+    const venteDebit = isAvoir ? ht : 0, venteCredit = isAvoir ? 0 : ht;
+    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: f.dateFacture, lib, debit: clientDebit, credit: clientCredit, lettre, dateLet: paid ? f.datePaiement : undefined, valid: f.dateFacture });
+    push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: cVentes, compteLib: "Ventes de prestations", piece, pieceDate: f.dateFacture, lib, debit: venteDebit, credit: venteCredit, valid: f.dateFacture });
+    if (tva > 0) {
+      // TVA ventilee par taux depuis les lignes de facture (445711/712/713...).
+      // Les lignes d'avoir ont des montants negatifs : on filtre sur SUM <> 0 et on
+      // prend la valeur absolue, en inversant le sens (debit pour un avoir).
+      const lignes: any[] = await dbi.select({
+        tauxTVA: facturesLignes.tauxTVA,
+        tva: sql<string>`SUM(${facturesLignes.montantTVA})`,
+      }).from(facturesLignes)
+        .where(eq(facturesLignes.factureId, f.id))
+        .groupBy(facturesLignes.tauxTVA)
+        .having(sql`ABS(SUM(${facturesLignes.montantTVA})) > 0`);
+      const rows = (lignes as any[]) || [];
+      const sommeLignes = rows.reduce((s, l) => s + Math.abs(Number(l.tva || 0)), 0);
+      if (rows.length > 0 && Math.abs(sommeLignes - tva) < 0.02) {
+        for (const l of rows) {
+          const t = compteTvaCollectee(Number(l.tauxTVA || 20));
+          const mtva = Math.abs(Number(l.tva));
+          push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: t.compte, compteLib: t.lib, piece, pieceDate: f.dateFacture, lib, debit: isAvoir ? mtva : 0, credit: isAvoir ? 0 : mtva, valid: f.dateFacture });
+        }
+      } else {
+        // Repli : pas de lignes exploitables -> TVA agregee sur le compte configure.
+        const t = compteTvaCollectee(20);
+        push({ journal: jVE, journalLib: "Journal des ventes", num, date: f.dateFacture, compte: config?.compteTVACollectee || t.compte, compteLib: "TVA collectee", piece, pieceDate: f.dateFacture, lib, debit: isAvoir ? tva : 0, credit: isAvoir ? 0 : tva, valid: f.dateFacture });
+      }
+    }
+    nbEcritures++;
+  }
+
+  // ---- 2) JOURNAL DES ACHATS (AC) : depenses deductibles ----
+  const deps: any[] = await dbi.select({
+    id: depenses.id, numero: depenses.numero, date_depense: depenses.date_depense,
+    fournisseur: depenses.fournisseur, categorie: depenses.categorie,
+    montant_ht: depenses.montant_ht, montant_tva: depenses.montant_tva, montant_ttc: depenses.montant_ttc,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, dStr, fStr),
+    ))
+    .orderBy(asc(depenses.date_depense), asc(depenses.id));
+  for (const d of deps as any[]) {
+    num++;
+    const piece = d.numero || `D-${d.id}`;
+    const lib = `Achat ${piece}${d.fournisseur ? " - " + d.fournisseur : ""}`;
+    const ht = Number(d.montant_ht || 0), tvaD = Number(d.montant_tva || 0), ttc = Number(d.montant_ttc || 0);
+    const charge = compteChargeDepense(d.categorie);
+    push({ journal: jAC, journalLib: "Journal des achats", num, date: d.date_depense, compte: charge.compte, compteLib: charge.lib, piece, pieceDate: d.date_depense, lib, debit: ht, credit: 0, valid: d.date_depense });
+    if (tvaD > 0) push({ journal: jAC, journalLib: "Journal des achats", num, date: d.date_depense, compte: cTvaDed, compteLib: "TVA deductible", piece, pieceDate: d.date_depense, lib, debit: tvaD, credit: 0, valid: d.date_depense });
+    push({ journal: jAC, journalLib: "Journal des achats", num, date: d.date_depense, compte: cFourn, compteLib: "Fournisseurs", auxNum: d.fournisseur ? `F${String(d.id).padStart(5, "0")}` : "", auxLib: d.fournisseur || "", piece, pieceDate: d.date_depense, lib, debit: 0, credit: ttc, valid: d.date_depense });
+    nbEcritures++;
+  }
+
+  // ---- 3) JOURNAL DE BANQUE (BQ) : encaissements (factures reglees) ----
+  const pays: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, datePaiement: factures.datePaiement,
+    totalTTC: factures.totalTTC, typeDocument: factures.typeDocument,
+    clientId: factures.clientId, clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, "payee" as any),
+      isNotNull(factures.datePaiement),
+      sql`DATE(${factures.datePaiement}) BETWEEN ${dStr} AND ${fStr}`,
+    ))
+    .orderBy(asc(factures.datePaiement), asc(factures.id));
+  for (const p of pays as any[]) {
+    num++;
+    const auxNum = `C${String(p.clientId).padStart(5, "0")}`;
+    const auxLib = `${p.clientPrenom || ""} ${p.clientNom || ""}`.trim() || `Client ${p.clientId}`;
+    const piece = p.numero || `F-${p.id}`;
+    // OPE-136 — un avoir rembourse est un decaissement (banque au credit) ; on inverse
+    // le sens en valeur absolue, jamais de montant negatif au FEC.
+    const isAvoir = p.typeDocument === "avoir" || Number(p.totalTTC || 0) < 0;
+    const lib = `${isAvoir ? "Remboursement" : "Reglement"} ${piece}`;
+    const ttc = Math.abs(Number(p.totalTTC || 0));
+    const lettre = `VL${p.id}`;
+    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cBanque, compteLib: "Banque", piece, pieceDate: p.datePaiement, lib, debit: isAvoir ? 0 : ttc, credit: isAvoir ? ttc : 0, valid: p.datePaiement });
+    push({ journal: jBQ, journalLib: "Journal de banque", num, date: p.datePaiement, compte: cClients, compteLib: "Clients", auxNum, auxLib, piece, pieceDate: p.datePaiement, lib, debit: isAvoir ? ttc : 0, credit: isAvoir ? 0 : ttc, lettre, dateLet: p.datePaiement, valid: p.datePaiement });
+    nbEcritures++;
+  }
+
+  // ---- Controles de conformite ----
+  const erreurs: string[] = [];
+  totalDebit = Math.round(totalDebit * 100) / 100;
+  totalCredit = Math.round(totalCredit * 100) / 100;
+  const ecart = Math.round((totalDebit - totalCredit) * 100) / 100;
+  const equilibre = Math.abs(ecart) < 0.01;
+  if (!equilibre) erreurs.push(`Desequilibre debit/credit : ${ecart.toFixed(2)} EUR`);
+  for (const cpt of Array.from(comptes)) {
+    if (!/^[0-9]{3,}$/.test(cpt)) erreurs.push(`Compte PCG invalide : "${cpt}"`);
+  }
+  if (lines.length <= 1) erreurs.push("Aucune ecriture sur la periode");
+
+  const conformite: FecConformite = {
+    nbEcritures, nbLignes: lines.length - 1, totalDebit, totalCredit, ecart, equilibre, erreurs,
+    comptesUtilises: Array.from(comptes).sort(),
+  };
+  return { content: lines.join("\n"), conformite };
+}
+
 export async function genererExportFEC(
   artisanId: number,
   dateDebut: Date,
@@ -5208,8 +6460,7 @@ export async function genererExportFEC(
   // FEC (Fichier des Ecritures Comptables, format reglementaire FR) :
   // 1 ligne d'entete + 1 ligne par ecriture comptable.
   // Source : factures payees + factures de la periode.
-  const pool = getPool();
-  if (!pool) return "";
+  const dbi = await getDb();
   const config = await getConfigurationComptable(artisanId);
   const compteVentes = config?.compteVentes || "706000";
   const compteTVA = config?.compteTVACollectee || "445710";
@@ -5218,18 +6469,18 @@ export async function genererExportFEC(
 
   const dStr = dateDebut.toISOString().slice(0, 10);
   const fStr = dateFin.toISOString().slice(0, 10);
-  const [factures]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.dateFacture, f.totalHT, f.totalTVA, f.totalTTC,
-            f.statut, f.datePaiement,
-            c.nom AS clientNom, c.prenom AS clientPrenom
-       FROM factures f
-       LEFT JOIN clients c ON c.id = f.clientId
-      WHERE f.artisanId = ?
-        AND f.dateFacture BETWEEN ? AND ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-      ORDER BY f.dateFacture ASC, f.id ASC`,
-    [artisanId, dStr, fStr]
-  );
+  const facts: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalHT: factures.totalHT, totalTVA: factures.totalTVA, totalTTC: factures.totalTTC,
+    statut: factures.statut, datePaiement: factures.datePaiement,
+    clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`${factures.dateFacture} BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .orderBy(asc(factures.dateFacture), asc(factures.id));
 
   // Entete FEC (18 colonnes obligatoires).
   const header = [
@@ -5241,7 +6492,7 @@ export async function genererExportFEC(
 
   const rows: string[] = [header];
   let ecritureNum = 1;
-  for (const f of factures as any[]) {
+  for (const f of facts) {
     const dateF = new Date(f.dateFacture).toISOString().slice(0, 10).replace(/-/g, "");
     const clientLib = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client #${f.id}`;
     const ttc = fecAmount(f.totalTTC);
@@ -5263,28 +6514,27 @@ export async function genererExportIIF(
 ): Promise<string> {
   // IIF (Intuit Interchange Format pour QuickBooks). Format ligne par
   // ligne avec sections !TRNS / !SPL / !ENDTRNS.
-  const pool = getPool();
-  if (!pool) return "";
+  const dbi = await getDb();
 
   const dStr = dateDebut.toISOString().slice(0, 10);
   const fStr = dateFin.toISOString().slice(0, 10);
-  const [factures]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.dateFacture, f.totalHT, f.totalTVA, f.totalTTC,
-            c.nom AS clientNom, c.prenom AS clientPrenom
-       FROM factures f
-       LEFT JOIN clients c ON c.id = f.clientId
-      WHERE f.artisanId = ?
-        AND f.dateFacture BETWEEN ? AND ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-      ORDER BY f.dateFacture ASC`,
-    [artisanId, dStr, fStr]
-  );
+  const facts: any[] = await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalHT: factures.totalHT, totalTVA: factures.totalTVA, totalTTC: factures.totalTTC,
+    clientNom: clients.nom, clientPrenom: clients.prenom,
+  }).from(factures).leftJoin(clients, eq(clients.id, factures.clientId))
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      sql`${factures.dateFacture} BETWEEN ${dStr} AND ${fStr}`,
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+    ))
+    .orderBy(asc(factures.dateFacture));
 
   const lines: string[] = [];
   lines.push("!TRNS\tTRNSID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO");
   lines.push("!SPL\tSPLID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO");
   lines.push("!ENDTRNS");
-  for (const f of factures as any[]) {
+  for (const f of facts) {
     const dateF = new Date(f.dateFacture).toLocaleDateString("en-US");
     const client = `${f.clientPrenom || ""} ${f.clientNom || ""}`.trim() || `Client #${f.id}`;
     const ttc = Number(f.totalTTC).toFixed(2);
@@ -5300,24 +6550,27 @@ export async function genererExportIIF(
 
 // Items en attente de sync (factures non encore exportees vers le logiciel).
 export async function getPendingItemsComptables(artisanId: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const [rows]: any = await pool.execute(
-    `SELECT f.id, f.numero, f.dateFacture, f.totalTTC, f.statut
-       FROM factures f
-      WHERE f.artisanId = ?
-        AND f.statut IN ('validee','envoyee','payee','en_retard')
-        AND NOT EXISTS (
-          SELECT 1 FROM exports_comptables e
-           WHERE e.artisanId = f.artisanId
-             AND e.statut = 'termine'
-             AND f.dateFacture BETWEEN e.periodeDebut AND e.periodeFin
-        )
-      ORDER BY f.dateFacture DESC
-      LIMIT 200`,
-    [artisanId]
-  );
-  return (rows as any[]) || [];
+  const dbi = await getDb();
+  // Factures de l'artisan non couvertes par un export 'termine' chevauchant leur date.
+  // NOT EXISTS corrélé porté en Drizzle (la corrélation f.dateFacture BETWEEN
+  // e.periodeDebut AND e.periodeFin reste en sql brut, neutre dialecte).
+  return await dbi.select({
+    id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture,
+    totalTTC: factures.totalTTC, statut: factures.statut,
+  }).from(factures)
+    .where(and(
+      eq(factures.artisanId, artisanId),
+      inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"] as any),
+      notExists(
+        dbi.select({ x: sql`1` }).from(exportsComptables).where(and(
+          eq(exportsComptables.artisanId, factures.artisanId),
+          eq(exportsComptables.statut, "termine" as any),
+          sql`${factures.dateFacture} BETWEEN ${exportsComptables.periodeDebut} AND ${exportsComptables.periodeFin}`,
+        )),
+      ),
+    ))
+    .orderBy(desc(factures.dateFacture))
+    .limit(200);
 }
 
 export async function getSyncLogsComptables(artisanId: number): Promise<ExportComptable[]> {
@@ -5348,14 +6601,10 @@ export async function lancerSynchronisationComptable(
     nombreEcritures: items.length,
     statut: "termine",
   });
-  // Met a jour derniereSync.
-  const pool = getPool();
-  if (pool) {
-    await pool.execute(
-      `UPDATE configurations_comptables SET derniereSync = NOW() WHERE artisanId = ?`,
-      [artisanId]
-    );
-  }
+  // Met a jour derniereSync (NOW() -> Date JS).
+  const dbi = await getDb();
+  await dbi.update(configurationsComptables).set({ derniereSync: new Date() })
+    .where(eq(configurationsComptables.artisanId, artisanId));
   return { success: true, nbItems: items.length, message: `${items.length} ecritures synchronisees` };
 }
 
@@ -5373,23 +6622,27 @@ export async function retrySyncItem(exportId: number): Promise<ExportComptable |
 export async function savePushSubscription(
   data: InsertPushSubscription
 ): Promise<PushSubscription | undefined> {
-  // Upsert sur (technicienId, endpoint) : reactive ou recree.
-  const pool = getPool();
-  if (!pool) return undefined;
-  await pool.execute(
-    `INSERT INTO push_subscriptions
-       (technicienId, endpoint, p256dh, auth, userAgent, actif)
-     VALUES (?, ?, ?, ?, ?, TRUE)
-     ON DUPLICATE KEY UPDATE p256dh = VALUES(p256dh),
-                             auth = VALUES(auth),
-                             userAgent = VALUES(userAgent),
-                             actif = TRUE,
-                             updatedAt = CURRENT_TIMESTAMP`,
-    [data.technicienId, data.endpoint, data.p256dh, data.auth, data.userAgent || null]
-  );
+  // Upsert sur (technicienId, endpoint) : reactive ou recree — check-then-act neutre dialecte.
+  // NB OPE-184 : `push_subscriptions` n'a PAS de clé unique (seul `id` PK, vérifié base live)
+  // → l'ancien `ON DUPLICATE KEY UPDATE` ne déclenchait jamais l'update en mysql (bug latent :
+  // ré-abonnement = doublon de subscription). Le check-then-act rend l'upsert réellement idempotent.
+  // `actif` est forcé à TRUE (réactivation) ; `updatedAt` géré par $onUpdate.
   const dbi = await getDb();
+  const existing = await dbi.select({ id: pushSubscriptions.id }).from(pushSubscriptions)
+    .where(and(eq(pushSubscriptions.technicienId, data.technicienId), eq(pushSubscriptions.endpoint, data.endpoint)))
+    .limit(1);
+  if (existing[0]) {
+    await dbi.update(pushSubscriptions).set({
+      p256dh: data.p256dh, auth: data.auth, userAgent: data.userAgent || null, actif: true,
+    }).where(eq(pushSubscriptions.id, existing[0].id));
+  } else {
+    await dbi.insert(pushSubscriptions).values({
+      technicienId: data.technicienId, endpoint: data.endpoint, p256dh: data.p256dh,
+      auth: data.auth, userAgent: data.userAgent || null, actif: true,
+    });
+  }
   const r = await dbi.select().from(pushSubscriptions)
-    .where(and(eq(pushSubscriptions.technicienId, data.technicienId)))
+    .where(and(eq(pushSubscriptions.technicienId, data.technicienId), eq(pushSubscriptions.endpoint, data.endpoint)))
     .orderBy(desc(pushSubscriptions.id)).limit(1);
   return r[0];
 }
@@ -5401,6 +6654,13 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
   await dbi.update(pushSubscriptions)
     .set({ actif: false })
     .where(eq(pushSubscriptions.endpoint, endpoint));
+}
+
+export async function getPushSubscriptionByEndpoint(endpoint: string): Promise<PushSubscription | undefined> {
+  const dbi = await getDb();
+  if (!dbi) return undefined;
+  const r = await dbi.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)).limit(1);
+  return r[0];
 }
 
 export async function getPreferencesNotifications(
@@ -5449,6 +6709,13 @@ export async function getHistoriqueNotificationsPush(
     .limit(limit);
 }
 
+export async function getHistoriqueNotificationPushById(id: number): Promise<HistoriqueNotificationPush | undefined> {
+  const dbi = await getDb();
+  if (!dbi) return undefined;
+  const r = await dbi.select().from(historiqueNotificationsPush).where(eq(historiqueNotificationsPush.id, id)).limit(1);
+  return r[0];
+}
+
 export async function markNotificationPushAsRead(id: number): Promise<void> {
   const dbi = await getDb();
   await dbi.update(historiqueNotificationsPush)
@@ -5469,22 +6736,33 @@ export async function getConfigAlertePrevision(
   return r[0];
 }
 
+// Colonnes autorisées de config_alertes_previsions — whitelist explicite (noms
+// interpolés en SQL brut). Cf. audit injection SQL 2026-06-13.
+const CONFIG_ALERTE_COLS = new Set([
+  "artisanId", "seuilAlertePositif", "seuilAlerteNegatif", "alerteEmail",
+  "alerteSms", "emailDestination", "telephoneDestination", "frequenceVerification",
+  "actif",
+]);
+
 export async function saveConfigAlertePrevision(
   data: InsertConfigAlertePrevision
 ): Promise<ConfigAlertePrevision | undefined> {
-  // Upsert sur artisanId (cle unique dans le schema).
-  const pool = getPool();
-  if (!pool) return undefined;
-  const keys = Object.keys(data);
-  const cols = keys.join(", ");
-  const placeholders = keys.map(() => "?").join(", ");
-  const updates = keys.filter((k) => k !== "artisanId").map((k) => `${k} = VALUES(${k})`).join(", ");
-  const values = keys.map((k) => (data as any)[k]);
-  await pool.execute(
-    `INSERT INTO config_alertes_previsions (${cols}) VALUES (${placeholders})
-     ON DUPLICATE KEY UPDATE ${updates || "updatedAt = CURRENT_TIMESTAMP"}`,
-    values
-  );
+  // Upsert sur artisanId (clé unique) : select-puis-insert/update neutre dialecte.
+  // Whitelist CONFIG_ALERTE_COLS conservée (defense-in-depth audit injection SQL).
+  const dbi = await getDb();
+  const filtered: Record<string, any> = {};
+  for (const k of Object.keys(data)) if (CONFIG_ALERTE_COLS.has(k)) filtered[k] = (data as any)[k];
+  const existing = await dbi.select({ id: configAlertesPrevisions.id }).from(configAlertesPrevisions)
+    .where(eq(configAlertesPrevisions.artisanId, data.artisanId)).limit(1);
+  if (existing[0]) {
+    const { artisanId: _aid, ...updates } = filtered;
+    if (Object.keys(updates).length > 0) {
+      await dbi.update(configAlertesPrevisions).set(updates)
+        .where(eq(configAlertesPrevisions.artisanId, data.artisanId));
+    }
+  } else {
+    await dbi.insert(configAlertesPrevisions).values(filtered as any);
+  }
   return getConfigAlertePrevision(data.artisanId);
 }
 
@@ -5525,19 +6803,16 @@ export async function verifierEcartsEtEnvoyerAlertes(
   const caPrev = Number(prev.caPrevisionnel || 0);
   if (caPrev <= 0) return [];
 
-  // CA realise pour le mois (factures payees).
-  const pool = getPool();
-  if (!pool) return [];
+  // CA realise pour le mois (factures payees). dateFacture timestamp → sql BETWEEN brut.
   const debutMois = new Date(annee, mois - 1, 1).toISOString().slice(0, 10);
   const finMois = new Date(annee, mois, 0).toISOString().slice(0, 10);
-  const [rRows]: any = await pool.execute(
-    `SELECT COALESCE(SUM(totalTTC), 0) AS ca
-       FROM factures
-      WHERE artisanId = ? AND statut = 'payee'
-        AND dateFacture BETWEEN ? AND ?`,
-    [artisanId, debutMois, finMois]
-  );
-  const caReel = Number(rRows[0]?.ca || 0);
+  const [rRow] = await dbi.select({ ca: sql<string>`COALESCE(SUM(${factures.totalTTC}), 0)` })
+    .from(factures).where(and(
+      eq(factures.artisanId, artisanId),
+      eq(factures.statut, "payee" as any),
+      sql`${factures.dateFacture} BETWEEN ${debutMois} AND ${finMois}`,
+    ));
+  const caReel = Number(rRow?.ca || 0);
 
   // Calcul ecart en %.
   const ecart = ((caReel - caPrev) / caPrev) * 100;
@@ -5552,13 +6827,14 @@ export async function verifierEcartsEtEnvoyerAlertes(
 
   // Verifier si une alerte du meme type a deja ete envoyee ce mois pour
   // eviter le spam.
-  const [existsRows]: any = await pool.execute(
-    `SELECT id FROM historique_alertes_previsions
-      WHERE artisanId = ? AND mois = ? AND annee = ? AND typeAlerte = ?
-      LIMIT 1`,
-    [artisanId, mois, annee, typeAlerte]
-  );
-  if ((existsRows as any[]).length > 0) return [];
+  const existsRows = await dbi.select({ id: historiqueAlertesPrevisions.id }).from(historiqueAlertesPrevisions)
+    .where(and(
+      eq(historiqueAlertesPrevisions.artisanId, artisanId),
+      eq(historiqueAlertesPrevisions.mois, mois),
+      eq(historiqueAlertesPrevisions.annee, annee),
+      eq(historiqueAlertesPrevisions.typeAlerte, typeAlerte as any),
+    )).limit(1);
+  if (existsRows.length > 0) return [];
 
   const canal: "email" | "sms" | "les_deux" =
     config.alerteEmail && config.alerteSms ? "les_deux" :
@@ -5596,26 +6872,20 @@ export async function verifierEcartsEtEnvoyerAlertes(
 // ============================================================================
 
 export async function getNextDepenseNumero(artisanId: number): Promise<string> {
-  const pool = getPool();
-  if (!pool) return "DEP-00001";
-  const [rows]: any = await pool.execute(
-    "SELECT numero FROM depenses WHERE artisan_id = ? ORDER BY id DESC LIMIT 1",
-    [artisanId]
-  );
-  const last = (rows as any[])[0]?.numero || "";
+  const db = await getDb();
+  const [row] = await db.select({ numero: depenses.numero }).from(depenses)
+    .where(eq(depenses.artisan_id, artisanId)).orderBy(desc(depenses.id)).limit(1);
+  const last = row?.numero || "";
   const m = last.match(/-(\d+)$/);
   const n = m ? parseInt(m[1], 10) + 1 : 1;
   return `DEP-${String(n).padStart(5, "0")}`;
 }
 
 export async function getNextNoteFraisNumero(artisanId: number): Promise<string> {
-  const pool = getPool();
-  if (!pool) return "NDF-00001";
-  const [rows]: any = await pool.execute(
-    "SELECT numero FROM notes_de_frais WHERE artisan_id = ? ORDER BY id DESC LIMIT 1",
-    [artisanId]
-  );
-  const last = (rows as any[])[0]?.numero || "";
+  const db = await getDb();
+  const [row] = await db.select({ numero: notesDeFrais.numero }).from(notesDeFrais)
+    .where(eq(notesDeFrais.artisan_id, artisanId)).orderBy(desc(notesDeFrais.id)).limit(1);
+  const last = row?.numero || "";
   const m = last.match(/-(\d+)$/);
   const n = m ? parseInt(m[1], 10) + 1 : 1;
   return `NDF-${String(n).padStart(5, "0")}`;
@@ -5635,36 +6905,52 @@ export async function getDepensesByArtisan(
   artisanId: number,
   filters: DepenseFilters = {}
 ): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const conds: string[] = ["artisan_id = ?"];
-  const params: any[] = [artisanId];
-  if (filters.categorie) { conds.push("categorie = ?"); params.push(filters.categorie); }
-  if (filters.statut) { conds.push("statut = ?"); params.push(filters.statut); }
-  if (filters.dateDebut) { conds.push("date_depense >= ?"); params.push(filters.dateDebut); }
-  if (filters.dateFin) { conds.push("date_depense <= ?"); params.push(filters.dateFin); }
-  if (filters.userId) { conds.push("user_id = ?"); params.push(filters.userId); }
-  if (filters.clientId) { conds.push("client_id = ?"); params.push(filters.clientId); }
+  const db = await getDb();
+  const conds: any[] = [eq(depenses.artisan_id, artisanId)];
+  if (filters.categorie) conds.push(eq(depenses.categorie, filters.categorie));
+  if (filters.statut) conds.push(eq(depenses.statut, filters.statut as any));
+  if (filters.dateDebut) conds.push(gte(depenses.date_depense, filters.dateDebut));
+  if (filters.dateFin) conds.push(lte(depenses.date_depense, filters.dateFin));
+  if (filters.userId) conds.push(eq(depenses.user_id, filters.userId));
+  if (filters.clientId) conds.push(eq(depenses.client_id, filters.clientId));
   if (filters.search) {
-    conds.push("(fournisseur LIKE ? OR description LIKE ? OR numero LIKE ?)");
     const q = `%${filters.search}%`;
-    params.push(q, q, q);
+    conds.push(or(like(depenses.fournisseur, q), like(depenses.description, q), like(depenses.numero, q)));
   }
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM depenses WHERE ${conds.join(" AND ")} ORDER BY date_depense DESC, id DESC LIMIT 500`,
-    params
-  );
-  return rows as any[];
+  return await db.select().from(depenses).where(and(...conds))
+    .orderBy(desc(depenses.date_depense), desc(depenses.id)).limit(500);
 }
 
 export async function getDepenseById(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [rows]: any = await pool.execute(
-    "SELECT * FROM depenses WHERE id = ? AND artisan_id = ? LIMIT 1",
-    [id, artisanId]
-  );
-  return (rows as any[])[0] || null;
+  const db = await getDb();
+  const [row] = await db.select().from(depenses)
+    .where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId))).limit(1);
+  return row || null;
+}
+
+// OPE-99 — détection de doublon probable d'une dépense (anti double-remboursement /
+// double déduction TVA). Avertissement NON bloquant : on retourne les dépenses du même
+// tenant qui partagent montant TTC + date + fournisseur (triplet retenu par Odoo
+// hr_expense.duplicate_expense_ids). `excludeId` permet d'ignorer la dépense en cours
+// d'édition. Toujours scopé `artisan_id` (jamais cross-tenant).
+export async function findDepensesDoublons(
+  artisanId: number,
+  params: { montantTtc: number; dateDepense: string; fournisseur?: string | null; excludeId?: number },
+): Promise<any[]> {
+  const db = await getDb();
+  const conds: any[] = [
+    eq(depenses.artisan_id, artisanId),
+    sql`ABS(${depenses.montant_ttc} - ${params.montantTtc}) < 0.01`,
+    eq(depenses.date_depense, params.dateDepense),
+    sql`COALESCE(${depenses.fournisseur}, '') = COALESCE(${params.fournisseur ?? ''}, '')`,
+  ];
+  if (params.excludeId) conds.push(ne(depenses.id, params.excludeId));
+  return await db.select({
+    id: depenses.id, numero: depenses.numero, montantTtc: depenses.montant_ttc,
+    dateDepense: depenses.date_depense, fournisseur: depenses.fournisseur,
+    description: depenses.description, statut: depenses.statut,
+  }).from(depenses).where(and(...conds))
+    .orderBy(desc(depenses.date_depense), desc(depenses.id)).limit(10);
 }
 
 export async function createDepense(data: {
@@ -5691,38 +6977,37 @@ export async function createDepense(data: {
   justificatifNom?: string | null;
   tvaDeductible?: boolean;
 }): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT INTO depenses
-       (artisan_id, user_id, numero, date_depense, fournisseur, categorie,
-        sous_categorie, description, montant_ht, taux_tva, montant_tva,
-        montant_ttc, mode_paiement, statut, remboursable, chantier_id,
-        intervention_id, client_id, notes, justificatif_url,
-        justificatif_nom, tva_deductible)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.artisanId, data.userId, data.numero, data.dateDepense,
-      data.fournisseur || null, data.categorie, data.sousCategorie || null,
-      data.description || null, data.montantHt, data.tauxTva, data.montantTva,
-      data.montantTtc, data.modePaiement || "carte", data.statut || "brouillon",
-      data.remboursable ?? true, data.chantierId || null,
-      data.interventionId || null, data.clientId || null, data.notes || null,
-      data.justificatifUrl || null, data.justificatifNom || null,
-      data.tvaDeductible ?? true,
-    ]
-  );
-  if (!r?.insertId) return null;
-  return getDepenseById(r.insertId, data.artisanId);
+  const db = await getDb();
+  const newId = await insertReturningId(depenses, {
+    artisan_id: data.artisanId, user_id: data.userId, numero: data.numero,
+    date_depense: data.dateDepense, fournisseur: data.fournisseur || null,
+    categorie: data.categorie, sous_categorie: data.sousCategorie || null,
+    description: data.description || null,
+    montant_ht: String(data.montantHt), taux_tva: String(data.tauxTva),
+    montant_tva: String(data.montantTva), montant_ttc: String(data.montantTtc),
+    mode_paiement: (data.modePaiement || "carte") as any, statut: (data.statut || "brouillon") as any,
+    remboursable: data.remboursable ?? true, chantier_id: data.chantierId || null,
+    intervention_id: data.interventionId || null, client_id: data.clientId || null,
+    notes: data.notes || null, justificatif_url: data.justificatifUrl || null,
+    justificatif_nom: data.justificatifNom || null, tva_deductible: data.tvaDeductible ?? true,
+  });
+  if (!newId) return null;
+  return getDepenseById(newId, data.artisanId);
 }
 
 const DEPENSE_FIELD_MAP: Record<string, string> = {
   dateDepense: "date_depense", fournisseur: "fournisseur", categorie: "categorie",
   sousCategorie: "sous_categorie", description: "description",
   montantHt: "montant_ht", tauxTva: "taux_tva", montantTva: "montant_tva",
-  montantTtc: "montant_ttc", modePaiement: "mode_paiement", statut: "statut",
-  remboursable: "remboursable", rembourse: "rembourse",
-  dateRemboursement: "date_remboursement", chantierId: "chantier_id",
+  montantTtc: "montant_ttc", modePaiement: "mode_paiement",
+  // OPE-63 — `statut`/`rembourse`/`dateRemboursement` VOLONTAIREMENT hors map : les
+  // transitions d'état de remboursement sont réservées au circuit contrôlé des notes de
+  // frais (addDepenseToNoteFrais / approuverNoteFrais / payerNoteFrais, en SQL direct).
+  // Les laisser ici permettait à un collaborateur de s'auto-rembourser via le `update`
+  // générique (depenses.update accepte un objet libre) en contournant tout approbateur.
+  // `remboursable` (classification « éligible au remboursement ») reste éditable.
+  remboursable: "remboursable",
+  chantierId: "chantier_id",
   interventionId: "intervention_id", clientId: "client_id", notes: "notes",
   justificatifUrl: "justificatif_url", justificatifNom: "justificatif_nom",
   ocrBrut: "ocr_brut", ocrTraite: "ocr_traite",
@@ -5735,63 +7020,55 @@ export async function updateDepense(
   artisanId: number,
   data: Record<string, any>
 ): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const sets: string[] = [];
-  const vals: any[] = [];
+  const db = await getDb();
+  const numericCols = new Set(["montant_ht", "taux_tva", "montant_tva", "montant_ttc"]);
+  const sets: any = {};
   for (const [key, val] of Object.entries(data)) {
     const col = DEPENSE_FIELD_MAP[key];
-    if (!col) continue;
-    sets.push(`${col} = ?`);
-    vals.push(val);
+    if (!col) continue; // whitelist OPE-63 préservée
+    sets[col] = (numericCols.has(col) && val != null) ? String(val) : val;
   }
-  if (sets.length > 0) {
-    // Recalcul TVA/TTC si HT ou taux changent.
-    vals.push(id, artisanId);
-    await pool.execute(
-      `UPDATE depenses SET ${sets.join(", ")} WHERE id = ? AND artisan_id = ?`,
-      vals
-    );
+  if (Object.keys(sets).length > 0) {
+    await db.update(depenses).set(sets).where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
   }
-  // Recalcul TVA/TTC si montant_ht ou taux_tva ont change.
-  if ("montantHt" in data || "tauxTva" in data) {
+  // Recalcul TVA/TTC dès qu'un champ monétaire est touché (OPE-252) : la TVA et le
+  // TTC sont TOUJOURS dérivés du HT + taux (le formulaire est HT-first), donc on ne
+  // peut pas persister un montant_tva/montant_ttc incohérent avec le HT (qui
+  // corromprait FEC/CA3). Behavior-preserving : le front envoie HT+taux → recalcul
+  // déjà déclenché ; on ajoute juste le cas « TTC/TVA seul » (forgé) pour le corriger.
+  if ("montantHt" in data || "tauxTva" in data || "montantTva" in data || "montantTtc" in data) {
     const dep = await getDepenseById(id, artisanId);
     if (dep) {
       const ht = Number(dep.montant_ht || 0);
       const tx = Number(dep.taux_tva || 0);
       const tva = +(ht * tx / 100).toFixed(2);
       const ttc = +(ht + tva).toFixed(2);
-      await pool.execute(
-        `UPDATE depenses SET montant_tva = ?, montant_ttc = ? WHERE id = ? AND artisan_id = ?`,
-        [tva, ttc, id, artisanId]
-      );
+      await db.update(depenses).set({ montant_tva: String(tva), montant_ttc: String(ttc) })
+        .where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
     }
   }
   return getDepenseById(id, artisanId);
 }
 
 export async function deleteDepense(id: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(`DELETE FROM notes_frais_depenses WHERE depense_id = ?`, [id]);
-  await pool.execute(`DELETE FROM depenses WHERE id = ? AND artisan_id = ?`, [id, artisanId]);
+  const db = await getDb();
+  await db.delete(notesFraisDepenses).where(eq(notesFraisDepenses.depense_id, id));
+  await db.delete(depenses).where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
 }
 
-export async function markDepenseOcrTraite(id: number, ocrData: any): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `UPDATE depenses SET ocr_brut = ?, ocr_traite = TRUE WHERE id = ?`,
-    [JSON.stringify(ocrData || {}).slice(0, 5000), id]
-  );
+export async function markDepenseOcrTraite(id: number, artisanId: number, ocrData: any): Promise<void> {
+  const db = await getDb();
+  // OPE-91 : scope par artisan_id pour éviter l'écriture cross-tenant.
+  await db.update(depenses)
+    .set({ ocr_brut: JSON.stringify(ocrData || {}).slice(0, 5000), ocr_traite: true })
+    .where(and(eq(depenses.id, id), eq(depenses.artisan_id, artisanId)));
 }
 
 export async function getDepensesStats(
   artisanId: number,
   mois?: string
 ): Promise<any> {
-  const pool = getPool();
-  if (!pool) return null;
+  const db = await getDb();
   const m = mois || new Date().toISOString().slice(0, 7);
   const debutMois = `${m}-01`;
   const [y, mo] = m.split("-").map(Number);
@@ -5801,75 +7078,75 @@ export async function getDepensesStats(
   const finPrec = new Date(y, mo - 1, 0).toISOString().slice(0, 10);
   const anneeDebut = `${y}-01-01`;
   const anneeFin = `${y}-12-31`;
+  // 5 mois avant debutMois (remplace DATE_SUB(?, INTERVAL 5 MONTH)).
+  const cinqMoisAvant = new Date(y, (mo - 1) - 5, 1).toISOString().slice(0, 10);
 
-  const [totMois]: any = await pool.execute(
-    `SELECT COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb,
-            COALESCE(SUM(CASE WHEN remboursable = TRUE AND rembourse = FALSE THEN montant_ttc ELSE 0 END), 0) AS aRembourser,
-            COALESCE(SUM(CASE WHEN tva_deductible = TRUE THEN montant_tva ELSE 0 END), 0) AS tvaRecup
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
-    [artisanId, debutMois, finMois]
-  );
-  const [totPrec]: any = await pool.execute(
-    `SELECT COALESCE(SUM(montant_ttc), 0) AS total
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
-    [artisanId, debutPrec, finPrec]
-  );
-  const [totAnnee]: any = await pool.execute(
-    `SELECT COALESCE(SUM(montant_ttc), 0) AS total
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?`,
-    [artisanId, anneeDebut, anneeFin]
-  );
-  const [parCategorie]: any = await pool.execute(
-    `SELECT categorie, COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-      GROUP BY categorie
-      ORDER BY total DESC`,
-    [artisanId, debutMois, finMois]
-  );
-  const [topDepenses]: any = await pool.execute(
-    `SELECT id, numero, fournisseur, categorie, montant_ttc, date_depense
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-      ORDER BY montant_ttc DESC
-      LIMIT 5`,
-    [artisanId, debutMois, finMois]
-  );
-  const [topFournisseurs]: any = await pool.execute(
-    `SELECT fournisseur, COALESCE(SUM(montant_ttc), 0) AS total, COUNT(*) AS nb
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ? AND fournisseur IS NOT NULL AND fournisseur <> ''
-      GROUP BY fournisseur
-      ORDER BY total DESC
-      LIMIT 3`,
-    [artisanId, debutMois, finMois]
-  );
-  const [parMois]: any = await pool.execute(
-    `SELECT DATE_FORMAT(date_depense, '%Y-%m') AS mois,
-            COALESCE(SUM(montant_ttc), 0) AS total
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense >= DATE_SUB(?, INTERVAL 5 MONTH)
-      GROUP BY DATE_FORMAT(date_depense, '%Y-%m')
-      ORDER BY mois ASC`,
-    [artisanId, debutMois]
-  );
+  const sumTtcEntre = (d1: string, d2: string) =>
+    db.select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+      .from(depenses)
+      .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, d1, d2)));
 
-  const totalM = Number(totMois[0]?.total || 0);
-  const totalP = Number(totPrec[0]?.total || 0);
+  const [totMois] = await db.select({
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+    nb: sql<number>`COUNT(*)`,
+    aRembourser: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.remboursable} = TRUE AND ${depenses.rembourse} = FALSE THEN ${depenses.montant_ttc} ELSE 0 END), 0)`,
+    tvaRecup: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.tva_deductible} = TRUE THEN ${depenses.montant_tva} ELSE 0 END), 0)`,
+  }).from(depenses).where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)));
+
+  const [totPrec] = await sumTtcEntre(debutPrec, finPrec);
+  const [totAnnee] = await sumTtcEntre(anneeDebut, anneeFin);
+
+  const parCategorie = await db.select({
+    categorie: depenses.categorie,
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+    nb: sql<number>`COUNT(*)`,
+  }).from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)))
+    .groupBy(depenses.categorie)
+    .orderBy(desc(sql`COALESCE(SUM(${depenses.montant_ttc}), 0)`));
+
+  const topDepenses = await db.select({
+    id: depenses.id, numero: depenses.numero, fournisseur: depenses.fournisseur,
+    categorie: depenses.categorie, montant_ttc: depenses.montant_ttc, date_depense: depenses.date_depense,
+  }).from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)))
+    .orderBy(desc(depenses.montant_ttc)).limit(5);
+
+  const topFournisseurs = await db.select({
+    fournisseur: depenses.fournisseur,
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+    nb: sql<number>`COUNT(*)`,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, debutMois, finMois),
+      isNotNull(depenses.fournisseur),
+      ne(depenses.fournisseur, ""),
+    ))
+    .groupBy(depenses.fournisseur)
+    .orderBy(desc(sql`COALESCE(SUM(${depenses.montant_ttc}), 0)`)).limit(3);
+
+  const parMois = await db.select({
+    mois: sql<string>`to_char(${depenses.date_depense}, 'YYYY-MM')`,
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+  }).from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), gte(depenses.date_depense, cinqMoisAvant)))
+    .groupBy(sql`to_char(${depenses.date_depense}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${depenses.date_depense}, 'YYYY-MM') ASC`);
+
+  const totalM = Number(totMois?.total || 0);
+  const totalP = Number(totPrec?.total || 0);
   const variation = totalP > 0 ? ((totalM - totalP) / totalP) * 100 : null;
 
   return {
     mois: m,
     totalMois: totalM,
-    nbDepensesMois: Number(totMois[0]?.nb || 0),
-    aRembourser: Number(totMois[0]?.aRembourser || 0),
-    tvaRecuperable: Number(totMois[0]?.tvaRecup || 0),
+    nbDepensesMois: Number(totMois?.nb || 0),
+    aRembourser: Number(totMois?.aRembourser || 0),
+    tvaRecuperable: Number(totMois?.tvaRecup || 0),
     totalMoisPrecedent: totalP,
     variation,
-    totalAnnee: Number(totAnnee[0]?.total || 0),
+    totalAnnee: Number(totAnnee?.total || 0),
     parCategorie: parCategorie as any[],
     topDepenses: topDepenses as any[],
     topFournisseurs: topFournisseurs as any[],
@@ -5880,13 +7157,10 @@ export async function getDepensesStats(
 // === Catégories ===
 
 export async function getCategoriesDepenses(artisanId: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM categories_depenses WHERE artisan_id = ? AND actif = TRUE ORDER BY ordre ASC, id ASC`,
-    [artisanId]
-  );
-  return rows as any[];
+  const db = await getDb();
+  return await db.select().from(categoriesDepenses)
+    .where(and(eq(categoriesDepenses.artisan_id, artisanId), eq(categoriesDepenses.actif, true)))
+    .orderBy(asc(categoriesDepenses.ordre), asc(categoriesDepenses.id));
 }
 
 export async function createCategorieDepense(data: {
@@ -5897,20 +7171,22 @@ export async function createCategorieDepense(data: {
   compteComptable?: string;
   plafondMensuel?: number;
 }): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT IGNORE INTO categories_depenses
-       (artisan_id, nom, couleur, icone, compte_comptable, plafond_mensuel)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [data.artisanId, data.nom, data.couleur || "#6366f1", data.icone || "Receipt",
-     data.compteComptable || null, data.plafondMensuel || null]
-  );
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM categories_depenses WHERE artisan_id = ? AND nom = ? LIMIT 1`,
-    [data.artisanId, data.nom]
-  );
-  return (rows as any[])[0] || null;
+  const db = await getDb();
+  // INSERT IGNORE (unique artisan_id+nom) → select-puis-insert, dialect-neutre.
+  const existing = await db.select().from(categoriesDepenses)
+    .where(and(eq(categoriesDepenses.artisan_id, data.artisanId), eq(categoriesDepenses.nom, data.nom))).limit(1);
+  if (existing[0]) return existing[0];
+  await db.insert(categoriesDepenses).values({
+    artisan_id: data.artisanId,
+    nom: data.nom,
+    couleur: data.couleur || "#6366f1",
+    icone: data.icone || "Receipt",
+    compte_comptable: data.compteComptable ?? null,
+    plafond_mensuel: data.plafondMensuel != null ? String(data.plafondMensuel) : null,
+  });
+  const [row] = await db.select().from(categoriesDepenses)
+    .where(and(eq(categoriesDepenses.artisan_id, data.artisanId), eq(categoriesDepenses.nom, data.nom))).limit(1);
+  return row || null;
 }
 
 export async function updateCategorieDepense(
@@ -5918,69 +7194,47 @@ export async function updateCategorieDepense(
   artisanId: number,
   data: { nom?: string; couleur?: string; icone?: string; compteComptable?: string; plafondMensuel?: number; actif?: boolean }
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  const sets: string[] = [];
-  const vals: any[] = [];
-  if (data.nom !== undefined) { sets.push("nom = ?"); vals.push(data.nom); }
-  if (data.couleur !== undefined) { sets.push("couleur = ?"); vals.push(data.couleur); }
-  if (data.icone !== undefined) { sets.push("icone = ?"); vals.push(data.icone); }
-  if (data.compteComptable !== undefined) { sets.push("compte_comptable = ?"); vals.push(data.compteComptable); }
-  if (data.plafondMensuel !== undefined) { sets.push("plafond_mensuel = ?"); vals.push(data.plafondMensuel); }
-  if (data.actif !== undefined) { sets.push("actif = ?"); vals.push(data.actif); }
-  if (sets.length === 0) return;
-  vals.push(id, artisanId);
-  await pool.execute(
-    `UPDATE categories_depenses SET ${sets.join(", ")} WHERE id = ? AND artisan_id = ?`,
-    vals
-  );
+  const db = await getDb();
+  const sets: any = {};
+  if (data.nom !== undefined) sets.nom = data.nom;
+  if (data.couleur !== undefined) sets.couleur = data.couleur;
+  if (data.icone !== undefined) sets.icone = data.icone;
+  if (data.compteComptable !== undefined) sets.compte_comptable = data.compteComptable;
+  if (data.plafondMensuel !== undefined) sets.plafond_mensuel = data.plafondMensuel != null ? String(data.plafondMensuel) : null;
+  if (data.actif !== undefined) sets.actif = data.actif;
+  if (Object.keys(sets).length === 0) return;
+  await db.update(categoriesDepenses).set(sets)
+    .where(and(eq(categoriesDepenses.id, id), eq(categoriesDepenses.artisan_id, artisanId)));
 }
 
 export async function deleteCategorieDepense(id: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
+  const db = await getDb();
   // Soft-delete : marque actif=FALSE pour preserver l'historique des depenses.
-  await pool.execute(
-    `UPDATE categories_depenses SET actif = FALSE WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
+  await db.update(categoriesDepenses).set({ actif: false })
+    .where(and(eq(categoriesDepenses.id, id), eq(categoriesDepenses.artisan_id, artisanId)));
 }
 
 // === Notes de frais ===
 
 export async function getNotesFrais(artisanId: number, userId?: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const conds = ["artisan_id = ?"];
-  const params: any[] = [artisanId];
-  if (userId) { conds.push("user_id = ?"); params.push(userId); }
-  const [rows]: any = await pool.execute(
-    `SELECT n.*,
-            (SELECT COUNT(*) FROM notes_frais_depenses WHERE note_id = n.id) AS nb_depenses
-       FROM notes_de_frais n
-      WHERE ${conds.join(" AND ")}
-      ORDER BY n.created_at DESC`,
-    params
-  );
-  return rows as any[];
+  const db = await getDb();
+  const conds: any[] = [eq(notesDeFrais.artisan_id, artisanId)];
+  if (userId) conds.push(eq(notesDeFrais.user_id, userId));
+  return await db.select({
+    ...getTableColumns(notesDeFrais),
+    nb_depenses: sql<number>`(SELECT COUNT(*) FROM ${notesFraisDepenses} WHERE ${notesFraisDepenses.note_id} = ${notesDeFrais.id})`,
+  }).from(notesDeFrais).where(and(...conds)).orderBy(desc(notesDeFrais.created_at));
 }
 
 export async function getNoteFraisById(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM notes_de_frais WHERE id = ? AND artisan_id = ? LIMIT 1`,
-    [id, artisanId]
-  );
-  const note = (rows as any[])[0];
+  const db = await getDb();
+  const [note] = await db.select().from(notesDeFrais)
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId))).limit(1);
   if (!note) return null;
-  const [deps]: any = await pool.execute(
-    `SELECT d.* FROM depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-      WHERE nfd.note_id = ?
-      ORDER BY d.date_depense DESC`,
-    [id]
-  );
+  const deps = await db.select(getTableColumns(depenses)).from(depenses)
+    .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
+    .where(eq(notesFraisDepenses.note_id, id))
+    .orderBy(desc(depenses.date_depense));
   return { ...note, depenses: deps };
 }
 
@@ -5992,158 +7246,152 @@ export async function createNoteFrais(data: {
   periodeDebut: string;
   periodeFin: string;
 }): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT INTO notes_de_frais
-       (artisan_id, user_id, numero, titre, periode_debut, periode_fin)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [data.artisanId, data.userId, data.numero, data.titre, data.periodeDebut, data.periodeFin]
-  );
-  if (!r?.insertId) return null;
-  return getNoteFraisById(r.insertId, data.artisanId);
+  const newId = await insertReturningId(notesDeFrais, {
+    artisan_id: data.artisanId,
+    user_id: data.userId,
+    numero: data.numero,
+    titre: data.titre,
+    periode_debut: data.periodeDebut,
+    periode_fin: data.periodeFin,
+  });
+  if (!newId) return null;
+  return getNoteFraisById(newId, data.artisanId);
 }
 
 export async function addDepenseToNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  // Verifier que la depense appartient bien a l'artisan.
-  const [own]: any = await pool.execute(
-    `SELECT id FROM depenses WHERE id = ? AND artisan_id = ?`,
-    [depenseId, artisanId]
-  );
-  if ((own as any[]).length === 0) return;
-  await pool.execute(
-    `INSERT IGNORE INTO notes_frais_depenses (note_id, depense_id) VALUES (?, ?)`,
-    [noteId, depenseId]
-  );
+  const db = await getDb();
+  // OPE-182 — vérifier que la NOTE appartient bien à l'artisan (la table de liaison
+  // `notes_frais_depenses` n'a pas d'`artisan_id`) → empêche de lier sa dépense dans
+  // la note d'un autre tenant. Skip silencieux si la note n'est pas la sienne.
+  const [noteOwn] = await db.select({ id: notesDeFrais.id }).from(notesDeFrais)
+    .where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, artisanId))).limit(1);
+  if (!noteOwn) return;
+  // Verifier que la depense appartient bien a l'artisan + qu'elle est REMBOURSABLE :
+  // une note de frais ne regroupe que des avances remboursables au salarié (OPE-179).
+  // Skip silencieux (cohérent avec l'échec d'ownership) → une note ne contient jamais
+  // de dépense non remboursable « visible mais non comptée ». Sûr pour la création en lot.
+  const [dep] = await db.select({ remboursable: depenses.remboursable }).from(depenses)
+    .where(and(eq(depenses.id, depenseId), eq(depenses.artisan_id, artisanId))).limit(1);
+  if (!dep) return;
+  if (!dep.remboursable) return;
+  // INSERT IGNORE → select-then-insert (dialect-neutre, pas d'ON CONFLICT mysql).
+  const [existing] = await db.select({ note_id: notesFraisDepenses.note_id }).from(notesFraisDepenses)
+    .where(and(eq(notesFraisDepenses.note_id, noteId), eq(notesFraisDepenses.depense_id, depenseId))).limit(1);
+  if (existing) return;
+  await db.insert(notesFraisDepenses).values({ note_id: noteId, depense_id: depenseId });
 }
 
-export async function removeDepenseFromNoteFrais(noteId: number, depenseId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `DELETE FROM notes_frais_depenses WHERE note_id = ? AND depense_id = ?`,
-    [noteId, depenseId]
-  );
+export async function removeDepenseFromNoteFrais(noteId: number, depenseId: number, artisanId: number): Promise<void> {
+  const db = await getDb();
+  // OPE-182 — scoper la suppression du lien à la NOTE de l'artisan (table de liaison
+  // sans `artisan_id`) → empêche un retrait cross-tenant d'une dépense de la note d'autrui.
+  // On vérifie d'abord l'ownership de la note, puis on supprime le lien.
+  const [noteOwn] = await db.select({ id: notesDeFrais.id }).from(notesDeFrais)
+    .where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, artisanId))).limit(1);
+  if (!noteOwn) return;
+  await db.delete(notesFraisDepenses)
+    .where(and(eq(notesFraisDepenses.note_id, noteId), eq(notesFraisDepenses.depense_id, depenseId)));
 }
 
 export async function calculerTotalNoteFrais(noteId: number, artisanId: number): Promise<number> {
-  const pool = getPool();
-  if (!pool) return 0;
-  const [rows]: any = await pool.execute(
-    `SELECT COALESCE(SUM(d.montant_ttc), 0) AS total
-       FROM depenses d
-       INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [noteId, artisanId]
-  );
-  const total = Number((rows as any[])[0]?.total || 0);
-  await pool.execute(
-    `UPDATE notes_de_frais SET montant_total = ? WHERE id = ? AND artisan_id = ?`,
-    [total, noteId, artisanId]
-  );
+  const db = await getDb();
+  // OPE-179 — ne somme QUE les dépenses remboursables (avances salarié) : une dépense
+  // `remboursable = FALSE` (réglée par l'entreprise) liée à une note ne doit pas gonfler
+  // le montant à rembourser. Aligné sur la stat `getDepensesStats` (filtre déjà remboursable).
+  const [agg] = await db.select({
+    total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`,
+  }).from(depenses)
+    .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
+    .where(and(
+      eq(notesFraisDepenses.note_id, noteId),
+      eq(depenses.artisan_id, artisanId),
+      eq(depenses.remboursable, true),
+    ));
+  const total = Number(agg?.total || 0);
+  await db.update(notesDeFrais).set({ montant_total: String(total) })
+    .where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, artisanId)));
   return total;
 }
 
+// Sous-requête réutilisable : ids des dépenses liées à une note (remplace l'UPDATE..JOIN
+// mysql, non supporté en PG). On filtre côté UPDATE par artisan_id en plus, conservant
+// le scope tenant d'origine. `db` est passé pour rester dans le même pool/dialecte.
+function depenseIdsLieesANote(db: any, noteId: number) {
+  return db.select({ id: notesFraisDepenses.depense_id }).from(notesFraisDepenses)
+    .where(eq(notesFraisDepenses.note_id, noteId));
+}
+
+const todayDate = () => new Date().toISOString().slice(0, 10);
+
 export async function soumettreNoteFrais(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
+  const db = await getDb();
   await calculerTotalNoteFrais(id, artisanId);
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'soumise', date_soumission = CURDATE() WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
-  // Marquer toutes les depenses associees en 'soumise'.
-  await pool.execute(
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'soumise'
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [id, artisanId]
-  );
+  await db.update(notesDeFrais)
+    .set({ statut: "soumise" as any, date_soumission: todayDate() })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  // Marquer toutes les depenses associees en 'soumise' (UPDATE..JOIN -> sous-requête).
+  await db.update(depenses).set({ statut: "soumise" as any })
+    .where(and(eq(depenses.artisan_id, artisanId), inArray(depenses.id, depenseIdsLieesANote(db, id))));
   return getNoteFraisById(id, artisanId);
 }
 
 export async function approuverNoteFrais(id: number, artisanId: number, commentaire?: string): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'approuvee', date_approbation = CURDATE(), commentaire_approbateur = ?
-      WHERE id = ? AND artisan_id = ?`,
-    [commentaire || null, id, artisanId]
-  );
-  await pool.execute(
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'approuvee'
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [id, artisanId]
-  );
+  const db = await getDb();
+  await db.update(notesDeFrais)
+    .set({ statut: "approuvee" as any, date_approbation: todayDate(), commentaire_approbateur: commentaire || null })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  await db.update(depenses).set({ statut: "approuvee" as any })
+    .where(and(eq(depenses.artisan_id, artisanId), inArray(depenses.id, depenseIdsLieesANote(db, id))));
   return getNoteFraisById(id, artisanId);
 }
 
 export async function rejeterNoteFrais(id: number, artisanId: number, commentaire: string): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'rejetee', commentaire_approbateur = ?
-      WHERE id = ? AND artisan_id = ?`,
-    [commentaire, id, artisanId]
-  );
-  await pool.execute(
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'rejetee'
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [id, artisanId]
-  );
+  const db = await getDb();
+  await db.update(notesDeFrais)
+    .set({ statut: "rejetee" as any, commentaire_approbateur: commentaire })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  await db.update(depenses).set({ statut: "rejetee" as any })
+    .where(and(eq(depenses.artisan_id, artisanId), inArray(depenses.id, depenseIdsLieesANote(db, id))));
   return getNoteFraisById(id, artisanId);
 }
 
 export async function payerNoteFrais(id: number, artisanId: number): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  await pool.execute(
-    `UPDATE notes_de_frais SET statut = 'payee', date_paiement = CURDATE() WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
-  await pool.execute(
-    `UPDATE depenses d
-        INNER JOIN notes_frais_depenses nfd ON nfd.depense_id = d.id
-        SET d.statut = 'remboursee', d.rembourse = TRUE, d.date_remboursement = CURDATE()
-      WHERE nfd.note_id = ? AND d.artisan_id = ?`,
-    [id, artisanId]
-  );
+  const db = await getDb();
+  await db.update(notesDeFrais)
+    .set({ statut: "payee" as any, date_paiement: todayDate() })
+    .where(and(eq(notesDeFrais.id, id), eq(notesDeFrais.artisan_id, artisanId)));
+  // OPE-179 — ne marque « remboursée » QUE les dépenses remboursables (cohérent avec le
+  // total calculé) : une dépense non remboursable liée à la note n'est pas remboursée au salarié.
+  await db.update(depenses)
+    .set({ statut: "remboursee" as any, rembourse: true, date_remboursement: todayDate() })
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      eq(depenses.remboursable, true),
+      inArray(depenses.id, depenseIdsLieesANote(db, id)),
+    ));
   return getNoteFraisById(id, artisanId);
 }
 
 // === Budgets ===
 
 export async function calculerBudgetsRealises(artisanId: number, mois: string): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
+  const db = await getDb();
   // Realise du mois par categorie.
   const debutMois = `${mois}-01`;
   const [y, m] = mois.split("-").map(Number);
   const finMois = new Date(y, m, 0).toISOString().slice(0, 10);
-  const [realises]: any = await pool.execute(
-    `SELECT categorie, COALESCE(SUM(montant_ttc), 0) AS reel
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-      GROUP BY categorie`,
-    [artisanId, debutMois, finMois]
-  );
+  const realises = await db.select({ categorie: depenses.categorie, reel: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+    .from(depenses)
+    .where(and(eq(depenses.artisan_id, artisanId), between(depenses.date_depense, debutMois, finMois)))
+    .groupBy(depenses.categorie);
   const reelMap = new Map<string, number>();
-  for (const r of realises as any[]) reelMap.set(r.categorie, Number(r.reel));
+  for (const r of realises) reelMap.set(r.categorie as string, Number(r.reel));
 
-  const [budgets]: any = await pool.execute(
-    `SELECT categorie, budget FROM budgets_categories
-      WHERE artisan_id = ? AND mois = ?`,
-    [artisanId, mois]
-  );
+  const budgets = await db.select({ categorie: budgetsCategories.categorie, budget: budgetsCategories.budget })
+    .from(budgetsCategories)
+    .where(and(eq(budgetsCategories.artisan_id, artisanId), eq(budgetsCategories.mois, mois)));
   const budgetMap = new Map<string, number>();
-  for (const b of budgets as any[]) budgetMap.set(b.categorie, Number(b.budget));
+  for (const b of budgets) budgetMap.set(b.categorie as string, Number(b.budget));
 
   const cats = await getCategoriesDepenses(artisanId);
   return cats.map((c: any) => {
@@ -6163,14 +7411,237 @@ export async function upsertBudget(
   mois: string,
   budget: number
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `INSERT INTO budgets_categories (artisan_id, categorie, mois, budget)
-     VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE budget = VALUES(budget)`,
-    [artisanId, categorie, mois, budget]
-  );
+  const db = await getDb();
+  // ON DUPLICATE KEY (unique artisan_id+categorie+mois) → select-puis-insert/update (dialect-neutre).
+  const existing = await db.select({ id: budgetsCategories.id }).from(budgetsCategories)
+    .where(and(eq(budgetsCategories.artisan_id, artisanId), eq(budgetsCategories.categorie, categorie), eq(budgetsCategories.mois, mois)))
+    .limit(1);
+  if (existing[0]) {
+    await db.update(budgetsCategories).set({ budget: String(budget) }).where(eq(budgetsCategories.id, existing[0].id));
+  } else {
+    await db.insert(budgetsCategories).values({ artisan_id: artisanId, categorie, mois, budget: String(budget) });
+  }
+}
+
+// Copie tous les budgets d'un mois source vers un mois cible (upsert par catégorie).
+// Remplace l'ancien INSERT…SELECT…ON DUPLICATE KEY (routers.ts, raw SQL).
+export async function copierBudgetsMois(artisanId: number, moisSource: string, moisCible: string): Promise<void> {
+  const dbi = await getDb();
+  const sources = await dbi.select({ categorie: budgetsCategories.categorie, budget: budgetsCategories.budget })
+    .from(budgetsCategories)
+    .where(and(eq(budgetsCategories.artisan_id, artisanId), eq(budgetsCategories.mois, moisSource)));
+  for (const s of sources) {
+    await upsertBudget(artisanId, s.categorie as string, moisCible, Number(s.budget || 0));
+  }
+}
+
+// === Règles de catégorisation auto (T10C) ===
+
+export async function getReglesCategorisation(artisanId: number): Promise<any[]> {
+  const dbi = await getDb();
+  return await dbi.select().from(reglesCategorisation)
+    .where(and(eq(reglesCategorisation.artisan_id, artisanId), eq(reglesCategorisation.actif, true)))
+    .orderBy(desc(reglesCategorisation.id));
+}
+
+export async function createRegleCategorisation(artisanId: number, motifLibelle: string, categorie: string): Promise<void> {
+  const dbi = await getDb();
+  await dbi.insert(reglesCategorisation).values({ artisan_id: artisanId, motif_libelle: motifLibelle, categorie });
+}
+
+export async function deleteRegleCategorisation(id: number, artisanId: number): Promise<void> {
+  const dbi = await getDb();
+  // Soft-delete scopé artisan (cohérent avec l'ancien UPDATE actif=FALSE).
+  await dbi.update(reglesCategorisation).set({ actif: false })
+    .where(and(eq(reglesCategorisation.id, id), eq(reglesCategorisation.artisan_id, artisanId)));
+}
+
+// === Scheduler (T5) : dépenses récurrentes — port FINANCIER en Drizzle ===
+
+// Pour chaque dépense récurrente échue (prochaine_occurrence <= aujourd'hui), crée une
+// copie datée du jour (statut brouillon, recurrente=FALSE, nouveau numéro) et avance
+// prochaine_occurrence selon la fréquence. Idempotent : l'avance empêche les doublons
+// si le scheduler retourne le même jour. Renvoie le nb de dépenses créées.
+export async function genererDepensesRecurrentes(): Promise<number> {
+  const dbi = await getDb();
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await dbi.select({
+    id: depenses.id, artisan_id: depenses.artisan_id, user_id: depenses.user_id,
+    fournisseur: depenses.fournisseur, categorie: depenses.categorie, sous_categorie: depenses.sous_categorie,
+    description: depenses.description, montant_ht: depenses.montant_ht, taux_tva: depenses.taux_tva,
+    montant_tva: depenses.montant_tva, montant_ttc: depenses.montant_ttc, mode_paiement: depenses.mode_paiement,
+    remboursable: depenses.remboursable, chantier_id: depenses.chantier_id, intervention_id: depenses.intervention_id,
+    client_id: depenses.client_id, notes: depenses.notes, tva_deductible: depenses.tva_deductible,
+    frequence_recurrence: depenses.frequence_recurrence, prochaine_occurrence: depenses.prochaine_occurrence,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.recurrente, true),
+      isNotNull(depenses.prochaine_occurrence),
+      lte(depenses.prochaine_occurrence, today),
+    ))
+    .limit(50);
+
+  let nbCreated = 0;
+  for (const d of rows) {
+    try {
+      const numero = await getNextDepenseNumero(d.artisan_id as number);
+      // Copie exacte des montants (HT/TVA/TTC) à la date du jour, statut brouillon, non récurrente.
+      await dbi.insert(depenses).values({
+        artisan_id: d.artisan_id, user_id: d.user_id, numero, date_depense: today,
+        fournisseur: d.fournisseur, categorie: d.categorie, sous_categorie: d.sous_categorie,
+        description: d.description, montant_ht: d.montant_ht, taux_tva: d.taux_tva,
+        montant_tva: d.montant_tva, montant_ttc: d.montant_ttc, mode_paiement: d.mode_paiement as any,
+        statut: "brouillon" as any, remboursable: d.remboursable, chantier_id: d.chantier_id,
+        intervention_id: d.intervention_id, client_id: d.client_id, notes: d.notes,
+        tva_deductible: d.tva_deductible, recurrente: false,
+      } as any);
+
+      // Avance prochaine_occurrence selon la fréquence (DATE_ADD → JS, clamp fin de mois).
+      const cur = new Date(d.prochaine_occurrence as string);
+      let next: Date;
+      if (d.frequence_recurrence === "hebdomadaire" as any) next = new Date(cur.getTime() + 7 * 24 * 3600 * 1000);
+      else if (d.frequence_recurrence === "trimestrielle") next = addMonthsClamped(cur, 3);
+      else if (d.frequence_recurrence === "annuelle") next = addMonthsClamped(cur, 12);
+      else next = addMonthsClamped(cur, 1); // mensuelle par défaut
+      await dbi.update(depenses).set({ prochaine_occurrence: next.toISOString().slice(0, 10) })
+        .where(eq(depenses.id, d.id));
+
+      // Notification à l'artisan (best-effort).
+      try {
+        await dbi.insert(notifications).values({
+          artisanId: d.artisan_id as number, type: "info" as any,
+          titre: `Dépense récurrente créée : ${d.fournisseur || d.categorie}`,
+          message: `${numero} — ${Number(d.montant_ttc).toLocaleString("fr-FR")} EUR — créée automatiquement aujourd'hui.`,
+          lien: "/depenses", lu: false,
+        } as any);
+      } catch { /* table notifications absente : ok */ }
+      nbCreated++;
+    } catch (errIn: any) {
+      console.warn(`[Scheduler] depense recurrente ${d.id} :`, errIn?.message);
+    }
+  }
+  return nbCreated;
+}
+
+// === Scheduler (T5) : expiration trials + destinataires emails — portés en Drizzle ===
+
+// Bascule les trials échus en 'expired' (status + plan). Renvoie le nb de lignes touchées.
+export async function expireTrials(): Promise<number> {
+  const dbi = await getDb();
+  const updated = await dbi.update(subscriptions)
+    .set({ status: "expired", plan: "expired" })
+    .where(and(eq(subscriptions.status, "trialing"), sql`${subscriptions.trial_ends_at} < NOW()`))
+    .returning({ id: subscriptions.id });
+  return updated.length;
+}
+
+// Destinataires d'un email de fin d'essai à J-N (trial_ends_at = aujourd'hui + N jours).
+export async function getTrialEndingRecipients(daysAhead: number): Promise<Array<{ artisanId: number; email: string | null; prenom: string | null }>> {
+  const dbi = await getDb();
+  const cible = new Date(Date.now() + daysAhead * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  return await dbi.select({ artisanId: artisans.id, email: users.email, prenom: users.prenom })
+    .from(artisans)
+    .innerJoin(users, eq(users.id, artisans.userId))
+    .innerJoin(subscriptions, eq(subscriptions.artisan_id, artisans.id))
+    .where(and(
+      eq(subscriptions.status, "trialing"),
+      sql`DATE(${subscriptions.trial_ends_at}) = ${cible}`,
+    ));
+}
+
+// Destinataires de l'email découverte J+N après inscription (users.createdAt = aujourd'hui - N jours).
+export async function getDiscoveryRecipients(daysAfterSignup: number): Promise<Array<{ artisanId: number; email: string | null; prenom: string | null }>> {
+  const dbi = await getDb();
+  const cible = new Date(Date.now() - daysAfterSignup * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  return await dbi.select({ artisanId: artisans.id, email: users.email, prenom: users.prenom })
+    .from(artisans)
+    .innerJoin(users, eq(users.id, artisans.userId))
+    .where(sql`DATE(${users.createdAt}) = ${cible}`);
+}
+
+// === Bibliothèque d'articles (catalogue public, endpoints /api/articles/*) ===
+
+// Recherche d'articles visibles (nom/description/categorie ilike) + filtres optionnels.
+export async function searchBibliothequeArticles(
+  q: string,
+  filters: { metier?: string; categorie?: string; sousCategorie?: string } = {},
+): Promise<any[]> {
+  const dbi = await getDb();
+  const like = `%${q}%`;
+  const conds: any[] = [
+    eq(bibliothequeArticles.visible, true),
+    or(
+      ilike(bibliothequeArticles.nom, like),
+      ilike(bibliothequeArticles.description, like),
+      ilike(bibliothequeArticles.categorie, like),
+    ),
+  ];
+  if (filters.metier) conds.push(eq(bibliothequeArticles.metier, filters.metier));
+  if (filters.categorie) conds.push(eq(bibliothequeArticles.categorie, filters.categorie));
+  if (filters.sousCategorie) conds.push(eq(bibliothequeArticles.sous_categorie, filters.sousCategorie));
+  return await dbi.select({
+    id: bibliothequeArticles.id, nom: bibliothequeArticles.nom, description: bibliothequeArticles.description,
+    prix_base: bibliothequeArticles.prix_base, unite: bibliothequeArticles.unite, metier: bibliothequeArticles.metier,
+    categorie: bibliothequeArticles.categorie, sous_categorie: bibliothequeArticles.sous_categorie,
+    duree_moyenne_minutes: bibliothequeArticles.duree_moyenne_minutes,
+  }).from(bibliothequeArticles).where(and(...conds)).orderBy(asc(bibliothequeArticles.nom)).limit(10);
+}
+
+// Couples (categorie, sous_categorie) distincts pour un métier (catalogue visible).
+export async function getBibliothequeCategories(metier: string): Promise<Array<{ categorie: string; sous_categorie: string }>> {
+  const dbi = await getDb();
+  return await dbi.selectDistinct({
+    categorie: bibliothequeArticles.categorie, sous_categorie: bibliothequeArticles.sous_categorie,
+  }).from(bibliothequeArticles)
+    .where(and(eq(bibliothequeArticles.visible, true), eq(bibliothequeArticles.metier, metier)))
+    .orderBy(asc(bibliothequeArticles.categorie), asc(bibliothequeArticles.sous_categorie));
+}
+
+// === Bootstrap / seed démo (OPE-184 : dialect-aware Drizzle, remplacent le raw SQL d'index.ts) ===
+
+// Met des objectifs par défaut là où ils sont absents/0 (idempotent). Renvoie le nb de lignes touchées.
+export async function migrateDefaultObjectifs(): Promise<number> {
+  const dbi = await getDb();
+  const updated = await dbi.update(parametresArtisan)
+    .set({ objectifCA: "10000", objectifDevis: 15, objectifClients: 5 })
+    .where(sql`(${parametresArtisan.objectifCA} IS NULL OR ${parametresArtisan.objectifCA} = 0)
+               AND (${parametresArtisan.objectifDevis} IS NULL OR ${parametresArtisan.objectifDevis} = 0)`)
+    .returning({ id: parametresArtisan.id });
+  return updated.length;
+}
+
+// Seed 5 notifications de démo pour l'artisan 1 (one-time, skip si déjà présentes).
+export async function seedDemoNotifications(): Promise<number> {
+  const dbi = await getDb();
+  const [c] = await dbi.select({ cnt: sql<number>`COUNT(*)` }).from(notifications).where(eq(notifications.artisanId, 1));
+  if (Number(c?.cnt || 0) > 0) return 0;
+  const now = Date.now();
+  const rows = [
+    { type: 'succes', titre: 'Devis DEV-00026 accepte et signe', message: 'Le client Durand Pierre a accepte et signe le devis DEV-00026', lien: '/devis/26', lu: false, hours: 2 },
+    { type: 'info', titre: 'Nouveau message de Hab Doudi', message: 'Bonjour, je souhaiterais modifier la date de mon intervention...', lien: '/chat', lu: false, hours: 4 },
+    { type: 'rappel', titre: 'Intervention demain : Entretien chauffage M. Durand', message: 'Rappel: Intervention prevue demain a 09:00 chez Pierre Durand', lien: '/interventions', lu: false, hours: 6 },
+    { type: 'alerte', titre: 'Stock bas : Joint torique (5 restants)', message: "Le stock de Joint torique est descendu sous le seuil d'alerte", lien: '/stocks', lu: true, hours: 24 },
+    { type: 'rappel', titre: 'Facture FAC-00008 en retard de 35 jours', message: 'La facture FAC-00008 de 360.00 EUR est en retard de paiement', lien: '/factures/8', lu: true, hours: 48 },
+  ];
+  for (const n of rows) {
+    await dbi.insert(notifications).values({
+      artisanId: 1, type: n.type as any, titre: n.titre, message: n.message,
+      lien: n.lien, lu: n.lu, createdAt: new Date(now - n.hours * 3600000),
+    } as any);
+  }
+  return rows.length;
+}
+
+// Seed 2 RDV en ligne de démo pour l'artisan 1 (one-time, skip si déjà présents).
+export async function seedDemoRdv(): Promise<number> {
+  const dbi = await getDb();
+  const [c] = await dbi.select({ cnt: sql<number>`COUNT(*)` }).from(rdvEnLigne).where(eq(rdvEnLigne.artisanId, 1));
+  if (Number(c?.cnt || 0) > 0) return 0;
+  await dbi.insert(rdvEnLigne).values([
+    { artisanId: 1, clientId: 2, titre: 'Fuite robinet cuisine', description: 'Le robinet de la cuisine fuit depuis 2 jours, goutte a goutte permanent. Marque Grohe.', dateProposee: new Date('2026-02-24T10:00:00'), dureeEstimee: 60, statut: 'en_attente' as any, urgence: 'normale' as any },
+    { artisanId: 1, clientId: 5, titre: 'Panne chauffe-eau', description: "Le chauffe-eau ne produit plus d'eau chaude depuis ce matin. Modele Atlantic 200L.", dateProposee: new Date('2026-02-25T14:00:00'), dureeEstimee: 60, statut: 'en_attente' as any, urgence: 'urgente' as any },
+  ] as any);
+  return 2;
 }
 
 // === Relevés bancaires ===
@@ -6180,69 +7651,54 @@ export async function importReleve(
   nomFichier: string,
   transactions: Array<{ dateTransaction: string; libelle: string; montant: number; typeTransaction: string }>
 ): Promise<{ releveId: number; nbImportees: number }> {
-  const pool = getPool();
-  if (!pool) return { releveId: 0, nbImportees: 0 };
-  const [rRel]: any = await pool.execute(
-    `INSERT INTO releves_bancaires (artisan_id, nom_fichier, nb_transactions, statut)
-     VALUES (?, ?, ?, 'en_cours')`,
-    [artisanId, nomFichier, transactions.length]
-  );
-  const releveId = rRel?.insertId || 0;
+  const dbi = await getDb();
+  const releveId = await insertReturningId(relevesBancaires, {
+    artisan_id: artisanId, nom_fichier: nomFichier,
+    nb_transactions: transactions.length, statut: "en_cours",
+  });
+  if (!releveId) return { releveId: 0, nbImportees: 0 };
+  // Règles de catégorisation actives, lues une seule fois (boucle en mémoire).
+  let regles: any[] = [];
+  try {
+    regles = await dbi.select({ motif_libelle: reglesCategorisation.motif_libelle, categorie: reglesCategorisation.categorie })
+      .from(reglesCategorisation)
+      .where(and(eq(reglesCategorisation.artisan_id, artisanId), eq(reglesCategorisation.actif, true)));
+  } catch { /* ok */ }
   let nbImportees = 0;
   for (const t of transactions) {
     // Detection categorie suggeree via regles_categorisation.
     let categorieSuggeree: string | null = null;
-    try {
-      const [regles]: any = await pool.execute(
-        `SELECT motif_libelle, categorie FROM regles_categorisation
-          WHERE artisan_id = ? AND actif = TRUE`,
-        [artisanId]
-      );
-      const lib = String(t.libelle || "").toUpperCase();
-      for (const r of regles as any[]) {
-        if (lib.includes(String(r.motif_libelle).toUpperCase())) {
-          categorieSuggeree = r.categorie;
-          break;
-        }
+    const lib = String(t.libelle || "").toUpperCase();
+    for (const r of regles) {
+      if (lib.includes(String(r.motif_libelle).toUpperCase())) {
+        categorieSuggeree = r.categorie;
+        break;
       }
-    } catch {
-      /* ok */
     }
     try {
-      await pool.execute(
-        `INSERT INTO transactions_bancaires
-           (artisan_id, releve_id, date_transaction, libelle, montant,
-            type_transaction, categorie_suggeree)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          artisanId, releveId, t.dateTransaction, t.libelle,
-          Math.abs(t.montant), t.typeTransaction, categorieSuggeree,
-        ]
-      );
+      await dbi.insert(transactionsBancaires).values({
+        artisan_id: artisanId, releve_id: releveId, date_transaction: t.dateTransaction,
+        libelle: t.libelle, montant: String(Math.abs(t.montant)),
+        type_transaction: t.typeTransaction as any, categorie_suggeree: categorieSuggeree,
+      });
       nbImportees++;
     } catch {
       /* ok ligne suivante */
     }
   }
-  await pool.execute(
-    `UPDATE releves_bancaires SET nb_importees = ?, statut = 'termine' WHERE id = ?`,
-    [nbImportees, releveId]
-  );
+  await dbi.update(relevesBancaires).set({ nb_importees: nbImportees, statut: "termine" as any })
+    .where(eq(relevesBancaires.id, releveId));
   return { releveId, nbImportees };
 }
 
 export async function getTransactionsBancaires(artisanId: number, releveId?: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const conds = ["artisan_id = ?", "ignoree = FALSE"];
-  const params: any[] = [artisanId];
-  if (releveId) { conds.push("releve_id = ?"); params.push(releveId); }
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM transactions_bancaires WHERE ${conds.join(" AND ")}
-      ORDER BY date_transaction DESC, id DESC LIMIT 500`,
-    params
-  );
-  return rows as any[];
+  const dbi = await getDb();
+  const conds: any[] = [eq(transactionsBancaires.artisan_id, artisanId), eq(transactionsBancaires.ignoree, false)];
+  if (releveId) conds.push(eq(transactionsBancaires.releve_id, releveId));
+  return await dbi.select().from(transactionsBancaires)
+    .where(and(...conds))
+    .orderBy(desc(transactionsBancaires.date_transaction), desc(transactionsBancaires.id))
+    .limit(500);
 }
 
 export async function lierTransactionDepense(
@@ -6250,23 +7706,15 @@ export async function lierTransactionDepense(
   depenseId: number,
   artisanId: number
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `UPDATE transactions_bancaires SET depense_id = ?
-      WHERE id = ? AND artisan_id = ?`,
-    [depenseId, transactionId, artisanId]
-  );
+  const dbi = await getDb();
+  await dbi.update(transactionsBancaires).set({ depense_id: depenseId })
+    .where(and(eq(transactionsBancaires.id, transactionId), eq(transactionsBancaires.artisan_id, artisanId)));
 }
 
 export async function ignorerTransaction(id: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  await pool.execute(
-    `UPDATE transactions_bancaires SET ignoree = TRUE
-      WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
+  const dbi = await getDb();
+  await dbi.update(transactionsBancaires).set({ ignoree: true })
+    .where(and(eq(transactionsBancaires.id, id), eq(transactionsBancaires.artisan_id, artisanId)));
 }
 
 // === Export FEC achats ===
@@ -6276,23 +7724,24 @@ export async function exportDepensesFEC(
   dateDebut: string,
   dateFin: string
 ): Promise<string> {
-  const pool = getPool();
-  if (!pool) return "";
+  const dbi = await getDb();
   const config = await getConfigurationComptable(artisanId);
   const compteAchats = config?.compteAchats || "607000";
   const compteTVA = config?.compteTVADeductible || "445660";
   const compteFournisseurs = config?.compteFournisseurs || "401000";
   const journal = config?.journalAchats || "AC";
 
-  const [rows]: any = await pool.execute(
-    `SELECT id, numero, date_depense, fournisseur, montant_ht, montant_tva,
-            montant_ttc, description
-       FROM depenses
-      WHERE artisan_id = ? AND date_depense BETWEEN ? AND ?
-        AND tva_deductible = TRUE
-      ORDER BY date_depense ASC, id ASC`,
-    [artisanId, dateDebut, dateFin]
-  );
+  const rows: any[] = await dbi.select({
+    id: depenses.id, numero: depenses.numero, date_depense: depenses.date_depense,
+    fournisseur: depenses.fournisseur, montant_ht: depenses.montant_ht,
+    montant_tva: depenses.montant_tva, montant_ttc: depenses.montant_ttc, description: depenses.description,
+  }).from(depenses)
+    .where(and(
+      eq(depenses.artisan_id, artisanId),
+      between(depenses.date_depense, dateDebut, dateFin),
+      eq(depenses.tva_deductible, true),
+    ))
+    .orderBy(asc(depenses.date_depense), asc(depenses.id));
 
   const header = [
     "JournalCode", "JournalLib", "EcritureNum", "EcritureDate", "CompteNum",
@@ -6313,4 +7762,52 @@ export async function exportDepensesFEC(
     num++;
   }
   return lines.join("\n");
+}
+
+// ============================================================================
+// AI CHAT — threads and messages
+// ============================================================================
+
+export async function getOrCreateAiThread(artisanId: number, firstMessage: string): Promise<number> {
+  const title = firstMessage.slice(0, 80) + (firstMessage.length > 80 ? '…' : '');
+  return await insertReturningId(aiThreads, { artisanId, mode: 'general', title, lastMessageAt: new Date() });
+}
+
+export async function getAiThread(threadId: number, artisanId: number): Promise<any> {
+  const db = await getDb();
+  const [row] = await db.select().from(aiThreads)
+    .where(and(eq(aiThreads.id, threadId), eq(aiThreads.artisanId, artisanId))).limit(1);
+  return row || null;
+}
+
+export async function listAiThreads(artisanId: number, limit = 20): Promise<any[]> {
+  const db = await getDb();
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit) || 20));
+  return await db.select().from(aiThreads)
+    .where(eq(aiThreads.artisanId, artisanId))
+    .orderBy(desc(aiThreads.lastMessageAt)).limit(safeLimit);
+}
+
+export async function insertAiMessage(
+  threadId: number,
+  role: 'user' | 'assistant',
+  transcript: string,
+  metadata?: any,
+  pricingMetadata?: any,
+): Promise<void> {
+  const db = await getDb();
+  await db.insert(aiMessages).values({
+    threadId, role, transcript,
+    metadata: metadata ?? null,
+    pricingMetadata: pricingMetadata ?? null,
+  });
+  await db.update(aiThreads).set({ lastMessageAt: new Date() }).where(eq(aiThreads.id, threadId));
+}
+
+export async function getAiMessages(threadId: number, limit = 50): Promise<any[]> {
+  const db = await getDb();
+  const safeLimit = Math.max(1, Math.min(500, Math.floor(limit) || 50));
+  return await db.select().from(aiMessages)
+    .where(eq(aiMessages.threadId, threadId))
+    .orderBy(asc(aiMessages.createdAt)).limit(safeLimit);
 }

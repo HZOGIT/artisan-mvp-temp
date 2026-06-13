@@ -241,6 +241,26 @@ interface InfoBlock {
   lines: string[];     // body lines (address, phone, email, SIRET, ...)
 }
 
+// OPE-151 — mentions légales obligatoires de l'émetteur (Code de commerce R123-237) :
+// pour une société, forme juridique + capital + RCS (ville + SIREN dérivé du SIRET) ;
+// « RM … » si inscrit au Répertoire des Métiers. Rien d'imposé en plus pour un EI/micro.
+function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
+  const a = artisan as any;
+  const lines: string[] = [];
+  const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
+  if (a.formeJuridique && SOCIETES.includes(a.formeJuridique)) {
+    const siren = a.siret ? String(a.siret).replace(/\D/g, "").slice(0, 9) : "";
+    const cap = a.capitalSocial != null && String(a.capitalSocial) !== ""
+      ? `au capital de ${Number(a.capitalSocial).toLocaleString("fr-FR")} €` : "";
+    const head = [a.formeJuridique, cap].filter(Boolean).join(" ");
+    const rcs = a.villeRCS && siren ? `RCS ${a.villeRCS} ${siren}` : "";
+    const line = [head, rcs].filter(Boolean).join(" — ");
+    if (line) lines.push(line);
+  }
+  if (a.numeroRM) lines.push(`Inscrit au Répertoire des Métiers — RM ${a.numeroRM}`);
+  return lines;
+}
+
 function buildArtisanBlock(artisan: Artisan): InfoBlock {
   const a = artisan as any;
   const lines: string[] = [];
@@ -257,14 +277,27 @@ function buildArtisanBlock(artisan: Artisan): InfoBlock {
 
 function buildClientBlock(client: Client): InfoBlock {
   const lines: string[] = [];
-  if (client.adresse) lines.push(client.adresse);
-  const cpVille = `${client.codePostal || ""} ${client.ville || ""}`.trim();
+  const personName = `${client.prenom || ""} ${client.nom}`.trim();
+  // OPE-92 — un client professionnel : la raison sociale devient l'intitulé,
+  // le contact figure en première ligne, et SIRET / n° TVA sont rappelés (mentions B2B).
+  const isPro = (client as any).type === "professionnel";
+  const raisonSociale = (client as any).raisonSociale as string | null | undefined;
+  if (isPro && raisonSociale && personName) lines.push(`Contact: ${personName}`);
+  // OPE-93 — sur une facture/devis on utilise l'adresse de FACTURATION si renseignée
+  // (fallback par champ vers l'adresse principale = adresse de chantier).
+  const adrFact = (client as any).adresseFacturation || client.adresse;
+  const cpFact = (client as any).codePostalFacturation || client.codePostal;
+  const villeFact = (client as any).villeFacturation || client.ville;
+  if (adrFact) lines.push(adrFact);
+  const cpVille = `${cpFact || ""} ${villeFact || ""}`.trim();
   if (cpVille) lines.push(cpVille);
   if (client.telephone) lines.push(`Tél: ${client.telephone}`);
   if (client.email) lines.push(`Email: ${client.email}`);
+  if (isPro && (client as any).siret) lines.push(`SIRET: ${(client as any).siret}`);
+  if (isPro && (client as any).numeroTVA) lines.push(`TVA: ${(client as any).numeroTVA}`);
   return {
     label: "CLIENT",
-    name: `${client.prenom || ""} ${client.nom}`.trim(),
+    name: isPro && raisonSociale ? raisonSociale : personName,
     lines,
   };
 }
@@ -408,12 +441,38 @@ export interface PDFDevisData {
   devis: Devis & { lignes: DevisLigne[] };
   artisan: Artisan;
   client: Client;
+  // OPE-127 — CGV réutilisables (parametres_artisan.conditionsGenerales). Si fournies,
+  // ajoutées sur une page dédiée en fin de document. Parité avec le générateur client.
+  cgv?: string | null;
 }
 
 export interface PDFFactureData {
   facture: Facture & { lignes: FactureLigne[] };
   artisan: Artisan;
   client: Client;
+  cgv?: string | null; // OPE-127 — CGV (cf. PDFDevisData) ; pas sur un avoir.
+}
+
+// OPE-127 — page CGV dédiée (mirroir de `addCgvPage` du générateur client), avec saut
+// de page si le texte déborde (CGV potentiellement longues). Lecture seule, additif.
+function renderCgvPage(doc: jsPDF, cgv: string): void {
+  doc.addPage();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  doc.setFontSize(16);
+  doc.setFont("Roboto", "bold");
+  doc.setTextColor(41, 128, 185);
+  doc.text("Conditions Générales de Vente", pageWidth / 2, 25, { align: "center" });
+  doc.setFontSize(8);
+  doc.setFont("Roboto", "normal");
+  doc.setTextColor(60, 60, 60);
+  const lines = doc.splitTextToSize(cgv, pageWidth - 2 * MARGIN) as string[];
+  let y = 40;
+  for (const line of lines) {
+    if (y > pageHeight - 15) { doc.addPage(); y = 20; }
+    doc.text(line, MARGIN, y);
+    y += 4;
+  }
 }
 
 // ============================================================================
@@ -435,6 +494,8 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     dateLines: [
       `Date : ${new Date(devis.dateDevis).toLocaleDateString("fr-FR")}`,
       `Validité : ${devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : "Non définie"}`,
+      // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+      ...(devis.referenceClient ? [`Votre réf. : ${devis.referenceClient}`] : []),
     ],
   });
 
@@ -442,6 +503,15 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
 
   // Tableau des lignes
   const tableData = devis.lignes.map((ligne) => {
+    // OPE-168 — section (en-tête de lot, gras) / note (texte libre, italique) en
+    // pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+    const type = (ligne as any).type ?? "produit";
+    if (type === "section") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+    }
+    if (type === "note") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+    }
     const quantite = Number(ligne.quantite) || 0;
     const prixUnitaire =
       typeof ligne.prixUnitaireHT === "string" ? parseFloat(ligne.prixUnitaireHT) : Number(ligne.prixUnitaireHT);
@@ -498,6 +568,20 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   doc.text("Conditions de paiement : à réception de la facture.", MARGIN, Math.max(totalsEndY + 12, 280));
   doc.text("Devis valable 30 jours à compter de la date d'émission.", MARGIN, Math.max(totalsEndY + 17, 285));
 
+  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné).
+  const mentions = buildMentionsLegalesEmetteur(artisan);
+  if (mentions.length > 0) {
+    doc.setFontSize(7);
+    let my = Math.max(totalsEndY + 23, 290);
+    for (const m of mentions) {
+      doc.text(m, MARGIN, my);
+      my += 4;
+    }
+  }
+
+  // OPE-127 — CGV sur page dédiée (parité avec le PDF client). N'apparaît que si renseignées.
+  if (data.cgv && String(data.cgv).trim()) renderCgvPage(doc, String(data.cgv));
+
   return Buffer.from(doc.output("arraybuffer"));
 }
 
@@ -514,26 +598,63 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const successColor: RGB = [16, 185, 129];
   const dangerColor: RGB = [239, 68, 68];
 
+  // OPE-165 — un avoir (note de crédit) est un document DISTINCT d'une facture :
+  // titré « AVOIR », rappelant la facture d'origine, sans échéance ni mentions de
+  // pénalité de retard. Parité avec le générateur PDF client (déjà avoir-aware).
+  // typeDocument ∈ { facture, avoir } (défaut « facture ») → comportement inchangé
+  // pour toute facture normale (isAvoir = false).
+  const isAvoir = (facture as any).typeDocument === "avoir";
+  const avoirRed: RGB = [220, 53, 69];
+
   renderHeaderBand(doc, {
     primaryColor: primary,
     artisan,
-    title: "FACTURE",
+    title: isAvoir ? "AVOIR" : "FACTURE",
     number: `N° ${facture.numero}`,
     dateLines: [
       `Date : ${new Date(facture.dateFacture).toLocaleDateString("fr-FR")}`,
-      `Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`,
+      // Un avoir n'a pas d'échéance de règlement : on rappelle la facture d'origine
+      // (l'objet par défaut d'un avoir = « Avoir sur facture {numéro} »).
+      ...(isAvoir
+        ? ((facture as any).objet ? [String((facture as any).objet)] : [])
+        : [`Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`]),
+      // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+      ...(facture.referenceClient ? [`Votre réf. : ${facture.referenceClient}`] : []),
     ],
   });
+
+  // OPE-165 — sous-bandeau rouge distinctif pour un avoir, placé dans l'espace
+  // entre le bandeau d'en-tête (y=HEADER_H) et les blocs émetteur/client (y=50).
+  if (isAvoir) {
+    doc.setFillColor(...avoirRed);
+    doc.rect(0, HEADER_H, PAGE_W, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(10);
+    doc.text("AVOIR — Document d'annulation", PAGE_W / 2, HEADER_H + 5.5, { align: "center" });
+    doc.setTextColor(...TEXT_BODY);
+  }
 
   const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
 
   // Tableau des lignes
-  const tableData = facture.lignes.map((ligne) => [
-    ligne.designation,
-    (Number(ligne.quantite) || 0).toString(),
-    `${Number(ligne.prixUnitaireHT).toFixed(2)} €`,
-    `${(Number(ligne.prixUnitaireHT) * (Number(ligne.quantite) || 0)).toFixed(2)} €`,
-  ]);
+  const tableData = facture.lignes.map((ligne) => {
+    // OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
+    // en pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+    const type = (ligne as any).type ?? "produit";
+    if (type === "section") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
+    }
+    if (type === "note") {
+      return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "italic" as const, textColor: [100, 100, 100] as [number, number, number] } }];
+    }
+    return [
+      ligne.designation,
+      (Number(ligne.quantite) || 0).toString(),
+      `${Number(ligne.prixUnitaireHT).toFixed(2)} €`,
+      `${(Number(ligne.prixUnitaireHT) * (Number(ligne.quantite) || 0)).toFixed(2)} €`,
+    ];
+  });
 
   autoTable(doc, {
     head: [["Désignation", "Quantité", "P.U. HT", "Total HT"]],
@@ -574,7 +695,12 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   // Statut
   doc.setFont("Roboto", "bold");
   doc.setFontSize(11);
-  if (facture.statut === "payee") {
+  if (isAvoir) {
+    // OPE-165 — un avoir n'a pas de statut de paiement : il vient en déduction
+    // ou remboursement, pas « en attente de paiement ».
+    doc.setTextColor(...primary);
+    doc.text("AVOIR — montant à déduire ou rembourser", MARGIN, totalsStartY + 6);
+  } else if (facture.statut === "payee") {
     doc.setTextColor(...successColor);
     doc.text("FACTURE PAYÉE", MARGIN, totalsStartY + 6);
   } else {
@@ -590,27 +716,74 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_BODY);
 
-  if (a.iban) {
-    doc.setFont("Roboto", "bold");
-    doc.text("Règlement par virement bancaire :", MARGIN, footerY);
-    doc.setFont("Roboto", "normal");
-    doc.text(`IBAN : ${a.iban}`, MARGIN, footerY + 4);
-    footerY += 10;
+  // OPE-165 — `fy` = ordonnée de la dernière ligne de pied dessinée (avant les
+  // mentions légales émetteur). Un avoir n'appelle aucun règlement : pas d'IBAN,
+  // pas de conditions de paiement, pas de pénalités de retard ni d'escompte.
+  let fy: number;
+  if (isAvoir) {
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    const origineObjet = (facture as any).objet ? String((facture as any).objet) : "la facture d'origine";
+    const avoirNote = doc.splitTextToSize(
+      `${origineObjet}. Le présent avoir vient en déduction d'un règlement ultérieur ou donne lieu à remboursement. Un avoir n'a pas d'échéance de paiement.`,
+      175,
+    ) as string[];
+    const noteLines = avoirNote.slice(0, 3);
+    doc.text(noteLines, MARGIN, footerY);
+    fy = footerY + (noteLines.length - 1) * 4;
+  } else {
+    if (a.iban) {
+      doc.setFont("Roboto", "bold");
+      doc.text("Règlement par virement bancaire :", MARGIN, footerY);
+      doc.setFont("Roboto", "normal");
+      doc.text(`IBAN : ${a.iban}`, MARGIN, footerY + 4);
+      footerY += 10;
+    }
+
+    doc.setFontSize(7);
+    doc.setTextColor(...TEXT_MUTED);
+    // OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
+    // `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
+    const fctr = facture as any;
+    const condRaw = fctr.conditionsPaiement && String(fctr.conditionsPaiement).trim()
+      ? String(fctr.conditionsPaiement).trim()
+      : (facture.dateEcheance
+          ? `Paiement à échéance : ${new Date(facture.dateEcheance).toLocaleDateString("fr-FR")}`
+          : "Paiement à réception.");
+    const condLines = (doc.splitTextToSize(condRaw, 175) as string[]).slice(0, 2);
+    doc.text(condLines, MARGIN, footerY);
+    const fyPenalty = footerY + condLines.length * 4;
+    doc.text(
+      "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée,",
+      MARGIN,
+      fyPenalty,
+    );
+    doc.text(
+      "ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C. com.).",
+      MARGIN,
+      fyPenalty + 4,
+    );
+    // OPE-164 — mention d'escompte obligatoire en B2B (Art. L441-9 II 3° C. com.).
+    doc.text(
+      "Escompte pour paiement anticipé : néant (Art. L441-9 C. com.).",
+      MARGIN,
+      fyPenalty + 8,
+    );
+    fy = fyPenalty + 8;
   }
 
-  doc.setFontSize(7);
-  doc.setTextColor(...TEXT_MUTED);
-  doc.text("Paiement à 30 jours.", MARGIN, footerY);
-  doc.text(
-    "En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée,",
-    MARGIN,
-    footerY + 4,
-  );
-  doc.text(
-    "ainsi qu'une indemnité forfaitaire de 40 € pour frais de recouvrement (Art. L441-10 C. com.).",
-    MARGIN,
-    footerY + 8,
-  );
+  // OPE-151 — mentions légales émetteur (forme juridique / capital / RCS / RM).
+  const mentions = buildMentionsLegalesEmetteur(artisan);
+  let my = fy + 6;
+  for (const m of mentions) {
+    doc.text(m, MARGIN, my);
+    my += 4;
+  }
+
+  // OPE-127 — CGV sur page dédiée (parité PDF client) ; PAS sur un avoir (document d'annulation).
+  if (data.cgv && String(data.cgv).trim() && (facture as any).typeDocument !== "avoir") {
+    renderCgvPage(doc, String(data.cgv));
+  }
 
   return Buffer.from(doc.output("arraybuffer"));
 }
@@ -753,6 +926,144 @@ export function generateContratPDF(data: PDFContratData): Buffer {
     PAGE_H - 12,
   );
   doc.text("Document généré automatiquement — Contrat de maintenance", MARGIN, PAGE_H - 8);
+
+  return Buffer.from(doc.output("arraybuffer"));
+}
+
+// ============================================================================
+// BON D'INTERVENTION / COMPTE-RENDU SIGNÉ (OPE-161)
+// ============================================================================
+// Matérialise en PDF une intervention terminée + sa signature client déjà
+// capturée (interventions_mobile). Rapport FIXE (pas de worksheet paramétrable).
+
+export interface PDFInterventionData {
+  intervention: any; // titre, description, dateDebut, dateFin, adresse, statut, numero?
+  artisan: Artisan;
+  client: Client;
+  mobile?: any | null; // signatureClient (base64), signatureDate, heureArrivee/Depart, notesIntervention
+  technicienNom?: string | null;
+}
+
+export function generateInterventionPDF(data: PDFInterventionData): Buffer {
+  const { intervention, artisan, client, mobile, technicienNom } = data;
+  const doc = new jsPDF();
+  registerFonts(doc);
+
+  const primary = COLOR_COMMANDE; // vert — distinct des devis/factures
+
+  const fmtDate = (d: any) => (d ? new Date(d).toLocaleDateString("fr-FR") : "—");
+  const fmtHeure = (d: any) =>
+    d ? new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+
+  renderHeaderBand(doc, {
+    primaryColor: primary,
+    artisan,
+    title: "BON D'INTERVENTION",
+    number: intervention.numero ? `N° ${intervention.numero}` : `Réf : INT-${intervention.id}`,
+    dateLines: [
+      `Date : ${fmtDate(intervention.dateDebut)}`,
+      ...(technicienNom ? [`Technicien : ${technicienNom}`] : []),
+    ],
+  });
+
+  const blocksEndY = renderInfoBlocks(doc, primary, buildArtisanBlock(artisan), buildClientBlock(client));
+
+  // Titre de l'intervention
+  let y = blocksEndY + 10;
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...primary);
+  doc.text(intervention.titre || "Intervention", MARGIN, y);
+  y += 8;
+
+  // Détails
+  const arrivee = fmtHeure(mobile?.heureArrivee);
+  const depart = fmtHeure(mobile?.heureDepart);
+  let duree = "—";
+  if (mobile?.heureArrivee && mobile?.heureDepart) {
+    const mins = Math.round(
+      (new Date(mobile.heureDepart).getTime() - new Date(mobile.heureArrivee).getTime()) / 60000,
+    );
+    if (mins > 0) duree = `${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, "0")}`;
+  }
+  const detailsData: string[][] = [
+    ["Date", fmtDate(intervention.dateDebut)],
+    ["Statut", intervention.statut === "terminee" ? "Terminée" : (intervention.statut || "—")],
+  ];
+  if (intervention.adresse) detailsData.push(["Lieu", String(intervention.adresse)]);
+  if (technicienNom) detailsData.push(["Technicien", technicienNom]);
+  if (arrivee) detailsData.push(["Heure d'arrivée", arrivee]);
+  if (depart) detailsData.push(["Heure de départ", depart]);
+  if (duree !== "—") detailsData.push(["Durée sur site", duree]);
+
+  autoTable(doc, {
+    body: detailsData,
+    startY: y,
+    theme: "plain",
+    styles: { font: "Roboto", fontSize: 10, textColor: TEXT_BODY, cellPadding: 3 },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 60, textColor: TEXT_DARK },
+      1: { cellWidth: 110 },
+    },
+    margin: { left: MARGIN, right: MARGIN },
+  });
+  y = (doc as any).lastAutoTable.finalY + 8;
+
+  // Travaux réalisés (description + notes terrain)
+  const corps = [intervention.description, mobile?.notesIntervention].filter(Boolean).join("\n\n");
+  if (corps) {
+    doc.setFont("Roboto", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...primary);
+    doc.text("Travaux réalisés", MARGIN, y);
+    y += 6;
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...TEXT_BODY);
+    const lines = doc.splitTextToSize(corps, PAGE_W - 2 * MARGIN);
+    doc.text(lines, MARGIN, y);
+    y += lines.length * 4 + 6;
+  }
+
+  // Signature client (image base64 déjà capturée)
+  const sig: string | undefined = mobile?.signatureClient;
+  y = Math.max(y + 6, 225);
+  doc.setFont("Roboto", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...TEXT_DARK);
+  doc.text("Signature du client", MARGIN, y);
+  if (mobile?.signatureDate) {
+    doc.setFont("Roboto", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...TEXT_MUTED);
+    doc.text(`Signé le ${fmtDate(mobile.signatureDate)}`, MARGIN, y + 5);
+  }
+  if (sig && /^data:image\/(png|jpe?g);base64,/i.test(sig)) {
+    try {
+      const fmt = /jpe?g/i.test(sig) ? "JPEG" : "PNG";
+      doc.addImage(sig, fmt, MARGIN, y + 8, 60, 25);
+    } catch (e) {
+      // signature illisible → on n'embarque pas l'image, le cadre reste
+    }
+  }
+  doc.setDrawColor(...DIVIDER);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y + 36, MARGIN + 70, y + 36);
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_BODY);
+  doc.text(`${client.prenom || ""} ${client.nom}`.trim(), MARGIN, y + 41);
+
+  // Pied de page
+  doc.setFont("Roboto", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...TEXT_MUTED);
+  doc.text(
+    `${artisan.nomEntreprise || ""}${artisan.siret ? ` — SIRET : ${artisan.siret}` : ""}`,
+    MARGIN,
+    PAGE_H - 12,
+  );
+  doc.text("Document généré automatiquement — Bon d'intervention", MARGIN, PAGE_H - 8);
 
   return Buffer.from(doc.output("arraybuffer"));
 }

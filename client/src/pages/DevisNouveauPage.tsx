@@ -47,6 +47,7 @@ export default function DevisNouveauPage() {
   const [dateDevis, setDateDevis] = useState(new Date().toISOString().split('T')[0]);
   const [dateExpiration, setDateExpiration] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [objet, setObjet] = useState("");
+  const [referenceClient, setReferenceClient] = useState("");
   const [notes, setNotes] = useState("");
   const [lignes, setLignes] = useState<LigneDevis[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,9 +64,47 @@ export default function DevisNouveauPage() {
 
   // Requetes tRPC
   const { data: clients = [] } = trpc.clients.list.useQuery();
-  const { data: modeles = [] } = trpc.devis.getModeles.useQuery();
+  // OPE-144 — encours impayé du client sélectionné (alerte non bloquante avant d'émettre).
+  const { data: encoursClient } = trpc.clients.getEncours.useQuery(
+    { clientId },
+    { enabled: clientId > 0 }
+  );
+  const { data: modeles = [], refetch: refetchModeles } = trpc.devis.getModeles.useQuery();
   const createMutation = trpc.devis.create.useMutation();
   const addLigneMutation = trpc.devis.addLigne.useMutation();
+  // OPE-128 — enregistrer le devis courant comme MODÈLE réutilisable (la création de
+  // modèle n'existait nulle part côté UI ; on réutilise createModele + addLigneToModele).
+  const createModeleMutation = trpc.devis.createModele.useMutation();
+  const addLigneModeleMutation = trpc.devis.addLigneToModele.useMutation();
+  const [modeleNom, setModeleNom] = useState("");
+  const [showSaveModele, setShowSaveModele] = useState(false);
+  const [savingModele, setSavingModele] = useState(false);
+  const handleSaveAsModele = async () => {
+    if (!modeleNom.trim()) { toast.error("Donnez un nom au modèle"); return; }
+    if (lignes.length === 0) { toast.error("Ajoutez au moins une ligne"); return; }
+    setSavingModele(true);
+    try {
+      const modele = await createModeleMutation.mutateAsync({ nom: modeleNom.trim() });
+      for (const l of lignes) {
+        await addLigneModeleMutation.mutateAsync({
+          modeleId: modele.id,
+          designation: l.description,
+          quantite: l.quantite,
+          prixUnitaireHT: l.prixUnitaireHT,
+          tauxTVA: l.tauxTVA,
+          unite: l.unite || "unité",
+        });
+      }
+      toast.success("Modèle enregistré");
+      setModeleNom("");
+      setShowSaveModele(false);
+      refetchModeles();
+    } catch (e: any) {
+      toast.error(e?.message || "Erreur lors de l'enregistrement du modèle");
+    } finally {
+      setSavingModele(false);
+    }
+  };
   const getModeleQuery = trpc.devis.getModeleWithLignes.useQuery(
     { modeleId: selectedModeleId || 0 },
     { enabled: selectedModeleId !== null }
@@ -128,6 +167,8 @@ export default function DevisNouveauPage() {
             description: article.nom,
             prixUnitaireHT: parseFloat(article.prix_base) || 0,
             unite: article.unite || "unité",
+            // OPE-142/167 : taux de TVA par défaut de l'article (fallback : valeur courante de la ligne).
+            tauxTVA: (article as any).tauxTVA != null && (article as any).tauxTVA !== "" ? parseFloat((article as any).tauxTVA) : ligne.tauxTVA,
           }
         : ligne
     ));
@@ -218,6 +259,7 @@ export default function DevisNouveauPage() {
       const devis = await createMutation.mutateAsync({
         clientId,
         objet: objet || undefined,
+        referenceClient: referenceClient || undefined,
         dateValidite: dateExpiration,
         notes,
       });
@@ -302,6 +344,19 @@ export default function DevisNouveauPage() {
               </option>
             ))}
           </select>
+          {/* OPE-144 — alerte non bloquante « client à risque » : impayés en cours */}
+          {clientId > 0 && encoursClient && parseFloat(encoursClient.encoursTotal) > 0 && (
+            <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <span aria-hidden="true">⚠️</span>
+              <span>
+                Ce client a <strong>{formatCurrency(encoursClient.encoursTotal)}</strong> d'impayés en cours
+                {parseFloat(encoursClient.echu) > 0 && (
+                  <> (dont <strong>{formatCurrency(encoursClient.echu)}</strong> échus)</>
+                )}
+                {" "}sur {encoursClient.nbFacturesImpayees} facture{encoursClient.nbFacturesImpayees > 1 ? "s" : ""}.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Objet */}
@@ -314,6 +369,19 @@ export default function DevisNouveauPage() {
             value={objet}
             onChange={(e) => setObjet(e.target.value)}
             placeholder="Ex: Rénovation salle de bain, Dépannage fuite..."
+          />
+        </div>
+
+        {/* Référence client (B2B) — OPE-158 */}
+        <div>
+          <Label htmlFor="referenceClient" className="block text-sm font-medium mb-2">
+            Référence client / N° de commande
+          </Label>
+          <Input
+            id="referenceClient"
+            value={referenceClient}
+            onChange={(e) => setReferenceClient(e.target.value)}
+            placeholder="Ex: BC-2026-0042 (optionnel, pour les clients pros)"
           />
         </div>
 
@@ -369,6 +437,35 @@ export default function DevisNouveauPage() {
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {/* OPE-128 — Enregistrer le devis courant comme modèle réutilisable */}
+        {lignes.length > 0 && (
+          <div>
+            {!showSaveModele ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setShowSaveModele(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Enregistrer comme modèle
+              </Button>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <Input
+                  placeholder="Nom du modèle (ex. Entretien chaudière)"
+                  value={modeleNom}
+                  onChange={(e) => setModeleNom(e.target.value)}
+                  className="sm:w-72"
+                  maxLength={255}
+                />
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" onClick={handleSaveAsModele} disabled={savingModele}>
+                    {savingModele ? "Enregistrement..." : "Enregistrer"}
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setShowSaveModele(false); setModeleNom(""); }}>
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

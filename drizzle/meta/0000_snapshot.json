@@ -1,9 +1,154 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "7f7922d8-e40f-40d6-9276-a82b8217f7f5",
+  "id": "68903df0-59f8-4d8f-a3b0-36434dc2e988",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "ai_messages": {
+      "name": "ai_messages",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "threadId": {
+          "name": "threadId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "transcript": {
+          "name": "transcript",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attachments": {
+          "name": "attachments",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "json",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "ai_messages_id": {
+          "name": "ai_messages_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "ai_threads": {
+      "name": "ai_threads",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "artisanId": {
+          "name": "artisanId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'general'"
+        },
+        "parcoursId": {
+          "name": "parcoursId",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "lastMessageAt": {
+          "name": "lastMessageAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "ai_threads_id": {
+          "name": "ai_threads_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "analyses_photos_chantier": {
       "name": "analyses_photos_chantier",
       "columns": {
@@ -321,9 +466,37 @@
           "autoincrement": false,
           "default": "'20.00'"
         },
+        "numeroTVA": {
+          "name": "numeroTVA",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "iban": {
+          "name": "iban",
+          "type": "varchar(34)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "codeAPE": {
+          "name": "codeAPE",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "logo": {
           "name": "logo",
-          "type": "text",
+          "type": "mediumtext",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -361,6 +534,12 @@
           "name": "artisans_userId_unique",
           "columns": [
             "userId"
+          ]
+        },
+        "artisans_slug_unique": {
+          "name": "artisans_slug_unique",
+          "columns": [
+            "slug"
           ]
         }
       },
@@ -471,6 +650,80 @@
       "compositePrimaryKeys": {
         "assurances_vehicules_id": {
           "name": "assurances_vehicules_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "audit_log": {
+      "name": "audit_log",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "artisanId": {
+          "name": "artisanId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entityType": {
+          "name": "entityType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entityId": {
+          "name": "entityId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "details": {
+          "name": "details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "audit_log_id": {
+          "name": "audit_log_id",
           "columns": [
             "id"
           ]
@@ -773,16 +1026,30 @@
           "notNull": true,
           "autoincrement": true
         },
-        "reference": {
-          "name": "reference",
+        "metier": {
+          "name": "metier",
           "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "designation": {
-          "name": "designation",
-          "type": "varchar(500)",
+        "categorie": {
+          "name": "categorie",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sous_categorie": {
+          "name": "sous_categorie",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "nom": {
+          "name": "nom",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -794,49 +1061,50 @@
           "notNull": false,
           "autoincrement": false
         },
-        "unite": {
-          "name": "unite",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "'unité'"
-        },
-        "prixUnitaireHT": {
-          "name": "prixUnitaireHT",
+        "prix_base": {
+          "name": "prix_base",
           "type": "decimal(10,2)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "categorie": {
-          "name": "categorie",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "sousCategorie": {
-          "name": "sousCategorie",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "metier": {
-          "name": "metier",
-          "type": "enum('plomberie','electricite','chauffage','general')",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "'general'"
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp",
+        "unite": {
+          "name": "unite",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "duree_moyenne_minutes": {
+          "name": "duree_moyenne_minutes",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "visible": {
+          "name": "visible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "onUpdate": true,
           "default": "(now())"
         }
       },
@@ -1413,6 +1681,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "numero": {
+          "name": "numero",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "reference": {
           "name": "reference",
           "type": "varchar(50)",
@@ -1444,15 +1719,50 @@
         },
         "statut": {
           "name": "statut",
-          "type": "enum('en_attente','confirmee','expediee','livree','annulee')",
+          "type": "enum('brouillon','envoyee','confirmee','livree','annulee')",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
-          "default": "'en_attente'"
+          "default": "'brouillon'"
         },
         "montantTotal": {
           "name": "montantTotal",
           "type": "decimal(10,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "totalHT": {
+          "name": "totalHT",
+          "type": "decimal(10,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "totalTVA": {
+          "name": "totalTVA",
+          "type": "decimal(10,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "totalTTC": {
+          "name": "totalTTC",
+          "type": "decimal(10,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "delaiLivraison": {
+          "name": "delaiLivraison",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "adresseLivraison": {
+          "name": "adresseLivraison",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2147,6 +2457,14 @@
           "notNull": false,
           "autoincrement": false
         },
+        "type": {
+          "name": "type",
+          "type": "enum('maintenance_preventive','entretien','depannage','contrat_service')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'entretien'"
+        },
         "montantHT": {
           "name": "montantHT",
           "type": "decimal(10,2)",
@@ -2183,9 +2501,39 @@
           "notNull": false,
           "autoincrement": false
         },
+        "reconduction": {
+          "name": "reconduction",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": true
+        },
+        "preavisResiliation": {
+          "name": "preavisResiliation",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 1
+        },
         "prochainFacturation": {
           "name": "prochainFacturation",
           "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "prochainPassage": {
+          "name": "prochainPassage",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "conditionsParticulieres": {
+          "name": "conditionsParticulieres",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2268,18 +2616,62 @@
         },
         "statut": {
           "name": "statut",
-          "type": "enum('active','archivee')",
+          "type": "enum('ouverte','fermee','archivee')",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
-          "default": "'active'"
+          "default": "'ouverte'"
         },
-        "dernierMessageAt": {
-          "name": "dernierMessageAt",
+        "devisId": {
+          "name": "devisId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "factureId": {
+          "name": "factureId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "interventionId": {
+          "name": "interventionId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dernierMessage": {
+          "name": "dernierMessage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dernierMessageDate": {
+          "name": "dernierMessageDate",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "nonLuArtisan": {
+          "name": "nonLuArtisan",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 0
+        },
+        "nonLuClient": {
+          "name": "nonLuClient",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 0
         },
         "createdAt": {
           "name": "createdAt",
@@ -3537,11 +3929,26 @@
         },
         "statut": {
           "name": "statut",
-          "type": "enum('brouillon','envoyee','payee','en_retard','annulee')",
+          "type": "enum('brouillon','validee','envoyee','payee','en_retard','annulee')",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
           "default": "'brouillon'"
+        },
+        "typeDocument": {
+          "name": "typeDocument",
+          "type": "enum('facture','avoir')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'facture'"
+        },
+        "factureOrigineId": {
+          "name": "factureOrigineId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "objet": {
           "name": "objet",
@@ -3599,6 +4006,13 @@
         "datePaiement": {
           "name": "datePaiement",
           "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "modePaiement": {
+          "name": "modePaiement",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4575,6 +4989,117 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "interventions_contrat": {
+      "name": "interventions_contrat",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "contratId": {
+          "name": "contratId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "artisanId": {
+          "name": "artisanId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "titre": {
+          "name": "titre",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dateIntervention": {
+          "name": "dateIntervention",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "duree": {
+          "name": "duree",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "technicienNom": {
+          "name": "technicienNom",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "statut": {
+          "name": "statut",
+          "type": "enum('planifiee','en_cours','effectuee','annulee')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'planifiee'"
+        },
+        "rapport": {
+          "name": "rapport",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "interventions_contrat_id": {
+          "name": "interventions_contrat_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "interventions_mobile": {
       "name": "interventions_mobile",
       "columns": {
@@ -4710,6 +5235,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "articleId": {
+          "name": "articleId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "stockId": {
           "name": "stockId",
           "type": "int",
@@ -4738,12 +5270,28 @@
           "notNull": true,
           "autoincrement": false
         },
+        "unite": {
+          "name": "unite",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'unité'"
+        },
         "prixUnitaire": {
           "name": "prixUnitaire",
           "type": "decimal(10,2)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "tauxTVA": {
+          "name": "tauxTVA",
+          "type": "decimal(5,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'20.00'"
         },
         "montantTotal": {
           "name": "montantTotal",
@@ -4783,8 +5331,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "expediteur": {
-          "name": "expediteur",
+        "auteur": {
+          "name": "auteur",
           "type": "enum('artisan','client')",
           "primaryKey": false,
           "notNull": true,
@@ -4805,9 +5353,16 @@
           "autoincrement": false,
           "default": false
         },
-        "luAt": {
-          "name": "luAt",
-          "type": "timestamp",
+        "pieceJointe": {
+          "name": "pieceJointe",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pieceJointeUrl": {
+          "name": "pieceJointeUrl",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -5537,6 +6092,14 @@
           "autoincrement": false,
           "default": "'FAC'"
         },
+        "prefixeAvoir": {
+          "name": "prefixeAvoir",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'AV'"
+        },
         "compteurDevis": {
           "name": "compteurDevis",
           "type": "int",
@@ -5547,6 +6110,14 @@
         },
         "compteurFacture": {
           "name": "compteurFacture",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 1
+        },
+        "compteurAvoir": {
+          "name": "compteurAvoir",
           "type": "int",
           "primaryKey": false,
           "notNull": false,
@@ -5591,6 +6162,89 @@
           "autoincrement": false,
           "default": 30
         },
+        "objectifCA": {
+          "name": "objectifCA",
+          "type": "decimal(10,2)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'0'"
+        },
+        "objectifDevis": {
+          "name": "objectifDevis",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 0
+        },
+        "objectifClients": {
+          "name": "objectifClients",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 0
+        },
+        "vitrineActive": {
+          "name": "vitrineActive",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": false
+        },
+        "vitrineDescription": {
+          "name": "vitrineDescription",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vitrineZone": {
+          "name": "vitrineZone",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vitrineServices": {
+          "name": "vitrineServices",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vitrineExperience": {
+          "name": "vitrineExperience",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "couleurPrincipale": {
+          "name": "couleurPrincipale",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'#4F46E5'"
+        },
+        "couleurSecondaire": {
+          "name": "couleurSecondaire",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'#6366F1'"
+        },
+        "conditionsPaiementDefaut": {
+          "name": "conditionsPaiementDefaut",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "timestamp",
@@ -5627,6 +6281,60 @@
           ]
         }
       },
+      "checkConstraint": {}
+    },
+    "permissions_utilisateur": {
+      "name": "permissions_utilisateur",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "permission": {
+          "name": "permission",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "autorise": {
+          "name": "autorise",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "permissions_utilisateur_id": {
+          "name": "permissions_utilisateur_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "checkConstraint": {}
     },
     "phases_chantier": {
@@ -6545,6 +7253,120 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "rdv_en_ligne": {
+      "name": "rdv_en_ligne",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "artisanId": {
+          "name": "artisanId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clientId": {
+          "name": "clientId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "titre": {
+          "name": "titre",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dateProposee": {
+          "name": "dateProposee",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "dureeEstimee": {
+          "name": "dureeEstimee",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 60
+        },
+        "statut_rdv": {
+          "name": "statut_rdv",
+          "type": "enum('en_attente','confirme','refuse','annule')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'en_attente'"
+        },
+        "motifRefus": {
+          "name": "motifRefus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "urgence_rdv": {
+          "name": "urgence_rdv",
+          "type": "enum('normale','urgente','tres_urgente')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'normale'"
+        },
+        "interventionId": {
+          "name": "interventionId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "rdv_en_ligne_id": {
+          "name": "rdv_en_ligne_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "relances_devis": {
       "name": "relances_devis",
       "columns": {
@@ -6695,6 +7517,58 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "sessions": {
+      "name": "sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "sessions_userId_users_id_fk": {
+          "name": "sessions_userId_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "sessions_id": {
+          "name": "sessions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "signatures_devis": {
       "name": "signatures_devis",
       "columns": {
@@ -6718,6 +7592,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "statut": {
+          "name": "statut",
+          "type": "enum('en_attente','accepte','refuse')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'en_attente'"
         },
         "signatureData": {
           "name": "signatureData",
@@ -6749,6 +7631,13 @@
         },
         "userAgent": {
           "name": "userAgent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "motifRefus": {
+          "name": "motifRefus",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -7192,6 +8081,121 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
+    "suivi_chantier": {
+      "name": "suivi_chantier",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "chantierId": {
+          "name": "chantierId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "titre": {
+          "name": "titre",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "statut": {
+          "name": "statut",
+          "type": "enum('a_faire','en_cours','termine')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'a_faire'"
+        },
+        "pourcentage": {
+          "name": "pourcentage",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 0
+        },
+        "ordre": {
+          "name": "ordre",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 1
+        },
+        "visibleClient": {
+          "name": "visibleClient",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": true
+        },
+        "dateDebut": {
+          "name": "dateDebut",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dateFin": {
+          "name": "dateFin",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "commentaire": {
+          "name": "commentaire",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "onUpdate": true,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "suivi_chantier_id": {
+          "name": "suivi_chantier_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
     "techniciens": {
       "name": "techniciens",
       "columns": {
@@ -7321,6 +8325,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "prenom": {
+          "name": "prenom",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "email": {
           "name": "email",
           "type": "varchar(320)",
@@ -7344,11 +8355,26 @@
         },
         "role": {
           "name": "role",
-          "type": "enum('user','admin')",
+          "type": "enum('admin','artisan','secretaire','technicien')",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'user'"
+          "default": "'artisan'"
+        },
+        "artisanId": {
+          "name": "artisanId",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actif": {
+          "name": "actif",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
         },
         "createdAt": {
           "name": "createdAt",

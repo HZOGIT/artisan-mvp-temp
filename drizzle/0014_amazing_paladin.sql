@@ -1,0 +1,1 @@
+ALTER TABLE `bibliotheque_articles` ADD `prixRevient` decimal(10,2);

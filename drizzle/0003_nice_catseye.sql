@@ -1,0 +1,1 @@
+ALTER TABLE `articles_artisan` ADD `tauxTVA` decimal(5,2) DEFAULT '20.00';

@@ -19,6 +19,8 @@ export default function Parametres() {
     mentionsLegalesDevis: "",
     mentionsLegalesFacture: "",
     conditionsPaiementDefaut: "Paiement à 30 jours",
+    delaiPaiementJours: "",
+    delaiPaiementType: "net",
     delaiValiditeDevis: "30",
     notificationsEmail: true,
     vitrineActive: false,
@@ -36,6 +38,25 @@ export default function Parametres() {
 
   const { data: parametres, isLoading } = trpc.parametres.get.useQuery();
   const { data: artisan, refetch: refetchArtisan } = trpc.artisan.getProfile.useQuery();
+
+  // OPE-156 — flux iCal (abonnement agenda externe aux interventions).
+  const { data: icalFeed, refetch: refetchIcal } = trpc.calendrier.getIcalFeed.useQuery();
+  const icalUrl = icalFeed?.path ? `${window.location.origin}${icalFeed.path}` : "";
+  const regenIcal = trpc.calendrier.regenerateIcalFeed.useMutation({
+    onSuccess: () => { refetchIcal(); toast.success("Lien d'abonnement régénéré (l'ancien est révoqué)"); },
+    onError: () => toast.error("Impossible de régénérer le lien"),
+  });
+
+  // OPE-172 — demandes de contact (leads) de la vitrine.
+  const { data: demandesContact, refetch: refetchDemandes } = trpc.vitrine.getDemandesContact.useQuery();
+  const updateDemandeStatut = trpc.vitrine.updateDemandeContactStatut.useMutation({
+    onSuccess: () => { refetchDemandes(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const convertirDemande = trpc.vitrine.convertirDemandeEnClient.useMutation({
+    onSuccess: () => { refetchDemandes(); toast.success("Lead converti en client"); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const updateMutation = trpc.parametres.update.useMutation({
     onSuccess: () => {
@@ -65,6 +86,8 @@ export default function Parametres() {
         mentionsLegalesDevis: parametres.mentionsLegales || "",
         mentionsLegalesFacture: parametres.conditionsGenerales || "",
         conditionsPaiementDefaut: parametres.conditionsPaiementDefaut || "Paiement à 30 jours",
+        delaiPaiementJours: parametres.delaiPaiementJours != null ? String(parametres.delaiPaiementJours) : "",
+        delaiPaiementType: parametres.delaiPaiementType || "net",
         delaiValiditeDevis: String(parametres.rappelDevisJours || 30),
         notificationsEmail: parametres.notificationsEmail ?? true,
         vitrineActive: parametres.vitrineActive ?? false,
@@ -93,6 +116,8 @@ export default function Parametres() {
       mentionsLegales: formData.mentionsLegalesDevis,
       conditionsGenerales: formData.mentionsLegalesFacture,
       conditionsPaiementDefaut: formData.conditionsPaiementDefaut,
+      delaiPaiementJours: formData.delaiPaiementJours.trim() === "" ? null : (parseInt(formData.delaiPaiementJours) || 0),
+      delaiPaiementType: formData.delaiPaiementType as "net" | "fin_de_mois",
       notificationsEmail: formData.notificationsEmail,
       rappelDevisJours: parseInt(formData.delaiValiditeDevis) || 30,
       vitrineActive: formData.vitrineActive,
@@ -145,16 +170,11 @@ export default function Parametres() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   // Lecture du tab actif depuis l'URL (?tab=abonnement pour deep link
   // depuis le banner ou le webhook de checkout success).
+  // IMPORTANT : ces hooks (useSearch/useLocation/useState/useEffect) doivent
+  // rester AVANT tout `return` conditionnel (ex. isLoading) — sinon le nombre
+  // de hooks varie entre les rendus → React error #310 (Rules of Hooks).
   const search = useSearch();
   const [, navigate] = useLocation();
   const initialTab = new URLSearchParams(search).get("tab") === "abonnement" ? "abonnement" : "general";
@@ -172,6 +192,14 @@ export default function Parametres() {
       navigate("/parametres?tab=abonnement", { replace: true });
     }
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -365,6 +393,34 @@ export default function Parametres() {
                 placeholder="Paiement à 30 jours"
               />
             </div>
+            {/* OPE-94 — délai de paiement structuré : calcule l'échéance des factures */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="delaiPaiementJours">Délai de paiement (jours)</Label>
+                <Input
+                  id="delaiPaiementJours"
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={formData.delaiPaiementJours}
+                  onChange={(e) => setFormData({ ...formData, delaiPaiementJours: e.target.value })}
+                  placeholder="Ex : 30 (vide = pas d'échéance auto)"
+                />
+                <p className="text-xs text-muted-foreground">Calcule automatiquement la date d'échéance des nouvelles factures.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="delaiPaiementType">Type de délai</Label>
+                <select
+                  id="delaiPaiementType"
+                  value={formData.delaiPaiementType}
+                  onChange={(e) => setFormData({ ...formData, delaiPaiementType: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="net">Net (date + N jours)</option>
+                  <option value="fin_de_mois">N jours fin de mois</option>
+                </select>
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="mentionsLegalesDevis">Mentions légales</Label>
               <Textarea
@@ -514,6 +570,103 @@ export default function Parametres() {
           </Button>
         </div>
       </form>
+
+      {/* OPE-156 — Synchronisation calendrier (iCal) */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Synchroniser mon agenda</CardTitle>
+          <CardDescription>
+            Abonnez votre agenda (Google Agenda, Apple Calendrier, Outlook) à vos interventions
+            Operioz. Le lien est secret — ne le partagez pas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Input readOnly value={icalUrl} placeholder="Génération du lien…" onFocus={(e) => e.currentTarget.select()} />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!icalUrl}
+              onClick={() => { if (icalUrl) { navigator.clipboard?.writeText(icalUrl); toast.success("Lien copié"); } }}
+            >
+              Copier
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Dans votre agenda : « Ajouter un calendrier » → « À partir d'une URL » → collez ce lien.
+            Les interventions s'y mettent à jour automatiquement.
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={regenIcal.isPending}
+            onClick={() => regenIcal.mutate()}
+          >
+            Régénérer le lien (révoque l'ancien)
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* OPE-172 — Demandes de contact (leads vitrine) */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Demandes de contact</CardTitle>
+          <CardDescription>
+            Les messages reçus via votre page vitrine. Suivez-les (nouveau → contacté → converti/perdu)
+            pour ne perdre aucun prospect.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(!demandesContact || demandesContact.length === 0) ? (
+            <p className="text-sm text-muted-foreground">Aucune demande pour le moment.</p>
+          ) : (
+            <div className="space-y-3">
+              {demandesContact.map((d: any) => (
+                <div key={d.id} className="border rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="space-y-0.5">
+                      <p className="font-medium">
+                        {d.nom}
+                        <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          d.statut === "converti" ? "bg-green-100 text-green-700"
+                          : d.statut === "perdu" ? "bg-gray-200 text-gray-600"
+                          : d.statut === "contacte" ? "bg-amber-100 text-amber-800"
+                          : "bg-blue-100 text-blue-700"}`}>
+                          {d.statut}
+                        </span>
+                      </p>
+                      {d.email && <p className="text-xs text-muted-foreground">{d.email}</p>}
+                      {d.telephone && <p className="text-xs text-muted-foreground">{d.telephone}</p>}
+                      {d.message && <p className="text-sm mt-1 whitespace-pre-wrap">{d.message}</p>}
+                    </div>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      {d.statut !== "converti" && (
+                        <Button type="button" size="sm" variant="outline" disabled={convertirDemande.isPending}
+                          onClick={() => convertirDemande.mutate({ id: d.id })}>
+                          Convertir en client
+                        </Button>
+                      )}
+                      {d.statut === "nouveau" && (
+                        <Button type="button" size="sm" variant="ghost"
+                          onClick={() => updateDemandeStatut.mutate({ id: d.id, statut: "contacte" })}>
+                          Marquer contacté
+                        </Button>
+                      )}
+                      {d.statut !== "perdu" && d.statut !== "converti" && (
+                        <Button type="button" size="sm" variant="ghost" className="text-muted-foreground"
+                          onClick={() => updateDemandeStatut.mutate({ id: d.id, statut: "perdu" })}>
+                          Marquer perdu
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
         </TabsContent>
       </Tabs>
     </div>

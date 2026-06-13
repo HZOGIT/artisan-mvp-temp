@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Building2, Calendar, Euro, Users, FileText, Trash2, Edit, ChevronRight, Clock, CheckCircle2, PauseCircle, XCircle, AlertCircle, Eye, EyeOff, ListChecks } from "lucide-react";
+import { Plus, Building2, Calendar, Euro, Users, FileText, Trash2, Edit, ChevronRight, Clock, CheckCircle2, PauseCircle, XCircle, AlertCircle, Eye, EyeOff, ListChecks, Bell, Circle, AlarmClock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 export default function Chantiers() {
@@ -56,6 +56,34 @@ export default function Chantiers() {
     { enabled: !!selectedChantier }
   );
 
+  // OPE-121 — rappels/activités CRM rattachés au chantier sélectionné.
+  const { data: allActivitesCh, refetch: refetchActivitesCh } = trpc.activites.list.useQuery();
+  const activitesChantier = (allActivitesCh || []).filter(
+    (a: any) => a.entiteType === "chantier" && a.entiteId === selectedChantier,
+  );
+  const [rappelTitre, setRappelTitre] = useState("");
+  const [rappelEcheance, setRappelEcheance] = useState("");
+  const [rappelType, setRappelType] = useState("autre");
+  const createRappelCh = trpc.activites.create.useMutation({
+    onSuccess: () => {
+      toast.success("Rappel ajouté");
+      setRappelTitre(""); setRappelEcheance(""); setRappelType("autre");
+      refetchActivitesCh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const toggleRappelCh = trpc.activites.toggleFait.useMutation({
+    onSuccess: () => refetchActivitesCh(),
+    onError: (e) => toast.error(e.message),
+  });
+  const deleteRappelCh = trpc.activites.delete.useMutation({
+    onSuccess: () => refetchActivitesCh(),
+    onError: (e) => toast.error(e.message),
+  });
+  const rappelTypeLabels: Record<string, string> = {
+    appel: "Appel", email: "Email", rdv: "RDV", relance: "Relance", autre: "À faire",
+  };
+
   const [suiviForm, setSuiviForm] = useState({ titre: "", description: "", ordre: 1, visibleClient: true });
   const [isSuiviDialogOpen, setIsSuiviDialogOpen] = useState(false);
 
@@ -81,6 +109,34 @@ export default function Chantiers() {
     onSuccess: () => {
       toast.success("Etape supprimee");
       utils.chantiers.getSuivi.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  // OPE-106 — pointages de main-d'œuvre (heures réalisées) du chantier sélectionné.
+  const { data: pointages } = trpc.chantiers.getPointages.useQuery(
+    { chantierId: selectedChantier! },
+    { enabled: !!selectedChantier }
+  );
+  const { data: techniciensList } = trpc.techniciens.getAll.useQuery();
+  const [pointageForm, setPointageForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    heures: "",
+    technicienId: "",
+    description: "",
+  });
+  const addPointageMutation = trpc.chantiers.addPointage.useMutation({
+    onSuccess: () => {
+      toast.success("Pointage ajouté");
+      utils.chantiers.getPointages.invalidate();
+      setPointageForm({ date: new Date().toISOString().slice(0, 10), heures: "", technicienId: "", description: "" });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const deletePointageMutation = trpc.chantiers.deletePointage.useMutation({
+    onSuccess: () => {
+      toast.success("Pointage supprimé");
+      utils.chantiers.getPointages.invalidate();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -390,6 +446,7 @@ export default function Chantiers() {
         {/* Détails du chantier */}
         <div className="lg:col-span-2">
           {selectedChantier && chantierDetails ? (
+            <>
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -417,6 +474,7 @@ export default function Chantiers() {
                   <TabsList className="mb-4">
                     <TabsTrigger value="apercu">Aperçu</TabsTrigger>
                     <TabsTrigger value="phases">Phases</TabsTrigger>
+                    <TabsTrigger value="mainoeuvre">Main-d'œuvre</TabsTrigger>
                     <TabsTrigger value="interventions">Interventions</TabsTrigger>
                     <TabsTrigger value="documents">Documents</TabsTrigger>
                     <TabsTrigger value="suivi">Suivi client</TabsTrigger>
@@ -461,6 +519,34 @@ export default function Chantiers() {
                           </p>
                         </CardContent>
                       </Card>
+                      {/* OPE-107 — coût réel agrégé depuis les dépenses + marge */}
+                      <Card>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center gap-2">
+                            <Euro className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Coût réel</span>
+                          </div>
+                          <p className="text-lg font-semibold mt-1">
+                            {(statistiques?.coutReel || 0).toLocaleString()} €
+                          </p>
+                        </CardContent>
+                      </Card>
+                      {statistiques?.marge !== null && statistiques?.marge !== undefined && (
+                        <Card>
+                          <CardContent className="pt-4">
+                            <div className="flex items-center gap-2">
+                              <Euro className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">Marge</span>
+                            </div>
+                            <p className={`text-lg font-semibold mt-1 ${statistiques.marge >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {statistiques.marge.toLocaleString()} €
+                              {statistiques.margePct !== null && statistiques.margePct !== undefined && (
+                                <span className="text-sm font-normal"> ({statistiques.margePct}%)</span>
+                              )}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
                       <Card>
                         <CardContent className="pt-4">
                           <div className="flex items-center gap-2">
@@ -563,6 +649,123 @@ export default function Chantiers() {
                         Ajouter une phase
                       </Button>
                     </div>
+                  </TabsContent>
+
+                  <TabsContent value="mainoeuvre">
+                    {(() => {
+                      const totalPrevues = (phases || []).reduce(
+                        (s: number, p: any) => s + (parseFloat(p.heuresPrevues) || 0), 0);
+                      const totalPointees = (pointages || []).reduce(
+                        (s: number, p: any) => s + (parseFloat(p.heures) || 0), 0);
+                      const ecart = totalPointees - totalPrevues;
+                      const techNom = (id: number | null) => {
+                        if (!id) return "—";
+                        const t = (techniciensList || []).find((x: any) => x.id === id);
+                        return t ? `${t.prenom || ""} ${t.nom}`.trim() : `#${id}`;
+                      };
+                      return (
+                        <div className="space-y-4">
+                          {/* Synthèse prévu vs réalisé */}
+                          <div className="grid grid-cols-3 gap-4">
+                            <Card><CardContent className="pt-4 text-center">
+                              <p className="text-sm text-muted-foreground">Heures prévues</p>
+                              <p className="text-2xl font-bold">{totalPrevues.toFixed(1)} h</p>
+                            </CardContent></Card>
+                            <Card><CardContent className="pt-4 text-center">
+                              <p className="text-sm text-muted-foreground">Heures pointées</p>
+                              <p className="text-2xl font-bold">{totalPointees.toFixed(1)} h</p>
+                            </CardContent></Card>
+                            <Card><CardContent className="pt-4 text-center">
+                              <p className="text-sm text-muted-foreground">Écart</p>
+                              <p className={`text-2xl font-bold ${ecart > 0 ? "text-red-600" : "text-green-600"}`}>
+                                {ecart > 0 ? "+" : ""}{ecart.toFixed(1)} h
+                              </p>
+                            </CardContent></Card>
+                          </div>
+
+                          {/* Formulaire d'ajout de pointage */}
+                          <form
+                            className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end border rounded-lg p-3"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const heures = parseFloat(pointageForm.heures);
+                              if (!pointageForm.date) { toast.error("Date requise"); return; }
+                              if (!(heures > 0)) { toast.error("Heures invalides"); return; }
+                              addPointageMutation.mutate({
+                                chantierId: selectedChantier!,
+                                date: pointageForm.date,
+                                heures,
+                                technicienId: pointageForm.technicienId ? parseInt(pointageForm.technicienId) : undefined,
+                                description: pointageForm.description || undefined,
+                              });
+                            }}
+                          >
+                            <div>
+                              <Label className="text-xs">Date</Label>
+                              <Input type="date" value={pointageForm.date}
+                                onChange={(e) => setPointageForm({ ...pointageForm, date: e.target.value })} />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Heures</Label>
+                              <Input type="number" step="0.25" min="0" max="24" placeholder="7.5"
+                                value={pointageForm.heures}
+                                onChange={(e) => setPointageForm({ ...pointageForm, heures: e.target.value })} />
+                            </div>
+                            <div>
+                              <Label className="text-xs">Technicien</Label>
+                              <Select value={pointageForm.technicienId || "none"}
+                                onValueChange={(v) => setPointageForm({ ...pointageForm, technicienId: v === "none" ? "" : v })}>
+                                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">—</SelectItem>
+                                  {(techniciensList || []).map((t: any) => (
+                                    <SelectItem key={t.id} value={String(t.id)}>
+                                      {`${t.prenom || ""} ${t.nom}`.trim()}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Description</Label>
+                              <Input value={pointageForm.description}
+                                onChange={(e) => setPointageForm({ ...pointageForm, description: e.target.value })} />
+                            </div>
+                            <Button type="submit" disabled={addPointageMutation.isPending}>
+                              <Plus className="h-4 w-4 mr-1" /> Pointer
+                            </Button>
+                          </form>
+
+                          {/* Liste des pointages */}
+                          {pointages && pointages.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {pointages.map((p: any) => (
+                                <div key={p.id} className="flex items-center justify-between gap-2 border rounded-lg p-2.5 text-sm">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span className="font-semibold w-16">{Number(p.heures).toFixed(2)} h</span>
+                                    <span className="text-muted-foreground">{new Date(p.date).toLocaleDateString("fr-FR")}</span>
+                                    <span>{techNom(p.technicienId)}</span>
+                                    {p.description && <span className="text-muted-foreground truncate">— {p.description}</span>}
+                                  </div>
+                                  <Button variant="ghost" size="icon"
+                                    onClick={() => {
+                                      if (confirm("Supprimer ce pointage ?")) {
+                                        deletePointageMutation.mutate({ chantierId: selectedChantier!, id: p.id });
+                                      }
+                                    }}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">
+                              Aucune heure pointée sur ce chantier.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </TabsContent>
 
                   <TabsContent value="interventions">
@@ -713,6 +916,108 @@ export default function Chantiers() {
                 </Tabs>
               </CardContent>
             </Card>
+
+            {/* OPE-121 — Rappels / activités CRM rattachés à ce chantier */}
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Bell className="h-5 w-5" />
+                  Rappels ({activitesChantier.filter((a: any) => !a.fait).length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form
+                  className="flex flex-col sm:flex-row gap-2 mb-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!rappelTitre.trim()) { toast.error("Le titre est requis"); return; }
+                    if (!rappelEcheance) { toast.error("L'échéance est requise"); return; }
+                    createRappelCh.mutate({
+                      titre: rappelTitre.trim(),
+                      echeance: rappelEcheance,
+                      type: rappelType as any,
+                      entiteType: "chantier",
+                      entiteId: selectedChantier!,
+                    });
+                  }}
+                >
+                  <Input
+                    placeholder="Rappel sur ce chantier (visite, relance, livraison…)"
+                    value={rappelTitre}
+                    onChange={(e) => setRappelTitre(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    type="date"
+                    value={rappelEcheance}
+                    onChange={(e) => setRappelEcheance(e.target.value)}
+                    className="sm:w-40"
+                  />
+                  <Select value={rappelType} onValueChange={setRappelType}>
+                    <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="autre">À faire</SelectItem>
+                      <SelectItem value="appel">Appel</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="rdv">RDV</SelectItem>
+                      <SelectItem value="relance">Relance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button type="submit" disabled={createRappelCh.isPending}>
+                    <Plus className="h-4 w-4 mr-1" /> Ajouter
+                  </Button>
+                </form>
+
+                {activitesChantier.length > 0 ? (
+                  <div className="space-y-2">
+                    {activitesChantier
+                      .slice()
+                      .sort((a: any, b: any) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime())
+                      .map((a: any) => (
+                        <div key={a.id} className="flex items-start gap-2 p-3 rounded-lg border">
+                          <button
+                            type="button"
+                            title={a.fait ? "Marquer à faire" : "Marquer fait"}
+                            onClick={() => toggleRappelCh.mutate({ id: a.id, fait: !a.fait })}
+                            className="mt-0.5 shrink-0"
+                          >
+                            {a.fait
+                              ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                              : <Circle className="h-4 w-4 text-muted-foreground" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium ${a.fait ? "line-through text-muted-foreground" : ""}`}>
+                              {a.titre}
+                            </p>
+                            <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <AlarmClock className="h-3 w-3" />
+                                {new Date(a.echeance).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded-full bg-muted text-[10px] font-semibold">
+                                {rappelTypeLabels[a.type] || a.type}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            title="Supprimer"
+                            onClick={() => deleteRappelCh.mutate({ id: a.id })}
+                            className="mt-0.5 shrink-0 text-muted-foreground hover:text-rose-500"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-6 text-sm text-muted-foreground">
+                    Aucun rappel pour ce chantier.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            </>
           ) : (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">

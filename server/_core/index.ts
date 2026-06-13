@@ -6,7 +6,7 @@ import net from "net";
 import cookieParser from "cookie-parser";
 import multer from "multer";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../routers";
+import { appRouter, checkRateLimit } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 
@@ -15,6 +15,53 @@ import { serveStatic, setupVite } from "./vite";
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET manquant ! Definir la variable d'environnement (min 32 caracteres).");
+}
+
+// OPE-82 — Filet de dernier recours au niveau process. Sans ces handlers, une
+// rejection non gerée ou un evenement 'error' non ecoute (ex. pool MySQL sur
+// coupure DB) termine le process (Node 22) → crash de toute l'instance
+// multi-tenant. On loggue et on NE quitte PAS (la coupure DB est transitoire ;
+// le pool se reconnecte) pour eviter les crash-loops.
+process.on("unhandledRejection", (reason: unknown) => {
+  console.error("[unhandledRejection]", reason);
+});
+process.on("uncaughtException", (err: Error) => {
+  console.error("[uncaughtException]", err?.stack || err?.message || err);
+});
+
+// OPE-24 — rate-limit en mémoire pour l'endpoint public /api/voice/debug
+// (crash-reporting via sendBeacon). Borne le flood de logs par IP.
+const voiceDebugHits = new Map<string, { count: number; resetAt: number }>();
+
+// OPE-24 — rate-limit en mémoire pour /api/articles/search (public, interroge la DB).
+// Borne le scraping/flood non authentifié du catalogue de référence par IP.
+const articleSearchHits = new Map<string, { count: number; resetAt: number }>();
+
+// OPE-24 — rate-limit IP des routes publiques GÉNÉRATRICES de PDF/iCal (jsPDF/sérialisation
+// = CPU + N requêtes DB par appel). Token-gated mais un token fuité pourrait spammer la
+// génération → épuisement CPU. Seau dédié, limite généreuse (consultation/abonnement
+// légitime très en-dessous), 429 au-delà.
+const pdfRouteHits = new Map<string, { count: number; resetAt: number }>();
+// OPE-24 — rate-limit IP de la création de session de paiement Stripe (route publique
+// token-gated). Chaque appel crée une session Stripe + une ligne `paiements_stripe` :
+// un token portail fuité (ou un brute-force de factureId) pourrait spammer l'API Stripe
+// et faire grossir la table. Seau dédié, limite généreuse (un client clique « Payer »
+// une fois ou deux), 429 au-delà. Ne touche PAS la logique de paiement (garde en amont).
+const paiementRouteHits = new Map<string, { count: number; resetAt: number }>();
+function checkIpRouteLimit(req: any, bucket: Map<string, { count: number; resetAt: number }>, limit: number, windowMs: number): boolean {
+  const ip = String(
+    (req.headers['cf-connecting-ip'] as string)
+    || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+    || req.socket?.remoteAddress || 'unknown'
+  );
+  const now = Date.now();
+  const hit = bucket.get(ip);
+  if (!hit || hit.resetAt <= now) {
+    bucket.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (++hit.count > limit) return false;
+  return true;
 }
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -44,65 +91,24 @@ async function startServer() {
   console.log('[Stripe] STRIPE_WEBHOOK_SECRET:', process.env.STRIPE_WEBHOOK_SECRET ? 'Set' : 'Missing');
   
   try {
-    const { getDb, seedTestData } = await import('../db');
+    const { getDb, seedTestData, migrateDefaultObjectifs, seedDemoNotifications, seedDemoRdv } = await import('../db');
     const db = await getDb();
     if (db) {
       console.log('[Database] MySQL connected successfully');
       // Seed test data (one-time, skips if data already exists)
       try { await seedTestData(); } catch (e) { console.error('[Seed] Error:', e); }
-      // Migrate parametres_artisan: set default objectif values
+      // OPE-184 — bootstrap/seed portés en Drizzle (dialect-aware, idempotents).
       try {
-        const { getPool: getMigPool } = await import('../db');
-        const migPool = getMigPool();
-        if (migPool) {
-          const [rows] = await migPool.execute("SELECT id FROM parametres_artisan WHERE (objectifCA IS NULL OR objectifCA = 0) AND (objectifDevis IS NULL OR objectifDevis = 0) LIMIT 1");
-          if ((rows as any[]).length > 0) {
-            await migPool.execute("UPDATE parametres_artisan SET objectifCA = 10000, objectifDevis = 15, objectifClients = 5 WHERE objectifCA IS NULL OR objectifCA = 0");
-            console.log('[Migration] Set default objectif values in parametres_artisan');
-          }
-        }
+        const n = await migrateDefaultObjectifs();
+        if (n > 0) console.log(`[Migration] Set default objectif values in parametres_artisan (${n})`);
       } catch (e) { console.error('[Migration] objectif values error:', e); }
-      // Seed demo notifications (one-time)
       try {
-        const { getPool } = await import('../db');
-        const pool = getPool();
-        if (pool) {
-          const [existing] = await pool.execute('SELECT COUNT(*) as cnt FROM notifications WHERE artisanId = 1');
-          if ((existing as any)[0].cnt === 0) {
-            const now = new Date();
-            const notifs = [
-              { type: 'succes', titre: 'Devis DEV-00026 accepte et signe', message: 'Le client Durand Pierre a accepte et signe le devis DEV-00026', lien: '/devis/26', lu: 0, hours: 2 },
-              { type: 'info', titre: 'Nouveau message de Hab Doudi', message: 'Bonjour, je souhaiterais modifier la date de mon intervention...', lien: '/chat', lu: 0, hours: 4 },
-              { type: 'rappel', titre: 'Intervention demain : Entretien chauffage M. Durand', message: 'Rappel: Intervention prevue demain a 09:00 chez Pierre Durand', lien: '/interventions', lu: 0, hours: 6 },
-              { type: 'alerte', titre: 'Stock bas : Joint torique (5 restants)', message: 'Le stock de Joint torique est descendu sous le seuil d\'alerte', lien: '/stocks', lu: 1, hours: 24 },
-              { type: 'rappel', titre: 'Facture FAC-00008 en retard de 35 jours', message: 'La facture FAC-00008 de 360.00 EUR est en retard de paiement', lien: '/factures/8', lu: 1, hours: 48 },
-            ];
-            for (const n of notifs) {
-              const createdAt = new Date(now.getTime() - n.hours * 3600000);
-              await pool.execute(
-                'INSERT INTO notifications (artisanId, type, titre, message, lien, lu, createdAt) VALUES (1, ?, ?, ?, ?, ?, ?)',
-                [n.type, n.titre, n.message, n.lien, n.lu, createdAt]
-              );
-            }
-            console.log('[Seed] 5 demo notifications inserted');
-          }
-        }
+        const n = await seedDemoNotifications();
+        if (n > 0) console.log(`[Seed] ${n} demo notifications inserted`);
       } catch (e) { console.error('[Seed] Notifications error:', e); }
-      // Seed demo RDV en ligne (one-time)
       try {
-        const { getPool: getRdvPool } = await import('../db');
-        const rdvPool = getRdvPool();
-        if (rdvPool) {
-          const [existingRdv] = await rdvPool.execute('SELECT COUNT(*) as cnt FROM rdv_en_ligne WHERE artisanId = 1');
-          if ((existingRdv as any)[0].cnt === 0) {
-            await rdvPool.execute(
-              `INSERT INTO rdv_en_ligne (artisanId, clientId, titre, description, dateProposee, dureeEstimee, statut, urgence, createdAt, updatedAt) VALUES
-              (1, 2, 'Fuite robinet cuisine', 'Le robinet de la cuisine fuit depuis 2 jours, goutte a goutte permanent. Marque Grohe.', '2026-02-24 10:00:00', 60, 'en_attente', 'normale', NOW(), NOW()),
-              (1, 5, 'Panne chauffe-eau', 'Le chauffe-eau ne produit plus d''eau chaude depuis ce matin. Modele Atlantic 200L.', '2026-02-25 14:00:00', 60, 'en_attente', 'urgente', NOW(), NOW())`
-            );
-            console.log('[Seed] 2 demo RDV en ligne inserted');
-          }
-        }
+        const n = await seedDemoRdv();
+        if (n > 0) console.log(`[Seed] ${n} demo RDV en ligne inserted`);
       } catch (e) { console.error('[Seed] RDV en ligne error:', e); }
     } else {
       console.error('[Database] MySQL connection failed: getDb returned null');
@@ -148,8 +154,10 @@ async function startServer() {
       const { handleStripeWebhook } = await import('../stripe/webhookHandler');
       return handleStripeWebhook(req, res);
     } catch (error: any) {
+      // Détail loggué côté serveur ; ne pas l'exposer au caller (endpoint public
+      // non authentifié — pas de fuite de message d'erreur interne).
       console.error('[Stripe Webhook] Route error:', error);
-      res.status(500).json({ error: 'Webhook route error', detail: error.message });
+      res.status(500).json({ error: 'Webhook route error' });
     }
   });
 
@@ -197,7 +205,12 @@ async function startServer() {
     const path = req.path || '';
     const isAuth = path.includes('auth.signin') || path.includes('auth.signup');
     if (!isAuth) return next();
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+    // OPE-80 : prioriser CF-Connecting-IP (posé par Cloudflare en edge, non
+    // falsifiable par le client) plutôt que X-Forwarded-For[0] (que le client peut
+    // préfixer pour usurper une IP et contourner le rate-limit). Fallback XFF/socket
+    // si l'app n'est pas derrière Cloudflare.
+    const ip = (req.headers['cf-connecting-ip'] as string)?.trim()
+      || (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
       || req.socket.remoteAddress
       || 'unknown';
     const now = Date.now();
@@ -213,6 +226,43 @@ async function startServer() {
       res.setHeader('Retry-After', retryAfterS);
       return res.status(429).json({
         error: { message: 'Trop de tentatives. Réessayez dans 15 minutes.', code: 'TOO_MANY_REQUESTS' },
+      });
+    }
+    next();
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Rate limit dédié aux endpoints de reset de mot de passe
+  // (auth.forgotPassword / auth.resetPassword). Bucket SÉPARÉ de signin/signup
+  // pour ne pas pénaliser une récupération légitime après quelques échecs de
+  // login. Borne l'email-bombing (forgotPassword était hors rate-limit — cf.
+  // OPE-76 / OPE-24) + le flood de tentatives de token. IP via CF-Connecting-IP
+  // (non falsifiable) comme le middleware ci-dessus (OPE-80).
+  // ─────────────────────────────────────────────────────────────────
+  const pwdResetAttempts = new Map<string, { count: number; resetAt: number }>();
+  const PWD_RESET_MAX = 5;
+  const PWD_RESET_WINDOW_MS = 15 * 60 * 1000;
+  app.use('/api/trpc', (req, res, next) => {
+    const path = req.path || '';
+    const isReset = path.includes('auth.forgotPassword') || path.includes('auth.resetPassword');
+    if (!isReset) return next();
+    const ip = (req.headers['cf-connecting-ip'] as string)?.trim()
+      || (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim()
+      || req.socket.remoteAddress
+      || 'unknown';
+    const now = Date.now();
+    let entry = pwdResetAttempts.get(ip);
+    if (!entry || entry.resetAt <= now) {
+      entry = { count: 1, resetAt: now + PWD_RESET_WINDOW_MS };
+      pwdResetAttempts.set(ip, entry);
+      return next();
+    }
+    entry.count++;
+    if (entry.count > PWD_RESET_MAX) {
+      const retryAfterS = Math.ceil((entry.resetAt - now) / 1000);
+      res.setHeader('Retry-After', retryAfterS);
+      return res.status(429).json({
+        error: { message: 'Trop de demandes. Réessayez dans quelques minutes.', code: 'TOO_MANY_REQUESTS' },
       });
     }
     next();
@@ -247,8 +297,8 @@ async function startServer() {
       await updateArtisan(artisan.id, { logo: base64 });
       res.json({ success: true, logoUrl: base64 });
     } catch (error: any) {
-      // Surface the actual error: hiding it as a generic 500 is what kept
-      // ER_DATA_TOO_LONG invisible for so long.
+      // Détail loggué côté serveur (debug) — JAMAIS renvoyé au client (fuite de
+      // sqlMessage/schéma interne). On mappe les cas connus vers un message convivial.
       console.error('[Upload Logo] Error:', {
         message: error?.message,
         code: error?.code,
@@ -258,11 +308,10 @@ async function startServer() {
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'Fichier trop volumineux (max 2MB)' });
       }
-      res.status(500).json({
-        error: 'Erreur serveur',
-        detail: error?.sqlMessage || error?.message || String(error),
-        code: error?.code,
-      });
+      if (error.code === 'ER_DATA_TOO_LONG') {
+        return res.status(400).json({ error: 'Image trop volumineuse après encodage. Réduisez la taille ou la résolution du logo.' });
+      }
+      res.status(500).json({ error: 'Erreur serveur' });
     }
   });
 
@@ -316,6 +365,20 @@ async function startServer() {
   // ============================================================
   app.get('/api/articles/search', async (req, res) => {
     try {
+      // OPE-24 — endpoint public interrogeant la DB : rate-limit par IP (anti-scraping/DoS).
+      // Limite généreuse (recherche au clavier) ; 429 au-delà.
+      const ip = String(
+        (req.headers['cf-connecting-ip'] as string)
+        || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+        || req.socket?.remoteAddress || 'unknown'
+      );
+      const nowRl = Date.now();
+      const hitRl = articleSearchHits.get(ip);
+      if (!hitRl || hitRl.resetAt <= nowRl) {
+        articleSearchHits.set(ip, { count: 1, resetAt: nowRl + 60_000 });
+      } else if (++hitRl.count > 120) {
+        return res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' });
+      }
       const q = (req.query.q as string || '').trim();
       if (q.length < 2) {
         return res.json([]);
@@ -324,30 +387,9 @@ async function startServer() {
       const categorie = req.query.categorie as string | undefined;
       const sous_categorie = req.query.sous_categorie as string | undefined;
 
-      const { getDb, getPool } = await import('../db');
-      await getDb(); // ensure connection is initialized
-      const pool = getPool();
-      if (!pool) return res.status(500).json({ error: 'Database unavailable' });
-
-      // COLLATE utf8mb4_general_ci : insensible aux accents et a la casse.
-      // Recherche elargie au-dela du nom : description et categorie.
-      let query = `
-        SELECT id, nom, description, prix_base, unite, metier, categorie, sous_categorie, duree_moyenne_minutes
-        FROM bibliotheque_articles
-        WHERE visible = 1
-          AND (nom COLLATE utf8mb4_general_ci LIKE ?
-               OR description COLLATE utf8mb4_general_ci LIKE ?
-               OR categorie COLLATE utf8mb4_general_ci LIKE ?)
-      `;
-      const params: any[] = [`%${q}%`, `%${q}%`, `%${q}%`];
-
-      if (metier) { query += ' AND metier = ?'; params.push(metier); }
-      if (categorie) { query += ' AND categorie = ?'; params.push(categorie); }
-      if (sous_categorie) { query += ' AND sous_categorie = ?'; params.push(sous_categorie); }
-
-      query += ' ORDER BY nom LIMIT 10';
-
-      const [rows] = await pool.execute(query, params);
+      // OPE-184 — recherche d'articles portée en Drizzle (db.searchBibliothequeArticles).
+      const { searchBibliothequeArticles } = await import('../db');
+      const rows = await searchBibliothequeArticles(q, { metier, categorie, sousCategorie: sous_categorie });
       res.json(rows);
     } catch (error) {
       console.error('[API] /api/articles/search error:', error);
@@ -357,20 +399,28 @@ async function startServer() {
 
   app.get('/api/articles/categories', async (req, res) => {
     try {
+      // OPE-24 — endpoint public interrogeant la DB : rate-limit par IP (anti-scraping/DoS),
+      // même seau partagé que /api/articles/search (catalogue de référence public).
+      const ip = String(
+        (req.headers['cf-connecting-ip'] as string)
+        || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+        || req.socket?.remoteAddress || 'unknown'
+      );
+      const nowRl = Date.now();
+      const hitRl = articleSearchHits.get(ip);
+      if (!hitRl || hitRl.resetAt <= nowRl) {
+        articleSearchHits.set(ip, { count: 1, resetAt: nowRl + 60_000 });
+      } else if (++hitRl.count > 120) {
+        return res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' });
+      }
       const metier = req.query.metier as string;
       if (!metier) {
         return res.status(400).json({ error: 'Parameter metier is required' });
       }
 
-      const { getDb, getPool } = await import('../db');
-      await getDb();
-      const pool = getPool();
-      if (!pool) return res.status(500).json({ error: 'Database unavailable' });
-
-      const [rows] = await pool.execute(
-        `SELECT DISTINCT categorie, sous_categorie FROM bibliotheque_articles WHERE visible = 1 AND metier = ? ORDER BY categorie, sous_categorie`,
-        [metier]
-      );
+      // OPE-184 — catégories portées en Drizzle (db.getBibliothequeCategories).
+      const { getBibliothequeCategories } = await import('../db');
+      const rows = await getBibliothequeCategories(metier);
 
       // Group by categorie
       const grouped: Record<string, string[]> = {};
@@ -393,7 +443,8 @@ async function startServer() {
   // ============================================================
   app.get('/api/portail/:token/devis/:id/pdf', async (req, res) => {
     try {
-      const { getClientPortalAccessByToken, getDevisById, getLignesDevisByDevisId, getArtisanById, getClientById } = await import('../db');
+      if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' }); return; }
+      const { getClientPortalAccessByToken, getDevisById, getLignesDevisByDevisId, getArtisanById, getClientById, getParametresArtisan } = await import('../db');
       const access = await getClientPortalAccessByToken(req.params.token);
       if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
 
@@ -405,8 +456,11 @@ async function startServer() {
       const client = await getClientById(access.clientId);
       if (!artisan || !client) return res.status(404).json({ error: 'Données introuvables' });
 
+      // OPE-127 — CGV de l'artisan (parametres) sur le PDF du PORTAIL (parité avec le PDF
+      // client téléchargé par l'artisan, qui les imprime déjà). N'apparaît que si renseignées.
+      const paramsDevis = await getParametresArtisan(access.artisanId);
       const { generateDevisPDF } = await import('./pdfGenerator');
-      const pdfBuffer = generateDevisPDF({ devis: { ...devisData, lignes }, artisan, client });
+      const pdfBuffer = generateDevisPDF({ devis: { ...devisData, lignes }, artisan, client, cgv: paramsDevis?.conditionsGenerales });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="Devis_${devisData.numero}.pdf"`);
@@ -419,7 +473,8 @@ async function startServer() {
 
   app.get('/api/portail/:token/factures/:id/pdf', async (req, res) => {
     try {
-      const { getClientPortalAccessByToken, getFactureById, getLignesFacturesByFactureId, getArtisanById, getClientById } = await import('../db');
+      if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' }); return; }
+      const { getClientPortalAccessByToken, getFactureById, getLignesFacturesByFactureId, getArtisanById, getClientById, getParametresArtisan } = await import('../db');
       const access = await getClientPortalAccessByToken(req.params.token);
       if (!access) return res.status(403).json({ error: 'Accès non autorisé ou expiré' });
 
@@ -431,8 +486,10 @@ async function startServer() {
       const client = await getClientById(access.clientId);
       if (!artisan || !client) return res.status(404).json({ error: 'Données introuvables' });
 
+      // OPE-127 — CGV sur le PDF facture du PORTAIL (parité PDF client). Pas sur un avoir (géré côté générateur).
+      const paramsFacture = await getParametresArtisan(access.artisanId);
       const { generateFacturePDF } = await import('./pdfGenerator');
-      const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client });
+      const pdfBuffer = generateFacturePDF({ facture: { ...facture, lignes }, artisan, client, cgv: paramsFacture?.conditionsGenerales });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `inline; filename="Facture_${facture.numero}.pdf"`);
@@ -455,7 +512,7 @@ async function startServer() {
       if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
       const secret = new TextEncoder().encode(JWT_SECRET);
       let payload: any;
-      try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+      try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
 
       const contrat = await getContratById(parseInt(req.params.id));
       if (!contrat) { res.status(404).json({ error: 'Contrat non trouvé' }); return; }
@@ -476,6 +533,45 @@ async function startServer() {
     }
   });
 
+  // OPE-161 — bon d'intervention / compte-rendu signé (PDF). Scopé artisan (JWT cookie).
+  app.get('/api/interventions/:id/bon-pdf', async (req, res) => {
+    try {
+      const { getInterventionById, getArtisanByUserId, getClientById, getInterventionMobileByInterventionId, getTechnicienById } = await import('../db');
+      const { generateInterventionPDF } = await import('./pdfGenerator');
+      const { jwtVerify } = await import('jose');
+
+      const token = req.cookies?.token;
+      if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
+      const secret = new TextEncoder().encode(JWT_SECRET);
+      let payload: any;
+      try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+
+      const intervention = await getInterventionById(parseInt(req.params.id));
+      if (!intervention) { res.status(404).json({ error: 'Intervention non trouvée' }); return; }
+
+      const artisan = await getArtisanByUserId(payload.userId);
+      if (!artisan || intervention.artisanId !== artisan.id) { res.status(403).json({ error: 'Accès non autorisé' }); return; }
+
+      const client = intervention.clientId ? await getClientById(intervention.clientId) : null;
+      if (!client) { res.status(404).json({ error: 'Client non trouvé' }); return; }
+
+      const mobile = await getInterventionMobileByInterventionId(intervention.id).catch(() => null);
+      let technicienNom: string | null = null;
+      if (intervention.technicienId) {
+        const tech = await getTechnicienById(intervention.technicienId);
+        if (tech && tech.artisanId === artisan.id) technicienNom = `${tech.prenom || ''} ${tech.nom}`.trim();
+      }
+
+      const pdfBuffer = generateInterventionPDF({ intervention, artisan, client, mobile, technicienNom });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="bon-intervention-${intervention.id}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('[Intervention] PDF error:', error);
+      res.status(500).json({ error: 'Erreur lors de la génération du PDF' });
+    }
+  });
+
   // Bon de commande PDF (authenticated via cookie)
   app.get('/api/commandes-fournisseurs/:id/pdf', async (req, res) => {
     try {
@@ -487,7 +583,7 @@ async function startServer() {
       if (!token) { res.status(401).json({ error: 'Non authentifié' }); return; }
       const secret = new TextEncoder().encode(JWT_SECRET);
       let payload: any;
-      try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
+      try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return; }
 
       const commande = await getCommandeFournisseurById(parseInt(req.params.id));
       if (!commande) { res.status(404).json({ error: 'Commande non trouvée' }); return; }
@@ -510,6 +606,66 @@ async function startServer() {
   });
 
   // ============================================================================
+  // FLUX iCAL — abonnement agenda externe aux interventions (OPE-156)
+  // ============================================================================
+  // Public mais protégé par un jeton secret non devinable dans l'URL (généré par
+  // l'artisan via calendrier.getIcalFeed). Lecture seule.
+  app.get('/api/calendar/:token.ics', async (req, res) => {
+    try {
+      if (!checkIpRouteLimit(req, pdfRouteHits, 60, 60_000)) { res.status(429).type('text/plain').send('Trop de requêtes'); return; }
+      const { getArtisanByIcalToken, getInterventionsByArtisanId, getClientById } = await import('../db');
+      const token = String(req.params.token || '').replace(/\.ics$/i, '');
+      const artisan = token ? await getArtisanByIcalToken(token) : undefined;
+      if (!artisan) { res.status(404).type('text/plain').send('Calendrier introuvable'); return; }
+
+      const icalText = (s: any) => String(s ?? '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+      const icalDate = (d: any) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+
+      // Fenêtre raisonnable : interventions à partir d'il y a 90 jours.
+      const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const all = await getInterventionsByArtisanId(artisan.id);
+      const list = all.filter((i: any) => new Date(i.dateDebut) >= since);
+
+      const lines: string[] = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Operioz//Interventions//FR',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        `X-WR-CALNAME:${icalText(`Operioz — ${artisan.nomEntreprise || 'Interventions'}`)}`,
+      ];
+      const stamp = icalDate(new Date());
+      for (const i of list as any[]) {
+        const client = i.clientId ? await getClientById(i.clientId) : null;
+        const clientNom = client ? `${client.prenom || ''} ${client.nom || ''}`.trim() : '';
+        const debut = new Date(i.dateDebut);
+        const fin = i.dateFin ? new Date(i.dateFin) : new Date(debut.getTime() + 60 * 60000);
+        const descParts = [i.description, clientNom ? `Client : ${clientNom}` : '', client?.telephone ? `Tél : ${client.telephone}` : ''].filter(Boolean);
+        lines.push(
+          'BEGIN:VEVENT',
+          `UID:operioz-intervention-${i.id}@operioz.com`,
+          `DTSTAMP:${stamp}`,
+          `DTSTART:${icalDate(debut)}`,
+          `DTEND:${icalDate(fin)}`,
+          `SUMMARY:${icalText(i.titre || 'Intervention')}`,
+          ...(i.adresse ? [`LOCATION:${icalText(i.adresse)}`] : []),
+          ...(descParts.length ? [`DESCRIPTION:${icalText(descParts.join('\n'))}`] : []),
+          `STATUS:${i.statut === 'annulee' ? 'CANCELLED' : 'CONFIRMED'}`,
+          'END:VEVENT',
+        );
+      }
+      lines.push('END:VCALENDAR');
+
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', 'inline; filename="operioz.ics"');
+      res.send(lines.join('\r\n') + '\r\n');
+    } catch (error) {
+      console.error('[iCal] feed error:', error);
+      res.status(500).type('text/plain').send('Erreur de génération du calendrier');
+    }
+  });
+
+  // ============================================================================
   // COMPTABILITE EXPORTS (FEC + CSV)
   // ============================================================================
 
@@ -521,7 +677,7 @@ async function startServer() {
     if (!token) { res.status(401).json({ error: 'Non authentifié' }); return null; }
     const secret = new TextEncoder().encode(JWT_SECRET);
     let payload: any;
-    try { payload = (await jwtVerify(token, secret)).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return null; }
+    try { payload = (await jwtVerify(token, secret, { algorithms: ["HS256"] })).payload; } catch { res.status(401).json({ error: 'Token invalide' }); return null; }
     const artisan = await getArtisanByUserId(payload.userId);
     if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return null; }
     return artisan;
@@ -542,59 +698,48 @@ async function startServer() {
     return `${y}${m}${day}`;
   }
 
+  // OPE-180 — neutralise une cellule CSV avant interpolation :
+  // 1) injection de formule (cellule commençant par = + - @ TAB CR exécutée par
+  //    Excel/LibreOffice chez le comptable) → préfixe d'une apostrophe ;
+  // 2) rupture de structure (séparateur ; guillemet ou newline dans un nom de
+  //    client légitime → colonnes décalées) → échappement RFC 4180 (guillemets).
+  // Les nombres (montants fecAmount à virgule décimale, éventuellement négatifs) et
+  // les dates sont laissés inchangés → sortie identique pour des données saines.
+  function csvCell(val: string | number | null | undefined): string {
+    let s = String(val ?? '');
+    if (/^-?\d+(?:[.,]\d+)?$/.test(s)) return s; // nombre pur : inchangé
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;      // anti injection de formule
+    if (/[;"\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"'; // anti rupture de structure
+    return s;
+  }
+
   // GET /api/comptabilite/fec - Generate FEC file
   app.get('/api/comptabilite/fec', async (req, res) => {
     try {
       const artisan = await authFromCookie(req, res);
       if (!artisan) return;
 
-      const { getFacturesByArtisanId, getClientById } = await import('../db');
+      const { genererFEC } = await import('../db');
       const dateDebut = req.query.dateDebut ? new Date(req.query.dateDebut as string) : new Date(new Date().getFullYear(), 0, 1);
       const dateFin = req.query.dateFin ? new Date(req.query.dateFin as string) : new Date();
       dateFin.setHours(23, 59, 59, 999);
 
-      const allFactures = await getFacturesByArtisanId(artisan.id);
-      const factures = allFactures.filter(f => {
-        const d = new Date(f.dateFacture);
-        return d >= dateDebut && d <= dateFin && f.statut !== 'brouillon' && f.statut !== 'annulee';
-      });
+      // Generateur FEC unique, conforme (18 colonnes, equilibre, journaux VE/AC/BQ).
+      const { content, conformite } = await genererFEC(artisan.id, dateDebut, dateFin);
 
-      // FEC header
-      const header = 'JournalCode|JournalLib|EcritureNum|EcritureDate|CompteNum|CompteLib|CompAuxNum|CompAuxLib|PieceRef|PieceDate|EcritureLib|Debit|Credit|EcritureLet|DateLet|ValidDate|Montantdevise|Idevise';
-      const lines: string[] = [header];
+      // FEC : SIREN (9 chiffres) + "FEC" + date de cloture (YYYYMMDD).
+      const siren = (artisan.siret || '000000000').replace(/\D/g, '').slice(0, 9).padEnd(9, '0');
+      const filename = `${siren}FEC${fecDate(dateFin)}.txt`;
 
-      let ecritureNum = 1;
-      for (const facture of factures) {
-        const client = await getClientById(facture.clientId);
-        const clientNom = client?.nom || 'Client';
-        const clientNum = `C${String(facture.clientId).padStart(5, '0')}`;
-        const ecritureDate = fecDate(facture.dateFacture);
-        const pieceRef = facture.numero;
-        const ecritureLib = `Facture ${facture.numero} - ${clientNom}`;
-        const ttc = parseFloat(facture.totalTTC?.toString() || '0');
-        const ht = parseFloat(facture.totalHT?.toString() || '0');
-        const tva = parseFloat(facture.totalTVA?.toString() || '0');
-        const validDate = fecDate(facture.dateFacture);
-        const num = String(ecritureNum).padStart(6, '0');
-
-        // Ligne 1: Débit 411000 (Clients) TTC
-        lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|411000|Clients|${clientNum}|${clientNom}|${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(ttc)}|${fecAmount(0)}||||EUR`);
-        // Ligne 2: Crédit 701000 (Ventes) HT
-        lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|701000|Ventes de produits finis||${clientNom}|${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(0)}|${fecAmount(ht)}||||EUR`);
-        // Ligne 3: Crédit 445710 (TVA collectée) TVA
-        if (tva > 0) {
-          lines.push(`VE|Journal des ventes|${num}|${ecritureDate}|445710|TVA collectée|||${pieceRef}|${ecritureDate}|${ecritureLib}|${fecAmount(0)}|${fecAmount(tva)}||||EUR`);
-        }
-        ecritureNum++;
-      }
-
-      const content = lines.join('\n');
-      const siret = (artisan.siret || '00000000000000').replace(/\s/g, '');
-      const filename = `${siret}FEC${fecDate(dateFin)}.txt`;
-
+      // En-tetes informatifs de conformite (consultables par le front pour le badge).
+      res.setHeader('X-FEC-Equilibre', conformite.equilibre ? '1' : '0');
+      res.setHeader('X-FEC-Debit', String(conformite.totalDebit));
+      res.setHeader('X-FEC-Credit', String(conformite.totalCredit));
+      res.setHeader('X-FEC-Lignes', String(conformite.nbLignes));
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(content);
+      // BOM UTF-8 : aide les outils comptables (DGFiP Test Compta Demat) a detecter l'encodage.
+      res.send('﻿' + content);
     } catch (error) {
       console.error('[Compta] FEC error:', error);
       res.status(500).json({ error: 'Erreur lors de la génération du FEC' });
@@ -624,7 +769,11 @@ async function startServer() {
       for (const f of factures) {
         const client = await getClientById(f.clientId);
         const date = new Date(f.dateFacture).toLocaleDateString('fr-FR');
-        csvLines.push(`${date};${f.numero};${client?.nom || 'Client'};${fecAmount(f.totalHT)};${fecAmount(f.totalTVA)};${fecAmount(f.totalTTC)};${f.statut}`);
+        csvLines.push([
+          date, f.numero, client?.nom || 'Client',
+          fecAmount(f.totalHT), fecAmount(f.totalTVA), fecAmount(f.totalTTC),
+          f.statut,
+        ].map(csvCell).join(';'));
       }
 
       const content = '\ufeff' + csvLines.join('\n'); // BOM for Excel
@@ -797,6 +946,11 @@ async function startServer() {
   // POST /api/paiement/create-checkout-session
   app.post('/api/paiement/create-checkout-session', async (req, res) => {
     try {
+      // OPE-24 — rate-limit IP (20/min) : borne le spam de création de sessions Stripe
+      // (token-gated mais un token fuité pourrait flooder l'API Stripe + la table paiements).
+      if (!checkIpRouteLimit(req, paiementRouteHits, 20, 60_000)) {
+        return res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' });
+      }
       const { factureId, token } = req.body;
       if (!factureId || !token) {
         return res.status(400).json({ error: 'factureId et token requis' });
@@ -815,6 +969,12 @@ async function startServer() {
 
       if (facture.statut === 'payee') {
         return res.status(400).json({ error: 'Cette facture est déjà payée' });
+      }
+      // OPE-67 : une facture brouillon/annulée ne doit pas être encaissable (le garde
+      // d'UI est contournable par POST direct). Blocklist conservatrice : on bloque les
+      // 2 cas non ambigus, sans toucher envoyee/validee/en_retard (pas de régression).
+      if (facture.statut === 'brouillon' || facture.statut === 'annulee') {
+        return res.status(400).json({ error: "Cette facture n'est pas payable en ligne" });
       }
 
       const client = await getClientById(access.clientId);
@@ -867,12 +1027,10 @@ async function startServer() {
         raw: error?.raw?.message,
         stack: error?.stack?.split('\n').slice(0, 5),
       }));
-      const detail = error?.message?.includes('STRIPE_SECRET_KEY is not configured')
-        ? 'Clé Stripe non configurée. Ajoutez STRIPE_SECRET_KEY dans les variables d\'environnement Railway.'
-        : error?.type === 'StripeAuthenticationError'
-        ? 'Clé Stripe invalide ou manquante'
-        : error?.message || 'Erreur inconnue';
-      res.status(500).json({ error: 'Erreur lors de la création de la session de paiement', detail });
+      // Endpoint atteint par le client du portail (semi-public) : message générique,
+      // sans exposer les détails Stripe/config internes (clé, Railway, message brut).
+      // Le détail complet reste loggué côté serveur ci-dessus.
+      res.status(500).json({ error: 'Le paiement en ligne est momentanément indisponible. Veuillez réessayer plus tard ou contacter votre artisan.' });
     }
   });
 
@@ -924,107 +1082,178 @@ async function startServer() {
       const user = await getUserFromRequest(req);
       if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
 
-      const { getArtisanByUserId } = await import('../db');
+      const { getArtisanByUserId, getOrCreateAiThread, insertAiMessage } = await import('../db');
       const artisan = await getArtisanByUserId(user.id);
       if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
 
-      const { message, history, pageContext } = req.body;
+      // Rate-limit IA partagé (OPE-24) : borne le burn Gemini par tenant. Chaque
+      // requête peut déclencher jusqu'à MAX_TURNS appels Gemini -> 429 avant tout stream.
+      if (!checkRateLimit(artisan.id)) {
+        res.status(429).json({ error: 'Trop de requêtes. Réessayez dans quelques minutes.' });
+        return;
+      }
+
+      const { message, history, pageContext, threadId: clientThreadId } = req.body;
       if (!message) { res.status(400).json({ error: 'Message requis' }); return; }
 
-      // System prompt centralisé (cache TTL 60s, factorisé avec les quick actions tRPC)
       const { buildSystemPrompt } = await import('./assistantContext');
       const systemPrompt = await buildSystemPrompt(artisan.id, {
         pageContext: typeof pageContext === 'string' ? pageContext : undefined,
       });
 
-      // Build messages array with history (typé large pour accepter les tool_use/tool_result blocks)
-      const messages: any[] = [];
+      // Build Gemini contents array from history
+      const contents: any[] = [];
       if (Array.isArray(history)) {
         for (const h of history.slice(-10)) {
-          if (h?.role && h?.content) messages.push({ role: h.role, content: h.content });
+          if (h?.role && h?.content) {
+            contents.push({
+              role: h.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: String(h.content) }],
+            });
+          }
         }
       }
-      messages.push({ role: 'user', content: message });
+      contents.push({ role: 'user', parts: [{ text: message }] });
 
-      // Set SSE headers
+      // SSE headers
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
 
-      const Anthropic = (await import('@anthropic-ai/sdk')).default;
-      const anthropic = new Anthropic();
-      const { AGENT_TOOLS, executeTool } = await import('./assistantTools');
+      const { GoogleGenAI } = await import('@google/genai');
+      const { AGENT_TOOLS, executeTool, TOOL_INVALIDATIONS } = await import('./assistantTools');
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const model = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash';
 
       let aborted = false;
       req.on('close', () => { aborted = true; });
 
-      // Boucle agentique : on stream le texte au fur et à mesure, et si Claude
-      // demande un outil on l'exécute puis on relance un tour. Max 10 tours pour
-      // permettre des chaînes d'actions (ex: vérifier stocks → identifier
-      // ruptures → chercher fournisseur → créer commande → envoyer).
+      // Create/get thread for persistence
+      let threadId: number = clientThreadId || 0;
+      if (!threadId) {
+        try { threadId = await getOrCreateAiThread(artisan.id, message); } catch { threadId = 0; }
+      }
+      if (threadId) res.write(`data: ${JSON.stringify({ threadId })}\n\n`);
+
       const MAX_TURNS = 10;
-      let currentStream: any = null;
+      let fullAssistantText = '';
+      let usageMetadata: any = null;
+      let emptyRetries = 0; // Gemini renvoie parfois un candidat vide -> on retente
+      const collectedToolCalls: Array<{ name: string; args: any; ok: boolean; error?: string }> = [];
 
       try {
         for (let turn = 0; turn < MAX_TURNS && !aborted; turn++) {
-          currentStream = anthropic.messages.stream({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 2000,
-            temperature: 0.7,
-            system: systemPrompt,
-            tools: AGENT_TOOLS,
-            messages,
+          const stream = await ai.models.generateContentStream({
+            model,
+            contents,
+            config: {
+              systemInstruction: systemPrompt,
+              tools: [{ functionDeclarations: AGENT_TOOLS }],
+              maxOutputTokens: 2000,
+              temperature: 0.7,
+            },
           });
 
-          currentStream.on('text', (text: string) => {
-            if (!aborted) res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
-          });
+          let textBuffer = '';
+          const functionCalls: any[] = [];
+          // Gemini 3.x attache un thought_signature aux parts functionCall : il
+          // DOIT être renvoyé tel quel au tour suivant (sinon 400 "Function call
+          // is missing a thought_signature"). On conserve donc les parts BRUTES
+          // pour reconstruire le tour 'model' à l'identique.
+          const functionCallParts: any[] = [];
+          let lastFinishReason: string | undefined;
 
-          const finalMessage = await currentStream.finalMessage();
-
-          if (finalMessage.stop_reason !== 'tool_use') break;
-
-          const toolUses = (finalMessage.content as any[]).filter(b => b.type === 'tool_use');
-          if (toolUses.length === 0) break;
-
-          // Ajoute la réponse complète de l'assistant (texte + tool_use blocks) à l'historique
-          messages.push({ role: 'assistant', content: finalMessage.content });
-
-          // Exécute chaque outil et construit les tool_result
-          const { TOOL_INVALIDATIONS } = await import('./assistantTools');
-          const toolResults: any[] = [];
-          for (const tu of toolUses) {
+          for await (const chunk of stream) {
             if (aborted) break;
-            res.write(`data: ${JSON.stringify({ toolUse: tu.name })}\n\n`);
-            const result = await executeTool(tu.name, tu.input, { artisanId: artisan.id });
-            // L'outil naviguer_vers déclenche un event SSE spécial pour
-            // que le client redirige l'artisan vers la page concernée.
-            if (tu.name === 'naviguer_vers' && result.ok) {
-              const nav = (result.data as any)?.navigate;
-              if (nav?.page) {
-                res.write(`data: ${JSON.stringify({ navigate: nav.page, filtre: nav.filtre, message: nav.message })}\n\n`);
+            const fr = chunk.candidates?.[0]?.finishReason;
+            if (fr) lastFinishReason = fr;
+            // In @google/genai v1.x, iterate parts directly. `chunk.text` is a
+            // getter (not a method) and throws/ warns when functionCall parts
+            // are present — so we extract text + functionCalls from parts.
+            const parts = chunk.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (typeof part.text === 'string' && part.text) {
+                textBuffer += part.text;
+                fullAssistantText += part.text;
+                res.write(`data: ${JSON.stringify({ content: part.text })}\n\n`);
+              }
+              if (part.functionCall) {
+                functionCalls.push(part.functionCall);
+                functionCallParts.push(part); // part brute (incl. thoughtSignature)
               }
             }
-            // Si l'outil a modifié des données, on émet un event invalidate
-            // pour que le client rafraîchisse le cache tRPC concerné.
-            if (result.ok) {
-              const keys = TOOL_INVALIDATIONS[tu.name];
-              if (keys && keys.length > 0) {
-                res.write(`data: ${JSON.stringify({ invalidate: keys })}\n\n`);
-              }
-            }
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: tu.id,
-              content: JSON.stringify(result),
-              is_error: !result.ok,
-            });
+            if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
           }
 
-          if (toolResults.length === 0) break;
-          messages.push({ role: 'user', content: toolResults });
+          // Assemble model turn. On renvoie les parts functionCall BRUTES (avec
+          // leur thoughtSignature) — requis par Gemini 3.x au tour suivant.
+          const modelParts: any[] = [];
+          if (textBuffer) modelParts.push({ text: textBuffer });
+          functionCallParts.forEach(p => modelParts.push(p));
+          if (modelParts.length > 0) contents.push({ role: 'model', parts: modelParts });
+
+          if (functionCalls.length === 0) {
+            if (!textBuffer) console.warn(`[Assistant] tour vide — finishReason=${lastFinishReason} promptLen=${systemPrompt.length}`);
+            // Candidat Gemini vide (ni texte ni tool) sur ce tour : on retente
+            // le meme tour quelques fois avant d'abandonner, sinon l'utilisateur
+            // recoit une reponse totalement vide.
+            if (!textBuffer && !fullAssistantText && collectedToolCalls.length === 0 && emptyRetries < 2) {
+              emptyRetries++;
+              turn--;
+              continue;
+            }
+            break;
+          }
+
+          // Execute tools
+          const toolResultParts: any[] = [];
+          for (const fc of functionCalls) {
+            if (aborted) break;
+            res.write(`data: ${JSON.stringify({ toolStart: { name: fc.name, args: fc.args || {} } })}\n\n`);
+            const result = await executeTool(fc.name, fc.args || {}, { artisanId: artisan.id });
+            const toolError = result.ok ? undefined : (typeof result === 'object' && 'error' in result ? String((result as any).error) : 'Erreur');
+            res.write(`data: ${JSON.stringify({ toolEnd: { name: fc.name, ok: result.ok, error: toolError } })}\n\n`);
+            collectedToolCalls.push({ name: fc.name, args: fc.args || {}, ok: result.ok, error: toolError });
+
+            if (fc.name === 'naviguer_vers' && result.ok) {
+              const nav = (result.data as any)?.navigate;
+              if (nav?.page) res.write(`data: ${JSON.stringify({ navigate: nav.page, filtre: nav.filtre, message: nav.message })}\n\n`);
+            }
+            if (result.ok) {
+              const keys = TOOL_INVALIDATIONS[fc.name];
+              if (keys?.length) res.write(`data: ${JSON.stringify({ invalidate: keys })}\n\n`);
+            }
+            toolResultParts.push({ functionResponse: { name: fc.name, response: result } });
+          }
+          if (toolResultParts.length > 0) contents.push({ role: 'user', parts: toolResultParts });
+          if (toolResultParts.length === 0) break;
+        }
+
+        // Persist messages to DB
+        if (threadId && !aborted) {
+          try {
+            await insertAiMessage(threadId, 'user', message);
+            if (fullAssistantText) {
+              await insertAiMessage(
+                threadId,
+                'assistant',
+                fullAssistantText,
+                { model, toolCalls: collectedToolCalls.length > 0 ? collectedToolCalls : undefined },
+                usageMetadata ?? undefined,
+              );
+            }
+          } catch (e: any) {
+            console.warn('[Assistant] Persist error:', e?.message);
+          }
+        }
+
+        // Filet anti-réponse-vide : si Gemini n'a produit NI texte NI action
+        // visible, on renvoie un message plutôt qu'un chat muet.
+        if (!aborted && !fullAssistantText && collectedToolCalls.length === 0) {
+          res.write(`data: ${JSON.stringify({ content: "Je n'ai pas réussi à traiter ta demande. Peux-tu la reformuler ?" })}\n\n`);
         }
 
         if (!aborted) {
@@ -1037,16 +1266,231 @@ async function startServer() {
           res.write(`data: ${JSON.stringify({ error: 'Erreur de génération' })}\n\n`);
           res.end();
         }
-      } finally {
-        if (currentStream && typeof currentStream.abort === 'function' && aborted) {
-          try { currentStream.abort(); } catch { /* noop */ }
-        }
       }
     } catch (error) {
       console.error('[Assistant] Error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Erreur serveur' });
+      if (!res.headersSent) res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
+
+  // Voice debug sink — the browser POSTs its voice-session diagnostics here so
+  // we can see them in the server logs (the Live WS itself is browser↔Google
+  // and never touches us). Dev aid; fire-and-forget from the client.
+  app.post('/api/voice/debug', (req, res) => {
+    try {
+      // OPE-24 — endpoint public (crash-reporting sendBeacon, sans auth).
+      // 1) rate-limit par IP (CF-Connecting-IP de confiance derriere Cloudflare)
+      //    → borne le flood de logs ; throttle SILENCIEUX pour ne pas casser les
+      //    clients legitimes. 2) sanitisation anti log-injection (CRLF/control).
+      const ip = String(
+        (req.headers['cf-connecting-ip'] as string)
+        || (req.headers['x-forwarded-for'] as string || '').split(',')[0].trim()
+        || req.socket?.remoteAddress || 'unknown'
+      );
+      const now = Date.now();
+      const hit = voiceDebugHits.get(ip);
+      if (!hit || hit.resetAt <= now) {
+        voiceDebugHits.set(ip, { count: 1, resetAt: now + 60_000 });
+      } else if (++hit.count > 30) {
+        return res.json({ ok: true });
       }
+      const sanitize = (v: any) =>
+        String(typeof v === 'string' ? v : JSON.stringify(v))
+          .replace(/[\r\n\x00-\x1f]/g, ' ')
+          .slice(0, 500);
+      const { events } = req.body || {};
+      if (Array.isArray(events)) {
+        for (const e of events.slice(0, 20)) {
+          console.log(`[VoiceDebug] ${sanitize(e)}`);
+        }
+      } else if (req.body?.msg) {
+        console.log(`[VoiceDebug] ${sanitize(req.body.msg)}`);
+      }
+    } catch { /* ignore */ }
+    res.json({ ok: true });
+  });
+
+  // Voice token endpoint — mints ephemeral Gemini token for Live WebSocket
+  app.post('/api/voice/token', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
+
+      const { getArtisanByUserId, getAiMessages, getOrCreateAiThread } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      // Rate-limit IA partagé (OPE-24) : un token vocal ouvre une session Gemini Live
+      // coûteuse -> borne par tenant (budget partagé avec le chat texte / outils IA).
+      if (!checkRateLimit(artisan.id)) {
+        res.status(429).json({ error: 'Trop de requêtes. Réessayez dans quelques minutes.' });
+        return;
+      }
+
+      // Ensure a thread exists so voice turns can be persisted (browser↔Google
+      // voice never hits our server, so the client posts turns to /voice/persist).
+      let threadId = req.body?.threadId ? Number(req.body.threadId) : 0;
+      if (!threadId) {
+        try { threadId = await getOrCreateAiThread(artisan.id, 'Conversation vocale'); } catch { threadId = 0; }
+      }
+
+      // Build the system instruction: artisan business context + recent
+      // conversation history (so voice mode is seamless with the text chat).
+      const { buildSystemPrompt } = await import('./assistantContext');
+      let systemText = await buildSystemPrompt(artisan.id);
+
+      if (threadId) {
+        try {
+          const msgs = await getAiMessages(Number(threadId), 20);
+          if (msgs.length > 0) {
+            const histLines = msgs
+              .map((m: any) => `${m.role === 'assistant' ? 'Assistant' : 'Artisan'}: ${m.transcript}`)
+              .join('\n');
+            systemText += `\n\n--- Historique récent de la conversation ---\n${histLines}`;
+          }
+        } catch { /* history optional */ }
+      }
+
+      // Tools: list them in the prompt AND declare them in the setup so the model
+      // calls them for real instead of hallucinating ("Tool call: …", "un instant…").
+      const { AGENT_TOOLS } = await import('./assistantTools');
+      const toolList = (AGENT_TOOLS as any[]).map((t) => `- ${t.name} : ${t.description}`).join('\n');
+      systemText += `\n\n--- OUTILS DISPONIBLES (fonctions que tu peux APPELER) ---
+${toolList}
+
+RÈGLES STRICTES sur les outils :
+- Quand une demande nécessite une de ces actions, APPELLE réellement la fonction correspondante. N'écris/ne prononce JAMAIS "Tool call:" ou le nom de la fonction en texte.
+- N'invente JAMAIS un résultat, un client, un devis, un montant ou une donnée. Ne prétends pas avoir fait une action sans appeler l'outil.
+- N'annonce pas "je cherche" / "un instant" pour ensuite attendre : appelle l'outil immédiatement, son résultat te reviendra et tu répondras ensuite.
+- Si AUCUNE fonction ne couvre la demande, dis-le franchement plutôt que d'inventer, et propose éventuellement de repasser en mode texte.`;
+
+      // Expiry: token valid 30 min, session must start within 1 min
+      const now = new Date();
+      const expireTime = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+      const newSessionExpireTime = new Date(now.getTime() + 60 * 1000).toISOString();
+
+      const liveModel = process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-latest';
+      const apiKey = process.env.GEMINI_API_KEY!;
+
+      // Ephemeral token endpoint is v1alpha/auth_tokens with a FLAT snake_case
+      // body (the @google/genai SDK and v1beta paths do not expose this).
+      // response_modalities must be a SINGLE modality for Live — we use AUDIO
+      // and enable input/output transcription to get synchronized TEXT
+      // (seamless voice + text).
+      const body: any = {
+        uses: 1,
+        expire_time: expireTime,
+        new_session_expire_time: newSessionExpireTime,
+        bidi_generate_content_setup: {
+          model: `models/${liveModel}`,
+          generation_config: {
+            response_modalities: ['AUDIO'],
+            speech_config: {
+              voice_config: { prebuilt_voice_config: { voice_name: 'Aoede' } },
+            },
+          },
+          system_instruction: { parts: [{ text: systemText }] },
+          input_audio_transcription: {},
+          output_audio_transcription: {},
+          tools: [{ function_declarations: AGENT_TOOLS }],
+        },
+      };
+
+      const tokenRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1alpha/auth_tokens?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.text();
+        console.error('[VoiceToken] Gemini error:', tokenRes.status, err);
+        res.status(502).json({ error: 'Impossible de créer le token vocal' });
+        return;
+      }
+
+      const tokenData = await tokenRes.json();
+      const token = tokenData?.name || tokenData?.token;
+
+      res.json({
+        token,
+        wsUrl: `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained`,
+        model: liveModel,
+        expiresAt: expireTime,
+        threadId: threadId || undefined,
+      });
+    } catch (error) {
+      console.error('[VoiceToken] Error:', error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
+
+  // Persist a completed VOICE turn (user + assistant transcripts) to the thread.
+  // The Gemini Live session is browser↔Google, so the client posts each turn here.
+  app.post('/api/voice/persist', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
+
+      const { getArtisanByUserId, getAiThread, insertAiMessage } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      const threadId = Number(req.body?.threadId);
+      const userText = typeof req.body?.userTranscript === 'string' ? req.body.userTranscript.trim() : '';
+      const assistantText = typeof req.body?.assistantTranscript === 'string' ? req.body.assistantTranscript.trim() : '';
+      const usageMeta = req.body?.usageMetadata ?? undefined;
+      if (!threadId || (!userText && !assistantText)) { res.status(400).json({ error: 'threadId + transcript requis' }); return; }
+
+      // Verify the thread belongs to this artisan.
+      const thread = await getAiThread(threadId, artisan.id);
+      if (!thread) { res.status(404).json({ error: 'Thread introuvable' }); return; }
+
+      if (userText) await insertAiMessage(threadId, 'user', userText, { source: 'voice' });
+      if (assistantText) await insertAiMessage(threadId, 'assistant', assistantText, { source: 'voice' }, usageMeta);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error('[VoicePersist] Error:', error);
+      res.status(500).json({ error: 'Erreur serveur' });
+    }
+  });
+
+  // Execute a tool requested by the voice Live session. The browser receives the
+  // Gemini `toolCall`, calls this (with DB-backed artisan context), and sends the
+  // result back to Gemini as a toolResponse.
+  app.post('/api/voice/tool', async (req, res) => {
+    try {
+      const { getUserFromRequest } = await import('./auth-simple');
+      const user = await getUserFromRequest(req);
+      if (!user) { res.status(401).json({ error: 'Non autorisé' }); return; }
+
+      const { getArtisanByUserId } = await import('../db');
+      const artisan = await getArtisanByUserId(user.id);
+      if (!artisan) { res.status(404).json({ error: 'Artisan non trouvé' }); return; }
+
+      // OPE-170 — rate-limit par tenant (bucket IA partagé avec /api/voice/token + assistant
+      // texte). Sans borne, /api/voice/tool exécutait les outils d'envoi (envoyer_facture,
+      // envoyer_devis, envoyer_relance, envoyer_commande_fournisseur...) en boucle directe
+      // -> envoi d'emails non borné (coût Resend + réputation d'expéditeur).
+      if (!checkRateLimit(artisan.id)) {
+        res.status(429).json({ result: { ok: false, error: 'Trop de requêtes. Réessayez dans un instant.' } });
+        return;
+      }
+
+      const { name, args } = req.body || {};
+      if (!name || typeof name !== 'string') { res.status(400).json({ error: 'name requis' }); return; }
+
+      const { executeTool } = await import('./assistantTools');
+      const result = await executeTool(name, args || {}, { artisanId: artisan.id });
+      res.json({ result });
+    } catch (error: any) {
+      console.error('[VoiceTool] Error:', error?.message);
+      res.json({ result: { ok: false, error: 'Erreur exécution outil' } });
     }
   });
 
@@ -1070,6 +1514,16 @@ async function startServer() {
   } else {
     serveStatic(app);
   }
+
+  // OPE-82 — Middleware d'erreur Express (4 args). Express 4 ne transmet pas
+  // automatiquement les erreurs des handlers async ; ce filet attrape ce qui
+  // remonte (next(err) ou throw sync), loggue, et renvoie un 500 generique
+  // (pas de detail interne expose au client).
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("[express error]", err?.stack || err?.message || err);
+    if (res.headersSent) return;
+    res.status(500).json({ error: "Erreur serveur" });
+  });
 
   // En production (Railway, …), on DOIT listen exactement sur
   // process.env.PORT et sur 0.0.0.0. Tenter de "trouver un autre port"
@@ -1111,16 +1565,8 @@ async function startServer() {
       //    envois d'email pour ne pas envoyer un J-3 alors qu'il est deja
       //    a 0 jour (edge case du scheduler qui aurait saute des heures).
       try {
-        const pool = db.getPool();
-        if (pool) {
-          const [r] = await pool.execute(
-            `UPDATE subscriptions SET status='expired', plan='expired'
-             WHERE status='trialing' AND trial_ends_at < NOW()`
-          ) as any;
-          if (r.affectedRows > 0) {
-            console.log(`[Scheduler] ${r.affectedRows} trial(s) expire(s) -> plan='expired'`);
-          }
-        }
+        const n = await db.expireTrials();
+        if (n > 0) console.log(`[Scheduler] ${n} trial(s) expire(s) -> plan='expired'`);
       } catch (e: any) {
         console.warn("[Scheduler] expire trials:", e?.message || e);
       }
@@ -1129,54 +1575,26 @@ async function startServer() {
       //    On utilise DATE() pour matcher par jour calendaire et eviter
       //    un envoi a la minute pres.
       try {
-        const pool = db.getPool();
-        if (pool) {
-          const [rows] = await pool.execute(`
-            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
-            FROM artisans a
-            JOIN users u ON u.id = a.userId
-            JOIN subscriptions s ON s.artisan_id = a.id
-            WHERE s.status = 'trialing'
-              AND DATE(s.trial_ends_at) = DATE(DATE_ADD(NOW(), INTERVAL 3 DAY))
-          `) as any;
-          for (const row of rows as any[]) {
-            if (!row.email) continue;
-            const { subject, body } = buildTrialEndingJ3Email({
-              firstName: row.prenom, appUrl,
-            });
-            await sendEmail({ to: row.email, subject, body });
-          }
-          if ((rows as any[]).length > 0) {
-            console.log(`[Scheduler] ${(rows as any[]).length} email(s) J-3 envoye(s)`);
-          }
+        const rows = await db.getTrialEndingRecipients(3);
+        for (const row of rows) {
+          if (!row.email) continue;
+          const { subject, body } = buildTrialEndingJ3Email({ firstName: row.prenom ?? undefined, appUrl });
+          await sendEmail({ to: row.email, subject, body });
         }
+        if (rows.length > 0) console.log(`[Scheduler] ${rows.length} email(s) J-3 envoye(s)`);
       } catch (e: any) {
         console.warn("[Scheduler] J-3:", e?.message || e);
       }
 
       // 4) Emails J-1.
       try {
-        const pool = db.getPool();
-        if (pool) {
-          const [rows] = await pool.execute(`
-            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
-            FROM artisans a
-            JOIN users u ON u.id = a.userId
-            JOIN subscriptions s ON s.artisan_id = a.id
-            WHERE s.status = 'trialing'
-              AND DATE(s.trial_ends_at) = DATE(DATE_ADD(NOW(), INTERVAL 1 DAY))
-          `) as any;
-          for (const row of rows as any[]) {
-            if (!row.email) continue;
-            const { subject, body } = buildTrialEndingJ1Email({
-              firstName: row.prenom, appUrl,
-            });
-            await sendEmail({ to: row.email, subject, body });
-          }
-          if ((rows as any[]).length > 0) {
-            console.log(`[Scheduler] ${(rows as any[]).length} email(s) J-1 envoye(s)`);
-          }
+        const rows = await db.getTrialEndingRecipients(1);
+        for (const row of rows) {
+          if (!row.email) continue;
+          const { subject, body } = buildTrialEndingJ1Email({ firstName: row.prenom ?? undefined, appUrl });
+          await sendEmail({ to: row.email, subject, body });
         }
+        if (rows.length > 0) console.log(`[Scheduler] ${rows.length} email(s) J-1 envoye(s)`);
       } catch (e: any) {
         console.warn("[Scheduler] J-1:", e?.message || e);
       }
@@ -1185,25 +1603,13 @@ async function startServer() {
       //    bien demarrer (devis IA, import clients, paiement en ligne).
       try {
         const { buildDiscoveryJ3Email } = await import("./emailService");
-        const pool = db.getPool();
-        if (pool) {
-          const [rows] = await pool.execute(`
-            SELECT a.id AS artisanId, u.email AS email, u.prenom AS prenom
-            FROM artisans a
-            JOIN users u ON u.id = a.userId
-            WHERE DATE(u.createdAt) = DATE(DATE_SUB(NOW(), INTERVAL 3 DAY))
-          `) as any;
-          for (const row of rows as any[]) {
-            if (!row.email) continue;
-            const { subject, body } = buildDiscoveryJ3Email({
-              firstName: row.prenom, appUrl,
-            });
-            await sendEmail({ to: row.email, subject, body });
-          }
-          if ((rows as any[]).length > 0) {
-            console.log(`[Scheduler] ${(rows as any[]).length} email(s) decouverte J+3 envoye(s)`);
-          }
+        const rows = await db.getDiscoveryRecipients(3);
+        for (const row of rows) {
+          if (!row.email) continue;
+          const { subject, body } = buildDiscoveryJ3Email({ firstName: row.prenom ?? undefined, appUrl });
+          await sendEmail({ to: row.email, subject, body });
         }
+        if (rows.length > 0) console.log(`[Scheduler] ${rows.length} email(s) decouverte J+3 envoye(s)`);
       } catch (e: any) {
         console.warn("[Scheduler] J+3:", e?.message || e);
       }
@@ -1215,74 +1621,9 @@ async function startServer() {
       //    Idempotent : si le scheduler tourne plusieurs fois le meme
       //    jour, l'update de prochaine_occurrence empeche les doublons.
       try {
-        const pool = db.getPool();
-        if (pool) {
-          const [rows] = await pool.execute(`
-            SELECT id, artisan_id, user_id, fournisseur, categorie, sous_categorie,
-                   description, montant_ht, taux_tva, montant_tva, montant_ttc,
-                   mode_paiement, remboursable, chantier_id, intervention_id,
-                   client_id, notes, tva_deductible, frequence_recurrence,
-                   prochaine_occurrence
-              FROM depenses
-             WHERE recurrente = TRUE
-               AND prochaine_occurrence IS NOT NULL
-               AND prochaine_occurrence <= CURDATE()
-             LIMIT 50
-          `) as any;
-          let nbCreated = 0;
-          for (const d of rows as any[]) {
-            try {
-              // Generer un nouveau numero DEP-XXXXX.
-              const numero = await db.getNextDepenseNumero(d.artisan_id);
-              await pool.execute(
-                `INSERT INTO depenses
-                   (artisan_id, user_id, numero, date_depense, fournisseur,
-                    categorie, sous_categorie, description, montant_ht, taux_tva,
-                    montant_tva, montant_ttc, mode_paiement, statut, remboursable,
-                    chantier_id, intervention_id, client_id, notes, tva_deductible,
-                    recurrente)
-                 VALUES (?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, 'brouillon', ?, ?, ?, ?, ?, ?, FALSE)`,
-                [
-                  d.artisan_id, d.user_id, numero, d.fournisseur, d.categorie,
-                  d.sous_categorie, d.description, d.montant_ht, d.taux_tva,
-                  d.montant_tva, d.montant_ttc, d.mode_paiement, d.remboursable,
-                  d.chantier_id, d.intervention_id, d.client_id, d.notes,
-                  d.tva_deductible,
-                ]
-              );
-              // Avance prochaine_occurrence selon la frequence.
-              const interval =
-                d.frequence_recurrence === "hebdomadaire" ? "INTERVAL 7 DAY" :
-                d.frequence_recurrence === "trimestrielle" ? "INTERVAL 3 MONTH" :
-                d.frequence_recurrence === "annuelle" ? "INTERVAL 1 YEAR" :
-                "INTERVAL 1 MONTH"; // mensuelle par defaut
-              await pool.execute(
-                `UPDATE depenses
-                    SET prochaine_occurrence = DATE_ADD(prochaine_occurrence, ${interval})
-                  WHERE id = ?`,
-                [d.id]
-              );
-              // Notification a l'artisan.
-              try {
-                await pool.execute(
-                  `INSERT INTO notifications (artisanId, type, titre, message, lien, lu)
-                   VALUES (?, 'info', ?, ?, '/depenses', 0)`,
-                  [
-                    d.artisan_id,
-                    `Dépense récurrente créée : ${d.fournisseur || d.categorie}`,
-                    `${numero} — ${Number(d.montant_ttc).toLocaleString("fr-FR")} EUR — créée automatiquement aujourd'hui.`,
-                  ]
-                );
-              } catch {/* table notifications absente : ok */}
-              nbCreated++;
-            } catch (errIn: any) {
-              console.warn(`[Scheduler] depense recurrente ${d.id} :`, errIn?.message);
-            }
-          }
-          if (nbCreated > 0) {
-            console.log(`[Scheduler] ${nbCreated} depense(s) recurrente(s) creee(s)`);
-          }
-        }
+        // OPE-184 — génération des dépenses récurrentes portée en Drizzle (db.genererDepensesRecurrentes).
+        const nbCreated = await db.genererDepensesRecurrentes();
+        if (nbCreated > 0) console.log(`[Scheduler] ${nbCreated} depense(s) recurrente(s) creee(s)`);
       } catch (e: any) {
         console.warn("[Scheduler] depenses recurrentes:", e?.message || e);
       }

@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-export type Message = { role: "user" | "assistant"; content: string };
+export type ToolCall = {
+  name: string;
+  args: Record<string, any>;
+  status: "running" | "ok" | "error";
+  error?: string;
+};
+
+export type Message = { role: "user" | "assistant"; content: string; toolCalls?: ToolCall[] };
 
 interface UseAssistantStreamOptions {
   /** Texte injecté dans le system prompt côté serveur pour situer l'IA */
@@ -32,6 +39,8 @@ interface UseAssistantStreamReturn {
  *   du callback à chaque changement de route).
  * - Le message assistant est ajouté à la liste seulement quand le premier chunk
  *   arrive, pour qu'AIChatBox affiche son spinner de chargement entre-temps.
+ * - Les tool calls (toolStart/toolEnd) sont reflétés en temps réel dans le message
+ *   assistant courant et persistés dans la DB via metadata.toolCalls.
  */
 export function useAssistantStream(
   options: UseAssistantStreamOptions = {}
@@ -79,17 +88,60 @@ export function useAssistantStream(
     const controller = new AbortController();
     abortRef.current = controller;
 
-    let assistantAdded = false;
+    // Tracks whether an assistant message bubble has been created for this stream.
+    // Shared across appendChunk and tool call handlers so all SSE events land
+    // in the same message object.
+    let assistantStarted = false;
+
+    const ensureAssistantMessage = () => {
+      if (!assistantStarted) {
+        assistantStarted = true;
+        setMessages((prev) => [...prev, { role: "assistant", content: "", toolCalls: [] }]);
+      }
+    };
+
     const appendChunk = (chunk: string) => {
+      if (!assistantStarted) {
+        assistantStarted = true;
+        setMessages((prev) => [...prev, { role: "assistant", content: chunk, toolCalls: [] }]);
+      } else {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant") {
+            updated[updated.length - 1] = { ...last, content: last.content + chunk };
+          }
+          return updated;
+        });
+      }
+    };
+
+    const handleToolStart = (name: string, args: Record<string, any>) => {
+      ensureAssistantMessage();
       setMessages((prev) => {
-        if (!assistantAdded) {
-          assistantAdded = true;
-          return [...prev, { role: "assistant", content: chunk }];
-        }
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last?.role === "assistant") {
-          updated[updated.length - 1] = { ...last, content: last.content + chunk };
+          const calls = [...(last.toolCalls ?? []), { name, args, status: "running" as const }];
+          updated[updated.length - 1] = { ...last, toolCalls: calls };
+        }
+        return updated;
+      });
+    };
+
+    const handleToolEnd = (name: string, ok: boolean, error?: string) => {
+      setMessages((prev) => {
+        const updated = [...prev];
+        for (let i = updated.length - 1; i >= 0; i--) {
+          if (updated[i].role === "assistant") {
+            const calls = (updated[i].toolCalls ?? []).map((tc) =>
+              tc.name === name && tc.status === "running"
+                ? { ...tc, status: ok ? ("ok" as const) : ("error" as const), error }
+                : tc
+            );
+            updated[i] = { ...updated[i], toolCalls: calls };
+            break;
+          }
         }
         return updated;
       });
@@ -135,6 +187,8 @@ export function useAssistantStream(
             const parsed = JSON.parse(data);
             if (parsed.content) appendChunk(parsed.content);
             if (parsed.error) toast.error(parsed.error);
+            if (parsed.toolStart) handleToolStart(parsed.toolStart.name, parsed.toolStart.args ?? {});
+            if (parsed.toolEnd) handleToolEnd(parsed.toolEnd.name, parsed.toolEnd.ok, parsed.toolEnd.error);
             if (typeof parsed.navigate === "string" && parsed.navigate.length > 0) {
               onNavigateRef.current?.({
                 page: parsed.navigate,
@@ -154,8 +208,6 @@ export function useAssistantStream(
     } catch (error: any) {
       if (error.name === "AbortError") return;
       toast.error(error.message || "Erreur de connexion");
-      // Si on a déjà commencé à streamer, on garde le message partiel.
-      // Sinon, rien à nettoyer (assistantAdded est false).
     } finally {
       setIsStreaming(false);
       abortRef.current = null;

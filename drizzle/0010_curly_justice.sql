@@ -1,0 +1,1 @@
+ALTER TABLE `techniciens` ADD `coutHoraire` decimal(8,2);

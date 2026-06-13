@@ -43,6 +43,7 @@ export default function Vehicules() {
     modele: "",
     annee: new Date().getFullYear(),
     typeCarburant: "diesel" as const,
+    puissanceFiscale: undefined as number | undefined,
     kilometrageActuel: 0,
     technicienId: undefined as number | undefined,
   });
@@ -118,6 +119,17 @@ export default function Vehicules() {
                     type="number"
                     value={formData.annee}
                     onChange={(e) => setFormData({ ...formData, annee: parseInt(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <Label>Puissance fiscale (CV)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={formData.puissanceFiscale ?? ""}
+                    onChange={(e) => setFormData({ ...formData, puissanceFiscale: e.target.value ? parseInt(e.target.value) : undefined })}
+                    placeholder="ex. 5"
                   />
                 </div>
                 <div>
@@ -295,6 +307,12 @@ export default function Vehicules() {
                       <span className="text-muted-foreground">Carburant</span>
                       <span className="font-medium capitalize">{vehicule.typeCarburant}</span>
                     </div>
+                    {vehicule.puissanceFiscale != null && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Puissance fiscale</span>
+                        <span className="font-medium">{vehicule.puissanceFiscale} CV</span>
+                      </div>
+                    )}
                     {vehicule.technicienId && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Assigné à</span>
