@@ -7224,13 +7224,10 @@ export async function getDepensesStats(
 // === Catégories ===
 
 export async function getCategoriesDepenses(artisanId: number): Promise<any[]> {
-  const pool = getPool();
-  if (!pool) return [];
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM categories_depenses WHERE artisan_id = ? AND actif = TRUE ORDER BY ordre ASC, id ASC`,
-    [artisanId]
-  );
-  return rows as any[];
+  const db = await getDb();
+  return await db.select().from(categoriesDepenses)
+    .where(and(eq(categoriesDepenses.artisan_id, artisanId), eq(categoriesDepenses.actif, true)))
+    .orderBy(asc(categoriesDepenses.ordre), asc(categoriesDepenses.id));
 }
 
 export async function createCategorieDepense(data: {
@@ -7241,20 +7238,22 @@ export async function createCategorieDepense(data: {
   compteComptable?: string;
   plafondMensuel?: number;
 }): Promise<any | null> {
-  const pool = getPool();
-  if (!pool) return null;
-  const [r]: any = await pool.execute(
-    `INSERT IGNORE INTO categories_depenses
-       (artisan_id, nom, couleur, icone, compte_comptable, plafond_mensuel)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [data.artisanId, data.nom, data.couleur || "#6366f1", data.icone || "Receipt",
-     data.compteComptable || null, data.plafondMensuel || null]
-  );
-  const [rows]: any = await pool.execute(
-    `SELECT * FROM categories_depenses WHERE artisan_id = ? AND nom = ? LIMIT 1`,
-    [data.artisanId, data.nom]
-  );
-  return (rows as any[])[0] || null;
+  const db = await getDb();
+  // INSERT IGNORE (unique artisan_id+nom) → select-puis-insert, dialect-neutre.
+  const existing = await db.select().from(categoriesDepenses)
+    .where(and(eq(categoriesDepenses.artisan_id, data.artisanId), eq(categoriesDepenses.nom, data.nom))).limit(1);
+  if (existing[0]) return existing[0];
+  await db.insert(categoriesDepenses).values({
+    artisan_id: data.artisanId,
+    nom: data.nom,
+    couleur: data.couleur || "#6366f1",
+    icone: data.icone || "Receipt",
+    compte_comptable: data.compteComptable ?? null,
+    plafond_mensuel: data.plafondMensuel != null ? String(data.plafondMensuel) : null,
+  });
+  const [row] = await db.select().from(categoriesDepenses)
+    .where(and(eq(categoriesDepenses.artisan_id, data.artisanId), eq(categoriesDepenses.nom, data.nom))).limit(1);
+  return row || null;
 }
 
 export async function updateCategorieDepense(
@@ -7262,32 +7261,24 @@ export async function updateCategorieDepense(
   artisanId: number,
   data: { nom?: string; couleur?: string; icone?: string; compteComptable?: string; plafondMensuel?: number; actif?: boolean }
 ): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
-  const sets: string[] = [];
-  const vals: any[] = [];
-  if (data.nom !== undefined) { sets.push("nom = ?"); vals.push(data.nom); }
-  if (data.couleur !== undefined) { sets.push("couleur = ?"); vals.push(data.couleur); }
-  if (data.icone !== undefined) { sets.push("icone = ?"); vals.push(data.icone); }
-  if (data.compteComptable !== undefined) { sets.push("compte_comptable = ?"); vals.push(data.compteComptable); }
-  if (data.plafondMensuel !== undefined) { sets.push("plafond_mensuel = ?"); vals.push(data.plafondMensuel); }
-  if (data.actif !== undefined) { sets.push("actif = ?"); vals.push(data.actif); }
-  if (sets.length === 0) return;
-  vals.push(id, artisanId);
-  await pool.execute(
-    `UPDATE categories_depenses SET ${sets.join(", ")} WHERE id = ? AND artisan_id = ?`,
-    vals
-  );
+  const db = await getDb();
+  const sets: any = {};
+  if (data.nom !== undefined) sets.nom = data.nom;
+  if (data.couleur !== undefined) sets.couleur = data.couleur;
+  if (data.icone !== undefined) sets.icone = data.icone;
+  if (data.compteComptable !== undefined) sets.compte_comptable = data.compteComptable;
+  if (data.plafondMensuel !== undefined) sets.plafond_mensuel = data.plafondMensuel != null ? String(data.plafondMensuel) : null;
+  if (data.actif !== undefined) sets.actif = data.actif;
+  if (Object.keys(sets).length === 0) return;
+  await db.update(categoriesDepenses).set(sets)
+    .where(and(eq(categoriesDepenses.id, id), eq(categoriesDepenses.artisan_id, artisanId)));
 }
 
 export async function deleteCategorieDepense(id: number, artisanId: number): Promise<void> {
-  const pool = getPool();
-  if (!pool) return;
+  const db = await getDb();
   // Soft-delete : marque actif=FALSE pour preserver l'historique des depenses.
-  await pool.execute(
-    `UPDATE categories_depenses SET actif = FALSE WHERE id = ? AND artisan_id = ?`,
-    [id, artisanId]
-  );
+  await db.update(categoriesDepenses).set({ actif: false })
+    .where(and(eq(categoriesDepenses.id, id), eq(categoriesDepenses.artisan_id, artisanId)));
 }
 
 // === Notes de frais ===

@@ -122,7 +122,13 @@ Découvert en attaquant 7b-2-b (`getStatistiquesChantier` interroge `depenses`).
 
 **→ P0.5e (OPE-254) = FAIT. Périmètre réel : 103 tables (vs 89 estimées au départ).**
 
-**Prochaine action : P0.7c** (compta/dépenses, ~30 fn, HAUT RISQUE) — désormais testable PG+mysql (tables compta créées des deux côtés en P0.5e). Sous-batchs fins, valider chaque fonction sur les 2 dialectes. Inclut calculerBudgetsRealises (reporté de 7b). Importer depenses/categoriesDepenses/notesDeFrais/notesFraisDepenses/budgetsCategories/transactionsBancaires/relevesBancaires/reglesCategorisation dans db.ts.
+### P0.7c — compta/dépenses (HAUT RISQUE)
+**DÉCISION ARCHITECTURE (PG-first)** : les tables fix-duplicates (depenses, categories_depenses, etc.) sont modélisées **uniquement dans `schema.pg.ts`**, PAS dans le schéma mysql legacy `schema.ts`. Donc en mode mysql, `schema.active` renvoie `undefined` pour ces tables → les fonctions compta portées **fonctionnent en PG, pas en mysql**. C'est **INTENTIONNEL** : le nouveau `db.ts` ne tourne jamais en mode mysql en prod (l'ancien stack bascule sur PG au cutover avec `DB_DIALECT=postgresql` ; on ne modélise pas le legacy mysql voué à être supprimé). → **Validation compta = PG uniquement.**
+⚠️ **Garde-fou** : NE JAMAIS déployer le nouveau `db.ts` sur staging/prod en mode mysql avant le cutover PG (sinon crash compta). Cohérent avec « PAS de staging:deploy avant fin P0.7 + cutover ».
+
+- **7c-1 FAIT** : getCategoriesDepenses, createCategorieDepense (INSERT IGNORE → select-puis-insert), updateCategorieDepense, deleteCategorieDepense (soft-delete) → Drizzle. **Validé PG** (CRUD + idempotence + soft-delete + filtre actif corrects). tsc neuf vert.
+
+**Prochaine action : P0.7c-2** (createDepense, updateDepense, deleteDepense, getDepenseById, getDepensesByArtisan). Importer `depenses` (déjà fait). Test PG. Vérifier montants TTC=HT+TVA + numéro.
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
