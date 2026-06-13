@@ -12,6 +12,8 @@ export class FakeBadgeRepository implements IBadgeRepository {
   private attributions: BadgeTechnicien[] = [];
   private techniciens: Array<{ id: number; artisanId: number }> = [];
   private classementStore: ClassementEntry[] = [];
+  // Progrès par technicien (pour verifierEtAttribuerBadges) : { technicienId -> {interventions, avisPositifs} }.
+  private progress = new Map<number, { interventions: number; avisPositifs: number }>();
   private seq = 0;
   private attrSeq = 0;
 
@@ -23,6 +25,11 @@ export class FakeBadgeRepository implements IBadgeRepository {
   // Utilitaire de test (hors port) : ajoute une ligne de classement.
   seedClassement(entry: ClassementEntry): void {
     this.classementStore.push(entry);
+  }
+
+  // Utilitaire de test (hors port) : déclare le progrès d'un technicien.
+  seedProgress(technicienId: number, p: { interventions: number; avisPositifs: number }): void {
+    this.progress.set(technicienId, p);
   }
 
   private ownsTechnicien(ctx: TenantContext, technicienId: number): boolean {
@@ -110,5 +117,20 @@ export class FakeBadgeRepository implements IBadgeRepository {
   // renvoie le classement déjà seedé pour la période, scopé tenant.
   async recalculerClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]> {
     return this.getClassement(ctx, periode);
+  }
+
+  async verifierEtAttribuerBadges(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[] | null> {
+    if (!this.ownsTechnicien(ctx, technicienId)) return null;
+    const prog = this.progress.get(technicienId) ?? { interventions: 0, avisPositifs: 0 };
+    const obtenus: BadgeTechnicien[] = [];
+    for (const b of this.badgesStore.filter((x) => x.artisanId === ctx.artisanId && x.actif)) {
+      const seuil = b.seuil ?? 0;
+      if (seuil <= 0) continue;
+      const valeur = b.categorie === "interventions" ? prog.interventions : b.categorie === "avis" ? prog.avisPositifs : 0;
+      if (valeur < seuil) continue;
+      const at = await this.attribuer(ctx, technicienId, b.id, valeur);
+      if (at) obtenus.push(at);
+    }
+    return obtenus;
   }
 }

@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
-import { badges, badgesTechniciens, classementTechniciens, factures, interventions, techniciens } from "../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { avisClients, badges, badgesTechniciens, classementTechniciens, factures, interventions, techniciens } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -256,6 +256,69 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         .where(and(eq(classementTechniciens.artisanId, ctx.artisanId), eq(classementTechniciens.periode, periode)))
         .orderBy(asc(classementTechniciens.rang));
       return finaux.map(toClassement);
+    });
+  }
+
+  verifierEtAttribuerBadges(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[] | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Ownership technicien AVANT tout calcul (anti-IDOR).
+      const [tech] = await tx
+        .select({ id: techniciens.id })
+        .from(techniciens)
+        .where(and(eq(techniciens.id, technicienId), eq(techniciens.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!tech) return null;
+
+      // Agrégats scopés tenant : interventions terminées du technicien + avis positifs de l'artisan.
+      const [intRow] = await tx
+        .select({ n: sql<number>`count(*)` })
+        .from(interventions)
+        .where(
+          and(
+            eq(interventions.technicienId, technicienId),
+            eq(interventions.artisanId, ctx.artisanId),
+            eq(interventions.statut, "terminee"),
+          ),
+        );
+      const nbInterventions = Number(intRow?.n ?? 0);
+
+      const [avisRow] = await tx
+        .select({ n: sql<number>`count(*)` })
+        .from(avisClients)
+        .where(and(eq(avisClients.artisanId, ctx.artisanId), gte(avisClients.note, 4)));
+      const nbAvisPositifs = Number(avisRow?.n ?? 0);
+
+      const actifs = await tx
+        .select()
+        .from(badges)
+        .where(and(eq(badges.artisanId, ctx.artisanId), eq(badges.actif, true)));
+
+      const obtenus: BadgeTechnicien[] = [];
+      for (const b of actifs) {
+        const seuil = b.seuil ?? 0;
+        if (seuil <= 0) continue;
+        let valeur = 0;
+        if (b.categorie === "interventions") valeur = nbInterventions;
+        else if (b.categorie === "avis") valeur = nbAvisPositifs;
+        if (valeur < seuil) continue;
+
+        // Attribution idempotente (dans la même tx) : technicien + badge déjà du tenant.
+        const [existing] = await tx
+          .select()
+          .from(badgesTechniciens)
+          .where(and(eq(badgesTechniciens.technicienId, technicienId), eq(badgesTechniciens.badgeId, b.id)))
+          .limit(1);
+        if (existing) {
+          obtenus.push(toBadgeTech(existing));
+          continue;
+        }
+        const [row] = await tx
+          .insert(badgesTechniciens)
+          .values({ technicienId, badgeId: b.id, valeurAtteinte: valeur })
+          .returning();
+        obtenus.push(toBadgeTech(row));
+      }
+      return obtenus;
     });
   }
 

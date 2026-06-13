@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeBadgeRepository } from "../infra/badge-repository-fake";
-import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge } from "./write-use-cases";
+import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge, verifierBadges } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -57,5 +57,27 @@ describe("badges — use-cases écriture (repo mocké)", () => {
   it("attribuerBadge anti-IDOR : badge d'un autre tenant → NotFoundError", async () => {
     // B tente d'attribuer le badge de A sur son propre technicien
     await expect(attribuerBadge(repo, B, 200, badgeA)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("verifierBadges : attribue les badges dont le seuil est atteint", async () => {
+    // badgeA (PRO) sans seuil → ignoré. Crée un badge avec seuil.
+    const seuilBadge = await creerBadge(repo, A, { code: "10I", nom: "10 interventions", categorie: "interventions", seuil: 10 });
+    repo.seedProgress(100, { interventions: 12, avisPositifs: 0 }); // technicien de A au-dessus du seuil
+    const obtenus = await verifierBadges(repo, A, 100);
+    expect(obtenus.map((o) => o.badgeId)).toContain(seuilBadge.id);
+    // idempotent : 2e passage ne duplique pas l'attribution
+    const obtenus2 = await verifierBadges(repo, A, 100);
+    expect(obtenus2.find((o) => o.badgeId === seuilBadge.id)?.id).toBe(obtenus.find((o) => o.badgeId === seuilBadge.id)?.id);
+  });
+
+  it("verifierBadges : seuil non atteint → aucune attribution", async () => {
+    await creerBadge(repo, A, { code: "50I", nom: "50 interventions", categorie: "interventions", seuil: 50 });
+    repo.seedProgress(100, { interventions: 3, avisPositifs: 0 });
+    expect(await verifierBadges(repo, A, 100)).toEqual([]);
+  });
+
+  it("verifierBadges : technicien d'un autre tenant → NotFoundError (anti-IDOR)", async () => {
+    await expect(verifierBadges(repo, A, 200)).rejects.toBeInstanceOf(NotFoundError);
+    await expectCrossTenantDenied(() => verifierBadges(repo, A, 200));
   });
 });

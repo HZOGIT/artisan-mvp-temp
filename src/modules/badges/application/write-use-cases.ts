@@ -52,3 +52,15 @@ export function calculerClassement(
 ): Promise<ClassementEntry[]> {
   return repo.recalculerClassement(ctx, periode);
 }
+
+// Vérifie les seuils et attribue les badges atteints au technicien. Anti-IDOR : le repo
+// renvoie null si le technicien n'appartient pas au tenant → NotFoundError.
+export async function verifierBadges(
+  repo: IBadgeRepository,
+  ctx: TenantContext,
+  technicienId: number,
+): Promise<BadgeTechnicien[]> {
+  const obtenus = await repo.verifierEtAttribuerBadges(ctx, technicienId);
+  if (!obtenus) throw new NotFoundError("Technicien introuvable");
+  return obtenus;
+}

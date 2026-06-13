@@ -188,6 +188,27 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     expect(top?.pointsTotal).toBe(25);
   });
 
+  it("verifierBadges : attribue le badge dont le seuil interventions est atteint, scopé/anti-IDOR", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // badge actif avec seuil interventions = 2
+    const bId = (await callMutation(server, "badges.create", { code: "S2", nom: "Seuil2", categorie: "interventions", seuil: 2 }, tA)).json().result.data.id as number;
+    // 2 interventions terminées pour techA
+    await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut,"technicienId") values ($1,$2,$3,now(),$4,$5)', [artisanA, 1, "V1", "terminee", techA]);
+    await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut",statut,"technicienId") values ($1,$2,$3,now(),$4,$5)', [artisanA, 1, "V2", "terminee", techA]);
+
+    const res = await callMutation(server, "badges.verifierBadges", { technicienId: techA }, tA);
+    expect(res.statusCode).toBe(200);
+    expect((res.json().result.data as Array<{ badgeId: number }>).some((o) => o.badgeId === bId)).toBe(true);
+    // l'attribution est visible et unique
+    const lst = await callQuery(server, "badges.getBadgesTechnicien", { technicienId: techA }, tA);
+    expect((lst.json().result.data as Array<{ badgeId: number }>).filter((x) => x.badgeId === bId).length).toBe(1);
+    // anti-IDOR : A ne peut pas vérifier le technicien de B
+    expect((await callMutation(server, "badges.verifierBadges", { technicienId: techB }, tA)).statusCode).toBe(404);
+    // B ne peut pas vérifier le technicien de A
+    expect((await callMutation(server, "badges.verifierBadges", { technicienId: techA }, tB)).statusCode).toBe(404);
+  });
+
   it("getClassement : scopé tenant (B ne voit pas le classement de A)", async () => {
     // Seed classement via admin pour A et B (même période).
     await admin.query(

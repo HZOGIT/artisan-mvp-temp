@@ -14,6 +14,7 @@ const stubRepo: IBadgeRepository = {
   attribuer: async () => null,
   getClassement: async () => [],
   recalculerClassement: async () => [],
+  verifierEtAttribuerBadges: async () => [],
 };
 
 describe("badges.module", () => {
@@ -33,6 +34,7 @@ describe("badges.module", () => {
       "listBadgesTechnicien",
       "recalculerClassement",
       "update",
+      "verifierEtAttribuerBadges",
     ]);
   });
 
@@ -48,6 +50,7 @@ describe("badges.module", () => {
       "getClassement",
       "list",
       "update",
+      "verifierBadges",
     ]);
   });
 });

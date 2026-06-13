@@ -36,4 +36,10 @@ export interface IBadgeRepository {
   // interventions terminées + CA des factures payées du tenant, puis le renvoie.
   // Tout scopé artisanId (RLS + filtre). Idempotent (purge avant insert).
   recalculerClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]>;
+
+  // Vérifie les seuils (interventions terminées, avis positifs) pour un technicien et
+  // attribue les badges actifs du tenant dont le seuil est atteint. Renvoie les badges
+  // concernés (attribution idempotente). `null` si le technicien n'appartient pas au
+  // tenant (anti-IDOR). Tout scopé artisanId + RLS.
+  verifierEtAttribuerBadges(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[] | null>;
 }
