@@ -2,6 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 import type { Position, EnregistrerPositionInput } from "../domain/position";
+import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 
 // Port du repository techniciens. Chaque méthode exige le TenantContext (scope tenant +
 // RLS). `techniciens` possède un `artisanId` → double cloisonnement RLS + filtre.
@@ -28,4 +29,8 @@ export interface ITechnicienRepository {
   getDernierePosition(ctx: TenantContext, technicienId: number): Promise<Position | null>;
   // Enregistre une position GPS — null si le technicien n'appartient pas au tenant.
   enregistrerPosition(ctx: TenantContext, technicienId: number, input: EnregistrerPositionInput): Promise<Position | null>;
+
+  // Utilisateurs du tenant liables à une fiche technicien (propriétaire + collaborateurs).
+  // ⚠️ `users` hors RLS tenant → filtre artisanId EXPLICITE (jamais d'autre tenant).
+  getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]>;
 }

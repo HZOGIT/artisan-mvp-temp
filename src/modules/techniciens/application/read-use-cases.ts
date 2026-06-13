@@ -4,6 +4,7 @@ import type { ITechnicienRepository } from "./technicien-repository";
 import type { Technicien } from "../domain/technicien";
 import type { Disponibilite } from "../domain/disponibilite";
 import type { Position } from "../domain/position";
+import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
 // par le `TenantContext` (le repo l'applique). `getTechnicien` sur une ressource d'un
@@ -37,4 +38,12 @@ export function getDernierePosition(
   technicienId: number,
 ): Promise<Position | null> {
   return repo.getDernierePosition(ctx, technicienId);
+}
+
+// Utilisateurs du tenant liables à une fiche technicien (scopé artisanId explicite).
+export function listerUtilisateursLiables(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+): Promise<UtilisateurLiable[]> {
+  return repo.getUsersLiables(ctx);
 }

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, or } from "drizzle-orm";
 import {
   techniciens,
   positionsTechniciens,
@@ -6,6 +6,8 @@ import {
   badgesTechniciens,
   objectifsTechniciens,
   classementTechniciens,
+  users,
+  artisans,
 } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -14,6 +16,7 @@ import type { ITechnicienRepository } from "../application/technicien-repository
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 import type { Position, EnregistrerPositionInput } from "../domain/position";
+import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 
 type TechnicienRow = typeof techniciens.$inferSelect;
 type DispoRow = typeof disponibilitesTechniciens.$inferSelect;
@@ -227,6 +230,30 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
         })
         .returning();
       return toPosition(row);
+    });
+  }
+
+  getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // `users`/`artisans` hors RLS tenant → filtre artisanId EXPLICITE.
+      // Liables = le propriétaire (artisans.userId) + les collaborateurs (users.artisanId).
+      const [art] = await tx
+        .select({ userId: artisans.userId })
+        .from(artisans)
+        .where(eq(artisans.id, ctx.artisanId))
+        .limit(1);
+      if (!art) return [];
+      const rows = await tx
+        .select({ id: users.id, name: users.name, prenom: users.prenom, email: users.email, role: users.role })
+        .from(users)
+        .where(or(eq(users.id, art.userId), eq(users.artisanId, ctx.artisanId)))
+        .orderBy(asc(users.id));
+      return rows.map((u) => ({
+        id: u.id,
+        nom: [u.prenom, u.name].filter(Boolean).join(" ").trim() || (u.email ?? ""),
+        email: u.email ?? null,
+        role: u.role,
+      }));
     });
   }
 

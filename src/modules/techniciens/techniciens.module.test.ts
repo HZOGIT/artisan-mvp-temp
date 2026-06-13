@@ -14,6 +14,7 @@ const stubRepo: ITechnicienRepository = {
   setDisponibilite: async () => null,
   getDernierePosition: async () => null,
   enregistrerPosition: async () => null,
+  getUsersLiables: async () => [],
 };
 
 describe("techniciens.module", () => {
@@ -29,6 +30,7 @@ describe("techniciens.module", () => {
       "enregistrerPosition",
       "getById",
       "getDernierePosition",
+      "getUsersLiables",
       "list",
       "listDisponibilites",
       "setDisponibilite",
@@ -47,6 +49,7 @@ describe("techniciens.module", () => {
       "getById",
       "getDernierePosition",
       "getDisponibilites",
+      "getLinkableUsers",
       "list",
       "setDisponibilite",
       "update",

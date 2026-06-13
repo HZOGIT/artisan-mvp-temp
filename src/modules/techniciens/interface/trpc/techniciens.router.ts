@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ITechnicienRepository } from "../../application/technicien-repository";
-import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition } from "../../application/read-use-cases";
+import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables } from "../../application/read-use-cases";
 import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition } from "../../application/write-use-cases";
 
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
@@ -84,6 +84,8 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
         const { technicienId, ...data } = input;
         return definirDisponibilite(repo, ctx.tenant, technicienId, data);
       }),
+
+    getLinkableUsers: protectedProcedure.query(({ ctx }) => listerUtilisateursLiables(repo, ctx.tenant)),
 
     getDernierePosition: protectedProcedure
       .input(z.object({ technicienId: z.number().int() }))

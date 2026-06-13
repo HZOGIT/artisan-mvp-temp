@@ -3,6 +3,7 @@ import type { ITechnicienRepository } from "../application/technicien-repository
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 import type { Position, EnregistrerPositionInput } from "../domain/position";
+import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
 // scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
@@ -10,9 +11,15 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
   private store: Technicien[] = [];
   private dispos: Disponibilite[] = [];
   private positions: Position[] = [];
+  private usersLiables = new Map<number, UtilisateurLiable[]>();
   private seq = 0;
   private dispoSeq = 0;
   private posSeq = 0;
+
+  // Utilitaire de test (hors port) : déclare les users liables d'un tenant.
+  seedUsersLiables(artisanId: number, list: UtilisateurLiable[]): void {
+    this.usersLiables.set(artisanId, list);
+  }
 
   private async owns(ctx: TenantContext, technicienId: number): Promise<boolean> {
     return (await this.getById(ctx, technicienId)) !== null;
@@ -117,5 +124,9 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     };
     this.positions.push(p);
     return p;
+  }
+
+  async getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]> {
+    return this.usersLiables.get(ctx.artisanId) ?? [];
   }
 }

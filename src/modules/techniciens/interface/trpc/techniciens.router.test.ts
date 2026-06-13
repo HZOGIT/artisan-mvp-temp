@@ -14,6 +14,8 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 
 const UA = 9935001;
 const UB = 9935002;
+const COLLAB_A = 9935011;
+const COLLAB_B = 9935012;
 
 async function token(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -53,6 +55,10 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     }
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
+    // Collaborateurs liés (users.artisanId) — un par tenant.
+    await admin.query("delete from users where id in ($1,$2)", [COLLAB_A, COLLAB_B]);
+    await admin.query('insert into users (id, email, password, role, name, "artisanId") values ($1,$2,\'x\',\'technicien\',$3,$4)', [COLLAB_A, `c${COLLAB_A}@t.fr`, "Collab A", artisanA]);
+    await admin.query('insert into users (id, email, password, role, name, "artisanId") values ($1,$2,\'x\',\'secretaire\',$3,$4)', [COLLAB_B, `c${COLLAB_B}@t.fr`, "Collab B", artisanB]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), technicienRepo: new TechnicienRepositoryDrizzle(app.db) });
   });
 
@@ -63,6 +69,7 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
       await admin.query('delete from positions_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
       await admin.query('delete from techniciens where "artisanId"=$1', [aId]);
     }
+    await admin.query("delete from users where id in ($1,$2)", [COLLAB_A, COLLAB_B]);
     for (const uid of [UA, UB]) {
       await admin.query('delete from artisans where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
@@ -170,6 +177,22 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     // anti-IDOR géoloc : B ne lit/écrit pas la position du technicien de A → null / 404
     expect((await callQuery(server, "techniciens.getDernierePosition", { technicienId: techId }, tB)).json().result.data).toBeNull();
     expect((await callMutation(server, "techniciens.enregistrerPosition", { technicienId: techId, latitude: "48.85", longitude: "2.35" }, tB)).statusCode).toBe(404);
+  });
+
+  it("getLinkableUsers : propriétaire + collaborateurs du tenant, scopé (pas d'autre tenant)", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const usersA = (await callQuery(server, "techniciens.getLinkableUsers", undefined, tA)).json().result.data as Array<{ id: number }>;
+    const idsA = usersA.map((u) => u.id);
+    expect(idsA).toContain(UA); // propriétaire
+    expect(idsA).toContain(COLLAB_A); // collaborateur
+    expect(idsA).not.toContain(UB); // pas l'autre tenant
+    expect(idsA).not.toContain(COLLAB_B);
+    // B ne voit pas les users de A
+    const idsB = ((await callQuery(server, "techniciens.getLinkableUsers", undefined, tB)).json().result.data as Array<{ id: number }>).map((u) => u.id);
+    expect(idsB).toContain(UB);
+    expect(idsB).not.toContain(UA);
+    expect(idsB).not.toContain(COLLAB_A);
   });
 
   it("update partiel : ne touche pas les champs non fournis", async () => {

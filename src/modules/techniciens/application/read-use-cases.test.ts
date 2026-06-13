@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { FakeTechnicienRepository } from "../infra/technicien-repository-fake";
-import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition } from "./read-use-cases";
+import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -52,5 +52,12 @@ describe("techniciens — use-cases lecture (repo mocké)", () => {
     expect((await getDernierePosition(repo, A, tA.id))?.latitude).toBe("48.85");
     // B ne lit pas la position du technicien de A
     expect(await getDernierePosition(repo, B, tA.id)).toBeNull();
+  });
+
+  it("listerUtilisateursLiables : scopé tenant", async () => {
+    repo.seedUsersLiables(1, [{ id: 10, nom: "Owner A", email: "a@a.fr", role: "artisan" }]);
+    repo.seedUsersLiables(2, [{ id: 20, nom: "Owner B", email: "b@b.fr", role: "artisan" }]);
+    expect((await listerUtilisateursLiables(repo, A)).map((u) => u.id)).toEqual([10]);
+    expect((await listerUtilisateursLiables(repo, B)).map((u) => u.id)).toEqual([20]);
   });
 });
