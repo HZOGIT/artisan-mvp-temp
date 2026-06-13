@@ -119,4 +119,45 @@ describe.skipIf(!URL)("chantiers.router e2e (HTTP → tRPC → use-case → repo
     expect((await callMutation(server, "chantiers.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "chantiers.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("id inexistant du même tenant : getById / update / delete → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "chantiers.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "chantiers.update", { id: 999999999, nom: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "chantiers.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : reference > 50, nom > 255, statut/priorite invalides, budget non décimal → 400", async () => {
+    const tA = await token(UA);
+    const b = { clientId: clientA };
+    expect((await callMutation(server, "chantiers.create", { ...b, reference: "x".repeat(51), nom: "OK" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "chantiers.create", { ...b, reference: ref(), nom: "x".repeat(256) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "chantiers.create", { ...b, reference: ref(), nom: "OK", statut: "inconnu" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "chantiers.create", { ...b, reference: ref(), nom: "OK", priorite: "extreme" }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "chantiers.create", { ...b, reference: ref(), nom: "OK", budgetPrevisionnel: "abc" }, tA)).statusCode).toBe(400);
+  });
+
+  it("avancement borné : 0 et 100 acceptés ; -1 et 101 → 400", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "chantiers.create", { clientId: clientA, reference: ref(), nom: "Min", avancement: 0 }, tA)).statusCode).toBe(200);
+    expect((await callMutation(server, "chantiers.create", { clientId: clientA, reference: ref(), nom: "Max", avancement: 100 }, tA)).statusCode).toBe(200);
+    expect((await callMutation(server, "chantiers.create", { clientId: clientA, reference: ref(), nom: "Neg", avancement: -1 }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "chantiers.create", { clientId: clientA, reference: ref(), nom: "Over", avancement: 101 }, tA)).statusCode).toBe(400);
+  });
+
+  it("update : dateFinPrevue < dateDebut (fournies ensemble) → 400", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "chantiers.create", { clientId: clientA, reference: ref(), nom: "Dates" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "chantiers.update", { id, dateDebut: "2026-09-10", dateFinPrevue: "2026-09-01" }, tA)).statusCode).toBe(400);
+  });
+
+  it("update ne peut PAS rattacher un autre client (clientId strip par zod) — client immuable", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "chantiers.create", { clientId: clientA, reference: ref(), nom: "Immuable" }, tA)).json().result.data.id as number;
+    // tente de réaffecter le chantier au client de B via update → clé hors schéma retirée
+    await callMutation(server, "chantiers.update", { id, clientId: clientB, nom: "Toujours A" }, tA);
+    const after = (await callQuery(server, "chantiers.getById", { id }, tA)).json().result.data as { clientId: number; nom: string };
+    expect(after.clientId).toBe(clientA); // client inchangé
+    expect(after.nom).toBe("Toujours A"); // seul le champ légitime appliqué
+  });
 });
