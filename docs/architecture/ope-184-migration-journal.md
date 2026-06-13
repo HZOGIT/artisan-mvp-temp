@@ -64,7 +64,9 @@ Méthode : nouveau fichier **`drizzle/schema.pg.ts`** (pg-core) séparé du `sch
 **DÉCISION HUMAINE** : on garde PG-first. On NE grind PAS le SQL legacy en aveugle. **Nouveau séquencement** :
 1. **P0.8 (OPE-194)** : copie data MySQL(:3306)→PG(:5432).
    - **P0.8a FAIT (dérive schéma)** : 3 tables live HORS Drizzle découvertes (`active_sessions`, `devices`, `subscriptions`) → modélisées en pgTable (snake_case, uniques composites), migration `drizzle/pg/0001` appliquée. **Schéma PG = 92 tables**. schema.active.ts régénéré (92).
-   - **P0.8b À FAIRE** : ETL (mysql2 read → node-postgres insert ; coercition 45 bool 0/1→bool + 8 jsonb ; FK quasi nulles donc ordre libre sauf sessions→users) + recaler séquences serial `setval(max(id))`. Gate = comptes de lignes identiques mysql vs pg + 0 erreur.
+   - **P0.8b FAIT** : `scripts/pg-data-copy.mjs` (ETL générique : coercition bool 0/1→bool + jsonb, `session_replication_role=replica` pendant le load, truncate idempotent, recalage séquences `setval`) + tâche `task pg:copy-data`. Exécuté sur dev → **comptes IDENTIQUES mysql↔pg** (clients 13/13, ai_messages 74/74, subscriptions 1/1, devis 3/3, permissions 28/28…), séquences OK (insert pg sans id ne collisionne pas). **→ P0.8 (OPE-194) = FAIT.**
+
+**Prochaine action : P0.9 (OPE-195)** — faire tourner sur PG (`DB_DIALECT=postgresql`) le sous-ensemble de tests qui frappe la DB directement (db-secure/integration : `security.test.ts`, `tests/isolation-multi-tenant`, `fournisseurs.test.ts`) = filet JETABLE qui révèle quelles fonctions raw-SQL cassent. Puis P0.7-suite (port des ~104 points, gaté par ces tests).
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 

@@ -61,6 +61,11 @@ tasks:
     cmds:
       - '{{.COMPOSE}} exec app sh -c "cd /app && node scripts/check-schema-drift.mjs"'
 
+  pg:copy-data:
+    desc: "OPE-184 — copie les données MySQL -> PostgreSQL (bascule PG-first). Idempotent."
+    cmds:
+      - '{{.COMPOSE}} exec app sh -c "cd /app && MYSQL_URL=mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp PG_URL=postgres://${POSTGRES_USER:-artisan_user}:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp node scripts/pg-data-copy.mjs"'
+
   # Deprecated alias — kept so old muscle memory still works. Use db:migrate.
   dev:migrate:
     desc: "(deprecated) → use db:migrate"
