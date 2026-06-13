@@ -53,7 +53,9 @@ export function requireRole(...allowedRoles: string[]) {
     if (!allowedRoles.includes(opts.ctx.user.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Accès interdit pour votre rôle" });
     }
-    return opts.next({ ctx: opts.ctx });
+    // user est garanti non-null ici (guard ci-dessus) — on le re-narrow dans le
+    // ctx de sortie pour que les procédures consommatrices voient `ctx.user` non-null.
+    return opts.next({ ctx: { ...opts.ctx, user: opts.ctx.user } });
   });
 }
 
@@ -72,14 +74,18 @@ export function requirePermission(...requiredPerms: string[]) {
     }
     // Admin bypasses all permission checks
     if (opts.ctx.user.role === "admin") {
-      return opts.next({ ctx: opts.ctx });
+      // user est garanti non-null ici (guard ci-dessus) — on le re-narrow dans le
+    // ctx de sortie pour que les procédures consommatrices voient `ctx.user` non-null.
+    return opts.next({ ctx: { ...opts.ctx, user: opts.ctx.user } });
     }
     const userPerms: string[] = (opts.ctx.user as any).permissions || [];
     const hasAll = requiredPerms.every(p => userPerms.includes(p));
     if (!hasAll) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Vous n'avez pas la permission requise" });
     }
-    return opts.next({ ctx: opts.ctx });
+    // user est garanti non-null ici (guard ci-dessus) — on le re-narrow dans le
+    // ctx de sortie pour que les procédures consommatrices voient `ctx.user` non-null.
+    return opts.next({ ctx: { ...opts.ctx, user: opts.ctx.user } });
   });
 }
 

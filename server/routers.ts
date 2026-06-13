@@ -10019,7 +10019,7 @@ const depensesRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      data: z.record(z.any()),
+      data: z.record(z.string(), z.any()),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
