@@ -5492,29 +5492,31 @@ export async function initSoldeConges(
   data: InsertSoldeConge
 ): Promise<SoldeConge | undefined> {
   const dbi = await getDb();
-  // INSERT ... ON DUPLICATE KEY UPDATE via raw SQL pour gerer la clef
-  // composite (technicien, type, annee) eventuellement existante.
-  const pool = getPool();
-  if (pool) {
-    await pool.execute(
-      `INSERT INTO soldes_conges
-        (technicienId, artisanId, type, annee, soldeInitial, soldeRestant, joursAcquis, joursPris)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE soldeInitial = VALUES(soldeInitial),
-                               soldeRestant = VALUES(soldeRestant),
-                               joursAcquis = VALUES(joursAcquis),
-                               joursPris = VALUES(joursPris)`,
-      [
-        data.technicienId,
-        data.artisanId,
-        data.type,
-        data.annee,
-        data.soldeInitial ?? "0.00",
-        data.soldeRestant ?? "0.00",
-        data.joursAcquis ?? "0.00",
-        data.joursPris ?? "0.00",
-      ]
-    );
+  // Upsert idempotent sur (technicien, type, annee) via check-then-act (neutre dialecte).
+  // NB OPE-184 : `soldes_conges` n'a PAS de clé unique sur (technicienId,type,annee)
+  // (seul `id` est PK, vérifié sur la base live) → l'ancien `ON DUPLICATE KEY UPDATE`
+  // ne déclenchait JAMAIS la branche UPDATE en mysql (bug latent : ré-init = doublon).
+  // Le check-then-act corrige ce comportement et le rend réellement idempotent,
+  // aligné sur `updateSoldeConges` (OPE-178).
+  const vals = {
+    soldeInitial: data.soldeInitial ?? "0.00",
+    soldeRestant: data.soldeRestant ?? "0.00",
+    joursAcquis: data.joursAcquis ?? "0.00",
+    joursPris: data.joursPris ?? "0.00",
+  };
+  const existing = await dbi.select({ id: soldesConges.id }).from(soldesConges)
+    .where(and(
+      eq(soldesConges.technicienId, data.technicienId),
+      eq(soldesConges.type, data.type),
+      eq(soldesConges.annee, data.annee),
+    )).limit(1);
+  if (existing[0]) {
+    await dbi.update(soldesConges).set(vals).where(eq(soldesConges.id, existing[0].id));
+  } else {
+    await dbi.insert(soldesConges).values({
+      technicienId: data.technicienId, artisanId: data.artisanId,
+      type: data.type, annee: data.annee, ...vals,
+    });
   }
   const r = await dbi.select().from(soldesConges)
     .where(and(
@@ -5539,28 +5541,26 @@ export async function updateSoldeConges(
   //  - ligne présente            -> UPDATE (comportement INCHANGÉ).
   //  - absente + décompte (>0)   -> INSERT (trace le décompte ; solde acquis = 0).
   //  - absente + recrédit (<=0)  -> no-op (rien n'avait été décompté à recréditer).
-  const pool = getPool();
-  if (!pool) return;
-  const [rows] = await pool.execute(
-    `SELECT id FROM soldes_conges WHERE technicienId = ? AND type = ? AND annee = ? LIMIT 1`,
-    [technicienId, type, annee]
-  );
-  const exists = Array.isArray(rows) && (rows as any[]).length > 0;
-  if (exists) {
-    await pool.execute(
-      `UPDATE soldes_conges
-          SET joursPris = joursPris + ?,
-              soldeRestant = GREATEST(0, soldeRestant - ?)
-        WHERE technicienId = ? AND type = ? AND annee = ?`,
-      [joursPrisDelta, joursPrisDelta, technicienId, type, annee]
-    );
+  const dbi = await getDb();
+  const existing = await dbi.select({ id: soldesConges.id }).from(soldesConges)
+    .where(and(
+      eq(soldesConges.technicienId, technicienId),
+      eq(soldesConges.type, type),
+      eq(soldesConges.annee, annee),
+    )).limit(1);
+  if (existing[0]) {
+    // GREATEST(0, …) : supporté par PG et mysql ; arithmétique sur colonnes en sql brut.
+    await dbi.update(soldesConges).set({
+      joursPris: sql`${soldesConges.joursPris} + ${joursPrisDelta}`,
+      soldeRestant: sql`GREATEST(0, ${soldesConges.soldeRestant} - ${joursPrisDelta})`,
+    }).where(eq(soldesConges.id, existing[0].id));
   } else if (joursPrisDelta > 0) {
-    await pool.execute(
-      `INSERT INTO soldes_conges
-        (technicienId, artisanId, type, annee, soldeInitial, soldeRestant, joursAcquis, joursPris)
-       VALUES (?, ?, ?, ?, '0.00', GREATEST(0, 0 - ?), '0.00', ?)`,
-      [technicienId, artisanId, type, annee, joursPrisDelta, joursPrisDelta]
-    );
+    // Absente + décompte (>0) → INSERT (trace le décompte ; soldeRestant planché à 0).
+    await dbi.insert(soldesConges).values({
+      technicienId, artisanId, type, annee,
+      soldeInitial: "0.00", soldeRestant: "0.00", joursAcquis: "0.00",
+      joursPris: String(joursPrisDelta),
+    });
   }
 }
 
