@@ -22,4 +22,10 @@ describe("conges.module", () => {
   it("le port expose les opérations CRUD attendues", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsTechnicien", "update"]);
   });
+
+  it("expose un routeur tRPC assemblé (procédures parité)", () => {
+    const module = createCongesModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+  });
 });

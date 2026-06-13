@@ -35,6 +35,9 @@ import type { IClientRepository } from "./modules/clients/application/client-rep
 import { createInterventionsModule } from "./modules/interventions/interventions.module";
 import { InterventionRepositoryDrizzle } from "./modules/interventions/infra/intervention-repository-drizzle";
 import type { IInterventionRepository } from "./modules/interventions/application/intervention-repository";
+import { createCongesModule } from "./modules/conges/conges.module";
+import { CongeRepositoryDrizzle } from "./modules/conges/infra/conge-repository-drizzle";
+import type { ICongeRepository } from "./modules/conges/application/conge-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -56,6 +59,7 @@ export interface AppDeps extends ContextDeps {
   readonly stockRepo?: IStockRepository;
   readonly clientRepo?: IClientRepository;
   readonly interventionRepo?: IInterventionRepository;
+  readonly congeRepo?: ICongeRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -100,7 +104,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const interventions = createInterventionsModule({
     repository: deps.interventionRepo ?? new InterventionRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions });
+  const conges = createCongesModule({
+    repository: deps.congeRepo ?? new CongeRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
