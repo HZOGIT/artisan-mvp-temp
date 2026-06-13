@@ -86,6 +86,7 @@ import {
   configAlertesPrevisions, ConfigAlertePrevision, InsertConfigAlertePrevision,
   historiqueAlertesPrevisions, HistoriqueAlertePrevision, InsertHistoriqueAlertePrevision,
   emailsLog, EmailLog, InsertEmailLog,
+  aiThreads, aiMessages,
 } from "../drizzle/schema.active";
 import { ALL_PERMISSIONS } from "../shared/permissions";
 
@@ -7763,34 +7764,23 @@ export async function exportDepensesFEC(
 // ============================================================================
 
 export async function getOrCreateAiThread(artisanId: number, firstMessage: string): Promise<number> {
-  const pool = await ensurePool();
   const title = firstMessage.slice(0, 80) + (firstMessage.length > 80 ? '…' : '');
-  const [result] = await pool.execute(
-    'INSERT INTO ai_threads (artisanId, mode, title, lastMessageAt) VALUES (?, ?, ?, NOW())',
-    [artisanId, 'general', title]
-  ) as any;
-  return result.insertId;
+  return await insertReturningId(aiThreads, { artisanId, mode: 'general', title, lastMessageAt: new Date() });
 }
 
 export async function getAiThread(threadId: number, artisanId: number): Promise<any> {
-  const pool = await ensurePool();
-  const [rows] = await pool.execute(
-    'SELECT * FROM ai_threads WHERE id = ? AND artisanId = ? LIMIT 1',
-    [threadId, artisanId]
-  ) as any;
-  return (rows as any[])[0] || null;
+  const db = await getDb();
+  const [row] = await db.select().from(aiThreads)
+    .where(and(eq(aiThreads.id, threadId), eq(aiThreads.artisanId, artisanId))).limit(1);
+  return row || null;
 }
 
 export async function listAiThreads(artisanId: number, limit = 20): Promise<any[]> {
-  const pool = await ensurePool();
-  // NB: mysql2 prepared statements reject `LIMIT ?` ("Incorrect arguments to
-  // mysqld_stmt_execute"). limit is a controlled int, so inline it safely.
+  const db = await getDb();
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit) || 20));
-  const [rows] = await pool.execute(
-    `SELECT * FROM ai_threads WHERE artisanId = ? ORDER BY lastMessageAt DESC LIMIT ${safeLimit}`,
-    [artisanId]
-  ) as any;
-  return rows as any[];
+  return await db.select().from(aiThreads)
+    .where(eq(aiThreads.artisanId, artisanId))
+    .orderBy(desc(aiThreads.lastMessageAt)).limit(safeLimit);
 }
 
 export async function insertAiMessage(
@@ -7800,30 +7790,19 @@ export async function insertAiMessage(
   metadata?: any,
   pricingMetadata?: any,
 ): Promise<void> {
-  const pool = await ensurePool();
-  await pool.execute(
-    'INSERT INTO ai_messages (threadId, role, transcript, metadata, pricingMetadata) VALUES (?, ?, ?, ?, ?)',
-    [
-      threadId,
-      role,
-      transcript,
-      metadata ? JSON.stringify(metadata) : null,
-      pricingMetadata ? JSON.stringify(pricingMetadata) : null,
-    ]
-  );
-  await pool.execute(
-    'UPDATE ai_threads SET lastMessageAt = NOW() WHERE id = ?',
-    [threadId]
-  );
+  const db = await getDb();
+  await db.insert(aiMessages).values({
+    threadId, role, transcript,
+    metadata: metadata ?? null,
+    pricingMetadata: pricingMetadata ?? null,
+  });
+  await db.update(aiThreads).set({ lastMessageAt: new Date() }).where(eq(aiThreads.id, threadId));
 }
 
 export async function getAiMessages(threadId: number, limit = 50): Promise<any[]> {
-  const pool = await ensurePool();
-  // Same mysql2 `LIMIT ?` limitation as listAiThreads — inline the int.
+  const db = await getDb();
   const safeLimit = Math.max(1, Math.min(500, Math.floor(limit) || 50));
-  const [rows] = await pool.execute(
-    `SELECT * FROM ai_messages WHERE threadId = ? ORDER BY createdAt ASC LIMIT ${safeLimit}`,
-    [threadId]
-  ) as any;
-  return rows as any[];
+  return await db.select().from(aiMessages)
+    .where(eq(aiMessages.threadId, threadId))
+    .orderBy(asc(aiMessages.createdAt)).limit(safeLimit);
 }

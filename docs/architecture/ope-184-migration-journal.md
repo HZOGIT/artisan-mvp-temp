@@ -87,7 +87,12 @@ Tests db-direct sur PG : `fournisseurs.test.ts` **17/17 ✓**, `security.test.ts
 - 🔎 **Drift découvert** : mysql `conversations.statut` = `enum('active','archivee')` alors que schéma/code = `['ouverte','fermee','archivee']` → `getOrCreateConversation` **déjà cassé sur le mysql live** (pré-existant, pas une régression du port). Sur PG cohérent. À tracer (schema.ts ≠ base live par endroits — possible source d'autres surprises au cutover).
 - Inserts raw `pool.execute` (createDepense, createNoteFrais, createInterventionMobile, createPhotoIntervention, getOrCreateAiThread) → 7b/7c.
 
-**Prochaine action : P0.7b** — getPool/ensurePool lectures simples (couleurs calendrier, mobile/photos, stats chantier, getOrCreateAiThread). Stratégie : réécrire en Drizzle au cas par cas OU fournir un `pgPool` (placeholders `$1`, résultat `rows`) quand DB_DIALECT=postgresql. ⚠️ Le SQL brut mysql (`?`, `NOW()`, ``backticks``, `[rows]`) n'est PAS pg-compatible.
+### P0.7b EN COURS — réécriture des raw `getPool`/`ensurePool` en Drizzle (dialect-neutre)
+- **7b-1 FAIT** : 5 fn ai réécrites en Drizzle (getOrCreateAiThread, getAiThread, listAiThreads, insertAiMessage, getAiMessages) — `ensurePool()` raw → Drizzle. Validé **PG + mysql** sur vraies données (25 threads / 74 msgs). aiThreads/aiMessages ajoutés à l'import db.ts.
+- 🪦 **Calendrier couleurs (getCouleursCalendrier/setCouleurIntervention/setCouleursMultiples/deleteCouleurIntervention) = DEAD CODE** : tapent la table `couleurs_interventions` qui **n'existe dans AUCUNE base** (mysql 0 / pg 0). Déjà cassées sur mysql (pré-existant ; getCouleurs catch→{}, les set/delete throw). → **NE PAS porter à l'aveugle.** Option : réécrire contre `preferencesCouleursCalendrier` (= bugfix + changement de comportement, à valider) OU supprimer comme dead-code. **Sorti de la boucle → décision humaine / tâche dédiée.**
+- **7b-2 À FAIRE** : mobile/photos (getInterventionMobileByInterventionId, getInterventionsMobileByArtisanId, getPhotosByInterventionMobileId, createInterventionMobile, createPhotoIntervention), getStockEntrantByArtisan, getStatistiquesChantier, calculerBudgetsRealises, invalidateCache.
+
+**Prochaine action : P0.7b-2.**
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
