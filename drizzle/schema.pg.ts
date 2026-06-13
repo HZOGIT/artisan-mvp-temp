@@ -830,3 +830,285 @@ export const exportsComptables = pgTable("exports_comptables", {
 });
 export type ExportComptable = typeof exportsComptables.$inferSelect;
 export type InsertExportComptable = typeof exportsComptables.$inferInsert;
+
+// ════════════════════════════════════════════════════════════════════════════
+// BATCH 3a (P0.5) — ACHATS/STOCK + COMMANDES + PAIEMENTS + PORTAIL + CONTRATS
+// ════════════════════════════════════════════════════════════════════════════
+export const stockArticleTypeEnum = pgEnum("stock_article_type", ["bibliotheque", "artisan"]);
+export const mouvementTypeEnum = pgEnum("mouvement_type", ["entree", "sortie", "ajustement"]);
+export const relanceTypeEnum = pgEnum("relance_type", ["email", "notification"]);
+export const relanceStatutEnum = pgEnum("relance_statut", ["envoye", "echec"]);
+export const modeleEmailTypeEnum = pgEnum("modele_email_type", ["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]);
+export const commandeStatutEnum = pgEnum("commande_statut", ["brouillon", "envoyee", "confirmee", "partiellement_livree", "livree", "annulee"]);
+export const commandeStatutFacturationEnum = pgEnum("commande_statut_facturation", ["a_facturer", "facturee"]);
+export const paiementStatutEnum = pgEnum("paiement_statut", ["en_attente", "complete", "echoue", "rembourse"]);
+export const contratTypeEnum = pgEnum("contrat_type", ["maintenance_preventive", "entretien", "depannage", "contrat_service"]);
+export const contratPeriodiciteEnum = pgEnum("contrat_periodicite", ["mensuel", "trimestriel", "semestriel", "annuel"]);
+export const contratStatutEnum = pgEnum("contrat_statut", ["actif", "suspendu", "termine", "annule"]);
+export const interventionContratStatutEnum = pgEnum("intervention_contrat_statut", ["planifiee", "en_cours", "effectuee", "annulee"]);
+export const mobileSyncStatusEnum = pgEnum("mobile_sync_status", ["synced", "pending", "error"]);
+
+// ── STOCKS ───────────────────────────────────────────────────────────────────
+export const stocks = pgTable("stocks", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  articleId: integer("articleId"),
+  articleType: stockArticleTypeEnum("articleType").default("bibliotheque"),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  designation: varchar("designation", { length: 500 }).notNull(),
+  quantiteEnStock: numeric("quantiteEnStock", { precision: 10, scale: 2 }).default("0.00"),
+  seuilAlerte: numeric("seuilAlerte", { precision: 10, scale: 2 }).default("5.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixAchat: numeric("prixAchat", { precision: 10, scale: 2 }),
+  emplacement: varchar("emplacement", { length: 100 }),
+  fournisseur: varchar("fournisseur", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Stock = typeof stocks.$inferSelect;
+export type InsertStock = typeof stocks.$inferInsert;
+
+// ── MOUVEMENTS STOCK ─────────────────────────────────────────────────────────
+export const mouvementsStock = pgTable("mouvements_stock", {
+  id: serial("id").primaryKey(),
+  stockId: integer("stockId").notNull(),
+  type: mouvementTypeEnum("type").notNull(),
+  quantite: numeric("quantite", { precision: 10, scale: 2 }).notNull(),
+  quantiteAvant: numeric("quantiteAvant", { precision: 10, scale: 2 }).notNull(),
+  quantiteApres: numeric("quantiteApres", { precision: 10, scale: 2 }).notNull(),
+  motif: text("motif"),
+  reference: varchar("reference", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type MouvementStock = typeof mouvementsStock.$inferSelect;
+export type InsertMouvementStock = typeof mouvementsStock.$inferInsert;
+
+// ── FOURNISSEURS ─────────────────────────────────────────────────────────────
+export const fournisseurs = pgTable("fournisseurs", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  contact: varchar("contact", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  telephone: varchar("telephone", { length: 20 }),
+  adresse: text("adresse"),
+  codePostal: varchar("codePostal", { length: 10 }),
+  ville: varchar("ville", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Fournisseur = typeof fournisseurs.$inferSelect;
+export type InsertFournisseur = typeof fournisseurs.$inferInsert;
+
+// ── SMS VERIFICATIONS ────────────────────────────────────────────────────────
+export const smsVerifications = pgTable("sms_verifications", {
+  id: serial("id").primaryKey(),
+  signatureId: integer("signatureId").notNull(),
+  telephone: varchar("telephone", { length: 20 }).notNull(),
+  code: varchar("code", { length: 6 }).notNull(),
+  verified: boolean("verified").default(false),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SmsVerification = typeof smsVerifications.$inferSelect;
+export type InsertSmsVerification = typeof smsVerifications.$inferInsert;
+
+// ── RELANCES DEVIS ───────────────────────────────────────────────────────────
+export const relancesDevis = pgTable("relances_devis", {
+  id: serial("id").primaryKey(),
+  devisId: integer("devisId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  type: relanceTypeEnum("type").notNull(),
+  destinataire: varchar("destinataire", { length: 320 }),
+  message: text("message"),
+  statut: relanceStatutEnum("statut").default("envoye"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type RelanceDevis = typeof relancesDevis.$inferSelect;
+export type InsertRelanceDevis = typeof relancesDevis.$inferInsert;
+
+// ── MODELES EMAIL ────────────────────────────────────────────────────────────
+export const modelesEmail = pgTable("modeles_email", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  nom: varchar("nom", { length: 100 }).notNull(),
+  type: modeleEmailTypeEnum("type").notNull(),
+  sujet: varchar("sujet", { length: 255 }).notNull(),
+  contenu: text("contenu").notNull(),
+  isDefault: boolean("isDefault").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type ModeleEmail = typeof modelesEmail.$inferSelect;
+export type InsertModeleEmail = typeof modelesEmail.$inferInsert;
+
+// ── COMMANDES FOURNISSEURS ───────────────────────────────────────────────────
+export const commandesFournisseurs = pgTable("commandes_fournisseurs", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  fournisseurId: integer("fournisseurId").notNull(),
+  numero: varchar("numero", { length: 20 }),
+  reference: varchar("reference", { length: 50 }),
+  dateCommande: timestamp("dateCommande").defaultNow().notNull(),
+  dateLivraisonPrevue: timestamp("dateLivraisonPrevue"),
+  dateLivraisonReelle: timestamp("dateLivraisonReelle"),
+  statut: commandeStatutEnum("statut").default("brouillon"),
+  montantTotal: numeric("montantTotal", { precision: 10, scale: 2 }),
+  totalHT: numeric("totalHT", { precision: 10, scale: 2 }),
+  totalTVA: numeric("totalTVA", { precision: 10, scale: 2 }),
+  totalTTC: numeric("totalTTC", { precision: 10, scale: 2 }),
+  delaiLivraison: varchar("delaiLivraison", { length: 100 }),
+  adresseLivraison: text("adresseLivraison"),
+  notes: text("notes"),
+  statutFacturation: commandeStatutFacturationEnum("statutFacturation").default("a_facturer"),
+  depenseId: integer("depenseId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type CommandeFournisseur = typeof commandesFournisseurs.$inferSelect;
+export type InsertCommandeFournisseur = typeof commandesFournisseurs.$inferInsert;
+
+// ── LIGNES COMMANDES FOURNISSEURS ────────────────────────────────────────────
+export const lignesCommandesFournisseurs = pgTable("lignes_commandes_fournisseurs", {
+  id: serial("id").primaryKey(),
+  commandeId: integer("commandeId").notNull(),
+  articleId: integer("articleId"),
+  stockId: integer("stockId"),
+  designation: varchar("designation", { length: 255 }).notNull(),
+  reference: varchar("reference", { length: 50 }),
+  quantite: numeric("quantite", { precision: 10, scale: 2 }).notNull(),
+  quantiteRecue: numeric("quantiteRecue", { precision: 10, scale: 2 }).default("0.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaire: numeric("prixUnitaire", { precision: 10, scale: 2 }),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  montantTotal: numeric("montantTotal", { precision: 10, scale: 2 }),
+});
+export type LigneCommandeFournisseur = typeof lignesCommandesFournisseurs.$inferSelect;
+export type InsertLigneCommandeFournisseur = typeof lignesCommandesFournisseurs.$inferInsert;
+
+// ── PAIEMENTS STRIPE ─────────────────────────────────────────────────────────
+export const paiementsStripe = pgTable("paiements_stripe", {
+  id: serial("id").primaryKey(),
+  factureId: integer("factureId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  stripeSessionId: varchar("stripeSessionId", { length: 255 }),
+  stripePaymentIntentId: varchar("stripePaymentIntentId", { length: 255 }),
+  montant: numeric("montant", { precision: 10, scale: 2 }).notNull(),
+  devise: varchar("devise", { length: 3 }).default("EUR"),
+  statut: paiementStatutEnum("statut").default("en_attente"),
+  lienPaiement: varchar("lienPaiement", { length: 500 }),
+  tokenPaiement: varchar("tokenPaiement", { length: 64 }),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type PaiementStripe = typeof paiementsStripe.$inferSelect;
+export type InsertPaiementStripe = typeof paiementsStripe.$inferInsert;
+
+// ── CLIENT PORTAL ACCESS ─────────────────────────────────────────────────────
+export const clientPortalAccess = pgTable("client_portal_access", {
+  id: serial("id").primaryKey(),
+  clientId: integer("clientId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  lastAccessAt: timestamp("lastAccessAt"),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ClientPortalAccess = typeof clientPortalAccess.$inferSelect;
+export type InsertClientPortalAccess = typeof clientPortalAccess.$inferInsert;
+
+// ── CLIENT PORTAL SESSIONS ───────────────────────────────────────────────────
+export const clientPortalSessions = pgTable("client_portal_sessions", {
+  id: serial("id").primaryKey(),
+  clientId: integer("clientId").notNull(),
+  sessionToken: varchar("sessionToken", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  userAgent: text("userAgent"),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ClientPortalSession = typeof clientPortalSessions.$inferSelect;
+export type InsertClientPortalSession = typeof clientPortalSessions.$inferInsert;
+
+// ── CONTRATS MAINTENANCE ─────────────────────────────────────────────────────
+export const contratsMaintenance = pgTable("contrats_maintenance", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  type: contratTypeEnum("type").default("entretien"),
+  montantHT: numeric("montantHT", { precision: 10, scale: 2 }).notNull(),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  periodicite: contratPeriodiciteEnum("periodicite").notNull(),
+  dateDebut: timestamp("dateDebut").notNull(),
+  dateFin: timestamp("dateFin"),
+  reconduction: boolean("reconduction").default(true),
+  preavisResiliation: integer("preavisResiliation").default(1),
+  prochainFacturation: timestamp("prochainFacturation"),
+  prochainPassage: timestamp("prochainPassage"),
+  conditionsParticulieres: text("conditionsParticulieres"),
+  statut: contratStatutEnum("statut").default("actif"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type ContratMaintenance = typeof contratsMaintenance.$inferSelect;
+export type InsertContratMaintenance = typeof contratsMaintenance.$inferInsert;
+
+// ── FACTURES RECURRENTES ─────────────────────────────────────────────────────
+export const facturesRecurrentes = pgTable("factures_recurrentes", {
+  id: serial("id").primaryKey(),
+  contratId: integer("contratId").notNull(),
+  factureId: integer("factureId").notNull(),
+  periodeDebut: timestamp("periodeDebut").notNull(),
+  periodeFin: timestamp("periodeFin").notNull(),
+  genereeAutomatiquement: boolean("genereeAutomatiquement").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type FactureRecurrente = typeof facturesRecurrentes.$inferSelect;
+export type InsertFactureRecurrente = typeof facturesRecurrentes.$inferInsert;
+
+// ── INTERVENTIONS CONTRAT ────────────────────────────────────────────────────
+export const interventionsContrat = pgTable("interventions_contrat", {
+  id: serial("id").primaryKey(),
+  contratId: integer("contratId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  titre: varchar("titre", { length: 255 }).notNull(),
+  description: text("description"),
+  dateIntervention: timestamp("dateIntervention").notNull(),
+  duree: varchar("duree", { length: 50 }),
+  technicienNom: varchar("technicienNom", { length: 255 }),
+  statut: interventionContratStatutEnum("statut").default("planifiee"),
+  rapport: text("rapport"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type InterventionContrat = typeof interventionsContrat.$inferSelect;
+export type InsertInterventionContrat = typeof interventionsContrat.$inferInsert;
+
+// ── INTERVENTIONS MOBILE ─────────────────────────────────────────────────────
+export const interventionsMobile = pgTable("interventions_mobile", {
+  id: serial("id").primaryKey(),
+  interventionId: integer("interventionId").notNull(),
+  artisanId: integer("artisanId").notNull(),
+  latitude: numeric("latitude", { precision: 10, scale: 7 }),
+  longitude: numeric("longitude", { precision: 10, scale: 7 }),
+  heureArrivee: timestamp("heureArrivee"),
+  heureDepart: timestamp("heureDepart"),
+  notesIntervention: text("notesIntervention"),
+  signatureClient: text("signatureClient"),
+  signatureDate: timestamp("signatureDate"),
+  syncStatus: mobileSyncStatusEnum("syncStatus").default("synced"),
+  lastSyncAt: timestamp("lastSyncAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type InterventionMobile = typeof interventionsMobile.$inferSelect;
+export type InsertInterventionMobile = typeof interventionsMobile.$inferInsert;
