@@ -830,6 +830,21 @@ export async function getNextFactureNumber(artisanId: number): Promise<string> {
   return `${prefix}-${String(compteur).padStart(5, '0')}`;
 }
 
+// OPE-249 — ajoute N mois en CLAMPANT la fin de mois (équivalent de
+// `dateutil.relativedelta(months=N)` d'Odoo). `Date.setMonth(getMonth()+N)` brut
+// déborde (31 jan + 1 mois → 3 mars) ; ce helper clampe au dernier jour du mois
+// cible si le jour d'origine n'existe pas (→ 28/29 fév). Fonction pure (testable).
+// N peut être négatif. Behavior-preserving pour les jours 1–28 (inchangés).
+export function addMonthsClamped(base: Date, n: number): Date {
+  const day = base.getDate();
+  const r = new Date(base);
+  r.setDate(1);
+  r.setMonth(r.getMonth() + n);
+  const lastDayOfTargetMonth = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+  r.setDate(Math.min(day, lastDayOfTargetMonth));
+  return r;
+}
+
 // OPE-94 — calcule la date d'échéance d'une facture depuis un délai de paiement
 // structuré (≈ Odoo account.payment.term). `net` = base + N jours ; `fin_de_mois`
 // = base + N jours, puis dernier jour de ce mois. Fonction pure (testable).
@@ -3570,7 +3585,7 @@ export async function getTresoreriePrevisionnelle(
         const idx = weekIndex(occ);
         if (idx >= 0) buckets[idx].sorties += montant;
         if (step === 0) break; // fréquence inconnue → on ne compte qu'une occurrence
-        occ = new Date(occ); occ.setMonth(occ.getMonth() + step);
+        occ = addMonthsClamped(occ, step); // OPE-249 — clamp fin de mois (pas de débordement)
       }
     }
   }

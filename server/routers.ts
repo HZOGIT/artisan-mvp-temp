@@ -5251,13 +5251,12 @@ const contratsRouter = router({
       
       // Enregistrer la facture récurrente
       const now = new Date();
-      let periodeFin = new Date(now);
-      switch (contrat.periodicite) {
-        case 'mensuel': periodeFin.setMonth(periodeFin.getMonth() + 1); break;
-        case 'trimestriel': periodeFin.setMonth(periodeFin.getMonth() + 3); break;
-        case 'semestriel': periodeFin.setMonth(periodeFin.getMonth() + 6); break;
-        case 'annuel': periodeFin.setFullYear(periodeFin.getFullYear() + 1); break;
-      }
+      // OPE-249 — ajout de mois avec clamp de fin de mois (équivalent relativedelta).
+      // Évite le débordement (31 jan + 1 mois → 3 mars) sur periodeFin/prochainFacturation.
+      const moisParPeriodicite: Record<string, number> = {
+        mensuel: 1, trimestriel: 3, semestriel: 6, annuel: 12,
+      };
+      const periodeFin = db.addMonthsClamped(now, moisParPeriodicite[contrat.periodicite || ''] ?? 1);
       
       await db.createFactureRecurrente({
         contratId: contrat.id,
