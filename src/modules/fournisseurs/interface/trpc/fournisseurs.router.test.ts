@@ -104,4 +104,27 @@ describe.skipIf(!URL)("fournisseurs.router e2e (HTTP → tRPC → use-case → r
     expect((await callMutation(server, "fournisseurs.delete", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "fournisseurs.getById", { id }, tA)).statusCode).toBe(404);
   });
+
+  it("getById / update / delete sur un id inexistant du même tenant → 404", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "fournisseurs.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "fournisseurs.update", { id: 999999999, nom: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "fournisseurs.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : nom > 255, codePostal > 10, notes > 5000 → 400", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "fournisseurs.create", { nom: "x".repeat(256) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "fournisseurs.create", { nom: "C", codePostal: "x".repeat(11) }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "fournisseurs.create", { nom: "C", notes: "x".repeat(5001) }, tA)).statusCode).toBe(400);
+  });
+
+  it("update partiel : ne touche pas les champs non fournis", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "fournisseurs.create", { nom: "Garder", contact: "Jean", ville: "Lyon" }, tA)).json().result.data.id as number;
+    const maj = (await callMutation(server, "fournisseurs.update", { id, ville: "Marseille" }, tA)).json().result.data as { nom: string; contact: string | null; ville: string };
+    expect(maj.ville).toBe("Marseille");
+    expect(maj.nom).toBe("Garder");
+    expect(maj.contact).toBe("Jean");
+  });
 });
