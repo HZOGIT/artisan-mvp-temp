@@ -277,9 +277,31 @@ describe("bascule du domaine notesDeFrais (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine chantiers (flag gateway)", () => {
+  it("chantiers routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("chantiers", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { chantiers: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("chantiers", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("chantiers", 8, canary)).toBe(false);
+    const global: FeatureFlags = { chantiers: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("chantiers", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("chantiers", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine chantiers extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("chantiers.create")).toBe("chantiers");
+    expect(domainFromTrpcPath("/chantiers.update")).toBe("chantiers");
+  });
+
+  it("parse env : chantiers enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "chantiers" } as NodeJS.ProcessEnv).chantiers).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_CHANTIERS: "7" } as NodeJS.ProcessEnv).chantiers?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 12 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais"]) {
+  it("les 13 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
