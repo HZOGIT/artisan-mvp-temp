@@ -1,6 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { INotificationRepository } from "../application/notification-repository";
 import type { Notification, ListNotificationsOptions } from "../domain/notification";
+import type { FactureEnRetard, CreerNotificationInput } from "../domain/facture-en-retard";
 
 // Entrée de seed pour les tests (les notifications naissent côté serveur/scheduler).
 export interface SeedNotificationInput {
@@ -19,7 +20,13 @@ const PAGE_MAX = 100000;
 // scoping tenant + les filtres/pagination + l'anti-IDOR (markAsRead/archive hors tenant → false).
 export class FakeNotificationRepository implements INotificationRepository {
   private store: Notification[] = [];
+  private facturesRetard = new Map<number, FactureEnRetard[]>();
   private seq = 0;
+
+  // Utilitaire de test (hors port) : déclare les factures en retard d'un tenant.
+  seedFacturesEnRetard(artisanId: number, list: FactureEnRetard[]): void {
+    this.facturesRetard.set(artisanId, list);
+  }
 
   // Utilitaire de test (hors port) : insère une notification d'un tenant.
   seed(input: SeedNotificationInput): Notification {
@@ -78,5 +85,29 @@ export class FakeNotificationRepository implements INotificationRepository {
     if (!n) return false;
     this.store = this.store.map((x) => (x.id === id ? { ...x, archived: true } : x));
     return true;
+  }
+
+  async listFacturesEnRetard(ctx: TenantContext): Promise<FactureEnRetard[]> {
+    return this.facturesRetard.get(ctx.artisanId) ?? [];
+  }
+
+  async existeNotificationActive(ctx: TenantContext, lien: string): Promise<boolean> {
+    return this.store.some((n) => n.artisanId === ctx.artisanId && n.lien === lien && !n.archived);
+  }
+
+  async creer(ctx: TenantContext, input: CreerNotificationInput): Promise<Notification> {
+    const n: Notification = {
+      id: ++this.seq,
+      artisanId: ctx.artisanId,
+      type: input.type,
+      titre: input.titre,
+      message: input.message,
+      lien: input.lien,
+      lu: false,
+      archived: false,
+      createdAt: new Date(Date.now() + this.seq),
+    };
+    this.store.push(n);
+    return n;
   }
 }

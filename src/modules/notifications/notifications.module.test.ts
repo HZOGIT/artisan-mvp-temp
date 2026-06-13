@@ -8,6 +8,11 @@ const stubRepo: INotificationRepository = {
   markAsRead: async () => false,
   markAllAsRead: async () => 0,
   archive: async () => false,
+  listFacturesEnRetard: async () => [],
+  existeNotificationActive: async () => false,
+  creer: async () => {
+    throw new Error("non implémenté (stub)");
+  },
 };
 
 describe("notifications.module", () => {
@@ -17,7 +22,16 @@ describe("notifications.module", () => {
   });
 
   it("le port expose les opérations attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["archive", "countUnread", "list", "markAllAsRead", "markAsRead"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "archive",
+      "countUnread",
+      "creer",
+      "existeNotificationActive",
+      "list",
+      "listFacturesEnRetard",
+      "markAllAsRead",
+      "markAsRead",
+    ]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {

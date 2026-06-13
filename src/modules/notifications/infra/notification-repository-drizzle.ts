@@ -1,10 +1,11 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import { notifications } from "../../../../drizzle/schema.pg";
+import { and, desc, eq, ne, lt, isNotNull, sql } from "drizzle-orm";
+import { notifications, factures, clients } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { INotificationRepository } from "../application/notification-repository";
 import type { Notification, ListNotificationsOptions } from "../domain/notification";
+import type { FactureEnRetard, CreerNotificationInput } from "../domain/facture-en-retard";
 
 type NotificationRow = typeof notifications.$inferSelect;
 
@@ -92,6 +93,65 @@ export class NotificationRepositoryDrizzle implements INotificationRepository {
         .where(and(eq(notifications.id, id), eq(notifications.artisanId, ctx.artisanId)))
         .returning({ id: notifications.id });
       return updated.length > 0;
+    });
+  }
+
+  listFacturesEnRetard(ctx: TenantContext): Promise<FactureEnRetard[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Lecture seule, scopée tenant : factures non payées/non annulées à échéance dépassée.
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await tx
+        .select({
+          id: factures.id,
+          numero: factures.numero,
+          totalTTC: factures.totalTTC,
+          dateEcheance: factures.dateEcheance,
+          nom: clients.nom,
+          prenom: clients.prenom,
+        })
+        .from(factures)
+        .leftJoin(clients, and(eq(clients.id, factures.clientId), eq(clients.artisanId, ctx.artisanId)))
+        .where(
+          and(
+            eq(factures.artisanId, ctx.artisanId),
+            ne(factures.statut, "payee"),
+            ne(factures.statut, "annulee"),
+            isNotNull(factures.dateEcheance),
+            lt(sql`${factures.dateEcheance}::date`, today),
+          ),
+        )
+        .orderBy(desc(factures.dateEcheance));
+      return rows
+        .filter((r): r is typeof r & { dateEcheance: Date } => r.dateEcheance != null)
+        .map((r) => ({
+          id: r.id,
+          numero: r.numero,
+          totalTTC: r.totalTTC ?? "0.00",
+          dateEcheance: r.dateEcheance,
+          clientNom: [r.prenom, r.nom].filter(Boolean).join(" ").trim() || null,
+        }));
+    });
+  }
+
+  existeNotificationActive(ctx: TenantContext, lien: string): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(notifications)
+        .where(
+          and(eq(notifications.artisanId, ctx.artisanId), eq(notifications.lien, lien), eq(notifications.archived, false)),
+        );
+      return Number(row?.n ?? 0) > 0;
+    });
+  }
+
+  creer(ctx: TenantContext, input: CreerNotificationInput): Promise<Notification> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .insert(notifications)
+        .values({ artisanId: ctx.artisanId, type: input.type, titre: input.titre, message: input.message, lien: input.lien })
+        .returning();
+      return toNotification(row);
     });
   }
 }
