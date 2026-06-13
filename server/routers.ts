@@ -1420,8 +1420,10 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown) :
   createModele: protectedProcedure
     .input(z.object({
       nom: z.string().min(1).max(255),
-      description: z.string().optional(),
-      notes: z.string().optional(),
+      // Bornes texte (champs TEXT de modeles_devis) — defense-in-depth, alignées
+      // sur la convention devis/facture (notes 5000) ; addLigneToModele déjà borné.
+      description: z.string().max(2000).optional(),
+      notes: z.string().max(5000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const artisan = await db.getArtisanByUserId(ctx.user.id);
