@@ -1,15 +1,16 @@
 import type { INoteDeFraisRepository } from "./application/note-de-frais-repository";
+import { createNotesDeFraisRouter } from "./interface/trpc/notes-de-frais.router";
 
-// Wiring DI du module notes-de-frais. À l'étape scaffold, le module ne porte que ses
-// dépendances ; le routeur tRPC sera assemblé et exposé à l'étape interface (5/9).
+// Wiring DI du module notes-de-frais : assemble le routeur tRPC à partir du repository injecté.
 export interface NotesDeFraisModuleDeps {
   readonly repository: INoteDeFraisRepository;
 }
 
 export interface NotesDeFraisModule {
   readonly deps: NotesDeFraisModuleDeps;
+  readonly router: ReturnType<typeof createNotesDeFraisRouter>;
 }
 
 export function createNotesDeFraisModule(deps: NotesDeFraisModuleDeps): NotesDeFraisModule {
-  return { deps };
+  return { deps, router: createNotesDeFraisRouter(deps.repository) };
 }
