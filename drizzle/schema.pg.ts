@@ -28,6 +28,7 @@ import {
   bigint,
   jsonb,
   unique,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // ── Enums ──────────────────────────────────────────────────────────────────
@@ -1912,3 +1913,44 @@ export const reglesCategorisation = pgTable("regles_categorisation", {
 });
 export type RegleCategorisation = typeof reglesCategorisation.$inferSelect;
 export type InsertRegleCategorisation = typeof reglesCategorisation.$inferInsert;
+
+// ── 2e schéma (P0.5e-3) — modules / paywall + couleurs calendrier ────────────
+export const modules = pgTable("modules", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 50 }).notNull().unique(),
+  label: varchar("label", { length: 100 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }).notNull(),
+  categorie: varchar("categorie", { length: 50 }).notNull(),
+  plan_minimum: varchar("plan_minimum", { length: 20 }).default("essentiel").notNull(),
+  actif_par_defaut: boolean("actif_par_defaut").default(true).notNull(),
+  ordre: integer("ordre").default(0).notNull(),
+  created_at: timestamp("created_at").defaultNow(),
+});
+export type Module = typeof modules.$inferSelect;
+export type InsertModule = typeof modules.$inferInsert;
+
+export const artisanModules = pgTable("artisan_modules", {
+  id: serial("id").primaryKey(),
+  artisan_id: integer("artisan_id").notNull(),
+  module_slug: varchar("module_slug", { length: 50 }).notNull(),
+  actif: boolean("actif").default(true).notNull(),
+  activated_at: timestamp("activated_at").defaultNow(),
+}, (t) => ({
+  uqArtisanModule: unique("uq_artisan_module").on(t.artisan_id, t.module_slug),
+}));
+export type ArtisanModule = typeof artisanModules.$inferSelect;
+export type InsertArtisanModule = typeof artisanModules.$inferInsert;
+
+// couleurs_interventions : colonnes camelCase + PK composite (artisanId, interventionId), pas d'id.
+export const couleursInterventions = pgTable("couleurs_interventions", {
+  artisanId: integer("artisanId").notNull(),
+  interventionId: integer("interventionId").notNull(),
+  couleur: varchar("couleur", { length: 20 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.artisanId, t.interventionId] }),
+}));
+export type CouleurIntervention = typeof couleursInterventions.$inferSelect;
+export type InsertCouleurIntervention = typeof couleursInterventions.$inferInsert;
