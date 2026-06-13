@@ -191,6 +191,20 @@ export async function getDb() {
   }
 }
 
+// OPE-184 P0.7a — insert dialect-aware renvoyant l'id généré.
+// Postgres : `.returning({id})` (drizzle-mysql2 ne supporte PAS returning).
+// MySQL : forme historique mysql2 (ResultSetHeader.insertId). Remplace le pattern
+// `const [result] = await db.insert(X).values(Y); ... result.insertId`.
+async function insertReturningId(table: any, values: any): Promise<number> {
+  const db: any = await getDb();
+  if (process.env.DB_DIALECT === "postgresql") {
+    const [row]: any = await db.insert(table).values(values).returning({ id: table.id });
+    return row.id;
+  }
+  const [result]: any = await db.insert(table).values(values);
+  return result.insertId;
+}
+
 export function getPool() {
   return _pool;
 }
@@ -519,8 +533,8 @@ export async function getActivitesByArtisanId(artisanId: number): Promise<Activi
 
 export async function createActivite(data: InsertActivite): Promise<Activite> {
   const db = await getDb();
-  const [result] = await db.insert(activites).values(data);
-  const [created] = await db.select().from(activites).where(eq(activites.id, result.insertId));
+  const newId = await insertReturningId(activites, data);
+  const [created] = await db.select().from(activites).where(eq(activites.id, newId));
   return created;
 }
 
@@ -2415,9 +2429,9 @@ export async function createClientPortalAccess(data: InsertClientPortalAccess): 
       eq(clientPortalAccess.artisanId, data.artisanId),
       eq(clientPortalAccess.isActive, true)
     ));
-  const [result] = await db.insert(clientPortalAccess).values(data);
+  const newId = await insertReturningId(clientPortalAccess, data);
   const [created] = await db.select().from(clientPortalAccess)
-    .where(eq(clientPortalAccess.id, result.insertId));
+    .where(eq(clientPortalAccess.id, newId));
   return created;
 }
 
@@ -2492,8 +2506,8 @@ export async function getTechnicienByUserId(userId: number, artisanId: number): 
 
 export async function createTechnicien(data: InsertTechnicien): Promise<Technicien> {
   const db = await getDb();
-  const [result] = await db.insert(techniciens).values(data);
-  const [created] = await db.select().from(techniciens).where(eq(techniciens.id, result.insertId));
+  const newId = await insertReturningId(techniciens, data);
+  const [created] = await db.select().from(techniciens).where(eq(techniciens.id, newId));
   return created;
 }
 
@@ -2528,9 +2542,9 @@ export async function getHabilitationsByTechnicienId(technicienId: number): Prom
 
 export async function createHabilitationTechnicien(data: InsertHabilitationTechnicien): Promise<HabilitationTechnicien> {
   const db = await getDb();
-  const [result] = await db.insert(habilitationsTechniciens).values(data);
+  const newId = await insertReturningId(habilitationsTechniciens, data);
   const [created] = await db.select().from(habilitationsTechniciens)
-    .where(eq(habilitationsTechniciens.id, result.insertId));
+    .where(eq(habilitationsTechniciens.id, newId));
   return created;
 }
 
@@ -2605,9 +2619,9 @@ export async function setDisponibilite(data: {
       .where(eq(disponibilitesTechniciens.id, existing.id));
     return updated;
   } else {
-    const [result] = await db.insert(disponibilitesTechniciens).values(data);
+    const newId = await insertReturningId(disponibilitesTechniciens, data);
     const [created] = await db.select().from(disponibilitesTechniciens)
-      .where(eq(disponibilitesTechniciens.id, result.insertId));
+      .where(eq(disponibilitesTechniciens.id, newId));
     return created;
   }
 }
@@ -2628,7 +2642,7 @@ export async function updatePositionTechnicien(data: {
   interventionEnCoursId?: number;
 }): Promise<PositionTechnicien> {
   const db = await getDb();
-  const [result] = await db.insert(positionsTechniciens).values({
+  const newId = await insertReturningId(positionsTechniciens, {
     technicienId: data.technicienId,
     latitude: data.latitude,
     longitude: data.longitude,
@@ -2640,7 +2654,7 @@ export async function updatePositionTechnicien(data: {
     interventionEnCoursId: data.interventionEnCoursId,
   });
   const [created] = await db.select().from(positionsTechniciens)
-    .where(eq(positionsTechniciens.id, result.insertId));
+    .where(eq(positionsTechniciens.id, newId));
   return created;
 }
 
@@ -2709,9 +2723,9 @@ export async function getStatistiquesDeplacements(
 
 export async function createHistoriqueDeplacement(data: any): Promise<any> {
   const db = await getDb();
-  const [result] = await db.insert(historiqueDeplacements).values(data);
+  const newId = await insertReturningId(historiqueDeplacements, data);
   const [created] = await db.select().from(historiqueDeplacements)
-    .where(eq(historiqueDeplacements.id, result.insertId));
+    .where(eq(historiqueDeplacements.id, newId));
   return created;
 }
 
@@ -3870,8 +3884,7 @@ export async function getNextContratNumber(artisanId: number): Promise<string> {
 
 export async function createContrat(data: InsertContratMaintenance): Promise<ContratMaintenance> {
   const db = await getDb();
-  const result = await db.insert(contratsMaintenance).values(data);
-  const insertId = result[0].insertId;
+  const insertId = await insertReturningId(contratsMaintenance, data);
   const created = await db.select().from(contratsMaintenance).where(eq(contratsMaintenance.id, insertId)).limit(1);
   return created[0];
 }

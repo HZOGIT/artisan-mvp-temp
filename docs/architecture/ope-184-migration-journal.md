@@ -78,7 +78,12 @@ Tests db-direct sur PG : `fournisseurs.test.ts` **17/17 ✓**, `security.test.ts
 
 **Méthode 7a→7d** : chaque sous-batch porté → re-run du filet (`security.test.ts`, `fournisseurs.test.ts` + tests du domaine) sur PG → vert avant commit. Pour **7c**, vigilance maximale (numérotation, écritures, TVA) ; valider via les benchmarks compta si dispo.
 
-**Prochaine action : P0.7a** (inserts `.returning()`).
+**P0.7a EN COURS** — helper `insertReturningId(table, values)` dialect-aware ajouté dans db.ts (PG `.returning({id})`, mysql `insertId`).
+- **7a-1 FAIT** (8 fn Drizzle) : createActivite, createClientPortalAccess, createTechnicien, createHabilitationTechnicien, setDisponibilite, updatePositionTechnicien, createHistoriqueDeplacement, createContrat. **Validé sur PG ET mysql** (créent une ligne avec id correct ; tsc neuf vert).
+- **7a-2 À FAIRE** : createFactureRecurrente, createInterventionContrat, getOrCreateConversation, createMessage, createRdvEnLigne, getOrCreateAiThread, createPointageChantier (mêmes patterns famille A/B).
+- ⚠️ Les inserts **raw `pool.execute`** (createDepense, createNoteFrais, createInterventionMobile, createPhotoIntervention) NE sont PAS 7a → traités en 7b/7c (getPool).
+
+**Prochaine action : P0.7a-2.**
 2. **P0.9 (OPE-195)** : faire tourner la suite de tests / db-secure sur PG → identifie précisément quelles fonctions raw-SQL cassent (les tests = discovery + filet).
 3. **P0.7-suite** : porter les **~104 points** (73 `getPool()` raw mysql2 + 31 `insertId`) en **SOUS-BATCHS**, chacun **GATÉ par les tests sur vraies données** (détecte régressions financières). **NE PAS** marquer OPE-193 Done tant que l'app n'est pas fonctionnelle de bout en bout sur PG (tests verts).
 
