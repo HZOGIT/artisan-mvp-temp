@@ -120,4 +120,48 @@ describe.skipIf(!URL)("notifications.router e2e (HTTP → tRPC → use-case → 
     // limit > 100 rejeté par zod → 400
     expect((await callQuery(server, "notifications.list", { limit: 9999 }, tA)).statusCode).toBe(400);
   });
+
+  it("markAsRead / archive sur un id inexistant du même tenant → 404", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "notifications.markAsRead", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "notifications.archive", { id: 999999999 }, tA)).statusCode).toBe(404);
+  });
+
+  it("bornes zod : page 0 → 400, page > 100000 → 400", async () => {
+    const tA = await token(UA);
+    expect((await callQuery(server, "notifications.list", { page: 0 }, tA)).statusCode).toBe(400);
+    expect((await callQuery(server, "notifications.list", { page: 100001 }, tA)).statusCode).toBe(400);
+  });
+
+  it("filtres e2e : nonLuesUniquement / includeArchived exacts + ordre createdAt desc", async () => {
+    await admin.query('delete from notifications where "artisanId"=$1', [artisanA]);
+    const first = await seed(artisanA, "F-vieille");
+    await seed(artisanA, "F-lue", { lu: true });
+    await seed(artisanA, "F-arch", { archived: true });
+    const last = await seed(artisanA, "F-recente");
+    const tA = await token(UA);
+    // défaut : non archivées (3) ; ordre createdAt desc → la plus récente en tête
+    const def = (await callQuery(server, "notifications.list", undefined, tA)).json().result.data as Array<{ id: number; titre: string }>;
+    expect(def.length).toBe(3);
+    expect(def[0].id).toBe(last);
+    expect(def[def.length - 1].id).toBe(first);
+    // nonLuesUniquement → exclut F-lue et F-arch
+    const nl = (await callQuery(server, "notifications.list", { nonLuesUniquement: true }, tA)).json().result.data as Array<{ titre: string }>;
+    expect(nl.map((n) => n.titre).sort()).toEqual(["F-recente", "F-vieille"]);
+    // includeArchived → 4
+    expect(((await callQuery(server, "notifications.list", { includeArchived: true }, tA)).json().result.data as unknown[]).length).toBe(4);
+  });
+
+  it("markAllAsRead ne touche pas l'autre tenant (e2e) + getUnreadCount reflète", async () => {
+    await admin.query('delete from notifications where "artisanId" in ($1,$2)', [artisanA, artisanB]);
+    await seed(artisanA, "A1");
+    await seed(artisanA, "A2");
+    await seed(artisanB, "B1");
+    const tA = await token(UA);
+    const tB = await token(UB);
+    expect((await callMutation(server, "notifications.markAllAsRead", {}, tA)).json().result.data.count).toBe(2);
+    expect(await (await callQuery(server, "notifications.getUnreadCount", undefined, tA)).json().result.data).toBe(0);
+    // B intact
+    expect(await (await callQuery(server, "notifications.getUnreadCount", undefined, tB)).json().result.data).toBe(1);
+  });
 });
