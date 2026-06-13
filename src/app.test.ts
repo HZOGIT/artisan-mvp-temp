@@ -1,5 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { buildApp } from "./app";
+import { MIGRATED_DOMAINS } from "./interface/gateway/migrated-domains";
 
 describe("app Fastify (scaffold + tRPC)", () => {
   const app = buildApp();
@@ -25,6 +26,21 @@ describe("app Fastify (scaffold + tRPC)", () => {
 
   it("tRPC: une procédure inexistante → 404", async () => {
     const res = await app.inject({ method: "GET", url: "/api/trpc/nope" });
+    expect(res.statusCode).toBe(404);
+  });
+
+  // Garde-fou bascule : chaque domaine du registre MIGRATED_DOMAINS est réellement monté
+  // dans le nouveau stack (procédure `list` présente → 401 auth requise, pas 404 inexistant).
+  const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list" };
+  for (const domain of MIGRATED_DOMAINS) {
+    it(`domaine migré « ${domain} » monté dans le nouveau stack (≠ 404)`, async () => {
+      const res = await app.inject({ method: "GET", url: `/api/trpc/${sampleProcedure[domain]}` });
+      expect(res.statusCode).toBe(401); // procédure protégée existante, auth requise
+    });
+  }
+
+  it("un domaine non migré (factures) n'est PAS monté → 404", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/trpc/factures.list" });
     expect(res.statusCode).toBe(404);
   });
 });

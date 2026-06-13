@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { shouldRouteToNewStack, domainFromTrpcPath } from "./router-decision";
 import { parseFlagsFromEnv, NO_FLAGS, type FeatureFlags } from "./flags";
+import { MIGRATED_DOMAINS, isMigratedDomainAvailable } from "./migrated-domains";
 
 describe("shouldRouteToNewStack", () => {
   it("OFF par défaut : aucun flag → legacy", () => {
@@ -27,6 +28,40 @@ describe("shouldRouteToNewStack", () => {
     const flags: FeatureFlags = { vehicules: { enabled: true, tenantDenylist: [7] } };
     expect(shouldRouteToNewStack("vehicules", 7, flags)).toBe(false);
     expect(shouldRouteToNewStack("vehicules", 8, flags)).toBe(true);
+  });
+});
+
+describe("bascule du domaine avis (flag gateway)", () => {
+  it("avis routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    // OFF par défaut
+    expect(shouldRouteToNewStack("avis", 5, NO_FLAGS)).toBe(false);
+    // canary : seul le tenant allowlisté bascule
+    const canary: FeatureFlags = { avis: { enabled: false, tenantAllowlist: [5] } };
+    expect(shouldRouteToNewStack("avis", 5, canary)).toBe(true);
+    expect(shouldRouteToNewStack("avis", 6, canary)).toBe(false);
+    // global enabled + rollback ciblé prioritaire
+    const global: FeatureFlags = { avis: { enabled: true, tenantDenylist: [9] } };
+    expect(shouldRouteToNewStack("avis", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("avis", 9, global)).toBe(false);
+  });
+
+  it("le chemin tRPC du workflow avis extrait bien le domaine", () => {
+    expect(domainFromTrpcPath("avis.envoyerDemandeParClient")).toBe("avis");
+    expect(domainFromTrpcPath("/avis.moderer")).toBe("avis");
+  });
+
+  it("parse env : avis enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "vehicules,avis" } as NodeJS.ProcessEnv).avis).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_AVIS: "5,5" } as NodeJS.ProcessEnv).avis?.tenantAllowlist).toEqual([5, 5]);
+  });
+});
+
+describe("registre des domaines migrés", () => {
+  it("avis et vehicules sont éligibles à la bascule, pas un domaine non porté", () => {
+    expect(MIGRATED_DOMAINS).toContain("avis");
+    expect(MIGRATED_DOMAINS).toContain("vehicules");
+    expect(isMigratedDomainAvailable("avis")).toBe(true);
+    expect(isMigratedDomainAvailable("factures")).toBe(false);
   });
 });
 
