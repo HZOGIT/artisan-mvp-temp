@@ -17,10 +17,11 @@ import {
   Camera, 
   Navigation, 
   Phone, 
-  Clock, 
-  CheckCircle2, 
+  Clock,
+  CheckCircle2,
   Loader2,
-  PenTool
+  PenTool,
+  Users
 } from "lucide-react";
 
 export default function InterventionsMobile() {
@@ -32,6 +33,14 @@ export default function InterventionsMobile() {
   const [isDrawing, setIsDrawing] = useState(false);
 
   const { data: interventions, isLoading, refetch } = trpc.interventionsMobile.getTodayInterventions.useQuery();
+  // OPE-111 — équipe (intervenants additionnels) à afficher sur chaque intervention.
+  const { data: equipesByArtisan } = trpc.interventions.getEquipesByArtisan.useQuery();
+  const equipeParIntervention = new Map<number, any[]>();
+  for (const m of equipesByArtisan || []) {
+    const arr = equipeParIntervention.get(m.interventionId) || [];
+    arr.push(m);
+    equipeParIntervention.set(m.interventionId, arr);
+  }
 
   const startMutation = trpc.interventionsMobile.startIntervention.useMutation({
     onSuccess: () => {
@@ -216,6 +225,20 @@ export default function InterventionsMobile() {
                     <div className="flex items-start gap-2 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                       <span>{intervention.adresse}</span>
+                    </div>
+                  )}
+
+                  {/* OPE-111 — Équipe (intervenants additionnels sur cette intervention) */}
+                  {(equipeParIntervention.get(intervention.id)?.length ?? 0) > 0 && (
+                    <div className="flex items-start gap-2 text-sm">
+                      <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div className="flex flex-wrap gap-1">
+                        {equipeParIntervention.get(intervention.id)!.map((m: any) => (
+                          <Badge key={m.technicienId} variant="secondary" className="text-[11px] font-normal">
+                            {[m.prenom, m.nom].filter(Boolean).join(" ") || `Tech #${m.technicienId}`}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
 
