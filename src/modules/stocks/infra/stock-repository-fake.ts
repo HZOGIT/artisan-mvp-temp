@@ -27,6 +27,8 @@ export class FakeStockRepository implements IStockRepository {
 
   async create(ctx: TenantContext, input: CreateStockInput): Promise<Stock> {
     const now = new Date();
+    // Mirroir du formatage PG numeric(_,2) (ex. "3" stocké → "3.00") pour fidélité au repo réel.
+    const num = (v: string | undefined, fallback: string) => (v != null ? Number(v).toFixed(2) : fallback);
     const s: Stock = {
       id: ++this.seq,
       artisanId: ctx.artisanId,
@@ -34,8 +36,8 @@ export class FakeStockRepository implements IStockRepository {
       articleType: input.articleType ?? "bibliotheque",
       reference: input.reference,
       designation: input.designation,
-      quantiteEnStock: input.quantiteEnStock ?? "0.00",
-      seuilAlerte: input.seuilAlerte ?? "5.00",
+      quantiteEnStock: num(input.quantiteEnStock, "0.00"),
+      seuilAlerte: num(input.seuilAlerte, "5.00"),
       unite: input.unite ?? "unité",
       prixAchat: input.prixAchat ?? null,
       emplacement: input.emplacement ?? null,
