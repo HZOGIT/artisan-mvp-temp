@@ -42,6 +42,12 @@ const articleSearchHits = new Map<string, { count: number; resetAt: number }>();
 // génération → épuisement CPU. Seau dédié, limite généreuse (consultation/abonnement
 // légitime très en-dessous), 429 au-delà.
 const pdfRouteHits = new Map<string, { count: number; resetAt: number }>();
+// OPE-24 — rate-limit IP de la création de session de paiement Stripe (route publique
+// token-gated). Chaque appel crée une session Stripe + une ligne `paiements_stripe` :
+// un token portail fuité (ou un brute-force de factureId) pourrait spammer l'API Stripe
+// et faire grossir la table. Seau dédié, limite généreuse (un client clique « Payer »
+// une fois ou deux), 429 au-delà. Ne touche PAS la logique de paiement (garde en amont).
+const paiementRouteHits = new Map<string, { count: number; resetAt: number }>();
 function checkIpRouteLimit(req: any, bucket: Map<string, { count: number; resetAt: number }>, limit: number, windowMs: number): boolean {
   const ip = String(
     (req.headers['cf-connecting-ip'] as string)
@@ -1003,6 +1009,11 @@ async function startServer() {
   // POST /api/paiement/create-checkout-session
   app.post('/api/paiement/create-checkout-session', async (req, res) => {
     try {
+      // OPE-24 — rate-limit IP (20/min) : borne le spam de création de sessions Stripe
+      // (token-gated mais un token fuité pourrait flooder l'API Stripe + la table paiements).
+      if (!checkIpRouteLimit(req, paiementRouteHits, 20, 60_000)) {
+        return res.status(429).json({ error: 'Trop de requêtes, réessayez dans une minute' });
+      }
       const { factureId, token } = req.body;
       if (!factureId || !token) {
         return res.status(400).json({ error: 'factureId et token requis' });
