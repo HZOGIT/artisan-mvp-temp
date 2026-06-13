@@ -2,7 +2,7 @@
 // montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
 // cibler qu'un domaine présent ici (sinon le routage enverrait vers un domaine inexistant
 // du nouveau stack). Mis à jour à chaque domaine livré (étape 9/9 du gabarit).
-export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications"] as const;
+export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs"] as const;
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
