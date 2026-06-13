@@ -5248,6 +5248,10 @@ const contratsRouter = router({
         prixUnitaireHT: contrat.montantHT || "0",
         tauxTVA: contrat.tauxTVA || "20.00",
         montantHT: contrat.montantHT || "0",
+        // OPE-250 — renseigner montantTVA (sinon défaut 0 → ligne incohérente +
+        // ventilation TVA du FEC repliée à tort sur 445711 pour les taux réduits).
+        // Valeur déjà calculée (= totalTVA de la facture, ligne unique).
+        montantTVA: montantTVA.toFixed(2),
         montantTTC: montantTTC.toFixed(2),
       });
       
