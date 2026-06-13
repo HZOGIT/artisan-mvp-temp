@@ -8815,6 +8815,20 @@ const rdvRouter = router({
       if (isNaN(nouvelleDate.getTime())) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Date proposée invalide" });
       }
+      // Bornes de date (cohérence avec `demanderRdv` :4996-5005) : on ne propose pas un
+      // créneau dans un jour passé (RDV incohérent côté client) ni à un futur absurde
+      // (pollution de la colonne NOT NULL `dateProposee`, ex. année 9999). Behavior-preserving :
+      // aucune contre-proposition légitime n'est antérieure à aujourd'hui ni à plus de 2 ans.
+      // Borne basse = début du jour courant → autorise toute heure d'aujourd'hui.
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      if (nouvelleDate < startOfToday) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Le créneau proposé ne peut pas être dans le passé" });
+      }
+      const maxDateRdv = new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000);
+      if (nouvelleDate > maxDateRdv) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "La date proposée est trop éloignée" });
+      }
 
       await db.updateRdvStatut(rdv.id, "refuse", {
         motifRefus: "Creneau non disponible — un autre creneau a ete propose",
