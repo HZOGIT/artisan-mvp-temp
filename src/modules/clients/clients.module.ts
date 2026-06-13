@@ -1,16 +1,17 @@
 import type { IClientRepository } from "./application/client-repository";
+import { createClientsRouter } from "./interface/trpc/clients.router";
 
-// Wiring DI du module clients. À l'étape scaffold, le module ne porte que ses dépendances ;
-// le routeur tRPC sera assemblé et exposé à l'étape interface (5/9), comme pour les modules
-// précédents.
+// Wiring DI du module clients : assemble le routeur tRPC à partir du repository injecté.
+// Découple `app.ts`/`createAppRouter` des détails d'instanciation.
 export interface ClientsModuleDeps {
   readonly repository: IClientRepository;
 }
 
 export interface ClientsModule {
   readonly deps: ClientsModuleDeps;
+  readonly router: ReturnType<typeof createClientsRouter>;
 }
 
 export function createClientsModule(deps: ClientsModuleDeps): ClientsModule {
-  return { deps };
+  return { deps, router: createClientsRouter(deps.repository) };
 }
