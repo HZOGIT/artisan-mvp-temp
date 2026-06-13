@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import {
   clients,
   devis,
@@ -121,6 +121,31 @@ export class ClientRepositoryDrizzle implements IClientRepository {
         .from(contratsMaintenance)
         .where(and(eq(contratsMaintenance.clientId, clientId), eq(contratsMaintenance.artisanId, a)));
       return (d?.n ?? 0) + (f?.n ?? 0) + (i?.n ?? 0) + (c?.n ?? 0) + (ct?.n ?? 0);
+    });
+  }
+
+  search(ctx: TenantContext, query: string): Promise<Client[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Échappe les métacaractères LIKE (`\` d'abord, puis `%` et `_`) avec le caractère
+      // d'échappement par défaut de Postgres (`\`) → la saisie est traitée littéralement.
+      const escaped = query.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+      const term = `%${escaped}%`;
+      const rows = await tx
+        .select()
+        .from(clients)
+        .where(
+          and(
+            eq(clients.artisanId, ctx.artisanId),
+            or(
+              ilike(clients.nom, term),
+              ilike(clients.prenom, term),
+              ilike(clients.email, term),
+              ilike(clients.telephone, term),
+            ),
+          ),
+        )
+        .orderBy(asc(clients.nom), asc(clients.id));
+      return rows.map(toClient);
     });
   }
 }

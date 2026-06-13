@@ -89,4 +89,17 @@ describe.skipIf(!URL)("ClientRepositoryDrizzle (PG, RLS + scope tenant)", () => 
     await admin.query('delete from factures where "artisanId"=$1', [A]);
     await admin.query('delete from devis where "artisanId"=$1', [A]);
   });
+
+  it("search : trouve par nom/e-mail scopé tenant ; un `%` est littéral (pas d'injection LIKE)", async () => {
+    await repo.create(ctx(A), { nom: "Lefebvre", email: "lefebvre@a.fr" });
+    await repo.create(ctx(A), { nom: "a%b", email: "wild@a.fr" });
+    await repo.create(ctx(B), { nom: "Lefebvre", email: "lefebvre@b.fr" }); // homonyme chez B
+    // recherche par sous-chaîne (case-insensitive)
+    expect((await repo.search(ctx(A), "lefeb")).map((c) => c.nom)).toEqual(["Lefebvre"]);
+    // scope : le Lefebvre de B n'apparaît pas pour A
+    expect((await repo.search(ctx(A), "lefebvre")).every((c) => c.artisanId === A)).toBe(true);
+    // `%` traité littéralement : ne renvoie QUE le client contenant `%`, pas tout le tenant
+    const wild = await repo.search(ctx(A), "%");
+    expect(wild.map((c) => c.nom)).toEqual(["a%b"]);
+  });
 });

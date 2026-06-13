@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IClientRepository } from "../../application/client-repository";
-import { listClients, getClient } from "../../application/read-use-cases";
+import { listClients, getClient, rechercherClients } from "../../application/read-use-cases";
 import { creerClient, modifierClient, supprimerClient } from "../../application/write-use-cases";
 
 // Bornes alignées sur `ClientInputSchema` (shared/validation.ts) — defense-in-depth côté
@@ -56,6 +56,10 @@ export function createClientsRouter(repo: IClientRepository) {
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getClient(repo, ctx.tenant, input.id)),
+
+    search: protectedProcedure
+      .input(z.object({ query: z.string().min(1).max(100) }))
+      .query(({ ctx, input }) => rechercherClients(repo, ctx.tenant, input.query)),
 
     create: protectedProcedure
       .input(createSchema)

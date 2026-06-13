@@ -72,4 +72,15 @@ export class FakeClientRepository implements IClientRepository {
     if (!c) return 0;
     return this.documentsLies.get(clientId) ?? 0;
   }
+
+  async search(ctx: TenantContext, query: string): Promise<Client[]> {
+    // Substring case-insensitive sur les mêmes champs ; `includes` traite `%`/`_` comme des
+    // littéraux → parité avec le LIKE échappé du repo réel (pas d'injection de wildcard).
+    const q = query.toLowerCase();
+    return this.store.filter(
+      (c) =>
+        c.artisanId === ctx.artisanId &&
+        [c.nom, c.prenom, c.email, c.telephone].some((f) => (f ?? "").toLowerCase().includes(q)),
+    );
+  }
 }

@@ -19,4 +19,8 @@ export interface IClientRepository {
   // client dans le tenant. Garde d'intégrité référentielle avant suppression : on refuse de
   // supprimer un client encore référencé (évite des documents orphelins / factures cassées).
   countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number>;
+  // Recherche scopée tenant sur nom/prénom/e-mail/téléphone. ⚠️ Les métacaractères LIKE
+  // (`%`, `_`, `\`) de la saisie sont échappés par l'implémentation → pas d'injection de
+  // wildcard (une recherche `%` ne « matche » pas tout).
+  search(ctx: TenantContext, query: string): Promise<Client[]>;
 }
