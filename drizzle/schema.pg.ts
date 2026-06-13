@@ -142,3 +142,277 @@ export const auditLog = pgTable("audit_log", {
 });
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = typeof auditLog.$inferInsert;
+
+// ── Enums cœur facturation (P0.3b) ───────────────────────────────────────────
+export const devisStatutEnum = pgEnum("devis_statut", ["brouillon", "envoye", "accepte", "refuse", "expire"]);
+export const ligneTypeEnum = pgEnum("ligne_type", ["produit", "section", "note"]); // partagé devis_lignes / factures_lignes
+export const factureStatutEnum = pgEnum("facture_statut", ["brouillon", "validee", "envoyee", "payee", "en_retard", "annulee"]);
+export const factureTypeDocumentEnum = pgEnum("facture_type_document", ["facture", "avoir"]);
+export const delaiPaiementTypeEnum = pgEnum("delai_paiement_type", ["net", "fin_de_mois"]);
+export const signatureStatutEnum = pgEnum("signature_statut", ["en_attente", "accepte", "refuse"]);
+
+// ── BIBLIOTHEQUE ARTICLES ────────────────────────────────────────────────────
+export const bibliothequeArticles = pgTable("bibliotheque_articles", {
+  id: serial("id").primaryKey(),
+  metier: varchar("metier", { length: 50 }).notNull(),
+  categorie: varchar("categorie", { length: 50 }).notNull(),
+  sous_categorie: varchar("sous_categorie", { length: 100 }).notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  description: text("description"),
+  prix_base: numeric("prix_base", { precision: 10, scale: 2 }).notNull(),
+  unite: varchar("unite", { length: 50 }).notNull(),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  prixRevient: numeric("prixRevient", { precision: 10, scale: 2 }),
+  duree_moyenne_minutes: integer("duree_moyenne_minutes"),
+  visible: boolean("visible").default(true),
+  created_at: timestamp("created_at").defaultNow(),
+  updated_at: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+});
+export type BibliothequeArticle = typeof bibliothequeArticles.$inferSelect;
+export type InsertBibliothequeArticle = typeof bibliothequeArticles.$inferInsert;
+
+// ── ARTICLES ARTISAN ─────────────────────────────────────────────────────────
+export const articlesArtisan = pgTable("articles_artisan", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  reference: varchar("reference", { length: 50 }).notNull(),
+  designation: varchar("designation", { length: 500 }).notNull(),
+  description: text("description"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  categorie: varchar("categorie", { length: 100 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type ArticleArtisan = typeof articlesArtisan.$inferSelect;
+export type InsertArticleArtisan = typeof articlesArtisan.$inferInsert;
+
+// ── ARTICLES FOURNISSEURS ────────────────────────────────────────────────────
+export const articlesFournisseurs = pgTable("articles_fournisseurs", {
+  id: serial("id").primaryKey(),
+  articleId: integer("articleId").notNull(),
+  fournisseurId: integer("fournisseurId").notNull(),
+  referenceExterne: varchar("referenceExterne", { length: 100 }),
+  prixAchat: numeric("prixAchat", { precision: 10, scale: 2 }),
+  delaiLivraison: integer("delaiLivraison"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ArticleFournisseur = typeof articlesFournisseurs.$inferSelect;
+export type InsertArticleFournisseur = typeof articlesFournisseurs.$inferInsert;
+
+// ── DEVIS ──────────────────────────────────────────────────────────────────
+export const devis = pgTable("devis", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  numero: varchar("numero", { length: 50 }).notNull(),
+  dateDevis: timestamp("dateDevis").defaultNow().notNull(),
+  dateValidite: timestamp("dateValidite"),
+  dateVue: timestamp("dateVue"),
+  statut: devisStatutEnum("statut").default("brouillon"),
+  objet: text("objet"),
+  referenceClient: varchar("referenceClient", { length: 100 }),
+  conditionsPaiement: text("conditionsPaiement"),
+  notes: text("notes"),
+  totalHT: numeric("totalHT", { precision: 10, scale: 2 }).default("0.00"),
+  totalTVA: numeric("totalTVA", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: numeric("totalTTC", { precision: 10, scale: 2 }).default("0.00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Devis = typeof devis.$inferSelect;
+export type InsertDevis = typeof devis.$inferInsert;
+
+// ── DEVIS LIGNES ─────────────────────────────────────────────────────────────
+export const devisLignes = pgTable("devis_lignes", {
+  id: serial("id").primaryKey(),
+  devisId: integer("devisId").notNull(),
+  ordre: integer("ordre").default(0),
+  reference: varchar("reference", { length: 50 }),
+  designation: varchar("designation", { length: 500 }).notNull(),
+  description: text("description"),
+  quantite: numeric("quantite", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  montantHT: numeric("montantHT", { precision: 10, scale: 2 }).default("0.00"),
+  montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
+  montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  type: ligneTypeEnum("type").default("produit"),
+});
+export type DevisLigne = typeof devisLignes.$inferSelect;
+export type InsertDevisLigne = typeof devisLignes.$inferInsert;
+
+// ── FACTURES ───────────────────────────────────────────────────────────────
+export const factures = pgTable("factures", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  clientId: integer("clientId").notNull(),
+  devisId: integer("devisId"),
+  numero: varchar("numero", { length: 50 }).notNull(),
+  dateFacture: timestamp("dateFacture").defaultNow().notNull(),
+  dateEcheance: timestamp("dateEcheance"),
+  statut: factureStatutEnum("statut").default("brouillon"),
+  typeDocument: factureTypeDocumentEnum("typeDocument").default("facture"),
+  factureOrigineId: integer("factureOrigineId"),
+  objet: text("objet"),
+  referenceClient: varchar("referenceClient", { length: 100 }),
+  siretDestinataire: varchar("siretDestinataire", { length: 14 }),
+  conditionsPaiement: text("conditionsPaiement"),
+  notes: text("notes"),
+  totalHT: numeric("totalHT", { precision: 10, scale: 2 }).default("0.00"),
+  totalTVA: numeric("totalTVA", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: numeric("totalTTC", { precision: 10, scale: 2 }).default("0.00"),
+  montantPaye: numeric("montantPaye", { precision: 10, scale: 2 }).default("0.00"),
+  datePaiement: timestamp("datePaiement"),
+  modePaiement: varchar("modePaiement", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type Facture = typeof factures.$inferSelect;
+export type InsertFacture = typeof factures.$inferInsert;
+
+// ── FACTURES LIGNES ──────────────────────────────────────────────────────────
+export const facturesLignes = pgTable("factures_lignes", {
+  id: serial("id").primaryKey(),
+  factureId: integer("factureId").notNull(),
+  ordre: integer("ordre").default(0),
+  reference: varchar("reference", { length: 50 }),
+  designation: varchar("designation", { length: 500 }).notNull(),
+  description: text("description"),
+  quantite: numeric("quantite", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).notNull(),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  montantHT: numeric("montantHT", { precision: 10, scale: 2 }).default("0.00"),
+  montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
+  montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  type: ligneTypeEnum("type").default("produit"),
+});
+export type FactureLigne = typeof facturesLignes.$inferSelect;
+export type InsertFactureLigne = typeof facturesLignes.$inferInsert;
+
+// ── SIGNATURES DEVIS ─────────────────────────────────────────────────────────
+export const signaturesDevis = pgTable("signatures_devis", {
+  id: serial("id").primaryKey(),
+  devisId: integer("devisId").notNull().unique(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  statut: signatureStatutEnum("statut").default("en_attente"),
+  signatureData: text("signatureData"),
+  signataireName: varchar("signataireName", { length: 255 }),
+  signataireEmail: varchar("signataireEmail", { length: 320 }),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  userAgent: text("userAgent"),
+  motifRefus: text("motifRefus"),
+  signedAt: timestamp("signedAt"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SignatureDevis = typeof signaturesDevis.$inferSelect;
+export type InsertSignatureDevis = typeof signaturesDevis.$inferInsert;
+
+// ── PARAMETRES ARTISAN ───────────────────────────────────────────────────────
+export const parametresArtisan = pgTable("parametres_artisan", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull().unique(),
+  prefixeDevis: varchar("prefixeDevis", { length: 10 }).default("DEV"),
+  prefixeFacture: varchar("prefixeFacture", { length: 10 }).default("FAC"),
+  prefixeAvoir: varchar("prefixeAvoir", { length: 10 }).default("AV"),
+  compteurDevis: integer("compteurDevis").default(1),
+  compteurFacture: integer("compteurFacture").default(1),
+  compteurAvoir: integer("compteurAvoir").default(1),
+  mentionsLegales: text("mentionsLegales"),
+  conditionsGenerales: text("conditionsGenerales"),
+  notificationsEmail: boolean("notificationsEmail").default(true),
+  rappelDevisJours: integer("rappelDevisJours").default(7),
+  rappelFactureJours: integer("rappelFactureJours").default(30),
+  objectifCA: numeric("objectifCA", { precision: 10, scale: 2 }).default("0"),
+  objectifDevis: integer("objectifDevis").default(0),
+  objectifClients: integer("objectifClients").default(0),
+  vitrineActive: boolean("vitrineActive").default(false),
+  vitrineDescription: text("vitrineDescription"),
+  vitrineZone: varchar("vitrineZone", { length: 500 }),
+  vitrineServices: text("vitrineServices"),
+  vitrineExperience: integer("vitrineExperience"),
+  couleurPrincipale: varchar("couleurPrincipale", { length: 20 }).default("#4F46E5"),
+  couleurSecondaire: varchar("couleurSecondaire", { length: 20 }).default("#6366F1"),
+  conditionsPaiementDefaut: text("conditionsPaiementDefaut"),
+  delaiPaiementJours: integer("delaiPaiementJours"),
+  delaiPaiementType: delaiPaiementTypeEnum("delaiPaiementType").default("net"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type ParametresArtisan = typeof parametresArtisan.$inferSelect;
+export type InsertParametresArtisan = typeof parametresArtisan.$inferInsert;
+
+// ── DEVIS OPTIONS ────────────────────────────────────────────────────────────
+export const devisOptions = pgTable("devis_options", {
+  id: serial("id").primaryKey(),
+  devisId: integer("devisId").notNull(),
+  nom: varchar("nom", { length: 100 }).notNull(),
+  description: text("description"),
+  ordre: integer("ordre").default(1),
+  totalHT: numeric("totalHT", { precision: 10, scale: 2 }).default("0.00"),
+  totalTVA: numeric("totalTVA", { precision: 10, scale: 2 }).default("0.00"),
+  totalTTC: numeric("totalTTC", { precision: 10, scale: 2 }).default("0.00"),
+  recommandee: boolean("recommandee").default(false),
+  selectionnee: boolean("selectionnee").default(false),
+  dateSelection: timestamp("dateSelection"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type DevisOption = typeof devisOptions.$inferSelect;
+export type InsertDevisOption = typeof devisOptions.$inferInsert;
+
+// ── DEVIS OPTIONS LIGNES ─────────────────────────────────────────────────────
+export const devisOptionsLignes = pgTable("devis_options_lignes", {
+  id: serial("id").primaryKey(),
+  optionId: integer("optionId").notNull(),
+  articleId: integer("articleId"),
+  designation: varchar("designation", { length: 255 }).notNull(),
+  description: text("description"),
+  quantite: numeric("quantite", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).default("0.00"),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  remise: numeric("remise", { precision: 5, scale: 2 }).default("0.00"),
+  montantHT: numeric("montantHT", { precision: 10, scale: 2 }).default("0.00"),
+  montantTVA: numeric("montantTVA", { precision: 10, scale: 2 }).default("0.00"),
+  montantTTC: numeric("montantTTC", { precision: 10, scale: 2 }).default("0.00"),
+  ordre: integer("ordre").default(1),
+});
+export type DevisOptionLigne = typeof devisOptionsLignes.$inferSelect;
+export type InsertDevisOptionLigne = typeof devisOptionsLignes.$inferInsert;
+
+// ── MODELES DEVIS ────────────────────────────────────────────────────────────
+export const modelesDevis = pgTable("modeles_devis", {
+  id: serial("id").primaryKey(),
+  artisanId: integer("artisanId").notNull(),
+  nom: varchar("nom", { length: 255 }).notNull(),
+  description: text("description"),
+  notes: text("notes"),
+  isDefault: boolean("isDefault").default(false),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+export type ModeleDevis = typeof modelesDevis.$inferSelect;
+export type InsertModeleDevis = typeof modelesDevis.$inferInsert;
+
+// ── MODELES DEVIS LIGNES ─────────────────────────────────────────────────────
+export const modelesDevisLignes = pgTable("modeles_devis_lignes", {
+  id: serial("id").primaryKey(),
+  modeleId: integer("modeleId").notNull(),
+  articleId: integer("articleId"),
+  designation: varchar("designation", { length: 255 }).notNull(),
+  description: text("description"),
+  quantite: numeric("quantite", { precision: 10, scale: 2 }).default("1.00"),
+  unite: varchar("unite", { length: 20 }).default("unité"),
+  prixUnitaireHT: numeric("prixUnitaireHT", { precision: 10, scale: 2 }).default("0.00"),
+  tauxTVA: numeric("tauxTVA", { precision: 5, scale: 2 }).default("20.00"),
+  remise: numeric("remise", { precision: 5, scale: 2 }).default("0.00"),
+  ordre: integer("ordre").default(1),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type ModeleDevisLigne = typeof modelesDevisLignes.$inferSelect;
+export type InsertModeleDevisLigne = typeof modelesDevisLignes.$inferInsert;

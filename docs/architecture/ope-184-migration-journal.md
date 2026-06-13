@@ -44,7 +44,9 @@
 ### P0.3 (OPE-189) — conversion schéma batch 1 — EN COURS (sous-batchs)
 Méthode : nouveau fichier **`drizzle/schema.pg.ts`** (pg-core) séparé du `schema.ts` mysql (legacy intact jusqu'au repoint P0.7). Gate code neuf = **`tsconfig.src.json`** (`pnpm exec tsc -p tsconfig.src.json`).
 - [x] **3a** — rails + 6 tables fondatrices : enums (user_role, artisan_specialite, forme_juridique, client_type) + `users, permissions_utilisateur, artisans, clients, sessions, audit_log`. tsc gate **vert**. Pattern : serial (PK, copie ids OK), numeric, $onUpdate, pgEnum, noms de colonnes identiques.
-- [ ] **3b** — reste du batch 1 (cœur facturation) : `bibliotheque_articles, articles_artisan, articles_fournisseurs, devis, devis_lignes, devis_options, devis_options_lignes, signatures_devis, factures, factures_lignes, parametres_artisan, modeles_devis, modeles_devis_lignes`.
+- [x] **3b** — reste du batch 1 (cœur facturation, 13 tables) converti. **Batch 1 = 19 pgTable + 10 pgEnum.** Double validation : tsc gate vert + `drizzle-kit generate` (10 CREATE TYPE + 19 CREATE TABLE, DDL PG valide).
+
+**P0.3 (OPE-189) = FAIT.**
 
 ### Prochaine action
-→ **P0.3b** : convertir les tables cœur facturation ci-dessus dans `drizzle/schema.pg.ts` (lire leurs défs dans `drizzle/schema.ts`, appliquer le mapping, garder le tsc gate vert). Puis P0.4 (batch 2), P0.5 (batch 3), P0.6 (générer la baseline migration PG).
+→ **P0.4 (OPE-190)** : conversion batch 2 (compta + terrain) dans `drizzle/schema.pg.ts` : ecritures_comptables, plan_comptable, exports_comptables, configurations_comptables, previsions_ca, historique_ca, interventions*, chantiers*, phases/documents_chantier, techniciens, positions/disponibilites/classement/objectifs_techniciens, vehicules + entretiens/assurances/historique_kilometrage. Même méthode (lire défs schema.ts, mapping, tsc gate vert, valider DDL).
