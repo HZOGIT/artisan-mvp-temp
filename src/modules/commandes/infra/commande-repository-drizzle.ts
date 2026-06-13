@@ -3,6 +3,8 @@ import {
   commandesFournisseurs,
   lignesCommandesFournisseurs,
   fournisseurs,
+  stocks,
+  mouvementsStock,
 } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -262,10 +264,37 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
         // Invariant garanti côté infra : qté reçue ∈ [0, quantité commandée] (clamp défensif).
         const max = Number(ligne.quantite);
         const valeur = Math.max(0, Math.min(quantiteRecue, max));
+        const ancienneRecue = Number(ligne.quantiteRecue ?? 0);
         await tx
           .update(lignesCommandesFournisseurs)
           .set({ quantiteRecue: valeur.toFixed(2) })
           .where(eq(lignesCommandesFournisseurs.id, ligneId));
+
+        // Intégration stock : entrée/sortie du DELTA reçu (anti double-comptage : variation
+        // seulement). Uniquement si la ligne est liée à un stock APPARTENANT au tenant
+        // (scoping strict). Atomique (même transaction) + trace mouvement_stock.
+        const delta = valeur - ancienneRecue;
+        if (ligne.stockId != null && Math.abs(delta) > 1e-9) {
+          const [stock] = await tx
+            .select({ id: stocks.id, q: stocks.quantiteEnStock })
+            .from(stocks)
+            .where(and(eq(stocks.id, ligne.stockId), eq(stocks.artisanId, ctx.artisanId)))
+            .limit(1);
+          if (stock) {
+            const avant = Number(stock.q ?? 0);
+            const apres = avant + delta;
+            await tx.update(stocks).set({ quantiteEnStock: apres.toFixed(2), updatedAt: new Date() }).where(eq(stocks.id, stock.id));
+            await tx.insert(mouvementsStock).values({
+              stockId: stock.id,
+              type: delta > 0 ? "entree" : "sortie",
+              quantite: Math.abs(delta).toFixed(2),
+              quantiteAvant: avant.toFixed(2),
+              quantiteApres: apres.toFixed(2),
+              motif: `Réception commande ${commande.numero ?? commande.id}`,
+              reference: String(commande.numero ?? commande.id),
+            });
+          }
+        }
       }
 
       // Recalcule le statut depuis les quantités reçues (source de vérité = lignes).

@@ -46,6 +46,8 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
 
   beforeAll(async () => {
     for (const uid of [UA, UB]) {
+      await admin.query('delete from mouvements_stock where "stockId" in (select id from stocks where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
+      await admin.query('delete from stocks where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
       await admin.query('delete from commandes_fournisseurs where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from fournisseurs where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
@@ -63,6 +65,8 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
   afterAll(async () => {
     await server.close();
     for (const aId of [artisanA, artisanB]) {
+      await admin.query('delete from mouvements_stock where "stockId" in (select id from stocks where "artisanId"=$1)', [aId]);
+      await admin.query('delete from stocks where "artisanId"=$1', [aId]);
       await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId"=$1)', [aId]);
       await admin.query('delete from commandes_fournisseurs where "artisanId"=$1', [aId]);
       await admin.query('delete from fournisseurs where "artisanId"=$1', [aId]);
@@ -175,6 +179,49 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 10 }] }, tA)).json().result.data.statut).toBe("livree");
     // cross-tenant → 404
     expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 1 }] }, tB)).statusCode).toBe(404);
+  });
+
+  it("recevoir : intégration stock du DELTA scopée tenant, anti double-comptage, audit mouvement", async () => {
+    const tA = await token(UA);
+    // stock de A (quantité initiale 100) + commande de A avec une ligne liée à ce stock (qté 10)
+    const stockA = (await admin.query(
+      `insert into stocks ("artisanId", reference, designation, "quantiteEnStock") values ($1,$2,$3,'100.00') returning id`,
+      [artisanA, `S-${Date.now()}`, "Tube cuivre"],
+    )).rows[0].id as number;
+    const cmd = (await admin.query(
+      `insert into commandes_fournisseurs ("artisanId","fournisseurId",statut) values ($1,$2,'confirmee') returning id`,
+      [artisanA, fournA],
+    )).rows[0].id as number;
+    const ligneId = (await admin.query(
+      `insert into lignes_commandes_fournisseurs ("commandeId","stockId",designation,quantite,"quantiteRecue") values ($1,$2,$3,'10.00','0.00') returning id`,
+      [cmd, stockA, "Tube"],
+    )).rows[0].id as number;
+
+    // réception partielle 4 → stock 100 + 4 = 104
+    await callMutation(server, "commandes.recevoir", { id: cmd, lignes: [{ ligneId, quantiteRecue: 4 }] }, tA);
+    let q = (await admin.query('select "quantiteEnStock" as q from stocks where id=$1', [stockA])).rows[0].q;
+    expect(Number(q)).toBeCloseTo(104, 2);
+    // réception complémentaire 10 → DELTA 6 → stock 110 (pas 114 : anti double-comptage)
+    await callMutation(server, "commandes.recevoir", { id: cmd, lignes: [{ ligneId, quantiteRecue: 10 }] }, tA);
+    q = (await admin.query('select "quantiteEnStock" as q from stocks where id=$1', [stockA])).rows[0].q;
+    expect(Number(q)).toBeCloseTo(110, 2);
+    // 2 mouvements d'entrée tracés (delta 4 puis 6)
+    const mvts = await admin.query('select type, quantite from mouvements_stock where "stockId"=$1 order by id', [stockA]);
+    expect(mvts.rows.map((r: { type: string; quantite: string }) => `${r.type}:${Number(r.quantite)}`)).toEqual(["entree:4", "entree:6"]);
+
+    // anti-IDOR stock : une ligne d'une commande de A liée à un stock de B ne touche PAS B
+    const stockB = (await admin.query(
+      `insert into stocks ("artisanId", reference, designation, "quantiteEnStock") values ($1,$2,$3,'50.00') returning id`,
+      [artisanB, `SB-${Date.now()}`, "Autre"],
+    )).rows[0].id as number;
+    const cmd2 = (await admin.query(`insert into commandes_fournisseurs ("artisanId","fournisseurId",statut) values ($1,$2,'confirmee') returning id`, [artisanA, fournA])).rows[0].id as number;
+    const ligne2 = (await admin.query(
+      `insert into lignes_commandes_fournisseurs ("commandeId","stockId",designation,quantite,"quantiteRecue") values ($1,$2,$3,'5.00','0.00') returning id`,
+      [cmd2, stockB, "X"],
+    )).rows[0].id as number;
+    await callMutation(server, "commandes.recevoir", { id: cmd2, lignes: [{ ligneId: ligne2, quantiteRecue: 5 }] }, tA);
+    const qB = (await admin.query('select "quantiteEnStock" as q from stocks where id=$1', [stockB])).rows[0].q;
+    expect(Number(qB)).toBeCloseTo(50, 2); // inchangé (stock d'un autre tenant)
   });
 
   it("getEnRetard : commandes échéance dépassée non livrées, scopé tenant", async () => {
