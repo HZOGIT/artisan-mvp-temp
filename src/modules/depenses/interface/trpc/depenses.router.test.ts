@@ -119,6 +119,26 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callMutation(server, "depenses.setBudget", { categorie: "Carburant", mois: "2026-07", budget: 1 })).statusCode).toBe(401); // sans cookie
   });
 
+  it("getBudgets (parité client) : réalisé calculé (SUM dépenses du mois) + écart + pct par catégorie", async () => {
+    const tA = await token(UA);
+    await callMutation(server, "depenses.createCategorie", { nom: "Carburant", couleur: "#112233" }, tA);
+    await callMutation(server, "depenses.setBudget", { categorie: "Carburant", mois: "2026-08", budget: 500 }, tA);
+    // une dépense du mois (montantTtc dérivé de montantHt+tauxTva=0 → 200.00)
+    await callMutation(server, "depenses.create", { dateDepense: "2026-08-15", categorie: "Carburant", montantHt: "200.00", tauxTva: "0" }, tA);
+    // + une dépense HORS mois (ne doit PAS compter dans le réalisé d'août)
+    await callMutation(server, "depenses.create", { dateDepense: "2026-07-10", categorie: "Carburant", montantHt: "999.00", tauxTva: "0" }, tA);
+    const data = (await callQuery(server, "depenses.getBudgets", { mois: "2026-08" }, tA)).json().result.data as Array<{
+      categorie: string;
+      budget: number;
+      reel: number;
+      ecart: number;
+      pct: number;
+    }>;
+    const carb = data.find((b) => b.categorie === "Carburant")!;
+    expect(carb).toMatchObject({ budget: 500, reel: 200, ecart: 300, pct: 40 });
+    expect((await callQuery(server, "depenses.getBudgets", { mois: "2026-08" })).statusCode).toBe(401); // sans cookie
+  });
+
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
     const tA = await token(UA);
     const created = await callMutation(

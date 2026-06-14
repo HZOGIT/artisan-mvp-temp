@@ -24,4 +24,8 @@ export interface IDepenseRepository {
   // dernière dépense de l'artisan. Le numéro est généré côté serveur (jamais fourni par le
   // client) → intégrité de la numérotation comptable (parité legacy `getNextDepenseNumero`).
   nextNumero(ctx: TenantContext): Promise<string>;
+  // Réalisé du mois agrégé par catégorie : SUM(montantTtc) des dépenses dont `dateDepense` est dans
+  // le mois "YYYY-MM", groupé par `categorie`. Sert au read dérivé « budgets réalisés » (parité
+  // legacy `calculerBudgetsRealises`). Montant rendu en string (numeric PG).
+  realisesParCategorie(ctx: TenantContext, mois: string): Promise<{ categorie: string; reel: string }[]>;
 }

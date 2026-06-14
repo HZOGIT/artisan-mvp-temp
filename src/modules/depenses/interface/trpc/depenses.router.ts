@@ -13,6 +13,7 @@ import { creerCategorie, modifierCategorie, supprimerCategorie } from "../../../
 import type { IBudgetCategorieRepository } from "../../../budgets-categories/application/budget-categorie-repository";
 import { budgetsParMois } from "../../../budgets-categories/application/read-use-cases";
 import { creerBudget, modifierBudget } from "../../../budgets-categories/application/write-use-cases";
+import { budgetsRealises } from "../../application/budgets-realises-use-case";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -158,7 +159,12 @@ export function createDepensesRouter(
         return { success: true };
       }),
 
-    // ── Budgets mensuels par catégorie (parité client : trpc.depenses.setBudget) ───────
+    // ── Budgets mensuels par catégorie (parité client : trpc.depenses.getBudgets/setBudget) ──
+    // Read DÉRIVÉ : budget vs réalisé (SUM dépenses du mois) par catégorie + écart + pourcentage.
+    getBudgets: protectedProcedure
+      .input(z.object({ mois: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)") }))
+      .query(({ ctx, input }) => budgetsRealises(categorieRepo, budgetRepo, repo, ctx.tenant, input.mois)),
+
     // Upsert (categorie, mois) : crée si absent, sinon met à jour le montant — délègue au domaine
     // budgets-categories (contrainte UNIQUE (artisan, categorie, mois) garantie côté DB).
     setBudget: protectedProcedure

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, between, desc, eq, sql } from "drizzle-orm";
 import { depenses, chantiers, interventions, clients } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -118,6 +118,20 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
         .where(eq(depenses.artisan_id, ctx.artisanId))
         .orderBy(desc(depenses.date_depense), desc(depenses.id));
       return rows.map(toDepense);
+    });
+  }
+
+  realisesParCategorie(ctx: TenantContext, mois: string): Promise<{ categorie: string; reel: string }[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [y, m] = mois.split("-").map(Number);
+      const debut = `${mois}-01`;
+      const fin = new Date(y, m, 0).toISOString().slice(0, 10); // dernier jour du mois
+      const rows = await tx
+        .select({ categorie: depenses.categorie, reel: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)::text` })
+        .from(depenses)
+        .where(and(eq(depenses.artisan_id, ctx.artisanId), between(depenses.date_depense, debut, fin)))
+        .groupBy(depenses.categorie);
+      return rows.map((r) => ({ categorie: r.categorie, reel: r.reel }));
     });
   }
 

@@ -14,6 +14,7 @@ const stubRepo: IDepenseRepository = {
   delete: async () => false,
   ownsRef: async () => false,
   nextNumero: async () => "DEP-00001",
+  realisesParCategorie: async () => [],
 };
 
 const stubCategorieRepo: ICategorieDepenseRepository = {
@@ -44,7 +45,7 @@ describe("depenses.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "nextNumero", "ownsRef", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "nextNumero", "ownsRef", "realisesParCategorie", "update"]);
   });
 
   it("expose les procédures de catégories (parité client trpc.depenses.*Categorie)", () => {

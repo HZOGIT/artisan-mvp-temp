@@ -22,6 +22,15 @@ export class FakeDepenseRepository implements IDepenseRepository {
     return this.store.filter((d) => d.artisanId === ctx.artisanId);
   }
 
+  async realisesParCategorie(ctx: TenantContext, mois: string): Promise<{ categorie: string; reel: string }[]> {
+    const sums = new Map<string, number>();
+    for (const d of this.store) {
+      if (d.artisanId !== ctx.artisanId || !d.dateDepense.startsWith(`${mois}-`)) continue;
+      sums.set(d.categorie, (sums.get(d.categorie) ?? 0) + Number(d.montantTtc));
+    }
+    return Array.from(sums.entries(), ([categorie, reel]) => ({ categorie, reel: String(reel) }));
+  }
+
   async getById(ctx: TenantContext, id: number): Promise<Depense | null> {
     return this.store.find((d) => d.id === id && d.artisanId === ctx.artisanId) ?? null;
   }
