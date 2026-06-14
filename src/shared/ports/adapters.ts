@@ -80,7 +80,9 @@ export class GeminiLlmAdapter implements LlmPort {
 
   private request(prompt: string, opts?: LlmCompleteOptions) {
     return {
-      model: opts?.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-2.5-flash",
+      // Modèle le plus récent/capable par défaut (Gemini 3 Pro) ; surchargé par l'env
+      // `GEMINI_TEXT_MODEL` (staging) ou par `opts.model` au cas par cas.
+      model: opts?.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
         ...(opts?.system ? { systemInstruction: opts.system } : {}),

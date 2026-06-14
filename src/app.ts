@@ -26,6 +26,7 @@ import { FournisseurRepositoryDrizzle } from "./modules/fournisseurs/infra/fourn
 import type { IFournisseurRepository } from "./modules/fournisseurs/application/fournisseur-repository";
 import { createCommandesModule } from "./modules/commandes/commandes.module";
 import { CommandeRepositoryDrizzle } from "./modules/commandes/infra/commande-repository-drizzle";
+import { ArtisanReaderDrizzle as CommandeArtisanReaderDrizzle } from "./modules/commandes/infra/artisan-reader-drizzle";
 import type { ICommandeRepository } from "./modules/commandes/application/commande-repository";
 import { createStocksModule } from "./modules/stocks/stocks.module";
 import { StockRepositoryDrizzle } from "./modules/stocks/infra/stock-repository-drizzle";
@@ -189,11 +190,22 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
   });
+  const commandeRepo = deps.commandeRepo ?? new CommandeRepositoryDrizzle(getDbHandle().db);
   const commandes = createCommandesModule({
-    repository: deps.commandeRepo ?? new CommandeRepositoryDrizzle(getDbHandle().db),
+    repository: commandeRepo,
     fournisseurRepository: fournisseurRepo,
     devisRepository: devisRepo,
     clientRepository: clientRepo,
+    // Envoi du bon de commande par email (PDF en PJ) : artisan reader + PdfPort/EmailPort legacy +
+    // rate-limiter anti-abus (20 / 15 min). email/rate-limiter injectables en test.
+    mailing: {
+      repo: commandeRepo,
+      fournisseurRepo,
+      artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db),
+      pdf: new LegacyPdfAdapter(),
+      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
+    },
   });
   const stocks = createStocksModule({
     repository: deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db),

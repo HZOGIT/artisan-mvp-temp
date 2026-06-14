@@ -8,6 +8,7 @@ import { listCommandes, getCommande, listLignesCommande } from "../../applicatio
 import { getPerformancesFournisseurs } from "../../application/performances-use-cases";
 import { listerDevisAcceptes } from "../../application/devis-acceptes-use-cases";
 import { creerCommande, modifierCommande, supprimerCommande } from "../../application/write-use-cases";
+import { envoyerCommandeParEmail, type CommandeMailingDeps } from "../../application/envoyer-commande-email";
 import {
   changerStatutCommande,
   listerCommandesEnRetard,
@@ -65,6 +66,7 @@ export function createCommandesRouter(
   fournisseurRepo: IFournisseurRepository,
   devisRepo: IDevisRepository,
   clientRepo: IClientRepository,
+  mailing: CommandeMailingDeps,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listCommandes(repo, ctx.tenant)),
@@ -157,5 +159,11 @@ export function createCommandesRouter(
       .mutation(({ ctx, input }) =>
         definirStatutFacturation(repo, ctx.tenant, input.id, input.statutFacturation, input.depenseId ?? null),
       ),
+
+    // Envoi du bon de commande au fournisseur par email (PDF en PJ) — parité `sendEmail`.
+    // ownership 404 / fournisseur.email 400 / rate-limit 429 ; statut → envoyee après envoi.
+    sendEmail: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => envoyerCommandeParEmail(mailing, ctx.tenant, input.id)),
   });
 }

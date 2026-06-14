@@ -19,13 +19,22 @@ const stubRepo: ICommandeRepository = {
 };
 
 // Stubs minimaux des repos composés par commandes (getPerformances + listDevisAcceptes).
-const stubFournisseurRepo = { list: async () => [] } as unknown as IFournisseurRepository;
+const stubFournisseurRepo = { list: async () => [], getById: async () => null } as unknown as IFournisseurRepository;
 const stubDevisRepo = { list: async () => [] } as unknown as IDevisRepository;
 const stubClientRepo = { getById: async () => null } as unknown as IClientRepository;
+// Stub des dépendances d'envoi email (sendEmail) — non exercées par ces tests de câblage.
+const stubMailing = {
+  repo: stubRepo,
+  fournisseurRepo: stubFournisseurRepo,
+  artisanReader: { getArtisan: async () => null },
+  pdf: { render: async () => Buffer.from("") },
+  email: { send: async () => {} },
+  rateLimiter: { check: async () => true },
+};
 
 describe("commandes.module", () => {
   it("createCommandesModule câble le repository injecté", () => {
-    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, clientRepository: stubClientRepo });
+    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, clientRepository: stubClientRepo, mailing: stubMailing });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -45,7 +54,7 @@ describe("commandes.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
-    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, clientRepository: stubClientRepo });
+    const module = createCommandesModule({ repository: stubRepo, fournisseurRepository: stubFournisseurRepo, devisRepository: stubDevisRepo, clientRepository: stubClientRepo, mailing: stubMailing });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "create",
@@ -57,6 +66,7 @@ describe("commandes.module", () => {
       "list",
       "listDevisAcceptes",
       "recevoir",
+      "sendEmail",
       "setStatutFacturation",
       "update",
       "updateStatut",
