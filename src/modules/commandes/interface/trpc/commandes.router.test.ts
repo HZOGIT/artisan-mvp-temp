@@ -35,7 +35,7 @@ function callQuery(app: ReturnType<typeof buildApp>, path: string, input: unknow
   return app.inject({ method: "GET", url: `/api/trpc/${path}${qs}`, headers: tok ? { cookie: `token=${tok}` } : {} });
 }
 
-describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo → RLS)", () => {
+describe.skipIf(!URL)("commandesFournisseurs.router e2e (HTTP → tRPC → use-case → repo → RLS)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   let artisanA = 0;
@@ -83,70 +83,70 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
 
   const ligne = { designation: "Tube", quantite: 10, prixUnitaire: 5, tauxTVA: 20 };
 
-  it("sans cookie → commandes.list 401", async () => {
-    expect((await callQuery(server, "commandes.list", undefined)).statusCode).toBe(401);
+  it("sans cookie → commandesFournisseurs.list 401", async () => {
+    expect((await callQuery(server, "commandesFournisseurs.list", undefined)).statusCode).toBe(401);
   });
 
   it("create (totaux serveur) + list + getLignes scopés au tenant A", async () => {
     const tA = await token(UA);
-    const created = await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [ligne] }, tA);
+    const created = await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [ligne] }, tA);
     expect(created.statusCode).toBe(200);
     const cmd = created.json().result.data as { id: number; totalHT: string; totalTTC: string };
     expect(cmd.totalHT).toBe("50.00");
     expect(cmd.totalTTC).toBe("60.00");
-    expect((await callQuery(server, "commandes.list", undefined, tA)).json().result.data as Array<{ id: number }>).toContainEqual(expect.objectContaining({ id: cmd.id }));
-    expect(((await callQuery(server, "commandes.getLignes", { commandeId: cmd.id }, tA)).json().result.data as unknown[]).length).toBe(1);
+    expect((await callQuery(server, "commandesFournisseurs.list", undefined, tA)).json().result.data as Array<{ id: number }>).toContainEqual(expect.objectContaining({ id: cmd.id }));
+    expect(((await callQuery(server, "commandesFournisseurs.getLignes", { commandeId: cmd.id }, tA)).json().result.data as unknown[]).length).toBe(1);
   });
 
   it("validation Zod : sans ligne → 400", async () => {
     const tA = await token(UA);
-    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [] }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [] }, tA)).statusCode).toBe(400);
   });
 
   it("anti-IDOR-FK : create avec le fournisseur d'un autre tenant → 404", async () => {
     const tA = await token(UA);
-    expect((await callMutation(server, "commandes.create", { fournisseurId: fournB, lignes: [ligne] }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournB, lignes: [ligne] }, tA)).statusCode).toBe(404);
   });
 
   it("isolation cross-tenant : B ne voit/modifie/supprime pas la commande de A", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
-    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
-    expect((await callQuery(server, "commandes.getById", { id }, tB)).statusCode).toBe(404);
-    expect((await callQuery(server, "commandes.getLignes", { commandeId: id }, tB)).json().result.data).toEqual([]);
-    expect((await callMutation(server, "commandes.update", { id, notes: "hack" }, tB)).statusCode).toBe(404);
-    expect((await callMutation(server, "commandes.delete", { id }, tB)).statusCode).toBe(404);
-    expect((await callQuery(server, "commandes.getById", { id }, tA)).statusCode).toBe(200);
+    const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
+    expect((await callQuery(server, "commandesFournisseurs.getById", { id }, tB)).statusCode).toBe(404);
+    expect((await callQuery(server, "commandesFournisseurs.getLignes", { commandeId: id }, tB)).json().result.data).toEqual([]);
+    expect((await callMutation(server, "commandesFournisseurs.update", { id, notes: "hack" }, tB)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandesFournisseurs.delete", { id }, tB)).statusCode).toBe(404);
+    expect((await callQuery(server, "commandesFournisseurs.getById", { id }, tA)).statusCode).toBe(200);
   });
 
   it("update (métadonnées) + delete OK pour le propriétaire", async () => {
     const tA = await token(UA);
-    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
-    expect((await callMutation(server, "commandes.update", { id, notes: "ok" }, tA)).json().result.data.notes).toBe("ok");
-    expect((await callMutation(server, "commandes.delete", { id }, tA)).json().result.data).toEqual({ success: true });
-    expect((await callQuery(server, "commandes.getById", { id }, tA)).statusCode).toBe(404);
+    const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "commandesFournisseurs.update", { id, notes: "ok" }, tA)).json().result.data.notes).toBe("ok");
+    expect((await callMutation(server, "commandesFournisseurs.delete", { id }, tA)).json().result.data).toEqual({ success: true });
+    expect((await callQuery(server, "commandesFournisseurs.getById", { id }, tA)).statusCode).toBe(404);
   });
 
   it("getById / update / delete sur un id inexistant du même tenant → 404", async () => {
     const tA = await token(UA);
-    expect((await callQuery(server, "commandes.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
-    expect((await callMutation(server, "commandes.update", { id: 999999999, notes: "x" }, tA)).statusCode).toBe(404);
-    expect((await callMutation(server, "commandes.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callQuery(server, "commandesFournisseurs.getById", { id: 999999999 }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandesFournisseurs.update", { id: 999999999, notes: "x" }, tA)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandesFournisseurs.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
   });
 
   it("bornes zod : quantite ≤ 0, lignes > 500, designation vide, tauxTVA > 100 → 400", async () => {
     const tA = await token(UA);
-    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ ...ligne, quantite: 0 }] }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [{ ...ligne, quantite: 0 }] }, tA)).statusCode).toBe(400);
     const trop = Array.from({ length: 501 }, () => ligne);
-    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: trop }, tA)).statusCode).toBe(400);
-    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ ...ligne, designation: "" }] }, tA)).statusCode).toBe(400);
-    expect((await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ ...ligne, tauxTVA: 150 }] }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: trop }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [{ ...ligne, designation: "" }] }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [{ ...ligne, tauxTVA: 150 }] }, tA)).statusCode).toBe(400);
   });
 
   it("getLignes reflète les lignes créées (quantité/prix/montantTotal serveur)", async () => {
     const tA = await token(UA);
-    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ designation: "Coude", quantite: 4, prixUnitaire: 2.5, tauxTVA: 10 }] }, tA)).json().result.data.id as number;
-    const lignes = (await callQuery(server, "commandes.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ designation: string; quantite: string; prixUnitaire: string; montantTotal: string; quantiteRecue: string }>;
+    const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [{ designation: "Coude", quantite: 4, prixUnitaire: 2.5, tauxTVA: 10 }] }, tA)).json().result.data.id as number;
+    const lignes = (await callQuery(server, "commandesFournisseurs.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ designation: string; quantite: string; prixUnitaire: string; montantTotal: string; quantiteRecue: string }>;
     expect(lignes.length).toBe(1);
     expect(lignes[0].designation).toBe("Coude");
     expect(lignes[0].quantite).toBe("4.00");
@@ -158,29 +158,29 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
   it("updateStatut : transition scopée ; cross-tenant → 404", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
-    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
-    expect((await callMutation(server, "commandes.updateStatut", { id, statut: "confirmee" }, tA)).json().result.data.statut).toBe("confirmee");
-    expect((await callMutation(server, "commandes.updateStatut", { id, statut: "annulee" }, tB)).statusCode).toBe(404);
-    expect((await callMutation(server, "commandes.updateStatut", { id, statut: "x_invalide" as unknown as string }, tA)).statusCode).toBe(400);
+    const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "confirmee" }, tA)).json().result.data.statut).toBe("confirmee");
+    expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "annulee" }, tB)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "x_invalide" as unknown as string }, tA)).statusCode).toBe(400);
   });
 
   it("recevoir : réception partielle → partiellement_livree, totale → livree ; qté > commandée → 400 ; cross-tenant → 404", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
-    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [{ designation: "Tube", quantite: 10, prixUnitaire: 5 }] }, tA)).json().result.data.id as number;
-    await callMutation(server, "commandes.updateStatut", { id, statut: "confirmee" }, tA);
-    const ligneId = ((await callQuery(server, "commandes.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ id: number }>)[0].id;
+    const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [{ designation: "Tube", quantite: 10, prixUnitaire: 5 }] }, tA)).json().result.data.id as number;
+    await callMutation(server, "commandesFournisseurs.updateStatut", { id, statut: "confirmee" }, tA);
+    const ligneId = ((await callQuery(server, "commandesFournisseurs.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ id: number }>)[0].id;
     // partielle
-    const partiel = await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 4 }] }, tA);
+    const partiel = await callMutation(server, "commandesFournisseurs.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 4 }] }, tA);
     expect(partiel.statusCode).toBe(200);
     expect(partiel.json().result.data.statut).toBe("partiellement_livree");
-    expect(((await callQuery(server, "commandes.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ quantiteRecue: string }>)[0].quantiteRecue).toBe("4.00");
+    expect(((await callQuery(server, "commandesFournisseurs.getLignes", { commandeId: id }, tA)).json().result.data as Array<{ quantiteRecue: string }>)[0].quantiteRecue).toBe("4.00");
     // qté reçue > commandée → 400 (invariant)
-    expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 99 }] }, tA)).statusCode).toBe(400);
+    expect((await callMutation(server, "commandesFournisseurs.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 99 }] }, tA)).statusCode).toBe(400);
     // totale → livree
-    expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 10 }] }, tA)).json().result.data.statut).toBe("livree");
+    expect((await callMutation(server, "commandesFournisseurs.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 10 }] }, tA)).json().result.data.statut).toBe("livree");
     // cross-tenant → 404
-    expect((await callMutation(server, "commandes.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 1 }] }, tB)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandesFournisseurs.recevoir", { id, lignes: [{ ligneId, quantiteRecue: 1 }] }, tB)).statusCode).toBe(404);
   });
 
   it("recevoir : intégration stock du DELTA scopée tenant, anti double-comptage, audit mouvement", async () => {
@@ -200,11 +200,11 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
     )).rows[0].id as number;
 
     // réception partielle 4 → stock 100 + 4 = 104
-    await callMutation(server, "commandes.recevoir", { id: cmd, lignes: [{ ligneId, quantiteRecue: 4 }] }, tA);
+    await callMutation(server, "commandesFournisseurs.recevoir", { id: cmd, lignes: [{ ligneId, quantiteRecue: 4 }] }, tA);
     let q = (await admin.query('select "quantiteEnStock" as q from stocks where id=$1', [stockA])).rows[0].q;
     expect(Number(q)).toBeCloseTo(104, 2);
     // réception complémentaire 10 → DELTA 6 → stock 110 (pas 114 : anti double-comptage)
-    await callMutation(server, "commandes.recevoir", { id: cmd, lignes: [{ ligneId, quantiteRecue: 10 }] }, tA);
+    await callMutation(server, "commandesFournisseurs.recevoir", { id: cmd, lignes: [{ ligneId, quantiteRecue: 10 }] }, tA);
     q = (await admin.query('select "quantiteEnStock" as q from stocks where id=$1', [stockA])).rows[0].q;
     expect(Number(q)).toBeCloseTo(110, 2);
     // 2 mouvements d'entrée tracés (delta 4 puis 6)
@@ -221,7 +221,7 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
       `insert into lignes_commandes_fournisseurs ("commandeId","stockId",designation,quantite,"quantiteRecue") values ($1,$2,$3,'5.00','0.00') returning id`,
       [cmd2, stockB, "X"],
     )).rows[0].id as number;
-    await callMutation(server, "commandes.recevoir", { id: cmd2, lignes: [{ ligneId: ligne2, quantiteRecue: 5 }] }, tA);
+    await callMutation(server, "commandesFournisseurs.recevoir", { id: cmd2, lignes: [{ ligneId: ligne2, quantiteRecue: 5 }] }, tA);
     const qB = (await admin.query('select "quantiteEnStock" as q from stocks where id=$1', [stockB])).rows[0].q;
     expect(Number(qB)).toBeCloseTo(50, 2); // inchangé (stock d'un autre tenant)
   });
@@ -229,7 +229,7 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
   it("setStatutFacturation : facturee + lien dépense owned ; dépense d'un autre tenant non liée ; cross-tenant → 404", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
-    const id = (await callMutation(server, "commandes.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
+    const id = (await callMutation(server, "commandesFournisseurs.create", { fournisseurId: fournA, lignes: [ligne] }, tA)).json().result.data.id as number;
     const depA = (await admin.query(
       `insert into depenses (artisan_id, user_id, numero, date_depense, categorie, montant_ht, montant_ttc) values ($1,$2,$3, now(), 'achats','100.00','120.00') returning id`,
       [artisanA, UA, `DEP-${Date.now()}`],
@@ -239,17 +239,17 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
       [artisanB, UB, `DEPB-${Date.now()}`],
     )).rows[0].id as number;
     // facturée + dépense de A → liée
-    const f1 = await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "facturee", depenseId: depA }, tA);
+    const f1 = await callMutation(server, "commandesFournisseurs.setStatutFacturation", { id, statutFacturation: "facturee", depenseId: depA }, tA);
     expect(f1.json().result.data.statutFacturation).toBe("facturee");
     expect(f1.json().result.data.depenseId).toBe(depA);
     // facturée + dépense de B → non liée (anti-IDOR-FK)
-    const f2 = await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "facturee", depenseId: depB }, tA);
+    const f2 = await callMutation(server, "commandesFournisseurs.setStatutFacturation", { id, statutFacturation: "facturee", depenseId: depB }, tA);
     expect(f2.json().result.data.depenseId).toBeNull();
     // a_facturer → délie
-    const f3 = await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "a_facturer" }, tA);
+    const f3 = await callMutation(server, "commandesFournisseurs.setStatutFacturation", { id, statutFacturation: "a_facturer" }, tA);
     expect(f3.json().result.data.depenseId).toBeNull();
     // cross-tenant → 404
-    expect((await callMutation(server, "commandes.setStatutFacturation", { id, statutFacturation: "facturee" }, tB)).statusCode).toBe(404);
+    expect((await callMutation(server, "commandesFournisseurs.setStatutFacturation", { id, statutFacturation: "facturee" }, tB)).statusCode).toBe(404);
   });
 
   it("getEnRetard : commandes échéance dépassée non livrées, scopé tenant", async () => {
@@ -270,11 +270,11 @@ describe.skipIf(!URL)("commandes.router e2e (HTTP → tRPC → use-case → repo
       `insert into commandes_fournisseurs ("artisanId","fournisseurId",statut,"dateLivraisonPrevue") values ($1,$2,'envoyee', now() - interval '3 days')`,
       [artisanB, fournB],
     );
-    const retardsA = (await callQuery(server, "commandes.getEnRetard", undefined, tA)).json().result.data as Array<{ id: number }>;
+    const retardsA = (await callQuery(server, "commandesFournisseurs.getEnRetard", undefined, tA)).json().result.data as Array<{ id: number }>;
     expect(retardsA.map((c) => c.id)).toContain(cmdRetard);
     expect(retardsA.every((c) => c.id !== undefined)).toBe(true);
     // B ne voit pas les retards de A
-    const retardsB = (await callQuery(server, "commandes.getEnRetard", undefined, tB)).json().result.data as Array<{ id: number }>;
+    const retardsB = (await callQuery(server, "commandesFournisseurs.getEnRetard", undefined, tB)).json().result.data as Array<{ id: number }>;
     expect(retardsB.some((c) => c.id === cmdRetard)).toBe(false);
   });
 });

@@ -15,7 +15,7 @@
 | techniciens | techniciens | ✅ name-match | 11 |
 | notifications | notifications | ✅ name-match | 7 |
 | fournisseurs | fournisseurs | ✅ name-match | 9 |
-| commandes | commandesFournisseurs | ⚠️ renommer → `commandesFournisseurs` | 10 |
+| commandesFournisseurs | commandesFournisseurs | ✅ name-match | 10 |
 | stocks | stocks | ✅ name-match | 9 |
 | clients | clients | ✅ name-match | 8 |
 | interventions | interventions | ✅ name-match | 6 |
@@ -40,9 +40,9 @@
 | reglesCategorisation | reglesCategorisation | ⚠️ pas de top-level legacy | 5 |
 | previsions | previsions | ✅ name-match | 6 |
 
-**Name-match (flippables après parité)** : 18 — vehicules, avis, badges, techniciens, notifications, fournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail, previsions
+**Name-match (flippables après parité)** : 19 — vehicules, avis, badges, techniciens, notifications, fournisseurs, commandesFournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail, previsions
 
-**À réconcilier (renommage / sous-routeur)** : 12 — commandes, notesDeFrais, ecritures, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation
+**À réconcilier (renommage / sous-routeur)** : 11 — notesDeFrais, ecritures, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation
 
 ## 2. Procédures servies par le nouveau stack (par domaine)
 
@@ -52,7 +52,7 @@
 - **techniciens** (11) : `create`, `delete`, `enregistrerPosition`, `getAll`, `getById`, `getDernierePosition`, `getDisponibilites`, `getLinkableUsers`, `list`, `setDisponibilite`, `update`
 - **notifications** (7) : `archive`, `delete`, `generateOverdueReminders`, `getUnreadCount`, `list`, `markAllAsRead`, `markAsRead`
 - **fournisseurs** (9) : `associateArticle`, `create`, `delete`, `dissociateArticle`, `getArticleFournisseurs`, `getById`, `getFournisseurArticles`, `list`, `update`
-- **commandes** (10) : `create`, `delete`, `getById`, `getEnRetard`, `getLignes`, `list`, `recevoir`, `setStatutFacturation`, `update`, `updateStatut`
+- **commandesFournisseurs** (10) : `create`, `delete`, `getById`, `getEnRetard`, `getLignes`, `list`, `recevoir`, `setStatutFacturation`, `update`, `updateStatut`
 - **stocks** (9) : `adjustQuantity`, `create`, `delete`, `getById`, `getLowStock`, `getMouvements`, `getStocksEnRupture`, `list`, `update`
 - **clients** (8) : `create`, `delete`, `getById`, `getEncours`, `getEncoursMap`, `list`, `search`, `update`
 - **interventions** (6) : `create`, `delete`, `getById`, `getMine`, `list`, `update`

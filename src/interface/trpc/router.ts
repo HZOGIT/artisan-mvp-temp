@@ -81,7 +81,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     techniciens: deps.techniciens.router,
     notifications: deps.notifications.router,
     fournisseurs: deps.fournisseurs.router,
-    commandes: deps.commandes.router,
+    commandesFournisseurs: deps.commandes.router,
     stocks: deps.stocks.router,
     clients: deps.clients.router,
     interventions: deps.interventions.router,

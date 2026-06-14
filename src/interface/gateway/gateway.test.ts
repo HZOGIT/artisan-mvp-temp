@@ -144,25 +144,25 @@ describe("bascule du domaine fournisseurs (flag gateway)", () => {
   });
 });
 
-describe("bascule du domaine commandes (flag gateway)", () => {
-  it("commandes routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
-    expect(shouldRouteToNewStack("commandes", 7, NO_FLAGS)).toBe(false);
-    const canary: FeatureFlags = { commandes: { enabled: false, tenantAllowlist: [7] } };
-    expect(shouldRouteToNewStack("commandes", 7, canary)).toBe(true);
-    expect(shouldRouteToNewStack("commandes", 8, canary)).toBe(false);
-    const global: FeatureFlags = { commandes: { enabled: true, tenantDenylist: [3] } };
-    expect(shouldRouteToNewStack("commandes", 1, global)).toBe(true);
-    expect(shouldRouteToNewStack("commandes", 3, global)).toBe(false);
+describe("bascule du domaine commandesFournisseurs (flag gateway)", () => {
+  it("commandesFournisseurs routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("commandesFournisseurs", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { commandesFournisseurs: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("commandesFournisseurs", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("commandesFournisseurs", 8, canary)).toBe(false);
+    const global: FeatureFlags = { commandesFournisseurs: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("commandesFournisseurs", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("commandesFournisseurs", 3, global)).toBe(false);
   });
 
-  it("les chemins tRPC du domaine commandes extraient bien le domaine", () => {
-    expect(domainFromTrpcPath("commandes.recevoir")).toBe("commandes");
-    expect(domainFromTrpcPath("/commandes.setStatutFacturation")).toBe("commandes");
+  it("les chemins tRPC du domaine commandesFournisseurs extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("commandesFournisseurs.recevoir")).toBe("commandesFournisseurs");
+    expect(domainFromTrpcPath("/commandesFournisseurs.setStatutFacturation")).toBe("commandesFournisseurs");
   });
 
-  it("parse env : commandes enabled + canary", () => {
-    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "commandes" } as NodeJS.ProcessEnv).commandes).toEqual({ enabled: true });
-    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_COMMANDES: "7" } as NodeJS.ProcessEnv).commandes?.tenantAllowlist).toEqual([7]);
+  it("parse env : commandesFournisseurs enabled + canary", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "commandesFournisseurs" } as NodeJS.ProcessEnv).commandesFournisseurs).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_COMMANDESFOURNISSEURS: "7" } as NodeJS.ProcessEnv).commandesFournisseurs?.tenantAllowlist).toEqual([7]);
   });
 });
 
@@ -708,7 +708,7 @@ describe("canary env camelCase recanonicalisé (NEW_STACK_CANARY_<DOMAINE>)", ()
 
 describe("registre des domaines migrés", () => {
   it("les 30 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne", "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne", "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }

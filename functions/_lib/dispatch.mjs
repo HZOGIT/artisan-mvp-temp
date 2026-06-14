@@ -9,7 +9,7 @@
 
 // Domaines portés par le nouveau stack (clés tRPC top-level appelées par le client). == MIGRATED_DOMAINS.
 export const MIGRATED = [
-  "vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks",
+  "vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks",
   "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures",
   "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne",
   "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories",
