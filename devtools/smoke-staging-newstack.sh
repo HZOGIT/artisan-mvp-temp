@@ -42,6 +42,16 @@ for p in $PROCS; do
   if [ "$code" = "200" ]; then echo "  ✓ $p -> 200"; else echo "  ✖ $p -> $code (attendu 200)"; fail=1; fi
 done
 
+# 2b) Round-trip transformer SUPERJSON (régression critique : le client/legacy utilisent superjson ;
+# si le new-stack ne le configure pas, toutes les mutations cassent et le front ne désérialise rien).
+# La réponse d'une query authentifiée DOIT être enveloppée superjson → contient la clé "json".
+body=$(curl -s --cookie "token=$TOKEN_A" "$NEWSTACK_URL/api/trpc/clients.list?batch=1&input=%7B%7D")
+if printf '%s' "$body" | grep -q '"json"'; then
+  echo "  ✓ transformer superjson actif (réponse enveloppée {json:…})"
+else
+  echo "  ✖ réponse NON superjson (clients.list) — transformer manquant ! body=$(printf '%s' "$body" | head -c 200)"; fail=1
+fi
+
 # 3) Contrôle d'isolation : l'auth fonctionne aussi pour B (tenant distinct) — 200 (ses propres données).
 codeB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
   "$NEWSTACK_URL/api/trpc/vehicules.list?batch=1&input=%7B%7D")
