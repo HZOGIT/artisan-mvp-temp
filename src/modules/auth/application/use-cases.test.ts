@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { UnauthorizedError } from "../../../shared/errors";
+import { ConflictError, UnauthorizedError, ValidationError } from "../../../shared/errors";
+import { FakeEmailPort } from "../../../shared/ports/fakes";
 import { FakePasswordHasher } from "../../../shared/ports/password-hasher-bcrypt";
 import { verifyAuthToken } from "../../../shared/tenant/jwt";
 import { FakeAuthRepository } from "../infra/auth-repository-fake";
 import type { AuthDeps } from "./use-cases";
-import { me, signin } from "./use-cases";
+import { deleteAccount, forgotPassword, me, resetPassword, signin, updateEmail, updatePassword } from "./use-cases";
 
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const makeDeps = (repo: FakeAuthRepository): AuthDeps => ({ repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET });
@@ -42,5 +43,69 @@ describe("auth use-cases", () => {
     await expect(signin(deps, { email: "ok@t.fr", password: "mauvais" })).rejects.toBeInstanceOf(UnauthorizedError);
     await expect(signin(deps, { email: "oauth@t.fr", password: "x" })).rejects.toBeInstanceOf(UnauthorizedError);
     expect(repo.touched).toEqual([]); // aucun login réussi
+  });
+
+  it("updateEmail : OK si libre ou inchangé ; ConflictError si pris par un autre", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "moi@t.fr" });
+    repo.seed({ id: 2, email: "autre@t.fr" });
+    const deps = makeDeps(repo);
+    expect(await updateEmail(deps, 1, "nouveau@t.fr")).toEqual({ success: true });
+    expect((await repo.getById(1))?.email).toBe("nouveau@t.fr");
+    await expect(updateEmail(deps, 1, "autre@t.fr")).rejects.toBeInstanceOf(ConflictError);
+    // Inchangé (toujours mon propre email) → OK.
+    expect(await updateEmail(deps, 1, "nouveau@t.fr")).toEqual({ success: true });
+  });
+
+  it("updatePassword : vérifie l'ancien (bcrypt) puis hashe le nouveau ; mauvais ancien → 401", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "u@t.fr", password: "hashed:vieux" });
+    const deps = makeDeps(repo);
+    await expect(updatePassword(deps, 1, "faux", "nouveaupass")).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(await updatePassword(deps, 1, "vieux", "nouveaupass")).toEqual({ success: true });
+    expect((await repo.findCredentialsById(1))?.password).toBe("hashed:nouveaupass");
+  });
+
+  it("updatePassword : compte sans mot de passe (OAuth) → ValidationError (400)", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "oauth@t.fr", password: null });
+    await expect(updatePassword(makeDeps(repo), 1, "x", "nouveaupass")).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("forgotPassword : anti-énumération (toujours success), pose le jeton + envoie l'email pour un compte valide", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "valide@t.fr", password: "hashed:x", actif: true });
+    const email = new FakeEmailPort();
+    const deps: AuthDeps = { repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET, email, appUrl: "https://app.test", genResetToken: () => "RAWTOKEN" };
+    // Compte valide → email envoyé, jeton posé (hash, jamais le brut en base).
+    expect(await forgotPassword(deps, "valide@t.fr")).toEqual({ success: true });
+    expect(email.sent).toHaveLength(1);
+    expect(email.sent[0].body).toContain("https://app.test/reset-password?token=RAWTOKEN");
+    // Email inconnu → MÊME réponse, aucun email (anti-énumération).
+    expect(await forgotPassword(deps, "inconnu@t.fr")).toEqual({ success: true });
+    expect(email.sent).toHaveLength(1);
+  });
+
+  it("resetPassword : jeton valide → applique + invalide ; jeton inconnu/expiré → ValidationError", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "u@t.fr", password: "hashed:vieux", actif: true });
+    const deps: AuthDeps = { repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET, email: new FakeEmailPort(), appUrl: "https://app.test", genResetToken: () => "RAWTOKEN" };
+    await forgotPassword(deps, "u@t.fr"); // pose le jeton (hash de RAWTOKEN)
+    await expect(resetPassword(deps, "mauvais-token", "nouveaupass")).rejects.toBeInstanceOf(ValidationError);
+    expect(await resetPassword(deps, "RAWTOKEN", "nouveaupass")).toEqual({ success: true });
+    expect((await repo.findCredentialsById(1))?.password).toBe("hashed:nouveaupass");
+    // Jeton consommé : un 2e usage échoue.
+    await expect(resetPassword(deps, "RAWTOKEN", "encore")).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("deleteAccount : soft-delete (actif=false + email neutralisé) ; confirmation incorrecte → 400", async () => {
+    const repo = new FakeAuthRepository();
+    repo.seed({ id: 1, email: "u@t.fr" });
+    const deps = makeDeps(repo);
+    await expect(deleteAccount(deps, 1, "oui")).rejects.toBeInstanceOf(ValidationError);
+    expect(await deleteAccount(deps, 1, "SUPPRIMER")).toEqual({ success: true });
+    const u = await repo.getById(1);
+    expect(u?.actif).toBe(false);
+    expect(u?.email).toMatch(/^deleted_1_\d+@operioz\.com$/);
   });
 });

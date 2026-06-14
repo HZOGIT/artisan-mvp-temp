@@ -25,9 +25,9 @@ describe("auth.module (router via createCaller)", () => {
     return createAuthModule({ repository: repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET });
   }
 
-  it("expose me/signin/logout", () => {
+  it("expose me/signin/logout + writes profil + reset (manque signup avant montage)", () => {
     const procedures = Object.keys((build().router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["logout", "me", "signin"]);
+    expect(procedures).toEqual(["deleteAccount", "forgotPassword", "logout", "me", "resetPassword", "signin", "updateEmail", "updatePassword"]);
   });
 
   it("signin : pose le cookie `token` et renvoie {success, user}", async () => {
