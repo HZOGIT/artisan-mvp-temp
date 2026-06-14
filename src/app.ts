@@ -184,6 +184,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const commandes = createCommandesModule({
     repository: deps.commandeRepo ?? new CommandeRepositoryDrizzle(getDbHandle().db),
+    fournisseurRepository: fournisseurRepo,
   });
   const stocks = createStocksModule({
     repository: deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db),

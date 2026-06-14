@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ICommandeRepository } from "../../application/commande-repository";
+import type { IFournisseurRepository } from "../../../fournisseurs/application/fournisseur-repository";
 import { listCommandes, getCommande, listLignesCommande } from "../../application/read-use-cases";
+import { getPerformancesFournisseurs } from "../../application/performances-use-cases";
 import { creerCommande, modifierCommande, supprimerCommande } from "../../application/write-use-cases";
 import {
   changerStatutCommande,
@@ -55,7 +57,7 @@ function toCreateLignes(lignes: z.infer<typeof ligneSchema>[]): CreateLigneInput
 // Routeur tRPC du domaine commandes fournisseurs. Transport mince : valide les inputs
 // (zod), délègue aux use-cases (scoping tenant via ctx.tenant + totaux serveur), laisse
 // remonter les Domain errors (NotFound→404, Validation→400). Repository injecté (DI).
-export function createCommandesRouter(repo: ICommandeRepository) {
+export function createCommandesRouter(repo: ICommandeRepository, fournisseurRepo: IFournisseurRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listCommandes(repo, ctx.tenant)),
 
@@ -109,6 +111,10 @@ export function createCommandesRouter(repo: ICommandeRepository) {
       ),
 
     getEnRetard: protectedProcedure.query(({ ctx }) => listerCommandesEnRetard(repo, ctx.tenant)),
+
+    // Performances par fournisseur (parité client `trpc.commandesFournisseurs.getPerformances`) :
+    // stats dérivées des commandes × fournisseurs du tenant (cross-domaine, scopé).
+    getPerformances: protectedProcedure.query(({ ctx }) => getPerformancesFournisseurs(repo, fournisseurRepo, ctx.tenant)),
 
     recevoir: protectedProcedure
       .input(

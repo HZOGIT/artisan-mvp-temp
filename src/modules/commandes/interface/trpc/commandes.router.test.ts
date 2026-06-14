@@ -277,4 +277,17 @@ describe.skipIf(!URL)("commandesFournisseurs.router e2e (HTTP → tRPC → use-c
     const retardsB = (await callQuery(server, "commandesFournisseurs.getEnRetard", undefined, tB)).json().result.data as Array<{ id: number }>;
     expect(retardsB.some((c) => c.id === cmdRetard)).toBe(false);
   });
+
+  it("getPerformances (parité client) : 1 entrée par fournisseur du tenant, scopé ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    expect((await callQuery(server, "commandesFournisseurs.getPerformances", undefined)).statusCode).toBe(401);
+    const perfA = (await callQuery(server, "commandesFournisseurs.getPerformances", undefined, tA)).json().result.data as Array<{ fournisseur: { id: number }; totalCommandes: number }>;
+    // A voit son fournisseur fournA, JAMAIS celui de B (fournB)
+    expect(perfA.some((p) => p.fournisseur.id === fournA)).toBe(true);
+    expect(perfA.some((p) => p.fournisseur.id === fournB)).toBe(false);
+    // B ne voit pas fournA
+    const perfB = (await callQuery(server, "commandesFournisseurs.getPerformances", undefined, tB)).json().result.data as Array<{ fournisseur: { id: number } }>;
+    expect(perfB.some((p) => p.fournisseur.id === fournA)).toBe(false);
+  });
 });

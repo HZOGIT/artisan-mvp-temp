@@ -1,10 +1,12 @@
 import type { ICommandeRepository } from "./application/commande-repository";
+import type { IFournisseurRepository } from "../fournisseurs/application/fournisseur-repository";
 import { createCommandesRouter } from "./interface/trpc/commandes.router";
 
 // Wiring DI du module commandes : assemble le routeur tRPC à partir du repository injecté.
-// Découple `app.ts`/`createAppRouter` des détails d'instanciation.
+// `fournisseurRepository` est composé (getPerformances agrège commandes × fournisseurs).
 export interface CommandesModuleDeps {
   readonly repository: ICommandeRepository;
+  readonly fournisseurRepository: IFournisseurRepository;
 }
 
 export interface CommandesModule {
@@ -13,5 +15,5 @@ export interface CommandesModule {
 }
 
 export function createCommandesModule(deps: CommandesModuleDeps): CommandesModule {
-  return { deps, router: createCommandesRouter(deps.repository) };
+  return { deps, router: createCommandesRouter(deps.repository, deps.fournisseurRepository) };
 }
