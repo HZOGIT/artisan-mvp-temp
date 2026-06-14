@@ -14,7 +14,7 @@ export const MIGRATED = [
   "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures",
   "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv",
   "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories",
-  "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs",
+  "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs", "comptabilite",
 ];
 const MIGRATED_SET = new Set(MIGRATED);
 

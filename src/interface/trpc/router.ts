@@ -42,6 +42,7 @@ import type { GeolocalisationModule } from "../../modules/geolocalisation/geoloc
 import type { DashboardModule } from "../../modules/dashboard/dashboard.module";
 import type { RapportsModule } from "../../modules/rapports/rapports.module";
 import type { UtilisateursModule } from "../../modules/utilisateurs/utilisateurs.module";
+import type { ComptabiliteModule } from "../../modules/comptabilite/comptabilite.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -87,6 +88,7 @@ export interface AppRouterDeps {
   readonly dashboard: DashboardModule;
   readonly rapports: RapportsModule;
   readonly utilisateurs: UtilisateursModule;
+  readonly comptabilite: ComptabiliteModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -141,6 +143,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     dashboard: deps.dashboard.router,
     rapports: deps.rapports.router,
     utilisateurs: deps.utilisateurs.router,
+    comptabilite: deps.comptabilite.router,
   });
 }
 

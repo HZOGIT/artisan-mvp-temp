@@ -93,6 +93,9 @@ import { createUtilisateursModule } from "./modules/utilisateurs/utilisateurs.mo
 import { UtilisateurRepositoryDrizzle } from "./modules/utilisateurs/infra/utilisateur-repository-drizzle";
 import type { IUtilisateurRepository } from "./modules/utilisateurs/application/utilisateur-repository";
 import { BcryptPasswordHasher } from "./shared/ports/password-hasher-bcrypt";
+import { createComptabiliteModule } from "./modules/comptabilite/comptabilite.module";
+import { ComptabiliteReaderDrizzle } from "./modules/comptabilite/infra/comptabilite-reader-drizzle";
+import type { IComptabiliteReader } from "./modules/comptabilite/application/comptabilite-reader";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -228,6 +231,7 @@ export interface AppDeps extends ContextDeps {
   readonly dashboardReader?: IDashboardReader;
   readonly rapportRepo?: IRapportRepository;
   readonly utilisateurRepo?: IUtilisateurRepository;
+  readonly comptabiliteReader?: IComptabiliteReader;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -512,7 +516,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     hasher: new BcryptPasswordHasher(),
     email: deps.emailPort ?? new LegacyEmailAdapter(),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs });
+  // Comptabilité (SENSIBLE, gate `comptabilite.voir`) — LECTURES (grand-livre/balance/journal/TVA).
+  // ⚠️ Montée mais PAS encore activée (DEFAULT_ENABLED) : il manque `getFecPreview` (générateur FEC) →
+  // le trafic comptabilité reste sur le legacy tant que la parité FEC n'est pas livrée+prouvée.
+  const comptabilite = createComptabiliteModule({
+    reader: deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
