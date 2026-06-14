@@ -454,9 +454,32 @@ describe("bascule du domaine modelesEmail (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine modelesDevis (flag gateway)", () => {
+  it("modelesDevis routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("modelesDevis", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { modelesDevis: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("modelesDevis", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("modelesDevis", 8, canary)).toBe(false);
+    const global: FeatureFlags = { modelesDevis: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("modelesDevis", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("modelesDevis", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine modelesDevis extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("modelesDevis.create")).toBe("modelesDevis");
+    expect(domainFromTrpcPath("/modelesDevis.getById")).toBe("modelesDevis");
+  });
+
+  it("parse env : modelesDevis enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "modelesDevis" } as NodeJS.ProcessEnv).modelesDevis).toEqual({ enabled: true });
+    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // (le parseur lowercase le suffixe → clé `modelesdevis`) — même limitation que notesDeFrais.
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 20 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail"]) {
+  it("les 21 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
