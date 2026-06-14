@@ -15,6 +15,9 @@ const stubRepo: ITechnicienRepository = {
   getDernierePosition: async () => null,
   enregistrerPosition: async () => null,
   getUsersLiables: async () => [],
+  listHabilitations: async () => [],
+  ajouterHabilitation: async () => null,
+  supprimerHabilitation: async () => false,
 };
 
 describe("techniciens.module", () => {
@@ -25,6 +28,7 @@ describe("techniciens.module", () => {
 
   it("le port expose les opérations attendues", () => {
     expect(Object.keys(stubRepo).sort()).toEqual([
+      "ajouterHabilitation",
       "create",
       "delete",
       "enregistrerPosition",
@@ -33,7 +37,9 @@ describe("techniciens.module", () => {
       "getUsersLiables",
       "list",
       "listDisponibilites",
+      "listHabilitations",
       "setDisponibilite",
+      "supprimerHabilitation",
       "update",
     ]);
   });
@@ -42,13 +48,16 @@ describe("techniciens.module", () => {
     const module = createTechniciensModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
+      "addHabilitation",
       "create",
       "delete",
+      "deleteHabilitation",
       "enregistrerPosition",
       "getAll",
       "getById",
       "getDernierePosition",
       "getDisponibilites",
+      "getHabilitations",
       "getLinkableUsers",
       "list",
       "setDisponibilite",

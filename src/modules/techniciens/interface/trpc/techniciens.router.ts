@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ITechnicienRepository } from "../../application/technicien-repository";
-import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables } from "../../application/read-use-cases";
-import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition } from "../../application/write-use-cases";
+import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables, listHabilitations } from "../../application/read-use-cases";
+import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition, ajouterHabilitation, supprimerHabilitation } from "../../application/write-use-cases";
 
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
 const coutHoraire = z.string().regex(/^\d+(\.\d{1,2})?$/, "Coût horaire invalide").max(12);
@@ -108,6 +108,34 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
       .mutation(({ ctx, input }) => {
         const { technicienId, ...data } = input;
         return enregistrerPosition(repo, ctx.tenant, technicienId, data);
+      }),
+
+    // ── Habilitations / certifications BTP (OPE-162, données salarié — anti-IDOR ownership) ──
+    getHabilitations: protectedProcedure
+      .input(z.object({ technicienId: z.number().int() }))
+      .query(({ ctx, input }) => listHabilitations(repo, ctx.tenant, input.technicienId)),
+
+    addHabilitation: protectedProcedure
+      .input(
+        z.object({
+          technicienId: z.number().int(),
+          type: z.string().trim().min(1).max(255),
+          numero: z.string().trim().max(100).optional(),
+          organisme: z.string().trim().max(255).optional(),
+          dateObtention: z.string().optional(),
+          dateExpiration: z.string().optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { technicienId, ...data } = input;
+        return ajouterHabilitation(repo, ctx.tenant, technicienId, data);
+      }),
+
+    deleteHabilitation: protectedProcedure
+      .input(z.object({ technicienId: z.number().int(), id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await supprimerHabilitation(repo, ctx.tenant, input.technicienId, input.id);
+        return { success: true };
       }),
   });
 }

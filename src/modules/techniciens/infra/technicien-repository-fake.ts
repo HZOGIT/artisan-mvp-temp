@@ -4,6 +4,7 @@ import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from ".
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 import type { Position, EnregistrerPositionInput } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
+import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
 // scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
@@ -11,10 +12,12 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
   private store: Technicien[] = [];
   private dispos: Disponibilite[] = [];
   private positions: Position[] = [];
+  private habilitations: Array<HabilitationTechnicien & { artisanId: number }> = [];
   private usersLiables = new Map<number, UtilisateurLiable[]>();
   private seq = 0;
   private dispoSeq = 0;
   private posSeq = 0;
+  private habSeq = 0;
 
   // Utilitaire de test (hors port) : déclare les users liables d'un tenant.
   seedUsersLiables(artisanId: number, list: UtilisateurLiable[]): void {
@@ -128,5 +131,41 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
 
   async getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]> {
     return this.usersLiables.get(ctx.artisanId) ?? [];
+  }
+
+  async listHabilitations(ctx: TenantContext, technicienId: number): Promise<HabilitationTechnicien[]> {
+    if (!(await this.owns(ctx, technicienId))) return [];
+    return this.habilitations
+      .filter((h) => h.artisanId === ctx.artisanId && h.technicienId === technicienId)
+      .map(({ artisanId: _a, ...h }) => h);
+  }
+
+  async ajouterHabilitation(
+    ctx: TenantContext,
+    technicienId: number,
+    input: AjouterHabilitationInput,
+  ): Promise<HabilitationTechnicien | null> {
+    if (!(await this.owns(ctx, technicienId))) return null;
+    const h: HabilitationTechnicien & { artisanId: number } = {
+      id: ++this.habSeq,
+      artisanId: ctx.artisanId,
+      technicienId,
+      type: input.type,
+      numero: input.numero ?? null,
+      organisme: input.organisme ?? null,
+      dateObtention: input.dateObtention ?? null,
+      dateExpiration: input.dateExpiration ?? null,
+      createdAt: new Date(),
+    };
+    this.habilitations.push(h);
+    const { artisanId: _a, ...pub } = h;
+    return pub;
+  }
+
+  async supprimerHabilitation(ctx: TenantContext, technicienId: number, id: number): Promise<boolean> {
+    if (!(await this.owns(ctx, technicienId))) return false;
+    const before = this.habilitations.length;
+    this.habilitations = this.habilitations.filter((h) => !(h.id === id && h.technicienId === technicienId));
+    return this.habilitations.length < before;
   }
 }

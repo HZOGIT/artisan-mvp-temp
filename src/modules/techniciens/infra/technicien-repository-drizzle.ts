@@ -6,6 +6,7 @@ import {
   badgesTechniciens,
   objectifsTechniciens,
   classementTechniciens,
+  habilitationsTechniciens,
   users,
   artisans,
 } from "../../../../drizzle/schema.pg";
@@ -17,10 +18,25 @@ import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from ".
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 import type { Position, EnregistrerPositionInput } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
+import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
 
 type TechnicienRow = typeof techniciens.$inferSelect;
 type DispoRow = typeof disponibilitesTechniciens.$inferSelect;
 type PositionRow = typeof positionsTechniciens.$inferSelect;
+type HabilitationRow = typeof habilitationsTechniciens.$inferSelect;
+
+function toHabilitation(r: HabilitationRow): HabilitationTechnicien {
+  return {
+    id: r.id,
+    technicienId: r.technicienId,
+    type: r.type,
+    numero: r.numero,
+    organisme: r.organisme,
+    dateObtention: r.dateObtention,
+    dateExpiration: r.dateExpiration,
+    createdAt: r.createdAt,
+  };
+}
 
 function toPosition(r: PositionRow): Position {
   return {
@@ -254,6 +270,52 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
         email: u.email ?? null,
         role: u.role,
       }));
+    });
+  }
+
+  listHabilitations(ctx: TenantContext, technicienId: number): Promise<HabilitationTechnicien[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return [];
+      const rows = await tx
+        .select()
+        .from(habilitationsTechniciens)
+        .where(eq(habilitationsTechniciens.technicienId, technicienId))
+        .orderBy(asc(habilitationsTechniciens.dateExpiration), asc(habilitationsTechniciens.id));
+      return rows.map(toHabilitation);
+    });
+  }
+
+  ajouterHabilitation(
+    ctx: TenantContext,
+    technicienId: number,
+    input: AjouterHabilitationInput,
+  ): Promise<HabilitationTechnicien | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
+      const [row] = await tx
+        .insert(habilitationsTechniciens)
+        .values({
+          technicienId,
+          artisanId: ctx.artisanId,
+          type: input.type,
+          numero: input.numero ?? null,
+          organisme: input.organisme ?? null,
+          dateObtention: input.dateObtention ?? null,
+          dateExpiration: input.dateExpiration ?? null,
+        })
+        .returning();
+      return toHabilitation(row);
+    });
+  }
+
+  supprimerHabilitation(ctx: TenantContext, technicienId: number, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return false;
+      const deleted = await tx
+        .delete(habilitationsTechniciens)
+        .where(and(eq(habilitationsTechniciens.id, id), eq(habilitationsTechniciens.technicienId, technicienId)))
+        .returning({ id: habilitationsTechniciens.id });
+      return deleted.length > 0;
     });
   }
 

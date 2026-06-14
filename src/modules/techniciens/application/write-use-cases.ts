@@ -4,9 +4,18 @@ import type { ITechnicienRepository } from "./technicien-repository";
 import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from "../domain/technicien";
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 import type { Position, EnregistrerPositionInput } from "../domain/position";
+import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
 
 // Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
 // une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
+
+// Normalise une date ISO `YYYY-MM-DD` : renvoie la chaîne si valide, sinon null (parité legacy
+// `addHabilitation` qui ignore les dates invalides plutôt que d'insérer une valeur NaN).
+function normaliserDate(s?: string | null): string | null {
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : s.slice(0, 10);
+}
 
 export async function creerTechnicien(
   repo: ITechnicienRepository,
@@ -69,4 +78,36 @@ export async function enregistrerPosition(
   const position = await repo.enregistrerPosition(ctx, technicienId, input);
   if (!position) throw new NotFoundError("Technicien introuvable");
   return position;
+}
+
+// Ajoute une habilitation BTP (anti-IDOR : null si technicien hors tenant → NotFound). `type` requis ;
+// dates invalides ignorées (→ null). Parité legacy `addHabilitation`.
+export async function ajouterHabilitation(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+  technicienId: number,
+  input: AjouterHabilitationInput,
+): Promise<HabilitationTechnicien> {
+  if (!input.type?.trim()) throw new ValidationError("Type d'habilitation requis");
+  const habilitation = await repo.ajouterHabilitation(ctx, technicienId, {
+    type: input.type.trim(),
+    numero: input.numero || null,
+    organisme: input.organisme || null,
+    dateObtention: normaliserDate(input.dateObtention),
+    dateExpiration: normaliserDate(input.dateExpiration),
+  });
+  if (!habilitation) throw new NotFoundError("Technicien introuvable");
+  return habilitation;
+}
+
+// Supprime une habilitation (scopée au technicien owné) — NotFound si technicien hors tenant
+// ou habilitation introuvable. Parité legacy `deleteHabilitation`.
+export async function supprimerHabilitation(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+  technicienId: number,
+  id: number,
+): Promise<void> {
+  const ok = await repo.supprimerHabilitation(ctx, technicienId, id);
+  if (!ok) throw new NotFoundError("Habilitation introuvable");
 }

@@ -65,6 +65,7 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
   afterAll(async () => {
     await server.close();
     for (const aId of [artisanA, artisanB]) {
+      await admin.query('delete from habilitations_techniciens where "artisanId"=$1', [aId]);
       await admin.query('delete from disponibilites_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
       await admin.query('delete from positions_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
       await admin.query('delete from techniciens where "artisanId"=$1', [aId]);
@@ -203,5 +204,37 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     expect(maj.statut).toBe("inactif");
     expect(maj.specialite).toBe("Élec");
     expect(maj.nom).toBe("Garder");
+  });
+
+  it("habilitations (parité client) : add/get/delete scopés au technicien owné ; anti-IDOR cross-tenant ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const techA = (await callMutation(server, "techniciens.create", { nom: "Hab A" }, tA)).json().result.data.id as number;
+    const techB = (await callMutation(server, "techniciens.create", { nom: "Hab B" }, tB)).json().result.data.id as number;
+    // 401 sans cookie
+    expect((await callQuery(server, "techniciens.getHabilitations", { technicienId: techA })).statusCode).toBe(401);
+    // add (date invalide ignorée → null)
+    const added = await callMutation(
+      server,
+      "techniciens.addHabilitation",
+      { technicienId: techA, type: "CACES R486", numero: "ABC", organisme: "APAVE", dateObtention: "2025-01-15", dateExpiration: "pas-une-date" },
+      tA,
+    );
+    expect(added.statusCode).toBe(200);
+    const hab = added.json().result.data as { id: number; type: string; dateObtention: string | null; dateExpiration: string | null };
+    expect(hab.type).toBe("CACES R486");
+    expect(hab.dateObtention).toBe("2025-01-15");
+    expect(hab.dateExpiration).toBeNull(); // date invalide ignorée
+    // get → liste scopée
+    const list = (await callQuery(server, "techniciens.getHabilitations", { technicienId: techA }, tA)).json().result.data as Array<{ id: number }>;
+    expect(list.map((h) => h.id)).toContain(hab.id);
+    // ANTI-IDOR : A demande les habilitations du technicien de B → [] ; A ne peut pas en ajouter pour techB → 404
+    expect((await callQuery(server, "techniciens.getHabilitations", { technicienId: techB }, tA)).json().result.data).toEqual([]);
+    expect((await callMutation(server, "techniciens.addHabilitation", { technicienId: techB, type: "X" }, tA)).statusCode).toBe(404);
+    // delete scopé : B ne peut pas supprimer l'habilitation de A (techA hors tenant de B) → 404
+    expect((await callMutation(server, "techniciens.deleteHabilitation", { technicienId: techA, id: hab.id }, tB)).statusCode).toBe(404);
+    // A supprime → success ; re-supprimer → 404 (introuvable)
+    expect((await callMutation(server, "techniciens.deleteHabilitation", { technicienId: techA, id: hab.id }, tA)).statusCode).toBe(200);
+    expect((await callMutation(server, "techniciens.deleteHabilitation", { technicienId: techA, id: hab.id }, tA)).statusCode).toBe(404);
   });
 });

@@ -3,6 +3,7 @@ import type { Technicien, CreateTechnicienInput, UpdateTechnicienInput } from ".
 import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibilite";
 import type { Position, EnregistrerPositionInput } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
+import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
 
 // Port du repository techniciens. Chaque méthode exige le TenantContext (scope tenant +
 // RLS). `techniciens` possède un `artisanId` → double cloisonnement RLS + filtre.
@@ -33,4 +34,17 @@ export interface ITechnicienRepository {
   // Utilisateurs du tenant liables à une fiche technicien (propriétaire + collaborateurs).
   // ⚠️ `users` hors RLS tenant → filtre artisanId EXPLICITE (jamais d'autre tenant).
   getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]>;
+
+  // Habilitations BTP d'un technicien (OPE-162, données salarié) — [] si le technicien
+  // n'appartient pas au tenant (anti-IDOR). Tri par dateExpiration (échéances d'abord).
+  listHabilitations(ctx: TenantContext, technicienId: number): Promise<HabilitationTechnicien[]>;
+  // Ajoute une habilitation — null si le technicien n'appartient pas au tenant.
+  ajouterHabilitation(
+    ctx: TenantContext,
+    technicienId: number,
+    input: AjouterHabilitationInput,
+  ): Promise<HabilitationTechnicien | null>;
+  // Supprime une habilitation (scopée au technicien owné) — false si technicien hors tenant
+  // ou habilitation introuvable.
+  supprimerHabilitation(ctx: TenantContext, technicienId: number, id: number): Promise<boolean>;
 }

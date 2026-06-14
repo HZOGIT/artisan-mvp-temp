@@ -5,6 +5,7 @@ import type { Technicien } from "../domain/technicien";
 import type { Disponibilite } from "../domain/disponibilite";
 import type { Position } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
+import type { HabilitationTechnicien } from "../domain/habilitation";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
 // par le `TenantContext` (le repo l'applique). `getTechnicien` sur une ressource d'un
@@ -46,4 +47,14 @@ export function listerUtilisateursLiables(
   ctx: TenantContext,
 ): Promise<UtilisateurLiable[]> {
   return repo.getUsersLiables(ctx);
+}
+
+// Habilitations BTP d'un technicien — [] si le technicien n'appartient pas au tenant
+// (données salarié, anti-IDOR sans oracle). Parité legacy `getHabilitations`.
+export function listHabilitations(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+  technicienId: number,
+): Promise<HabilitationTechnicien[]> {
+  return repo.listHabilitations(ctx, technicienId);
 }
