@@ -21,4 +21,10 @@ describe("regles-categorisation.module", () => {
   it("le port expose le CRUD attendu", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
   });
+
+  it("expose un routeur tRPC assemblé (CRUD)", () => {
+    const module = createReglesCategorisationModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+  });
 });

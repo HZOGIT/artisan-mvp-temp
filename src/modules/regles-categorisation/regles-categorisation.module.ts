@@ -1,15 +1,17 @@
 import type { IRegleCategorisationRepository } from "./application/regle-categorisation-repository";
+import { createReglesCategorisationRouter } from "./interface/trpc/regles-categorisation.router";
 
-// Wiring DI du module regles-categorisation. À l'étape scaffold, le module ne porte que ses
-// dépendances ; le routeur tRPC sera assemblé et exposé à l'étape interface (5/9).
+// Wiring DI du module regles-categorisation : assemble le routeur tRPC (CRUD catalogue) à partir du
+// repository injecté.
 export interface ReglesCategorisationModuleDeps {
   readonly repository: IRegleCategorisationRepository;
 }
 
 export interface ReglesCategorisationModule {
   readonly deps: ReglesCategorisationModuleDeps;
+  readonly router: ReturnType<typeof createReglesCategorisationRouter>;
 }
 
 export function createReglesCategorisationModule(deps: ReglesCategorisationModuleDeps): ReglesCategorisationModule {
-  return { deps };
+  return { deps, router: createReglesCategorisationRouter(deps.repository) };
 }
