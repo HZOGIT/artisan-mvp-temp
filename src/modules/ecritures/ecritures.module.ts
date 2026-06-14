@@ -1,17 +1,18 @@
 import type { IEcritureRepository } from "./application/ecriture-repository";
+import { createEcrituresRouter } from "./interface/trpc/ecritures.router";
 
-// Wiring DI du module ecritures. À l'étape scaffold, le module ne porte que ses dépendances ;
-// le routeur tRPC (lecture : journal/balance/grand-livre/export FEC) sera assemblé à l'étape
-// interface (5/9). La génération des écritures (vente/encaissement) branchera le `ComptaPort`
-// des factures sur ce module.
+// Wiring DI du module ecritures : assemble le routeur tRPC (lecture seule : list/byFacture/
+// balance/grand-livre/export FEC) à partir du repository injecté. La génération des écritures
+// (vente/encaissement) branche le `ComptaPort` des factures sur ce module (cf. adapter).
 export interface EcrituresModuleDeps {
   readonly repository: IEcritureRepository;
 }
 
 export interface EcrituresModule {
   readonly deps: EcrituresModuleDeps;
+  readonly router: ReturnType<typeof createEcrituresRouter>;
 }
 
 export function createEcrituresModule(deps: EcrituresModuleDeps): EcrituresModule {
-  return { deps };
+  return { deps, router: createEcrituresRouter(deps.repository) };
 }

@@ -59,6 +59,8 @@ import type { ComptaPort } from "./modules/factures/application/compta-port";
 import { EcritureRepositoryDrizzle } from "./modules/ecritures/infra/ecriture-repository-drizzle";
 import { FactureReaderDrizzle } from "./modules/ecritures/infra/facture-reader-drizzle";
 import { ComptaEcrituresAdapter } from "./modules/ecritures/infra/compta-ecritures-adapter";
+import { createEcrituresModule } from "./modules/ecritures/ecritures.module";
+import type { IEcritureRepository } from "./modules/ecritures/application/ecriture-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -88,6 +90,7 @@ export interface AppDeps extends ContextDeps {
   readonly factureRepo?: IFactureRepository;
   readonly devisReader?: IDevisReader;
   readonly compta?: ComptaPort;
+  readonly ecritureRepo?: IEcritureRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -157,7 +160,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     devisReader: deps.devisReader ?? new DevisReaderDrizzle(getDbHandle().db),
     compta,
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures });
+  // Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est
+  // l'effet de bord du workflow facture (via le ComptaPort ci-dessus).
+  const ecritures = createEcrituresModule({
+    repository: deps.ecritureRepo ?? new EcritureRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

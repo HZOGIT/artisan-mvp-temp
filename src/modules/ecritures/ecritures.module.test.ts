@@ -19,4 +19,10 @@ describe("ecritures.module", () => {
   it("le port expose les opérations attendues (lecture + batch + idempotence)", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["createMany", "deleteByFacture", "deleteByFactureJournal", "list", "listByFacture"]);
   });
+
+  it("expose un routeur tRPC de LECTURE assemblé (aucune mutation)", () => {
+    const module = createEcrituresModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["balance", "byFacture", "exportFec", "grandLivre", "list"]);
+  });
 });
