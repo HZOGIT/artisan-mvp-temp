@@ -272,7 +272,7 @@ describe("bascule du domaine notesDeFrais (flag gateway)", () => {
 
   it("parse env : notesDeFrais enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "notesDeFrais" } as NodeJS.ProcessEnv).notesDeFrais).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `notesdefrais`) — limitation tracée comme finding.
   });
 });
@@ -449,7 +449,7 @@ describe("bascule du domaine modelesEmail (flag gateway)", () => {
 
   it("parse env : modelesEmail enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "modelesEmail" } as NodeJS.ProcessEnv).modelesEmail).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `modelesemail`) — même limitation que notesDeFrais.
   });
 });
@@ -472,7 +472,7 @@ describe("bascule du domaine modelesDevis (flag gateway)", () => {
 
   it("parse env : modelesDevis enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "modelesDevis" } as NodeJS.ProcessEnv).modelesDevis).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `modelesdevis`) — même limitation que notesDeFrais.
   });
 });
@@ -495,7 +495,7 @@ describe("bascule du domaine configRelances (flag gateway)", () => {
 
   it("parse env : configRelances enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "configRelances" } as NodeJS.ProcessEnv).configRelances).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `configrelances`) — même limitation que notesDeFrais.
   });
 });
@@ -518,7 +518,7 @@ describe("bascule du domaine rdvEnLigne (flag gateway)", () => {
 
   it("parse env : rdvEnLigne enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "rdvEnLigne" } as NodeJS.ProcessEnv).rdvEnLigne).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `rdvenligne`) — même limitation que notesDeFrais.
   });
 });
@@ -541,7 +541,7 @@ describe("bascule du domaine relancesDevis (flag gateway)", () => {
 
   it("parse env : relancesDevis enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "relancesDevis" } as NodeJS.ProcessEnv).relancesDevis).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `relancesdevis`) — même limitation que notesDeFrais.
   });
 });
@@ -564,7 +564,7 @@ describe("bascule du domaine categoriesDepenses (flag gateway)", () => {
 
   it("parse env : categoriesDepenses enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "categoriesDepenses" } as NodeJS.ProcessEnv).categoriesDepenses).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `categoriesdepenses`) — même limitation que notesDeFrais.
   });
 });
@@ -587,7 +587,7 @@ describe("bascule du domaine contratsMaintenance (flag gateway)", () => {
 
   it("parse env : contratsMaintenance enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "contratsMaintenance" } as NodeJS.ProcessEnv).contratsMaintenance).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `contratsmaintenance`) — même limitation que notesDeFrais.
   });
 });
@@ -610,7 +610,7 @@ describe("bascule du domaine demandesContact (flag gateway)", () => {
 
   it("parse env : demandesContact enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "demandesContact" } as NodeJS.ProcessEnv).demandesContact).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `demandescontact`) — même limitation que notesDeFrais.
   });
 });
@@ -633,7 +633,7 @@ describe("bascule du domaine budgetsCategories (flag gateway)", () => {
 
   it("parse env : budgetsCategories enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "budgetsCategories" } as NodeJS.ProcessEnv).budgetsCategories).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `budgetscategories`) — même limitation que notesDeFrais.
   });
 });
@@ -656,7 +656,7 @@ describe("bascule du domaine reglesCategorisation (flag gateway)", () => {
 
   it("parse env : reglesCategorisation enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "reglesCategorisation" } as NodeJS.ProcessEnv).reglesCategorisation).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `reglescategorisation`) — même limitation que notesDeFrais.
   });
 });
@@ -679,8 +679,30 @@ describe("bascule du domaine previsionsCA (flag gateway)", () => {
 
   it("parse env : previsionsCA enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
     expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "previsionsCA" } as NodeJS.ProcessEnv).previsionsCA).toEqual({ enabled: true });
-    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `previsionsca`) — même limitation que notesDeFrais.
+  });
+});
+
+describe("canary env camelCase recanonicalisé (NEW_STACK_CANARY_<DOMAINE>)", () => {
+  it("recanonicalise le suffixe lowercased vers le nom réel du domaine (camelCase) via le registre", () => {
+    // Avant correction, le suffixe était lowercasé → clé `budgetscategories` ≠ domaine `budgetsCategories`.
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_BUDGETSCATEGORIES: "7" } as NodeJS.ProcessEnv).budgetsCategories?.tenantAllowlist).toEqual([7]);
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_REGLESCATEGORISATION: "7,8" } as NodeJS.ProcessEnv).reglesCategorisation?.tenantAllowlist).toEqual([7, 8]);
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_PREVISIONSCA: "9" } as NodeJS.ProcessEnv).previsionsCA?.tenantAllowlist).toEqual([9]);
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_NOTESDEFRAIS: "3" } as NodeJS.ProcessEnv).notesDeFrais?.tenantAllowlist).toEqual([3]);
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_RDVENLIGNE: "5" } as NodeJS.ProcessEnv).rdvEnLigne?.tenantAllowlist).toEqual([5]);
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_MODELESEMAIL: "2" } as NodeJS.ProcessEnv).modelesEmail?.tenantAllowlist).toEqual([2]);
+  });
+
+  it("le canary camelCase pilote bien la bascule (shouldRouteToNewStack)", () => {
+    const flags = parseFlagsFromEnv({ NEW_STACK_CANARY_BUDGETSCATEGORIES: "7" } as NodeJS.ProcessEnv);
+    expect(shouldRouteToNewStack("budgetsCategories", 7, flags)).toBe(true);
+    expect(shouldRouteToNewStack("budgetsCategories", 8, flags)).toBe(false);
+  });
+
+  it("un suffixe inconnu (hors registre) retombe sur la clé minuscule (rétro-compat)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_SUPPORT: "1" } as NodeJS.ProcessEnv).support?.tenantAllowlist).toEqual([1]);
   });
 });
 

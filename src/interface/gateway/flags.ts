@@ -1,6 +1,13 @@
+import { MIGRATED_DOMAINS } from "./migrated-domains";
+
 // Modèle de feature flags du gateway : par domaine, avec canary par tenant.
 // La SOURCE des flags (env / table DB lue par le gateway) est branchée en R0.19 ;
 // ici on définit seulement le type + un parseur env simple pour démarrer.
+
+// Les noms de variables d'env (`NEW_STACK_CANARY_<DOMAINE>`) ne portent pas la casse du domaine.
+// On recanonicalise le suffixe (insensible à la casse) vers le nom réel du domaine via le registre,
+// pour que le canary fonctionne aussi pour les domaines camelCase (budgetsCategories, notesDeFrais…).
+const DOMAINE_PAR_CLE_MINUSCULE = new Map<string, string>(MIGRATED_DOMAINS.map((d) => [d.toLowerCase(), d]));
 
 export interface DomainFlag {
   // Activé globalement pour ce domaine (tous les tenants).
@@ -30,7 +37,9 @@ export function parseFlagsFromEnv(env: NodeJS.ProcessEnv = process.env): Feature
   const prefix = "NEW_STACK_CANARY_";
   for (const [key, value] of Object.entries(env)) {
     if (!key.startsWith(prefix) || !value) continue;
-    const domain = key.slice(prefix.length).toLowerCase();
+    const suffixe = key.slice(prefix.length).toLowerCase();
+    // Recanonicalisation via le registre (camelCase) ; repli sur le suffixe minuscule si inconnu.
+    const domain = DOMAINE_PAR_CLE_MINUSCULE.get(suffixe) ?? suffixe;
     const tenants = value
       .split(",")
       .map((s) => Number(s.trim()))
