@@ -154,6 +154,43 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
     expect((await mut(server, "rdv.confirm", { rdvId: id2 }, tB)).statusCode).toBe(404);
   });
 
+  it("refuse (parité client) : passe à refuse + motif ; cross-tenant 404 ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await creer(tA)).json().result.data.id as number;
+    expect((await mut(server, "rdv.refuse", { rdvId: id, motif: "x" })).statusCode).toBe(401);
+    const res = await mut(server, "rdv.refuse", { rdvId: id, motif: "Indisponible" }, tA);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().result.data.statut).toBe("refuse");
+    expect(res.json().result.data.motifRefus).toBe("Indisponible");
+    // cross-tenant
+    const id2 = (await creer(tA)).json().result.data.id as number;
+    expect((await mut(server, "rdv.refuse", { rdvId: id2, motif: "y" }, tB)).statusCode).toBe(404);
+  });
+
+  it("proposeAutreCreneau (parité client) : refuse l'ancien + crée un nouveau RDV ; date invalide/passé → 400 ; cross-tenant 404", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await creer(tA)).json().result.data.id as number;
+    // date invalide → 400
+    expect((await mut(server, "rdv.proposeAutreCreneau", { rdvId: id, nouvelleDateProposee: "pas-une-date" }, tA)).statusCode).toBe(400);
+    // date dans le passé → 400
+    expect((await mut(server, "rdv.proposeAutreCreneau", { rdvId: id, nouvelleDateProposee: "2020-01-01T10:00:00.000Z" }, tA)).statusCode).toBe(400);
+    // créneau valide (futur) → ancien refusé + nouveau créé
+    const nouvelle = "2026-09-15T14:00:00.000Z";
+    const res = await mut(server, "rdv.proposeAutreCreneau", { rdvId: id, nouvelleDateProposee: nouvelle }, tA);
+    expect(res.statusCode).toBe(200);
+    const newRdv = res.json().result.data as { id: number; statut: string; clientId: number };
+    expect(newRdv.id).not.toBe(id); // c'est un NOUVEAU rdv
+    expect(newRdv.statut).toBe("en_attente");
+    expect(newRdv.clientId).toBe(clientA);
+    // l'ancien est passé à refuse
+    expect((await q(server, "rdv.getById", { id }, tA)).json().result.data.statut).toBe("refuse");
+    // cross-tenant : B ne peut pas proposer sur le RDV de A → 404
+    const id2 = (await creer(tA)).json().result.data.id as number;
+    expect((await mut(server, "rdv.proposeAutreCreneau", { rdvId: id2, nouvelleDateProposee: nouvelle }, tB)).statusCode).toBe(404);
+  });
+
   it("getStats / getPendingCount (parité client) : comptes par statut scopés tenant ; 401", async () => {
     const tA = await token(UA);
     // 401 sans cookie

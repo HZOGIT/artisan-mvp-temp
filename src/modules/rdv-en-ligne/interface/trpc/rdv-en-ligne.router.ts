@@ -6,6 +6,7 @@ import { listRdvs, getRdv, getRdvStats, getRdvPendingCount } from "../../applica
 import { creerRdv, modifierRdv, supprimerRdv } from "../../application/write-use-cases";
 import { confirmerRdv, refuserRdv, annulerRdv } from "../../application/transition-use-cases";
 import { confirmerRdvAvecIntervention } from "../../application/confirm-use-cases";
+import { proposerAutreCreneau } from "../../application/propose-use-cases";
 
 const urgenceEnum = z.enum(["normale", "urgente", "tres_urgente"]);
 // `dateProposee` arrive en string ISO (transport JSON) ; `z.coerce.date()` la convertit en Date pour
@@ -75,6 +76,18 @@ export function createRdvEnLigneRouter(repo: IRdvRepository, interventionRepo: I
     confirm: protectedProcedure
       .input(z.object({ rdvId: z.number().int() }))
       .mutation(({ ctx, input }) => confirmerRdvAvecIntervention(repo, interventionRepo, ctx.tenant, input.rdvId)),
+
+    // Refus « métier » (parité client `trpc.rdv.refuse`) : passe le RDV à refuse avec motif.
+    // (Délègue au use-case de transition — en_attente→refuse. Email client ajouté au slice email.)
+    refuse: protectedProcedure
+      .input(z.object({ rdvId: z.number().int(), motif: z.string().min(1).max(5000) }))
+      .mutation(({ ctx, input }) => refuserRdv(repo, ctx.tenant, input.rdvId, input.motif)),
+
+    // Proposition d'un autre créneau (parité client `trpc.rdv.proposeAutreCreneau`) : refuse l'ancien
+    // RDV + crée un nouveau RDV au créneau proposé (date validée AVANT mutation). Email au slice email.
+    proposeAutreCreneau: protectedProcedure
+      .input(z.object({ rdvId: z.number().int(), nouvelleDateProposee: z.string() }))
+      .mutation(({ ctx, input }) => proposerAutreCreneau(repo, ctx.tenant, input.rdvId, input.nouvelleDateProposee)),
 
     refuser: protectedProcedure
       .input(z.object({ id: z.number().int(), motifRefus: z.string().min(1).max(5000) }))
