@@ -105,8 +105,8 @@ import type { IRegleCategorisationRepository } from "./modules/regles-categorisa
 import { createPrevisionsCAModule } from "./modules/previsions-ca/previsions-ca.module";
 import { PrevisionCARepositoryDrizzle } from "./modules/previsions-ca/infra/prevision-ca-repository-drizzle";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
-import type { EmailPort, RateLimiterPort } from "./shared/ports";
-import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter } from "./shared/ports";
+import type { EmailPort, RateLimiterPort, LlmPort } from "./shared/ports";
+import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter } from "./shared/ports";
 
 export interface AppDeps extends ContextDeps {
   // Repos injectables (tests). Par défaut, repos Drizzle sur le client par défaut
@@ -117,6 +117,9 @@ export interface AppDeps extends ContextDeps {
   readonly demandeAvisRepo?: IDemandeAvisRepository;
   readonly emailPort?: EmailPort;
   readonly rateLimiter?: RateLimiterPort;
+  // Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe).
+  readonly llm?: LlmPort;
+  readonly iaRateLimiter?: RateLimiterPort;
   readonly lienBaseUrl?: string;
   readonly badgeRepo?: IBadgeRepository;
   readonly technicienRepo?: ITechnicienRepository;
@@ -187,6 +190,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const fournisseurRepo = deps.fournisseurRepo ?? new FournisseurRepositoryDrizzle(getDbHandle().db);
   const clientRepo = deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db);
   const devisRepo = deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db);
+  // Repos stock/articles hoistés : modules dédiés + composés par commandes (genererDepuisDevisIA :
+  // ajustement stock + matching articleId).
+  const stockRepo = deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db);
+  const articleRepo = deps.articleRepo ?? new ArticleRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
   });
@@ -206,9 +213,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: deps.emailPort ?? new LegacyEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
+    // Proposition IA de lignes de commande depuis un devis accepté (lecture seule) : devis + stock +
+    // articles + LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan).
+    ia: {
+      devisRepo,
+      stockRepo,
+      articleRepo,
+      llm: deps.llm ?? new GeminiLlmAdapter(),
+      rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+    },
   });
   const stocks = createStocksModule({
-    repository: deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db),
+    repository: stockRepo,
     notificationRepository: notificationRepo,
     fournisseurRepository: fournisseurRepo,
   });
@@ -274,7 +290,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.ecritureRepo ?? new EcritureRepositoryDrizzle(getDbHandle().db),
   });
   const articles = createArticlesModule({
-    repository: deps.articleRepo ?? new ArticleRepositoryDrizzle(getDbHandle().db),
+    repository: articleRepo,
   });
   const parametres = createParametresModule({
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),

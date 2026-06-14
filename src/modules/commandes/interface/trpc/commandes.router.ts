@@ -9,6 +9,7 @@ import { getPerformancesFournisseurs } from "../../application/performances-use-
 import { listerDevisAcceptes } from "../../application/devis-acceptes-use-cases";
 import { creerCommande, modifierCommande, supprimerCommande } from "../../application/write-use-cases";
 import { envoyerCommandeParEmail, type CommandeMailingDeps } from "../../application/envoyer-commande-email";
+import { genererCommandeDepuisDevisIA, type CommandeIaDeps } from "../../application/generer-depuis-devis-ia";
 import {
   changerStatutCommande,
   listerCommandesEnRetard,
@@ -67,6 +68,7 @@ export function createCommandesRouter(
   devisRepo: IDevisRepository,
   clientRepo: IClientRepository,
   mailing: CommandeMailingDeps,
+  ia: CommandeIaDeps,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listCommandes(repo, ctx.tenant)),
@@ -165,5 +167,11 @@ export function createCommandesRouter(
     sendEmail: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => envoyerCommandeParEmail(mailing, ctx.tenant, input.id)),
+
+    // Proposition IA de lignes de commande à partir d'un devis accepté (LECTURE SEULE, non persistée).
+    // rate-limit IA 429 / devis 404 / statut accepté 400. Parité `genererDepuisDevisIA`.
+    genererDepuisDevisIA: protectedProcedure
+      .input(z.object({ devisId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => genererCommandeDepuisDevisIA(ia, ctx.tenant, input.devisId)),
   });
 }

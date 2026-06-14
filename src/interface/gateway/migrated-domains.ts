@@ -34,4 +34,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "clients", // parité vérifiée : CRUD/search/getEncours/getEncoursMap + importFromExcel ⊇ appels client
   "factures", // parité vérifiée : list/getById(enrichi lignes+client)/getAvoirsByFacture/getAuditLog/create/update/delete/addLigne/createAvoir/markAsPaid/sendByEmail ⊇ appels client
   "contrats", // parité vérifiée : list/getById/create/update/delete/getAFacturer/getInterventions/createIntervention/updateIntervention/generateFacture ⊇ appels client
+  "commandesFournisseurs", // parité vérifiée : CRUD/getLignes/updateStatut/recevoir/setStatutFacturation/getEnRetard/getPerformances/listDevisAcceptes/sendEmail/genererDepuisDevisIA ⊇ appels client
 ] as const;
