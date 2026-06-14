@@ -1,6 +1,15 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "../application/chantier-repository";
-import type { Chantier, CreateChantierInput, UpdateChantierInput, ChantierPointage, CreatePointageInput } from "../domain/chantier";
+import type {
+  Chantier,
+  CreateChantierInput,
+  UpdateChantierInput,
+  ChantierPointage,
+  CreatePointageInput,
+  ChantierSuivi,
+  CreateSuiviInput,
+  UpdateSuiviInput,
+} from "../domain/chantier";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
 // tenant et les valeurs par défaut PG (statut planifie, priorite normale, avancement 0,
@@ -116,5 +125,65 @@ export class FakeChantierRepository implements IChantierRepository {
     const before = this.pointages.length;
     this.pointages = this.pointages.filter((p) => !(p.id === id && p.chantierId === chantierId));
     return this.pointages.length < before;
+  }
+
+  // ⚠️ suivi_chantier sans artisanId : ces méthodes ne scopent PAS (le use-case garde l'ownership).
+  private suivis: ChantierSuivi[] = [];
+  private suiviSeq = 0;
+
+  async listSuivi(_ctx: TenantContext, chantierId: number): Promise<ChantierSuivi[]> {
+    return this.suivis.filter((s) => s.chantierId === chantierId).sort((a, b) => a.ordre - b.ordre || a.id - b.id);
+  }
+
+  async getSuiviById(_ctx: TenantContext, id: number): Promise<ChantierSuivi | null> {
+    return this.suivis.find((s) => s.id === id) ?? null;
+  }
+
+  async addSuivi(_ctx: TenantContext, input: CreateSuiviInput): Promise<ChantierSuivi> {
+    const now = new Date();
+    const s: ChantierSuivi = {
+      id: ++this.suiviSeq,
+      chantierId: input.chantierId,
+      titre: input.titre,
+      description: input.description ?? null,
+      statut: input.statut ?? "a_faire",
+      pourcentage: input.pourcentage ?? 0,
+      ordre: input.ordre ?? 1,
+      visibleClient: input.visibleClient ?? true,
+      dateDebut: input.dateDebut ?? null,
+      dateFin: input.dateFin ?? null,
+      commentaire: input.commentaire ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.suivis.push(s);
+    return s;
+  }
+
+  async updateSuivi(_ctx: TenantContext, id: number, input: UpdateSuiviInput): Promise<ChantierSuivi | null> {
+    const idx = this.suivis.findIndex((s) => s.id === id);
+    if (idx === -1) return null;
+    const cur = this.suivis[idx];
+    const next: ChantierSuivi = {
+      ...cur,
+      ...(input.titre !== undefined ? { titre: input.titre } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.statut !== undefined ? { statut: input.statut } : {}),
+      ...(input.pourcentage !== undefined ? { pourcentage: input.pourcentage } : {}),
+      ...(input.ordre !== undefined ? { ordre: input.ordre } : {}),
+      ...(input.visibleClient !== undefined ? { visibleClient: input.visibleClient } : {}),
+      ...(input.dateDebut !== undefined ? { dateDebut: input.dateDebut } : {}),
+      ...(input.dateFin !== undefined ? { dateFin: input.dateFin } : {}),
+      ...(input.commentaire !== undefined ? { commentaire: input.commentaire } : {}),
+      updatedAt: new Date(),
+    };
+    this.suivis[idx] = next;
+    return next;
+  }
+
+  async deleteSuivi(_ctx: TenantContext, id: number): Promise<boolean> {
+    const before = this.suivis.length;
+    this.suivis = this.suivis.filter((s) => s.id !== id);
+    return this.suivis.length < before;
   }
 }

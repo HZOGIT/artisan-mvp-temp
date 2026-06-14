@@ -13,7 +13,17 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "../application/chantier-repository";
-import type { Chantier, CreateChantierInput, UpdateChantierInput, ChantierPointage, CreatePointageInput } from "../domain/chantier";
+import type {
+  Chantier,
+  CreateChantierInput,
+  UpdateChantierInput,
+  ChantierPointage,
+  CreatePointageInput,
+  ChantierSuivi,
+  SuiviStatut,
+  CreateSuiviInput,
+  UpdateSuiviInput,
+} from "../domain/chantier";
 
 type PointageRow = typeof pointagesChantier.$inferSelect;
 
@@ -27,6 +37,26 @@ function toPointage(r: PointageRow): ChantierPointage {
     heures: r.heures,
     description: r.description ?? null,
     createdAt: r.createdAt,
+  };
+}
+
+type SuiviRow = typeof suiviChantier.$inferSelect;
+
+function toSuivi(r: SuiviRow): ChantierSuivi {
+  return {
+    id: r.id,
+    chantierId: r.chantierId,
+    titre: r.titre,
+    description: r.description ?? null,
+    statut: (r.statut ?? "a_faire") as SuiviStatut,
+    pourcentage: r.pourcentage ?? 0,
+    ordre: r.ordre ?? 1,
+    visibleClient: r.visibleClient ?? true,
+    dateDebut: r.dateDebut ?? null,
+    dateFin: r.dateFin ?? null,
+    commentaire: r.commentaire ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
   };
 }
 
@@ -203,6 +233,71 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
           and(eq(pointagesChantier.id, id), eq(pointagesChantier.chantierId, chantierId), eq(pointagesChantier.artisanId, ctx.artisanId)),
         )
         .returning({ id: pointagesChantier.id });
+      return deleted.length > 0;
+    });
+  }
+
+  // ⚠️ `suivi_chantier` n'a PAS d'artisanId : ces méthodes ne sont PAS scopées tenant au niveau SQL —
+  // l'ownership (via le chantier parent) est garanti par le use-case AVANT l'appel (anti-IDOR).
+  listSuivi(ctx: TenantContext, chantierId: number): Promise<ChantierSuivi[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(suiviChantier)
+        .where(eq(suiviChantier.chantierId, chantierId))
+        .orderBy(asc(suiviChantier.ordre), asc(suiviChantier.id));
+      return rows.map(toSuivi);
+    });
+  }
+
+  getSuiviById(ctx: TenantContext, id: number): Promise<ChantierSuivi | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx.select().from(suiviChantier).where(eq(suiviChantier.id, id)).limit(1);
+      return row ? toSuivi(row) : null;
+    });
+  }
+
+  addSuivi(ctx: TenantContext, input: CreateSuiviInput): Promise<ChantierSuivi> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .insert(suiviChantier)
+        .values({
+          chantierId: input.chantierId,
+          titre: input.titre,
+          description: input.description ?? null,
+          statut: input.statut ?? undefined,
+          pourcentage: input.pourcentage ?? undefined,
+          ordre: input.ordre ?? undefined,
+          visibleClient: input.visibleClient ?? undefined,
+          dateDebut: input.dateDebut ?? null,
+          dateFin: input.dateFin ?? null,
+          commentaire: input.commentaire ?? null,
+        })
+        .returning();
+      return toSuivi(row);
+    });
+  }
+
+  updateSuivi(ctx: TenantContext, id: number, input: UpdateSuiviInput): Promise<ChantierSuivi | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const set: Partial<typeof suiviChantier.$inferInsert> = { updatedAt: new Date() };
+      if (input.titre !== undefined) set.titre = input.titre;
+      if (input.description !== undefined) set.description = input.description;
+      if (input.statut !== undefined) set.statut = input.statut;
+      if (input.pourcentage !== undefined) set.pourcentage = input.pourcentage;
+      if (input.ordre !== undefined) set.ordre = input.ordre;
+      if (input.visibleClient !== undefined) set.visibleClient = input.visibleClient;
+      if (input.dateDebut !== undefined) set.dateDebut = input.dateDebut;
+      if (input.dateFin !== undefined) set.dateFin = input.dateFin;
+      if (input.commentaire !== undefined) set.commentaire = input.commentaire;
+      const [row] = await tx.update(suiviChantier).set(set).where(eq(suiviChantier.id, id)).returning();
+      return row ? toSuivi(row) : null;
+    });
+  }
+
+  deleteSuivi(ctx: TenantContext, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const deleted = await tx.delete(suiviChantier).where(eq(suiviChantier.id, id)).returning({ id: suiviChantier.id });
       return deleted.length > 0;
     });
   }

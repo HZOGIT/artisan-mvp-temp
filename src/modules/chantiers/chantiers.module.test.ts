@@ -15,6 +15,13 @@ const stubRepo: IChantierRepository = {
   listPointages: async () => [],
   addPointage: async () => null,
   deletePointage: async () => false,
+  listSuivi: async () => [],
+  getSuiviById: async () => null,
+  addSuivi: async () => {
+    throw new Error("non implémenté (stub)");
+  },
+  updateSuivi: async () => null,
+  deleteSuivi: async () => false,
 };
 
 describe("chantiers.module", () => {
@@ -26,15 +33,20 @@ describe("chantiers.module", () => {
   it("le port expose les opérations CRUD attendues", () => {
     expect(Object.keys(stubRepo).sort()).toEqual([
       "addPointage",
+      "addSuivi",
       "create",
       "delete",
       "deletePointage",
+      "deleteSuivi",
       "getById",
+      "getSuiviById",
       "list",
       "listPointages",
+      "listSuivi",
       "ownsClient",
       "ownsTechnicien",
       "update",
+      "updateSuivi",
     ]);
   });
 
@@ -44,12 +56,16 @@ describe("chantiers.module", () => {
     expect(procedures).toEqual([
       "addPointage",
       "create",
+      "createSuivi",
       "delete",
       "deletePointage",
+      "deleteSuivi",
       "getById",
       "getPointages",
+      "getSuivi",
       "list",
       "update",
+      "updateSuivi",
     ]);
   });
 });

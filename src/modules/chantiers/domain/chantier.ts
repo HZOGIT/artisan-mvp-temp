@@ -93,3 +93,50 @@ export interface CreatePointageInput {
   readonly heures: string;
   readonly description?: string | null;
 }
+
+// ── Suivi de chantier (avancement / jalons) ──────────────────────────────────────────────────
+// Table `suivi_chantier` : étapes de suivi d'un chantier. ⚠️ **SANS artisanId** → scopée UNIQUEMENT
+// via le chantier parent (anti-IDOR : toute opération exige l'ownership du chantier ; pas de RLS sur
+// cette table). `dateDebut`/`dateFin` = jour PG (YYYY-MM-DD).
+export type SuiviStatut = "a_faire" | "en_cours" | "termine";
+
+export interface ChantierSuivi {
+  readonly id: number;
+  readonly chantierId: number;
+  readonly titre: string;
+  readonly description: string | null;
+  readonly statut: SuiviStatut;
+  readonly pourcentage: number;
+  readonly ordre: number;
+  readonly visibleClient: boolean;
+  readonly dateDebut: string | null;
+  readonly dateFin: string | null;
+  readonly commentaire: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export interface CreateSuiviInput {
+  readonly chantierId: number;
+  readonly titre: string;
+  readonly description?: string | null;
+  readonly statut?: SuiviStatut;
+  readonly pourcentage?: number;
+  readonly ordre?: number;
+  readonly visibleClient?: boolean;
+  readonly dateDebut?: string | null;
+  readonly dateFin?: string | null;
+  readonly commentaire?: string | null;
+}
+
+export interface UpdateSuiviInput {
+  readonly titre?: string;
+  readonly description?: string | null;
+  readonly statut?: SuiviStatut;
+  readonly pourcentage?: number;
+  readonly ordre?: number;
+  readonly visibleClient?: boolean;
+  readonly dateDebut?: string | null;
+  readonly dateFin?: string | null;
+  readonly commentaire?: string | null;
+}

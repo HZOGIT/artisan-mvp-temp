@@ -4,6 +4,9 @@ import type { IChantierRepository } from "../../application/chantier-repository"
 import { listChantiers, getChantier } from "../../application/read-use-cases";
 import { creerChantier, modifierChantier, supprimerChantier } from "../../application/write-use-cases";
 import { getPointagesChantier, ajouterPointage, supprimerPointage } from "../../application/pointages-use-cases";
+import { getSuiviChantier, creerSuivi, modifierSuivi, supprimerSuivi } from "../../application/suivi-use-cases";
+
+const suiviStatutEnum = z.enum(["a_faire", "en_cours", "termine"]);
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -109,6 +112,55 @@ export function createChantiersRouter(repo: IChantierRepository) {
       .input(z.object({ chantierId: z.number().int(), id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerPointage(repo, ctx.tenant, input.chantierId, input.id);
+        return { success: true };
+      }),
+
+    // ── Suivi (avancement/jalons) — sous-ressource scopée via le chantier parent (anti-IDOR) ──────
+    getSuivi: protectedProcedure
+      .input(z.object({ chantierId: z.number().int() }))
+      .query(({ ctx, input }) => getSuiviChantier(repo, ctx.tenant, input.chantierId)),
+
+    createSuivi: protectedProcedure
+      .input(
+        z.object({
+          chantierId: z.number().int(),
+          titre: z.string().min(1).max(255),
+          description: z.string().max(5000).nullish(),
+          statut: suiviStatutEnum.optional(),
+          pourcentage: z.number().int().min(0).max(100).optional(),
+          ordre: z.number().int().optional(),
+          visibleClient: z.boolean().optional(),
+          dateDebut: z.string().nullish(),
+          dateFin: z.string().nullish(),
+          commentaire: z.string().max(5000).nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => creerSuivi(repo, ctx.tenant, input)),
+
+    updateSuivi: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int(),
+          titre: z.string().min(1).max(255).optional(),
+          description: z.string().max(5000).nullish(),
+          statut: suiviStatutEnum.optional(),
+          pourcentage: z.number().int().min(0).max(100).optional(),
+          ordre: z.number().int().optional(),
+          visibleClient: z.boolean().optional(),
+          dateDebut: z.string().nullish(),
+          dateFin: z.string().nullish(),
+          commentaire: z.string().max(5000).nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { id, ...data } = input;
+        return modifierSuivi(repo, ctx.tenant, id, data);
+      }),
+
+    deleteSuivi: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await supprimerSuivi(repo, ctx.tenant, input.id);
         return { success: true };
       }),
   });

@@ -27,6 +27,7 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
 
   const cleanup = async () => {
     await admin.query('delete from pointages_chantier where "artisanId" in ($1,$2)', [A, B]);
+    await admin.query('delete from suivi_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from chantiers where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
@@ -114,5 +115,28 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.deletePointage(ctx(B), c.id, p!.id)).toBe(false);
     expect(await repo.deletePointage(ctx(A), c.id, p!.id)).toBe(true);
     expect(await repo.listPointages(ctx(A), c.id)).toEqual([]);
+  });
+
+  it("suivi : add/list/get/update/delete (table sans artisanId, scope via chantier parent)", async () => {
+    const c = await repo.create(ctx(A), { clientId: clientA, reference: ref(), nom: "Suivable" });
+    const s = await repo.addSuivi(ctx(A), { chantierId: c.id, titre: "Fondations", ordre: 2 });
+    expect(s.statut).toBe("a_faire"); // défaut PG
+    expect(s.pourcentage).toBe(0);
+    expect(s.visibleClient).toBe(true);
+    const s2 = await repo.addSuivi(ctx(A), { chantierId: c.id, titre: "Gros œuvre", ordre: 1, dateDebut: "2026-09-02" });
+    expect(s2.dateDebut).toBe("2026-09-02");
+    // listSuivi ordonné par `ordre` puis id
+    expect((await repo.listSuivi(ctx(A), c.id)).map((x) => x.titre)).toEqual(["Gros œuvre", "Fondations"]);
+    // getSuiviById (non scopé tenant : la table n'a pas d'artisanId)
+    expect((await repo.getSuiviById(ctx(A), s.id))?.titre).toBe("Fondations");
+    // update partiel
+    const maj = await repo.updateSuivi(ctx(A), s.id, { statut: "termine", pourcentage: 100 });
+    expect(maj?.statut).toBe("termine");
+    expect(maj?.pourcentage).toBe(100);
+    expect(maj?.titre).toBe("Fondations"); // champ non fourni préservé
+    // delete idempotent
+    expect(await repo.deleteSuivi(ctx(A), s.id)).toBe(true);
+    expect(await repo.deleteSuivi(ctx(A), s.id)).toBe(false);
+    expect((await repo.listSuivi(ctx(A), c.id)).map((x) => x.id)).toEqual([s2.id]);
   });
 });
