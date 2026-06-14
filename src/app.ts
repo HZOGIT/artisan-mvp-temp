@@ -196,12 +196,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const chantiers = createChantiersModule({
     repository: deps.chantierRepo ?? new ChantierRepositoryDrizzle(getDbHandle().db),
   });
-  // Repo catégories de dépense partagé : le domaine categoriesDepenses ET le routeur depenses
-  // (parité client `trpc.depenses.*Categorie`) consomment la même instance.
+  // Repos catégories + budgets de dépense partagés : les domaines categoriesDepenses/budgetsCategories
+  // ET le routeur depenses (parité client `trpc.depenses.*Categorie` / `setBudget`) consomment les
+  // mêmes instances.
   const categorieDepenseRepo = deps.categorieDepenseRepo ?? new CategorieDepenseRepositoryDrizzle(getDbHandle().db);
+  const budgetCategorieRepo = deps.budgetCategorieRepo ?? new BudgetCategorieRepositoryDrizzle(getDbHandle().db);
   const depenses = createDepensesModule({
     repository: deps.depenseRepo ?? new DepenseRepositoryDrizzle(getDbHandle().db),
     categorieRepository: categorieDepenseRepo,
+    budgetRepository: budgetCategorieRepo,
   });
   const devis = createDevisModule({
     repository: deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db),
@@ -252,7 +255,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.demandeContactRepo ?? new DemandeContactRepositoryDrizzle(getDbHandle().db),
   });
   const budgetsCategories = createBudgetsCategoriesModule({
-    repository: deps.budgetCategorieRepo ?? new BudgetCategorieRepositoryDrizzle(getDbHandle().db),
+    repository: budgetCategorieRepo,
   });
   const reglesCategorisation = createReglesCategorisationModule({
     repository: deps.regleCategorisationRepo ?? new RegleCategorisationRepositoryDrizzle(getDbHandle().db),

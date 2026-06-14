@@ -9,6 +9,10 @@ import { creerDepense, modifierDepense, supprimerDepense } from "../../applicati
 import type { ICategorieDepenseRepository } from "../../../categories-depenses/application/categorie-depense-repository";
 import { listCategories } from "../../../categories-depenses/application/read-use-cases";
 import { creerCategorie, modifierCategorie, supprimerCategorie } from "../../../categories-depenses/application/write-use-cases";
+// Composition : le client gère les budgets mensuels par catégorie via `trpc.depenses.setBudget` / etc.
+import type { IBudgetCategorieRepository } from "../../../budgets-categories/application/budget-categorie-repository";
+import { budgetsParMois } from "../../../budgets-categories/application/read-use-cases";
+import { creerBudget, modifierBudget } from "../../../budgets-categories/application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -90,7 +94,11 @@ const updateCategorieSchema = z.object({
 // use-cases (scoping tenant + TVA dérivée + anti-IDOR-FK via ctx.tenant), laisse remonter les
 // Domain errors (NotFound→404, Validation→400). Repos injectés (DI) : `repo` (dépenses) +
 // `categorieRepo` (catégories de dépense, composées sous ce routeur pour parité avec le client).
-export function createDepensesRouter(repo: IDepenseRepository, categorieRepo: ICategorieDepenseRepository) {
+export function createDepensesRouter(
+  repo: IDepenseRepository,
+  categorieRepo: ICategorieDepenseRepository,
+  budgetRepo: IBudgetCategorieRepository,
+) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
 
@@ -147,6 +155,25 @@ export function createDepensesRouter(repo: IDepenseRepository, categorieRepo: IC
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerCategorie(categorieRepo, ctx.tenant, input.id);
+        return { success: true };
+      }),
+
+    // ── Budgets mensuels par catégorie (parité client : trpc.depenses.setBudget) ───────
+    // Upsert (categorie, mois) : crée si absent, sinon met à jour le montant — délègue au domaine
+    // budgets-categories (contrainte UNIQUE (artisan, categorie, mois) garantie côté DB).
+    setBudget: protectedProcedure
+      .input(
+        z.object({
+          categorie: z.string().max(100),
+          mois: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
+          budget: z.number(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const montant = String(input.budget);
+        const existant = (await budgetsParMois(budgetRepo, ctx.tenant, input.mois)).find((b) => b.categorie === input.categorie);
+        if (existant) await modifierBudget(budgetRepo, ctx.tenant, existant.id, { budget: montant });
+        else await creerBudget(budgetRepo, ctx.tenant, { categorie: input.categorie, mois: input.mois, budget: montant });
         return { success: true };
       }),
   });

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createDepensesModule } from "./depenses.module";
 import type { IDepenseRepository } from "./application/depense-repository";
 import type { ICategorieDepenseRepository } from "../categories-depenses/application/categorie-depense-repository";
+import type { IBudgetCategorieRepository } from "../budgets-categories/application/budget-categorie-repository";
 
 const stubRepo: IDepenseRepository = {
   list: async () => [],
@@ -25,9 +26,20 @@ const stubCategorieRepo: ICategorieDepenseRepository = {
   delete: async () => false,
 };
 
+const stubBudgetRepo: IBudgetCategorieRepository = {
+  list: async () => [],
+  listByMois: async () => [],
+  getById: async () => null,
+  create: async () => {
+    throw new Error("non implémenté (stub)");
+  },
+  update: async () => null,
+  delete: async () => false,
+};
+
 describe("depenses.module", () => {
   it("createDepensesModule câble le repository injecté", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -36,8 +48,8 @@ describe("depenses.module", () => {
   });
 
   it("expose les procédures de catégories (parité client trpc.depenses.*Categorie)", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record);
-    expect(procedures).toEqual(expect.arrayContaining(["getCategories", "createCategorie", "updateCategorie", "deleteCategorie"]));
+    expect(procedures).toEqual(expect.arrayContaining(["getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget"]));
   });
 });

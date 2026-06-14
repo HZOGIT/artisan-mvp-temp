@@ -49,6 +49,7 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
   const purge = async (uid: number) => {
     await admin.query('delete from depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from categories_depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from budgets_categories where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from chantiers where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -105,6 +106,17 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callMutation(server, "depenses.updateCategorie", { id, actif: false }, tA)).json().result.data).toEqual({ success: true });
     expect((await callMutation(server, "depenses.deleteCategorie", { id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "depenses.getCategories", undefined, tA)).json().result.data).toEqual([]);
+  });
+
+  it("setBudget (parité client) : upsert (categorie, mois) — create puis update, scopé tenant", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "depenses.setBudget", { categorie: "Carburant", mois: "2026-07", budget: 500 }, tA)).json().result.data).toEqual({ success: true });
+    // upsert : 2e setBudget même (categorie, mois) → met à jour (pas de doublon)
+    expect((await callMutation(server, "depenses.setBudget", { categorie: "Carburant", mois: "2026-07", budget: 800 }, tA)).json().result.data).toEqual({ success: true });
+    const rows = await admin.query("select budget from budgets_categories where artisan_id=$1 and categorie=$2 and mois=$3", [artisanA, "Carburant", "2026-07"]);
+    expect(rows.rowCount).toBe(1);
+    expect(Number(rows.rows[0].budget)).toBe(800);
+    expect((await callMutation(server, "depenses.setBudget", { categorie: "Carburant", mois: "2026-07", budget: 1 })).statusCode).toBe(401); // sans cookie
   });
 
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
