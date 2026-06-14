@@ -15,3 +15,25 @@ export async function getRdv(repo: IRdvRepository, ctx: TenantContext, id: numbe
   if (!rdv) throw new NotFoundError("Rendez-vous introuvable");
   return rdv;
 }
+
+// Comptes des RDV par statut, scopés tenant (parité legacy `rdv.getStats`).
+export interface RdvStats {
+  readonly enAttente: number;
+  readonly confirmes: number;
+  readonly refuses: number;
+}
+
+export async function getRdvStats(repo: IRdvRepository, ctx: TenantContext): Promise<RdvStats> {
+  const rdvs = await repo.list(ctx);
+  return {
+    enAttente: rdvs.filter((r) => r.statut === "en_attente").length,
+    confirmes: rdvs.filter((r) => r.statut === "confirme").length,
+    refuses: rdvs.filter((r) => r.statut === "refuse").length,
+  };
+}
+
+// Nombre de RDV en attente, scopé tenant (parité legacy `rdv.getPendingCount`).
+export async function getRdvPendingCount(repo: IRdvRepository, ctx: TenantContext): Promise<number> {
+  const rdvs = await repo.list(ctx);
+  return rdvs.filter((r) => r.statut === "en_attente").length;
+}

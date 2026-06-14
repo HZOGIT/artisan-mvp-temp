@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IRdvRepository } from "../../application/rdv-repository";
-import { listRdvs, getRdv } from "../../application/read-use-cases";
+import { listRdvs, getRdv, getRdvStats, getRdvPendingCount } from "../../application/read-use-cases";
 import { creerRdv, modifierRdv, supprimerRdv } from "../../application/write-use-cases";
 import { confirmerRdv, refuserRdv, annulerRdv } from "../../application/transition-use-cases";
 
@@ -35,6 +35,11 @@ const updateSchema = z.object({
 export function createRdvEnLigneRouter(repo: IRdvRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listRdvs(repo, ctx.tenant)),
+
+    // Comptes par statut + nombre en attente (parité client trpc.rdv.getStats / getPendingCount).
+    getStats: protectedProcedure.query(({ ctx }) => getRdvStats(repo, ctx.tenant)),
+
+    getPendingCount: protectedProcedure.query(({ ctx }) => getRdvPendingCount(repo, ctx.tenant)),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))

@@ -129,4 +129,28 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
     // confirmer depuis un statut terminal (refuse) → 409
     expect((await mut(server, "rdv.confirmer", { id: id2 }, tA)).statusCode).toBe(409);
   });
+
+  it("getStats / getPendingCount (parité client) : comptes par statut scopés tenant ; 401", async () => {
+    const tA = await token(UA);
+    // 401 sans cookie
+    expect((await q(server, "rdv.getStats", undefined)).statusCode).toBe(401);
+    expect((await q(server, "rdv.getPendingCount", undefined)).statusCode).toBe(401);
+    // état de départ
+    const base = (await q(server, "rdv.getStats", undefined, tA)).json().result.data as { enAttente: number; confirmes: number; refuses: number };
+    const basePending = (await q(server, "rdv.getPendingCount", undefined, tA)).json().result.data as number;
+    // 3 RDV : 1 confirmé, 1 refusé, 1 laissé en_attente
+    const a = (await creer(tA)).json().result.data.id as number;
+    const b = (await creer(tA)).json().result.data.id as number;
+    await creer(tA); // reste en_attente
+    await mut(server, "rdv.confirmer", { id: a }, tA);
+    await mut(server, "rdv.refuser", { id: b, motifRefus: "Indispo" }, tA);
+    const stats = (await q(server, "rdv.getStats", undefined, tA)).json().result.data as { enAttente: number; confirmes: number; refuses: number };
+    expect(stats.confirmes).toBe(base.confirmes + 1);
+    expect(stats.refuses).toBe(base.refuses + 1);
+    expect(stats.enAttente).toBe(base.enAttente + 1); // les 3 créés, -1 confirmé -1 refusé = +1 en_attente
+    // getPendingCount cohérent avec enAttente
+    const pending = (await q(server, "rdv.getPendingCount", undefined, tA)).json().result.data as number;
+    expect(pending).toBe(basePending + 1);
+    expect(pending).toBe(stats.enAttente);
+  });
 });
