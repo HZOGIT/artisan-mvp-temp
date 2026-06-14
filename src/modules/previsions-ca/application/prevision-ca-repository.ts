@@ -1,5 +1,12 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput, HistoriqueCA } from "../domain/prevision-ca";
+import type {
+  CreatePrevisionInput,
+  PrevisionCA,
+  UpdatePrevisionInput,
+  HistoriqueCA,
+  UpsertHistoriqueInput,
+  UpsertPrevisionInput,
+} from "../domain/prevision-ca";
 
 // Port du repository previsions-ca (prévisions de CA par période). Chaque méthode exige le
 // TenantContext (scope tenant + RLS). `previsions_ca` possède un `artisanId` → double cloisonnement
@@ -22,4 +29,8 @@ export interface IPrevisionCARepository {
   listHistorique(ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]>;
   // Historique de CA d'une année donnée (pour la comparaison prévu vs réalisé). [] si aucun.
   listHistoriqueAnnee(ctx: TenantContext, annee: number): Promise<HistoriqueCA[]>;
+  // Upsert d'une ligne d'historique de CA (delete+insert par (artisan,mois,annee) ; artisanId forcé).
+  upsertHistorique(ctx: TenantContext, entry: UpsertHistoriqueInput): Promise<void>;
+  // Upsert d'une prévision calculée (delete+insert par (artisan,mois,annee) ; artisanId forcé).
+  upsertPrevision(ctx: TenantContext, entry: UpsertPrevisionInput): Promise<void>;
 }

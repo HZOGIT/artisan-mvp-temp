@@ -4,7 +4,15 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IPrevisionCARepository } from "../application/prevision-ca-repository";
-import type { CreatePrevisionInput, PrevisionCA, PrevisionMethode, UpdatePrevisionInput, HistoriqueCA } from "../domain/prevision-ca";
+import type {
+  CreatePrevisionInput,
+  PrevisionCA,
+  PrevisionMethode,
+  UpdatePrevisionInput,
+  HistoriqueCA,
+  UpsertHistoriqueInput,
+  UpsertPrevisionInput,
+} from "../domain/prevision-ca";
 
 type PrevisionRow = typeof previsionsCA.$inferSelect;
 type PrevisionInsert = typeof previsionsCA.$inferInsert;
@@ -164,6 +172,40 @@ export class PrevisionCARepositoryDrizzle implements IPrevisionCARepository {
         .from(historiqueCA)
         .where(and(eq(historiqueCA.artisanId, ctx.artisanId), eq(historiqueCA.annee, annee)));
       return rows.map(toHistorique);
+    });
+  }
+
+  // Upsert = delete (artisan,mois,annee) puis insert (artisanId forcé) — parité legacy.
+  upsertHistorique(ctx: TenantContext, entry: UpsertHistoriqueInput): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .delete(historiqueCA)
+        .where(and(eq(historiqueCA.artisanId, ctx.artisanId), eq(historiqueCA.mois, entry.mois), eq(historiqueCA.annee, entry.annee)));
+      await tx.insert(historiqueCA).values({
+        artisanId: ctx.artisanId,
+        mois: entry.mois,
+        annee: entry.annee,
+        caTotal: entry.caTotal,
+        nombreFactures: entry.nombreFactures,
+        nombreClients: entry.nombreClients,
+        panierMoyen: entry.panierMoyen,
+      });
+    });
+  }
+
+  upsertPrevision(ctx: TenantContext, entry: UpsertPrevisionInput): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .delete(previsionsCA)
+        .where(and(eq(previsionsCA.artisanId, ctx.artisanId), eq(previsionsCA.mois, entry.mois), eq(previsionsCA.annee, entry.annee)));
+      await tx.insert(previsionsCA).values({
+        artisanId: ctx.artisanId,
+        mois: entry.mois,
+        annee: entry.annee,
+        caPrevisionnel: entry.caPrevisionnel,
+        methodeCalcul: entry.methodeCalcul,
+        confiance: entry.confiance,
+      });
     });
   }
 }

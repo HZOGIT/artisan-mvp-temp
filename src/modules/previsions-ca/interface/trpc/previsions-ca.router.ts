@@ -3,6 +3,8 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IPrevisionCARepository } from "../../application/prevision-ca-repository";
 import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique, getComparaison } from "../../application/read-use-cases";
 import { creerPrevision, modifierPrevision, supprimerPrevision } from "../../application/write-use-cases";
+import { calculerPrevisions } from "../../application/calculer-use-case";
+import type { FacturesCAReader } from "../../application/factures-ca-reader";
 
 const methode = z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"]);
 const montantPos = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant positif décimal invalide");
@@ -33,7 +35,7 @@ const updateSchema = z.object({
 // Routeur tRPC du domaine previsions-ca (prévisions de CA par période). Transport mince : valide les
 // inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain
 // errors (NotFound→404, Validation→400). Repo injecté.
-export function createPrevisionsCARouter(repo: IPrevisionCARepository) {
+export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesCAReader?: FacturesCAReader) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listPrevisions(repo, ctx.tenant)),
 
@@ -78,5 +80,15 @@ export function createPrevisionsCARouter(repo: IPrevisionCARepository) {
     getComparaison: protectedProcedure
       .input(z.object({ annee: z.number().int().min(2000).max(2100) }))
       .query(({ ctx, input }) => getComparaison(repo, ctx.tenant, input.annee)),
+
+    // `calculer {methode}` (mutation) : recalcule l'historique depuis les factures payées, puis
+    // projette les prévisions de l'année courante. Sans reader CA → message « pas assez de données ».
+    calculer: protectedProcedure
+      .input(z.object({ methode: z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite"]).default("moyenne_mobile") }))
+      .mutation(({ ctx, input }) =>
+        facturesCAReader
+          ? calculerPrevisions({ repo, facturesReader: facturesCAReader }, ctx.tenant, input.methode)
+          : Promise.resolve({ message: "Pas assez de données historiques pour calculer les prévisions" }),
+      ),
   });
 }

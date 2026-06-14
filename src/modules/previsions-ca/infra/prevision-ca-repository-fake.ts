@@ -1,6 +1,13 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IPrevisionCARepository } from "../application/prevision-ca-repository";
-import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput, HistoriqueCA } from "../domain/prevision-ca";
+import type {
+  CreatePrevisionInput,
+  PrevisionCA,
+  UpdatePrevisionInput,
+  HistoriqueCA,
+  UpsertHistoriqueInput,
+  UpsertPrevisionInput,
+} from "../domain/prevision-ca";
 
 // Implémentation in-memory du repository previsions-ca (tests sans DB). Reproduit les invariants du
 // repo Drizzle : scope par artisanId, artisanId forcé, défauts montants "0.00", confiance null, update
@@ -73,6 +80,7 @@ export class FakePrevisionCARepository implements IPrevisionCARepository {
 
   // Historique de CA (table distincte) — injecté en test via `seedHistorique`.
   private readonly historique: HistoriqueCA[] = [];
+  private histSeq = 1000;
 
   // Aide de test : ajoute une ligne d'historique de CA pour un tenant.
   seedHistorique(entry: HistoriqueCA): void {
@@ -88,5 +96,42 @@ export class FakePrevisionCARepository implements IPrevisionCARepository {
 
   async listHistoriqueAnnee(ctx: TenantContext, annee: number): Promise<HistoriqueCA[]> {
     return this.historique.filter((h) => h.artisanId === ctx.artisanId && h.annee === annee);
+  }
+
+  async upsertHistorique(ctx: TenantContext, entry: UpsertHistoriqueInput): Promise<void> {
+    const i = this.historique.findIndex((h) => h.artisanId === ctx.artisanId && h.mois === entry.mois && h.annee === entry.annee);
+    if (i !== -1) this.historique.splice(i, 1);
+    this.historique.push({
+      id: ++this.histSeq,
+      artisanId: ctx.artisanId,
+      mois: entry.mois,
+      annee: entry.annee,
+      caTotal: entry.caTotal,
+      nombreFactures: entry.nombreFactures,
+      nombreClients: entry.nombreClients,
+      panierMoyen: entry.panierMoyen,
+      tauxConversion: null,
+      createdAt: new Date(),
+    });
+  }
+
+  async upsertPrevision(ctx: TenantContext, entry: UpsertPrevisionInput): Promise<void> {
+    const i = this.store.findIndex((p) => p.artisanId === ctx.artisanId && p.mois === entry.mois && p.annee === entry.annee);
+    if (i !== -1) this.store.splice(i, 1);
+    const now = new Date();
+    this.store.push({
+      id: ++this.seq,
+      artisanId: ctx.artisanId,
+      mois: entry.mois,
+      annee: entry.annee,
+      caPrevisionnel: entry.caPrevisionnel,
+      caRealise: "0.00",
+      ecart: "0.00",
+      ecartPourcentage: "0.00",
+      methodeCalcul: entry.methodeCalcul,
+      confiance: entry.confiance,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 }

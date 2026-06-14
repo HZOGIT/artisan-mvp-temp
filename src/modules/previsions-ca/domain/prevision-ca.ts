@@ -67,3 +67,47 @@ export interface ComparaisonMois {
   readonly ecart: number; // caRealise - caPrevisionnel
   readonly ecartPourcentage: number;
 }
+
+// Agrégat de CA réalisé par mois (issu des factures PAYÉES du tenant) — sert au recalcul de
+// l'historique (`calculer`). Montant en string (numeric PG).
+export interface CAParMois {
+  readonly mois: number;
+  readonly annee: number;
+  readonly caTotal: string;
+  readonly nombreFactures: number;
+  readonly nombreClients: number;
+}
+
+// Upsert d'une ligne d'historique de CA (delete+insert par (artisan,mois,annee)).
+export interface UpsertHistoriqueInput {
+  readonly mois: number;
+  readonly annee: number;
+  readonly caTotal: string;
+  readonly nombreFactures: number;
+  readonly nombreClients: number;
+  readonly panierMoyen: string;
+}
+
+// Upsert d'une prévision calculée (delete+insert par (artisan,mois,annee)).
+export interface UpsertPrevisionInput {
+  readonly mois: number;
+  readonly annee: number;
+  readonly caPrevisionnel: string;
+  readonly methodeCalcul: PrevisionMethode;
+  readonly confiance: string;
+}
+
+// Une prédiction mensuelle calculée (sortie de `calculer`).
+export interface PredictionMois {
+  readonly mois: number;
+  readonly caPrevisionnel: number;
+  readonly confiance: number;
+}
+
+// Résultat de `calculer` : soit les prédictions calculées, soit un message (pas assez d'historique).
+export interface CalculPrevisionsResult {
+  readonly predictions?: PredictionMois[];
+  readonly methode?: PrevisionMethode;
+  readonly annee?: number;
+  readonly message?: string;
+}

@@ -14,6 +14,8 @@ const stubRepo: IPrevisionCARepository = {
   delete: async () => false,
   listHistorique: async () => [],
   listHistoriqueAnnee: async () => [],
+  upsertHistorique: async () => {},
+  upsertPrevision: async () => {},
 };
 
 describe("previsions-ca.module", () => {
@@ -23,7 +25,7 @@ describe("previsions-ca.module", () => {
   });
 
   it("le port expose le CRUD + listByAnnee attendus", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByAnnee", "listHistorique", "listHistoriqueAnnee", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByAnnee", "listHistorique", "listHistoriqueAnnee", "update", "upsertHistorique", "upsertPrevision"]);
   });
 
   it("l'enum de méthode de calcul couvre les valeurs attendues", () => {
@@ -34,6 +36,6 @@ describe("previsions-ca.module", () => {
   it("expose un routeur tRPC assemblé (CRUD + byAnnee)", () => {
     const module = createPrevisionsCAModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["byAnnee", "create", "delete", "getById", "getComparaison", "getHistorique", "getPrevisions", "list", "update"]);
+    expect(procedures).toEqual(["byAnnee", "calculer", "create", "delete", "getById", "getComparaison", "getHistorique", "getPrevisions", "list", "update"]);
   });
 });

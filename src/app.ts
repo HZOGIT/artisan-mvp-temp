@@ -118,6 +118,8 @@ import { RegleCategorisationRepositoryDrizzle } from "./modules/regles-categoris
 import type { IRegleCategorisationRepository } from "./modules/regles-categorisation/application/regle-categorisation-repository";
 import { createPrevisionsCAModule } from "./modules/previsions-ca/previsions-ca.module";
 import { PrevisionCARepositoryDrizzle } from "./modules/previsions-ca/infra/prevision-ca-repository-drizzle";
+import { FacturesCAReaderDrizzle } from "./modules/previsions-ca/infra/factures-ca-reader-drizzle";
+import type { FacturesCAReader } from "./modules/previsions-ca/application/factures-ca-reader";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort } from "./shared/ports";
 import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter } from "./shared/ports";
@@ -167,6 +169,7 @@ export interface AppDeps extends ContextDeps {
   readonly budgetCategorieRepo?: IBudgetCategorieRepository;
   readonly regleCategorisationRepo?: IRegleCategorisationRepository;
   readonly previsionCARepo?: IPrevisionCARepository;
+  readonly facturesCAReader?: FacturesCAReader;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -398,6 +401,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const previsionsCA = createPrevisionsCAModule({
     repository: deps.previsionCARepo ?? new PrevisionCARepositoryDrizzle(getDbHandle().db),
+    // `calculer` agrège le CA réalisé depuis les factures PAYÉES (reader cross-domaine, scopé tenant).
+    facturesCAReader: deps.facturesCAReader ?? new FacturesCAReaderDrizzle(getDbHandle().db),
   });
   const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA });
 
