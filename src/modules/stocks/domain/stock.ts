@@ -34,6 +34,13 @@ export interface MouvementStock {
   readonly createdAt: Date;
 }
 
+// Quantité en commande (non encore reçue) pour un stock donné. `entrant` = somme des
+// `quantite - quantiteRecue` des lignes de commandes fournisseurs non soldées liées à ce stock.
+export interface StockEntrant {
+  readonly stockId: number;
+  readonly entrant: number;
+}
+
 export interface CreateStockInput {
   readonly articleId?: number | null;
   readonly articleType?: StockArticleType;

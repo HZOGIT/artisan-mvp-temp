@@ -5,6 +5,7 @@ import type {
   UpdateStockInput,
   AdjustStockInput,
   MouvementStock,
+  StockEntrant,
 } from "../domain/stock";
 
 // Résultat d'un ajustement de quantité (mouvement tracé). `not_found` = stock hors tenant ;
@@ -38,4 +39,9 @@ export interface IStockRepository {
   // Stocks du tenant en rupture stricte (`quantiteEnStock <= 0`, épuisés). Sous-ensemble de
   // `listLowStock`. (Le legacy conflait les deux ; on distingue ici, plus correct sémantiquement.)
   listEnRupture(ctx: TenantContext): Promise<Stock[]>;
+  // Quantités EN COMMANDE (non encore reçues) par stock : pour chaque `stockId` lié à une ligne de
+  // commande fournisseur non soldée (statut envoyee/confirmee/partiellement_livree), somme des
+  // `quantite - quantiteRecue` restant à recevoir. Scopé tenant (commandes du tenant). Parité
+  // legacy `getStockEntrantByArtisan`. N'inclut que les `stockId` avec un entrant strictement > 0.
+  listEntrant(ctx: TenantContext): Promise<StockEntrant[]>;
 }

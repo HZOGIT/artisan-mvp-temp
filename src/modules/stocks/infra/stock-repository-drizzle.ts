@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
-import { stocks, mouvementsStock } from "../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { stocks, mouvementsStock, commandesFournisseurs, lignesCommandesFournisseurs } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -11,6 +11,7 @@ import type {
   AdjustStockInput,
   MouvementStock,
   MouvementType,
+  StockEntrant,
 } from "../domain/stock";
 
 type StockRow = typeof stocks.$inferSelect;
@@ -212,6 +213,27 @@ export class StockRepositoryDrizzle implements IStockRepository {
         .where(and(eq(stocks.artisanId, ctx.artisanId), sql`${stocks.quantiteEnStock} <= 0`))
         .orderBy(asc(stocks.designation), asc(stocks.id));
       return rows.map(toStock);
+    });
+  }
+
+  listEntrant(ctx: TenantContext): Promise<StockEntrant[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Reste à recevoir = Σ max(quantite - quantiteRecue, 0) sur les lignes de commandes non soldées.
+      const entrantExpr = sql<string>`COALESCE(SUM(GREATEST(${lignesCommandesFournisseurs.quantite} - ${lignesCommandesFournisseurs.quantiteRecue}, 0)), 0)`;
+      const rows = await tx
+        .select({ stockId: lignesCommandesFournisseurs.stockId, entrant: entrantExpr })
+        .from(lignesCommandesFournisseurs)
+        .innerJoin(commandesFournisseurs, eq(commandesFournisseurs.id, lignesCommandesFournisseurs.commandeId))
+        .where(
+          and(
+            eq(commandesFournisseurs.artisanId, ctx.artisanId),
+            inArray(commandesFournisseurs.statut, ["envoyee", "confirmee", "partiellement_livree"]),
+            isNotNull(lignesCommandesFournisseurs.stockId),
+          ),
+        )
+        .groupBy(lignesCommandesFournisseurs.stockId)
+        .having(sql`${entrantExpr} > 0`);
+      return rows.map((r) => ({ stockId: Number(r.stockId), entrant: Number(r.entrant) || 0 }));
     });
   }
 }

@@ -6,6 +6,7 @@ import type {
   UpdateStockInput,
   AdjustStockInput,
   MouvementStock,
+  StockEntrant,
 } from "../domain/stock";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
@@ -14,8 +15,16 @@ import type {
 export class FakeStockRepository implements IStockRepository {
   private store: Stock[] = [];
   private mouvements: MouvementStock[] = [];
+  // Entrant simulé par tenant (les commandes fournisseurs ne sont pas modélisées dans ce fake) :
+  // clé `${artisanId}` → liste {stockId, entrant}. Alimenté par seedEntrant (aide de test).
+  private entrants = new Map<number, StockEntrant[]>();
   private seq = 0;
   private mvSeq = 0;
+
+  // Aide de test (hors port) : déclare l'entrant (commandes non reçues) d'un tenant.
+  seedEntrant(artisanId: number, entrant: StockEntrant[]): void {
+    this.entrants.set(artisanId, entrant);
+  }
 
   async list(ctx: TenantContext): Promise<Stock[]> {
     return this.store.filter((s) => s.artisanId === ctx.artisanId);
@@ -106,5 +115,9 @@ export class FakeStockRepository implements IStockRepository {
 
   async listEnRupture(ctx: TenantContext): Promise<Stock[]> {
     return this.store.filter((s) => s.artisanId === ctx.artisanId && Number(s.quantiteEnStock) <= 0);
+  }
+
+  async listEntrant(ctx: TenantContext): Promise<StockEntrant[]> {
+    return (this.entrants.get(ctx.artisanId) ?? []).filter((e) => e.entrant > 0);
   }
 }

@@ -7,6 +7,7 @@ import {
   getMouvementsStock,
   listStocksEnAlerte,
   listStocksEnRupture,
+  listStockEntrant,
 } from "../../application/read-use-cases";
 import {
   creerStock,
@@ -97,5 +98,8 @@ export function createStocksRouter(repo: IStockRepository) {
     getLowStock: protectedProcedure.query(({ ctx }) => listStocksEnAlerte(repo, ctx.tenant)),
 
     getStocksEnRupture: protectedProcedure.query(({ ctx }) => listStocksEnRupture(repo, ctx.tenant)),
+
+    // Quantités en commande (non reçues) par stock (parité client trpc.stocks.getEntrant).
+    getEntrant: protectedProcedure.query(({ ctx }) => listStockEntrant(repo, ctx.tenant)),
   });
 }

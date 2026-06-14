@@ -14,6 +14,7 @@ const stubRepo: IStockRepository = {
   listMouvements: async () => null,
   listLowStock: async () => [],
   listEnRupture: async () => [],
+  listEntrant: async () => [],
 };
 
 describe("stocks.module", () => {
@@ -30,6 +31,7 @@ describe("stocks.module", () => {
       "getById",
       "list",
       "listEnRupture",
+      "listEntrant",
       "listLowStock",
       "listMouvements",
       "update",
@@ -44,6 +46,7 @@ describe("stocks.module", () => {
       "create",
       "delete",
       "getById",
+      "getEntrant",
       "getLowStock",
       "getMouvements",
       "getStocksEnRupture",

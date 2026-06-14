@@ -1,7 +1,7 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IStockRepository } from "./stock-repository";
-import type { Stock, MouvementStock } from "../domain/stock";
+import type { Stock, MouvementStock, StockEntrant } from "../domain/stock";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par
 // le `TenantContext` (le repo l'applique). `getStock` sur une ressource d'un autre tenant
@@ -38,4 +38,9 @@ export function listStocksEnAlerte(repo: IStockRepository, ctx: TenantContext): 
 // Stocks en rupture stricte (épuisés, quantité ≤ 0), scopés tenant.
 export function listStocksEnRupture(repo: IStockRepository, ctx: TenantContext): Promise<Stock[]> {
   return repo.listEnRupture(ctx);
+}
+
+// Quantités en commande (non reçues) par stock, scopées tenant. Parité legacy `getEntrant`.
+export function listStockEntrant(repo: IStockRepository, ctx: TenantContext): Promise<StockEntrant[]> {
+  return repo.listEntrant(ctx);
 }

@@ -58,6 +58,9 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
   afterAll(async () => {
     await server.close();
     for (const aId of [artisanA, artisanB]) {
+      await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId"=$1)', [aId]);
+      await admin.query('delete from commandes_fournisseurs where "artisanId"=$1', [aId]);
+      await admin.query('delete from fournisseurs where "artisanId"=$1', [aId]);
       await admin.query('delete from mouvements_stock where "stockId" in (select id from stocks where "artisanId"=$1)', [aId]);
       await admin.query('delete from stocks where "artisanId"=$1', [aId]);
     }
@@ -214,5 +217,28 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
     // aucun stock de B (réf "B-…") ne fuite vers A
     expect(lowRefs.some((r) => r.startsWith("B-"))).toBe(false);
     expect(rupRefs.some((r) => r.startsWith("B-"))).toBe(false);
+  });
+
+  it("getEntrant (parité client) : Σ(quantite-quantiteRecue) des commandes non soldées, scopé tenant ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // 401 sans cookie
+    expect((await callQuery(server, "stocks.getEntrant", undefined)).statusCode).toBe(401);
+    // stock de A
+    const stockId = (await callMutation(server, "stocks.create", { reference: `ENT-${Date.now()}`, designation: "Entrant", quantiteEnStock: "0", seuilAlerte: "5" }, tA)).json().result.data.id as number;
+    // fournisseur + commande ENVOYÉE de A + 2 lignes liées au même stock (10-3) + (5-0) = 12 entrant
+    const fId = (await admin.query('insert into fournisseurs ("artisanId", nom) values ($1,$2) returning id', [artisanA, "Fournisseur A"])).rows[0].id as number;
+    const cId = (await admin.query('insert into commandes_fournisseurs ("artisanId","fournisseurId",statut) values ($1,$2,$3) returning id', [artisanA, fId, "envoyee"])).rows[0].id as number;
+    await admin.query('insert into lignes_commandes_fournisseurs ("commandeId","stockId",designation,quantite,"quantiteRecue") values ($1,$2,$3,$4,$5),($1,$2,$3,$6,$7)', [cId, stockId, "L", "10", "3", "5", "0"]);
+    // commande BROUILLON (non comptée) sur le même stock
+    const cBrouillon = (await admin.query('insert into commandes_fournisseurs ("artisanId","fournisseurId",statut) values ($1,$2,$3) returning id', [artisanA, fId, "brouillon"])).rows[0].id as number;
+    await admin.query('insert into lignes_commandes_fournisseurs ("commandeId","stockId",designation,quantite,"quantiteRecue") values ($1,$2,$3,$4,$5)', [cBrouillon, stockId, "L", "99", "0"]);
+
+    const entrant = (await callQuery(server, "stocks.getEntrant", undefined, tA)).json().result.data as Array<{ stockId: number; entrant: number }>;
+    const ligne = entrant.find((e) => e.stockId === stockId);
+    expect(ligne).toBeDefined();
+    expect(ligne!.entrant).toBe(12); // (10-3)+(5-0) ; la commande brouillon est exclue
+    // isolation : B ne voit pas l'entrant de A
+    expect((await callQuery(server, "stocks.getEntrant", undefined, tB)).json().result.data).toEqual([]);
   });
 });
