@@ -76,6 +76,9 @@ import type { IIcalFeedRepository } from "./modules/calendrier/application/ical-
 import { createEmailsModule } from "./modules/emails/emails.module";
 import { EmailLogReaderDrizzle } from "./modules/emails/infra/email-log-reader-drizzle";
 import type { IEmailLogReader } from "./modules/emails/application/email-log-reader";
+import { createSearchModule } from "./modules/search/search.module";
+import { SearchReaderDrizzle } from "./modules/search/infra/search-reader-drizzle";
+import type { ISearchReader } from "./modules/search/application/search-reader";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -206,6 +209,7 @@ export interface AppDeps extends ContextDeps {
   readonly devisStatsReader?: IDevisStatsReader;
   readonly icalFeedRepo?: IIcalFeedRepository;
   readonly emailLogReader?: IEmailLogReader;
+  readonly searchReader?: ISearchReader;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -471,7 +475,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const emails = createEmailsModule({
     reader: deps.emailLogReader ?? new EmailLogReaderDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails });
+  const search = createSearchModule({
+    reader: deps.searchReader ?? new SearchReaderDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

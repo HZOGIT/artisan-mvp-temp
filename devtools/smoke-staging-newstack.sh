@@ -62,6 +62,11 @@ codeDO=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
   "$NEWSTACK_URL/api/trpc/devisOptions.getByDevisId?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22devisId%22%3A$SMOKE_DID%7D%7D%7D")
 [ "$codeDO" = "200" ] && echo "  ✓ devisOptions.getByDevisId (devis possédé) -> 200" || { echo "  ✖ devisOptions.getByDevisId -> $codeDO (attendu 200)"; fail=1; }
 
+# 2d) search.global : nécessite un `query` (≥2 chars). Vérifie 200 (recherche scopée tenant A).
+codeSearch=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
+  "$NEWSTACK_URL/api/trpc/search.global?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22query%22%3A%22zz%22%7D%7D%7D")
+[ "$codeSearch" = "200" ] && echo "  ✓ search.global (query=zz) -> 200" || { echo "  ✖ search.global -> $codeSearch (attendu 200)"; fail=1; }
+
 # 3) Contrôle d'isolation : l'auth fonctionne aussi pour B (tenant distinct) — 200 (ses propres données).
 codeB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
   "$NEWSTACK_URL/api/trpc/vehicules.list?batch=1&input=%7B%7D")
