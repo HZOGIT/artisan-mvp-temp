@@ -17,6 +17,9 @@ export interface AjustementSolde {
 // portés par les use-cases du workflow d'approbation (étape ultérieure), pas par le CRUD.
 export interface ICongeRepository {
   list(ctx: TenantContext): Promise<Conge[]>;
+  // Demandes en attente d'approbation (statut `en_attente`), scopées tenant, triées par
+  // `dateDebut` ASC (parité legacy `getCongesEnAttente`). Vue du manager/approbateur.
+  listEnAttente(ctx: TenantContext): Promise<Conge[]>;
   // null si la demande n'appartient pas au tenant.
   getById(ctx: TenantContext, id: number): Promise<Conge | null>;
   create(ctx: TenantContext, input: CreateCongeInput): Promise<Conge>;

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { conges, techniciens, soldesConges } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -42,6 +42,17 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
         .from(conges)
         .where(eq(conges.artisanId, ctx.artisanId))
         .orderBy(desc(conges.dateDebut), desc(conges.id));
+      return rows.map(toConge);
+    });
+  }
+
+  listEnAttente(ctx: TenantContext): Promise<Conge[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(conges)
+        .where(and(eq(conges.artisanId, ctx.artisanId), eq(conges.statut, "en_attente")))
+        .orderBy(asc(conges.dateDebut));
       return rows.map(toConge);
     });
   }

@@ -26,4 +26,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "parametres",
   "modelesEmail",
   "relances",
+  "conges", // parité vérifiée : list/getById/create/update/delete/approuver/refuser/annuler + enAttente ⊇ appels client
 ] as const;

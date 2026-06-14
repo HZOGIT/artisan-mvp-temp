@@ -34,7 +34,7 @@ done
 # Domaines servis par le nouveau stack = DEFAULT_ENABLED de l'edge (source : src migrated-domains.ts
 # STAGING_NEW_STACK_DEFAULT_DOMAINS). Smoke : la route tRPC doit exister (401 sans cookie = OK ;
 # 404 = route absente → déploiement cassé). On teste une procédure `list`/`get` par domaine.
-SMOKE_PROCS="vehicules.list notifications.list fournisseurs.list parametres.get modelesEmail.list relances.list"
+SMOKE_PROCS="vehicules.list notifications.list fournisseurs.list parametres.get modelesEmail.list relances.list conges.list"
 echo "▶ Smoke des domaines servis par le nouveau stack (401 attendu = route présente, auth requise)…"
 fail=0
 for p in $SMOKE_PROCS; do
@@ -52,4 +52,4 @@ done
 echo "▶ Smoke authentifié (faux users staging)…"
 ./devtools/smoke-staging-newstack.sh
 
-echo "✓ Nouveau stack déployé + smoke (anonyme & authentifié) OK ($NEWSTACK_URL). Routage trafic = git push origin staging (Pages)."
+echo "✓ Nouveau stack déployé + smoke (anonyme & authentifié) OK ($NEWSTACK_URL). Routage trafic = ./devtools/deploy-staging-pages.sh (wrangler)."

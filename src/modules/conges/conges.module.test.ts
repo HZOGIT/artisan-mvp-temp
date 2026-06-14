@@ -4,6 +4,7 @@ import type { ICongeRepository } from "./application/conge-repository";
 
 const stubRepo: ICongeRepository = {
   list: async () => [],
+  listEnAttente: async () => [],
   getById: async () => null,
   create: async () => {
     throw new Error("non implémenté (stub)");
@@ -30,6 +31,7 @@ describe("conges.module", () => {
       "findTechnicienIdForUser",
       "getById",
       "list",
+      "listEnAttente",
       "ownsTechnicien",
       "setStatut",
       "update",
@@ -39,6 +41,6 @@ describe("conges.module", () => {
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createCongesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["annuler", "approuver", "create", "delete", "getById", "list", "refuser", "update"]);
+    expect(procedures).toEqual(["annuler", "approuver", "create", "delete", "enAttente", "getById", "list", "refuser", "update"]);
   });
 });

@@ -94,6 +94,26 @@ describe.skipIf(!URL)("conges.router e2e (HTTP → tRPC → use-case → repo �
     expect((list.json().result.data as Array<{ id: number }>).some((c) => c.id === id)).toBe(true);
   });
 
+  it("enAttente (parité client) : seules les demandes 'en_attente' du tenant, triées dateDebut ASC ; isolation ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // 401 sans cookie
+    expect((await callQuery(server, "conges.enAttente", undefined)).statusCode).toBe(401);
+    // 2 demandes de A (en_attente par défaut), créées dans le désordre chronologique
+    const tardive = (await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2026-09-20", dateFin: "2026-09-21" }, tA)).json().result.data.id as number;
+    const precoce = (await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2026-09-01", dateFin: "2026-09-02" }, tA)).json().result.data.id as number;
+    const enAttente = (await callQuery(server, "conges.enAttente", undefined, tA)).json().result.data as Array<{ id: number; statut: string; dateDebut: string }>;
+    // toutes en_attente, scopées A
+    expect(enAttente.every((c) => c.statut === "en_attente")).toBe(true);
+    const ids = enAttente.map((c) => c.id);
+    expect(ids).toContain(tardive);
+    expect(ids).toContain(precoce);
+    // tri dateDebut ASC : la précoce (09-01) avant la tardive (09-20)
+    expect(ids.indexOf(precoce)).toBeLessThan(ids.indexOf(tardive));
+    // isolation : B ne voit pas les demandes de A
+    expect((await callQuery(server, "conges.enAttente", undefined, tB)).json().result.data).toEqual([]);
+  });
+
   it("validation : dateFin < dateDebut → 400 ; date mal formée → 400", async () => {
     const tA = await token(UA);
     expect((await callMutation(server, "conges.create", { technicienId: techA, type: "rtt", dateDebut: "2026-07-10", dateFin: "2026-07-05" }, tA)).statusCode).toBe(400);

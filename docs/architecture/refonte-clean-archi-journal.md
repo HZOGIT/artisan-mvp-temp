@@ -46,7 +46,7 @@ Tout rapport d'itération (ntfy ET Linear) DOIT inclure, en plus du résumé de 
 | Déploiement new-stack en staging (derrière dispatcher, flags OFF) | 6 % | 100 % | 6,0 % |
 | Parité fonctionnelle (réconciliation 13 noms + parité procédures 30 domaines + migration 29 routeurs legacy-only) | 25 % | ~6 % | ~1,5 % |
 | Surface hors-tRPC (auth+JWT, webhooks Stripe/**abonnement**, uploads/OCR, PDF/iCal, vitrine/portail) | 12 % | 0 % | 0 % |
-| Bascule staging (domaines ON progressifs + smoke vert → trafic new-stack) | 8 % | ~25 % | ~2,0 % |
+| Bascule staging (domaines ON progressifs + smoke vert → trafic new-stack) | 8 % | ~30 % | ~2,4 % |
 | Bascule prod (flags ON prod + monitoring) | 6 % | 0 % | 0 % |
 | Extinction legacy (suppression `server/`, OPE-255) | 4 % | 0 % | 0 % |
 | **TOTAL** | **100 %** | | **≈ 48 %** |
@@ -56,8 +56,8 @@ Tout rapport d'itération (ntfy ET Linear) DOIT inclure, en plus du résumé de 
 
 | Module / logique cœur | Migré clean-archi | Déployé new-stack | **Sert le trafic staging** |
 |---|---|---|---|
-| **vehicules, notifications, fournisseurs, parametres, modelesEmail, relances** (parité vérifiée) | ✅ | ✅ | **🟢 new-stack** (activés) |
-| 24 autres domaines migrés (clients, devis, factures, depenses, stocks, interventions, chantiers, contrats, commandes, rdv, `ecritures`, …) | ✅ | ✅ (prêt) | **legacy** (parité incomplète → pas encore activés) |
+| **vehicules, notifications, fournisseurs, parametres, modelesEmail, relances, conges** (parité vérifiée) | ✅ | ✅ | **🟢 new-stack** (activés, 7 domaines) |
+| 23 autres domaines migrés (clients, devis, factures, depenses, stocks, interventions, chantiers, contrats, commandes, rdv, `ecritures`, …) | ✅ | ✅ (prêt) | **legacy** (parité incomplète → pas encore activés) |
 | **Abonnement / Stripe** (subscription, webhooks, billing) | ❌ | ❌ | **legacy** |
 | Auth / sessions / JWT / révocation | ❌ | ❌ | **legacy** |
 | Comptabilité FEC / export / déclaration TVA | ❌ (`ecritures` seules migrées) | ❌ | **legacy** |
@@ -67,7 +67,7 @@ Tout rapport d'itération (ntfy ET Linear) DOIT inclure, en plus du résumé de 
 | Génération PDF / iCal | ❌ | ❌ | **legacy** |
 | Vitrine / portail public | partiel (`demandesContact` migré) | partiel | **legacy** |
 
-**À retenir** : **6 domaines servent désormais le trafic staging via le new-stack** (parité de surface vérifiée : le new-stack expose toutes les procédures `trpc.<domaine>.*` que le client appelle). Les 24 autres domaines migrés restent sur le legacy tant que leur parité fine n'est pas complète (sinon un appel client tomberait sur une procédure absente). **Processus par itération** : implémenter les procédures manquantes d'un domaine → quand il couvre 100 % des appels client, l'ajouter à `STAGING_NEW_STACK_DEFAULT_DOMAINS` → `deploy-staging-newstack.sh` + `git push` → smoke. Les logiques cœur sensibles (abonnement/Stripe, auth, FEC/TVA, signature, assistant) restent à migrer (surface hors-tRPC, priorité (4)).
+**À retenir** : **7 domaines servent désormais le trafic staging via le new-stack** (parité de surface vérifiée : le new-stack expose toutes les procédures `trpc.<domaine>.*` que le client appelle). Les 24 autres domaines migrés restent sur le legacy tant que leur parité fine n'est pas complète (sinon un appel client tomberait sur une procédure absente). **Processus par itération** : implémenter les procédures manquantes d'un domaine → quand il couvre 100 % des appels client, l'ajouter à `STAGING_NEW_STACK_DEFAULT_DOMAINS` → `deploy-staging-newstack.sh` + `git push` → smoke. Les logiques cœur sensibles (abonnement/Stripe, auth, FEC/TVA, signature, assistant) restent à migrer (surface hors-tRPC, priorité (4)).
 
 ---
 
@@ -848,8 +848,11 @@ Chaque itération doit **déployer le nouveau stack et l'utiliser réellement** 
 5. 4 canaux (reporting : % switch-prod + trafic basculé + domaines servis par le new-stack).
 ⚠️ **Ne JAMAIS activer un domaine dont la parité de surface n'est pas vérifiée** (un appel client tomberait sur une procédure absente → app cassée).
 
-## Prochaine action : **(B1) Étendre la bascule — amener `conges` à parité complète puis l'activer**
-`conges` est migré et name-matché ; il ne manque que **`enAttente`** (le client `client/src` appelle `trpc.conges.enAttente`). (a) inspecter le legacy (`grep -nE "enAttente|congesRouter" server/routers.ts`) — probablement la liste des congés `statut='en_attente'` scopée tenant (filtre du manager). (b) ajouter le use-case/route `enAttente` au domaine `conges` (read scopé tenant ; réutiliser le repo `list` + filtre statut, ou une méthode repo dédiée). (c) e2e PG (liste filtrée + isolation cross-tenant). (d) **vérifier la couverture** : `grep -rhoE "trpc\.conges\.[a-zA-Z]+" client/src | sort -u` ⊆ procédures montées. (e) ajouter `conges` à `STAGING_NEW_STACK_DEFAULT_DOMAINS` + `DEFAULT_ENABLED`. Gate `tsc src` + `vitest run src`. Déployer (`deploy-staging-newstack.sh`) + `git push` + vérifier `x-operioz-backend: new-stack` sur `conges.list`. Puis enchaîner les domaines par coût croissant : **badges** (+`getObjectifsTechnicien`), **avis** (+`getDemandeInfo`,`submitAvis` — portail public), **stocks** (+`generateAlerts`,`getEntrant`,`getRapportCommande`), **techniciens** (+habilitations+`getStats`), **rdv** (+`confirm`/`refuse` alias+`getPendingCount`/`getStats`/`proposeAutreCreneau`)… En //, **continuer la parité `depenses`** (gros : 28 appels client) : (2i) `approuver`/`rejeter` NoteFrais (anti self-approbation), (2j) `payer`+lignes, budgets/stats.
+## Prochaine action : **(B2) Étendre la bascule — amener `badges` à parité complète puis l'activer**
+`badges` est migré + name-matché ; il ne manque que **`getObjectifsTechnicien`** (appelé par le client). (a) inspecter le legacy (`grep -nE "getObjectifsTechnicien|badgesRouter" server/routers.ts` + le `db.getObjectifsTechnicien` correspondant) — vraisemblablement les objectifs/progression d'un technicien (⚠️ **données salarié** → vérifier le scoping tenant + ownership du technicien, anti-IDOR comme `conges.byTechnicien`). (b) porter le read au domaine `badges` (port + drizzle + fake + use-case + route `getObjectifsTechnicien {technicienId}` avec garde ownership technicien). (c) e2e PG (objectifs scopés + technicien hors tenant → refus). (d) **vérifier couverture** : `grep -rhoE "trpc\.badges\.[a-zA-Z]+" client/src | sort -u` ⊆ procédures montées. (e) activer `badges` (`STAGING_NEW_STACK_DEFAULT_DOMAINS` + `DEFAULT_ENABLED` + smoke scripts). Gate `tsc src` + `vitest run src`. **Déployer** : `deploy-staging-newstack.sh` + `deploy-staging-pages.sh` + vérifier `x-operioz-backend: new-stack` sur `badges.list`. Puis enchaîner par coût croissant : **avis** (+`getDemandeInfo`,`submitAvis` — portail public, ⚠️ anti-oracle), **stocks** (+`generateAlerts`,`getEntrant`,`getRapportCommande`), **techniciens** (+habilitations+`getStats`), **rdv** (+`confirm`/`refuse` alias+`getPendingCount`/`getStats`/`proposeAutreCreneau`)… En //, **continuer la parité `depenses`** (gros : 28 appels client) : (2i) `approuver`/`rejeter` NoteFrais (anti self-approbation), (2j) `payer`+lignes, budgets/stats.
+
+### (archive) (B1) `conges` à parité complète + ACTIVÉ — **FAIT** (2026-06-14)
+Manquait `enAttente` (vue manager). Ajouté : port `ICongeRepository.listEnAttente` (scopé tenant, `statut='en_attente'`, tri `dateDebut` ASC — parité legacy `getCongesEnAttente`) + Drizzle + fake + use-case `listCongesEnAttente` + route `conges.enAttente`. Couverture client (`approuver/create/enAttente/list/refuser`) **complète** → `conges` ajouté à `STAGING_NEW_STACK_DEFAULT_DOMAINS`/`DEFAULT_ENABLED` + smoke scripts. e2e PG : enAttente filtré `en_attente` + tri ASC + isolation B + 401. Gate `tsc src` + suite **1470/1470**. **Déployé + vérifié EN LIGNE** : `conges.list/enAttente/approuver` → `x-operioz-backend: new-stack` + 200 authentifié (faux user staging). **🟢 7e domaine live.**
 
 ### (archive) BASCULE STAGING ACTIVÉE + fix resolver — **FAIT** (2026-06-14)
 Demande utilisateur : déployer le nouveau stack et lui faire **servir le trafic** (parties refactorées), proprement, en testant avec de vrais users. Livré :

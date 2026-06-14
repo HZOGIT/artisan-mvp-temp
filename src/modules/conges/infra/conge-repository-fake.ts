@@ -34,6 +34,12 @@ export class FakeCongeRepository implements ICongeRepository {
     return this.store.filter((c) => c.artisanId === ctx.artisanId);
   }
 
+  async listEnAttente(ctx: TenantContext): Promise<Conge[]> {
+    return this.store
+      .filter((c) => c.artisanId === ctx.artisanId && c.statut === "en_attente")
+      .sort((a, b) => a.dateDebut.localeCompare(b.dateDebut));
+  }
+
   async getById(ctx: TenantContext, id: number): Promise<Conge | null> {
     return this.store.find((c) => c.id === id && c.artisanId === ctx.artisanId) ?? null;
   }

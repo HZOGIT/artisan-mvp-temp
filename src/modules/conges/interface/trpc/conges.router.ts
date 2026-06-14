@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ICongeRepository } from "../../application/conge-repository";
-import { listConges, getConge } from "../../application/read-use-cases";
+import { listConges, listCongesEnAttente, getConge } from "../../application/read-use-cases";
 import {
   creerConge,
   modifierConge,
@@ -42,6 +42,9 @@ const updateSchema = z.object({
 export function createCongesRouter(repo: ICongeRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listConges(repo, ctx.tenant)),
+
+    // Demandes en attente (vue manager/approbateur), scopées tenant (parité client trpc.conges.enAttente).
+    enAttente: protectedProcedure.query(({ ctx }) => listCongesEnAttente(repo, ctx.tenant)),
 
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
