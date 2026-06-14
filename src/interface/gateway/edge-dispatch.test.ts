@@ -1,12 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { MIGRATED_DOMAINS } from "./migrated-domains";
+import { MIGRATED_DOMAINS, STAGING_NEW_STACK_DEFAULT_DOMAINS } from "./migrated-domains";
 // @ts-ignore — module ESM de la Pages Function (JS pur, sans types). Importé pour verrouiller la
 // parité avec le gateway src (anti-drift) : la logique edge réimplémente la décision en JS.
-import { MIGRATED as EDGE_MIGRATED, decideTarget, domainFromTrpcPath } from "../../../functions/_lib/dispatch.mjs";
+import {
+  MIGRATED as EDGE_MIGRATED,
+  DEFAULT_ENABLED as EDGE_DEFAULT_ENABLED,
+  decideTarget,
+  domainFromTrpcPath,
+  domainsFromTrpcPath,
+} from "../../../functions/_lib/dispatch.mjs";
 
 // La Pages Function `functions/api/[[path]].js` ne peut pas importer src/** (JS pur, pas de build TS).
 // Elle réimplémente la décision de dispatch dans `functions/_lib/dispatch.mjs`. Ce test garantit que
 // cette réimplémentation reste alignée sur le registre + la sémantique du gateway clean-archi.
+
+// Un domaine migré qui n'est PAS activé par défaut (pour les cas « OFF par défaut »).
+const NON_DEFAULT = MIGRATED_DOMAINS.find((d) => !STAGING_NEW_STACK_DEFAULT_DOMAINS.includes(d as never))!; // ex. "avis"
+const DEFAULT_ON = STAGING_NEW_STACK_DEFAULT_DOMAINS[0]; // ex. "vehicules"
 
 describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gateway src", () => {
   it("la table MIGRATED de l'edge == MIGRATED_DOMAINS (même ensemble + cardinalité)", () => {
@@ -14,17 +24,36 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(EDGE_MIGRATED.length).toBe(MIGRATED_DOMAINS.length);
   });
 
-  it("domainFromTrpcPath extrait le domaine ; null hors /api/trpc", () => {
-    expect(domainFromTrpcPath("/api/trpc/articles.list")).toBe("articles");
-    expect(domainFromTrpcPath("/api/trpc/clients.getById")).toBe("clients");
-    expect(domainFromTrpcPath("/api/auth/login")).toBeNull();
-    expect(domainFromTrpcPath("/")).toBeNull();
+  it("DEFAULT_ENABLED de l'edge == STAGING_NEW_STACK_DEFAULT_DOMAINS (anti-drift de la bascule)", () => {
+    expect(new Set(EDGE_DEFAULT_ENABLED)).toEqual(new Set(STAGING_NEW_STACK_DEFAULT_DOMAINS));
+    expect(EDGE_DEFAULT_ENABLED.length).toBe(STAGING_NEW_STACK_DEFAULT_DOMAINS.length);
+    // Tout domaine activé par défaut DOIT être un domaine migré (sinon routage vers l'inexistant).
+    for (const d of EDGE_DEFAULT_ENABLED) expect(MIGRATED_DOMAINS).toContain(d);
   });
 
-  it("OFF par défaut : un domaine migré part en legacy ; activé via NEW_STACK_DOMAINS → new-stack", () => {
-    const d = MIGRATED_DOMAINS[0];
-    expect(decideTarget(`/api/trpc/${d}.list`, {})).toBe("legacy");
-    expect(decideTarget(`/api/trpc/${d}.list`, { NEW_STACK_DOMAINS: d })).toBe("new-stack");
+  it("domainFromTrpcPath/domainsFromTrpcPath extraient le(s) domaine(s) ; vide hors /api/trpc", () => {
+    expect(domainFromTrpcPath("/api/trpc/articles.list")).toBe("articles");
+    expect(domainsFromTrpcPath("/api/trpc/articles.list")).toEqual(["articles"]);
+    // batch httpBatchLink : plusieurs domaines
+    expect(domainsFromTrpcPath("/api/trpc/vehicules.list,clients.getById")).toEqual(["vehicules", "clients"]);
+    expect(domainFromTrpcPath("/api/auth/login")).toBeNull();
+    expect(domainsFromTrpcPath("/")).toEqual([]);
+  });
+
+  it("activé par défaut (DEFAULT_ENABLED) : un domaine à parité vérifiée → new-stack sans env", () => {
+    expect(decideTarget(`/api/trpc/${DEFAULT_ON}.list`, {})).toBe("new-stack");
+  });
+
+  it("OFF par défaut : un domaine migré NON activé part en legacy ; activé via NEW_STACK_DOMAINS → new-stack", () => {
+    expect(decideTarget(`/api/trpc/${NON_DEFAULT}.list`, {})).toBe("legacy");
+    expect(decideTarget(`/api/trpc/${NON_DEFAULT}.list`, { NEW_STACK_DOMAINS: NON_DEFAULT })).toBe("new-stack");
+  });
+
+  it("batch : new-stack seulement si TOUS les domaines sont activés ; mixte → legacy (sûreté)", () => {
+    // vehicules activé par défaut + notifications activé par défaut → batch entièrement new-stack
+    expect(decideTarget("/api/trpc/vehicules.list,notifications.list", {})).toBe("new-stack");
+    // vehicules (ON) + clients (OFF) → batch mixte → legacy (legacy sert tout)
+    expect(decideTarget("/api/trpc/vehicules.list,clients.list", {})).toBe("legacy");
   });
 
   it("domaine non porté → legacy même si listé (sûreté)", () => {
@@ -32,7 +61,7 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
   });
 
   it("hors-tRPC → legacy (auth, webhooks, front)", () => {
-    const env = { NEW_STACK_DOMAINS: MIGRATED_DOMAINS[0] };
+    const env = { NEW_STACK_DOMAINS: NON_DEFAULT };
     expect(decideTarget("/api/auth/login", env)).toBe("legacy");
     expect(decideTarget("/api/webhooks/stripe", env)).toBe("legacy");
     expect(decideTarget("/", env)).toBe("legacy");

@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { resolveDispatchTarget, dispatchesToNewStack } from "./dispatch";
+import { resolveDispatchTarget, resolveBatchDispatchTarget, dispatchesToNewStack } from "./dispatch";
 import { NO_FLAGS, type FeatureFlags } from "./flags";
 import { MIGRATED_DOMAINS } from "./migrated-domains";
 
 // Un domaine réellement porté par le nouveau stack (1er du registre) pour les cas nominaux.
 const MIGRE = MIGRATED_DOMAINS[0]; // ex. "vehicules"
+const MIGRE2 = MIGRATED_DOMAINS[1]; // ex. "avis"
 
 describe("resolveDispatchTarget (décision de dispatch legacy↔nouveau stack)", () => {
   it("OFF par défaut : un domaine porté part en legacy tant qu'aucun flag ne l'active", () => {
@@ -63,5 +64,31 @@ describe("resolveDispatchTarget (décision de dispatch legacy↔nouveau stack)",
         expect(resolveDispatchTarget(`${autre}.list`, 1, flags)).toBe("legacy");
       }
     }
+  });
+});
+
+describe("resolveBatchDispatchTarget (décision batch-aware, httpBatchLink)", () => {
+  it("batch mono-domaine activé → new-stack", () => {
+    const flags: FeatureFlags = { [MIGRE]: { enabled: true } };
+    expect(resolveBatchDispatchTarget(`${MIGRE}.list`, 1, flags)).toBe("new-stack");
+  });
+
+  it("batch entièrement activé (tous les domaines ON) → new-stack", () => {
+    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, [MIGRE2]: { enabled: true } };
+    expect(resolveBatchDispatchTarget(`${MIGRE}.list,${MIGRE2}.getById`, 1, flags)).toBe("new-stack");
+  });
+
+  it("batch mixte (un domaine ON + un domaine OFF) → legacy (le legacy sert tout)", () => {
+    const flags: FeatureFlags = { [MIGRE]: { enabled: true } }; // MIGRE2 non activé
+    expect(resolveBatchDispatchTarget(`${MIGRE}.list,${MIGRE2}.getById`, 1, flags)).toBe("legacy");
+  });
+
+  it("batch avec un domaine NON porté par le nouveau stack → legacy", () => {
+    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, support: { enabled: true } };
+    expect(resolveBatchDispatchTarget(`${MIGRE}.list,support.list`, 1, flags)).toBe("legacy");
+  });
+
+  it("chemin sans domaine (health/whoami) → legacy", () => {
+    expect(resolveBatchDispatchTarget("health", 1, { [MIGRE]: { enabled: true } })).toBe("legacy");
   });
 });

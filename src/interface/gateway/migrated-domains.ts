@@ -10,3 +10,20 @@ export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 export function isMigratedDomainAvailable(domain: string): domain is MigratedDomain {
   return (MIGRATED_DOMAINS as readonly string[]).includes(domain);
 }
+
+// Domaines servis PAR DÉFAUT par le nouveau stack en STAGING (bascule réelle du trafic). Un domaine
+// n'entre ici qu'une fois sa **parité de surface vérifiée** : le nouveau stack expose TOUTES les
+// procédures que le client appelle pour ce domaine (`trpc.<domaine>.*`) — sinon un appel client
+// tomberait sur une procédure inexistante. Vérification : diff des appels client (`client/src`) vs
+// procédures montées (cf. `docs/architecture/refonte-parite-backlog.md` §2). Cette liste est la
+// **source de vérité** mirroir-ée par l'edge (`functions/_lib/dispatch.mjs` DEFAULT_ENABLED, verrouillé
+// par `edge-dispatch.test.ts`). On l'élargit domaine par domaine au fil de la parité (les autres
+// domaines migrés restent servis par le legacy tant que leur parité n'est pas complète).
+export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
+  "vehicules",
+  "notifications",
+  "fournisseurs",
+  "parametres",
+  "modelesEmail",
+  "relances",
+] as const;

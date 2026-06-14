@@ -4,6 +4,7 @@ import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
 import { getDbHandle } from "./shared/db";
+import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { VehiculeRepositoryDrizzle } from "./modules/vehicules/infra/vehicule-repository-drizzle";
 import type { IVehiculeRepository } from "./modules/vehicules/application/vehicule-repository";
 import { AvisRepositoryDrizzle } from "./modules/avis/infra/avis-repository-drizzle";
@@ -272,7 +273,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     prefix: "/api/trpc",
     trpcOptions: {
       router: appRouter,
-      createContext: makeCreateContext({ jwtSecret: deps.jwtSecret, resolver: deps.resolver }),
+      // ⚠️ Sans resolver, `tenant` reste null → toute procédure protégée renvoie 401. En production
+      // (déploiement réel), on câble par défaut le DrizzleTenantResolver (lit `artisans`/`users`, hors
+      // RLS) pour que l'auth par cookie `token` résolve l'artisanId. Les tests injectent leur resolver.
+      createContext: makeCreateContext({
+        jwtSecret: deps.jwtSecret,
+        resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+      }),
     },
   });
 

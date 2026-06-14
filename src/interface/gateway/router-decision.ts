@@ -30,3 +30,19 @@ export function domainFromTrpcPath(path: string): string | null {
   if (dot <= 0) return null;
   return trimmed.slice(0, dot);
 }
+
+// Domaines d'un chemin tRPC, **batch inclus** : tRPC `httpBatchLink` concatène les procédures
+// d'un même tick par des virgules (`vehicules.list,clients.getById`). Renvoie la liste des domaines
+// distincts (ordre d'apparition). Vide si aucun préfixe de domaine. Sert à décider d'un batch :
+// on ne le détourne vers le nouveau stack QUE si TOUS ses domaines y sont servis (cf. dispatch.ts).
+export function domainsFromTrpcPath(path: string): string[] {
+  const trimmed = path.replace(/^\/+/, "");
+  const domains: string[] = [];
+  for (const segment of trimmed.split(",")) {
+    const dot = segment.indexOf(".");
+    if (dot <= 0) continue;
+    const domain = segment.slice(0, dot);
+    if (domain && !domains.includes(domain)) domains.push(domain);
+  }
+  return domains;
+}

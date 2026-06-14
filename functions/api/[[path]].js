@@ -30,5 +30,14 @@ export async function onRequest(context) {
     init.body = request.body;
     init.duplex = "half";
   }
-  return fetch(target, init);
+  const response = await fetch(target, init);
+  // Observabilité de la bascule (smoke/diagnostic) : quel backend a servi. STREAMING-SAFE — on
+  // ré-emballe en préservant le flux du body (SSE assistant/chat OK), on ajoute juste un en-tête.
+  const outHeaders = new Headers(response.headers);
+  outHeaders.set("x-operioz-backend", backend === NEWSTACK ? "new-stack" : "legacy");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: outHeaders,
+  });
 }

@@ -1,5 +1,5 @@
 import type { FeatureFlags } from "./flags";
-import { domainFromTrpcPath, shouldRouteToNewStack } from "./router-decision";
+import { domainFromTrpcPath, domainsFromTrpcPath, shouldRouteToNewStack } from "./router-decision";
 import { isMigratedDomainAvailable } from "./migrated-domains";
 
 // Cible de dispatch d'une requête : le nouveau stack clean-archi ou le legacy.
@@ -34,4 +34,23 @@ export function resolveDispatchTarget(
 // Helper booléen équivalent (lisibilité côté appelant).
 export function dispatchesToNewStack(trpcPath: string, tenantId: number | undefined, flags: FeatureFlags): boolean {
   return resolveDispatchTarget(trpcPath, tenantId, flags) === "new-stack";
+}
+
+// Résolution **batch-aware** : avec `httpBatchLink`, un chemin peut porter plusieurs procédures de
+// domaines différents (`a.x,b.y`). On ne détourne le batch vers le nouveau stack QUE si CHAQUE
+// domaine y est servi (migré + routé) — sinon legacy, qui sert tout (donc jamais de procédure
+// inexistante côté nouveau stack). C'est la décision SÛRE pour une bascule progressive sans toucher
+// au batching client : seuls les batches mono-domaine (ou entièrement migrés) basculent. Un chemin
+// sans domaine (health/whoami/hors-tRPC) → legacy.
+export function resolveBatchDispatchTarget(
+  trpcPath: string,
+  tenantId: number | undefined,
+  flags: FeatureFlags,
+): DispatchTarget {
+  const domains = domainsFromTrpcPath(trpcPath);
+  if (domains.length === 0) return "legacy";
+  const allOnNewStack = domains.every(
+    (d) => isMigratedDomainAvailable(d) && shouldRouteToNewStack(d, tenantId, flags),
+  );
+  return allOnNewStack ? "new-stack" : "legacy";
 }

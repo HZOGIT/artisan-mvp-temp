@@ -46,18 +46,18 @@ Tout rapport d'itération (ntfy ET Linear) DOIT inclure, en plus du résumé de 
 | Déploiement new-stack en staging (derrière dispatcher, flags OFF) | 6 % | 100 % | 6,0 % |
 | Parité fonctionnelle (réconciliation 13 noms + parité procédures 30 domaines + migration 29 routeurs legacy-only) | 25 % | ~6 % | ~1,5 % |
 | Surface hors-tRPC (auth+JWT, webhooks Stripe/**abonnement**, uploads/OCR, PDF/iCal, vitrine/portail) | 12 % | 0 % | 0 % |
-| Bascule staging (flags ON progressifs + smoke vert → 100 % trafic new-stack) | 8 % | 0 % | 0 % |
+| Bascule staging (domaines ON progressifs + smoke vert → trafic new-stack) | 8 % | ~25 % | ~2,0 % |
 | Bascule prod (flags ON prod + monitoring) | 6 % | 0 % | 0 % |
 | Extinction legacy (suppression `server/`, OPE-255) | 4 % | 0 % | 0 % |
-| **TOTAL** | **100 %** | | **≈ 46 %** |
+| **TOTAL** | **100 %** | | **≈ 48 %** |
 
 ## État du déploiement staging — qui sert quoi AUJOURD'HUI (2026-06-14)
-> Deux backends derrière le dispatcher edge (`functions/api/[[path]].js`) : **legacy** `staging-backend.operioz.com` et **new-stack** `staging-newstack.operioz.com`. **Tous les flags de bascule sont OFF** → le dispatcher route **100 % du trafic vers le legacy**. Le new-stack est déployé et prêt mais ne reçoit aucun trafic de prod tant qu'un domaine n'est pas flaggé ON.
+> Deux backends derrière le dispatcher edge (`functions/api/[[path]].js`) : **legacy** `staging-backend.operioz.com` et **new-stack** `staging-newstack.operioz.com`. Le dispatcher est **batch-aware** : il route un (batch de) procédure(s) vers le new-stack **uniquement si TOUS ses domaines y sont servis ET activés** (sinon legacy, qui sert tout → jamais de procédure manquante). Les domaines activés par défaut = `STAGING_NEW_STACK_DEFAULT_DOMAINS` (parité de surface vérifiée) ; déploiement du routage = `git push origin staging` (build Pages) ; déploiement du backend = `./devtools/deploy-staging-newstack.sh` (rebuild `--build` + smoke). En-tête `x-operioz-backend` sur chaque réponse pour vérifier la bascule.
 
-| Module / logique cœur | Migré clean-archi | Déployé new-stack staging | **Sert le trafic staging** |
+| Module / logique cœur | Migré clean-archi | Déployé new-stack | **Sert le trafic staging** |
 |---|---|---|---|
-| 30 domaines CRUD (clients, devis, factures, depenses, stocks, interventions, chantiers, contrats, commandes, rdv, …) | ✅ | ✅ (disponible) | **legacy** (flag OFF) |
-| Écritures comptables (`ecritures`) | ✅ | ✅ | **legacy** (flag OFF) |
+| **vehicules, notifications, fournisseurs, parametres, modelesEmail, relances** (parité vérifiée) | ✅ | ✅ | **🟢 new-stack** (activés) |
+| 24 autres domaines migrés (clients, devis, factures, depenses, stocks, interventions, chantiers, contrats, commandes, rdv, `ecritures`, …) | ✅ | ✅ (prêt) | **legacy** (parité incomplète → pas encore activés) |
 | **Abonnement / Stripe** (subscription, webhooks, billing) | ❌ | ❌ | **legacy** |
 | Auth / sessions / JWT / révocation | ❌ | ❌ | **legacy** |
 | Comptabilité FEC / export / déclaration TVA | ❌ (`ecritures` seules migrées) | ❌ | **legacy** |
@@ -67,7 +67,7 @@ Tout rapport d'itération (ntfy ET Linear) DOIT inclure, en plus du résumé de 
 | Génération PDF / iCal | ❌ | ❌ | **legacy** |
 | Vitrine / portail public | partiel (`demandesContact` migré) | partiel | **legacy** |
 
-**À retenir** : en staging, **0 module ne sert le trafic via le new-stack** (tous les flags OFF) — le legacy sert 100 %. Le new-stack a **30 domaines cœur déployés et prêts** ; le 1er flag ON est prévu après clôture de la parité `depenses`. Les logiques cœur sensibles (abonnement/Stripe, auth, FEC/TVA, signature, assistant) **ne sont pas encore migrées** (surface hors-tRPC, traitée en priorité (4)).
+**À retenir** : **6 domaines servent désormais le trafic staging via le new-stack** (parité de surface vérifiée : le new-stack expose toutes les procédures `trpc.<domaine>.*` que le client appelle). Les 24 autres domaines migrés restent sur le legacy tant que leur parité fine n'est pas complète (sinon un appel client tomberait sur une procédure absente). **Processus par itération** : implémenter les procédures manquantes d'un domaine → quand il couvre 100 % des appels client, l'ajouter à `STAGING_NEW_STACK_DEFAULT_DOMAINS` → `deploy-staging-newstack.sh` + `git push` → smoke. Les logiques cœur sensibles (abonnement/Stripe, auth, FEC/TVA, signature, assistant) restent à migrer (surface hors-tRPC, priorité (4)).
 
 ---
 
@@ -839,7 +839,27 @@ Composées du domaine reglesCategorisation (`listRegles`/`creerRegle`/`supprimer
 ### (2f) Parité `depenses` — `getNoteFraisById` (null-parity) — FAIT (2026-06-14)
 Exposé en appelant directement `noteRepo.getById(ctx, id)` → renvoie l'objet OU **null** (200, pas 404) hors tenant — comportement legacy préservé (le use-case `getNoteDeFrais` qui throw NotFound n'est PAS utilisé ici). e2e PG : owner→objet / hors tenant→null(200) / 401. Gate `tsc src` + suite **1459/1459**. ⚠️ **`createNoteFrais` reporté** (le legacy génère le `numero` serveur via `getNextNoteFraisNumero` ; le use-case `creerNoteDeFrais` EXIGE `numero` en entrée et le port `INoteDeFraisRepository` n'a PAS de générateur → slice (2g) ajoute le générateur).
 
-## Prochaine action : **(2i) Parité `depenses` — `approuverNoteFrais` / `rejeterNoteFrais` (⚠️ anti self-approbation)**
+## Processus par itération (NOUVEAU — orienté DÉPLOIEMENT, demande utilisateur 2026-06-14)
+Chaque itération doit **déployer le nouveau stack et l'utiliser réellement** sans casser l'app. Boucle :
+1. Implémenter UN incrément propre (procédures manquantes d'un domaine, ou parité d'un sous-domaine) — tests verts.
+2. Si un domaine couvre désormais **100 % des appels client** (`grep "trpc.<d>." client/src` ⊆ procédures montées) → l'ajouter à `STAGING_NEW_STACK_DEFAULT_DOMAINS` (src/interface/gateway/migrated-domains.ts) **et** `DEFAULT_ENABLED` (functions/_lib/dispatch.mjs) — verrouillé par `edge-dispatch.test.ts`.
+3. **Déployer** : `./devtools/deploy-staging-newstack.sh` (rebuild `--build` + smoke anonyme **+ smoke authentifié** avec faux users staging A/B → 200). Échec smoke = échec déploiement.
+4. `git push origin staging` → build Pages (dispatcher + front). Vérifier l'en-tête `x-operioz-backend` sur les routes activées.
+5. 4 canaux (reporting : % switch-prod + trafic basculé + domaines servis par le new-stack).
+⚠️ **Ne JAMAIS activer un domaine dont la parité de surface n'est pas vérifiée** (un appel client tomberait sur une procédure absente → app cassée).
+
+## Prochaine action : **(B1) Étendre la bascule — amener `conges` à parité complète puis l'activer**
+`conges` est migré et name-matché ; il ne manque que **`enAttente`** (le client `client/src` appelle `trpc.conges.enAttente`). (a) inspecter le legacy (`grep -nE "enAttente|congesRouter" server/routers.ts`) — probablement la liste des congés `statut='en_attente'` scopée tenant (filtre du manager). (b) ajouter le use-case/route `enAttente` au domaine `conges` (read scopé tenant ; réutiliser le repo `list` + filtre statut, ou une méthode repo dédiée). (c) e2e PG (liste filtrée + isolation cross-tenant). (d) **vérifier la couverture** : `grep -rhoE "trpc\.conges\.[a-zA-Z]+" client/src | sort -u` ⊆ procédures montées. (e) ajouter `conges` à `STAGING_NEW_STACK_DEFAULT_DOMAINS` + `DEFAULT_ENABLED`. Gate `tsc src` + `vitest run src`. Déployer (`deploy-staging-newstack.sh`) + `git push` + vérifier `x-operioz-backend: new-stack` sur `conges.list`. Puis enchaîner les domaines par coût croissant : **badges** (+`getObjectifsTechnicien`), **avis** (+`getDemandeInfo`,`submitAvis` — portail public), **stocks** (+`generateAlerts`,`getEntrant`,`getRapportCommande`), **techniciens** (+habilitations+`getStats`), **rdv** (+`confirm`/`refuse` alias+`getPendingCount`/`getStats`/`proposeAutreCreneau`)… En //, **continuer la parité `depenses`** (gros : 28 appels client) : (2i) `approuver`/`rejeter` NoteFrais (anti self-approbation), (2j) `payer`+lignes, budgets/stats.
+
+### (archive) BASCULE STAGING ACTIVÉE + fix resolver — **FAIT** (2026-06-14)
+Demande utilisateur : déployer le nouveau stack et lui faire **servir le trafic** (parties refactorées), proprement, en testant avec de vrais users. Livré :
+- **Dispatcher batch-aware** (`functions/_lib/dispatch.mjs` + miroir src `dispatch.ts`/`router-decision.ts`) : un (batch de) procédure(s) ne part vers le new-stack que si **TOUS** ses domaines y sont migrés **et** activés (sinon legacy, qui sert tout) → pas besoin de toucher au `httpBatchLink` client, zéro risque de procédure manquante. `domainsFromTrpcPath` parse les batchs (`a.x,b.y`).
+- **`STAGING_NEW_STACK_DEFAULT_DOMAINS`** (source de vérité src) = 6 domaines à **parité de surface vérifiée** (diff appels client vs procédures montées) : `vehicules, notifications, fournisseurs, parametres, modelesEmail, relances`. Mirroir-é par `DEFAULT_ENABLED` (edge), anti-drift `edge-dispatch.test.ts`. Activés **sans variable d'env** → le déploiement Pages suffit.
+- 🐛 **BUG CRITIQUE corrigé** : `buildApp` ne câblait **aucun `TenantResolver`** par défaut → en production le nouveau stack renvoyait **401 à TOUTE requête authentifiée** (tenant toujours null). Ajout du défaut `new DrizzleTenantResolver(getDbHandle().db)`. (`artisans`/`users` hors RLS → lisibles sans contexte tenant : vérifié.)
+- **Outils de déploiement** : `devtools/deploy-staging-newstack.sh` (rebuild `docker compose --build` + smoke), `devtools/smoke-staging-newstack.sh` (crée 2 **faux users staging** A/B + artisans, forge des JWT cookie `token`, **smoke authentifié 200** + isolation + 401 sans cookie), `devtools/mint-jwt.mjs`. En-tête **`x-operioz-backend`** ajouté par la Pages Function (observabilité de la bascule, streaming-safe).
+- **Vérifié** : new-stack rebâti, health 200, **6 domaines → 200 authentifié** (users A/B), 401 sans cookie. Gate `tsc src` + suite **1469/1469 (259 fichiers)**.
+
+### (file d'attente) (2i) Parité `depenses` — `approuverNoteFrais` / `rejeterNoteFrais` (⚠️ anti self-approbation)
 Exposer sur le routeur `depenses` deux mutations composant les use-cases **déjà migrés** (workflow notes-de-frais, `write-use-cases.ts`) : `approuverNoteFrais {id, commentaire?}` → `approuverNoteDeFrais(noteRepo, ctx, id, commentaire)` et `rejeterNoteFrais {id, commentaire}` → `rejeterNoteDeFrais(noteRepo, ctx, id, commentaire)`. ⚠️ **INVARIANT SENSIBLE — anti self-approbation** : l'approbateur (`ctx.userId`) ≠ le demandeur (`note.userId`) → sinon `ForbiddenError`→403 (porté par le use-case `assertPasSelfApprobation`). Autres invariants (portés use-case) : transition `soumise→approuvee|rejetee` uniquement (sinon `ConflictError`→409), idempotence (déjà approuvée/rejetée → no-op), hors tenant → `NotFoundError`→404. **D'abord vérifier signature legacy** (`grep -nE -A14 "approuverNoteFrais|rejeterNoteFrais" server/routers.ts` ~10131) — `approuver` a `commentaire?` optionnel, `rejeter` exige probablement un `commentaire` (motif). e2e PG (⚠️ **2 users du même artisan** : créer un 2e user côté admin SQL pour tester l'anti self-approbation — la note créée par UA ne peut PAS être approuvée par UA ; il faut un approbateur ≠ demandeur) : soumettre puis approuver par un autre user → `approuvee` ; **approuver sa PROPRE note → 403** ; rejeter par un autre → `rejetee` + commentaire ; approuver une note non soumise → 409 ; hors tenant → 404 ; 401 sans cookie. ⚠️ Le contexte de test doit pouvoir forger un `ctx.userId` ≠ créateur (regarder comment `token()`/`callMutation` posent le userId — sinon créer la note via admin SQL avec `user_id` = autre user, puis approuver via le user du token). Gate `tsc src` + `vitest run src`. Ensuite (2j) `payerNoteFrais` + `addDepenseToNoteFrais`/`removeDepenseFromNoteFrais` (lignes), puis `copierBudgetsMois`/`stats` → clôture parité `depenses` → 1er flag ON staging + smoke. **Rappel reporting** : ntfy + Linear doivent inclure % switch-prod + trafic basculé 0% + état déploiement staging (cf. en-tête journal).
 
 ### (archive) (2h) Parité `depenses` — `soumettreNoteFrais` — **FAIT** (2026-06-14)

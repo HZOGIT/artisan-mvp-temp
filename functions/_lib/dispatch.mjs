@@ -2,10 +2,11 @@
 // build TS, donc pas d'import depuis src/**). Tenue synchronisée avec src/interface/gateway via le
 // test de parité anti-drift `src/interface/gateway/edge-dispatch.test.ts`.
 //
-// Décision PAR DOMAINE et GLOBALE (flag NEW_STACK_DOMAINS) : suffisant pour une bascule progressive
-// en staging. Le canary par tenant (qui exige l'auth) n'est PAS fait à l'edge — il restera côté
-// backend si besoin. Défaut sûr : tout part en legacy tant qu'un domaine n'est pas explicitement migré
-// ET activé.
+// Décision PAR DOMAINE et GLOBALE : un domaine migré + activé est servi par le nouveau stack, sinon
+// legacy. Défaut sûr : tout domaine NON activé part en legacy. La liste `DEFAULT_ENABLED` active la
+// bascule réelle du trafic en staging dès le déploiement (pas besoin de variable d'env) ; elle ne
+// contient que des domaines à **parité de surface vérifiée** (le nouveau stack expose toutes les
+// procédures appelées par le client). `NEW_STACK_DOMAINS` peut en ajouter d'autres ponctuellement.
 
 // Domaines portés par le nouveau stack (clés tRPC top-level appelées par le client). == MIGRATED_DOMAINS.
 export const MIGRATED = [
@@ -17,29 +18,49 @@ export const MIGRATED = [
 ];
 const MIGRATED_SET = new Set(MIGRATED);
 
+// Domaines servis par défaut par le nouveau stack en staging. == STAGING_NEW_STACK_DEFAULT_DOMAINS
+// (src/interface/gateway/migrated-domains.ts). Parité de surface vérifiée (diff appels client vs
+// procédures montées). On élargit cette liste domaine par domaine au fil de la parité.
+export const DEFAULT_ENABLED = [
+  "vehicules", "notifications", "fournisseurs", "parametres", "modelesEmail", "relances",
+];
+
 const TRPC_PREFIX = "/api/trpc/";
 
-// Domaine d'un chemin tRPC : "/api/trpc/articles.list" → "articles" ; null si hors /api/trpc.
-// ⚠️ Batch tRPC ("a.x,b.y") : on lit le préfixe de la 1re procédure → un batch multi-domaines ne peut
-// pas être éclaté ; par sûreté il faut éviter le batching client (ou il partira selon son 1er domaine).
-export function domainFromTrpcPath(pathname) {
-  if (typeof pathname !== "string" || !pathname.startsWith(TRPC_PREFIX)) return null;
+// Domaines d'un chemin tRPC, BATCH inclus : "/api/trpc/a.list,b.get" → ["a","b"]. tRPC `httpBatchLink`
+// concatène les procédures d'un même tick par des virgules. Renvoie [] hors /api/trpc.
+export function domainsFromTrpcPath(pathname) {
+  if (typeof pathname !== "string" || !pathname.startsWith(TRPC_PREFIX)) return [];
   const rest = pathname.slice(TRPC_PREFIX.length);
-  const dot = rest.indexOf(".");
-  const seg = dot > 0 ? rest.slice(0, dot) : rest;
-  return seg || null;
+  const domains = [];
+  for (const segment of rest.split(",")) {
+    const dot = segment.indexOf(".");
+    const domain = dot > 0 ? segment.slice(0, dot) : segment;
+    const trimmed = (domain || "").trim();
+    if (trimmed && !domains.includes(trimmed)) domains.push(trimmed);
+  }
+  return domains;
 }
 
-// Domaines activés globalement via l'env de la Pages Function : NEW_STACK_DOMAINS="articles,clients".
+// Domaine de la 1re procédure (compat). Préférer domainsFromTrpcPath pour la décision.
+export function domainFromTrpcPath(pathname) {
+  return domainsFromTrpcPath(pathname)[0] ?? null;
+}
+
+// Domaines activés : DEFAULT_ENABLED (code) ∪ NEW_STACK_DOMAINS (env de la Pages Function).
 export function enabledDomains(env) {
   const raw = (env && env.NEW_STACK_DOMAINS) || "";
-  return new Set(String(raw).split(",").map((s) => s.trim()).filter(Boolean));
+  const fromEnv = String(raw).split(",").map((s) => s.trim()).filter(Boolean);
+  return new Set([...DEFAULT_ENABLED, ...fromEnv]);
 }
 
-// Cible de dispatch : "new-stack" (domaine migré ET activé) ou "legacy" (défaut sûr).
+// Cible de dispatch : "new-stack" SEULEMENT si le chemin cible au moins un domaine ET que TOUS les
+// domaines (batch inclus) sont migrés ET activés. Sinon "legacy" (défaut sûr, sert tout) → un batch
+// mêlant un domaine activé et un domaine legacy part en legacy (jamais de procédure manquante).
 export function decideTarget(pathname, env) {
-  const domain = domainFromTrpcPath(pathname);
-  if (!domain) return "legacy";
-  if (!MIGRATED_SET.has(domain)) return "legacy";
-  return enabledDomains(env).has(domain) ? "new-stack" : "legacy";
+  const domains = domainsFromTrpcPath(pathname);
+  if (domains.length === 0) return "legacy";
+  const enabled = enabledDomains(env);
+  const allOnNewStack = domains.every((d) => MIGRATED_SET.has(d) && enabled.has(d));
+  return allOnNewStack ? "new-stack" : "legacy";
 }
