@@ -35,6 +35,7 @@ import type { DevisOptionsModule } from "../../modules/devis-options/devis-optio
 import type { ActivitesModule } from "../../modules/activites/activites.module";
 import type { FeatureModulesModule } from "../../modules/feature-modules/feature-modules.module";
 import type { StatistiquesModule } from "../../modules/statistiques/statistiques.module";
+import type { CalendrierModule } from "../../modules/calendrier/calendrier.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -73,6 +74,7 @@ export interface AppRouterDeps {
   readonly activites: ActivitesModule;
   readonly modules: FeatureModulesModule;
   readonly statistiques: StatistiquesModule;
+  readonly calendrier: CalendrierModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -120,6 +122,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     activites: deps.activites.router,
     modules: deps.modules.router,
     statistiques: deps.statistiques.router,
+    calendrier: deps.calendrier.router,
   });
 }
 

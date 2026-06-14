@@ -70,6 +70,9 @@ import type { IModulesRepository } from "./modules/feature-modules/application/m
 import { createStatistiquesModule } from "./modules/statistiques/statistiques.module";
 import { DevisStatsReaderDrizzle } from "./modules/statistiques/infra/devis-stats-reader-drizzle";
 import type { IDevisStatsReader } from "./modules/statistiques/application/devis-stats-reader";
+import { createCalendrierModule } from "./modules/calendrier/calendrier.module";
+import { IcalFeedRepositoryDrizzle } from "./modules/calendrier/infra/ical-feed-repository-drizzle";
+import type { IIcalFeedRepository } from "./modules/calendrier/application/ical-feed-repository";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -198,6 +201,7 @@ export interface AppDeps extends ContextDeps {
   readonly activiteRepo?: IActiviteRepository;
   readonly modulesRepo?: IModulesRepository;
   readonly devisStatsReader?: IDevisStatsReader;
+  readonly icalFeedRepo?: IIcalFeedRepository;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -457,7 +461,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const statistiques = createStatistiquesModule({
     devisStatsReader: deps.devisStatsReader ?? new DevisStatsReaderDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques });
+  const calendrier = createCalendrierModule({
+    repository: deps.icalFeedRepo ?? new IcalFeedRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
