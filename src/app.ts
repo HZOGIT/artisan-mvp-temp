@@ -82,6 +82,9 @@ import type { IRdvRepository } from "./modules/rdv-en-ligne/application/rdv-repo
 import { createRelancesDevisModule } from "./modules/relances-devis/relances-devis.module";
 import { RelanceDevisRepositoryDrizzle } from "./modules/relances-devis/infra/relance-devis-repository-drizzle";
 import type { IRelanceDevisRepository } from "./modules/relances-devis/application/relance-devis-repository";
+import { createCategoriesDepensesModule } from "./modules/categories-depenses/categories-depenses.module";
+import { CategorieDepenseRepositoryDrizzle } from "./modules/categories-depenses/infra/categorie-depense-repository-drizzle";
+import type { ICategorieDepenseRepository } from "./modules/categories-depenses/application/categorie-depense-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -119,6 +122,7 @@ export interface AppDeps extends ContextDeps {
   readonly configRelancesRepo?: IConfigRelancesRepository;
   readonly rdvRepo?: IRdvRepository;
   readonly relanceDevisRepo?: IRelanceDevisRepository;
+  readonly categorieDepenseRepo?: ICategorieDepenseRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -214,7 +218,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const relancesDevis = createRelancesDevisModule({
     repository: deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis });
+  const categoriesDepenses = createCategoriesDepensesModule({
+    repository: deps.categorieDepenseRepo ?? new CategorieDepenseRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
