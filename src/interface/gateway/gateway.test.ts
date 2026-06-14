@@ -431,9 +431,32 @@ describe("bascule du domaine parametres (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine modelesEmail (flag gateway)", () => {
+  it("modelesEmail routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("modelesEmail", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { modelesEmail: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("modelesEmail", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("modelesEmail", 8, canary)).toBe(false);
+    const global: FeatureFlags = { modelesEmail: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("modelesEmail", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("modelesEmail", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine modelesEmail extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("modelesEmail.create")).toBe("modelesEmail");
+    expect(domainFromTrpcPath("/modelesEmail.byType")).toBe("modelesEmail");
+  });
+
+  it("parse env : modelesEmail enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "modelesEmail" } as NodeJS.ProcessEnv).modelesEmail).toEqual({ enabled: true });
+    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // (le parseur lowercase le suffixe → clé `modelesemail`) — même limitation que notesDeFrais.
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 19 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres"]) {
+  it("les 20 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
