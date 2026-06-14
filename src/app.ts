@@ -99,6 +99,9 @@ import type { IComptabiliteReader } from "./modules/comptabilite/application/com
 import { createAuthModule } from "./modules/auth/auth.module";
 import { AuthRepositoryDrizzle } from "./modules/auth/infra/auth-repository-drizzle";
 import type { IAuthRepository } from "./modules/auth/application/auth-repository";
+import { createSubscriptionModule } from "./modules/subscription/subscription.module";
+import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
+import type { ISubscriptionReader } from "./modules/subscription/application/subscription-reader";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -236,6 +239,7 @@ export interface AppDeps extends ContextDeps {
   readonly utilisateurRepo?: IUtilisateurRepository;
   readonly comptabiliteReader?: IComptabiliteReader;
   readonly authRepo?: IAuthRepository;
+  readonly subscriptionReader?: ISubscriptionReader;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -536,7 +540,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth });
+  // Abonnement (SENSIBLE/billing) — slice LECTURE `getCurrent` (table subscriptions HORS RLS, scope
+  // explicite). MONTÉ mais PAS activé : il manque les effets Stripe (checkout/portal/cancel/reactivate)
+  // + le webhook → le trafic abonnement reste sur le legacy jusqu'à parité complète.
+  const subscription = createSubscriptionModule({
+    reader: deps.subscriptionReader ?? new SubscriptionReaderDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

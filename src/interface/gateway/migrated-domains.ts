@@ -2,7 +2,7 @@
 // montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
 // cibler qu'un domaine présent ici (sinon le routage enverrait vers un domaine inexistant
 // du nouveau stack). Mis à jour à chaque domaine livré (étape 9/9 du gabarit).
-export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs", "comptabilite", "auth"] as const;
+export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs", "comptabilite", "auth", "subscription"] as const;
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
@@ -56,4 +56,6 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "utilisateurs", // parité vérifiée : list/invite/updateRole/toggleActif/getPermissions/updatePermissions/resetPermissions (gate utilisateurs.gerer ; tables HORS RLS, scope artisanId explicite) ⊇ 7 appels client
   "comptabilite", // parité vérifiée : getGrandLivre/getBalance/getJournalVentes/getRapportTVA/getDeclarationTVADetail/getFecPreview (gate comptabilite.voir ; FEC opposable Σdébit=Σcrédit, lecture seule) ⊇ 6 appels client
   "auth", // parité vérifiée : me/signin/signup/logout/updateEmail/updatePassword/forgotPassword/resetPassword/deleteAccount (JWT secret legacy, cookie inter-opérable) ⊇ 9 appels client. Smoke e2e OK (signup→cookie→me 200 + provisioning ; signin bon→200 / mauvais→401).
+  // NB : `subscription` est MONTÉ (MIGRATED_DOMAINS) mais **PAS activé ici** : seul `getCurrent` (lecture)
+  // est porté ; il manque createCheckout/createPortal/cancel/reactivate (effets Stripe) + le webhook signé.
 ] as const;
