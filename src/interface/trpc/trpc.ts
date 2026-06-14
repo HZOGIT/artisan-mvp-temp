@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { AppContext } from "./context";
 import type { TenantContext } from "../../shared/tenant";
-import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyRequestsError } from "../../shared/errors";
+import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyRequestsError, UnauthorizedError } from "../../shared/errors";
 
 // ⚠️ Le client (client/src) et le legacy utilisent **superjson** comme data transformer. Le
 // new-stack DOIT l'utiliser aussi, sinon les payloads de mutation arrivent enveloppés (`{json:…}`)
@@ -20,6 +20,7 @@ const mapDomainErrors = t.middleware(async ({ next }) => {
   if (result.ok) return result;
   const cause: unknown = result.error.cause ?? result.error;
   if (cause instanceof NotFoundError) throw new TRPCError({ code: "NOT_FOUND", message: cause.message });
+  if (cause instanceof UnauthorizedError) throw new TRPCError({ code: "UNAUTHORIZED", message: cause.message });
   if (cause instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: cause.message });
   if (cause instanceof ForbiddenError) throw new TRPCError({ code: "FORBIDDEN", message: cause.message });
   if (cause instanceof ConflictError) throw new TRPCError({ code: "CONFLICT", message: cause.message });

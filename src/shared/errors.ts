@@ -34,6 +34,16 @@ export class ValidationError extends Error {
   }
 }
 
+// Authentification échouée/absente (identifiants invalides, session requise). Traduite en
+// UNAUTHORIZED côté transport. ⚠️ Distinct de ForbiddenError (authentifié mais droits insuffisants).
+export class UnauthorizedError extends Error {
+  readonly code = "UNAUTHORIZED" as const;
+  constructor(message = "Authentification requise") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 // Limite d'usage atteinte (anti-abus). Traduite en TOO_MANY_REQUESTS côté transport.
 export class TooManyRequestsError extends Error {
   readonly code = "TOO_MANY_REQUESTS" as const;

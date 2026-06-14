@@ -15,6 +15,9 @@ export interface AppContext {
   // Permissions de l'utilisateur courant (codes `domaine.action`), résolues depuis `permissions_utilisateur`.
   // Sert au seam `permissionProcedure`. Vide si non authentifié ou aucun reader injecté.
   readonly permissions: readonly string[];
+  // Réponse Fastify (pour poser/effacer le cookie d'auth depuis les procédures `auth.*`). Null hors
+  // d'une requête HTTP réelle (tests via createCaller) → les procédures cookie doivent rester tolérantes.
+  readonly res: FastifyReply | null;
 }
 
 export interface ContextDeps {
@@ -35,6 +38,6 @@ export function makeCreateContext(deps: ContextDeps = {}) {
     const role = claims ? (deps.roleReader ? await deps.roleReader.getRole(claims.userId) : tenant?.role ?? null) : null;
     // Permissions résolues comme le rôle (INDÉPENDANT du tenant) ; vide si pas de reader/auth.
     const permissions = claims && deps.permissionsReader ? await deps.permissionsReader.getPermissions(claims.userId) : [];
-    return { claims, tenant, role, permissions };
+    return { claims, tenant, role, permissions, res: opts.res };
   };
 }

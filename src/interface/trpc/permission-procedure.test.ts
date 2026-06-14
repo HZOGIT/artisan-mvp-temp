@@ -18,6 +18,7 @@ const baseCtx = (over: Partial<AppContext>): AppContext => ({
   tenant: { artisanId: 10, userId: 1 },
   role: "secretaire",
   permissions: [],
+  res: null,
   ...over,
 });
 
