@@ -51,6 +51,10 @@ import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repos
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
 import { DevisRepositoryDrizzle } from "./modules/devis/infra/devis-repository-drizzle";
+import {
+  ArtisanReaderDrizzle as SharedArtisanReaderDrizzle,
+  ClientReaderDrizzle as SharedClientReaderDrizzle,
+} from "./shared/readers/contact-readers-drizzle";
 import type { IDevisRepository } from "./modules/devis/application/devis-repository";
 import { createFacturesModule } from "./modules/factures/factures.module";
 import { FactureRepositoryDrizzle } from "./modules/factures/infra/facture-repository-drizzle";
@@ -261,6 +265,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const devis = createDevisModule({
     repository: devisRepo,
+    // Envoi du devis par email (PDF en PJ) + getById enrichi : readers contact partagés +
+    // PdfPort/EmailPort legacy + rate-limiter anti-abus (20 / 15 min). email/rate-limiter injectables.
+    mailing: {
+      artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+      clientReader: new SharedClientReaderDrizzle(getDbHandle().db),
+      pdf: new LegacyPdfAdapter(),
+      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
+    },
   });
   // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
   // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.

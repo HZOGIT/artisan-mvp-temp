@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDevisRepository } from "../../application/devis-repository";
-import { listDevis, getDevis, listLignesDevis } from "../../application/read-use-cases";
+import { listDevis, getDevisDetail, listLignesDevis } from "../../application/read-use-cases";
+import { envoyerDevisParEmail, type DevisMailingDeps } from "../../application/envoyer-devis-email";
 import {
   creerDevis,
   modifierDevis,
@@ -72,13 +73,14 @@ const ligneUpdateSchema = z.object({
 // Routeur tRPC du domaine devis. Transport mince : valide les inputs (zod), délègue aux use-cases
 // (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-acceptation via
 // ctx.tenant), laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
-export function createDevisRouter(repo: IDevisRepository) {
+export function createDevisRouter(repo: IDevisRepository, mailing: DevisMailingDeps) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDevis(repo, ctx.tenant)),
 
+    // Détail enrichi (parité legacy : `{ ...devis, lignes, client }`) — consommé par DevisDetail.
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .query(({ ctx, input }) => getDevis(repo, ctx.tenant, input.id)),
+      .query(({ ctx, input }) => getDevisDetail(repo, mailing.clientReader, ctx.tenant, input.id)),
 
     getLignes: protectedProcedure
       .input(z.object({ devisId: z.number().int() }))
@@ -139,5 +141,23 @@ export function createDevisRouter(repo: IDevisRepository) {
     expirer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
+
+    // Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.
+    // ownership 404 / client.email 400 / rate-limit 429 ; passe `envoye` si brouillon.
+    sendByEmail: protectedProcedure
+      .input(
+        z.object({
+          devisId: z.number().int(),
+          customMessage: z.string().max(5000).optional(),
+          attachPdf: z.boolean().optional().default(true),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        envoyerDevisParEmail(repo, mailing, ctx.tenant, {
+          devisId: input.devisId,
+          customMessage: input.customMessage,
+          attachPdf: input.attachPdf,
+        }),
+      ),
   });
 }

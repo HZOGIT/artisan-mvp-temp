@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { createDevisModule } from "./devis.module";
 import type { IDevisRepository } from "./application/devis-repository";
+import type { DevisMailingDeps } from "./application/envoyer-devis-email";
+
+const stubMailing: DevisMailingDeps = {
+  artisanReader: { getArtisan: async () => null },
+  clientReader: { getClient: async () => null },
+  pdf: { render: async () => Buffer.from("") },
+  email: { send: async () => {} },
+  rateLimiter: { check: async () => true },
+};
 
 const stubRepo: IDevisRepository = {
   list: async () => [],
@@ -21,7 +30,7 @@ const stubRepo: IDevisRepository = {
 
 describe("devis.module", () => {
   it("createDevisModule câble le repository injecté", () => {
-    const module = createDevisModule({ repository: stubRepo });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -43,7 +52,7 @@ describe("devis.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
-    const module = createDevisModule({ repository: stubRepo });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "accepter",
@@ -57,6 +66,7 @@ describe("devis.module", () => {
       "getLignes",
       "list",
       "refuser",
+      "sendByEmail",
       "update",
       "updateLigne",
     ]);
