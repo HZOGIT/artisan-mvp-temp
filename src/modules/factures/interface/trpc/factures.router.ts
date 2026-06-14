@@ -136,7 +136,7 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     // ⚠️ Le passage à `payee` se fait via le paiement (étape ultérieure), pas ici.
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "envoyee")),
+      .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta)),
 
     marquerEnRetard: protectedProcedure
       .input(z.object({ id: z.number().int() }))

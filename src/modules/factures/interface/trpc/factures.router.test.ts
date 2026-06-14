@@ -5,6 +5,7 @@ import { buildApp } from "../../../../app";
 import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { FactureRepositoryDrizzle } from "../../infra/facture-repository-drizzle";
+import { NoopComptaPort } from "../../application/compta-port";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -66,7 +67,9 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Client A"])).rows[0].id;
     clientB = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanB, "Client B"])).rows[0].id;
     devisB = (await admin.query('insert into devis ("artisanId","clientId",numero) values ($1,$2,$3) returning id', [artisanB, clientB, "DEV-B-FACT"])).rows[0].id;
-    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: new FactureRepositoryDrizzle(app.db) });
+    // ⚠️ NoopComptaPort : ce test couvre les factures, pas la génération FEC (testée côté
+    // ecritures) — évite un effet de bord d'écritures via une autre connexion.
+    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: new FactureRepositoryDrizzle(app.db), compta: new NoopComptaPort() });
   });
 
   afterAll(async () => {

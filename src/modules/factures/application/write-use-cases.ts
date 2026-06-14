@@ -301,6 +301,7 @@ export async function changerStatutFacture(
   ctx: TenantContext,
   id: number,
   cible: FactureStatut,
+  compta: ComptaPort = NOOP_COMPTA,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   if (facture.statut === cible) return facture; // idempotent
@@ -309,6 +310,8 @@ export async function changerStatutFacture(
   }
   const updated = await repo.setStatut(ctx, id, cible);
   if (!updated) throw new NotFoundError("Facture introuvable");
+  // À l'émission (passage `envoyee`) : génère la pièce de vente FEC (411/706/445). Idempotent.
+  if (cible === "envoyee") await compta.genererEcrituresVente(ctx, id);
   return updated;
 }
 

@@ -5,6 +5,7 @@ import { buildApp } from "../../../../app";
 import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { FactureRepositoryDrizzle } from "../../infra/facture-repository-drizzle";
+import { NoopComptaPort } from "../../application/compta-port";
 
 // Durcissement e2e du domaine factures : bornes zod exhaustives + invariants du transport
 // (numero/statut/totaux/montantPaye inviolables, ligne liée à la facture ciblée). Complète
@@ -62,7 +63,7 @@ describe.skipIf(!URL)("factures.router e2e — bornes & invariants transport", (
     }
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanA, "Client A"])).rows[0].id;
-    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: new FactureRepositoryDrizzle(app.db) });
+    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), factureRepo: new FactureRepositoryDrizzle(app.db), compta: new NoopComptaPort() });
   });
 
   afterAll(async () => {

@@ -55,6 +55,10 @@ import { FactureRepositoryDrizzle } from "./modules/factures/infra/facture-repos
 import { DevisReaderDrizzle } from "./modules/factures/infra/devis-reader-drizzle";
 import type { IFactureRepository } from "./modules/factures/application/facture-repository";
 import type { IDevisReader } from "./modules/factures/application/devis-reader";
+import type { ComptaPort } from "./modules/factures/application/compta-port";
+import { EcritureRepositoryDrizzle } from "./modules/ecritures/infra/ecriture-repository-drizzle";
+import { FactureReaderDrizzle } from "./modules/ecritures/infra/facture-reader-drizzle";
+import { ComptaEcrituresAdapter } from "./modules/ecritures/infra/compta-ecritures-adapter";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -83,6 +87,7 @@ export interface AppDeps extends ContextDeps {
   readonly devisRepo?: IDevisRepository;
   readonly factureRepo?: IFactureRepository;
   readonly devisReader?: IDevisReader;
+  readonly compta?: ComptaPort;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -142,9 +147,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const devis = createDevisModule({
     repository: deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db),
   });
+  // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
+  // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.
+  const compta =
+    deps.compta ??
+    new ComptaEcrituresAdapter(new EcritureRepositoryDrizzle(getDbHandle().db), new FactureReaderDrizzle(getDbHandle().db));
   const factures = createFacturesModule({
     repository: deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db),
     devisReader: deps.devisReader ?? new DevisReaderDrizzle(getDbHandle().db),
+    compta,
   });
   const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures });
 
