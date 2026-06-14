@@ -34,8 +34,19 @@ export class FakeDevisRepository implements IDevisRepository {
     this.devisStore = this.devisStore.map((d) => (d.id === id ? { ...d, statut } : d));
   }
 
+  // Aide de test : force la date du devis (ancienneté — relances automatiques).
+  setDateDevisForTest(id: number, dateDevis: Date): void {
+    this.devisStore = this.devisStore.map((d) => (d.id === id ? { ...d, dateDevis } : d));
+  }
+
   async list(ctx: TenantContext): Promise<Devis[]> {
     return this.devisStore.filter((d) => d.artisanId === ctx.artisanId);
+  }
+
+  async listNonSignes(ctx: TenantContext): Promise<Devis[]> {
+    return this.devisStore.filter(
+      (d) => d.artisanId === ctx.artisanId && (d.statut === "brouillon" || d.statut === "envoye"),
+    );
   }
 
   async getById(ctx: TenantContext, id: number): Promise<Devis | null> {

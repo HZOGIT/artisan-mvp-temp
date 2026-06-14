@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { devis, devisLignes, clients, parametresArtisan } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -72,6 +72,17 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
         .select()
         .from(devis)
         .where(eq(devis.artisanId, ctx.artisanId))
+        .orderBy(desc(devis.dateDevis), desc(devis.id));
+      return rows.map(toDevis);
+    });
+  }
+
+  listNonSignes(ctx: TenantContext): Promise<Devis[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(devis)
+        .where(and(eq(devis.artisanId, ctx.artisanId), inArray(devis.statut, ["brouillon", "envoye"])))
         .orderBy(desc(devis.dateDevis), desc(devis.id));
       return rows.map(toDevis);
     });

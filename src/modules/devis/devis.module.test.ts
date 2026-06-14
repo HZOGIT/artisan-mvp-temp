@@ -21,9 +21,18 @@ const stubModeleRepo = {
   delete: async () => false,
   addLigne: async () => null,
 } as unknown as import("../modeles-devis/application/modele-devis-repository").IModeleDevisRepository;
+const stubRelanceRepo = {
+  list: async () => [],
+  listByDevis: async () => [],
+  getById: async () => null,
+  create: async () => ({ id: 1 }),
+  delete: async () => false,
+  ownsDevis: async () => false,
+} as unknown as import("../relances-devis/application/relance-devis-repository").IRelanceDevisRepository;
 
 const stubRepo: IDevisRepository = {
   list: async () => [],
+  listNonSignes: async () => [],
   getById: async () => null,
   create: async () => {
     throw new Error("non implémenté (stub)");
@@ -41,7 +50,7 @@ const stubRepo: IDevisRepository = {
 
 describe("devis.module", () => {
   it("createDevisModule câble le repository injecté", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo, relanceRepository: stubRelanceRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -54,6 +63,7 @@ describe("devis.module", () => {
       "getById",
       "list",
       "listLignes",
+      "listNonSignes",
       "nextNumero",
       "ownsClient",
       "setStatut",
@@ -63,7 +73,7 @@ describe("devis.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo, relanceRepository: stubRelanceRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "accepter",
@@ -76,6 +86,8 @@ describe("devis.module", () => {
       "deleteLigne",
       "duplicate",
       "envoyer",
+      "envoyerRelance",
+      "envoyerRelancesAutomatiques",
       "expirer",
       "getById",
       "getLignes",

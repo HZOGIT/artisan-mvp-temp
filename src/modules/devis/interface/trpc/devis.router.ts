@@ -7,6 +7,8 @@ import type { DevisToFactureConverter } from "../../application/devis-to-facture
 import type { IModeleDevisRepository } from "../../../modeles-devis/application/modele-devis-repository";
 import { listModelesDevis, getModeleDevisAvecLignes } from "../../../modeles-devis/application/read-use-cases";
 import { creerModeleDevis, ajouterLigneModeleDevis } from "../../../modeles-devis/application/write-use-cases";
+import type { IRelanceDevisRepository } from "../../../relances-devis/application/relance-devis-repository";
+import { envoyerRelanceDevis, envoyerRelancesAutomatiques } from "../../application/relances-devis";
 import {
   creerDevis,
   modifierDevis,
@@ -83,7 +85,17 @@ export function createDevisRouter(
   mailing: DevisMailingDeps,
   converter: DevisToFactureConverter,
   modeleRepo: IModeleDevisRepository,
+  relanceRepo: IRelanceDevisRepository,
 ) {
+  // Dépendances de relance (réutilise les readers/email/rate-limiter du mailing + le repo relances).
+  const relanceDeps = {
+    devisRepo: repo,
+    relanceRepo,
+    clientReader: mailing.clientReader,
+    artisanReader: mailing.artisanReader,
+    email: mailing.email,
+    rateLimiter: mailing.rateLimiter,
+  };
   return router({
     list: protectedProcedure.query(({ ctx }) => listDevis(repo, ctx.tenant)),
 
@@ -190,6 +202,15 @@ export function createDevisRouter(
           remise: input.remise !== undefined ? String(input.remise) : undefined,
         }),
       ),
+
+    // ── Relances de devis (email + journal append-only) ──────────────────────────────────────────
+    envoyerRelance: protectedProcedure
+      .input(z.object({ devisId: z.number().int(), message: z.string().max(5000).optional() }))
+      .mutation(({ ctx, input }) => envoyerRelanceDevis(relanceDeps, ctx.tenant, input)),
+
+    envoyerRelancesAutomatiques: protectedProcedure
+      .input(z.object({ joursMinimum: z.number().int().min(0).optional(), joursEntreRelances: z.number().int().min(0).optional() }))
+      .mutation(({ ctx, input }) => envoyerRelancesAutomatiques(relanceDeps, ctx.tenant, input)),
 
     // Convertit un devis accepté en facture brouillon (cross-domaine) — parité `convertToFacture`.
     // 404 devis hors tenant ; Conflict si non accepté ou déjà converti (invariants factures).

@@ -18,6 +18,9 @@ import type {
 // les use-cases (étapes ultérieures), pas par le CRUD.
 export interface IDevisRepository {
   list(ctx: TenantContext): Promise<Devis[]>;
+  // Devis « non signés » (statut ∈ {brouillon, envoye}), du plus récent au plus ancien — base des
+  // relances et de `getDevisNonSignes`. Scopé tenant.
+  listNonSignes(ctx: TenantContext): Promise<Devis[]>;
   // null si le devis n'appartient pas au tenant.
   getById(ctx: TenantContext, id: number): Promise<Devis | null>;
   create(ctx: TenantContext, input: CreateDevisInput): Promise<Devis>;

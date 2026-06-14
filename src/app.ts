@@ -204,6 +204,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
   // Repo modèles de devis partagé : module modelesDevis + composé par devis (getModeles/…).
   const modeleDevisRepo = deps.modeleDevisRepo ?? new ModeleDevisRepositoryDrizzle(getDbHandle().db);
+  // Repo relances partagé : module relancesDevis + composé par devis (envoyerRelance/…).
+  const relanceDevisRepo = deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
   });
@@ -285,6 +287,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     converter: new FacturesDevisToFactureConverter(factureRepo, new DevisReaderDrizzle(getDbHandle().db)),
     // Modèles de devis exposés sous `devis.*` : repo partagé avec le module modelesDevis.
     modeleRepository: modeleDevisRepo,
+    // Relances exposées sous `devis.*` : repo partagé avec le module relancesDevis.
+    relanceRepository: relanceDevisRepo,
   });
   // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
   // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.
@@ -331,7 +335,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     clientRepository: clientRepo,
   });
   const relancesDevis = createRelancesDevisModule({
-    repository: deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db),
+    repository: relanceDevisRepo,
   });
   const categoriesDepenses = createCategoriesDepensesModule({
     repository: categorieDepenseRepo,
