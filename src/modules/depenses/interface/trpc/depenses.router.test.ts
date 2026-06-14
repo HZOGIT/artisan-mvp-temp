@@ -167,6 +167,23 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "depenses.listNotesFrais", undefined, tB)).json().result.data).toEqual([]); // isolation
   });
 
+  it("getNoteFraisById (parité client) : note de A → objet ; hors tenant → null (PAS 404) ; sans cookie 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (
+      await admin.query(
+        "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin) values ($1,$2,'NF-GET','Note get','2027-04-01','2027-04-30') returning id",
+        [artisanA, UA],
+      )
+    ).rows[0].id as number;
+    expect((await callQuery(server, "depenses.getNoteFraisById", { id })).statusCode).toBe(401);
+    expect((await callQuery(server, "depenses.getNoteFraisById", { id }, tA)).json().result.data).toMatchObject({ id, titre: "Note get" });
+    // hors tenant → null (et statusCode 200, pas 404) — comportement legacy préservé
+    const resB = await callQuery(server, "depenses.getNoteFraisById", { id }, tB);
+    expect(resB.statusCode).toBe(200);
+    expect(resB.json().result.data).toBeNull();
+  });
+
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
     const tA = await token(UA);
     const created = await callMutation(

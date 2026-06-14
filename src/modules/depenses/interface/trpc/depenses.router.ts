@@ -214,5 +214,12 @@ export function createDepensesRouter(
     // Read seul pour l'instant ; les mutations (create/soumettre/approuver/rejeter/payer) viendront
     // en slices dédiés en préservant l'anti self-approbation porté par le domaine notes-de-frais.
     listNotesFrais: protectedProcedure.query(({ ctx }) => listNotesDeFrais(noteRepo, ctx.tenant)),
+
+    // ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
+    // On appelle donc directement le repo (getById → null) plutôt que le use-case `getNoteDeFrais`
+    // (qui lève NotFound → 404).
+    getNoteFraisById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(({ ctx, input }) => noteRepo.getById(ctx.tenant, input.id)),
   });
 }
