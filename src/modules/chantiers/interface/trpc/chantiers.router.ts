@@ -6,6 +6,12 @@ import { creerChantier, modifierChantier, supprimerChantier } from "../../applic
 import { getPointagesChantier, ajouterPointage, supprimerPointage } from "../../application/pointages-use-cases";
 import { getSuiviChantier, creerSuivi, modifierSuivi, supprimerSuivi } from "../../application/suivi-use-cases";
 import { getPhasesChantier, creerPhase, modifierPhase, supprimerPhase } from "../../application/phases-use-cases";
+import {
+  getInterventionsLiees,
+  getAllInterventionsLiees,
+  associerInterventionChantier,
+  dissocierInterventionChantier,
+} from "../../application/interventions-liees-use-cases";
 
 const suiviStatutEnum = z.enum(["a_faire", "en_cours", "termine"]);
 const phaseStatutEnum = z.enum(["a_faire", "en_cours", "termine", "annule"]);
@@ -208,6 +214,31 @@ export function createChantiersRouter(repo: IChantierRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerPhase(repo, ctx.tenant, input.id);
+        return { success: true };
+      }),
+
+    // ── Interventions liées — table de liaison (anti-IDOR DOUBLE chantier+intervention) ───────────
+    getInterventions: protectedProcedure
+      .input(z.object({ chantierId: z.number().int() }))
+      .query(({ ctx, input }) => getInterventionsLiees(repo, ctx.tenant, input.chantierId)),
+
+    getAllInterventionsChantier: protectedProcedure.query(({ ctx }) => getAllInterventionsLiees(repo, ctx.tenant)),
+
+    associerIntervention: protectedProcedure
+      .input(
+        z.object({
+          chantierId: z.number().int(),
+          interventionId: z.number().int(),
+          phaseId: z.number().int().nullish(),
+          ordre: z.number().int().optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) => associerInterventionChantier(repo, ctx.tenant, input)),
+
+    dissocierIntervention: protectedProcedure
+      .input(z.object({ chantierId: z.number().int(), interventionId: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await dissocierInterventionChantier(repo, ctx.tenant, input.chantierId, input.interventionId);
         return { success: true };
       }),
   });

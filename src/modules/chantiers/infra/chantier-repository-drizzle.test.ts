@@ -24,11 +24,15 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
   let clientB = 0;
 
   let techA = 0;
+  let intervA = 0;
+  let intervB = 0;
 
   const cleanup = async () => {
     await admin.query('delete from pointages_chantier where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from suivi_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from phases_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
+    await admin.query('delete from interventions_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
+    await admin.query('delete from interventions where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from chantiers where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
@@ -40,6 +44,8 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [A, "Client A"])).rows[0].id;
     clientB = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [B, "Client B"])).rows[0].id;
     techA = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [A, "Tech A"])).rows[0].id;
+    intervA = (await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut") values ($1,$2,$3,now()) returning id', [A, clientA, "Interv A"])).rows[0].id;
+    intervB = (await admin.query('insert into interventions ("artisanId","clientId",titre,"dateDebut") values ($1,$2,$3,now()) returning id', [B, clientB, "Interv B"])).rows[0].id;
   });
 
   afterAll(async () => {
@@ -167,5 +173,25 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.deletePhase(ctx(A), p.id)).toBe(true);
     expect(await repo.deletePhase(ctx(A), p.id)).toBe(false);
     expect((await repo.listPhases(ctx(A), c.id)).map((x) => x.id)).toEqual([p2.id]);
+  });
+
+  it("interventions liées : ownsIntervention + associer/dissocier (anti-IDOR DOUBLE, idempotent)", async () => {
+    const c = await repo.create(ctx(A), { clientId: clientA, reference: ref(), nom: "Avec interventions" });
+    // ownsIntervention (anti-IDOR-FK) : reconnue pour son tenant, pas pour un autre
+    expect(await repo.ownsIntervention(ctx(A), intervA)).toBe(true);
+    expect(await repo.ownsIntervention(ctx(B), intervA)).toBe(false);
+    expect(await repo.ownsIntervention(ctx(A), intervB)).toBe(false);
+    // associer + idempotence (pas de doublon)
+    const l = await repo.associerIntervention(ctx(A), { chantierId: c.id, interventionId: intervA, ordre: 1 });
+    const l2 = await repo.associerIntervention(ctx(A), { chantierId: c.id, interventionId: intervA });
+    expect(l2.id).toBe(l.id);
+    expect((await repo.listInterventionsLiens(ctx(A), c.id)).map((x) => x.interventionId)).toEqual([intervA]);
+    // listAll scopé tenant (B ne voit rien)
+    expect((await repo.listAllInterventionsLiens(ctx(A))).some((x) => x.id === l.id)).toBe(true);
+    expect(await repo.listAllInterventionsLiens(ctx(B))).toEqual([]);
+    // dissocier idempotent
+    expect(await repo.dissocierIntervention(ctx(A), c.id, intervA)).toBe(true);
+    expect(await repo.dissocierIntervention(ctx(A), c.id, intervA)).toBe(false);
+    expect(await repo.listInterventionsLiens(ctx(A), c.id)).toEqual([]);
   });
 });

@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   chantiers,
   clients,
   techniciens,
+  interventions,
   phasesChantier,
   interventionsChantier,
   documentsChantier,
@@ -27,6 +28,8 @@ import type {
   PhaseStatut,
   CreatePhaseInput,
   UpdatePhaseInput,
+  ChantierInterventionLien,
+  AssocierInterventionInput,
 } from "../domain/chantier";
 
 type PointageRow = typeof pointagesChantier.$inferSelect;
@@ -82,6 +85,19 @@ function toPhase(r: PhaseRow): ChantierPhase {
     budgetPhase: r.budgetPhase ?? null,
     coutReel: r.coutReel ?? null,
     heuresPrevues: r.heuresPrevues ?? null,
+    createdAt: r.createdAt,
+  };
+}
+
+type InterventionLienRow = typeof interventionsChantier.$inferSelect;
+
+function toLien(r: InterventionLienRow): ChantierInterventionLien {
+  return {
+    id: r.id,
+    chantierId: r.chantierId,
+    interventionId: r.interventionId,
+    phaseId: r.phaseId ?? null,
+    ordre: r.ordre ?? 1,
     createdAt: r.createdAt,
   };
 }
@@ -391,6 +407,87 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
   deletePhase(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const deleted = await tx.delete(phasesChantier).where(eq(phasesChantier.id, id)).returning({ id: phasesChantier.id });
+      return deleted.length > 0;
+    });
+  }
+
+  // ── Interventions liées (`interventions_chantier`, SANS artisanId) ────────────────────────────
+  // `interventions` est scopée RLS/tenant (artisanId) → ce SELECT ne voit que les interventions du
+  // tenant (anti-IDOR-FK : interdit d'associer l'intervention d'un autre tenant).
+  ownsIntervention(ctx: TenantContext, interventionId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ id: interventions.id })
+        .from(interventions)
+        .where(eq(interventions.id, interventionId))
+        .limit(1);
+      return !!row;
+    });
+  }
+
+  listInterventionsLiens(ctx: TenantContext, chantierId: number): Promise<ChantierInterventionLien[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(interventionsChantier)
+        .where(eq(interventionsChantier.chantierId, chantierId))
+        .orderBy(asc(interventionsChantier.ordre), asc(interventionsChantier.id));
+      return rows.map(toLien);
+    });
+  }
+
+  listAllInterventionsLiens(ctx: TenantContext): Promise<ChantierInterventionLien[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // chantiers est scopée RLS/tenant → on ne récupère que les chantiers du tenant.
+      const ids = await tx.select({ id: chantiers.id }).from(chantiers);
+      if (ids.length === 0) return [];
+      const rows = await tx
+        .select()
+        .from(interventionsChantier)
+        .where(inArray(interventionsChantier.chantierId, ids.map((c) => c.id)))
+        .orderBy(asc(interventionsChantier.ordre), asc(interventionsChantier.id));
+      return rows.map(toLien);
+    });
+  }
+
+  associerIntervention(ctx: TenantContext, input: AssocierInterventionInput): Promise<ChantierInterventionLien> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Idempotent : si le lien (chantier,intervention) existe déjà, le renvoyer tel quel.
+      const [existing] = await tx
+        .select()
+        .from(interventionsChantier)
+        .where(
+          and(
+            eq(interventionsChantier.chantierId, input.chantierId),
+            eq(interventionsChantier.interventionId, input.interventionId),
+          ),
+        )
+        .limit(1);
+      if (existing) return toLien(existing);
+      const [row] = await tx
+        .insert(interventionsChantier)
+        .values({
+          chantierId: input.chantierId,
+          interventionId: input.interventionId,
+          phaseId: input.phaseId ?? null,
+          ordre: input.ordre ?? undefined,
+        })
+        .returning();
+      return toLien(row);
+    });
+  }
+
+  dissocierIntervention(ctx: TenantContext, chantierId: number, interventionId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const deleted = await tx
+        .delete(interventionsChantier)
+        .where(
+          and(
+            eq(interventionsChantier.chantierId, chantierId),
+            eq(interventionsChantier.interventionId, interventionId),
+          ),
+        )
+        .returning({ id: interventionsChantier.id });
       return deleted.length > 0;
     });
   }

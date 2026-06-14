@@ -11,6 +11,8 @@ import type {
   ChantierPhase,
   CreatePhaseInput,
   UpdatePhaseInput,
+  ChantierInterventionLien,
+  AssocierInterventionInput,
 } from "../domain/chantier";
 
 // Port du repository chantiers. Chaque méthode exige le TenantContext (scope tenant + RLS).
@@ -66,4 +68,17 @@ export interface IChantierRepository {
   updatePhase(ctx: TenantContext, id: number, input: UpdatePhaseInput): Promise<ChantierPhase | null>;
   // Supprime une phase par id (ownership vérifiée en amont) — false si absente.
   deletePhase(ctx: TenantContext, id: number): Promise<boolean>;
+
+  // ── Interventions liées (`interventions_chantier`, SANS artisanId → scopé via le chantier) ────
+  // true si l'intervention (FK) appartient au tenant (anti-IDOR-FK sur l'association).
+  ownsIntervention(ctx: TenantContext, interventionId: number): Promise<boolean>;
+  // Liens d'un chantier (triés par ordre). Ownership chantier vérifiée en amont par le use-case.
+  listInterventionsLiens(ctx: TenantContext, chantierId: number): Promise<ChantierInterventionLien[]>;
+  // Tous les liens des chantiers du tenant (scopé tenant via jointure chantiers, anti-N+1).
+  listAllInterventionsLiens(ctx: TenantContext): Promise<ChantierInterventionLien[]>;
+  // Associe une intervention à un chantier (idempotent sur (chantier,intervention)). Ownership des
+  // DEUX ressources (chantier + intervention) vérifiée en amont par le use-case.
+  associerIntervention(ctx: TenantContext, input: AssocierInterventionInput): Promise<ChantierInterventionLien>;
+  // Dissocie une intervention d'un chantier — false si le lien n'existait pas. Idempotent.
+  dissocierIntervention(ctx: TenantContext, chantierId: number, interventionId: number): Promise<boolean>;
 }

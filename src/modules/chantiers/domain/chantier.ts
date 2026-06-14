@@ -185,3 +185,22 @@ export interface UpdatePhaseInput {
   readonly coutReel?: string | null;
   readonly heuresPrevues?: string | null;
 }
+
+// ── Interventions rattachées à un chantier (table de liaison `interventions_chantier`) ─────────
+// ⚠️ **SANS artisanId** → scopée via le chantier parent. L'association exige que LE CHANTIER **et**
+// L'INTERVENTION appartiennent au tenant (anti-IDOR DOUBLE).
+export interface ChantierInterventionLien {
+  readonly id: number;
+  readonly chantierId: number;
+  readonly interventionId: number;
+  readonly phaseId: number | null;
+  readonly ordre: number;
+  readonly createdAt: Date;
+}
+
+export interface AssocierInterventionInput {
+  readonly chantierId: number;
+  readonly interventionId: number;
+  readonly phaseId?: number | null;
+  readonly ordre?: number;
+}

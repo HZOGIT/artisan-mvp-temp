@@ -12,6 +12,8 @@ import type {
   ChantierPhase,
   CreatePhaseInput,
   UpdatePhaseInput,
+  ChantierInterventionLien,
+  AssocierInterventionInput,
 } from "../domain/chantier";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -23,6 +25,7 @@ export class FakeChantierRepository implements IChantierRepository {
   // Clients appartenant à un tenant (injectable) : clé `${artisanId}:${clientId}`.
   private ownedClients = new Set<string>();
   private ownedTechniciens = new Set<string>();
+  private ownedInterventions = new Set<string>();
   private pointages: ChantierPointage[] = [];
   private pointageSeq = 0;
 
@@ -34,6 +37,11 @@ export class FakeChantierRepository implements IChantierRepository {
   // Aide de test : déclare qu'un technicien appartient au tenant.
   registerTechnicien(artisanId: number, technicienId: number): void {
     this.ownedTechniciens.add(`${artisanId}:${technicienId}`);
+  }
+
+  // Aide de test : déclare qu'une intervention appartient au tenant.
+  registerIntervention(artisanId: number, interventionId: number): void {
+    this.ownedInterventions.add(`${artisanId}:${interventionId}`);
   }
 
   async list(ctx: TenantContext): Promise<Chantier[]> {
@@ -246,5 +254,43 @@ export class FakeChantierRepository implements IChantierRepository {
     const before = this.phases.length;
     this.phases = this.phases.filter((p) => p.id !== id);
     return this.phases.length < before;
+  }
+
+  // ⚠️ interventions_chantier sans artisanId : scopé via le chantier parent (use-case).
+  private liens: ChantierInterventionLien[] = [];
+  private lienSeq = 0;
+
+  async ownsIntervention(ctx: TenantContext, interventionId: number): Promise<boolean> {
+    return this.ownedInterventions.has(`${ctx.artisanId}:${interventionId}`);
+  }
+
+  async listInterventionsLiens(_ctx: TenantContext, chantierId: number): Promise<ChantierInterventionLien[]> {
+    return this.liens.filter((l) => l.chantierId === chantierId).sort((a, b) => a.ordre - b.ordre || a.id - b.id);
+  }
+
+  async listAllInterventionsLiens(ctx: TenantContext): Promise<ChantierInterventionLien[]> {
+    const chantierIds = new Set(this.store.filter((c) => c.artisanId === ctx.artisanId).map((c) => c.id));
+    return this.liens.filter((l) => chantierIds.has(l.chantierId)).sort((a, b) => a.ordre - b.ordre || a.id - b.id);
+  }
+
+  async associerIntervention(_ctx: TenantContext, input: AssocierInterventionInput): Promise<ChantierInterventionLien> {
+    const existing = this.liens.find((l) => l.chantierId === input.chantierId && l.interventionId === input.interventionId);
+    if (existing) return existing;
+    const l: ChantierInterventionLien = {
+      id: ++this.lienSeq,
+      chantierId: input.chantierId,
+      interventionId: input.interventionId,
+      phaseId: input.phaseId ?? null,
+      ordre: input.ordre ?? 1,
+      createdAt: new Date(),
+    };
+    this.liens.push(l);
+    return l;
+  }
+
+  async dissocierIntervention(_ctx: TenantContext, chantierId: number, interventionId: number): Promise<boolean> {
+    const before = this.liens.length;
+    this.liens = this.liens.filter((l) => !(l.chantierId === chantierId && l.interventionId === interventionId));
+    return this.liens.length < before;
   }
 }

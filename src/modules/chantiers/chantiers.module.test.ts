@@ -29,6 +29,13 @@ const stubRepo: IChantierRepository = {
   },
   updatePhase: async () => null,
   deletePhase: async () => false,
+  ownsIntervention: async () => false,
+  listInterventionsLiens: async () => [],
+  listAllInterventionsLiens: async () => [],
+  associerIntervention: async () => {
+    throw new Error("non implémenté (stub)");
+  },
+  dissocierIntervention: async () => false,
 };
 
 describe("chantiers.module", () => {
@@ -42,19 +49,24 @@ describe("chantiers.module", () => {
       "addPhase",
       "addPointage",
       "addSuivi",
+      "associerIntervention",
       "create",
       "delete",
       "deletePhase",
       "deletePointage",
       "deleteSuivi",
+      "dissocierIntervention",
       "getById",
       "getPhaseById",
       "getSuiviById",
       "list",
+      "listAllInterventionsLiens",
+      "listInterventionsLiens",
       "listPhases",
       "listPointages",
       "listSuivi",
       "ownsClient",
+      "ownsIntervention",
       "ownsTechnicien",
       "update",
       "updatePhase",
@@ -67,6 +79,7 @@ describe("chantiers.module", () => {
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "addPointage",
+      "associerIntervention",
       "create",
       "createPhase",
       "createSuivi",
@@ -74,7 +87,10 @@ describe("chantiers.module", () => {
       "deletePhase",
       "deletePointage",
       "deleteSuivi",
+      "dissocierIntervention",
+      "getAllInterventionsChantier",
       "getById",
+      "getInterventions",
       "getPhases",
       "getPointages",
       "getSuivi",
