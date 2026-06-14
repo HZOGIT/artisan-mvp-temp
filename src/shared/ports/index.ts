@@ -5,5 +5,7 @@ export * from "./pdf";
 export * from "./rate-limiter";
 export * from "./llm";
 export * from "./vision";
+export * from "./password-hasher";
+export * from "./password-hasher-bcrypt";
 export * from "./fakes";
 export * from "./adapters";

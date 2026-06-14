@@ -2,7 +2,7 @@
 // montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
 // cibler qu'un domaine présent ici (sinon le routage enverrait vers un domaine inexistant
 // du nouveau stack). Mis à jour à chaque domaine livré (étape 9/9 du gabarit).
-export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports"] as const;
+export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs"] as const;
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
@@ -53,4 +53,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "geolocalisation", // parité vérifiée : getPositions (techniciens du tenant + dernière position, RGPD lecture seule) ⊇ 1 appel client
   "dashboard", // parité vérifiée : getStats/getRecentActivity/getUpcomingInterventions/getMonthlyCA/getYearlyComparison/getConversionRate/getTopClients/getClientEvolution/getObjectifs/getAlerts (10 agrégats) ⊇ appels client
   "rapports", // parité vérifiée : list/create/delete/toggleFavori/executer (rapports personnalisables, anti-IDOR via RLS) ⊇ 5 appels client
+  "utilisateurs", // parité vérifiée : list/invite/updateRole/toggleActif/getPermissions/updatePermissions/resetPermissions (gate utilisateurs.gerer ; tables HORS RLS, scope artisanId explicite) ⊇ 7 appels client
 ] as const;

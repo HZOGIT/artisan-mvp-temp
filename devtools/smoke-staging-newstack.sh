@@ -67,6 +67,17 @@ codeSearch=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
   "$NEWSTACK_URL/api/trpc/search.global?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22query%22%3A%22zz%22%7D%7D%7D")
 [ "$codeSearch" = "200" ] && echo "  ✓ search.global (query=zz) -> 200" || { echo "  ✖ search.global -> $codeSearch (attendu 200)"; fail=1; }
 
+# 2e) utilisateurs.list : gardé par la permission `utilisateurs.gerer` (seam permission). On accorde la
+# permission à A (idempotent) puis on attend 200 (gate + résolution permission + repo hors-RLS scopé OK).
+$PG "insert into permissions_utilisateur (\"userId\", permission, autorise) select $UA, 'utilisateurs.gerer', true where not exists (select 1 from permissions_utilisateur where \"userId\"=$UA and permission='utilisateurs.gerer');" >/dev/null
+codeU=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
+  "$NEWSTACK_URL/api/trpc/utilisateurs.list?batch=1&input=%7B%7D")
+[ "$codeU" = "200" ] && echo "  ✓ utilisateurs.list (perm utilisateurs.gerer accordée) -> 200" || { echo "  ✖ utilisateurs.list -> $codeU (attendu 200)"; fail=1; }
+# Sans la permission, B doit être refusé (403) — preuve que le gate mord vraiment.
+codeUB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
+  "$NEWSTACK_URL/api/trpc/utilisateurs.list?batch=1&input=%7B%7D")
+[ "$codeUB" = "403" ] && echo "  ✓ utilisateurs.list (B sans permission) -> 403" || { echo "  ✖ utilisateurs.list B -> $codeUB (attendu 403)"; fail=1; }
+
 # 3) Contrôle d'isolation : l'auth fonctionne aussi pour B (tenant distinct) — 200 (ses propres données).
 codeB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
   "$NEWSTACK_URL/api/trpc/vehicules.list?batch=1&input=%7B%7D")

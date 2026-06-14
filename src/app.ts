@@ -89,6 +89,10 @@ import type { IDashboardReader } from "./modules/dashboard/application/dashboard
 import { createRapportsModule } from "./modules/rapports/rapports.module";
 import { RapportRepositoryDrizzle } from "./modules/rapports/infra/rapport-repository-drizzle";
 import type { IRapportRepository } from "./modules/rapports/application/rapport-repository";
+import { createUtilisateursModule } from "./modules/utilisateurs/utilisateurs.module";
+import { UtilisateurRepositoryDrizzle } from "./modules/utilisateurs/infra/utilisateur-repository-drizzle";
+import type { IUtilisateurRepository } from "./modules/utilisateurs/application/utilisateur-repository";
+import { BcryptPasswordHasher } from "./shared/ports/password-hasher-bcrypt";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -223,6 +227,7 @@ export interface AppDeps extends ContextDeps {
   readonly technicienPositionReader?: ITechnicienPositionReader;
   readonly dashboardReader?: IDashboardReader;
   readonly rapportRepo?: IRapportRepository;
+  readonly utilisateurRepo?: IUtilisateurRepository;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -500,7 +505,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const rapports = createRapportsModule({
     repository: deps.rapportRepo ?? new RapportRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports });
+  // Gestion utilisateurs (SENSIBLE, gate `utilisateurs.gerer`) : repo HORS RLS scopé artisanId +
+  // hasher bcrypt (parité hash legacy) + EmailPort legacy (invitation).
+  const utilisateurs = createUtilisateursModule({
+    repository: deps.utilisateurRepo ?? new UtilisateurRepositoryDrizzle(getDbHandle().db),
+    hasher: new BcryptPasswordHasher(),
+    email: deps.emailPort ?? new LegacyEmailAdapter(),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
