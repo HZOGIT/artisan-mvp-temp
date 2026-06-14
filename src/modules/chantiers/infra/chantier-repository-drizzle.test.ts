@@ -10,8 +10,8 @@ const APP_URL =
   process.env.APP_DATABASE_URL ||
   (URL ? URL.replace(/:\/\/[^@]+@/, "://app_tenant:app_tenant_pw@") : undefined);
 
-const A = 993001;
-const B = 993002;
+const A = 9930011;
+const B = 9930012;
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 let seq = 0;
 const ref = () => `CH-${A}-${++seq}`;

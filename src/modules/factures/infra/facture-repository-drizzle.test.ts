@@ -10,10 +10,12 @@ const APP_URL =
   process.env.APP_DATABASE_URL ||
   (URL ? URL.replace(/:\/\/[^@]+@/, "://app_tenant:app_tenant_pw@") : undefined);
 
-const A = 994001;
-const B = 994002;
-const UA = 994101;
-const UB = 994102;
+// ⚠️ Plage d'ids UNIQUE à ce fichier (évite la collision cross-fichiers en run parallèle :
+// le 994001 était partagé avec notes_de_frais → cleanup croisé des `clients` seedés).
+const A = 9940011;
+const B = 9940012;
+const UA = 9940013;
+const UB = 9940014;
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
 describe.skipIf(!URL)("FactureRepositoryDrizzle (PG, RLS + scope tenant + lignes)", () => {

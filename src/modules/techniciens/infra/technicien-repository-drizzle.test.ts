@@ -10,8 +10,8 @@ const APP_URL =
   process.env.APP_DATABASE_URL ||
   (URL ? URL.replace(/:\/\/[^@]+@/, "://app_tenant:app_tenant_pw@") : undefined);
 
-const A = 994001;
-const B = 994002;
+const A = 9940021;
+const B = 9940022;
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 
 describe.skipIf(!URL)("TechnicienRepositoryDrizzle (PG, RLS + scope tenant)", () => {
