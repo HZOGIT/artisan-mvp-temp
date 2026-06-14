@@ -1,12 +1,42 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import { contratsMaintenance, clients } from "../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
+import { contratsMaintenance, clients, interventionsContrat } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IContratRepository } from "../application/contrat-repository";
-import type { Contrat, ContratPeriodicite, ContratStatut, ContratType, CreateContratInput, UpdateContratInput } from "../domain/contrat";
+import type { IContratRepository, ContratAFacturerRow } from "../application/contrat-repository";
+import type {
+  Contrat,
+  ContratPeriodicite,
+  ContratStatut,
+  ContratType,
+  CreateContratInput,
+  UpdateContratInput,
+  ContratIntervention,
+  ContratInterventionStatut,
+  CreateContratInterventionInput,
+  UpdateContratInterventionInput,
+} from "../domain/contrat";
 
 type ContratRow = typeof contratsMaintenance.$inferSelect;
+type InterventionRow = typeof interventionsContrat.$inferSelect;
+
+function toIntervention(r: InterventionRow): ContratIntervention {
+  return {
+    id: r.id,
+    contratId: r.contratId,
+    artisanId: r.artisanId,
+    titre: r.titre,
+    description: r.description ?? null,
+    dateIntervention: r.dateIntervention,
+    duree: r.duree ?? null,
+    technicienNom: r.technicienNom ?? null,
+    statut: (r.statut ?? "planifiee") as ContratInterventionStatut,
+    rapport: r.rapport ?? null,
+    notes: r.notes ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
 
 function toContrat(r: ContratRow): Contrat {
   return {
@@ -161,6 +191,100 @@ export class ContratRepositoryDrizzle implements IContratRepository {
       const m = maxRow?.maxRef?.match(/-(\d+)$/);
       const prochain = (m ? parseInt(m[1], 10) : 0) + 1;
       return `CTR-${String(prochain).padStart(5, "0")}`;
+    });
+  }
+
+  listAFacturer(ctx: TenantContext): Promise<ContratAFacturerRow[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Parité legacy `getContratsAFacturer` : actifs, prochainFacturation ≤ fin de journée, du plus
+      // ancien au plus récent. Jointure client (left) pour le nom (scopée tenant par le filtre artisanId).
+      const endOfToday = new Date();
+      endOfToday.setHours(23, 59, 59, 999);
+      const rows = await tx
+        .select({ contrat: contratsMaintenance, clientNom: clients.nom, clientPrenom: clients.prenom })
+        .from(contratsMaintenance)
+        .leftJoin(clients, eq(clients.id, contratsMaintenance.clientId))
+        .where(
+          and(
+            eq(contratsMaintenance.artisanId, ctx.artisanId),
+            eq(contratsMaintenance.statut, "actif"),
+            lte(contratsMaintenance.prochainFacturation, endOfToday),
+          ),
+        )
+        .orderBy(asc(contratsMaintenance.prochainFacturation));
+      return rows.map((r) => ({
+        ...toContrat(r.contrat),
+        clientNom: `${r.clientPrenom ?? ""} ${r.clientNom ?? ""}`.trim() || "Client",
+      }));
+    });
+  }
+
+  listInterventions(ctx: TenantContext, contratId: number): Promise<ContratIntervention[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Scope via le contrat parent : si le contrat n'est pas du tenant → [].
+      const [owned] = await tx
+        .select({ id: contratsMaintenance.id })
+        .from(contratsMaintenance)
+        .where(and(eq(contratsMaintenance.id, contratId), eq(contratsMaintenance.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!owned) return [];
+      const rows = await tx
+        .select()
+        .from(interventionsContrat)
+        .where(eq(interventionsContrat.contratId, contratId))
+        .orderBy(desc(interventionsContrat.dateIntervention), desc(interventionsContrat.id));
+      return rows.map(toIntervention);
+    });
+  }
+
+  getInterventionById(ctx: TenantContext, id: number): Promise<ContratIntervention | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(interventionsContrat)
+        .where(and(eq(interventionsContrat.id, id), eq(interventionsContrat.artisanId, ctx.artisanId)))
+        .limit(1);
+      return row ? toIntervention(row) : null;
+    });
+  }
+
+  createIntervention(ctx: TenantContext, input: CreateContratInterventionInput): Promise<ContratIntervention> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .insert(interventionsContrat)
+        .values({
+          contratId: input.contratId,
+          artisanId: ctx.artisanId, // forcé
+          titre: input.titre,
+          description: input.description ?? null,
+          dateIntervention: input.dateIntervention,
+          duree: input.duree ?? null,
+          technicienNom: input.technicienNom ?? null,
+          statut: "planifiee", // forcé
+          notes: input.notes ?? null,
+        })
+        .returning();
+      return toIntervention(row);
+    });
+  }
+
+  updateIntervention(ctx: TenantContext, id: number, input: UpdateContratInterventionInput): Promise<ContratIntervention | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const set: Partial<typeof interventionsContrat.$inferInsert> = { updatedAt: new Date() };
+      if (input.titre !== undefined) set.titre = input.titre;
+      if (input.description !== undefined) set.description = input.description;
+      if (input.dateIntervention !== undefined) set.dateIntervention = input.dateIntervention;
+      if (input.duree !== undefined) set.duree = input.duree;
+      if (input.technicienNom !== undefined) set.technicienNom = input.technicienNom;
+      if (input.statut !== undefined) set.statut = input.statut;
+      if (input.rapport !== undefined) set.rapport = input.rapport;
+      if (input.notes !== undefined) set.notes = input.notes;
+      const [row] = await tx
+        .update(interventionsContrat)
+        .set(set)
+        .where(and(eq(interventionsContrat.id, id), eq(interventionsContrat.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toIntervention(row) : null;
     });
   }
 }

@@ -51,6 +51,58 @@ export interface CreateContratInput {
   readonly notes?: string | null;
 }
 
+// ── Interventions liées à un contrat (sous-ressource `interventions_contrat`) ────────────────
+// Visites de maintenance planifiées/effectuées au titre d'un contrat. La table porte un `artisanId`
+// (double cloisonnement) mais les use-cases scopent TOUJOURS via le contrat parent du tenant
+// (anti-IDOR : une intervention n'est accessible que via son contrat possédé).
+export type ContratInterventionStatut = "planifiee" | "en_cours" | "effectuee" | "annulee";
+
+export interface ContratIntervention {
+  readonly id: number;
+  readonly contratId: number;
+  readonly artisanId: number;
+  readonly titre: string;
+  readonly description: string | null;
+  readonly dateIntervention: Date;
+  readonly duree: string | null;
+  readonly technicienNom: string | null;
+  readonly statut: ContratInterventionStatut;
+  readonly rapport: string | null;
+  readonly notes: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+// Création : `artisanId`/`statut` ("planifiee") posés par l'infra ; `contratId` validé (possédé).
+export interface CreateContratInterventionInput {
+  readonly contratId: number;
+  readonly titre: string;
+  readonly dateIntervention: Date;
+  readonly description?: string | null;
+  readonly duree?: string | null;
+  readonly technicienNom?: string | null;
+  readonly notes?: string | null;
+}
+
+export interface UpdateContratInterventionInput {
+  readonly titre?: string;
+  readonly description?: string | null;
+  readonly dateIntervention?: Date;
+  readonly duree?: string | null;
+  readonly technicienNom?: string | null;
+  readonly statut?: ContratInterventionStatut;
+  readonly rapport?: string | null;
+  readonly notes?: string | null;
+}
+
+// Contrat dont l'échéance de facturation est atteinte (statut actif, `prochainFacturation` ≤ fin de
+// journée), enrichi pour l'affichage : nom client (jointure), TTC dérivé (HT × (1+TVA)), jours de retard.
+export interface ContratAFacturer extends Contrat {
+  readonly clientNom: string;
+  readonly montantTTC: string;
+  readonly joursRetard: number;
+}
+
 // Update des métadonnées. ⚠️ `statut`/`reference`/`clientId` ABSENTS : statut via transitions
 // dédiées (7/9), reference immuable, clientId fixe.
 export interface UpdateContratInput {

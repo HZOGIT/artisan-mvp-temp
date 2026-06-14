@@ -1,6 +1,14 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IContratRepository } from "../application/contrat-repository";
-import type { Contrat, ContratStatut, CreateContratInput, UpdateContratInput } from "../domain/contrat";
+import type { IContratRepository, ContratAFacturerRow } from "../application/contrat-repository";
+import type {
+  Contrat,
+  ContratStatut,
+  CreateContratInput,
+  UpdateContratInput,
+  ContratIntervention,
+  CreateContratInterventionInput,
+  UpdateContratInterventionInput,
+} from "../domain/contrat";
 
 // Implémentation in-memory du repository contrats-maintenance (tests sans DB). Reproduit les
 // invariants du repo Drizzle : scope par artisanId, artisanId forcé, statut="actif" à la création,
@@ -10,11 +18,15 @@ export class FakeContratRepository implements IContratRepository {
   private readonly store: Contrat[] = [];
   private seq = 0;
   private readonly clientsByArtisan = new Map<number, Set<number>>();
+  private readonly clientNoms = new Map<string, string>();
   private readonly refCounter = new Map<number, number>();
+  private readonly interventions: ContratIntervention[] = [];
+  private interventionSeq = 0;
 
-  seedClient(artisanId: number, clientId: number): void {
+  seedClient(artisanId: number, clientId: number, nom = "Client"): void {
     if (!this.clientsByArtisan.has(artisanId)) this.clientsByArtisan.set(artisanId, new Set());
     this.clientsByArtisan.get(artisanId)!.add(clientId);
+    this.clientNoms.set(`${artisanId}:${clientId}`, nom);
   }
 
   private scoped(ctx: TenantContext): Contrat[] {
@@ -107,5 +119,66 @@ export class FakeContratRepository implements IContratRepository {
     const prochain = (this.refCounter.get(ctx.artisanId) ?? 0) + 1;
     this.refCounter.set(ctx.artisanId, prochain);
     return `CTR-${String(prochain).padStart(5, "0")}`;
+  }
+
+  async listAFacturer(ctx: TenantContext): Promise<ContratAFacturerRow[]> {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    return this.scoped(ctx)
+      .filter((c) => c.statut === "actif" && c.prochainFacturation !== null && c.prochainFacturation <= endOfToday)
+      .sort((a, b) => (a.prochainFacturation!.getTime() - b.prochainFacturation!.getTime()))
+      .map((c) => ({ ...c, clientNom: this.clientNoms.get(`${ctx.artisanId}:${c.clientId}`) ?? "Client" }));
+  }
+
+  async listInterventions(ctx: TenantContext, contratId: number): Promise<ContratIntervention[]> {
+    if (!(await this.getById(ctx, contratId))) return [];
+    return this.interventions
+      .filter((i) => i.contratId === contratId && i.artisanId === ctx.artisanId)
+      .sort((a, b) => b.dateIntervention.getTime() - a.dateIntervention.getTime() || b.id - a.id);
+  }
+
+  async getInterventionById(ctx: TenantContext, id: number): Promise<ContratIntervention | null> {
+    return this.interventions.find((i) => i.id === id && i.artisanId === ctx.artisanId) ?? null;
+  }
+
+  async createIntervention(ctx: TenantContext, input: CreateContratInterventionInput): Promise<ContratIntervention> {
+    const now = new Date();
+    const intervention: ContratIntervention = {
+      id: ++this.interventionSeq,
+      contratId: input.contratId,
+      artisanId: ctx.artisanId, // forcé
+      titre: input.titre,
+      description: input.description ?? null,
+      dateIntervention: input.dateIntervention,
+      duree: input.duree ?? null,
+      technicienNom: input.technicienNom ?? null,
+      statut: "planifiee", // forcé
+      rapport: null,
+      notes: input.notes ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.interventions.push(intervention);
+    return intervention;
+  }
+
+  async updateIntervention(ctx: TenantContext, id: number, input: UpdateContratInterventionInput): Promise<ContratIntervention | null> {
+    const idx = this.interventions.findIndex((i) => i.id === id && i.artisanId === ctx.artisanId);
+    if (idx === -1) return null;
+    const current = this.interventions[idx];
+    const next: ContratIntervention = {
+      ...current,
+      ...(input.titre !== undefined ? { titre: input.titre } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.dateIntervention !== undefined ? { dateIntervention: input.dateIntervention } : {}),
+      ...(input.duree !== undefined ? { duree: input.duree } : {}),
+      ...(input.technicienNom !== undefined ? { technicienNom: input.technicienNom } : {}),
+      ...(input.statut !== undefined ? { statut: input.statut } : {}),
+      ...(input.rapport !== undefined ? { rapport: input.rapport } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      updatedAt: new Date(),
+    };
+    this.interventions[idx] = next;
+    return next;
   }
 }

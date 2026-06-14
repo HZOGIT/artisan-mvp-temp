@@ -23,6 +23,7 @@ describe.skipIf(!URL)("ContratRepositoryDrizzle (PG, RLS + état machine + anti-
   let clientB = 0;
 
   const cleanup = async () => {
+    await admin.query('delete from interventions_contrat where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from contrats_maintenance where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
   };
@@ -82,5 +83,31 @@ describe.skipIf(!URL)("ContratRepositoryDrizzle (PG, RLS + état machine + anti-
     expect(await repo.ownsClient(ctx(A), clientA)).toBe(true);
     expect(await repo.ownsClient(ctx(A), clientB)).toBe(false);
     expect(await repo.ownsClient(ctx(A), 999999999)).toBe(false);
+  });
+
+  it("interventions : create/list/getById scopés via contrat parent + isolation cross-tenant", async () => {
+    const c = await repo.create(ctx(A), base(), await repo.nextReference(ctx(A)));
+    const i = await repo.createIntervention(ctx(A), { contratId: c.id, titre: "Visite", dateIntervention: new Date("2026-08-01T09:00:00Z") });
+    expect(i.artisanId).toBe(A);
+    expect(i.statut).toBe("planifiee");
+    expect((await repo.listInterventions(ctx(A), c.id)).some((x) => x.id === i.id)).toBe(true);
+    // B ne voit pas les interventions du contrat de A
+    expect(await repo.listInterventions(ctx(B), c.id)).toEqual([]);
+    await expectCrossTenantDenied(() => repo.getInterventionById(ctx(B), i.id));
+    const maj = await repo.updateIntervention(ctx(A), i.id, { statut: "effectuee", rapport: "OK" });
+    expect(maj?.statut).toBe("effectuee");
+    expect(await repo.updateIntervention(ctx(B), i.id, { statut: "annulee" })).toBeNull();
+  });
+
+  it("listAFacturer : actifs échus uniquement, avec nom client joint", async () => {
+    // contrat échu (hier) → présent ; contrat futur → absent
+    const echu = await repo.create(ctx(A), { ...base(), prochainFacturation: new Date(Date.now() - 86_400_000) }, await repo.nextReference(ctx(A)));
+    await repo.create(ctx(A), { ...base(), prochainFacturation: new Date(Date.now() + 30 * 86_400_000) }, await repo.nextReference(ctx(A)));
+    const out = await repo.listAFacturer(ctx(A));
+    expect(out.some((x) => x.id === echu.id)).toBe(true);
+    expect(out.find((x) => x.id === echu.id)?.clientNom).toBe("CA");
+    expect(out.every((x) => x.statut === "actif")).toBe(true);
+    // isolation : B ne voit aucun contrat de A
+    expect((await repo.listAFacturer(ctx(B))).some((x) => x.artisanId === A)).toBe(false);
   });
 });

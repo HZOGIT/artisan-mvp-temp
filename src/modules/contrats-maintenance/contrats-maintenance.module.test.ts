@@ -13,6 +13,13 @@ const stubRepo: IContratRepository = {
   delete: async () => false,
   ownsClient: async () => false,
   nextReference: async () => "CTR-00001",
+  listAFacturer: async () => [],
+  listInterventions: async () => [],
+  getInterventionById: async () => null,
+  createIntervention: async () => {
+    throw new Error("non implémenté (stub)");
+  },
+  updateIntervention: async () => null,
 };
 
 describe("contrats-maintenance.module", () => {
@@ -21,13 +28,41 @@ describe("contrats-maintenance.module", () => {
     expect(module.deps.repository).toBe(stubRepo);
   });
 
-  it("le port expose CRUD + setStatut + ownsClient + nextReference (anti-IDOR + référence serveur)", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "nextReference", "ownsClient", "setStatut", "update"]);
+  it("le port expose CRUD + setStatut + ownsClient + nextReference + à-facturer + interventions", () => {
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "create",
+      "createIntervention",
+      "delete",
+      "getById",
+      "getInterventionById",
+      "list",
+      "listAFacturer",
+      "listInterventions",
+      "nextReference",
+      "ownsClient",
+      "setStatut",
+      "update",
+      "updateIntervention",
+    ]);
   });
 
-  it("expose un routeur tRPC assemblé (CRUD + transitions suspendre/reactiver/terminer/annuler)", () => {
+  it("expose un routeur tRPC assemblé (CRUD + transitions + getAFacturer + interventions)", () => {
     const module = createContratsMaintenanceModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["annuler", "create", "delete", "getById", "list", "reactiver", "suspendre", "terminer", "update"]);
+    expect(procedures).toEqual([
+      "annuler",
+      "create",
+      "createIntervention",
+      "delete",
+      "getAFacturer",
+      "getById",
+      "getInterventions",
+      "list",
+      "reactiver",
+      "suspendre",
+      "terminer",
+      "update",
+      "updateIntervention",
+    ]);
   });
 });

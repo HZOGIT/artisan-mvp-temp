@@ -4,10 +4,17 @@ import type { IContratRepository } from "../../application/contrat-repository";
 import { listContrats, getContrat } from "../../application/read-use-cases";
 import { creerContrat, modifierContrat, supprimerContrat } from "../../application/write-use-cases";
 import { suspendreContrat, reactiverContrat, terminerContrat, annulerContrat } from "../../application/transition-use-cases";
+import {
+  listContratsAFacturer,
+  getInterventionsContrat,
+  creerInterventionContrat,
+  modifierInterventionContrat,
+} from "../../application/interventions-use-cases";
 
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 const typeEnum = z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]);
 const periodiciteEnum = z.enum(["mensuel", "trimestriel", "semestriel", "annuel"]);
+const interventionStatutEnum = z.enum(["planifiee", "en_cours", "effectuee", "annulee"]);
 // `dateDebut`/`dateFin` arrivent en string ISO (transport JSON) ; `z.coerce.date()` → Date.
 
 // Bornes alignées sur la table `contrats_maintenance` (defense-in-depth). ⚠️ Le client NE fournit
@@ -89,5 +96,47 @@ export function createContratsMaintenanceRouter(repo: IContratRepository) {
     annuler: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => annulerContrat(repo, ctx.tenant, input.id)),
+
+    // Contrats arrivés à échéance de facturation (enrichis client/TTC/retard) — parité `getAFacturer`.
+    getAFacturer: protectedProcedure.query(({ ctx }) => listContratsAFacturer(repo, ctx.tenant)),
+
+    // ── Sous-ressource interventions du contrat (ownership via contrat parent ; anti-IDOR id↔contrat) ──
+    getInterventions: protectedProcedure
+      .input(z.object({ contratId: z.number().int() }))
+      .query(({ ctx, input }) => getInterventionsContrat(repo, ctx.tenant, input.contratId)),
+
+    createIntervention: protectedProcedure
+      .input(
+        z.object({
+          contratId: z.number().int(),
+          titre: z.string().min(1).max(255),
+          dateIntervention: z.coerce.date(),
+          description: z.string().max(5000).nullish(),
+          duree: z.string().max(50).nullish(),
+          technicienNom: z.string().max(255).nullish(),
+          notes: z.string().max(5000).nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => creerInterventionContrat(repo, ctx.tenant, input)),
+
+    updateIntervention: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int(),
+          contratId: z.number().int(),
+          titre: z.string().min(1).max(255).optional(),
+          description: z.string().max(5000).nullish(),
+          dateIntervention: z.coerce.date().optional(),
+          duree: z.string().max(50).nullish(),
+          technicienNom: z.string().max(255).nullish(),
+          statut: interventionStatutEnum.optional(),
+          rapport: z.string().max(5000).nullish(),
+          notes: z.string().max(5000).nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { id, contratId, ...data } = input;
+        return modifierInterventionContrat(repo, ctx.tenant, id, contratId, data);
+      }),
   });
 }
