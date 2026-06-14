@@ -33,7 +33,7 @@ TOKEN_A=$(JWT_SECRET="$JWT_SECRET" node devtools/mint-jwt.mjs "$UA" "smoke+a@ope
 TOKEN_B=$(JWT_SECRET="$JWT_SECRET" node devtools/mint-jwt.mjs "$UB" "smoke+b@operioz.test")
 
 # 2) Smoke authentifié des domaines servis par le nouveau stack (200 attendu = endpoint OK end-to-end).
-PROCS="vehicules.list notifications.list fournisseurs.list parametres.get modelesEmail.list relances.list conges.list"
+PROCS="vehicules.list notifications.list fournisseurs.list parametres.get modelesEmail.list relances.list conges.list badges.list"
 fail=0
 echo "▶ Smoke authentifié (cookie token=JWT user A) — 200 attendu :"
 for p in $PROCS; do

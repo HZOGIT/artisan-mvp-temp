@@ -1,15 +1,32 @@
 import { and, asc, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
-import { avisClients, badges, badgesTechniciens, classementTechniciens, factures, interventions, techniciens } from "../../../../drizzle/schema.pg";
+import { avisClients, badges, badgesTechniciens, classementTechniciens, factures, interventions, objectifsTechniciens, techniciens } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "../application/badge-repository";
-import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+import type { Badge, BadgeTechnicien, CreateBadgeInput, ObjectifTechnicien, UpdateBadgeInput } from "../domain/badge";
 import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 type BadgeRow = typeof badges.$inferSelect;
 type BadgeTechRow = typeof badgesTechniciens.$inferSelect;
 type ClassementRow = typeof classementTechniciens.$inferSelect;
+type ObjectifRow = typeof objectifsTechniciens.$inferSelect;
+
+function toObjectif(r: ObjectifRow): ObjectifTechnicien {
+  return {
+    id: r.id,
+    technicienId: r.technicienId,
+    mois: r.mois,
+    annee: r.annee,
+    objectifInterventions: r.objectifInterventions,
+    objectifCA: r.objectifCA,
+    objectifAvisPositifs: r.objectifAvisPositifs,
+    interventionsRealisees: r.interventionsRealisees,
+    caRealise: r.caRealise,
+    avisPositifsObtenus: r.avisPositifsObtenus,
+    pointsGagnes: r.pointsGagnes,
+  };
+}
 
 // Bornes de la période courante (mirror legacy). dateFin = aujourd'hui.
 function bornesPeriode(periode: PeriodeClassement, now: Date): { debut: string; fin: string } {
@@ -151,6 +168,25 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
         .where(eq(badgesTechniciens.technicienId, technicienId))
         .orderBy(desc(badgesTechniciens.dateObtention), desc(badgesTechniciens.id));
       return rows.map(toBadgeTech);
+    });
+  }
+
+  listObjectifsTechnicien(ctx: TenantContext, technicienId: number, annee: number): Promise<ObjectifTechnicien[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Anti-IDOR : le technicien doit appartenir au tenant (données salarié) → [] sinon.
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return [];
+      const rows = await tx
+        .select()
+        .from(objectifsTechniciens)
+        .where(
+          and(
+            eq(objectifsTechniciens.artisanId, ctx.artisanId),
+            eq(objectifsTechniciens.technicienId, technicienId),
+            eq(objectifsTechniciens.annee, annee),
+          ),
+        )
+        .orderBy(asc(objectifsTechniciens.mois));
+      return rows.map(toObjectif);
     });
   }
 

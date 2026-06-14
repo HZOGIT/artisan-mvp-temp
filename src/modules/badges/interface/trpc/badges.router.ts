@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IBadgeRepository } from "../../application/badge-repository";
-import { listBadges, listBadgesDuTechnicien, getClassementTechniciens } from "../../application/read-use-cases";
+import { listBadges, listBadgesDuTechnicien, listObjectifsDuTechnicien, getClassementTechniciens } from "../../application/read-use-cases";
 import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge, calculerClassement, verifierBadges } from "../../application/write-use-cases";
 
 const categorie = z.enum(["interventions", "avis", "ca", "anciennete", "special"]);
@@ -59,6 +59,12 @@ export function createBadgesRouter(repo: IBadgeRepository) {
     getBadgesTechnicien: protectedProcedure
       .input(z.object({ technicienId: z.number().int() }))
       .query(({ ctx, input }) => listBadgesDuTechnicien(repo, ctx.tenant, input.technicienId)),
+
+    // Objectifs mensuels d'un technicien (parité client). ⚠️ données salarié : le repo applique
+    // l'anti-IDOR (technicien hors tenant → []). Tri par mois ASC (parité legacy).
+    getObjectifsTechnicien: protectedProcedure
+      .input(z.object({ technicienId: z.number().int(), annee: z.number().int() }))
+      .query(({ ctx, input }) => listObjectifsDuTechnicien(repo, ctx.tenant, input.technicienId, input.annee)),
 
     attribuerBadge: protectedProcedure
       .input(z.object({ technicienId: z.number().int(), badgeId: z.number().int(), valeurAtteinte: z.number().int().nullish() }))

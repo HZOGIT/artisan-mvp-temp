@@ -1,7 +1,7 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "./badge-repository";
-import type { Badge, BadgeTechnicien } from "../domain/badge";
+import type { Badge, BadgeTechnicien, ObjectifTechnicien } from "../domain/badge";
 import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
@@ -26,6 +26,17 @@ export function listBadgesDuTechnicien(
   technicienId: number,
 ): Promise<BadgeTechnicien[]> {
   return repo.listBadgesTechnicien(ctx, technicienId);
+}
+
+// Objectifs mensuels d'un technicien pour une année — [] si le technicien n'appartient pas au
+// tenant (anti-IDOR, données salarié). Parité legacy `getObjectifsTechnicien`.
+export function listObjectifsDuTechnicien(
+  repo: IBadgeRepository,
+  ctx: TenantContext,
+  technicienId: number,
+  annee: number,
+): Promise<ObjectifTechnicien[]> {
+  return repo.listObjectifsTechnicien(ctx, technicienId, annee);
 }
 
 // Classement des techniciens du tenant pour une période (lecture scopée tenant).

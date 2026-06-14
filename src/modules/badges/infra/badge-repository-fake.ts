@@ -1,6 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IBadgeRepository } from "../application/badge-repository";
-import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+import type { Badge, BadgeTechnicien, CreateBadgeInput, ObjectifTechnicien, UpdateBadgeInput } from "../domain/badge";
 import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 // Double in-memory du repository badges pour les tests de use-cases (sans DB). Reproduit
@@ -12,6 +12,8 @@ export class FakeBadgeRepository implements IBadgeRepository {
   private attributions: BadgeTechnicien[] = [];
   private techniciens: Array<{ id: number; artisanId: number }> = [];
   private classementStore: ClassementEntry[] = [];
+  // Objectifs mensuels (avec leur artisanId pour le scope tenant).
+  private objectifsStore: Array<ObjectifTechnicien & { artisanId: number }> = [];
   // Progrès par technicien (pour verifierEtAttribuerBadges) : { technicienId -> {interventions, avisPositifs} }.
   private progress = new Map<number, { interventions: number; avisPositifs: number }>();
   private seq = 0;
@@ -20,6 +22,11 @@ export class FakeBadgeRepository implements IBadgeRepository {
   // Utilitaire de test (hors port) : déclare un technicien appartenant à un tenant.
   seedTechnicien(id: number, artisanId: number): void {
     this.techniciens.push({ id, artisanId });
+  }
+
+  // Utilitaire de test (hors port) : ajoute un objectif mensuel (scopé artisanId).
+  seedObjectif(artisanId: number, objectif: ObjectifTechnicien): void {
+    this.objectifsStore.push({ ...objectif, artisanId });
   }
 
   // Utilitaire de test (hors port) : ajoute une ligne de classement.
@@ -83,6 +90,14 @@ export class FakeBadgeRepository implements IBadgeRepository {
   async listBadgesTechnicien(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[]> {
     if (!this.ownsTechnicien(ctx, technicienId)) return [];
     return this.attributions.filter((a) => a.technicienId === technicienId);
+  }
+
+  async listObjectifsTechnicien(ctx: TenantContext, technicienId: number, annee: number): Promise<ObjectifTechnicien[]> {
+    if (!this.ownsTechnicien(ctx, technicienId)) return [];
+    return this.objectifsStore
+      .filter((o) => o.artisanId === ctx.artisanId && o.technicienId === technicienId && o.annee === annee)
+      .sort((a, b) => a.mois - b.mois)
+      .map(({ artisanId: _a, ...o }) => o);
   }
 
   async attribuer(

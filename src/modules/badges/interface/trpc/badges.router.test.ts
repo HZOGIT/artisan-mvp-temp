@@ -67,6 +67,7 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     await server.close();
     for (const aId of [artisanA, artisanB]) {
       await admin.query('delete from badges_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
+      await admin.query('delete from objectifs_techniciens where "artisanId"=$1', [aId]);
       await admin.query('delete from classement_techniciens where "artisanId"=$1', [aId]);
       await admin.query('delete from interventions where "artisanId"=$1', [aId]);
       await admin.query('delete from factures where "artisanId"=$1', [aId]);
@@ -105,6 +106,26 @@ describe.skipIf(!URL)("badges.router e2e (HTTP → tRPC → use-case → repo �
     const bId = (await callMutation(server, "badges.create", { code: "SEC", nom: "Sec" }, tA)).json().result.data.id as number;
     expect((await callMutation(server, "badges.update", { id: bId, data: { nom: "hack" } }, tB)).statusCode).toBe(404);
     expect((await callMutation(server, "badges.delete", { id: bId }, tB)).statusCode).toBe(404);
+  });
+
+  it("getObjectifsTechnicien (parité client) : objectifs scopés + tri mois ASC ; anti-IDOR technicien hors tenant → [] ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // 401 sans cookie
+    expect((await callQuery(server, "badges.getObjectifsTechnicien", { technicienId: techA, annee: 2027 })).statusCode).toBe(401);
+    // seed 2 objectifs (mois 3 puis 1) pour techA/2027 → doivent ressortir triés mois ASC (1,3)
+    await admin.query(
+      'insert into objectifs_techniciens ("technicienId","artisanId",mois,annee,"objectifInterventions") values ($1,$2,3,2027,30),($1,$2,1,2027,10)',
+      [techA, artisanA],
+    );
+    const objs = (await callQuery(server, "badges.getObjectifsTechnicien", { technicienId: techA, annee: 2027 }, tA)).json().result.data as Array<{ mois: number }>;
+    expect(objs.map((o) => o.mois)).toEqual([1, 3]); // tri ASC
+    // année différente → vide
+    expect((await callQuery(server, "badges.getObjectifsTechnicien", { technicienId: techA, annee: 2099 }, tA)).json().result.data).toEqual([]);
+    // ANTI-IDOR : A demande les objectifs du technicien de B → [] (ne révèle rien)
+    expect((await callQuery(server, "badges.getObjectifsTechnicien", { technicienId: techB, annee: 2027 }, tA)).json().result.data).toEqual([]);
+    // isolation : B ne voit pas les objectifs (de son propre techB il n'y en a pas, et pas ceux de A)
+    expect((await callQuery(server, "badges.getObjectifsTechnicien", { technicienId: techA, annee: 2027 }, tB)).json().result.data).toEqual([]);
   });
 
   it("attribuerBadge : OK pour le technicien du tenant, anti-IDOR sur un technicien d'un autre tenant → 404", async () => {

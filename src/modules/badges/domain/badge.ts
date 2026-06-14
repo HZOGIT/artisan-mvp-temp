@@ -30,6 +30,23 @@ export interface BadgeTechnicien {
   readonly notifie: boolean;
 }
 
+// Objectif mensuel d'un technicien (gamification : cibles + réalisé). La table a un `artisanId`
+// (isolation RLS) mais l'accès passe AUSSI par l'appartenance du technicien au tenant (anti-IDOR,
+// données salarié). Montants `numeric` → string ; cibles/réalisés entiers nullable (défaut 0).
+export interface ObjectifTechnicien {
+  readonly id: number;
+  readonly technicienId: number;
+  readonly mois: number;
+  readonly annee: number;
+  readonly objectifInterventions: number | null;
+  readonly objectifCA: string | null;
+  readonly objectifAvisPositifs: number | null;
+  readonly interventionsRealisees: number | null;
+  readonly caRealise: string | null;
+  readonly avisPositifsObtenus: number | null;
+  readonly pointsGagnes: number | null;
+}
+
 export interface CreateBadgeInput {
   readonly code: string;
   readonly nom: string;

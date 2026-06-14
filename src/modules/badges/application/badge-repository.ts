@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
+import type { Badge, BadgeTechnicien, CreateBadgeInput, ObjectifTechnicien, UpdateBadgeInput } from "../domain/badge";
 import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
 // Port du repository badges. Chaque méthode exige le TenantContext (scope tenant + RLS).
@@ -19,6 +19,9 @@ export interface IBadgeRepository {
 
   // Badges attribués à un technicien — [] si le technicien n'appartient pas au tenant.
   listBadgesTechnicien(ctx: TenantContext, technicienId: number): Promise<BadgeTechnicien[]>;
+  // Objectifs mensuels d'un technicien pour une année (tri par `mois` ASC) — [] si le technicien
+  // n'appartient pas au tenant (anti-IDOR, données salarié). Parité legacy `getObjectifsTechnicien`.
+  listObjectifsTechnicien(ctx: TenantContext, technicienId: number, annee: number): Promise<ObjectifTechnicien[]>;
   // Attribue un badge à un technicien — null si technicien OU badge hors tenant.
   // Idempotent : une attribution déjà existante (même technicien+badge) est renvoyée telle quelle.
   attribuer(
