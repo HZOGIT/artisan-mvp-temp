@@ -94,4 +94,12 @@ export interface IChantierRepository {
   addDocument(ctx: TenantContext, input: AddDocumentInput): Promise<ChantierDocument>;
   // Supprime un document par id (ownership vérifiée en amont) — false si absent.
   deleteDocument(ctx: TenantContext, id: number): Promise<boolean>;
+
+  // ── Statistiques ──────────────────────────────────────────────────────────────────────────────
+  // Somme des `montant_ttc` des dépenses rattachées au chantier (`depenses.chantier_id`), scopée
+  // tenant (`depenses.artisan_id`). Renvoie un décimal string ("0" si aucune dépense). Ownership du
+  // chantier vérifiée en amont par le use-case.
+  sumDepensesChantier(ctx: TenantContext, chantierId: number): Promise<string>;
+  // Met à jour l'avancement (0..100) d'un chantier possédé (scopé tenant). Ownership vérifiée en amont.
+  setAvancement(ctx: TenantContext, chantierId: number, avancement: number): Promise<void>;
 }

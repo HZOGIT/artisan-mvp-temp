@@ -42,6 +42,8 @@ const stubRepo: IChantierRepository = {
     throw new Error("non implémenté (stub)");
   },
   deleteDocument: async () => false,
+  sumDepensesChantier: async () => "0",
+  setAvancement: async () => {},
 };
 
 describe("chantiers.module", () => {
@@ -78,6 +80,8 @@ describe("chantiers.module", () => {
       "ownsClient",
       "ownsIntervention",
       "ownsTechnicien",
+      "setAvancement",
+      "sumDepensesChantier",
       "update",
       "updatePhase",
       "updateSuivi",
@@ -91,6 +95,7 @@ describe("chantiers.module", () => {
       "addDocument",
       "addPointage",
       "associerIntervention",
+      "calculerAvancement",
       "create",
       "createPhase",
       "createSuivi",
@@ -106,6 +111,7 @@ describe("chantiers.module", () => {
       "getInterventions",
       "getPhases",
       "getPointages",
+      "getStatistiques",
       "getSuivi",
       "list",
       "update",

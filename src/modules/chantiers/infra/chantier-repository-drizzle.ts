@@ -9,6 +9,7 @@ import {
   documentsChantier,
   suiviChantier,
   pointagesChantier,
+  depenses,
 } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -548,6 +549,25 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
     return withTenant(this.db, ctx, async (tx) => {
       const deleted = await tx.delete(documentsChantier).where(eq(documentsChantier.id, id)).returning({ id: documentsChantier.id });
       return deleted.length > 0;
+    });
+  }
+
+  // `depenses` a `artisan_id` (RLS) → ce SELECT ne voit que les dépenses du tenant ; on borne aussi
+  // sur `chantier_id` (sous-ressource du chantier déjà vérifié par le use-case).
+  sumDepensesChantier(ctx: TenantContext, chantierId: number): Promise<string> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [agg] = await tx
+        .select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+        .from(depenses)
+        .where(and(eq(depenses.chantier_id, chantierId), eq(depenses.artisan_id, ctx.artisanId)));
+      return String(agg?.total ?? "0");
+    });
+  }
+
+  setAvancement(ctx: TenantContext, chantierId: number, avancement: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // `chantiers` est scopée RLS/tenant → l'UPDATE ne touche que le chantier du tenant.
+      await tx.update(chantiers).set({ avancement, updatedAt: new Date() }).where(eq(chantiers.id, chantierId));
     });
   }
 }

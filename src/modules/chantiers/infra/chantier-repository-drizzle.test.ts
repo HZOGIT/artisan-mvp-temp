@@ -33,6 +33,7 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     await admin.query('delete from phases_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from interventions_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from documents_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
+    await admin.query("delete from depenses where artisan_id in ($1,$2)", [A, B]);
     await admin.query('delete from interventions where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from chantiers where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
@@ -212,5 +213,28 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.deleteDocument(ctx(A), d.id)).toBe(true);
     expect(await repo.deleteDocument(ctx(A), d.id)).toBe(false);
     expect((await repo.listDocuments(ctx(A), c.id)).map((x) => x.id)).toEqual([d2.id]);
+  });
+
+  it("stats : sumDepensesChantier (scopé artisan+chantier) + setAvancement (scopé tenant)", async () => {
+    const c = await repo.create(ctx(A), { clientId: clientA, reference: ref(), nom: "Statable", budgetPrevisionnel: "10000.00" });
+    // aucune dépense → "0"
+    expect(parseFloat(await repo.sumDepensesChantier(ctx(A), c.id))).toBe(0);
+    // 2 dépenses TTC du tenant A rattachées au chantier + 1 dépense de B (ne doit pas compter)
+    await admin.query(
+      'insert into depenses (artisan_id,user_id,numero,date_depense,categorie,montant_ht,montant_ttc,chantier_id) values ($1,1,$2,now(),$3,$4,$5,$6)',
+      [A, `DEP-${A}-1`, "materiel", "1000.00", "1200.00", c.id],
+    );
+    await admin.query(
+      'insert into depenses (artisan_id,user_id,numero,date_depense,categorie,montant_ht,montant_ttc,chantier_id) values ($1,1,$2,now(),$3,$4,$5,$6)',
+      [A, `DEP-${A}-2`, "materiel", "2500.00", "3000.00", c.id],
+    );
+    expect(parseFloat(await repo.sumDepensesChantier(ctx(A), c.id))).toBe(4200);
+    // B ne voit pas les dépenses de A (RLS sur depenses.artisan_id)
+    expect(parseFloat(await repo.sumDepensesChantier(ctx(B), c.id))).toBe(0);
+    // setAvancement scopé tenant : A met à jour, B est sans effet
+    await repo.setAvancement(ctx(A), c.id, 73);
+    expect((await repo.getById(ctx(A), c.id))?.avancement).toBe(73);
+    await repo.setAvancement(ctx(B), c.id, 5);
+    expect((await repo.getById(ctx(A), c.id))?.avancement).toBe(73); // inchangé
   });
 });

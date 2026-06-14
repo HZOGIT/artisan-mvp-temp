@@ -329,4 +329,23 @@ export class FakeChantierRepository implements IChantierRepository {
     this.documents = this.documents.filter((d) => d.id !== id);
     return this.documents.length < before;
   }
+
+  // ── Statistiques ──────────────────────────────────────────────────────────────────────────────
+  // Aide de test : somme TTC des dépenses rattachées à un chantier (clé `${artisanId}:${chantierId}`).
+  private depensesTtc = new Map<string, string>();
+
+  // Aide de test : déclare le total TTC des dépenses d'un chantier (pour `sumDepensesChantier`).
+  registerDepensesChantier(artisanId: number, chantierId: number, totalTtc: string): void {
+    this.depensesTtc.set(`${artisanId}:${chantierId}`, totalTtc);
+  }
+
+  async sumDepensesChantier(ctx: TenantContext, chantierId: number): Promise<string> {
+    return this.depensesTtc.get(`${ctx.artisanId}:${chantierId}`) ?? "0";
+  }
+
+  async setAvancement(ctx: TenantContext, chantierId: number, avancement: number): Promise<void> {
+    const idx = this.store.findIndex((c) => c.id === chantierId && c.artisanId === ctx.artisanId);
+    if (idx === -1) return;
+    this.store[idx] = { ...this.store[idx], avancement, updatedAt: new Date() };
+  }
 }

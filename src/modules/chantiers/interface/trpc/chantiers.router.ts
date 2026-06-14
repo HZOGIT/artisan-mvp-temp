@@ -13,6 +13,7 @@ import {
   dissocierInterventionChantier,
 } from "../../application/interventions-liees-use-cases";
 import { getDocumentsChantier, ajouterDocument, supprimerDocument } from "../../application/documents-use-cases";
+import { getStatistiquesChantier, calculerAvancementChantier } from "../../application/stats-use-cases";
 
 const suiviStatutEnum = z.enum(["a_faire", "en_cours", "termine"]);
 const phaseStatutEnum = z.enum(["a_faire", "en_cours", "termine", "annule"]);
@@ -267,5 +268,14 @@ export function createChantiersRouter(repo: IChantierRepository) {
         await supprimerDocument(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // ── Statistiques (agrégat lecture seule) + recalcul d'avancement ──────────────────────────────
+    getStatistiques: protectedProcedure
+      .input(z.object({ chantierId: z.number().int() }))
+      .query(({ ctx, input }) => getStatistiquesChantier(repo, ctx.tenant, input.chantierId)),
+
+    calculerAvancement: protectedProcedure
+      .input(z.object({ chantierId: z.number().int() }))
+      .mutation(({ ctx, input }) => calculerAvancementChantier(repo, ctx.tenant, input.chantierId)),
   });
 }

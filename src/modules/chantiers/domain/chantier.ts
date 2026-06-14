@@ -226,3 +226,20 @@ export interface AddDocumentInput {
   readonly url: string;
   readonly taille?: number | null;
 }
+
+// ── Statistiques agrégées d'un chantier (lecture seule) ────────────────────────────────────────
+// `coutReel` = somme des dépenses TTC rattachées (repli sur `budgetRealise` manuel si aucune).
+// `marge`/`margePct` = null si pas de budget prévisionnel.
+export interface ChantierStatistiques {
+  readonly nombrePhases: number;
+  readonly phasesTerminees: number;
+  readonly nombreInterventions: number;
+  readonly nombreDocuments: number;
+  readonly budgetConsomme: number;
+  readonly budgetTotal: number;
+  readonly coutReel: number;
+  readonly marge: number | null;
+  readonly margePct: number | null;
+  readonly pourcentageBudget: number;
+  readonly avancement: number;
+}
