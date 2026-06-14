@@ -73,6 +73,9 @@ import type { IDevisStatsReader } from "./modules/statistiques/application/devis
 import { createCalendrierModule } from "./modules/calendrier/calendrier.module";
 import { IcalFeedRepositoryDrizzle } from "./modules/calendrier/infra/ical-feed-repository-drizzle";
 import type { IIcalFeedRepository } from "./modules/calendrier/application/ical-feed-repository";
+import { createEmailsModule } from "./modules/emails/emails.module";
+import { EmailLogReaderDrizzle } from "./modules/emails/infra/email-log-reader-drizzle";
+import type { IEmailLogReader } from "./modules/emails/application/email-log-reader";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -202,6 +205,7 @@ export interface AppDeps extends ContextDeps {
   readonly modulesRepo?: IModulesRepository;
   readonly devisStatsReader?: IDevisStatsReader;
   readonly icalFeedRepo?: IIcalFeedRepository;
+  readonly emailLogReader?: IEmailLogReader;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -464,7 +468,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const calendrier = createCalendrierModule({
     repository: deps.icalFeedRepo ?? new IcalFeedRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier });
+  const emails = createEmailsModule({
+    reader: deps.emailLogReader ?? new EmailLogReaderDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
