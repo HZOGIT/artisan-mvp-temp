@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeEcritureRepository } from "../infra/ecriture-repository-fake";
-import { listEcritures, listEcrituresFacture } from "./read-use-cases";
+import { listEcritures, listEcrituresFacture, balanceComptable, grandLivreComptable } from "./read-use-cases";
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateEcritureInput } from "../domain/ecriture";
 
@@ -44,5 +44,23 @@ describe("ecritures — use-cases de lecture", () => {
     await repo.createMany(A, pieceVente(503));
     expect(await repo.deleteByFacture(A, 503)).toBe(3);
     expect(await repo.deleteByFacture(A, 503)).toBe(0); // déjà vide → idempotent
+  });
+
+  it("balanceComptable : agrégat par compte scopé tenant ; Σsoldes=0 (équilibré)", async () => {
+    const repo = new FakeEcritureRepository();
+    await repo.createMany(A, pieceVente(501));
+    await repo.createMany(B, pieceVente(901)); // tenant B ignoré pour A
+    const b = await balanceComptable(repo, A);
+    expect(b.find((l) => l.numeroCompte === "411000")!.totalDebit).toBe("120.00");
+    expect(b.reduce((s, l) => s + Number(l.solde), 0)).toBeCloseTo(0, 2);
+  });
+
+  it("grandLivreComptable : filtré par compte, scopé tenant", async () => {
+    const repo = new FakeEcritureRepository();
+    await repo.createMany(A, pieceVente(501));
+    const gl = await grandLivreComptable(repo, A, "411000");
+    expect(gl.length).toBe(1);
+    expect(gl[0].numeroCompte).toBe("411000");
+    expect(await grandLivreComptable(repo, B, "411000")).toEqual([]); // pas d'écriture de B
   });
 });
