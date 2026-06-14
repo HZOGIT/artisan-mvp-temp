@@ -257,11 +257,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // Repo interventions partagé : module interventions ET composé par rdv (`confirm` crée une
   // intervention planifiée liée au RDV).
   const interventionRepo = deps.interventionRepo ?? new InterventionRepositoryDrizzle(getDbHandle().db);
+  // Repo congés partagé : module conges + composé par interventions (assignerTechnicien : détection de
+  // conflits d'agenda — congés approuvés du technicien). Hoisté avant interventions (évite le TDZ).
+  const congeRepo = deps.congeRepo ?? new CongeRepositoryDrizzle(getDbHandle().db);
   const interventions = createInterventionsModule({
     repository: interventionRepo,
+    congeRepository: congeRepo,
   });
   const conges = createCongesModule({
-    repository: deps.congeRepo ?? new CongeRepositoryDrizzle(getDbHandle().db),
+    repository: congeRepo,
   });
   // Repos partagés (catégories/budgets/règles de dépense + notes de frais) : les domaines dédiés ET le
   // routeur depenses (parité client `trpc.depenses.*`) consomment les mêmes instances.

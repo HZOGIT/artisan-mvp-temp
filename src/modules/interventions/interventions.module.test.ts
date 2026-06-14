@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { createInterventionsModule } from "./interventions.module";
 import type { IInterventionRepository } from "./application/intervention-repository";
+import type { ICongeRepository } from "../conges/application/conge-repository";
+
+const stubCongeRepo = { list: async () => [] } as unknown as ICongeRepository;
 
 const stubRepo: IInterventionRepository = {
   list: async () => [],
@@ -25,7 +28,7 @@ const stubRepo: IInterventionRepository = {
 
 describe("interventions.module", () => {
   it("createInterventionsModule câble le repository injecté", () => {
-    const module = createInterventionsModule({ repository: stubRepo });
+    const module = createInterventionsModule({ repository: stubRepo, congeRepository: stubCongeRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -49,10 +52,11 @@ describe("interventions.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
-    const module = createInterventionsModule({ repository: stubRepo });
+    const module = createInterventionsModule({ repository: stubRepo, congeRepository: stubCongeRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "ajouterMembreEquipe",
+      "assignerTechnicien",
       "create",
       "delete",
       "getById",

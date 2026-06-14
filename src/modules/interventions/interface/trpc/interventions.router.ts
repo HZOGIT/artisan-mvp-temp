@@ -16,6 +16,8 @@ import {
   getCouleursCalendrier,
   definirCouleurIntervention,
 } from "../../application/equipe-use-cases";
+import { assignerTechnicien } from "../../application/assigner-technicien";
+import type { ICongeRepository } from "../../../conges/application/conge-repository";
 
 // Dates reçues en string ISO (sélecteur front) → `Date`, avec rejet propre des dates
 // invalides (parité legacy : `new Date("garbage")` ne doit pas finir en timestamp NOT NULL).
@@ -58,7 +60,7 @@ const updateSchema = z.object({
 // Routeur tRPC du domaine interventions. Transport mince : valide les inputs (zod), convertit
 // les dates, délègue aux use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse
 // remonter les Domain errors (NotFound→404, Validation→400). Repo injecté (DI).
-export function createInterventionsRouter(repo: IInterventionRepository) {
+export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
 
@@ -125,5 +127,11 @@ export function createInterventionsRouter(repo: IInterventionRepository) {
         await definirCouleurIntervention(repo, ctx.tenant, input.interventionId, input.couleur);
         return { success: true };
       }),
+
+    // Affecte un technicien à une intervention (404 intervention / 403 technicien hors tenant) +
+    // renvoie les conflits NON bloquants (double-booking + congés approuvés).
+    assignerTechnicien: protectedProcedure
+      .input(z.object({ interventionId: z.number().int(), technicienId: z.number().int() }))
+      .mutation(({ ctx, input }) => assignerTechnicien(repo, congeRepo, ctx.tenant, input.interventionId, input.technicienId)),
   });
 }
