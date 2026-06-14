@@ -70,6 +70,9 @@ import type { IParametresRepository } from "./modules/parametres/application/par
 import { createModelesEmailModule } from "./modules/modeles-email/modeles-email.module";
 import { ModeleEmailRepositoryDrizzle } from "./modules/modeles-email/infra/modele-email-repository-drizzle";
 import type { IModeleEmailRepository } from "./modules/modeles-email/application/modele-email-repository";
+import { createModelesDevisModule } from "./modules/modeles-devis/modeles-devis.module";
+import { ModeleDevisRepositoryDrizzle } from "./modules/modeles-devis/infra/modele-devis-repository-drizzle";
+import type { IModeleDevisRepository } from "./modules/modeles-devis/application/modele-devis-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -103,6 +106,7 @@ export interface AppDeps extends ContextDeps {
   readonly articleRepo?: IArticleRepository;
   readonly parametresRepo?: IParametresRepository;
   readonly modeleEmailRepo?: IModeleEmailRepository;
+  readonly modeleDevisRepo?: IModeleDevisRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -186,7 +190,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const modelesEmail = createModelesEmailModule({
     repository: deps.modeleEmailRepo ?? new ModeleEmailRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail });
+  const modelesDevis = createModelesDevisModule({
+    repository: deps.modeleDevisRepo ?? new ModeleDevisRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
