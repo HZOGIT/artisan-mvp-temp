@@ -21,9 +21,15 @@ const demande: DemandeAvisDeps = {
   lienBaseUrl: "https://test.operioz.com",
 };
 
+const publicDeps = {
+  reader: { getByToken: async () => null },
+  contextReader: { getContext: async () => ({ artisanNomEntreprise: null, clientNom: null, interventionTitre: null, interventionDateDebut: null }) },
+  writer: { soumettre: async () => {} },
+};
+
 describe("avis.module", () => {
   it("createAvisModule câble les dépendances injectées", () => {
-    const module = createAvisModule({ avisRepo: stubRepo, demande });
+    const module = createAvisModule({ avisRepo: stubRepo, demande, public: publicDeps });
     expect(module.deps.avisRepo).toBe(stubRepo);
     expect(module.deps.demande).toBe(demande);
   });
@@ -33,17 +39,19 @@ describe("avis.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité + workflow)", () => {
-    const module = createAvisModule({ avisRepo: stubRepo, demande });
+    const module = createAvisModule({ avisRepo: stubRepo, demande, public: publicDeps });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "envoyerDemande",
       "envoyerDemandeParClient",
       "getAll",
       "getById",
+      "getDemandeInfo",
       "getStats",
       "list",
       "moderer",
       "repondre",
+      "submitAvis",
     ]);
   });
 });

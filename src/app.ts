@@ -12,6 +12,9 @@ import type { IAvisRepository } from "./modules/avis/application/avis-repository
 import { createAvisModule } from "./modules/avis/avis.module";
 import { DemandeAvisRepositoryDrizzle } from "./modules/avis/infra/demande-avis-repository-drizzle";
 import type { IDemandeAvisRepository } from "./modules/avis/application/demande-avis-repository";
+import { PublicDemandeAvisReaderDrizzle } from "./modules/avis/infra/public-demande-reader-drizzle";
+import { PublicDemandeContextReaderDrizzle } from "./modules/avis/infra/public-demande-context-reader-drizzle";
+import { PublicAvisWriterDrizzle } from "./modules/avis/infra/public-avis-writer-drizzle";
 import { createBadgesModule } from "./modules/badges/badges.module";
 import { BadgeRepositoryDrizzle } from "./modules/badges/infra/badge-repository-drizzle";
 import type { IBadgeRepository } from "./modules/badges/application/badge-repository";
@@ -175,6 +178,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: deps.emailPort ?? new LegacyEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
       lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    },
+    // Surface PUBLIQUE par token (portail d'avis) : lecture demande par token (policy RLS publique),
+    // contexte (noms) + écriture (avis/demande/notif) sous le tenant résolu.
+    public: {
+      reader: new PublicDemandeAvisReaderDrizzle(getDbHandle().db),
+      contextReader: new PublicDemandeContextReaderDrizzle(getDbHandle().db),
+      writer: new PublicAvisWriterDrizzle(getDbHandle().db),
     },
   });
   const badges = createBadgesModule({

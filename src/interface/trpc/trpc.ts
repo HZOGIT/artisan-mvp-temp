@@ -6,7 +6,6 @@ import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyR
 const t = initTRPC.context<AppContext>().create();
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
 
 // Traduit les erreurs de domaine en codes tRPC (transport). En tRPC v11, `next()` ne
 // throw pas : il renvoie un résultat `{ ok:false, error }` où `error` est un TRPCError
@@ -32,6 +31,11 @@ const requireTenant = t.middleware(({ ctx, next }) => {
   const tenant: TenantContext = ctx.tenant;
   return next({ ctx: { ...ctx, tenant } });
 });
+
+// Procédure PUBLIQUE (surface portail/vitrine par token — pas de tenant) : mapping des erreurs de
+// domaine (NotFound→404, Validation→400…) mais SANS exigence de tenant. Le scoping est porté par la
+// capacité (token) côté use-case/RLS, jamais par un cookie tenant.
+export const publicProcedure = t.procedure.use(mapDomainErrors);
 
 // Procédure protégée : mapping erreurs domaine + exigence de tenant.
 export const protectedProcedure = t.procedure.use(mapDomainErrors).use(requireTenant);
