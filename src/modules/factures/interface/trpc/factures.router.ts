@@ -3,7 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IFactureRepository } from "../../application/facture-repository";
 import type { IDevisReader } from "../../application/devis-reader";
 import type { ComptaPort } from "../../application/compta-port";
-import { listFactures, getFacture, listLignesFacture } from "../../application/read-use-cases";
+import { listFactures, getFacture, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
 import {
   creerFacture,
   modifierFacture,
@@ -92,6 +92,17 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     getLignes: protectedProcedure
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => listLignesFacture(repo, ctx.tenant, input.factureId)),
+
+    // Avoirs émis sur une facture (parité client `trpc.factures.getAvoirsByFacture`). Lecture seule,
+    // scopée tenant (→ [] hors tenant, comme le legacy).
+    getAvoirsByFacture: protectedProcedure
+      .input(z.object({ factureId: z.number().int() }))
+      .query(({ ctx, input }) => getAvoirsFacture(repo, ctx.tenant, input.factureId)),
+
+    // Journal d'audit d'une facture (parité client `trpc.factures.getAuditLog`). Lecture seule, scopée.
+    getAuditLog: protectedProcedure
+      .input(z.object({ factureId: z.number().int() }))
+      .query(({ ctx, input }) => getAuditLogFacture(repo, ctx.tenant, input.factureId)),
 
     create: protectedProcedure
       .input(createSchema)

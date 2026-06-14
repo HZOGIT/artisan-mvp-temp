@@ -108,3 +108,15 @@ export interface UpdateFactureLigneInput {
   readonly ordre?: number;
   readonly type?: LigneType;
 }
+
+// Entrée du journal d'audit d'une facture (lecture seule, parité legacy `getAuditLog`).
+// Table `audit_log` (scopée artisanId + entityType/entityId). `details` = JSON/texte libre.
+export interface AuditLogEntry {
+  readonly id: number;
+  readonly userId: number;
+  readonly entityType: string;
+  readonly entityId: number;
+  readonly action: string;
+  readonly details: string | null;
+  readonly createdAt: Date;
+}

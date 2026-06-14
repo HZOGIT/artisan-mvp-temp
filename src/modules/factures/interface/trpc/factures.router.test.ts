@@ -47,6 +47,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
   let server: ReturnType<typeof buildApp>;
 
   const purge = async (uid: number) => {
+    await admin.query('delete from audit_log where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from factures_lignes where "factureId" in (select id from factures where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
     await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from devis_lignes where "devisId" in (select id from devis where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
@@ -235,5 +236,40 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callMutation(server, "factures.convertirDepuisDevis", { devisId: devisBrouillon }, tA)).statusCode).toBe(409);
     // cross-tenant : B ne convertit pas le devis de A → 404
     expect((await callMutation(server, "factures.convertirDepuisDevis", { devisId }, tB)).statusCode).toBe(404);
+  });
+
+  it("getAvoirsByFacture (parité client) : avoirs scopés ; hors tenant → [] ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA, objet: "Avec avoir" }, tA)).json().result.data.id as number;
+    // une facture neuve n'a pas d'avoir
+    expect((await callQuery(server, "factures.getAvoirsByFacture", { factureId: id })).statusCode).toBe(401);
+    expect((await callQuery(server, "factures.getAvoirsByFacture", { factureId: id }, tA)).json().result.data).toEqual([]);
+    // seed un avoir (typeDocument='avoir', lié à la facture d'origine) côté admin → la lecture le renvoie
+    await admin.query(
+      `insert into factures ("artisanId","clientId",numero,"typeDocument","factureOrigineId",statut) values ($1,$2,$3,'avoir',$4,'envoyee')`,
+      [artisanA, clientA, `AV-T-${Date.now()}`, id],
+    );
+    const avoirs = (await callQuery(server, "factures.getAvoirsByFacture", { factureId: id }, tA)).json().result.data as Array<{ typeDocument: string }>;
+    expect(avoirs.length).toBe(1);
+    expect(avoirs[0].typeDocument).toBe("avoir");
+    // hors tenant → [] (pas 404)
+    expect((await callQuery(server, "factures.getAvoirsByFacture", { factureId: id }, tB)).json().result.data).toEqual([]);
+  });
+
+  it("getAuditLog (parité client) : entrées triées récent→ancien, scopées ; hors tenant → [] ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA, objet: "Audit" }, tA)).json().result.data.id as number;
+    expect((await callQuery(server, "factures.getAuditLog", { factureId: id })).statusCode).toBe(401);
+    // seed 2 entrées d'audit (la 2e plus récente)
+    await admin.query(
+      `insert into audit_log ("artisanId","userId","entityType","entityId",action,"createdAt") values ($1,$2,'facture',$3,'created', now() - interval '1 minute'),($1,$2,'facture',$3,'sent', now())`,
+      [artisanA, UA, id],
+    );
+    const log = (await callQuery(server, "factures.getAuditLog", { factureId: id }, tA)).json().result.data as Array<{ action: string }>;
+    expect(log.map((e) => e.action)).toEqual(["sent", "created"]); // tri récent → ancien
+    // hors tenant → [] (pas 404)
+    expect((await callQuery(server, "factures.getAuditLog", { factureId: id }, tB)).json().result.data).toEqual([]);
   });
 });

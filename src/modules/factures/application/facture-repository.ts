@@ -7,6 +7,7 @@ import type {
   UpdateFactureInput,
   CreateFactureLigneInput,
   UpdateFactureLigneInput,
+  AuditLogEntry,
 } from "../domain/facture";
 
 // Port du repository factures. Chaque méthode exige le TenantContext (scope tenant + RLS).
@@ -37,6 +38,9 @@ export interface IFactureRepository {
   nextNumeroAvoir(ctx: TenantContext): Promise<string>;
   // Avoirs émis sur une facture d'origine (typeDocument='avoir'), scopés tenant.
   listAvoirs(ctx: TenantContext, factureOrigineId: number): Promise<Facture[]>;
+  // Journal d'audit d'une facture (table `audit_log`, scopé artisanId + entityType='facture'),
+  // trié du plus récent au plus ancien. Lecture seule (parité legacy `getAuditLog`).
+  listAuditLog(ctx: TenantContext, factureId: number): Promise<AuditLogEntry[]>;
   // Crée un avoir (note de crédit) + ses lignes (montants négatifs déjà calculés) dans une
   // transaction — null si la facture d'origine n'appartient pas au tenant.
   createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null>;

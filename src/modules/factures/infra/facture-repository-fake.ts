@@ -7,6 +7,7 @@ import type {
   UpdateFactureInput,
   CreateFactureLigneInput,
   UpdateFactureLigneInput,
+  AuditLogEntry,
 } from "../domain/facture";
 import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
 
@@ -23,6 +24,23 @@ export class FakeFactureRepository implements IFactureRepository {
   private avoirCompteur = new Map<number, number>();
   private ownedClients = new Set<string>();
   private ownedDevis = new Set<string>();
+  // Journal d'audit simulé (avec artisanId pour le scope tenant).
+  private auditStore: Array<AuditLogEntry & { artisanId: number }> = [];
+  private auditSeq = 0;
+
+  // Aide de test (hors port) : ajoute une entrée d'audit pour une facture.
+  seedAuditLog(artisanId: number, factureId: number, action: string, userId = 1, details: string | null = null): void {
+    this.auditStore.push({
+      id: ++this.auditSeq,
+      artisanId,
+      userId,
+      entityType: "facture",
+      entityId: factureId,
+      action,
+      details,
+      createdAt: new Date(Date.now() + this.auditSeq),
+    });
+  }
 
   // Aides de test : déclarent qu'un client / devis appartient au tenant (anti-IDOR-FK).
   registerClient(artisanId: number, clientId: number): void {
@@ -152,6 +170,13 @@ export class FakeFactureRepository implements IFactureRepository {
     return this.factureStore.filter(
       (f) => f.artisanId === ctx.artisanId && f.typeDocument === "avoir" && f.factureOrigineId === factureOrigineId,
     );
+  }
+
+  async listAuditLog(ctx: TenantContext, factureId: number): Promise<AuditLogEntry[]> {
+    return this.auditStore
+      .filter((a) => a.artisanId === ctx.artisanId && a.entityType === "facture" && a.entityId === factureId)
+      .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime())
+      .map(({ artisanId: _a, ...e }) => e);
   }
 
   async createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null> {
