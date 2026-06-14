@@ -79,6 +79,9 @@ import type { IConfigRelancesRepository } from "./modules/config-relances/applic
 import { createRdvEnLigneModule } from "./modules/rdv-en-ligne/rdv-en-ligne.module";
 import { RdvRepositoryDrizzle } from "./modules/rdv-en-ligne/infra/rdv-repository-drizzle";
 import type { IRdvRepository } from "./modules/rdv-en-ligne/application/rdv-repository";
+import { createRelancesDevisModule } from "./modules/relances-devis/relances-devis.module";
+import { RelanceDevisRepositoryDrizzle } from "./modules/relances-devis/infra/relance-devis-repository-drizzle";
+import type { IRelanceDevisRepository } from "./modules/relances-devis/application/relance-devis-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -115,6 +118,7 @@ export interface AppDeps extends ContextDeps {
   readonly modeleDevisRepo?: IModeleDevisRepository;
   readonly configRelancesRepo?: IConfigRelancesRepository;
   readonly rdvRepo?: IRdvRepository;
+  readonly relanceDevisRepo?: IRelanceDevisRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -207,7 +211,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const rdvEnLigne = createRdvEnLigneModule({
     repository: deps.rdvRepo ?? new RdvRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne });
+  const relancesDevis = createRelancesDevisModule({
+    repository: deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

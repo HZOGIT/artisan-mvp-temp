@@ -22,4 +22,10 @@ describe("relances-devis.module", () => {
   it("le port expose le journal append-only (pas d'update) + ownsDevis (anti-IDOR-FK)", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByDevis", "ownsDevis"]);
   });
+
+  it("expose un routeur tRPC assemblé (list/byDevis/getById/create/delete ; pas d'update)", () => {
+    const module = createRelancesDevisModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["byDevis", "create", "delete", "getById", "list"]);
+  });
 });
