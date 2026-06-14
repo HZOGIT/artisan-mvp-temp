@@ -477,9 +477,32 @@ describe("bascule du domaine modelesDevis (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine configRelances (flag gateway)", () => {
+  it("configRelances routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("configRelances", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { configRelances: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("configRelances", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("configRelances", 8, canary)).toBe(false);
+    const global: FeatureFlags = { configRelances: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("configRelances", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("configRelances", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine configRelances extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("configRelances.get")).toBe("configRelances");
+    expect(domainFromTrpcPath("/configRelances.update")).toBe("configRelances");
+  });
+
+  it("parse env : configRelances enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "configRelances" } as NodeJS.ProcessEnv).configRelances).toEqual({ enabled: true });
+    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // (le parseur lowercase le suffixe → clé `configrelances`) — même limitation que notesDeFrais.
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 21 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis"]) {
+  it("les 22 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
