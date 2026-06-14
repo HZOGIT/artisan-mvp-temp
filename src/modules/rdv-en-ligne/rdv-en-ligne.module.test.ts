@@ -23,4 +23,10 @@ describe("rdv-en-ligne.module", () => {
   it("le port expose CRUD + setStatut + ownsClient (anti-IDOR-FK)", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsClient", "setStatut", "update"]);
   });
+
+  it("expose un routeur tRPC assemblé (CRUD ; transitions en 7/9)", () => {
+    const module = createRdvEnLigneModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+  });
 });

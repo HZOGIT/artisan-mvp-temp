@@ -22,6 +22,7 @@ import type { ParametresModule } from "../../modules/parametres/parametres.modul
 import type { ModelesEmailModule } from "../../modules/modeles-email/modeles-email.module";
 import type { ModelesDevisModule } from "../../modules/modeles-devis/modeles-devis.module";
 import type { ConfigRelancesModule } from "../../modules/config-relances/config-relances.module";
+import type { RdvEnLigneModule } from "../../modules/rdv-en-ligne/rdv-en-ligne.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -47,6 +48,7 @@ export interface AppRouterDeps {
   readonly modelesEmail: ModelesEmailModule;
   readonly modelesDevis: ModelesDevisModule;
   readonly configRelances: ConfigRelancesModule;
+  readonly rdvEnLigne: RdvEnLigneModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -81,6 +83,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     modelesEmail: deps.modelesEmail.router,
     modelesDevis: deps.modelesDevis.router,
     configRelances: deps.configRelances.router,
+    rdvEnLigne: deps.rdvEnLigne.router,
   });
 }
 
