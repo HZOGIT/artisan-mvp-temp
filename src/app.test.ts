@@ -1,10 +1,17 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { buildApp } from "./app";
 import { MIGRATED_DOMAINS } from "./interface/gateway/migrated-domains";
 
-describe("app Fastify (scaffold + tRPC)", () => {
-  const app = buildApp();
-  afterAll(() => app.close());
+// buildApp() construit les repos Drizzle par défaut (→ getDbHandle()) : nécessite une URL de base.
+// Sans DB, on skippe proprement (comme les e2e `.skipIf(!URL)`) plutôt que de planter la collecte.
+const HAS_DB = !!(process.env.APP_DATABASE_URL || process.env.DATABASE_URL);
+
+describe.skipIf(!HAS_DB)("app Fastify (scaffold + tRPC)", () => {
+  let app: ReturnType<typeof buildApp>;
+  beforeAll(() => {
+    app = buildApp();
+  });
+  afterAll(() => app?.close());
 
   it("GET /health → 200 { status: 'ok' }", async () => {
     const res = await app.inject({ method: "GET", url: "/health" });
