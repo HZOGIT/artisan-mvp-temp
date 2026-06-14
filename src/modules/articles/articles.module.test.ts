@@ -30,16 +30,20 @@ describe("articles.module", () => {
       "byCategorie",
       "create",
       "createArtisanArticle",
+      "createBibliothequeArticle",
       "delete",
       "deleteArtisanArticle",
+      "deleteBibliothequeArticle",
       "getArtisanArticles",
       "getBibliotheque",
       "getById",
+      "importBibliothequeArticles",
       "list",
       "search",
       "suggererArticlesIA",
       "update",
       "updateArtisanArticle",
+      "updateBibliothequeArticle",
     ]);
   });
 });

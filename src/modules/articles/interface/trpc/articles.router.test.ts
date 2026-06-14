@@ -4,16 +4,21 @@ import { Pool } from "pg";
 import { buildApp } from "../../../../app";
 import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
+import { DrizzleUserRoleReader } from "../../../../shared/tenant/role-reader";
 import { ArticleRepositoryDrizzle } from "../../infra/article-repository-drizzle";
+import { BibliothequeWriterDrizzle } from "../../infra/bibliotheque-writer-drizzle";
+import { BibliothequeReaderDrizzle } from "../../infra/bibliotheque-reader-drizzle";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
   process.env.APP_DATABASE_URL ||
   (URL ? URL.replace(/:\/\/[^@]+@/, "://app_tenant:app_tenant_pw@") : undefined);
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
+const BIBTAG = "ZZBIBE2E";
 
 const UA = 9943101;
 const UB = 9943102;
+const UADM = 9943103; // admin staff (rôle admin, sans artisan)
 let seq = 0;
 const ref = () => `ART-R-${++seq}`;
 
@@ -48,14 +53,26 @@ describe.skipIf(!URL)("articles.router e2e (HTTP → tRPC → use-case → repo 
       await purge(uid);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
     }
+    // Admin staff : rôle 'admin', SANS artisan (vérifie que `adminProcedure` ne dépend pas du tenant).
+    await purge(UADM);
+    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','admin')", [UADM, `u${UADM}@t.fr`]);
+    await admin.query("delete from bibliotheque_articles where nom like $1", [`${BIBTAG}%`]);
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     await admin.query('insert into artisans ("userId") values ($1) returning id', [UB]);
-    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), articleRepo: new ArticleRepositoryDrizzle(app.db) });
+    server = buildApp({
+      jwtSecret: SECRET,
+      resolver: new DrizzleTenantResolver(app.db),
+      roleReader: new DrizzleUserRoleReader(app.db),
+      articleRepo: new ArticleRepositoryDrizzle(app.db),
+      bibliothequeReader: new BibliothequeReaderDrizzle(app.db),
+      bibliothequeWriter: new BibliothequeWriterDrizzle(app.db),
+    });
   });
 
   afterAll(async () => {
     await server.close();
-    for (const uid of [UA, UB]) await purge(uid);
+    await admin.query("delete from bibliotheque_articles where nom like $1", [`${BIBTAG}%`]);
+    for (const uid of [UA, UB, UADM]) await purge(uid);
     await app.close();
     await admin.end();
   });
@@ -134,6 +151,32 @@ describe.skipIf(!URL)("articles.router e2e (HTTP → tRPC → use-case → repo 
     const s = await q(server, "articles.search", { query: "x" });
     expect(s.statusCode).toBe(200);
     expect(Array.isArray(s.json().result.data)).toBe(true);
+  });
+
+  it("bibliothèque WRITES : adminProcedure — 401 sans cookie, 403 non-admin, 200 admin", async () => {
+    const tArtisan = await token(UA); // rôle artisan
+    const tAdmin = await token(UADM); // rôle admin (sans artisan)
+    const payload = { nom: `${BIBTAG} Mitigeur`, unite: "u", prix_base: "45.00", categorie: "sanitaire", sous_categorie: "robinetterie", metier: "plombier" };
+    // sans cookie → 401
+    expect((await mut(server, "articles.createBibliothequeArticle", payload)).statusCode).toBe(401);
+    // artisan (non-admin) → 403
+    expect((await mut(server, "articles.createBibliothequeArticle", payload, tArtisan)).statusCode).toBe(403);
+    // admin → 200 (create)
+    const created = await mut(server, "articles.createBibliothequeArticle", payload, tAdmin);
+    expect(created.statusCode).toBe(200);
+    const id = created.json().result.data.id as number;
+    expect(created.json().result.data.tauxTVA).toBe("20.00"); // défaut PG
+    // update (admin) + non-admin refusé
+    expect((await mut(server, "articles.updateBibliothequeArticle", { id, prix_base: "50.00" }, tArtisan)).statusCode).toBe(403);
+    expect((await mut(server, "articles.updateBibliothequeArticle", { id, prix_base: "50.00" }, tAdmin)).json().result.data.prixBase).toBe("50.00");
+    // import (admin) → compte
+    const imp = await mut(server, "articles.importBibliothequeArticles", [{ ...payload, nom: `${BIBTAG} Imp` }], tAdmin);
+    expect(imp.json().result.data).toEqual({ imported: 1 });
+    // visible en lecture publique (getBibliotheque, sans cookie)
+    const liste = (await q(server, "articles.getBibliotheque", { metier: "plombier" })).json().result.data as Array<{ nom: string }>;
+    expect(liste.some((a) => a.nom === `${BIBTAG} Mitigeur`)).toBe(true);
+    // delete (admin)
+    expect((await mut(server, "articles.deleteBibliothequeArticle", { id }, tAdmin)).json().result.data).toEqual({ success: true });
   });
 
   it("byCategorie : filtre scopé tenant ; catégorie inconnue → []", async () => {

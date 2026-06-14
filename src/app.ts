@@ -5,6 +5,7 @@ import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
 import { getDbHandle } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
+import { DrizzleUserRoleReader, type UserRoleReader } from "./shared/tenant/role-reader";
 import { VehiculeRepositoryDrizzle } from "./modules/vehicules/infra/vehicule-repository-drizzle";
 import type { IVehiculeRepository } from "./modules/vehicules/application/vehicule-repository";
 import { AvisRepositoryDrizzle } from "./modules/avis/infra/avis-repository-drizzle";
@@ -76,7 +77,9 @@ import { createEcrituresModule } from "./modules/ecritures/ecritures.module";
 import type { IEcritureRepository } from "./modules/ecritures/application/ecriture-repository";
 import { createArticlesModule } from "./modules/articles/articles.module";
 import { BibliothequeReaderDrizzle } from "./modules/articles/infra/bibliotheque-reader-drizzle";
+import { BibliothequeWriterDrizzle } from "./modules/articles/infra/bibliotheque-writer-drizzle";
 import type { BibliothequeReader } from "./modules/articles/application/bibliotheque-reader";
+import type { BibliothequeWriter } from "./modules/articles/application/bibliotheque-writer";
 import { ArticleRepositoryDrizzle } from "./modules/articles/infra/article-repository-drizzle";
 import type { IArticleRepository } from "./modules/articles/application/article-repository";
 import { createParametresModule } from "./modules/parametres/parametres.module";
@@ -151,6 +154,7 @@ export interface AppDeps extends ContextDeps {
   readonly ecritureRepo?: IEcritureRepository;
   readonly articleRepo?: IArticleRepository;
   readonly bibliothequeReader?: BibliothequeReader;
+  readonly bibliothequeWriter?: BibliothequeWriter;
   readonly parametresRepo?: IParametresRepository;
   readonly modeleEmailRepo?: IModeleEmailRepository;
   readonly modeleDevisRepo?: IModeleDevisRepository;
@@ -351,6 +355,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     },
     // Catalogue partagé (lecture publique) : reader NON tenant (table sans artisanId, RLS OFF).
     bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
+    // Écritures catalogue : writer NON tenant, garde admin portée par la procédure tRPC.
+    bibliothequeWriter: deps.bibliothequeWriter ?? new BibliothequeWriterDrizzle(getDbHandle().db),
   });
   const parametres = createParametresModule({
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),
@@ -405,6 +411,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       createContext: makeCreateContext({
         jwtSecret: deps.jwtSecret,
         resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+        // Rôle résolu indépendamment du tenant (admin staff sans artisan) → garde `adminProcedure`.
+        roleReader: deps.roleReader ?? new DrizzleUserRoleReader(getDbHandle().db),
       }),
     },
   });

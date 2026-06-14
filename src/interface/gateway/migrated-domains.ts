@@ -39,4 +39,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "avis", // parité vérifiée : list/getAll/getById/getStats/repondre/moderer/envoyerDemandeParClient + PUBLICS getDemandeInfo/submitAvis (token) ⊇ appels client
   "interventions", // parité vérifiée : CRUD/getMine + équipe(4)/couleurs(2)/assignerTechnicien/getSuggestionsTechniciens(géo) ⊇ appels client
   "chantiers", // parité vérifiée : CRUD + pointages(3)/suivi(4)/phases(4)/interventions-liées(4)/documents(3)/getStatistiques/calculerAvancement ⊇ 16 appels client
+  "articles", // parité vérifiée : artisan(get/create/update/delete) + bibliothèque(getBibliotheque/search public + create/update/delete/import admin) + suggererArticlesIA ⊇ 8 appels client
 ] as const;

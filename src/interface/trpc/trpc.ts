@@ -32,6 +32,19 @@ const requireTenant = t.middleware(({ ctx, next }) => {
   return next({ ctx: { ...ctx, tenant } });
 });
 
+// Exige un utilisateur authentifié avec le rôle `admin` (staff Operioz). ⚠️ INDÉPENDANT du tenant :
+// un admin n'a pas forcément d'artisan → on s'appuie sur `ctx.role` (résolu depuis `users`), pas sur
+// `ctx.tenant`. Sert aux surfaces globales (catalogue bibliothèque, modération, config globale…).
+const requireAdmin = t.middleware(({ ctx, next }) => {
+  if (!ctx.claims) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentification requise" });
+  }
+  if (ctx.role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Réservé aux administrateurs" });
+  }
+  return next();
+});
+
 // Procédure PUBLIQUE (surface portail/vitrine par token — pas de tenant) : mapping des erreurs de
 // domaine (NotFound→404, Validation→400…) mais SANS exigence de tenant. Le scoping est porté par la
 // capacité (token) côté use-case/RLS, jamais par un cookie tenant.
@@ -39,3 +52,6 @@ export const publicProcedure = t.procedure.use(mapDomainErrors);
 
 // Procédure protégée : mapping erreurs domaine + exigence de tenant.
 export const protectedProcedure = t.procedure.use(mapDomainErrors).use(requireTenant);
+
+// Procédure ADMIN (staff Operioz) : mapping erreurs domaine + exigence du rôle admin (sans tenant).
+export const adminProcedure = t.procedure.use(mapDomainErrors).use(requireAdmin);
