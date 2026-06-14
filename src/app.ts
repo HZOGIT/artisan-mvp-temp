@@ -67,6 +67,9 @@ import type { IActiviteRepository } from "./modules/activites/application/activi
 import { createFeatureModulesModule } from "./modules/feature-modules/feature-modules.module";
 import { ModulesRepositoryDrizzle } from "./modules/feature-modules/infra/modules-repository-drizzle";
 import type { IModulesRepository } from "./modules/feature-modules/application/modules-repository";
+import { createStatistiquesModule } from "./modules/statistiques/statistiques.module";
+import { DevisStatsReaderDrizzle } from "./modules/statistiques/infra/devis-stats-reader-drizzle";
+import type { IDevisStatsReader } from "./modules/statistiques/application/devis-stats-reader";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -194,6 +197,7 @@ export interface AppDeps extends ContextDeps {
   readonly devisOptionRepo?: IDevisOptionRepository;
   readonly activiteRepo?: IActiviteRepository;
   readonly modulesRepo?: IModulesRepository;
+  readonly devisStatsReader?: IDevisStatsReader;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -450,7 +454,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const modules = createFeatureModulesModule({
     repository: deps.modulesRepo ?? new ModulesRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules });
+  const statistiques = createStatistiquesModule({
+    devisStatsReader: deps.devisStatsReader ?? new DevisStatsReaderDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
