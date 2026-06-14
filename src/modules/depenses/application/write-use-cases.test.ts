@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeDepenseRepository } from "../infra/depense-repository-fake";
-import { creerDepense, modifierDepense, supprimerDepense } from "./write-use-cases";
+import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm } from "./write-use-cases";
 import type { CreerDepenseInput } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
@@ -149,5 +149,41 @@ describe("depenses — use-cases d'écriture", () => {
     const d = await creerDepense(repo, A, base());
     await expectCrossTenantDenied(() => supprimerDepense(repo, B, d.id));
     await expect(supprimerDepense(repo, B, d.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("depenses — creerIndemniteKm", () => {
+  it("calcule le montant (km × tarif), sans TVA, remboursable, numéro serveur", async () => {
+    const repo = new FakeDepenseRepository();
+    const d = await creerIndemniteKm(repo, A, { dateDepense: "2026-06-15", kilometres: 100, tarifKm: 0.5 });
+    expect(d.montantHt).toBe("50.00"); // 100 × 0.5
+    expect(d.montantTtc).toBe("50.00"); // pas de TVA (taux 0)
+    expect(d.montantTva).toBe("0.00");
+    expect(d.tvaDeductible).toBe(false);
+    expect(d.remboursable).toBe(true);
+    expect(d.fournisseur).toBe("Indemnités kilométriques");
+    expect(d.numero).toMatch(/^DEP-/); // généré serveur
+  });
+
+  it("tarif par défaut 0.529 + motif dans la description", async () => {
+    const repo = new FakeDepenseRepository();
+    const d = await creerIndemniteKm(repo, A, { dateDepense: "2026-06-15", kilometres: 10, motif: "RDV client" });
+    expect(d.montantHt).toBe("5.29"); // 10 × 0.529
+    expect(d.description).toContain("RDV client");
+    expect(d.description).toContain("0.529");
+  });
+
+  it("km ≤ 0 → ValidationError", async () => {
+    const repo = new FakeDepenseRepository();
+    await expect(creerIndemniteKm(repo, A, { dateDepense: "2026-06-15", kilometres: 0 })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("anti-IDOR : clientId/chantierId hors tenant → NotFound (via creerDepense)", async () => {
+    const repo = new FakeDepenseRepository();
+    await expect(creerIndemniteKm(repo, A, { dateDepense: "2026-06-15", kilometres: 10, clientId: 999 })).rejects.toBeInstanceOf(NotFoundError);
+    // avec FK enregistrée comme appartenant au tenant → OK
+    repo.registerRef(1, "client", 555);
+    const d = await creerIndemniteKm(repo, A, { dateDepense: "2026-06-15", kilometres: 10, clientId: 555 });
+    expect(d.clientId).toBe(555);
   });
 });

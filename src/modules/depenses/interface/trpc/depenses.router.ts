@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDepenseRepository } from "../../application/depense-repository";
 import { listDepenses, getDepense, checkDoublons, getDepensesStats } from "../../application/read-use-cases";
-import { creerDepense, modifierDepense, supprimerDepense } from "../../application/write-use-cases";
+import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm } from "../../application/write-use-cases";
 // Composition : le client appelle les catégories de dépense via `trpc.depenses.getCategories/...`
 // (le legacy les expose sous le routeur `depenses`). On délègue aux use-cases du domaine
 // categories-depenses (déjà migré) — parité de surface, pas de duplication de logique.
@@ -12,7 +12,7 @@ import { creerCategorie, modifierCategorie, supprimerCategorie } from "../../../
 // Composition : le client gère les budgets mensuels par catégorie via `trpc.depenses.setBudget` / etc.
 import type { IBudgetCategorieRepository } from "../../../budgets-categories/application/budget-categorie-repository";
 import { budgetsParMois } from "../../../budgets-categories/application/read-use-cases";
-import { creerBudget, modifierBudget } from "../../../budgets-categories/application/write-use-cases";
+import { creerBudget, modifierBudget, copierBudgetsMois } from "../../../budgets-categories/application/write-use-cases";
 import { budgetsRealises } from "../../application/budgets-realises-use-case";
 // Composition : règles de catégorisation auto via `trpc.depenses.getRegles/createRegle/deleteRegle`.
 import type { IRegleCategorisationRepository } from "../../../regles-categorisation/application/regle-categorisation-repository";
@@ -211,6 +211,39 @@ export function createDepensesRouter(
         else await creerBudget(budgetRepo, ctx.tenant, { categorie: input.categorie, mois: input.mois, budget: montant });
         return { success: true };
       }),
+
+    // Copie les budgets d'un mois vers un autre (upsert par catégorie, idempotent).
+    copierBudgetsMois: protectedProcedure
+      .input(
+        z.object({
+          moisSource: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
+          moisCible: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)"),
+        }),
+      )
+      .mutation(({ ctx, input }) => copierBudgetsMois(budgetRepo, ctx.tenant, input.moisSource, input.moisCible)),
+
+    // ── Indemnité kilométrique (crée une dépense forfaitaire sans TVA) ────────────────
+    creerIndemniteKm: protectedProcedure
+      .input(
+        z.object({
+          dateDepense: z.string().min(1),
+          kilometres: z.number().positive(),
+          tarifKm: z.number().positive().default(0.529),
+          motif: z.string().max(500).optional(),
+          chantierId: z.number().int().nullish(),
+          clientId: z.number().int().nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        creerIndemniteKm(repo, ctx.tenant, {
+          dateDepense: input.dateDepense,
+          kilometres: input.kilometres,
+          tarifKm: input.tarifKm,
+          motif: input.motif,
+          chantierId: input.chantierId ?? null,
+          clientId: input.clientId ?? null,
+        }),
+      ),
 
     // ── Règles de catégorisation auto (parité client : trpc.depenses.getRegles/...) ────
     getRegles: protectedProcedure.query(({ ctx }) => listRegles(regleRepo, ctx.tenant)),

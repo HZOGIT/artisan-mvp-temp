@@ -115,3 +115,35 @@ export async function supprimerDepense(
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Dépense introuvable");
 }
+
+// Crée une dépense « indemnité kilométrique » (parité legacy `creerIndemniteKm`). Montant forfaitaire
+// = km × tarif, **sans TVA** (régime forfait, `tvaDeductible:false`), remboursable. Réutilise
+// `creerDepense` → anti-IDOR FK (client/chantier du tenant), numéro serveur, TVA dérivée (taux 0).
+export interface CreerIndemniteKmInput {
+  readonly dateDepense: string;
+  readonly kilometres: number;
+  readonly tarifKm?: number;
+  readonly motif?: string;
+  readonly chantierId?: number | null;
+  readonly clientId?: number | null;
+}
+
+export async function creerIndemniteKm(repo: IDepenseRepository, ctx: TenantContext, input: CreerIndemniteKmInput): Promise<Depense> {
+  if (!(input.kilometres > 0)) throw new ValidationError("Le kilométrage doit être positif");
+  const tarif = input.tarifKm ?? 0.529;
+  if (!(tarif > 0)) throw new ValidationError("Le tarif kilométrique doit être positif");
+  const montant = (Math.round(input.kilometres * tarif * 100) / 100).toFixed(2);
+  return creerDepense(repo, ctx, {
+    dateDepense: input.dateDepense,
+    fournisseur: "Indemnités kilométriques",
+    categorie: "Déplacement & Transport",
+    description: `${input.kilometres} km${input.motif ? ` — ${input.motif}` : ""} @ ${tarif} EUR/km`,
+    montantHt: montant,
+    tauxTva: "0",
+    modePaiement: "carte",
+    tvaDeductible: false,
+    remboursable: true,
+    chantierId: input.chantierId ?? null,
+    clientId: input.clientId ?? null,
+  });
+}

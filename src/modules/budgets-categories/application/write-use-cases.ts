@@ -45,3 +45,26 @@ export async function supprimerBudget(repo: IBudgetCategorieRepository, ctx: Ten
   const ok = await repo.delete(ctx, id);
   if (!ok) throw new NotFoundError("Budget introuvable");
 }
+
+// Copie les budgets d'un mois source vers un mois cible (upsert par catégorie). Parité legacy
+// `copierBudgetsMois`. Idempotent : une catégorie déjà budgétée dans le mois cible est mise à jour
+// (pas dupliquée — contrainte d'unicité (artisan,categorie,mois)). Scopé tenant par le repo.
+export async function copierBudgetsMois(
+  repo: IBudgetCategorieRepository,
+  ctx: TenantContext,
+  moisSource: string,
+  moisCible: string,
+): Promise<{ success: true; copies: number }> {
+  if (!MOIS.test(moisSource) || !MOIS.test(moisCible)) throw new ValidationError("Format de mois attendu : AAAA-MM");
+  const sources = await repo.listByMois(ctx, moisSource);
+  const cible = await repo.listByMois(ctx, moisCible);
+  const parCategorie = new Map(cible.map((b) => [b.categorie, b]));
+  let copies = 0;
+  for (const s of sources) {
+    const existant = parCategorie.get(s.categorie);
+    if (existant) await repo.update(ctx, existant.id, { budget: s.budget });
+    else await repo.create(ctx, { categorie: s.categorie, mois: moisCible, budget: s.budget });
+    copies++;
+  }
+  return { success: true, copies };
+}
