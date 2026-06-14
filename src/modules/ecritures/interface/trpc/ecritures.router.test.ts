@@ -7,6 +7,7 @@ import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-
 import { EcritureRepositoryDrizzle } from "../../infra/ecriture-repository-drizzle";
 import type { TenantContext } from "../../../../shared/tenant";
 import type { CreateEcritureInput } from "../../domain/ecriture";
+import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -24,8 +25,7 @@ async function token(userId: number): Promise<string> {
     .sign(new TextEncoder().encode(SECRET));
 }
 function q(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?: string) {
-  const qs = input === undefined ? "" : `?input=${encodeURIComponent(JSON.stringify(input))}`;
-  return app.inject({ method: "GET", url: `/api/trpc/${path}${qs}`, headers: tok ? { cookie: `token=${tok}` } : {} });
+  return injectTrpc(app, "GET", path, input, tok);
 }
 
 const piece = (factureId: number): CreateEcritureInput[] => {

@@ -54,7 +54,8 @@ describe.skipIf(!URL)("protectedProcedure e2e (resolver DB + cookie)", () => {
       headers: { cookie: `token=${token}` },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ result: { data: { artisanId, userId: USER_ID, role: "artisan" } } });
+    // Réponse sérialisée superjson : `result.data` enveloppé dans `{ json: … }`.
+    expect(res.json()).toMatchObject({ result: { data: { json: { artisanId, userId: USER_ID, role: "artisan" } } } });
   });
 
   it("sans cookie → UNAUTHORIZED (401)", async () => {

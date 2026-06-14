@@ -10,6 +10,7 @@ import { EcritureRepositoryDrizzle } from "./ecriture-repository-drizzle";
 import { FactureReaderDrizzle } from "./facture-reader-drizzle";
 import { ComptaEcrituresAdapter } from "./compta-ecritures-adapter";
 import type { TenantContext } from "../../../shared/tenant";
+import { injectTrpc } from "../../../shared/testing/trpc-inject";
 
 // e2e FEC bout-en-bout : facture (HTTP/tRPC) → génération réelle des écritures comptables en
 // base, via le ComptaPort branché sur l'adapter ecritures. ⚠️ Invariant Σdébit=Σcrédit + RLS.
@@ -29,7 +30,7 @@ async function token(userId: number): Promise<string> {
     .sign(new TextEncoder().encode(SECRET));
 }
 function mut(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok: string) {
-  return app.inject({ method: "POST", url: `/api/trpc/${path}`, headers: { "content-type": "application/json", cookie: `token=${tok}` }, payload: JSON.stringify(input) });
+  return injectTrpc(app, "POST", path, input, tok);
 }
 
 describe.skipIf(!URL)("FEC e2e (facture → écritures comptables équilibrées en base)", () => {

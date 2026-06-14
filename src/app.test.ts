@@ -27,8 +27,8 @@ describe.skipIf(!HAS_DB)("app Fastify (scaffold + tRPC)", () => {
   it("tRPC: GET /api/trpc/health → 200 (procedure publique servie)", async () => {
     const res = await app.inject({ method: "GET", url: "/api/trpc/health" });
     expect(res.statusCode).toBe(200);
-    // Format tRPC v11 (non-batché) : { result: { data: { status: 'ok' } } }
-    expect(res.json()).toMatchObject({ result: { data: { status: "ok" } } });
+    // Format tRPC v11 (non-batché) + transformer superjson : { result: { data: { json: { status: 'ok' } } } }
+    expect(res.json()).toMatchObject({ result: { data: { json: { status: "ok" } } } });
   });
 
   it("tRPC: une procédure inexistante → 404", async () => {

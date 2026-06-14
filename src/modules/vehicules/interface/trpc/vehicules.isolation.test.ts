@@ -5,6 +5,7 @@ import { buildApp } from "../../../../app";
 import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { VehiculeRepositoryDrizzle } from "../../infra/vehicule-repository-drizzle";
+import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -43,12 +44,7 @@ describe.skipIf(!URL)("vehicules — isolation cross-tenant systématique (toute
 
     // Un véhicule appartenant à A (créé en direct, scopé A).
     const tA = await tok(UA);
-    const created = await server.inject({
-      method: "POST",
-      url: "/api/trpc/vehicules.create",
-      headers: { "content-type": "application/json", cookie: `token=${tA}` },
-      payload: JSON.stringify({ immatriculation: "ISO-1" }),
-    });
+    const created = await injectTrpc(server, "POST", "vehicules.create", { immatriculation: "ISO-1" }, tA);
     vehiculeDeA = created.json().result.data.id;
     tokenB = await tok(UB);
   });
@@ -64,19 +60,8 @@ describe.skipIf(!URL)("vehicules — isolation cross-tenant systématique (toute
     await admin.end();
   });
 
-  const post = (path: string, input: unknown) =>
-    server.inject({
-      method: "POST",
-      url: `/api/trpc/${path}`,
-      headers: { "content-type": "application/json", cookie: `token=${tokenB}` },
-      payload: JSON.stringify(input),
-    });
-  const get = (path: string, input: unknown) =>
-    server.inject({
-      method: "GET",
-      url: input === undefined ? `/api/trpc/${path}` : `/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
-      headers: { cookie: `token=${tokenB}` },
-    });
+  const post = (path: string, input: unknown) => injectTrpc(server, "POST", path, input, tokenB);
+  const get = (path: string, input: unknown) => injectTrpc(server, "GET", path, input, tokenB);
 
   // Toutes les routes « by-id » du routeur, appelées en tant que B sur la ressource de A.
   // Un refus cross-tenant valide = NOT_FOUND (404). (B a un tenant valide → pas 401.)

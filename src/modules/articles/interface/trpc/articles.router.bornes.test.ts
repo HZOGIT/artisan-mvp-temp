@@ -5,6 +5,7 @@ import { buildApp } from "../../../../app";
 import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { ArticleRepositoryDrizzle } from "../../infra/article-repository-drizzle";
+import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 
 // Durcissement e2e du domaine articles : bornes zod exhaustives + invariants du transport
 // (artisanId/id inviolables). Complète articles.router.test.ts.
@@ -27,11 +28,10 @@ async function token(userId: number): Promise<string> {
     .sign(new TextEncoder().encode(SECRET));
 }
 function mut(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?: string) {
-  return app.inject({ method: "POST", url: `/api/trpc/${path}`, headers: { "content-type": "application/json", ...(tok ? { cookie: `token=${tok}` } : {}) }, payload: JSON.stringify(input) });
+  return injectTrpc(app, "POST", path, input, tok);
 }
 function q(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?: string) {
-  const qs = input === undefined ? "" : `?input=${encodeURIComponent(JSON.stringify(input))}`;
-  return app.inject({ method: "GET", url: `/api/trpc/${path}${qs}`, headers: tok ? { cookie: `token=${tok}` } : {} });
+  return injectTrpc(app, "GET", path, input, tok);
 }
 
 describe.skipIf(!URL)("articles.router e2e — bornes & invariants transport", () => {

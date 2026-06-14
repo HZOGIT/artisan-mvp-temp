@@ -5,6 +5,7 @@ import { buildApp } from "../../../../app";
 import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { ParametresRepositoryDrizzle } from "../../infra/parametres-repository-drizzle";
+import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -23,10 +24,10 @@ async function token(userId: number): Promise<string> {
     .sign(new TextEncoder().encode(SECRET));
 }
 function mut(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?: string) {
-  return app.inject({ method: "POST", url: `/api/trpc/${path}`, headers: { "content-type": "application/json", ...(tok ? { cookie: `token=${tok}` } : {}) }, payload: JSON.stringify(input) });
+  return injectTrpc(app, "POST", path, input, tok);
 }
 function q(app: ReturnType<typeof buildApp>, path: string, tok?: string) {
-  return app.inject({ method: "GET", url: `/api/trpc/${path}`, headers: tok ? { cookie: `token=${tok}` } : {} });
+  return injectTrpc(app, "GET", path, undefined, tok);
 }
 
 describe.skipIf(!URL)("parametres.router e2e (HTTP → tRPC → use-case → repo → RLS)", () => {

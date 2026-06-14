@@ -7,6 +7,7 @@ import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-
 import { AvisRepositoryDrizzle } from "../../infra/avis-repository-drizzle";
 import { DemandeAvisRepositoryDrizzle } from "../../infra/demande-avis-repository-drizzle";
 import { FakeEmailPort, FakeRateLimiter } from "../../../../shared/ports/fakes";
+import { injectTrpc } from "../../../../shared/testing/trpc-inject";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -25,12 +26,7 @@ async function token(userId: number): Promise<string> {
 }
 
 function callMutation(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?: string) {
-  return app.inject({
-    method: "POST",
-    url: `/api/trpc/${path}`,
-    headers: { "content-type": "application/json", ...(tok ? { cookie: `token=${tok}` } : {}) },
-    payload: JSON.stringify(input),
-  });
+  return injectTrpc(app, "POST", path, input, tok);
 }
 
 describe.skipIf(!URL)("avis.envoyerDemande e2e (workflow PG : ownership tenant + RLS)", () => {

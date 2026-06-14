@@ -1,9 +1,13 @@
 import { initTRPC, TRPCError } from "@trpc/server";
+import superjson from "superjson";
 import type { AppContext } from "./context";
 import type { TenantContext } from "../../shared/tenant";
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError, TooManyRequestsError } from "../../shared/errors";
 
-const t = initTRPC.context<AppContext>().create();
+// ⚠️ Le client (client/src) et le legacy utilisent **superjson** comme data transformer. Le
+// new-stack DOIT l'utiliser aussi, sinon les payloads de mutation arrivent enveloppés (`{json:…}`)
+// et la validation échoue (`nom` undefined…), et les réponses ne sont pas désérialisables côté front.
+const t = initTRPC.context<AppContext>().create({ transformer: superjson });
 
 export const router = t.router;
 
