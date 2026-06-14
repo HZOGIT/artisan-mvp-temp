@@ -53,6 +53,8 @@ import type { IChantierRepository } from "./modules/chantiers/application/chanti
 import { createDepensesModule } from "./modules/depenses/depenses.module";
 import { TransactionBancaireRepositoryDrizzle } from "./modules/depenses/infra/transaction-bancaire-repository-drizzle";
 import type { ITransactionBancaireRepository } from "./modules/depenses/application/transaction-bancaire-repository";
+import { FecReaderDrizzle } from "./modules/depenses/infra/fec-reader-drizzle";
+import type { FecReader } from "./modules/depenses/application/fec-reader";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -154,6 +156,7 @@ export interface AppDeps extends ContextDeps {
   readonly chantierRepo?: IChantierRepository;
   readonly depenseRepo?: IDepenseRepository;
   readonly transactionBancaireRepo?: ITransactionBancaireRepository;
+  readonly fecReader?: FecReader;
   readonly devisRepo?: IDevisRepository;
   readonly factureRepo?: IFactureRepository;
   readonly devisReader?: IDevisReader;
@@ -306,6 +309,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     regleRepository: regleCategorisationRepo,
     noteRepository: noteDeFraisRepo,
     transactionRepository: deps.transactionBancaireRepo ?? new TransactionBancaireRepositoryDrizzle(getDbHandle().db),
+    fecReader: deps.fecReader ?? new FecReaderDrizzle(getDbHandle().db),
   });
   const devis = createDevisModule({
     repository: devisRepo,

@@ -4,6 +4,7 @@ import type { IBudgetCategorieRepository } from "../budgets-categories/applicati
 import type { IRegleCategorisationRepository } from "../regles-categorisation/application/regle-categorisation-repository";
 import type { INoteDeFraisRepository } from "../notes-de-frais/application/note-de-frais-repository";
 import type { ITransactionBancaireRepository } from "./application/transaction-bancaire-repository";
+import type { FecReader } from "./application/fec-reader";
 import { createDepensesRouter } from "./interface/trpc/depenses.router";
 
 // Wiring DI du module depenses : assemble le routeur tRPC à partir des repositories injectés.
@@ -17,6 +18,7 @@ export interface DepensesModuleDeps {
   readonly regleRepository: IRegleCategorisationRepository;
   readonly noteRepository: INoteDeFraisRepository;
   readonly transactionRepository: ITransactionBancaireRepository;
+  readonly fecReader: FecReader;
 }
 
 export interface DepensesModule {
@@ -34,6 +36,7 @@ export function createDepensesModule(deps: DepensesModuleDeps): DepensesModule {
       deps.regleRepository,
       deps.noteRepository,
       deps.transactionRepository,
+      deps.fecReader,
     ),
   };
 }

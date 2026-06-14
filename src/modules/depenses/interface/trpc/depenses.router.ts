@@ -25,6 +25,8 @@ import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-c
 import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais, payerNoteDeFrais, ajouterDepenseANote, retirerDepenseDeNote } from "../../../notes-de-frais/application/write-use-cases";
 import type { ITransactionBancaireRepository } from "../../application/transaction-bancaire-repository";
 import { getTransactionsBancaires, ignorerTransaction, importReleve, convertirTransaction } from "../../application/transactions-use-cases";
+import type { FecReader } from "../../application/fec-reader";
+import { exportFecAchats } from "../../application/fec";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -113,6 +115,7 @@ export function createDepensesRouter(
   regleRepo: IRegleCategorisationRepository,
   noteRepo: INoteDeFraisRepository,
   transactionRepo: ITransactionBancaireRepository,
+  fecReader: FecReader,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -359,5 +362,10 @@ export function createDepensesRouter(
         }),
       )
       .mutation(({ ctx, input }) => convertirTransaction({ transactionRepo, depenseRepo: repo }, ctx.tenant, input)),
+
+    // ── Export FEC achats (format AFNOR ; débit=crédit par construction) — lecture seule ──────────
+    exportFecAchats: protectedProcedure
+      .input(z.object({ dateDebut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ"), dateFin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ") }))
+      .mutation(({ ctx, input }) => exportFecAchats(fecReader, ctx.tenant, input.dateDebut, input.dateFin)),
   });
 }
