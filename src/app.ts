@@ -85,6 +85,9 @@ import type { ITechnicienPositionReader } from "./modules/geolocalisation/applic
 import { createDashboardModule } from "./modules/dashboard/dashboard.module";
 import { DashboardReaderDrizzle } from "./modules/dashboard/infra/dashboard-reader-drizzle";
 import type { IDashboardReader } from "./modules/dashboard/application/dashboard-reader";
+import { createRapportsModule } from "./modules/rapports/rapports.module";
+import { RapportRepositoryDrizzle } from "./modules/rapports/infra/rapport-repository-drizzle";
+import type { IRapportRepository } from "./modules/rapports/application/rapport-repository";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -218,6 +221,7 @@ export interface AppDeps extends ContextDeps {
   readonly searchReader?: ISearchReader;
   readonly technicienPositionReader?: ITechnicienPositionReader;
   readonly dashboardReader?: IDashboardReader;
+  readonly rapportRepo?: IRapportRepository;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -492,7 +496,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const dashboard = createDashboardModule({
     reader: deps.dashboardReader ?? new DashboardReaderDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard });
+  const rapports = createRapportsModule({
+    repository: deps.rapportRepo ?? new RapportRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
