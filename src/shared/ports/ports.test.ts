@@ -46,4 +46,17 @@ describe("ports — découplage use-case / infra", () => {
     expect(pdf.rendered).toHaveLength(1);
     expect(pdf.rendered[0].data).toEqual({ numero: "FAC-1", total: 1200 });
   });
+
+  it("EmailPort transporte une pièce jointe (PDF) ; rétro-compatible sans pièce jointe", async () => {
+    const email = new FakeEmailPort();
+    // sans pièce jointe (appelants existants) → attachments undefined
+    await email.send({ to: "a@b.fr", subject: "S", body: "B" });
+    expect(email.sent[0].attachments).toBeUndefined();
+    // avec une pièce jointe (PDF du document)
+    const pdf = Buffer.from("%PDF-1.4 fake");
+    await email.send({ to: "c@d.fr", subject: "Facture", body: "Voir PJ", attachments: [{ filename: "Facture_FAC-1.pdf", content: pdf, contentType: "application/pdf" }] });
+    expect(email.sent[1].attachments).toHaveLength(1);
+    expect(email.sent[1].attachments![0].filename).toBe("Facture_FAC-1.pdf");
+    expect(email.sent[1].attachments![0].content).toBe(pdf);
+  });
 });
