@@ -266,5 +266,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     },
   });
 
+  // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).
+  app.decorate("appRouter", appRouter);
+
   return app;
 }
