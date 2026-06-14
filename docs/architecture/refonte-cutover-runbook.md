@@ -10,9 +10,23 @@
 - Les deux stacks lisent **la même base PostgreSQL** (post-migration PG). Aucune migration de données au cutover → **rollback instantané** (cf. § 6).
 - Legacy reste la route par défaut : tous les flags sont **OFF** tant qu'on ne les bascule pas.
 
+## ⚠️ Gap d'intégration identifié (2026-06-14) — le dispatcher de bascule n'est PAS encore câblé
+
+État réel vérifié dans le code :
+
+- La **logique de décision** du gateway existe et est **unit-testée** (`src/interface/gateway/` : `shouldRouteToNewStack`, `domainFromTrpcPath`, `parseFlagsFromEnv`) — mais elle **n'est invoquée nulle part dans un chemin de requête runtime** (zéro usage hors définitions + tests). C'est une **brique pure, prête à brancher**, pas un routeur actif.
+- L'edge `functions/api/[[path]].js` est un **proxy transparent** vers **un seul** backend (`staging-backend.operioz.com`) — il ne lit aucun flag et ne fait **aucun** routage par domaine.
+
+⇒ **Avant la bascule, il manque un *dispatcher* legacy↔nouveau stack** qui, pour chaque requête `/api/trpc/<domaine>.*`, calcule `domainFromTrpcPath(path)` → `shouldRouteToNewStack(domaine, tenantId, parseFlagsFromEnv())` et **forwarde vers le bon backend**. Options (à décider par l'humain) :
+  - **(a) Edge** : enrichir `functions/api/[[path]].js` pour router vers `BACKEND_LEGACY` ou `BACKEND_NEWSTACK` selon le flag (⚠️ le `tenantId` n'est pas trivialement disponible à l'edge avant auth → canary par tenant difficile ; convient pour un flag **global** par domaine) ;
+  - **(b) Backend reverse-proxy** : un service en amont (ou middleware Fastify/Express) qui a accès au `ctx.tenant` après auth et proxifie vers l'autre stack pour les domaines non encore migrés / non flaggés (permet le **canary par tenant**) ;
+  - **(c) Mono-backend** : monter les deux routeurs dans un même process et trancher par middleware avant le handler (le plus simple à observer, mais couple les deux stacks).
+
+Tant que ce dispatcher n'est pas en place, les § 5 ci-dessous décrivent la **cible**, pas un mécanisme déjà actif.
+
 ## Principe de routage (rappel)
 
-Le gateway décide legacy↔nouveau stack par domaine (`src/interface/gateway/`), piloté par variables d'environnement :
+La **logique** du gateway décide legacy↔nouveau stack par domaine (`src/interface/gateway/`), pilotée par variables d'environnement (⚠️ **décision pure — à brancher dans le dispatcher, cf. gap ci-dessus**) :
 
 - `NEW_STACK_DOMAINS="articles,categoriesDepenses"` → ces domaines **enabled globalement** sur le nouveau stack.
 - `NEW_STACK_CANARY_<DOMAINE>="12,34"` → **allowlist** de tenants (canary) pour `<DOMAINE>` (⚠️ le suffixe est lowercasé par le parseur → ne fonctionne **que** pour les domaines en minuscules ; pour un domaine camelCase, passer par `NEW_STACK_DOMAINS` + un denylist géré côté flags applicatifs).
@@ -42,7 +56,7 @@ Pour chaque domaine candidat, sur le nouveau stack :
 - créer/lire/supprimer une ressource jetable et vérifier l'**isolation cross-tenant** (un 2e tenant ne voit rien → `[]`/404).
 
 ### 5. Bascule progressive des flags (canary → global → cutover)
-Ordre **du moins sensible au plus sensible**. Pour chaque domaine : **canary 1 tenant pilote → élargir → enabled global**, en surveillant logs/erreurs/latence à chaque palier.
+**Pré-requis** : le dispatcher de bascule doit être en place (cf. § « Gap d'intégration ») — c'est **lui** (et non le proxy edge transparent actuel) qui consomme `NEW_STACK_DOMAINS`/`NEW_STACK_CANARY_*` pour aiguiller chaque domaine vers legacy ou nouveau stack. Ordre **du moins sensible au plus sensible**. Pour chaque domaine : **canary 1 tenant pilote → élargir → enabled global**, en surveillant logs/erreurs/latence à chaque palier.
 
 **Vague 1 — catalogues / lecture, risque faible** :
 `articles`, `categoriesDepenses`, `budgetsCategories`, `reglesCategorisation`, `previsionsCA`, `modelesEmail`, `modelesDevis`, `parametres`, `configRelances`.
@@ -71,4 +85,5 @@ Pour la vague 3 : router en **canary sur un tenant pilote**, exécuter legacy et
 
 ## Reste / suivi
 - Dette résiduelle & findings : commentaires sur l'issue Linear **OPE-276** (quota free-tier atteint pour la création d'issues).
-- Proxy Cloudflare : `functions/api/[[path]].js` (point de bascule côté edge si retenu).
+- Proxy Cloudflare : `functions/api/[[path]].js` — **actuellement proxy transparent** vers un backend unique ; deviendra le point de bascule edge **uniquement si** l'option (a) du § « Gap d'intégration » est retenue (sinon le dispatch se fait côté backend, options (b)/(c)).
+- **Action préalable au cutover (à cadrer/implémenter par l'humain)** : le **dispatcher legacy↔nouveau stack** (cf. § Gap) — la logique de décision (`src/interface/gateway/`) est prête et testée, mais son intégration dans le chemin de requête reste à faire.
