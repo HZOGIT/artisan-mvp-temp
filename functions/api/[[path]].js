@@ -1,12 +1,22 @@
-// Cloudflare Pages Function — proxy transparent /api/* -> backend staging.
-// Le front est servi par Pages (meme origine), donc les cookies d'auth (host-only,
-// SameSite=Lax) fonctionnent sans CORS. Le backend reste joignable via le tunnel.
-const BACKEND = "https://staging-backend.operioz.com";
+// Cloudflare Pages Function — dispatcher /api/* per-path : route vers le NOUVEAU STACK les domaines
+// tRPC migrés ET activés par flag (NEW_STACK_DOMAINS), sinon vers le LEGACY. Défaut sûr : flags vides
+// → 100% legacy (comportement identique au proxy transparent historique).
+//
+// Le front est servi par Pages (même origine) → cookies d'auth (host-only, SameSite=Lax) fonctionnent ;
+// on forwarde les en-têtes (dont Cookie) tels quels. STREAMING-SAFE : on retourne la Response de fetch
+// telle quelle (body en flux préservé → SSE de l'assistant/chat OK). Pas de canary par tenant ici
+// (décision pré-auth) : bascule GLOBALE par domaine via NEW_STACK_DOMAINS.
+import { decideTarget } from "../_lib/dispatch.mjs";
+
+const LEGACY = "https://staging-backend.operioz.com";
+const NEWSTACK = "https://staging-newstack.operioz.com";
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
-  const target = BACKEND + url.pathname + url.search;
+
+  const backend = decideTarget(url.pathname, env) === "new-stack" ? NEWSTACK : LEGACY;
+  const target = backend + url.pathname + url.search;
 
   const headers = new Headers(request.headers);
   headers.delete("host"); // laisser fetch poser le bon Host pour le routage tunnel
