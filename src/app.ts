@@ -176,23 +176,27 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const notifications = createNotificationsModule({
     repository: notificationRepo,
   });
-  // Repo fournisseurs partagé : module fournisseurs ET composé par stocks (getRapportCommande
-  // croise les associations article↔fournisseur). Une seule instance.
+  // Repos partagés hoistés (évite les TDZ entre modules qui se composent mutuellement) :
+  //  - fournisseurs : module fournisseurs + composé par stocks (getRapportCommande) ET commandes (getPerformances)
+  //  - clients : module clients + composé par rdv (list enrichi) ET commandes (listDevisAcceptes)
+  //  - devis : module devis + composé par commandes (listDevisAcceptes = devis acceptés)
   const fournisseurRepo = deps.fournisseurRepo ?? new FournisseurRepositoryDrizzle(getDbHandle().db);
+  const clientRepo = deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db);
+  const devisRepo = deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
   });
   const commandes = createCommandesModule({
     repository: deps.commandeRepo ?? new CommandeRepositoryDrizzle(getDbHandle().db),
     fournisseurRepository: fournisseurRepo,
+    devisRepository: devisRepo,
+    clientRepository: clientRepo,
   });
   const stocks = createStocksModule({
     repository: deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db),
     notificationRepository: notificationRepo,
     fournisseurRepository: fournisseurRepo,
   });
-  // Repo clients partagé : module clients ET composé par rdv (`list` enrichit chaque RDV de son client).
-  const clientRepo = deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db);
   const clients = createClientsModule({
     repository: clientRepo,
   });
@@ -225,7 +229,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     noteRepository: noteDeFraisRepo,
   });
   const devis = createDevisModule({
-    repository: deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db),
+    repository: devisRepo,
   });
   // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
   // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.

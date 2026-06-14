@@ -52,6 +52,8 @@ describe.skipIf(!URL)("commandesFournisseurs.router e2e (HTTP → tRPC → use-c
       await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
       await admin.query('delete from commandes_fournisseurs where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from fournisseurs where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+      await admin.query('delete from devis where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+      await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from artisans where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
@@ -72,6 +74,8 @@ describe.skipIf(!URL)("commandesFournisseurs.router e2e (HTTP → tRPC → use-c
       await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId"=$1)', [aId]);
       await admin.query('delete from commandes_fournisseurs where "artisanId"=$1', [aId]);
       await admin.query('delete from fournisseurs where "artisanId"=$1', [aId]);
+      await admin.query('delete from devis where "artisanId"=$1', [aId]);
+      await admin.query('delete from clients where "artisanId"=$1', [aId]);
     }
     for (const uid of [UA, UB]) {
       await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -289,5 +293,26 @@ describe.skipIf(!URL)("commandesFournisseurs.router e2e (HTTP → tRPC → use-c
     // B ne voit pas fournA
     const perfB = (await callQuery(server, "commandesFournisseurs.getPerformances", undefined, tB)).json().result.data as Array<{ fournisseur: { id: number } }>;
     expect(perfB.some((p) => p.fournisseur.id === fournA)).toBe(false);
+  });
+
+  it("listDevisAcceptes (parité client) : seuls les devis 'accepte', enrichis du nom client ; scopé ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    expect((await callQuery(server, "commandesFournisseurs.listDevisAcceptes", undefined)).statusCode).toBe(401);
+    // client + devis (1 accepté, 1 brouillon) côté admin pour A
+    const cliA = (await admin.query('insert into clients ("artisanId",nom,prenom) values ($1,$2,$3) returning id', [artisanA, "Durand", "Marie"])).rows[0].id as number;
+    const sfx = Date.now();
+    const accId = (await admin.query(`insert into devis ("artisanId","clientId",numero,statut,objet,"totalTTC") values ($1,$2,$3,'accepte','Rénovation','1200.00') returning id`, [artisanA, cliA, `DEV-ACC-${sfx}`])).rows[0].id as number;
+    await admin.query(`insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,'brouillon')`, [artisanA, cliA, `DEV-BR-${sfx}`]);
+    const list = (await callQuery(server, "commandesFournisseurs.listDevisAcceptes", undefined, tA)).json().result.data as Array<{ id: number; clientNom: string; totalTTC: number; numero: string }>;
+    const mine = list.find((d) => d.id === accId);
+    expect(mine).toBeDefined();
+    expect(mine!.clientNom).toBe("Durand Marie"); // nom + prénom
+    expect(mine!.totalTTC).toBe(1200);
+    // le brouillon n'est PAS listé
+    expect(list.some((d) => d.numero === `DEV-BR-${sfx}`)).toBe(false);
+    // isolation : B ne voit pas le devis de A
+    const listB = (await callQuery(server, "commandesFournisseurs.listDevisAcceptes", undefined, tB)).json().result.data as Array<{ id: number }>;
+    expect(listB.some((d) => d.id === accId)).toBe(false);
   });
 });
