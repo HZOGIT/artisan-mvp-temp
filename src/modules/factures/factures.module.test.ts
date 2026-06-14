@@ -82,6 +82,7 @@ describe("factures.module", () => {
       "getById",
       "getLignes",
       "list",
+      "markAsPaid",
       "marquerEnRetard",
       "update",
       "updateLigne",

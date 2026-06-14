@@ -24,7 +24,16 @@
 
 ---
 
-## §1 — ComptaPort write (FEC) — **À FAIRE EN PREMIER** (plus haute valeur, le plus sensible)
+## §1 — ComptaPort write (FEC) — ✅ **DÉJÀ FAIT** (découvert 2026-06-14)
+
+> **MISE À JOUR** : le `ComptaPort` write **était déjà porté** — `buildApp` câble par défaut le vrai
+> `ComptaEcrituresAdapter` (domaine `ecritures`), avec Σdébit=Σcrédit garanti et idempotence, testé
+> (`fec-e2e`, `ecriture-invariants`). `factures.markAsPaid` a donc été **exposé** (use-case
+> `marquerFacturePayee`, FEC-correct). Il ne reste à `factures` que **`sendByEmail`** (→ §2). Le
+> domaine `comptabilite` (lecture : balance/grand-livre/exportFec) est déjà migré (`ecritures`).
+> **Section conservée ci-dessous pour mémoire du raisonnement.**
+
+### (mémoire) Plan initial §1 — ComptaPort write (FEC)
 
 **Débloque** : `factures.markAsPaid` (→ activation de `factures`, il ne manque QUE ça), écritures réelles
 d'`enregistrerPaiement`, et le **domaine `comptabilite`** (ecritures/balance/grand-livre/export FEC).

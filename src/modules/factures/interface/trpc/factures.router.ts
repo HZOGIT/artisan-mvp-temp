@@ -13,6 +13,7 @@ import {
   supprimerLigneFacture,
   changerStatutFacture,
   enregistrerPaiementFacture,
+  marquerFacturePayee,
   creerAvoir,
   convertirDevisEnFacture,
 } from "../../application/write-use-cases";
@@ -201,6 +202,14 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
           { montant: input.montant, date: toDate(input.date), mode: input.mode ?? null },
           compta,
         ),
+      ),
+
+    // Marquer payée (parité client `trpc.factures.markAsPaid`) : écrase montantPaye + force `payee` +
+    // génère les écritures FEC (vente + encaissement) via le ComptaPort. ⚠️ sémantique legacy (non cumulatif).
+    markAsPaid: protectedProcedure
+      .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: z.string() }))
+      .mutation(({ ctx, input }) =>
+        marquerFacturePayee(repo, ctx.tenant, input.id, { montantPaye: input.montantPaye, datePaiement: input.datePaiement }, compta),
       ),
   });
 }

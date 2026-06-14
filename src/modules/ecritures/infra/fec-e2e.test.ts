@@ -107,6 +107,23 @@ describe.skipIf(!URL)("FEC e2e (facture → écritures comptables équilibrées 
     expect(dAll).toBeCloseTo(cAll, 2); // l'ensemble reste équilibré
   });
 
+  it("markAsPaid → pièces VENTE + ENCAISSEMENT générées, ensemble équilibré Σdébit=Σcrédit", async () => {
+    const tA = await token(UA);
+    const id = (await mut(server, "factures.create", { clientId: clientA, objet: "Solde direct" }, tA)).json().result.data.id as number;
+    await mut(server, "factures.addLigne", { factureId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "200.00", tauxTVA: "20" }, tA);
+    await mut(server, "factures.envoyer", { id }, tA); // facture émise (TTC = 240)
+    // markAsPaid : écrase montantPaye + payee + génère VENTE + ENCAISSEMENT via le vrai ComptaPort
+    const paid = await mut(server, "factures.markAsPaid", { id, montantPaye: "240.00", datePaiement: "2026-07-01" }, tA);
+    expect(paid.json().result.data.statut).toBe("payee");
+    const toutes = await ecritureRepo.listByFacture(ctx(artisanA), id);
+    expect(toutes.filter((e) => e.journal === "VE").length).toBe(3); // 411/706/445
+    expect(toutes.filter((e) => e.journal === "BQ").length).toBe(2); // 512/411
+    const d = toutes.reduce((s, e) => s + Number(e.debit), 0);
+    const c = toutes.reduce((s, e) => s + Number(e.credit), 0);
+    expect(d).toBeCloseTo(c, 2); // ⚠️ INVARIANT FEC : Σdébit = Σcrédit
+    expect(d).toBeCloseTo(480, 2); // VE débit 411=240 + BQ débit 512=240 = 480
+  });
+
   it("isolation cross-tenant : B ne lit pas les écritures de A", async () => {
     expect((await ecritureRepo.list(ctx(artisanB))).length).toBe(0);
   });

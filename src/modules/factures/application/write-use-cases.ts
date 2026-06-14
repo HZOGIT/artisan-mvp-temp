@@ -169,6 +169,43 @@ export async function enregistrerPaiementFacture(
   return updated;
 }
 
+// Entrée de `marquerFacturePayee` (parité legacy `markAsPaid`). `montantPaye` = montant **absolu**
+// (écrasé, PAS cumulé — sémantique legacy) ; `datePaiement` = ISO string (validée ici).
+export type MarquerPayeeInput = { readonly montantPaye: string; readonly datePaiement: string };
+
+// Marque une facture comme **payée** (parité legacy `markAsPaid`). ⚠️ Sémantique LEGACY (différente de
+// `enregistrerPaiementFacture`) : **écrase** `montantPaye`, force `statut=payee` (la facture émise est
+// soldée par cette action — le client n'appelle markAsPaid que sur une facture émise), puis génère les
+// **écritures FEC** (vente + encaissement) via le `ComptaPort`. L'invariant **Σ débit = Σ crédit** est
+// garanti par les use-cases de génération (domaine ecritures). Date invalide → ValidationError (400) AVANT
+// toute écriture (parité legacy : pas d'écriture sur une date NaN). Hors tenant → NotFoundError (404).
+// Génération d'écritures **best-effort** (try/catch — un échec compta ne casse pas le paiement, parité legacy).
+export async function marquerFacturePayee(
+  repo: IFactureRepository,
+  ctx: TenantContext,
+  id: number,
+  input: MarquerPayeeInput,
+  compta: ComptaPort = NOOP_COMPTA,
+): Promise<Facture> {
+  const facture = await getFactureOwned(repo, ctx, id);
+  const datePaiement = new Date(input.datePaiement);
+  if (Number.isNaN(datePaiement.getTime())) throw new ValidationError("Date de paiement invalide");
+  const updated = await repo.enregistrerPaiement(ctx, id, {
+    montantPaye: input.montantPaye, // écrasé (sémantique legacy, non cumulatif)
+    datePaiement,
+    modePaiement: facture.modePaiement, // préservé
+    statut: "payee",
+  });
+  if (!updated) throw new NotFoundError("Facture introuvable");
+  try {
+    await compta.genererEcrituresVente(ctx, id);
+    await compta.genererEcrituresEncaissement(ctx, id);
+  } catch {
+    // Échec de génération des écritures : ne casse pas le paiement (parité legacy try/catch).
+  }
+  return updated;
+}
+
 // Entrée de création d'un avoir (note de crédit) sur une facture d'origine.
 export type CreerAvoirInput = {
   readonly lignes: readonly {
