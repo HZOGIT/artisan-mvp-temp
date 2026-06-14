@@ -25,9 +25,9 @@ describe("contrats-maintenance.module", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "nextReference", "ownsClient", "setStatut", "update"]);
   });
 
-  it("expose un routeur tRPC assemblé (CRUD ; transitions en 7/9)", () => {
+  it("expose un routeur tRPC assemblé (CRUD + transitions suspendre/reactiver/terminer/annuler)", () => {
     const module = createContratsMaintenanceModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["annuler", "create", "delete", "getById", "list", "reactiver", "suspendre", "terminer", "update"]);
   });
 });

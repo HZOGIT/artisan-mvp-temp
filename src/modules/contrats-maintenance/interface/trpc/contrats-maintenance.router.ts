@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IContratRepository } from "../../application/contrat-repository";
 import { listContrats, getContrat } from "../../application/read-use-cases";
 import { creerContrat, modifierContrat, supprimerContrat } from "../../application/write-use-cases";
+import { suspendreContrat, reactiverContrat, terminerContrat, annulerContrat } from "../../application/transition-use-cases";
 
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 const typeEnum = z.enum(["maintenance_preventive", "entretien", "depannage", "contrat_service"]);
@@ -71,5 +72,22 @@ export function createContratsMaintenanceRouter(repo: IContratRepository) {
         await supprimerContrat(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
+    suspendre: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => suspendreContrat(repo, ctx.tenant, input.id)),
+
+    reactiver: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => reactiverContrat(repo, ctx.tenant, input.id)),
+
+    terminer: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => terminerContrat(repo, ctx.tenant, input.id)),
+
+    annuler: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => annulerContrat(repo, ctx.tenant, input.id)),
   });
 }
