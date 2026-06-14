@@ -104,7 +104,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     demandesContact: deps.demandesContact.router,
     budgetsCategories: deps.budgetsCategories.router,
     reglesCategorisation: deps.reglesCategorisation.router,
-    previsionsCA: deps.previsionsCA.router,
+    previsions: deps.previsionsCA.router,
   });
 }
 

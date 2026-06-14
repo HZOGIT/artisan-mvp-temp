@@ -38,11 +38,11 @@
 | demandesContact | demandesContact | ⚠️ pas de top-level legacy | 9 |
 | budgetsCategories | budgetsCategories | ⚠️ pas de top-level legacy | 6 |
 | reglesCategorisation | reglesCategorisation | ⚠️ pas de top-level legacy | 5 |
-| previsionsCA | previsions | ⚠️ renommer → `previsions` | 6 |
+| previsions | previsions | ✅ name-match | 6 |
 
-**Name-match (flippables après parité)** : 17 — vehicules, avis, badges, techniciens, notifications, fournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail
+**Name-match (flippables après parité)** : 18 — vehicules, avis, badges, techniciens, notifications, fournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail, previsions
 
-**À réconcilier (renommage / sous-routeur)** : 13 — commandes, notesDeFrais, ecritures, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA
+**À réconcilier (renommage / sous-routeur)** : 12 — commandes, notesDeFrais, ecritures, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation
 
 ## 2. Procédures servies par le nouveau stack (par domaine)
 
@@ -75,7 +75,7 @@
 - **demandesContact** (9) : `byStatut`, `convertir`, `create`, `delete`, `getById`, `list`, `marquerContacte`, `marquerPerdu`, `update`
 - **budgetsCategories** (6) : `byMois`, `create`, `delete`, `getById`, `list`, `update`
 - **reglesCategorisation** (5) : `create`, `delete`, `getById`, `list`, `update`
-- **previsionsCA** (6) : `byAnnee`, `create`, `delete`, `getById`, `list`, `update`
+- **previsions** (6) : `byAnnee`, `create`, `delete`, `getById`, `list`, `update`
 
 ## 3. Routeurs tRPC legacy SANS équivalent clean-archi (à migrer)
 
