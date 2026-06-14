@@ -13,6 +13,8 @@ import {
   getEquipesArtisan,
   ajouterMembreEquipe,
   retirerMembreEquipe,
+  getCouleursCalendrier,
+  definirCouleurIntervention,
 } from "../../application/equipe-use-cases";
 
 // Dates reçues en string ISO (sélecteur front) → `Date`, avec rejet propre des dates
@@ -111,6 +113,16 @@ export function createInterventionsRouter(repo: IInterventionRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await retirerMembreEquipe(repo, ctx.tenant, input.id);
+        return { success: true };
+      }),
+
+    // ── Couleurs calendrier (préférence d'affichage par artisan, scopée tenant) ───────────────────
+    getCouleursCalendrier: protectedProcedure.query(({ ctx }) => getCouleursCalendrier(repo, ctx.tenant)),
+
+    setCouleurIntervention: protectedProcedure
+      .input(z.object({ interventionId: z.number().int(), couleur: z.string().max(20) }))
+      .mutation(async ({ ctx, input }) => {
+        await definirCouleurIntervention(repo, ctx.tenant, input.interventionId, input.couleur);
         return { success: true };
       }),
   });

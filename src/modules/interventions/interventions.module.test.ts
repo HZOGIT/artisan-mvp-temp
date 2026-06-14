@@ -19,6 +19,8 @@ const stubRepo: IInterventionRepository = {
     throw new Error("non implémenté (stub)");
   },
   removeMembreEquipe: async () => {},
+  listCouleurs: async () => [],
+  setCouleur: async () => {},
 };
 
 describe("interventions.module", () => {
@@ -36,10 +38,12 @@ describe("interventions.module", () => {
       "getById",
       "list",
       "listByTechnicien",
+      "listCouleurs",
       "listEquipe",
       "listEquipesArtisan",
       "ownsRef",
       "removeMembreEquipe",
+      "setCouleur",
       "update",
     ]);
   });
@@ -52,11 +56,13 @@ describe("interventions.module", () => {
       "create",
       "delete",
       "getById",
+      "getCouleursCalendrier",
       "getEquipe",
       "getEquipesByArtisan",
       "getMine",
       "list",
       "retirerMembreEquipe",
+      "setCouleurIntervention",
       "update",
     ]);
   });

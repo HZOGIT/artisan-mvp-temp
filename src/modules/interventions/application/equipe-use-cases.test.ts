@@ -5,6 +5,8 @@ import {
   getEquipesArtisan,
   ajouterMembreEquipe,
   retirerMembreEquipe,
+  getCouleursCalendrier,
+  definirCouleurIntervention,
 } from "./equipe-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ForbiddenError } from "../../../shared/errors";
@@ -74,5 +76,18 @@ describe("interventions — équipe (sous-ressource) use-cases", () => {
     await retirerMembreEquipe(repo, A, m.id);
     await retirerMembreEquipe(repo, A, m.id);
     expect(await getEquipeIntervention(repo, A, i.id)).toHaveLength(0);
+  });
+
+  it("couleurs calendrier : setCouleur (upsert) + getCouleursCalendrier (map) scopés tenant", async () => {
+    const repo = new FakeInterventionRepository();
+    await definirCouleurIntervention(repo, A, 11, "bg-blue-500");
+    await definirCouleurIntervention(repo, A, 22, "bg-red-500");
+    await definirCouleurIntervention(repo, A, 11, "bg-green-500"); // upsert : remplace
+    await definirCouleurIntervention(repo, B, 11, "bg-yellow-500"); // autre tenant
+
+    const mapA = await getCouleursCalendrier(repo, A);
+    expect(mapA).toEqual({ 11: "bg-green-500", 22: "bg-red-500" });
+    // isolation : B ne voit que sa couleur
+    expect(await getCouleursCalendrier(repo, B)).toEqual({ 11: "bg-yellow-500" });
   });
 });

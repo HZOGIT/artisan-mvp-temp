@@ -43,4 +43,10 @@ export interface IInterventionRepository {
   addMembreEquipe(ctx: TenantContext, input: AjouterMembreEquipeInput): Promise<EquipeMembre>;
   // Retire un membre par id de liaison (scopé tenant ; idempotent — no-op si absent/hors tenant).
   removeMembreEquipe(ctx: TenantContext, id: number): Promise<void>;
+
+  // ── Couleurs calendrier (table `couleurs_interventions`, PK [artisanId, interventionId]) ──────
+  // Couleurs d'affichage des interventions du tenant (préférence d'affichage par artisan).
+  listCouleurs(ctx: TenantContext): Promise<Array<{ interventionId: number; couleur: string }>>;
+  // Upsert de la couleur d'une intervention (scopé `ctx.artisanId` par la PK) — idempotent.
+  setCouleur(ctx: TenantContext, interventionId: number, couleur: string): Promise<void>;
 }

@@ -24,6 +24,7 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
   let techA = 0;
 
   const cleanup = async () => {
+    await admin.query('delete from couleurs_interventions where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from interventions_techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from interventions where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
@@ -120,5 +121,15 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
     expect(await repo.listEquipe(ctx(A), i.id)).toHaveLength(1);
     await repo.removeMembreEquipe(ctx(A), m.id);
     expect(await repo.listEquipe(ctx(A), i.id)).toHaveLength(0);
+  });
+
+  it("couleurs : setCouleur upsert (PK artisanId+interventionId) + listCouleurs scopé tenant", async () => {
+    const i = await repo.create(ctx(A), { clientId: clientA, titre: "Coloré", dateDebut: new Date("2026-09-01T08:00:00Z") });
+    await repo.setCouleur(ctx(A), i.id, "bg-blue-500");
+    await repo.setCouleur(ctx(A), i.id, "bg-green-500"); // upsert → remplace (pas de violation PK)
+    const rows = await repo.listCouleurs(ctx(A));
+    expect(rows.filter((r) => r.interventionId === i.id)).toEqual([{ interventionId: i.id, couleur: "bg-green-500" }]);
+    // isolation : B ne voit pas la couleur de A
+    expect((await repo.listCouleurs(ctx(B))).some((r) => r.interventionId === i.id)).toBe(false);
   });
 });

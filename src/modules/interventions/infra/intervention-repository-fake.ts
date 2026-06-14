@@ -135,4 +135,18 @@ export class FakeInterventionRepository implements IInterventionRepository {
   async removeMembreEquipe(ctx: TenantContext, id: number): Promise<void> {
     this.equipe = this.equipe.filter((m) => !(m.id === id && m.artisanId === ctx.artisanId));
   }
+
+  private couleurs: Array<{ artisanId: number; interventionId: number; couleur: string }> = [];
+
+  async listCouleurs(ctx: TenantContext): Promise<Array<{ interventionId: number; couleur: string }>> {
+    return this.couleurs
+      .filter((c) => c.artisanId === ctx.artisanId)
+      .map((c) => ({ interventionId: c.interventionId, couleur: c.couleur }));
+  }
+
+  async setCouleur(ctx: TenantContext, interventionId: number, couleur: string): Promise<void> {
+    const existing = this.couleurs.find((c) => c.artisanId === ctx.artisanId && c.interventionId === interventionId);
+    if (existing) existing.couleur = couleur;
+    else this.couleurs.push({ artisanId: ctx.artisanId, interventionId, couleur });
+  }
 }

@@ -38,3 +38,23 @@ export async function ajouterMembreEquipe(
 export async function retirerMembreEquipe(repo: IInterventionRepository, ctx: TenantContext, id: number): Promise<void> {
   await repo.removeMembreEquipe(ctx, id);
 }
+
+// ── Couleurs calendrier (préférence d'affichage par artisan) ──────────────────────────────────
+// Carte `{ interventionId: couleur }` des interventions du tenant (parité legacy `getCouleursCalendrier`).
+export async function getCouleursCalendrier(repo: IInterventionRepository, ctx: TenantContext): Promise<Record<number, string>> {
+  const rows = await repo.listCouleurs(ctx);
+  const map: Record<number, string> = {};
+  for (const r of rows) map[r.interventionId] = r.couleur;
+  return map;
+}
+
+// Définit la couleur d'affichage d'une intervention (upsert scopé tenant). Métadonnée d'affichage
+// (clé `couleurs_interventions` par [artisanId, interventionId]) — pas de fuite cross-tenant.
+export async function definirCouleurIntervention(
+  repo: IInterventionRepository,
+  ctx: TenantContext,
+  interventionId: number,
+  couleur: string,
+): Promise<void> {
+  await repo.setCouleur(ctx, interventionId, couleur);
+}

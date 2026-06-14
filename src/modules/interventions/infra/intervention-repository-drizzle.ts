@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
-import { interventions, clients, techniciens, devis, factures, interventionsTechniciens } from "../../../../drizzle/schema.pg";
+import { interventions, clients, techniciens, devis, factures, interventionsTechniciens, couleursInterventions } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -232,6 +232,26 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
       await tx
         .delete(interventionsTechniciens)
         .where(and(eq(interventionsTechniciens.id, id), eq(interventionsTechniciens.artisanId, ctx.artisanId)));
+    });
+  }
+
+  listCouleurs(ctx: TenantContext): Promise<Array<{ interventionId: number; couleur: string }>> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select({ interventionId: couleursInterventions.interventionId, couleur: couleursInterventions.couleur })
+        .from(couleursInterventions)
+        .where(eq(couleursInterventions.artisanId, ctx.artisanId));
+      return rows;
+    });
+  }
+
+  setCouleur(ctx: TenantContext, interventionId: number, couleur: string): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Upsert sur la PK (artisanId, interventionId) → idempotent, scopé tenant.
+      await tx
+        .insert(couleursInterventions)
+        .values({ artisanId: ctx.artisanId, interventionId, couleur })
+        .onConflictDoUpdate({ target: [couleursInterventions.artisanId, couleursInterventions.interventionId], set: { couleur } });
     });
   }
 }
