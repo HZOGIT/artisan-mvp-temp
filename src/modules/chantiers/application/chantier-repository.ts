@@ -13,6 +13,8 @@ import type {
   UpdatePhaseInput,
   ChantierInterventionLien,
   AssocierInterventionInput,
+  ChantierDocument,
+  AddDocumentInput,
 } from "../domain/chantier";
 
 // Port du repository chantiers. Chaque méthode exige le TenantContext (scope tenant + RLS).
@@ -81,4 +83,15 @@ export interface IChantierRepository {
   associerIntervention(ctx: TenantContext, input: AssocierInterventionInput): Promise<ChantierInterventionLien>;
   // Dissocie une intervention d'un chantier — false si le lien n'existait pas. Idempotent.
   dissocierIntervention(ctx: TenantContext, chantierId: number, interventionId: number): Promise<boolean>;
+
+  // ── Documents (`documents_chantier`, SANS artisanId → scopé via le chantier parent) ───────────
+  // Documents d'un chantier (récents d'abord). Ownership chantier vérifiée en amont par le use-case.
+  listDocuments(ctx: TenantContext, chantierId: number): Promise<ChantierDocument[]>;
+  // Lit un document par id (NON scopé tenant). Le use-case s'en sert pour récupérer `chantierId`
+  // puis vérifier l'ownership du chantier (anti-IDOR). null si absent.
+  getDocumentById(ctx: TenantContext, id: number): Promise<ChantierDocument | null>;
+  // Ajoute un document (ownership du chantier vérifiée par le use-case).
+  addDocument(ctx: TenantContext, input: AddDocumentInput): Promise<ChantierDocument>;
+  // Supprime un document par id (ownership vérifiée en amont) — false si absent.
+  deleteDocument(ctx: TenantContext, id: number): Promise<boolean>;
 }

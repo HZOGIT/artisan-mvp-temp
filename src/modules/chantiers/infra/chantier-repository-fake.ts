@@ -14,6 +14,8 @@ import type {
   UpdatePhaseInput,
   ChantierInterventionLien,
   AssocierInterventionInput,
+  ChantierDocument,
+  AddDocumentInput,
 } from "../domain/chantier";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -292,5 +294,39 @@ export class FakeChantierRepository implements IChantierRepository {
     const before = this.liens.length;
     this.liens = this.liens.filter((l) => !(l.chantierId === chantierId && l.interventionId === interventionId));
     return this.liens.length < before;
+  }
+
+  // ⚠️ documents_chantier sans artisanId : scopé via le chantier parent (use-case).
+  private documents: ChantierDocument[] = [];
+  private documentSeq = 0;
+
+  async listDocuments(_ctx: TenantContext, chantierId: number): Promise<ChantierDocument[]> {
+    return this.documents
+      .filter((d) => d.chantierId === chantierId)
+      .sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime() || b.id - a.id);
+  }
+
+  async getDocumentById(_ctx: TenantContext, id: number): Promise<ChantierDocument | null> {
+    return this.documents.find((d) => d.id === id) ?? null;
+  }
+
+  async addDocument(_ctx: TenantContext, input: AddDocumentInput): Promise<ChantierDocument> {
+    const d: ChantierDocument = {
+      id: ++this.documentSeq,
+      chantierId: input.chantierId,
+      nom: input.nom,
+      type: input.type ?? "autre",
+      url: input.url,
+      taille: input.taille ?? null,
+      uploadedAt: new Date(),
+    };
+    this.documents.push(d);
+    return d;
+  }
+
+  async deleteDocument(_ctx: TenantContext, id: number): Promise<boolean> {
+    const before = this.documents.length;
+    this.documents = this.documents.filter((d) => d.id !== id);
+    return this.documents.length < before;
   }
 }

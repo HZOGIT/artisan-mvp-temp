@@ -204,3 +204,25 @@ export interface AssocierInterventionInput {
   readonly phaseId?: number | null;
   readonly ordre?: number;
 }
+
+// ── Documents de chantier (`documents_chantier`) ───────────────────────────────────────────────
+// ⚠️ **SANS artisanId** → scopée via le chantier parent (anti-IDOR ; pas de RLS sur cette table).
+export type DocumentChantierType = "plan" | "photo" | "permis" | "contrat" | "facture" | "autre";
+
+export interface ChantierDocument {
+  readonly id: number;
+  readonly chantierId: number;
+  readonly nom: string;
+  readonly type: DocumentChantierType;
+  readonly url: string;
+  readonly taille: number | null;
+  readonly uploadedAt: Date;
+}
+
+export interface AddDocumentInput {
+  readonly chantierId: number;
+  readonly nom: string;
+  readonly type?: DocumentChantierType;
+  readonly url: string;
+  readonly taille?: number | null;
+}

@@ -12,9 +12,11 @@ import {
   associerInterventionChantier,
   dissocierInterventionChantier,
 } from "../../application/interventions-liees-use-cases";
+import { getDocumentsChantier, ajouterDocument, supprimerDocument } from "../../application/documents-use-cases";
 
 const suiviStatutEnum = z.enum(["a_faire", "en_cours", "termine"]);
 const phaseStatutEnum = z.enum(["a_faire", "en_cours", "termine", "annule"]);
+const documentTypeEnum = z.enum(["plan", "photo", "permis", "contrat", "facture", "autre"]);
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -239,6 +241,30 @@ export function createChantiersRouter(repo: IChantierRepository) {
       .input(z.object({ chantierId: z.number().int(), interventionId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await dissocierInterventionChantier(repo, ctx.tenant, input.chantierId, input.interventionId);
+        return { success: true };
+      }),
+
+    // ── Documents — sous-ressource scopée via le chantier parent (anti-IDOR) ──────────────────────
+    getDocuments: protectedProcedure
+      .input(z.object({ chantierId: z.number().int() }))
+      .query(({ ctx, input }) => getDocumentsChantier(repo, ctx.tenant, input.chantierId)),
+
+    addDocument: protectedProcedure
+      .input(
+        z.object({
+          chantierId: z.number().int(),
+          nom: z.string().min(1).max(255),
+          type: documentTypeEnum.optional(),
+          url: z.string().min(1).max(65535),
+          taille: z.number().int().nonnegative().nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => ajouterDocument(repo, ctx.tenant, input)),
+
+    deleteDocument: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await supprimerDocument(repo, ctx.tenant, input.id);
         return { success: true };
       }),
   });

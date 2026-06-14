@@ -30,6 +30,9 @@ import type {
   UpdatePhaseInput,
   ChantierInterventionLien,
   AssocierInterventionInput,
+  ChantierDocument,
+  DocumentChantierType,
+  AddDocumentInput,
 } from "../domain/chantier";
 
 type PointageRow = typeof pointagesChantier.$inferSelect;
@@ -99,6 +102,20 @@ function toLien(r: InterventionLienRow): ChantierInterventionLien {
     phaseId: r.phaseId ?? null,
     ordre: r.ordre ?? 1,
     createdAt: r.createdAt,
+  };
+}
+
+type DocumentRow = typeof documentsChantier.$inferSelect;
+
+function toDocument(r: DocumentRow): ChantierDocument {
+  return {
+    id: r.id,
+    chantierId: r.chantierId,
+    nom: r.nom,
+    type: (r.type ?? "autre") as DocumentChantierType,
+    url: r.url,
+    taille: r.taille ?? null,
+    uploadedAt: r.uploadedAt,
   };
 }
 
@@ -488,6 +505,48 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
           ),
         )
         .returning({ id: interventionsChantier.id });
+      return deleted.length > 0;
+    });
+  }
+
+  // ⚠️ `documents_chantier` n'a PAS d'artisanId : scopé via le chantier parent par le use-case.
+  listDocuments(ctx: TenantContext, chantierId: number): Promise<ChantierDocument[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(documentsChantier)
+        .where(eq(documentsChantier.chantierId, chantierId))
+        .orderBy(desc(documentsChantier.uploadedAt), desc(documentsChantier.id));
+      return rows.map(toDocument);
+    });
+  }
+
+  getDocumentById(ctx: TenantContext, id: number): Promise<ChantierDocument | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx.select().from(documentsChantier).where(eq(documentsChantier.id, id)).limit(1);
+      return row ? toDocument(row) : null;
+    });
+  }
+
+  addDocument(ctx: TenantContext, input: AddDocumentInput): Promise<ChantierDocument> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .insert(documentsChantier)
+        .values({
+          chantierId: input.chantierId,
+          nom: input.nom,
+          type: input.type ?? undefined,
+          url: input.url,
+          taille: input.taille ?? null,
+        })
+        .returning();
+      return toDocument(row);
+    });
+  }
+
+  deleteDocument(ctx: TenantContext, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const deleted = await tx.delete(documentsChantier).where(eq(documentsChantier.id, id)).returning({ id: documentsChantier.id });
       return deleted.length > 0;
     });
   }

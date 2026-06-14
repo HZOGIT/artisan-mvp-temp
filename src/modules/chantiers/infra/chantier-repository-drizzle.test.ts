@@ -32,6 +32,7 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     await admin.query('delete from suivi_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from phases_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from interventions_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
+    await admin.query('delete from documents_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from interventions where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from chantiers where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
@@ -193,5 +194,23 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.dissocierIntervention(ctx(A), c.id, intervA)).toBe(true);
     expect(await repo.dissocierIntervention(ctx(A), c.id, intervA)).toBe(false);
     expect(await repo.listInterventionsLiens(ctx(A), c.id)).toEqual([]);
+  });
+
+  it("documents : add/list/get/delete (table sans artisanId, scope via chantier parent)", async () => {
+    const c = await repo.create(ctx(A), { clientId: clientA, reference: ref(), nom: "Avec documents" });
+    const d = await repo.addDocument(ctx(A), { chantierId: c.id, nom: "Plan", url: "https://x/plan.pdf" });
+    expect(d.type).toBe("autre"); // défaut PG
+    expect(d.taille).toBeNull();
+    const d2 = await repo.addDocument(ctx(A), { chantierId: c.id, nom: "Photo", type: "photo", url: "https://x/p.jpg", taille: 2048 });
+    expect(d2.type).toBe("photo");
+    expect(d2.taille).toBe(2048);
+    // récents d'abord (uploadedAt desc, id desc) — d2 ajouté après d
+    expect((await repo.listDocuments(ctx(A), c.id)).map((x) => x.id)).toEqual([d2.id, d.id]);
+    // getDocumentById (non scopé tenant : la table n'a pas d'artisanId)
+    expect((await repo.getDocumentById(ctx(A), d.id))?.nom).toBe("Plan");
+    // delete idempotent
+    expect(await repo.deleteDocument(ctx(A), d.id)).toBe(true);
+    expect(await repo.deleteDocument(ctx(A), d.id)).toBe(false);
+    expect((await repo.listDocuments(ctx(A), c.id)).map((x) => x.id)).toEqual([d2.id]);
   });
 });

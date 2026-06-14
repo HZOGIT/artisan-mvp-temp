@@ -36,6 +36,12 @@ const stubRepo: IChantierRepository = {
     throw new Error("non implémenté (stub)");
   },
   dissocierIntervention: async () => false,
+  listDocuments: async () => [],
+  getDocumentById: async () => null,
+  addDocument: async () => {
+    throw new Error("non implémenté (stub)");
+  },
+  deleteDocument: async () => false,
 };
 
 describe("chantiers.module", () => {
@@ -46,21 +52,25 @@ describe("chantiers.module", () => {
 
   it("le port expose les opérations CRUD attendues", () => {
     expect(Object.keys(stubRepo).sort()).toEqual([
+      "addDocument",
       "addPhase",
       "addPointage",
       "addSuivi",
       "associerIntervention",
       "create",
       "delete",
+      "deleteDocument",
       "deletePhase",
       "deletePointage",
       "deleteSuivi",
       "dissocierIntervention",
       "getById",
+      "getDocumentById",
       "getPhaseById",
       "getSuiviById",
       "list",
       "listAllInterventionsLiens",
+      "listDocuments",
       "listInterventionsLiens",
       "listPhases",
       "listPointages",
@@ -78,18 +88,21 @@ describe("chantiers.module", () => {
     const module = createChantiersModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
+      "addDocument",
       "addPointage",
       "associerIntervention",
       "create",
       "createPhase",
       "createSuivi",
       "delete",
+      "deleteDocument",
       "deletePhase",
       "deletePointage",
       "deleteSuivi",
       "dissocierIntervention",
       "getAllInterventionsChantier",
       "getById",
+      "getDocuments",
       "getInterventions",
       "getPhases",
       "getPointages",
