@@ -2,7 +2,9 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IStockRepository } from "../../application/stock-repository";
 import type { INotificationRepository } from "../../../notifications/application/notification-repository";
+import type { IFournisseurRepository } from "../../../fournisseurs/application/fournisseur-repository";
 import { genererAlertesStock } from "../../application/alertes-use-cases";
+import { genererRapportCommande } from "../../application/rapport-use-cases";
 import {
   listStocks,
   getStock,
@@ -51,7 +53,11 @@ const updateSchema = z.object({
 // use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
 // (NotFound→404, Validation→400). Repositories injectés (DI) → `repo` (stocks) + `notificationRepo`
 // (composé pour generateAlerts, qui crée des notifications « Stock bas »).
-export function createStocksRouter(repo: IStockRepository, notificationRepo: INotificationRepository) {
+export function createStocksRouter(
+  repo: IStockRepository,
+  notificationRepo: INotificationRepository,
+  fournisseurRepo: IFournisseurRepository,
+) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listStocks(repo, ctx.tenant)),
 
@@ -108,5 +114,9 @@ export function createStocksRouter(repo: IStockRepository, notificationRepo: INo
     // Génère une notification « Stock bas » par stock sous le seuil (parité client + legacy).
     // Cross-domaine : compose le repo notifications. Renvoie { alertsCreated }.
     generateAlerts: protectedProcedure.mutation(({ ctx }) => genererAlertesStock(repo, notificationRepo, ctx.tenant)),
+
+    // Rapport de réapprovisionnement groupé par fournisseur (parité client trpc.stocks.getRapportCommande).
+    // Cross-domaine : compose le repo fournisseurs (associations article↔fournisseur + fiches).
+    getRapportCommande: protectedProcedure.query(({ ctx }) => genererRapportCommande(repo, fournisseurRepo, ctx.tenant)),
   });
 }

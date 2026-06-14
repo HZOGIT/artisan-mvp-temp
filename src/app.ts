@@ -176,8 +176,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const notifications = createNotificationsModule({
     repository: notificationRepo,
   });
+  // Repo fournisseurs partagé : module fournisseurs ET composé par stocks (getRapportCommande
+  // croise les associations article↔fournisseur). Une seule instance.
+  const fournisseurRepo = deps.fournisseurRepo ?? new FournisseurRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
-    repository: deps.fournisseurRepo ?? new FournisseurRepositoryDrizzle(getDbHandle().db),
+    repository: fournisseurRepo,
   });
   const commandes = createCommandesModule({
     repository: deps.commandeRepo ?? new CommandeRepositoryDrizzle(getDbHandle().db),
@@ -185,6 +188,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const stocks = createStocksModule({
     repository: deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db),
     notificationRepository: notificationRepo,
+    fournisseurRepository: fournisseurRepo,
   });
   const clients = createClientsModule({
     repository: deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db),
