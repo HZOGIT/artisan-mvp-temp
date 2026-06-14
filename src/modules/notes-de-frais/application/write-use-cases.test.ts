@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeNoteDeFraisRepository } from "../infra/note-de-frais-repository-fake";
-import { creerNoteDeFrais, modifierNoteDeFrais, supprimerNoteDeFrais } from "./write-use-cases";
+import { creerNoteDeFrais, modifierNoteDeFrais, supprimerNoteDeFrais, ajouterDepenseANote, retirerDepenseDeNote } from "./write-use-cases";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
@@ -51,5 +51,50 @@ describe("notes-de-frais — use-cases d'écriture (create / update)", () => {
     await expect(supprimerNoteDeFrais(repo, B, n.id)).rejects.toBeInstanceOf(NotFoundError);
     await supprimerNoteDeFrais(repo, A, n.id);
     await expect(supprimerNoteDeFrais(repo, A, n.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("notes-de-frais — liens dépense ↔ note (add/remove)", () => {
+  it("ajoute une dépense remboursable du tenant + recalcule le total ; idempotent", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n = await creerNoteDeFrais(repo, A, base());
+    repo.registerDepense(1, 50, { remboursable: true, montantTtc: "120.00" });
+    repo.registerDepense(1, 51, { remboursable: true, montantTtc: "30.00" });
+    expect(await ajouterDepenseANote(repo, A, n.id, 50)).toEqual({ success: true });
+    await ajouterDepenseANote(repo, A, n.id, 51);
+    // idempotent (2e ajout du même lien ne double pas)
+    await ajouterDepenseANote(repo, A, n.id, 50);
+    expect(repo.linkedDepenseIds(n.id).sort()).toEqual([50, 51]);
+    expect((await repo.getById(A, n.id))?.montantTotal).toBe("150"); // 120 + 30
+  });
+
+  it("dépense NON remboursable → ignorée (skip silencieux), total inchangé", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n = await creerNoteDeFrais(repo, A, base());
+    repo.registerDepense(1, 60, { remboursable: false, montantTtc: "200.00" });
+    expect(await ajouterDepenseANote(repo, A, n.id, 60)).toEqual({ success: true });
+    expect(repo.linkedDepenseIds(n.id)).toEqual([]);
+    expect((await repo.getById(A, n.id))?.montantTotal).toBe("0");
+  });
+
+  it("anti-IDOR : note d'un autre tenant → skip silencieux (success, rien lié)", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const nA = await creerNoteDeFrais(repo, A, base());
+    repo.registerDepense(2, 70, { remboursable: true, montantTtc: "99.00" }); // dépense de B
+    // B tente d'ajouter SA dépense à la note de A → la note n'est pas à B → skip
+    expect(await ajouterDepenseANote(repo, B, nA.id, 70)).toEqual({ success: true });
+    expect(repo.linkedDepenseIds(nA.id)).toEqual([]);
+  });
+
+  it("retire un lien + recalcule ; idempotent", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n = await creerNoteDeFrais(repo, A, base());
+    repo.registerDepense(1, 80, { remboursable: true, montantTtc: "40.00" });
+    await ajouterDepenseANote(repo, A, n.id, 80);
+    expect(await retirerDepenseDeNote(repo, A, n.id, 80)).toEqual({ success: true });
+    expect(repo.linkedDepenseIds(n.id)).toEqual([]);
+    expect((await repo.getById(A, n.id))?.montantTotal).toBe("0");
+    // idempotent (re-retrait ne lève pas)
+    await retirerDepenseDeNote(repo, A, n.id, 80);
   });
 });

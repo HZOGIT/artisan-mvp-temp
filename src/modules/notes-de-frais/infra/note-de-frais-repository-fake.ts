@@ -9,6 +9,47 @@ import { computeNextNoteFraisNumero } from "../application/numero";
 export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
   private store: NoteDeFrais[] = [];
   private seq = 0;
+  // Dépenses connues (pour les liens) : clé `${artisanId}:${depenseId}` → {remboursable, montantTtc}.
+  private depenses = new Map<string, { remboursable: boolean; montantTtc: string }>();
+  // Liens note↔dépense : ensemble de `${noteId}:${depenseId}`.
+  private links = new Set<string>();
+
+  // Aide de test : déclare une dépense du tenant (pour addDepenseLink).
+  registerDepense(artisanId: number, depenseId: number, opts: { remboursable: boolean; montantTtc: string }): void {
+    this.depenses.set(`${artisanId}:${depenseId}`, opts);
+  }
+
+  // Ids des dépenses liées à une note (pour les assertions de test).
+  linkedDepenseIds(noteId: number): number[] {
+    return Array.from(this.links)
+      .filter((k) => k.startsWith(`${noteId}:`))
+      .map((k) => Number(k.split(":")[1]));
+  }
+
+  private recompute(ctx: TenantContext, noteId: number): void {
+    let total = 0;
+    for (const did of this.linkedDepenseIds(noteId)) {
+      const d = this.depenses.get(`${ctx.artisanId}:${did}`);
+      if (d && d.remboursable) total += Number(d.montantTtc);
+    }
+    this.store = this.store.map((n) => (n.id === noteId && n.artisanId === ctx.artisanId ? { ...n, montantTotal: String(total) } : n));
+  }
+
+  async addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void> {
+    const note = this.store.find((n) => n.id === noteId && n.artisanId === ctx.artisanId);
+    if (!note) return; // note pas au tenant → skip
+    const dep = this.depenses.get(`${ctx.artisanId}:${depenseId}`);
+    if (!dep || !dep.remboursable) return; // dépense pas au tenant / non remboursable → skip
+    this.links.add(`${noteId}:${depenseId}`); // idempotent (Set)
+    this.recompute(ctx, noteId);
+  }
+
+  async removeDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void> {
+    const note = this.store.find((n) => n.id === noteId && n.artisanId === ctx.artisanId);
+    if (!note) return;
+    this.links.delete(`${noteId}:${depenseId}`);
+    this.recompute(ctx, noteId);
+  }
 
   async nextNumero(ctx: TenantContext): Promise<string> {
     // Dernière note du tenant (par id décroissant) → numéro suivant (parité legacy).

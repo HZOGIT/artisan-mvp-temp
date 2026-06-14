@@ -24,6 +24,8 @@ describe.skipIf(!URL)("NoteDeFraisRepositoryDrizzle (PG, RLS + scope tenant)", (
   const repo = new NoteDeFraisRepositoryDrizzle(app.db);
 
   const cleanup = async () => {
+    await admin.query('delete from notes_frais_depenses where note_id in (select id from notes_de_frais where artisan_id in ($1,$2))', [A, B]);
+    await admin.query("delete from depenses where artisan_id in ($1,$2)", [A, B]);
     await admin.query('delete from notes_de_frais where artisan_id in ($1,$2)', [A, B]);
     await admin.query("delete from users where id in ($1,$2)", [UA, UB]);
   };
@@ -72,5 +74,39 @@ describe.skipIf(!URL)("NoteDeFraisRepositoryDrizzle (PG, RLS + scope tenant)", (
     const n = await repo.create(ctx(A), { userId: UA, numero: numero(), titre: "ASupprimer", periodeDebut: "2026-09-01", periodeFin: "2026-09-30" });
     expect(await repo.delete(ctx(A), n.id)).toBe(true);
     expect(await repo.getById(ctx(A), n.id)).toBeNull();
+  });
+
+  it("addDepenseLink/removeDepenseLink : anti-IDOR + recalcul montant_total (remboursables seules)", async () => {
+    const seedDep = async (artisanId: number, userId: number, ttc: string, remboursable: boolean) =>
+      (
+        await admin.query(
+          "insert into depenses (artisan_id,user_id,numero,date_depense,categorie,montant_ht,montant_ttc,remboursable) values ($1,$2,$3,now(),$4,$5,$6,$7) returning id",
+          [artisanId, userId, `DEP-${artisanId}-${Math.random().toString(36).slice(2, 8)}`, "repas", "100.00", ttc, remboursable],
+        )
+      ).rows[0].id as number;
+
+    const note = await repo.create(ctx(A), { userId: UA, numero: numero(), titre: "Liens", periodeDebut: "2026-10-01", periodeFin: "2026-10-31" });
+    const dRemb = await seedDep(A, UA, "120.00", true);
+    const dNonRemb = await seedDep(A, UA, "300.00", false);
+    const dB = await seedDep(B, UB, "999.00", true); // dépense d'un autre tenant
+
+    // dépense remboursable du tenant → liée, total recalculé
+    await repo.addDepenseLink(ctx(A), note.id, dRemb);
+    expect((await repo.getById(ctx(A), note.id))?.montantTotal).toBe("120.00");
+    // idempotent (contrainte unique)
+    await repo.addDepenseLink(ctx(A), note.id, dRemb);
+    expect((await repo.getById(ctx(A), note.id))?.montantTotal).toBe("120.00");
+    // dépense NON remboursable → ignorée (total inchangé)
+    await repo.addDepenseLink(ctx(A), note.id, dNonRemb);
+    expect((await repo.getById(ctx(A), note.id))?.montantTotal).toBe("120.00");
+    // anti-IDOR : dépense d'un AUTRE tenant → ignorée
+    await repo.addDepenseLink(ctx(A), note.id, dB);
+    expect((await repo.getById(ctx(A), note.id))?.montantTotal).toBe("120.00");
+    // anti-IDOR : B ne peut pas lier à la note de A (note pas à B) → skip
+    await repo.addDepenseLink(ctx(B), note.id, dB);
+    expect((await repo.getById(ctx(A), note.id))?.montantTotal).toBe("120.00");
+    // retrait → recalcul à 0
+    await repo.removeDepenseLink(ctx(A), note.id, dRemb);
+    expect((await repo.getById(ctx(A), note.id))?.montantTotal).toBe("0.00");
   });
 });

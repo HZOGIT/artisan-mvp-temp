@@ -35,4 +35,13 @@ export interface INoteDeFraisRepository {
   // Prochain numéro de note de frais (`NDF-00001`), scopé tenant, généré côté serveur (jamais fourni
   // par le client) → numérotation comptable maîtrisée (parité legacy `getNextNoteFraisNumero`).
   nextNumero(ctx: TenantContext): Promise<string>;
+
+  // ── Lien dépense ↔ note de frais (`notes_frais_depenses`, SANS artisan_id) ────────────────────
+  // ⚠️ Anti-IDOR : la note ET la dépense doivent appartenir au tenant ; la dépense doit être
+  // REMBOURSABLE (une note ne regroupe que des avances salarié). Échec silencieux sinon (skip).
+  // Idempotent (lien unique). Recalcule ensuite `montant_total` (= SUM des dépenses remboursables
+  // liées). Parité legacy `addDepenseToNoteFrais` + `calculerTotalNoteFrais`.
+  addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;
+  // Retire le lien (note du tenant requise ; skip silencieux sinon) puis recalcule `montant_total`.
+  removeDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;
 }

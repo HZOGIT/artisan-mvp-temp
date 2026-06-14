@@ -1,5 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
-import { notesDeFrais } from "../../../../drizzle/schema.pg";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { notesDeFrais, notesFraisDepenses, depenses } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -43,6 +43,39 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
         .orderBy(desc(notesDeFrais.id))
         .limit(1);
       return computeNextNoteFraisNumero(row?.numero ?? "");
+    });
+  }
+
+  addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // 1) la note doit appartenir au tenant.
+      const [note] = await tx.select({ id: notesDeFrais.id }).from(notesDeFrais).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId))).limit(1);
+      if (!note) return;
+      // 2) la dépense doit appartenir au tenant ET être remboursable.
+      const [dep] = await tx.select({ remboursable: depenses.remboursable }).from(depenses).where(and(eq(depenses.id, depenseId), eq(depenses.artisan_id, ctx.artisanId))).limit(1);
+      if (!dep || !dep.remboursable) return;
+      // 3) lien idempotent (contrainte unique note_id+depense_id), puis recalcul du total.
+      await tx.insert(notesFraisDepenses).values({ note_id: noteId, depense_id: depenseId }).onConflictDoNothing();
+      const [agg] = await tx
+        .select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+        .from(depenses)
+        .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
+        .where(and(eq(notesFraisDepenses.note_id, noteId), eq(depenses.artisan_id, ctx.artisanId), eq(depenses.remboursable, true)));
+      await tx.update(notesDeFrais).set({ montant_total: String(Number(agg?.total || 0)) }).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId)));
+    });
+  }
+
+  removeDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [note] = await tx.select({ id: notesDeFrais.id }).from(notesDeFrais).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId))).limit(1);
+      if (!note) return;
+      await tx.delete(notesFraisDepenses).where(and(eq(notesFraisDepenses.note_id, noteId), eq(notesFraisDepenses.depense_id, depenseId)));
+      const [agg] = await tx
+        .select({ total: sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)` })
+        .from(depenses)
+        .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
+        .where(and(eq(notesFraisDepenses.note_id, noteId), eq(depenses.artisan_id, ctx.artisanId), eq(depenses.remboursable, true)));
+      await tx.update(notesDeFrais).set({ montant_total: String(Number(agg?.total || 0)) }).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId)));
     });
   }
 

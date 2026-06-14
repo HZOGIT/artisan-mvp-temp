@@ -131,3 +131,16 @@ export async function payerNoteDeFrais(repo: INoteDeFraisRepository, ctx: Tenant
   if (!updated) throw new NotFoundError("Note de frais introuvable");
   return updated;
 }
+
+// Lie une dépense (remboursable, du tenant) à une note (du tenant) — anti-IDOR + recalcul du total
+// portés par le repo (skip silencieux si ownership/remboursable KO ; idempotent). Renvoie `{success}`
+// quoi qu'il arrive (parité legacy : ne révèle pas l'existence cross-tenant).
+export async function ajouterDepenseANote(repo: INoteDeFraisRepository, ctx: TenantContext, noteId: number, depenseId: number): Promise<{ success: true }> {
+  await repo.addDepenseLink(ctx, noteId, depenseId);
+  return { success: true };
+}
+
+export async function retirerDepenseDeNote(repo: INoteDeFraisRepository, ctx: TenantContext, noteId: number, depenseId: number): Promise<{ success: true }> {
+  await repo.removeDepenseLink(ctx, noteId, depenseId);
+  return { success: true };
+}
