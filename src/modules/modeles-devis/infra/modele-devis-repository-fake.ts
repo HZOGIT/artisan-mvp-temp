@@ -1,0 +1,103 @@
+import type { TenantContext } from "../../../shared/tenant";
+import type { IModeleDevisRepository } from "../application/modele-devis-repository";
+import type { CreateModeleDevisInput, CreateModeleDevisLigneInput, ModeleDevis, ModeleDevisLigne, UpdateModeleDevisInput } from "../domain/modele-devis";
+
+interface StoredModele {
+  id: number;
+  artisanId: number;
+  nom: string;
+  description: string | null;
+  notes: string | null;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Implémentation in-memory du repository modeles-devis (tests sans DB). Reproduit les invariants du
+// repo Drizzle : en-tête scopé par artisanId (artisanId forcé à la création), lignes stockées par
+// modeleId et **scopées via le parent** (jamais lisibles sans ownership), remplacement complet des
+// lignes à l'update, list « léger » (lignes = []), isDefault défaut false.
+export class FakeModeleDevisRepository implements IModeleDevisRepository {
+  private readonly modeles: StoredModele[] = [];
+  private readonly lignes = new Map<number, ModeleDevisLigne[]>();
+  private seqModele = 0;
+  private seqLigne = 0;
+
+  private toLigne(modeleId: number, l: CreateModeleDevisLigneInput, ordreParDefaut: number): ModeleDevisLigne {
+    return {
+      id: ++this.seqLigne,
+      modeleId,
+      articleId: l.articleId ?? null,
+      designation: l.designation,
+      description: l.description ?? null,
+      quantite: l.quantite ?? "1.00",
+      unite: l.unite ?? "unité",
+      prixUnitaireHT: l.prixUnitaireHT ?? "0.00",
+      tauxTVA: l.tauxTVA ?? "20.00",
+      remise: l.remise ?? "0.00",
+      ordre: l.ordre ?? ordreParDefaut,
+    };
+  }
+
+  private aggregate(m: StoredModele): ModeleDevis {
+    const lignes = [...(this.lignes.get(m.id) ?? [])].sort((a, b) => a.ordre - b.ordre || a.id - b.id);
+    return { ...m, lignes };
+  }
+
+  private owned(ctx: TenantContext, id: number): StoredModele | undefined {
+    return this.modeles.find((m) => m.id === id && m.artisanId === ctx.artisanId);
+  }
+
+  async list(ctx: TenantContext): Promise<ModeleDevis[]> {
+    return this.modeles
+      .filter((m) => m.artisanId === ctx.artisanId)
+      .sort((a, b) => a.nom.localeCompare(b.nom) || a.id - b.id)
+      .map((m) => ({ ...m, lignes: [] })); // léger
+  }
+
+  async getById(ctx: TenantContext, id: number): Promise<ModeleDevis | null> {
+    const m = this.owned(ctx, id);
+    return m ? this.aggregate(m) : null;
+  }
+
+  async create(ctx: TenantContext, input: CreateModeleDevisInput): Promise<ModeleDevis> {
+    const now = new Date();
+    const m: StoredModele = {
+      id: ++this.seqModele,
+      artisanId: ctx.artisanId,
+      nom: input.nom,
+      description: input.description ?? null,
+      notes: input.notes ?? null,
+      isDefault: input.isDefault ?? false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.modeles.push(m);
+    if (input.lignes?.length) {
+      this.lignes.set(m.id, input.lignes.map((l, i) => this.toLigne(m.id, l, i + 1)));
+    }
+    return this.aggregate(m);
+  }
+
+  async update(ctx: TenantContext, id: number, input: UpdateModeleDevisInput): Promise<ModeleDevis | null> {
+    const m = this.owned(ctx, id);
+    if (!m) return null;
+    if (input.nom !== undefined) m.nom = input.nom;
+    if (input.description !== undefined) m.description = input.description;
+    if (input.notes !== undefined) m.notes = input.notes;
+    if (input.isDefault !== undefined) m.isDefault = input.isDefault;
+    m.updatedAt = new Date();
+    if (input.lignes !== undefined) {
+      this.lignes.set(id, input.lignes.map((l, i) => this.toLigne(id, l, i + 1)));
+    }
+    return this.aggregate(m);
+  }
+
+  async delete(ctx: TenantContext, id: number): Promise<boolean> {
+    const idx = this.modeles.findIndex((m) => m.id === id && m.artisanId === ctx.artisanId);
+    if (idx === -1) return false;
+    this.modeles.splice(idx, 1);
+    this.lignes.delete(id);
+    return true;
+  }
+}
