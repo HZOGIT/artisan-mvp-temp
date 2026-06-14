@@ -500,9 +500,32 @@ describe("bascule du domaine configRelances (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine rdvEnLigne (flag gateway)", () => {
+  it("rdvEnLigne routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("rdvEnLigne", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { rdvEnLigne: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("rdvEnLigne", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("rdvEnLigne", 8, canary)).toBe(false);
+    const global: FeatureFlags = { rdvEnLigne: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("rdvEnLigne", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("rdvEnLigne", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine rdvEnLigne extraient bien le domaine (dont confirmer/refuser)", () => {
+    expect(domainFromTrpcPath("rdvEnLigne.create")).toBe("rdvEnLigne");
+    expect(domainFromTrpcPath("/rdvEnLigne.confirmer")).toBe("rdvEnLigne");
+  });
+
+  it("parse env : rdvEnLigne enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "rdvEnLigne" } as NodeJS.ProcessEnv).rdvEnLigne).toEqual({ enabled: true });
+    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // (le parseur lowercase le suffixe → clé `rdvenligne`) — même limitation que notesDeFrais.
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 22 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances"]) {
+  it("les 23 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
