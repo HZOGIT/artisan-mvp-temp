@@ -29,7 +29,7 @@ function q(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?:
   return app.inject({ method: "GET", url: `/api/trpc/${path}${qs}`, headers: tok ? { cookie: `token=${tok}` } : {} });
 }
 
-describe.skipIf(!URL)("relancesDevis.router e2e (HTTP → tRPC → use-case → repo → RLS, log append-only)", () => {
+describe.skipIf(!URL)("relances.router e2e (HTTP → tRPC → use-case → repo → RLS, log append-only)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   let server: ReturnType<typeof buildApp>;
@@ -66,58 +66,58 @@ describe.skipIf(!URL)("relancesDevis.router e2e (HTTP → tRPC → use-case → 
     await admin.end();
   });
 
-  it("sans cookie → relancesDevis.list 401", async () => {
-    expect((await q(server, "relancesDevis.list", undefined)).statusCode).toBe(401);
+  it("sans cookie → relances.list 401", async () => {
+    expect((await q(server, "relances.list", undefined)).statusCode).toBe(401);
   });
 
   it("create (devisId du tenant) + getById → statut envoye", async () => {
     const tA = await token(UA);
-    const created = await mut(server, "relancesDevis.create", { devisId: devisA, type: "email", destinataire: "c@test.fr" }, tA);
+    const created = await mut(server, "relances.create", { devisId: devisA, type: "email", destinataire: "c@test.fr" }, tA);
     expect(created.statusCode).toBe(200);
     const r = created.json().result.data as { id: number; statut: string; type: string };
     expect(r.statut).toBe("envoye");
     expect(r.type).toBe("email");
-    expect((await q(server, "relancesDevis.getById", { id: r.id }, tA)).json().result.data.devisId).toBe(devisA);
+    expect((await q(server, "relances.getById", { id: r.id }, tA)).json().result.data.devisId).toBe(devisA);
   });
 
   it("ANTI-IDOR : create avec un devisId d'un AUTRE tenant → 404", async () => {
     const tA = await token(UA);
-    expect((await mut(server, "relancesDevis.create", { devisId: devisB, type: "email" }, tA)).statusCode).toBe(404);
+    expect((await mut(server, "relances.create", { devisId: devisB, type: "email" }, tA)).statusCode).toBe(404);
   });
 
   it("byDevis : filtre scopé ; [] pour un devis sans relance", async () => {
     const tA = await token(UA);
-    await mut(server, "relancesDevis.create", { devisId: devisA, type: "notification" }, tA);
-    const rel = (await q(server, "relancesDevis.byDevis", { devisId: devisA }, tA)).json().result.data as Array<{ devisId: number }>;
+    await mut(server, "relances.create", { devisId: devisA, type: "notification" }, tA);
+    const rel = (await q(server, "relances.byDevis", { devisId: devisA }, tA)).json().result.data as Array<{ devisId: number }>;
     expect(rel.length).toBeGreaterThan(0);
     expect(rel.every((x) => x.devisId === devisA)).toBe(true);
-    expect((await q(server, "relancesDevis.byDevis", { devisId: 999999999 }, tA)).json().result.data).toEqual([]);
+    expect((await q(server, "relances.byDevis", { devisId: 999999999 }, tA)).json().result.data).toEqual([]);
   });
 
   it("validations → 400 : type hors enum, statut hors enum", async () => {
     const tA = await token(UA);
-    expect((await mut(server, "relancesDevis.create", { devisId: devisA, type: "sms" }, tA)).statusCode).toBe(400);
-    expect((await mut(server, "relancesDevis.create", { devisId: devisA, type: "email", statut: "en_cours" }, tA)).statusCode).toBe(400);
+    expect((await mut(server, "relances.create", { devisId: devisA, type: "sms" }, tA)).statusCode).toBe(400);
+    expect((await mut(server, "relances.create", { devisId: devisA, type: "email", statut: "en_cours" }, tA)).statusCode).toBe(400);
   });
 
   it("isolation cross-tenant : B ne voit/supprime pas la relance de A", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
-    const id = (await mut(server, "relancesDevis.create", { devisId: devisA, type: "email" }, tA)).json().result.data.id as number;
-    expect((await q(server, "relancesDevis.getById", { id }, tB)).statusCode).toBe(404);
-    expect((await q(server, "relancesDevis.list", undefined, tB)).json().result.data).toEqual([]);
-    expect((await q(server, "relancesDevis.byDevis", { devisId: devisA }, tB)).json().result.data).toEqual([]);
-    expect((await mut(server, "relancesDevis.delete", { id }, tB)).statusCode).toBe(404);
-    expect((await q(server, "relancesDevis.getById", { id }, tA)).statusCode).toBe(200);
+    const id = (await mut(server, "relances.create", { devisId: devisA, type: "email" }, tA)).json().result.data.id as number;
+    expect((await q(server, "relances.getById", { id }, tB)).statusCode).toBe(404);
+    expect((await q(server, "relances.list", undefined, tB)).json().result.data).toEqual([]);
+    expect((await q(server, "relances.byDevis", { devisId: devisA }, tB)).json().result.data).toEqual([]);
+    expect((await mut(server, "relances.delete", { id }, tB)).statusCode).toBe(404);
+    expect((await q(server, "relances.getById", { id }, tA)).statusCode).toBe(200);
   });
 
   it("delete OK propriétaire ; id inexistant → 404 ; pas de procédure update", async () => {
     const tA = await token(UA);
-    const id = (await mut(server, "relancesDevis.create", { devisId: devisA, type: "email" }, tA)).json().result.data.id as number;
-    expect((await mut(server, "relancesDevis.delete", { id }, tA)).json().result.data).toEqual({ success: true });
-    expect((await q(server, "relancesDevis.getById", { id }, tA)).statusCode).toBe(404);
-    expect((await mut(server, "relancesDevis.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
+    const id = (await mut(server, "relances.create", { devisId: devisA, type: "email" }, tA)).json().result.data.id as number;
+    expect((await mut(server, "relances.delete", { id }, tA)).json().result.data).toEqual({ success: true });
+    expect((await q(server, "relances.getById", { id }, tA)).statusCode).toBe(404);
+    expect((await mut(server, "relances.delete", { id: 999999999 }, tA)).statusCode).toBe(404);
     // immuabilité : la procédure update n'existe pas → route inexistante (404)
-    expect((await mut(server, "relancesDevis.update", { id }, tA)).statusCode).toBe(404);
+    expect((await mut(server, "relances.update", { id }, tA)).statusCode).toBe(404);
   });
 });

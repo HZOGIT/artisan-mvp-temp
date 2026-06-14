@@ -523,24 +523,24 @@ describe("bascule du domaine rdv (flag gateway)", () => {
   });
 });
 
-describe("bascule du domaine relancesDevis (flag gateway)", () => {
-  it("relancesDevis routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
-    expect(shouldRouteToNewStack("relancesDevis", 7, NO_FLAGS)).toBe(false);
-    const canary: FeatureFlags = { relancesDevis: { enabled: false, tenantAllowlist: [7] } };
-    expect(shouldRouteToNewStack("relancesDevis", 7, canary)).toBe(true);
-    expect(shouldRouteToNewStack("relancesDevis", 8, canary)).toBe(false);
-    const global: FeatureFlags = { relancesDevis: { enabled: true, tenantDenylist: [3] } };
-    expect(shouldRouteToNewStack("relancesDevis", 1, global)).toBe(true);
-    expect(shouldRouteToNewStack("relancesDevis", 3, global)).toBe(false);
+describe("bascule du domaine relances (flag gateway)", () => {
+  it("relances routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("relances", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { relances: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("relances", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("relances", 8, canary)).toBe(false);
+    const global: FeatureFlags = { relances: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("relances", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("relances", 3, global)).toBe(false);
   });
 
-  it("les chemins tRPC du domaine relancesDevis extraient bien le domaine", () => {
-    expect(domainFromTrpcPath("relancesDevis.create")).toBe("relancesDevis");
-    expect(domainFromTrpcPath("/relancesDevis.byDevis")).toBe("relancesDevis");
+  it("les chemins tRPC du domaine relances extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("relances.create")).toBe("relances");
+    expect(domainFromTrpcPath("/relances.byDevis")).toBe("relances");
   });
 
-  it("parse env : relancesDevis enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
-    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "relancesDevis" } as NodeJS.ProcessEnv).relancesDevis).toEqual({ enabled: true });
+  it("parse env : relances enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "relances" } as NodeJS.ProcessEnv).relances).toEqual({ enabled: true });
     // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `relancesdevis`) — même limitation que notesDeFrais.
   });
@@ -708,7 +708,7 @@ describe("canary env camelCase recanonicalisé (NEW_STACK_CANARY_<DOMAINE>)", ()
 
 describe("registre des domaines migrés", () => {
   it("les 30 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relancesDevis", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
