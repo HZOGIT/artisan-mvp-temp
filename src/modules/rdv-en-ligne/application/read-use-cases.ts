@@ -1,6 +1,8 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IRdvRepository } from "./rdv-repository";
+import type { IClientRepository } from "../../clients/application/client-repository";
+import type { Client } from "../../clients/domain/client";
 import type { Rdv } from "../domain/rdv";
 
 // Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
@@ -8,6 +10,23 @@ import type { Rdv } from "../domain/rdv";
 
 export function listRdvs(repo: IRdvRepository, ctx: TenantContext): Promise<Rdv[]> {
   return repo.list(ctx);
+}
+
+// RDV enrichi de son client (le client UI lit `rdv.client.prenom/nom`).
+export type RdvAvecClient = Rdv & { readonly client: Client | null };
+
+// Liste des RDV du tenant, chacun enrichi de son `client` (parité legacy `list` :
+// `Promise.all(map → {...r, client})`). ⚠️ Cross-domaine : compose le repo `clients` (scopé tenant →
+// un RDV dont le client n'appartiendrait pas au tenant aurait `client: null`).
+export async function listRdvsAvecClient(
+  rdvRepo: IRdvRepository,
+  clientRepo: IClientRepository,
+  ctx: TenantContext,
+): Promise<RdvAvecClient[]> {
+  const rdvs = await rdvRepo.list(ctx);
+  return Promise.all(
+    rdvs.map(async (rdv) => ({ ...rdv, client: await clientRepo.getById(ctx, rdv.clientId) })),
+  );
 }
 
 export async function getRdv(repo: IRdvRepository, ctx: TenantContext, id: number): Promise<Rdv> {

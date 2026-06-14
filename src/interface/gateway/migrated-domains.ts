@@ -30,4 +30,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "badges", // parité vérifiée : list/create/getBadgesTechnicien/getClassement/calculerClassement + getObjectifsTechnicien ⊇ appels client
   "stocks", // parité vérifiée : CRUD/adjustQuantity/getMouvements/getLowStock + getEntrant/generateAlerts/getRapportCommande ⊇ appels client
   "techniciens", // parité vérifiée : CRUD/getAll/getLinkableUsers + habilitations(get/add/delete) + getStats ⊇ appels client
+  "rdv", // parité vérifiée : list(enrichi client)/confirm/refuse/proposeAutreCreneau/getStats/getPendingCount ⊇ appels client (emails best-effort en cours)
 ] as const;

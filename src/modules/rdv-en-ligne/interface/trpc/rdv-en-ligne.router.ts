@@ -2,7 +2,8 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IRdvRepository } from "../../application/rdv-repository";
 import type { IInterventionRepository } from "../../../interventions/application/intervention-repository";
-import { listRdvs, getRdv, getRdvStats, getRdvPendingCount } from "../../application/read-use-cases";
+import type { IClientRepository } from "../../../clients/application/client-repository";
+import { getRdv, getRdvStats, getRdvPendingCount, listRdvsAvecClient } from "../../application/read-use-cases";
 import { creerRdv, modifierRdv, supprimerRdv } from "../../application/write-use-cases";
 import { confirmerRdv, refuserRdv, annulerRdv } from "../../application/transition-use-cases";
 import { confirmerRdvAvecIntervention } from "../../application/confirm-use-cases";
@@ -35,9 +36,14 @@ const updateSchema = z.object({
 // use-cases (scoping tenant via ctx.tenant + anti-IDOR clientId au use-case), laisse remonter les
 // Domain errors (NotFound→404, Validation→400). ⚠️ Les transitions de statut (confirmer/refuser/
 // annuler) seront exposées en 7/9 (procédures dédiées). Repo injecté.
-export function createRdvEnLigneRouter(repo: IRdvRepository, interventionRepo: IInterventionRepository) {
+export function createRdvEnLigneRouter(
+  repo: IRdvRepository,
+  interventionRepo: IInterventionRepository,
+  clientRepo: IClientRepository,
+) {
   return router({
-    list: protectedProcedure.query(({ ctx }) => listRdvs(repo, ctx.tenant)),
+    // Liste enrichie du `client` (parité legacy — le client UI lit `rdv.client.prenom/nom`).
+    list: protectedProcedure.query(({ ctx }) => listRdvsAvecClient(repo, clientRepo, ctx.tenant)),
 
     // Comptes par statut + nombre en attente (parité client trpc.rdv.getStats / getPendingCount).
     getStats: protectedProcedure.query(({ ctx }) => getRdvStats(repo, ctx.tenant)),

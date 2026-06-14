@@ -71,6 +71,18 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
     expect((await q(server, "rdv.list", undefined)).statusCode).toBe(401);
   });
 
+  it("list enrichi (parité client) : chaque RDV porte son `client` (prenom/nom) ; scopé tenant", async () => {
+    const tA = await token(UA);
+    const created = await creer(tA);
+    const id = created.json().result.data.id as number;
+    const list = (await q(server, "rdv.list", undefined, tA)).json().result.data as Array<{ id: number; clientId: number; client: { id: number; nom: string } | null }>;
+    const mine = list.find((r) => r.id === id);
+    expect(mine).toBeDefined();
+    expect(mine!.client).not.toBeNull(); // enrichi
+    expect(mine!.client!.id).toBe(clientA);
+    expect(mine!.client!.nom).toBe("Client A");
+  });
+
   it("create (clientId du tenant) + getById → statut en_attente, défauts", async () => {
     const tA = await token(UA);
     const created = await creer(tA);

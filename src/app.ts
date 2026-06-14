@@ -190,8 +190,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     notificationRepository: notificationRepo,
     fournisseurRepository: fournisseurRepo,
   });
+  // Repo clients partagé : module clients ET composé par rdv (`list` enrichit chaque RDV de son client).
+  const clientRepo = deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db);
   const clients = createClientsModule({
-    repository: deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db),
+    repository: clientRepo,
   });
   // Repo interventions partagé : module interventions ET composé par rdv (`confirm` crée une
   // intervention planifiée liée au RDV).
@@ -257,6 +259,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const rdvEnLigne = createRdvEnLigneModule({
     repository: deps.rdvRepo ?? new RdvRepositoryDrizzle(getDbHandle().db),
     interventionRepository: interventionRepo,
+    clientRepository: clientRepo,
   });
   const relancesDevis = createRelancesDevisModule({
     repository: deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db),
