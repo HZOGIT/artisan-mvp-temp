@@ -67,3 +67,29 @@ export interface UpdateChantierInput {
   readonly priorite?: ChantierPriorite;
   readonly notes?: string | null;
 }
+
+// ── Pointages (saisie de temps sur un chantier) ──────────────────────────────────────────────
+// Table `pointages_chantier` : heures passées par un technicien sur un chantier (et phase
+// optionnelle). Scopée tenant (artisanId) ET via le chantier parent (anti-IDOR). `date` = jour PG
+// (YYYY-MM-DD), `heures` = decimal/string.
+export interface ChantierPointage {
+  readonly id: number;
+  readonly chantierId: number;
+  readonly phaseId: number | null;
+  readonly technicienId: number | null;
+  readonly date: string;
+  readonly heures: string;
+  readonly description: string | null;
+  readonly createdAt: Date;
+}
+
+// Entrée de création d'un pointage. `artisanId` forcé serveur ; `technicienId` validé (anti-IDOR-FK,
+// ignoré → null s'il n'appartient pas au tenant). `date` = YYYY-MM-DD (validée au use-case).
+export interface CreatePointageInput {
+  readonly chantierId: number;
+  readonly phaseId?: number | null;
+  readonly technicienId?: number | null;
+  readonly date: string;
+  readonly heures: string;
+  readonly description?: string | null;
+}

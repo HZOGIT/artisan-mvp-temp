@@ -11,6 +11,10 @@ const stubRepo: IChantierRepository = {
   update: async () => null,
   delete: async () => false,
   ownsClient: async () => false,
+  ownsTechnicien: async () => false,
+  listPointages: async () => [],
+  addPointage: async () => null,
+  deletePointage: async () => false,
 };
 
 describe("chantiers.module", () => {
@@ -20,12 +24,32 @@ describe("chantiers.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsClient", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual([
+      "addPointage",
+      "create",
+      "delete",
+      "deletePointage",
+      "getById",
+      "list",
+      "listPointages",
+      "ownsClient",
+      "ownsTechnicien",
+      "update",
+    ]);
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
     const module = createChantiersModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual([
+      "addPointage",
+      "create",
+      "delete",
+      "deletePointage",
+      "getById",
+      "getPointages",
+      "list",
+      "update",
+    ]);
   });
 });

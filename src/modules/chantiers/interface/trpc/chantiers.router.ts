@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IChantierRepository } from "../../application/chantier-repository";
 import { listChantiers, getChantier } from "../../application/read-use-cases";
 import { creerChantier, modifierChantier, supprimerChantier } from "../../application/write-use-cases";
+import { getPointagesChantier, ajouterPointage, supprimerPointage } from "../../application/pointages-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -74,6 +75,40 @@ export function createChantiersRouter(repo: IChantierRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerChantier(repo, ctx.tenant, input.id);
+        return { success: true };
+      }),
+
+    // ── Pointages (saisie de temps) — sous-ressource scopée via le chantier parent ────────────────
+    getPointages: protectedProcedure
+      .input(z.object({ chantierId: z.number().int() }))
+      .query(({ ctx, input }) => getPointagesChantier(repo, ctx.tenant, input.chantierId)),
+
+    addPointage: protectedProcedure
+      .input(
+        z.object({
+          chantierId: z.number().int(),
+          phaseId: z.number().int().nullish(),
+          technicienId: z.number().int().nullish(),
+          date: z.string().min(1),
+          heures: z.number().positive().max(24, "Maximum 24 h par pointage"),
+          description: z.string().trim().max(500).optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ajouterPointage(repo, ctx.tenant, {
+          chantierId: input.chantierId,
+          phaseId: input.phaseId ?? null,
+          technicienId: input.technicienId ?? null,
+          date: input.date,
+          heures: input.heures.toFixed(2),
+          description: input.description ?? null,
+        }),
+      ),
+
+    deletePointage: protectedProcedure
+      .input(z.object({ chantierId: z.number().int(), id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await supprimerPointage(repo, ctx.tenant, input.chantierId, input.id);
         return { success: true };
       }),
   });

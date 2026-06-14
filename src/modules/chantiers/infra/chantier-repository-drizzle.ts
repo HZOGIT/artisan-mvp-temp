@@ -1,7 +1,8 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
   chantiers,
   clients,
+  techniciens,
   phasesChantier,
   interventionsChantier,
   documentsChantier,
@@ -12,7 +13,22 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "../application/chantier-repository";
-import type { Chantier, CreateChantierInput, UpdateChantierInput } from "../domain/chantier";
+import type { Chantier, CreateChantierInput, UpdateChantierInput, ChantierPointage, CreatePointageInput } from "../domain/chantier";
+
+type PointageRow = typeof pointagesChantier.$inferSelect;
+
+function toPointage(r: PointageRow): ChantierPointage {
+  return {
+    id: r.id,
+    chantierId: r.chantierId,
+    phaseId: r.phaseId ?? null,
+    technicienId: r.technicienId ?? null,
+    date: r.date,
+    heures: r.heures,
+    description: r.description ?? null,
+    createdAt: r.createdAt,
+  };
+}
 
 type ChantierRow = typeof chantiers.$inferSelect;
 
@@ -126,6 +142,68 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
         .from(clients)
         .where(and(eq(clients.id, clientId), eq(clients.artisanId, ctx.artisanId)));
       return (row?.n ?? 0) > 0;
+    });
+  }
+
+  ownsTechnicien(ctx: TenantContext, technicienId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(techniciens)
+        .where(and(eq(techniciens.id, technicienId), eq(techniciens.artisanId, ctx.artisanId)));
+      return (row?.n ?? 0) > 0;
+    });
+  }
+
+  private async ownsChantier(tx: DbClient, ctx: TenantContext, chantierId: number): Promise<boolean> {
+    const [row] = await tx
+      .select({ id: chantiers.id })
+      .from(chantiers)
+      .where(and(eq(chantiers.id, chantierId), eq(chantiers.artisanId, ctx.artisanId)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  listPointages(ctx: TenantContext, chantierId: number): Promise<ChantierPointage[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsChantier(tx, ctx, chantierId))) return [];
+      const rows = await tx
+        .select()
+        .from(pointagesChantier)
+        .where(and(eq(pointagesChantier.chantierId, chantierId), eq(pointagesChantier.artisanId, ctx.artisanId)))
+        .orderBy(desc(pointagesChantier.date), asc(pointagesChantier.id));
+      return rows.map(toPointage);
+    });
+  }
+
+  addPointage(ctx: TenantContext, input: CreatePointageInput): Promise<ChantierPointage | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsChantier(tx, ctx, input.chantierId))) return null;
+      const [row] = await tx
+        .insert(pointagesChantier)
+        .values({
+          artisanId: ctx.artisanId,
+          chantierId: input.chantierId,
+          phaseId: input.phaseId ?? null,
+          technicienId: input.technicienId ?? null,
+          date: input.date,
+          heures: input.heures,
+          description: input.description ?? null,
+        })
+        .returning();
+      return toPointage(row);
+    });
+  }
+
+  deletePointage(ctx: TenantContext, chantierId: number, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const deleted = await tx
+        .delete(pointagesChantier)
+        .where(
+          and(eq(pointagesChantier.id, id), eq(pointagesChantier.chantierId, chantierId), eq(pointagesChantier.artisanId, ctx.artisanId)),
+        )
+        .returning({ id: pointagesChantier.id });
+      return deleted.length > 0;
     });
   }
 }

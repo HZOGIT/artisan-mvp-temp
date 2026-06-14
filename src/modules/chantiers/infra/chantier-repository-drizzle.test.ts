@@ -23,8 +23,12 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
   let clientA = 0;
   let clientB = 0;
 
+  let techA = 0;
+
   const cleanup = async () => {
+    await admin.query('delete from pointages_chantier where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from chantiers where "artisanId" in ($1,$2)', [A, B]);
+    await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
   };
 
@@ -33,6 +37,7 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     // clientId est NOT NULL : on seed un client réel par tenant.
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [A, "Client A"])).rows[0].id;
     clientB = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [B, "Client B"])).rows[0].id;
+    techA = (await admin.query('insert into techniciens ("artisanId",nom) values ($1,$2) returning id', [A, "Tech A"])).rows[0].id;
   });
 
   afterAll(async () => {
@@ -93,5 +98,21 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     const docs = await admin.query('select count(*)::int as n from documents_chantier where "chantierId"=$1', [c.id]);
     expect(phases.rows[0].n).toBe(0);
     expect(docs.rows[0].n).toBe(0);
+  });
+
+  it("pointages : add/list/delete scopés via le chantier parent + ownsTechnicien", async () => {
+    const c = await repo.create(ctx(A), { clientId: clientA, reference: ref(), nom: "Pointable" });
+    expect(await repo.ownsTechnicien(ctx(A), techA)).toBe(true);
+    expect(await repo.ownsTechnicien(ctx(B), techA)).toBe(false);
+    const p = await repo.addPointage(ctx(A), { chantierId: c.id, technicienId: techA, date: "2026-09-02", heures: "4.00", description: "Pose" });
+    expect(p?.heures).toBe("4.00");
+    expect(p?.technicienId).toBe(techA);
+    expect((await repo.listPointages(ctx(A), c.id)).map((x) => x.id)).toEqual([p!.id]);
+    // isolation : B ne voit pas / n'ajoute pas / ne supprime pas
+    expect(await repo.listPointages(ctx(B), c.id)).toEqual([]);
+    expect(await repo.addPointage(ctx(B), { chantierId: c.id, date: "2026-09-02", heures: "1.00" })).toBeNull();
+    expect(await repo.deletePointage(ctx(B), c.id, p!.id)).toBe(false);
+    expect(await repo.deletePointage(ctx(A), c.id, p!.id)).toBe(true);
+    expect(await repo.listPointages(ctx(A), c.id)).toEqual([]);
   });
 });

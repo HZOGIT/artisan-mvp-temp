@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { Chantier, CreateChantierInput, UpdateChantierInput } from "../domain/chantier";
+import type { Chantier, CreateChantierInput, UpdateChantierInput, ChantierPointage, CreatePointageInput } from "../domain/chantier";
 
 // Port du repository chantiers. Chaque méthode exige le TenantContext (scope tenant + RLS).
 // `chantiers` possède un `artisanId` → double cloisonnement RLS + filtre. ⚠️ La FK `clientId`
@@ -17,4 +17,14 @@ export interface IChantierRepository {
   // true si le client (FK) appartient au tenant. Garde anti-IDOR-FK : interdit de rattacher un
   // chantier à un client d'un autre tenant.
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
+  // true si le technicien (FK) appartient au tenant (anti-IDOR-FK sur le pointage).
+  ownsTechnicien(ctx: TenantContext, technicienId: number): Promise<boolean>;
+
+  // ── Pointages (sous-ressource `pointages_chantier`, scopée via le chantier parent) ───────────
+  // Pointages d'un chantier — [] si le chantier n'appartient pas au tenant.
+  listPointages(ctx: TenantContext, chantierId: number): Promise<ChantierPointage[]>;
+  // Ajoute un pointage (artisanId forcé) — null si le chantier n'appartient pas au tenant.
+  addPointage(ctx: TenantContext, input: CreatePointageInput): Promise<ChantierPointage | null>;
+  // Supprime un pointage (scopé chantier+tenant) — false si absent/hors tenant. Idempotent.
+  deletePointage(ctx: TenantContext, chantierId: number, id: number): Promise<boolean>;
 }
