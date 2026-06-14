@@ -4,6 +4,7 @@ import type { IFactureRepository } from "./facture-repository";
 import type {
   Facture,
   FactureLigne,
+  FactureStatut,
   CreateFactureInput,
   UpdateFactureInput,
   CreateFactureLigneInput,
@@ -101,6 +102,36 @@ export async function modifierLigneFacture(
   assertLigneValide(input.designation, input.prixUnitaireHT, input.quantite);
   const updated = await repo.updateLigne(ctx, ligneId, input);
   if (!updated) throw new NotFoundError("Ligne introuvable");
+  return updated;
+}
+
+// Machine à états légale des factures (parité legacy `facturesRouter.update`) :
+//  brouillon → envoyee ; envoyee → payee | en_retard ; en_retard → payee.
+//  `payee`/`annulee` sont **terminaux**. `validee` n'a aucune transition (statut hérité de
+//  l'enum, non utilisé par le flux legacy). ⚠️ Le passage à `payee` est piloté par le use-case
+//  de **paiement** (enregistre montantPaye/datePaiement) — pas par une transition « nue ».
+const TRANSITIONS: Record<FactureStatut, readonly FactureStatut[]> = {
+  brouillon: ["envoyee"],
+  envoyee: ["payee", "en_retard"],
+  en_retard: ["payee"],
+  payee: [],
+  annulee: [],
+  validee: [],
+};
+
+export async function changerStatutFacture(
+  repo: IFactureRepository,
+  ctx: TenantContext,
+  id: number,
+  cible: FactureStatut,
+): Promise<Facture> {
+  const facture = await getFactureOwned(repo, ctx, id);
+  if (facture.statut === cible) return facture; // idempotent
+  if (!TRANSITIONS[facture.statut].includes(cible)) {
+    throw new ConflictError(`Transition de statut invalide : ${facture.statut} → ${cible}`);
+  }
+  const updated = await repo.setStatut(ctx, id, cible);
+  if (!updated) throw new NotFoundError("Facture introuvable");
   return updated;
 }
 

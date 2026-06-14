@@ -9,6 +9,7 @@ import {
   ajouterLigneFacture,
   modifierLigneFacture,
   supprimerLigneFacture,
+  changerStatutFacture,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -125,5 +126,15 @@ export function createFacturesRouter(repo: IFactureRepository) {
         await supprimerLigneFacture(repo, ctx.tenant, input.factureId, input.id);
         return { success: true };
       }),
+
+    // Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide).
+    // ⚠️ Le passage à `payee` se fait via le paiement (étape ultérieure), pas ici.
+    envoyer: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "envoyee")),
+
+    marquerEnRetard: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "en_retard")),
   });
 }

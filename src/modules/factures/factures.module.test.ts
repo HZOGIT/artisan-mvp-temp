@@ -44,7 +44,7 @@ describe("factures.module", () => {
     ]);
   });
 
-  it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes)", () => {
+  it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
     const module = createFacturesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
@@ -52,9 +52,11 @@ describe("factures.module", () => {
       "create",
       "delete",
       "deleteLigne",
+      "envoyer",
       "getById",
       "getLignes",
       "list",
+      "marquerEnRetard",
       "update",
       "updateLigne",
     ]);

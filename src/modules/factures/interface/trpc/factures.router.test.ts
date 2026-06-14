@@ -144,4 +144,16 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "factures.getById", { id }, tA)).statusCode).toBe(404);
     expect((await callMutation(server, "factures.update", { id: 999999999, objet: "x" }, tA)).statusCode).toBe(404);
   });
+
+  it("transitions de statut : envoyer→marquerEnRetard ; transition invalide → 409 ; cross-tenant → 404", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    // brouillon → marquerEnRetard directement interdit (il faut envoyer d'abord)
+    expect((await callMutation(server, "factures.marquerEnRetard", { id }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "factures.envoyer", { id }, tA)).json().result.data.statut).toBe("envoyee");
+    expect((await callMutation(server, "factures.marquerEnRetard", { id }, tA)).json().result.data.statut).toBe("en_retard");
+    // cross-tenant : B ne transitionne pas la facture de A
+    expect((await callMutation(server, "factures.envoyer", { id }, tB)).statusCode).toBe(404);
+  });
 });

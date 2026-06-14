@@ -7,6 +7,7 @@ import {
   ajouterLigneFacture,
   modifierLigneFacture,
   supprimerLigneFacture,
+  changerStatutFacture,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
@@ -105,5 +106,33 @@ describe("factures — use-cases d'écriture", () => {
     await expect(supprimerLigneFacture(repo, B, f.id, l.id)).rejects.toBeInstanceOf(NotFoundError);
     await supprimerLigneFacture(repo, A, f.id, l.id);
     expect((await repo.getById(A, f.id))?.totalTTC).toBe("0.00");
+  });
+
+  it("changerStatutFacture — machine à états : brouillon→envoyee→en_retard→payee ; idempotence", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    expect((await changerStatutFacture(repo, A, f.id, "envoyee")).statut).toBe("envoyee");
+    expect((await changerStatutFacture(repo, A, f.id, "envoyee")).statut).toBe("envoyee"); // idempotent
+    expect((await changerStatutFacture(repo, A, f.id, "en_retard")).statut).toBe("en_retard");
+    expect((await changerStatutFacture(repo, A, f.id, "payee")).statut).toBe("payee");
+  });
+
+  it("changerStatutFacture — transitions invalides → Conflict ; terminaux figés", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    // brouillon → payee (saute envoyee) interdit
+    await expect(changerStatutFacture(repo, A, f.id, "payee")).rejects.toBeInstanceOf(ConflictError);
+    await changerStatutFacture(repo, A, f.id, "envoyee");
+    await changerStatutFacture(repo, A, f.id, "payee");
+    // payee terminal → toute autre transition → Conflict
+    await expect(changerStatutFacture(repo, A, f.id, "envoyee")).rejects.toBeInstanceOf(ConflictError);
+    await expect(changerStatutFacture(repo, A, f.id, "en_retard")).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("changerStatutFacture — facture d'un autre tenant → NotFound", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await expectCrossTenantDenied(() => changerStatutFacture(repo, B, f.id, "envoyee"));
+    await expect(changerStatutFacture(repo, B, f.id, "envoyee")).rejects.toBeInstanceOf(NotFoundError);
   });
 });
