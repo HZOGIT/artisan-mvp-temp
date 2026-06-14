@@ -1,6 +1,7 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IFactureRepository } from "./facture-repository";
+import type { ClientReader, ClientInfo } from "./contact-readers";
 import type { Facture, FactureLigne, AuditLogEntry } from "../domain/facture";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
@@ -20,6 +21,23 @@ export async function getFacture(repo: IFactureRepository, ctx: TenantContext, i
 
 export function listLignesFacture(repo: IFactureRepository, ctx: TenantContext, factureId: number): Promise<FactureLigne[]> {
   return repo.listLignes(ctx, factureId);
+}
+
+// Facture enrichie pour l'affichage détail (parité legacy `factures.getById` qui renvoie
+// `{ ...facture, lignes, client }` — consommé par `FactureDetail` côté client). `client` peut être
+// null (client supprimé). Le scoping tenant est porté par le repo/reader (404 si hors tenant).
+export type FactureDetail = Facture & { readonly lignes: FactureLigne[]; readonly client: ClientInfo | null };
+
+export async function getFactureDetail(
+  repo: IFactureRepository,
+  clientReader: ClientReader,
+  ctx: TenantContext,
+  id: number,
+): Promise<FactureDetail> {
+  const facture = await repo.getById(ctx, id);
+  if (!facture) throw new NotFoundError("Facture introuvable");
+  const [lignes, client] = await Promise.all([repo.listLignes(ctx, id), clientReader.getClient(ctx, facture.clientId)]);
+  return { ...facture, lignes, client };
 }
 
 // Avoirs émis sur une facture (parité legacy `getAvoirsByFacture`). ⚠️ Behavior-preserving : le

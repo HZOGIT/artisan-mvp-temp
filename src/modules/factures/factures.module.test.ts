@@ -2,10 +2,19 @@ import { describe, it, expect } from "vitest";
 import { createFacturesModule } from "./factures.module";
 import type { IFactureRepository } from "./application/facture-repository";
 import type { IDevisReader } from "./application/devis-reader";
+import type { FactureMailingDeps } from "./application/envoyer-facture-email";
 
 const stubReader: IDevisReader = {
   getDevis: async () => null,
   getLignes: async () => [],
+};
+
+const stubMailing: FactureMailingDeps = {
+  artisanReader: { getArtisan: async () => null },
+  clientReader: { getClient: async () => null },
+  pdf: { render: async () => Buffer.from("") },
+  email: { send: async () => {} },
+  rateLimiter: { check: async () => true },
 };
 
 const stubRepo: IFactureRepository = {
@@ -35,7 +44,7 @@ const stubRepo: IFactureRepository = {
 
 describe("factures.module", () => {
   it("createFacturesModule câble le repository injecté", () => {
-    const module = createFacturesModule({ repository: stubRepo, devisReader: stubReader });
+    const module = createFacturesModule({ repository: stubRepo, devisReader: stubReader, mailing: stubMailing });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -65,7 +74,7 @@ describe("factures.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
-    const module = createFacturesModule({ repository: stubRepo, devisReader: stubReader });
+    const module = createFacturesModule({ repository: stubRepo, devisReader: stubReader, mailing: stubMailing });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "addLigne",
@@ -84,6 +93,7 @@ describe("factures.module", () => {
       "list",
       "markAsPaid",
       "marquerEnRetard",
+      "sendByEmail",
       "update",
       "updateLigne",
     ]);

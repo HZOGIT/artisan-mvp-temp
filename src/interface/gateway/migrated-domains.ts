@@ -32,4 +32,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "techniciens", // parité vérifiée : CRUD/getAll/getLinkableUsers + habilitations(get/add/delete) + getStats ⊇ appels client
   "rdv", // parité vérifiée : list(enrichi client)/confirm/refuse/proposeAutreCreneau/getStats/getPendingCount ⊇ appels client (emails best-effort en cours)
   "clients", // parité vérifiée : CRUD/search/getEncours/getEncoursMap + importFromExcel ⊇ appels client
+  "factures", // parité vérifiée : list/getById(enrichi lignes+client)/getAvoirsByFacture/getAuditLog/create/update/delete/addLigne/createAvoir/markAsPaid/sendByEmail ⊇ appels client
 ] as const;

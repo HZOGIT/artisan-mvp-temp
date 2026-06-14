@@ -3,7 +3,9 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IFactureRepository } from "../../application/facture-repository";
 import type { IDevisReader } from "../../application/devis-reader";
 import type { ComptaPort } from "../../application/compta-port";
-import { listFactures, getFacture, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
+import type { FactureMailingDeps } from "../../application/envoyer-facture-email";
+import { envoyerFactureParEmail } from "../../application/envoyer-facture-email";
+import { listFactures, getFactureDetail, listLignesFacture, getAvoirsFacture, getAuditLogFacture } from "../../application/read-use-cases";
 import {
   creerFacture,
   modifierFacture,
@@ -102,13 +104,14 @@ const avoirInputSchema = z.object({
 // Routeur tRPC du domaine factures. Transport mince : valide les inputs (zod), délègue aux
 // use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
 // laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
+    // Détail enrichi (parité legacy : `{ ...facture, lignes, client }`) — consommé par FactureDetail.
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .query(({ ctx, input }) => getFacture(repo, ctx.tenant, input.id)),
+      .query(({ ctx, input }) => getFactureDetail(repo, mailing.clientReader, ctx.tenant, input.id)),
 
     getLignes: protectedProcedure
       .input(z.object({ factureId: z.number().int() }))
@@ -210,6 +213,24 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: z.string() }))
       .mutation(({ ctx, input }) =>
         marquerFacturePayee(repo, ctx.tenant, input.id, { montantPaye: input.montantPaye, datePaiement: input.datePaiement }, compta),
+      ),
+
+    // Envoi de la facture par email (PDF en pièce jointe) — parité client `trpc.factures.sendByEmail`.
+    // ownership 404 / client.email 400 / rate-limit 429 ; passe `envoyee` si brouillon/validee (sans FEC).
+    sendByEmail: protectedProcedure
+      .input(
+        z.object({
+          factureId: z.number().int(),
+          customMessage: z.string().max(5000).optional(),
+          attachPdf: z.boolean().optional().default(true),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        envoyerFactureParEmail(repo, mailing, ctx.tenant, {
+          factureId: input.factureId,
+          customMessage: input.customMessage,
+          attachPdf: input.attachPdf,
+        }),
       ),
   });
 }

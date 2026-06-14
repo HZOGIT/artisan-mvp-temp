@@ -54,6 +54,8 @@ import type { IDevisRepository } from "./modules/devis/application/devis-reposit
 import { createFacturesModule } from "./modules/factures/factures.module";
 import { FactureRepositoryDrizzle } from "./modules/factures/infra/facture-repository-drizzle";
 import { DevisReaderDrizzle } from "./modules/factures/infra/devis-reader-drizzle";
+import { ArtisanReaderDrizzle } from "./modules/factures/infra/artisan-reader-drizzle";
+import { ClientReaderDrizzle } from "./modules/factures/infra/client-reader-drizzle";
 import type { IFactureRepository } from "./modules/factures/application/facture-repository";
 import type { IDevisReader } from "./modules/factures/application/devis-reader";
 import type { ComptaPort } from "./modules/factures/application/compta-port";
@@ -102,7 +104,7 @@ import { createPrevisionsCAModule } from "./modules/previsions-ca/previsions-ca.
 import { PrevisionCARepositoryDrizzle } from "./modules/previsions-ca/infra/prevision-ca-repository-drizzle";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
-import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
+import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
 export interface AppDeps extends ContextDeps {
   // Repos injectables (tests). Par défaut, repos Drizzle sur le client par défaut
@@ -240,6 +242,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db),
     devisReader: deps.devisReader ?? new DevisReaderDrizzle(getDbHandle().db),
     compta,
+    // Envoi par email (PDF en PJ) : lecture artisan/client scopée + PdfPort/EmailPort legacy +
+    // rate-limiter anti-abus (20 / 15 min, parité legacy). email/rate-limiter injectables en test.
+    mailing: {
+      artisanReader: new ArtisanReaderDrizzle(getDbHandle().db),
+      clientReader: new ClientReaderDrizzle(getDbHandle().db),
+      pdf: new LegacyPdfAdapter(),
+      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
+    },
   });
   // Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est
   // l'effet de bord du workflow facture (via le ComptaPort ci-dessus).
