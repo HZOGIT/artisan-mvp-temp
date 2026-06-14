@@ -25,9 +25,9 @@ describe("demandes-contact.module", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByStatut", "ownsClient", "setStatut", "update"]);
   });
 
-  it("expose un routeur tRPC assemblé (CRUD + byStatut ; transitions en 7/9)", () => {
+  it("expose un routeur tRPC assemblé (CRUD + byStatut + transitions marquerContacte/convertir/marquerPerdu)", () => {
     const module = createDemandesContactModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["byStatut", "create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["byStatut", "convertir", "create", "delete", "getById", "list", "marquerContacte", "marquerPerdu", "update"]);
   });
 });

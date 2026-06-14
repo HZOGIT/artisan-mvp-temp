@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDemandeContactRepository } from "../../application/demande-contact-repository";
 import { listDemandes, demandesParStatut, getDemande } from "../../application/read-use-cases";
 import { creerDemande, modifierDemande, supprimerDemande } from "../../application/write-use-cases";
+import { marquerContacte, convertir, marquerPerdu } from "../../application/transition-use-cases";
 
 const statutEnum = z.enum(["nouveau", "contacte", "converti", "perdu"]);
 
@@ -57,5 +58,19 @@ export function createDemandesContactRouter(repo: IDemandeContactRepository) {
         await supprimerDemande(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
+    marquerContacte: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => marquerContacte(repo, ctx.tenant, input.id)),
+
+    // Conversion : `clientId` optionnel (anti-IDOR vérifié au use-case).
+    convertir: protectedProcedure
+      .input(z.object({ id: z.number().int(), clientId: z.number().int().optional() }))
+      .mutation(({ ctx, input }) => convertir(repo, ctx.tenant, input.id, input.clientId)),
+
+    marquerPerdu: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => marquerPerdu(repo, ctx.tenant, input.id)),
   });
 }
