@@ -75,6 +75,8 @@ import { ComptaEcrituresAdapter } from "./modules/ecritures/infra/compta-ecritur
 import { createEcrituresModule } from "./modules/ecritures/ecritures.module";
 import type { IEcritureRepository } from "./modules/ecritures/application/ecriture-repository";
 import { createArticlesModule } from "./modules/articles/articles.module";
+import { BibliothequeReaderDrizzle } from "./modules/articles/infra/bibliotheque-reader-drizzle";
+import type { BibliothequeReader } from "./modules/articles/application/bibliotheque-reader";
 import { ArticleRepositoryDrizzle } from "./modules/articles/infra/article-repository-drizzle";
 import type { IArticleRepository } from "./modules/articles/application/article-repository";
 import { createParametresModule } from "./modules/parametres/parametres.module";
@@ -148,6 +150,7 @@ export interface AppDeps extends ContextDeps {
   readonly compta?: ComptaPort;
   readonly ecritureRepo?: IEcritureRepository;
   readonly articleRepo?: IArticleRepository;
+  readonly bibliothequeReader?: BibliothequeReader;
   readonly parametresRepo?: IParametresRepository;
   readonly modeleEmailRepo?: IModeleEmailRepository;
   readonly modeleDevisRepo?: IModeleDevisRepository;
@@ -346,6 +349,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     },
+    // Catalogue partagé (lecture publique) : reader NON tenant (table sans artisanId, RLS OFF).
+    bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
   });
   const parametres = createParametresModule({
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),

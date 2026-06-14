@@ -125,6 +125,17 @@ describe.skipIf(!URL)("articles.router e2e (HTTP → tRPC → use-case → repo 
     expect((await q(server, "articles.getArtisanArticles", undefined)).statusCode).toBe(401);
   });
 
+  it("getBibliotheque : PUBLIC (sans cookie → 200, catalogue partagé)", async () => {
+    // Pas de cookie : la bibliothèque est un référentiel partagé, lecture publique (parité legacy).
+    const res = await q(server, "articles.getBibliotheque", undefined);
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.json().result.data)).toBe(true);
+    // search aussi public
+    const s = await q(server, "articles.search", { query: "x" });
+    expect(s.statusCode).toBe(200);
+    expect(Array.isArray(s.json().result.data)).toBe(true);
+  });
+
   it("byCategorie : filtre scopé tenant ; catégorie inconnue → []", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
