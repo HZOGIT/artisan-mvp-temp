@@ -18,6 +18,12 @@ describe("config-relances.module", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["get", "upsert"]);
   });
 
+  it("expose un routeur tRPC assemblé (get/update)", () => {
+    const module = createConfigRelancesModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["get", "update"]);
+  });
+
   it("defaultConfigRelances aligne les défauts de la table", () => {
     const d = defaultConfigRelances(42);
     expect(d.artisanId).toBe(42);
