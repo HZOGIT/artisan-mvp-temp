@@ -343,6 +343,28 @@ describe("bascule du domaine devis (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine factures (flag gateway)", () => {
+  it("factures routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("factures", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { factures: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("factures", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("factures", 8, canary)).toBe(false);
+    const global: FeatureFlags = { factures: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("factures", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("factures", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine factures extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("factures.create")).toBe("factures");
+    expect(domainFromTrpcPath("/factures.convertirDepuisDevis")).toBe("factures");
+  });
+
+  it("parse env : factures enabled + canary (lowercase → canary env fonctionnel)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "factures" } as NodeJS.ProcessEnv).factures).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_FACTURES: "7" } as NodeJS.ProcessEnv).factures?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
   it("les 16 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
     for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures"]) {
