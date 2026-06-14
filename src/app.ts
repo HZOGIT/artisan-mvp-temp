@@ -64,6 +64,9 @@ import type { IDevisOptionRepository } from "./modules/devis-options/application
 import { createActivitesModule } from "./modules/activites/activites.module";
 import { ActiviteRepositoryDrizzle } from "./modules/activites/infra/activite-repository-drizzle";
 import type { IActiviteRepository } from "./modules/activites/application/activite-repository";
+import { createFeatureModulesModule } from "./modules/feature-modules/feature-modules.module";
+import { ModulesRepositoryDrizzle } from "./modules/feature-modules/infra/modules-repository-drizzle";
+import type { IModulesRepository } from "./modules/feature-modules/application/modules-repository";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -190,6 +193,7 @@ export interface AppDeps extends ContextDeps {
   readonly artisanRepo?: IArtisanRepository;
   readonly devisOptionRepo?: IDevisOptionRepository;
   readonly activiteRepo?: IActiviteRepository;
+  readonly modulesRepo?: IModulesRepository;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -443,7 +447,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const activites = createActivitesModule({
     repository: deps.activiteRepo ?? new ActiviteRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites });
+  const modules = createFeatureModulesModule({
+    repository: deps.modulesRepo ?? new ModulesRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

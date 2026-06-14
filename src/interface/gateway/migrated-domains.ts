@@ -2,7 +2,7 @@
 // montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
 // cibler qu'un domaine présent ici (sinon le routage enverrait vers un domaine inexistant
 // du nouveau stack). Mis à jour à chaque domaine livré (étape 9/9 du gabarit).
-export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites"] as const;
+export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules"] as const;
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
@@ -45,4 +45,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "artisan", // parité vérifiée : getProfile/updateProfile (profil entreprise du tenant) ⊇ 2 appels client
   "devisOptions", // parité vérifiée : getByDevisId/create/delete/select/convertirEnDevis (variantes de devis) ⊇ 5 appels client
   "activites", // parité vérifiée : list/create/toggleFait/delete (suivi commercial, anti-IDOR FK entité rattachée) ⊇ 4 appels client
+  "modules", // parité vérifiée : list/getMine/getOnboardingStatus/toggle/completeOnboarding/skipOnboarding (catalogue global + activation tenant + onboarding/plan) ⊇ 6 appels client
 ] as const;
