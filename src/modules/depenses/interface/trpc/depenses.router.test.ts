@@ -206,6 +206,32 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect(listA).toContainEqual(expect.objectContaining({ id: note.id }));
   });
 
+  it("soumettreNoteFrais (parité client) : brouillon→soumise, idempotent, hors tenant → 404, 401 sans cookie", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const created = await callMutation(
+      server,
+      "depenses.createNoteFrais",
+      { titre: "À soumettre", periodeDebut: "2027-06-01", periodeFin: "2027-06-30" },
+      tA,
+    );
+    const id = (created.json().result.data as { id: number }).id;
+    // 401 sans cookie
+    expect((await callMutation(server, "depenses.soumettreNoteFrais", { id })).statusCode).toBe(401);
+    // brouillon → soumise (+ dateSoumission)
+    const sub = await callMutation(server, "depenses.soumettreNoteFrais", { id }, tA);
+    expect(sub.statusCode).toBe(200);
+    const note = sub.json().result.data as { statut: string; dateSoumission: string | null };
+    expect(note.statut).toBe("soumise");
+    expect(note.dateSoumission).not.toBeNull();
+    // idempotent : re-soumettre laisse soumise (200)
+    const again = await callMutation(server, "depenses.soumettreNoteFrais", { id }, tA);
+    expect(again.statusCode).toBe(200);
+    expect((again.json().result.data as { statut: string }).statut).toBe("soumise");
+    // hors tenant → 404 (NotFound, ne révèle pas l'existence cross-tenant)
+    expect((await callMutation(server, "depenses.soumettreNoteFrais", { id }, tB)).statusCode).toBe(404);
+  });
+
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
     const tA = await token(UA);
     const created = await callMutation(

@@ -22,7 +22,7 @@ import { creerRegle, supprimerRegle } from "../../../regles-categorisation/appli
 // porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
 import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
 import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
-import { creerNoteDeFrais } from "../../../notes-de-frais/application/write-use-cases";
+import { creerNoteDeFrais, soumettreNoteDeFrais } from "../../../notes-de-frais/application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -239,6 +239,13 @@ export function createDepensesRouter(
           periodeFin: input.periodeFin,
         });
       }),
+
+    // Soumission d'une note de frais (parité client : trpc.depenses.soumettreNoteFrais). ⚠️ Le
+    // use-case porte les invariants : transition `brouillon→soumise` uniquement (sinon Conflict→409),
+    // idempotent (déjà soumise → no-op), hors tenant → NotFound→404.
+    soumettreNoteFrais: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => soumettreNoteDeFrais(noteRepo, ctx.tenant, input.id)),
 
     // ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
     // On appelle donc directement le repo (getById → null) plutôt que le use-case `getNoteDeFrais`
