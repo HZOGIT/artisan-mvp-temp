@@ -1,15 +1,17 @@
 import type { IDemandeContactRepository } from "./application/demande-contact-repository";
+import { createDemandesContactRouter } from "./interface/trpc/demandes-contact.router";
 
-// Wiring DI du module demandes-contact. À l'étape scaffold, le module ne porte que ses dépendances ;
-// le routeur tRPC sera assemblé et exposé à l'étape interface (5/9).
+// Wiring DI du module demandes-contact : assemble le routeur tRPC (CRUD) à partir du repository
+// injecté. ⚠️ Les transitions de statut (marquerContacte/convertir/marquerPerdu) seront ajoutées en 7/9.
 export interface DemandesContactModuleDeps {
   readonly repository: IDemandeContactRepository;
 }
 
 export interface DemandesContactModule {
   readonly deps: DemandesContactModuleDeps;
+  readonly router: ReturnType<typeof createDemandesContactRouter>;
 }
 
 export function createDemandesContactModule(deps: DemandesContactModuleDeps): DemandesContactModule {
-  return { deps };
+  return { deps, router: createDemandesContactRouter(deps.repository) };
 }

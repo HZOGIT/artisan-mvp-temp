@@ -24,4 +24,10 @@ describe("demandes-contact.module", () => {
   it("le port expose CRUD + listByStatut + setStatut + ownsClient (état machine + anti-IDOR)", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByStatut", "ownsClient", "setStatut", "update"]);
   });
+
+  it("expose un routeur tRPC assemblé (CRUD + byStatut ; transitions en 7/9)", () => {
+    const module = createDemandesContactModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["byStatut", "create", "delete", "getById", "list", "update"]);
+  });
 });

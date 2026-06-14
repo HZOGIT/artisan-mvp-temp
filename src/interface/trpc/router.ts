@@ -26,6 +26,7 @@ import type { RdvEnLigneModule } from "../../modules/rdv-en-ligne/rdv-en-ligne.m
 import type { RelancesDevisModule } from "../../modules/relances-devis/relances-devis.module";
 import type { CategoriesDepensesModule } from "../../modules/categories-depenses/categories-depenses.module";
 import type { ContratsMaintenanceModule } from "../../modules/contrats-maintenance/contrats-maintenance.module";
+import type { DemandesContactModule } from "../../modules/demandes-contact/demandes-contact.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -55,6 +56,7 @@ export interface AppRouterDeps {
   readonly relancesDevis: RelancesDevisModule;
   readonly categoriesDepenses: CategoriesDepensesModule;
   readonly contratsMaintenance: ContratsMaintenanceModule;
+  readonly demandesContact: DemandesContactModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -93,6 +95,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     relancesDevis: deps.relancesDevis.router,
     categoriesDepenses: deps.categoriesDepenses.router,
     contratsMaintenance: deps.contratsMaintenance.router,
+    demandesContact: deps.demandesContact.router,
   });
 }
 
