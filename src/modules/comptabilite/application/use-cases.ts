@@ -1,6 +1,8 @@
 import type { TenantContext } from "../../../shared/tenant";
 import { assembleDeclarationTVA, computeBalance, computeGrandLivre, computeRapportTVA } from "../domain/comptabilite";
 import type { CompteGrandLivre, DeclarationTVADetail, Ecriture, LigneBalance, RapportTVA } from "../domain/comptabilite";
+import { buildFec, fecPreview } from "../domain/fec";
+import type { FecPreview } from "../domain/fec";
 import type { IComptabiliteReader, Periode } from "./comptabilite-reader";
 
 type Clock = () => Date;
@@ -32,4 +34,12 @@ export async function getRapportTVA(reader: IComptabiliteReader, ctx: TenantCont
 export async function getDeclarationTVADetail(reader: IComptabiliteReader, ctx: TenantContext, input?: { dateDebut?: Date; dateFin?: Date }, now: Clock = () => new Date()): Promise<DeclarationTVADetail> {
   const brut = await reader.declarationTVADetail(ctx, resolvePeriode(input, now()));
   return assembleDeclarationTVA(brut.parTaux, brut.tvaDeductible);
+}
+
+// Aperçu FEC (15 premières lignes + conformité) : génère le FEC complet (PUR) puis projette. Lecture
+// seule ; l'invariant Σdébit=Σcrédit est porté par `buildFec` (vérifiable via `conformite.equilibre`).
+export async function getFecPreview(reader: IComptabiliteReader, ctx: TenantContext, input?: { dateDebut?: Date; dateFin?: Date }, now: Clock = () => new Date()): Promise<FecPreview> {
+  const p = resolvePeriode(input, now());
+  const [fecData, config, siret] = await Promise.all([reader.fecInput(ctx, p), reader.fecConfig(ctx), reader.siret(ctx)]);
+  return fecPreview(buildFec(fecData, config), siret);
 }

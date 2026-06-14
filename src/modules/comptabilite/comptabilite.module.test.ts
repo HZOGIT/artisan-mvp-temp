@@ -9,9 +9,9 @@ describe("comptabilite.module", () => {
     expect(module.deps.reader).toBe(reader);
   });
 
-  it("expose les 5 procédures de lecture (gate comptabilite.voir)", () => {
+  it("expose les 6 procédures de lecture (gate comptabilite.voir)", () => {
     const module = createComptabiliteModule({ reader: new FakeComptabiliteReader() });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["getBalance", "getDeclarationTVADetail", "getGrandLivre", "getJournalVentes", "getRapportTVA"]);
+    expect(procedures).toEqual(["getBalance", "getDeclarationTVADetail", "getFecPreview", "getGrandLivre", "getJournalVentes", "getRapportTVA"]);
   });
 });

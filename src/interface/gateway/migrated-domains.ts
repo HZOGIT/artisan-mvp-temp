@@ -54,6 +54,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "dashboard", // parité vérifiée : getStats/getRecentActivity/getUpcomingInterventions/getMonthlyCA/getYearlyComparison/getConversionRate/getTopClients/getClientEvolution/getObjectifs/getAlerts (10 agrégats) ⊇ appels client
   "rapports", // parité vérifiée : list/create/delete/toggleFavori/executer (rapports personnalisables, anti-IDOR via RLS) ⊇ 5 appels client
   "utilisateurs", // parité vérifiée : list/invite/updateRole/toggleActif/getPermissions/updatePermissions/resetPermissions (gate utilisateurs.gerer ; tables HORS RLS, scope artisanId explicite) ⊇ 7 appels client
-  // NB : `comptabilite` est MONTÉ (dans MIGRATED_DOMAINS) mais **PAS activé ici** : il manque `getFecPreview`
-  // (générateur FEC) → parité de surface incomplète. On l'ajoutera quand les 6 procs client seront couvertes.
+  "comptabilite", // parité vérifiée : getGrandLivre/getBalance/getJournalVentes/getRapportTVA/getDeclarationTVADetail/getFecPreview (gate comptabilite.voir ; FEC opposable Σdébit=Σcrédit, lecture seule) ⊇ 6 appels client
 ] as const;

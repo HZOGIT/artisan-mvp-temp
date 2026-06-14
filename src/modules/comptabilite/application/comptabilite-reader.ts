@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Ecriture } from "../domain/comptabilite";
+import type { FecConfig, FecInput } from "../domain/fec";
 
 // Bornes de période (résolues : par défaut le mois courant, parité legacy).
 export interface Periode {
@@ -22,4 +23,10 @@ export interface IComptabiliteReader {
   listJournalVentes(ctx: TenantContext, p: Periode): Promise<Ecriture[]>;
   // Base HT + TVA collectée par taux (factures émises) + TVA déductible (dépenses déductibles).
   declarationTVADetail(ctx: TenantContext, p: Periode): Promise<DeclarationTVABrut>;
+  // Données brutes du FEC (factures+lignes TVA, dépenses, encaissements) scopées tenant pour la période.
+  fecInput(ctx: TenantContext, p: Periode): Promise<FecInput>;
+  // Configuration comptable du tenant (comptes/journaux) ; valeurs par défaut PCG si absente.
+  fecConfig(ctx: TenantContext): Promise<FecConfig>;
+  // SIRET du tenant (entête de l'aperçu FEC).
+  siret(ctx: TenantContext): Promise<string | null>;
 }

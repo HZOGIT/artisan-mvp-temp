@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { TenantContext } from "../../../shared/tenant";
 import { FakeComptabiliteReader } from "../infra/comptabilite-reader-fake";
 import type { Ecriture } from "../domain/comptabilite";
-import { getBalance, getDeclarationTVADetail, getGrandLivre, getJournalVentes, getRapportTVA, resolvePeriode } from "./use-cases";
+import { getBalance, getDeclarationTVADetail, getFecPreview, getGrandLivre, getJournalVentes, getRapportTVA, resolvePeriode } from "./use-cases";
 
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 const NOW = new Date("2026-06-15T12:00:00Z");
@@ -52,5 +52,20 @@ describe("comptabilite use-cases", () => {
     const reader = new FakeComptabiliteReader();
     reader.seedEcritures(1, [ec({})]);
     expect(await getGrandLivre(reader, ctx(2), undefined, () => NOW)).toEqual([]);
+  });
+
+  it("getFecPreview : génère le FEC, projette 15 lignes + conformité équilibrée + siret", async () => {
+    const reader = new FakeComptabiliteReader();
+    reader.seedSiret(1, "11122233300044");
+    reader.seedFecInput(1, {
+      factures: [{ id: 1, numero: "FAC-1", dateFacture: new Date("2026-06-10"), totalHT: "100.00", totalTVA: "20.00", totalTTC: "120.00", statut: "envoyee", datePaiement: null, typeDocument: "facture", clientId: 7, clientNom: "Durand", clientPrenom: "Jean", lignesTVA: [{ tauxTVA: "20", tva: "20.00" }] }],
+      depenses: [],
+      encaissements: [],
+    });
+    const prev = await getFecPreview(reader, ctx(1), undefined, () => NOW);
+    expect(prev.siret).toBe("11122233300044");
+    expect(prev.totalFactures).toBe(1);
+    expect(prev.conformite.equilibre).toBe(true);
+    expect(prev.lines).toHaveLength(3);
   });
 });

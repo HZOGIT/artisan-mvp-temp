@@ -15,5 +15,6 @@ export function createComptabiliteRouter(reader: IComptabiliteReader) {
     getJournalVentes: gate.input(rangeInput).query(({ ctx, input }) => uc.getJournalVentes(reader, ctx.tenant, input)),
     getRapportTVA: gate.input(rangeInput).query(({ ctx, input }) => uc.getRapportTVA(reader, ctx.tenant, input)),
     getDeclarationTVADetail: gate.input(rangeInput).query(({ ctx, input }) => uc.getDeclarationTVADetail(reader, ctx.tenant, input)),
+    getFecPreview: gate.input(rangeInput).query(({ ctx, input }) => uc.getFecPreview(reader, ctx.tenant, input)),
   });
 }

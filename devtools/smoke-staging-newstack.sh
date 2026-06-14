@@ -78,6 +78,16 @@ codeUB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
   "$NEWSTACK_URL/api/trpc/utilisateurs.list?batch=1&input=%7B%7D")
 [ "$codeUB" = "403" ] && echo "  ✓ utilisateurs.list (B sans permission) -> 403" || { echo "  ✖ utilisateurs.list B -> $codeUB (attendu 403)"; fail=1; }
 
+# 2f) comptabilite : gardé par `comptabilite.voir`. On accorde la permission à A (idempotent) puis on
+# attend 200 sur getBalance ET getFecPreview (générateur FEC complet, lecture seule).
+$PG "insert into permissions_utilisateur (\"userId\", permission, autorise) select $UA, 'comptabilite.voir', true where not exists (select 1 from permissions_utilisateur where \"userId\"=$UA and permission='comptabilite.voir');" >/dev/null
+for cp in comptabilite.getBalance comptabilite.getFecPreview; do
+  codeC=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" "$NEWSTACK_URL/api/trpc/$cp?batch=1&input=%7B%7D")
+  [ "$codeC" = "200" ] && echo "  ✓ $cp (perm comptabilite.voir) -> 200" || { echo "  ✖ $cp -> $codeC (attendu 200)"; fail=1; }
+done
+codeCB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" "$NEWSTACK_URL/api/trpc/comptabilite.getBalance?batch=1&input=%7B%7D")
+[ "$codeCB" = "403" ] && echo "  ✓ comptabilite.getBalance (B sans permission) -> 403" || { echo "  ✖ comptabilite.getBalance B -> $codeCB (attendu 403)"; fail=1; }
+
 # 3) Contrôle d'isolation : l'auth fonctionne aussi pour B (tenant distinct) — 200 (ses propres données).
 codeB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
   "$NEWSTACK_URL/api/trpc/vehicules.list?batch=1&input=%7B%7D")
