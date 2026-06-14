@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDepenseRepository } from "../../application/depense-repository";
-import { listDepenses, getDepense } from "../../application/read-use-cases";
+import { listDepenses, getDepense, checkDoublons, getDepensesStats } from "../../application/read-use-cases";
 import { creerDepense, modifierDepense, supprimerDepense } from "../../application/write-use-cases";
 // Composition : le client appelle les catégories de dépense via `trpc.depenses.getCategories/...`
 // (le legacy les expose sous le routeur `depenses`). On délègue aux use-cases du domaine
@@ -135,6 +135,24 @@ export function createDepensesRouter(
         await supprimerDepense(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // ── Analytics dépenses (lecture seule) ────────────────────────────────────────────
+    // Doublons potentiels (aide saisie) : pas de détection si montant ≤ 0 / date invalide → [].
+    checkDoublons: protectedProcedure
+      .input(
+        z.object({
+          montantTtc: z.number(),
+          dateDepense: z.string().min(1),
+          fournisseur: z.string().max(255).optional(),
+          excludeId: z.number().int().optional(),
+        }),
+      )
+      .query(({ ctx, input }) => checkDoublons(repo, ctx.tenant, input)),
+
+    // Statistiques du mois (défaut = mois courant).
+    stats: protectedProcedure
+      .input(z.object({ mois: z.string().regex(/^\d{4}-\d{2}$/, "Mois invalide (AAAA-MM)").optional() }).optional())
+      .query(({ ctx, input }) => getDepensesStats(repo, ctx.tenant, input?.mois)),
 
     // ── Catégories de dépense (parité client : trpc.depenses.*Categorie) ──────────────
     getCategories: protectedProcedure.query(({ ctx }) => listCategories(categorieRepo, ctx.tenant)),

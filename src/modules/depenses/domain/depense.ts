@@ -98,3 +98,59 @@ export interface UpdateDepenseInput {
   readonly prochaineOccurrence?: string | null;
   readonly tvaDeductible?: boolean;
 }
+
+// ── Détection de doublons (aide à la saisie) ──────────────────────────────────────────────────
+export interface DoublonParams {
+  readonly montantTtc: number;
+  readonly dateDepense: string;
+  readonly fournisseur?: string | null;
+  readonly excludeId?: number;
+}
+
+export interface DepenseDoublon {
+  readonly id: number;
+  readonly numero: string;
+  readonly montantTtc: string;
+  readonly dateDepense: string;
+  readonly fournisseur: string | null;
+  readonly description: string | null;
+  readonly statut: string;
+}
+
+// ── Statistiques de dépenses (tableau de bord) ────────────────────────────────────────────────
+export interface DepenseStatsCategorie {
+  readonly categorie: string;
+  readonly total: string;
+  readonly nb: number;
+}
+export interface DepenseStatsTop {
+  readonly id: number;
+  readonly numero: string;
+  readonly fournisseur: string | null;
+  readonly categorie: string;
+  readonly montant_ttc: string;
+  readonly date_depense: string;
+}
+export interface DepenseStatsFournisseur {
+  readonly fournisseur: string | null;
+  readonly total: string;
+  readonly nb: number;
+}
+export interface DepenseStatsMois {
+  readonly mois: string;
+  readonly total: string;
+}
+export interface DepenseStats {
+  readonly mois: string;
+  readonly totalMois: number;
+  readonly nbDepensesMois: number;
+  readonly aRembourser: number;
+  readonly tvaRecuperable: number;
+  readonly totalMoisPrecedent: number;
+  readonly variation: number | null;
+  readonly totalAnnee: number;
+  readonly parCategorie: DepenseStatsCategorie[];
+  readonly topDepenses: DepenseStatsTop[];
+  readonly topFournisseurs: DepenseStatsFournisseur[];
+  readonly parMois: DepenseStatsMois[];
+}

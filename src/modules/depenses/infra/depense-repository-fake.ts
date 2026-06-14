@@ -1,6 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository, DepenseRefKind } from "../application/depense-repository";
-import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
+import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
 import { computeNextNumero } from "../application/numero";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -101,5 +101,50 @@ export class FakeDepenseRepository implements IDepenseRepository {
       .filter((d) => d.artisanId === ctx.artisanId)
       .reduce<Depense | null>((acc, d) => (acc && acc.id > d.id ? acc : d), null);
     return computeNextNumero(last?.numero ?? "");
+  }
+
+  async findDoublons(ctx: TenantContext, params: DoublonParams): Promise<DepenseDoublon[]> {
+    const target = (params.fournisseur ?? "") || "";
+    return this.store
+      .filter(
+        (d) =>
+          d.artisanId === ctx.artisanId &&
+          Math.abs(Number(d.montantTtc) - params.montantTtc) < 0.01 &&
+          d.dateDepense === params.dateDepense &&
+          (d.fournisseur ?? "") === target &&
+          (params.excludeId ? d.id !== params.excludeId : true),
+      )
+      .sort((x, z) => (x.dateDepense < z.dateDepense ? 1 : x.dateDepense > z.dateDepense ? -1 : z.id - x.id))
+      .slice(0, 10)
+      .map((d) => ({
+        id: d.id,
+        numero: d.numero,
+        montantTtc: d.montantTtc,
+        dateDepense: d.dateDepense,
+        fournisseur: d.fournisseur ?? null,
+        description: d.description ?? null,
+        statut: d.statut,
+      }));
+  }
+
+  // ⚠️ Version simplifiée (suffisante pour les tests de use-case : défaut du mois + délégation).
+  // L'agrégation fidèle est validée par le test DB du repo Drizzle.
+  async getStats(ctx: TenantContext, mois: string): Promise<DepenseStats> {
+    const dansMois = this.store.filter((d) => d.artisanId === ctx.artisanId && d.dateDepense.slice(0, 7) === mois);
+    const totalMois = dansMois.reduce((s, d) => s + Number(d.montantTtc), 0);
+    return {
+      mois,
+      totalMois,
+      nbDepensesMois: dansMois.length,
+      aRembourser: 0,
+      tvaRecuperable: 0,
+      totalMoisPrecedent: 0,
+      variation: null,
+      totalAnnee: 0,
+      parCategorie: [],
+      topDepenses: [],
+      topFournisseurs: [],
+      parMois: [],
+    };
   }
 }

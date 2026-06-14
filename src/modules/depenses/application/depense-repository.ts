@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
+import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
 
 // Nature d'une FK référencée par une dépense (toutes des tables scopées tenant).
 export type DepenseRefKind = "chantier" | "intervention" | "client";
@@ -28,4 +28,10 @@ export interface IDepenseRepository {
   // le mois "YYYY-MM", groupé par `categorie`. Sert au read dérivé « budgets réalisés » (parité
   // legacy `calculerBudgetsRealises`). Montant rendu en string (numeric PG).
   realisesParCategorie(ctx: TenantContext, mois: string): Promise<{ categorie: string; reel: string }[]>;
+  // Doublons potentiels d'une dépense (même montant TTC ±0.01, même date, même fournisseur), scopé
+  // tenant, hors `excludeId`, triés récent d'abord, ≤10. Aide à la saisie (parité `findDepensesDoublons`).
+  findDoublons(ctx: TenantContext, params: DoublonParams): Promise<DepenseDoublon[]>;
+  // Statistiques agrégées du mois `YYYY-MM` (total, par catégorie, top dépenses/fournisseurs,
+  // évolution sur 6 mois…), scopé tenant. Parité legacy `getDepensesStats`.
+  getStats(ctx: TenantContext, mois: string): Promise<DepenseStats>;
 }

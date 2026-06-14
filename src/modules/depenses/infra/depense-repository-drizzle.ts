@@ -1,10 +1,10 @@
-import { and, between, desc, eq, sql } from "drizzle-orm";
+import { and, between, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { depenses, chantiers, interventions, clients } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository, DepenseRefKind } from "../application/depense-repository";
-import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
+import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
 import { computeNextNumero } from "../application/numero";
 
 type DepenseRow = typeof depenses.$inferSelect;
@@ -214,6 +214,139 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
           break;
       }
       return (row?.n ?? 0) > 0;
+    });
+  }
+
+  findDoublons(ctx: TenantContext, params: DoublonParams): Promise<DepenseDoublon[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const conds = [
+        eq(depenses.artisan_id, ctx.artisanId),
+        sql`ABS(${depenses.montant_ttc} - ${params.montantTtc}) < 0.01`,
+        eq(depenses.date_depense, params.dateDepense),
+        sql`COALESCE(${depenses.fournisseur}, '') = COALESCE(${params.fournisseur ?? ""}, '')`,
+      ];
+      if (params.excludeId) conds.push(ne(depenses.id, params.excludeId));
+      const rows = await tx
+        .select({
+          id: depenses.id,
+          numero: depenses.numero,
+          montantTtc: depenses.montant_ttc,
+          dateDepense: depenses.date_depense,
+          fournisseur: depenses.fournisseur,
+          description: depenses.description,
+          statut: depenses.statut,
+        })
+        .from(depenses)
+        .where(and(...conds))
+        .orderBy(desc(depenses.date_depense), desc(depenses.id))
+        .limit(10);
+      return rows.map((r) => ({
+        id: r.id,
+        numero: r.numero,
+        montantTtc: r.montantTtc,
+        dateDepense: r.dateDepense,
+        fournisseur: r.fournisseur ?? null,
+        description: r.description ?? null,
+        statut: r.statut ?? "brouillon",
+      }));
+    });
+  }
+
+  getStats(ctx: TenantContext, mois: string): Promise<DepenseStats> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const a = ctx.artisanId;
+      const [y, mo] = mois.split("-").map(Number);
+      const debutMois = `${mois}-01`;
+      const finMois = new Date(y, mo, 0).toISOString().slice(0, 10);
+      const moisPrec = new Date(y, mo - 2, 1).toISOString().slice(0, 7);
+      const debutPrec = `${moisPrec}-01`;
+      const finPrec = new Date(y, mo - 1, 0).toISOString().slice(0, 10);
+      const anneeDebut = `${y}-01-01`;
+      const anneeFin = `${y}-12-31`;
+      const cinqMoisAvant = new Date(y, mo - 1 - 5, 1).toISOString().slice(0, 10);
+      const sumTtc = sql<string>`COALESCE(SUM(${depenses.montant_ttc}), 0)`;
+
+      const [totMois] = await tx
+        .select({
+          total: sumTtc,
+          nb: sql<number>`COUNT(*)::int`,
+          aRembourser: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.remboursable} = TRUE AND ${depenses.rembourse} = FALSE THEN ${depenses.montant_ttc} ELSE 0 END), 0)`,
+          tvaRecup: sql<string>`COALESCE(SUM(CASE WHEN ${depenses.tva_deductible} = TRUE THEN ${depenses.montant_tva} ELSE 0 END), 0)`,
+        })
+        .from(depenses)
+        .where(and(eq(depenses.artisan_id, a), between(depenses.date_depense, debutMois, finMois)));
+
+      const sumBetween = (d1: string, d2: string) =>
+        tx.select({ total: sumTtc }).from(depenses).where(and(eq(depenses.artisan_id, a), between(depenses.date_depense, d1, d2)));
+      const [totPrec] = await sumBetween(debutPrec, finPrec);
+      const [totAnnee] = await sumBetween(anneeDebut, anneeFin);
+
+      const parCategorie = await tx
+        .select({ categorie: depenses.categorie, total: sumTtc, nb: sql<number>`COUNT(*)::int` })
+        .from(depenses)
+        .where(and(eq(depenses.artisan_id, a), between(depenses.date_depense, debutMois, finMois)))
+        .groupBy(depenses.categorie)
+        .orderBy(desc(sumTtc));
+
+      const topDepenses = await tx
+        .select({
+          id: depenses.id,
+          numero: depenses.numero,
+          fournisseur: depenses.fournisseur,
+          categorie: depenses.categorie,
+          montant_ttc: depenses.montant_ttc,
+          date_depense: depenses.date_depense,
+        })
+        .from(depenses)
+        .where(and(eq(depenses.artisan_id, a), between(depenses.date_depense, debutMois, finMois)))
+        .orderBy(desc(depenses.montant_ttc))
+        .limit(5);
+
+      const topFournisseurs = await tx
+        .select({ fournisseur: depenses.fournisseur, total: sumTtc, nb: sql<number>`COUNT(*)::int` })
+        .from(depenses)
+        .where(
+          and(
+            eq(depenses.artisan_id, a),
+            between(depenses.date_depense, debutMois, finMois),
+            isNotNull(depenses.fournisseur),
+            ne(depenses.fournisseur, ""),
+          ),
+        )
+        .groupBy(depenses.fournisseur)
+        .orderBy(desc(sumTtc))
+        .limit(3);
+
+      const parMois = await tx
+        .select({ mois: sql<string>`to_char(${depenses.date_depense}, 'YYYY-MM')`, total: sumTtc })
+        .from(depenses)
+        .where(and(eq(depenses.artisan_id, a), gte(depenses.date_depense, cinqMoisAvant)))
+        .groupBy(sql`to_char(${depenses.date_depense}, 'YYYY-MM')`)
+        .orderBy(sql`to_char(${depenses.date_depense}, 'YYYY-MM') ASC`);
+
+      const totalM = Number(totMois?.total || 0);
+      const totalP = Number(totPrec?.total || 0);
+      return {
+        mois,
+        totalMois: totalM,
+        nbDepensesMois: Number(totMois?.nb || 0),
+        aRembourser: Number(totMois?.aRembourser || 0),
+        tvaRecuperable: Number(totMois?.tvaRecup || 0),
+        totalMoisPrecedent: totalP,
+        variation: totalP > 0 ? ((totalM - totalP) / totalP) * 100 : null,
+        totalAnnee: Number(totAnnee?.total || 0),
+        parCategorie: parCategorie.map((r) => ({ categorie: r.categorie, total: String(r.total), nb: r.nb })),
+        topDepenses: topDepenses.map((r) => ({
+          id: r.id,
+          numero: r.numero,
+          fournisseur: r.fournisseur ?? null,
+          categorie: r.categorie,
+          montant_ttc: r.montant_ttc,
+          date_depense: r.date_depense,
+        })),
+        topFournisseurs: topFournisseurs.map((r) => ({ fournisseur: r.fournisseur ?? null, total: String(r.total), nb: r.nb })),
+        parMois: parMois.map((r) => ({ mois: r.mois, total: String(r.total) })),
+      };
     });
   }
 }

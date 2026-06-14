@@ -85,4 +85,30 @@ describe.skipIf(!URL)("DepenseRepositoryDrizzle (PG, RLS + scope tenant)", () =>
     expect(await repo.delete(ctx(A), d.id)).toBe(true);
     expect(await repo.getById(ctx(A), d.id)).toBeNull();
   });
+
+  it("findDoublons : même montant+date+fournisseur, scopé tenant, exclut excludeId", async () => {
+    // numeric(10,2) → la tolérance ABS<0.01 revient à l'égalité au centime près.
+    const d1 = await repo.create(ctx(A), base({ montantTtc: "200.00", dateDepense: "2026-07-01", fournisseur: "Leroy" }));
+    await repo.create(ctx(A), base({ montantTtc: "200.00", dateDepense: "2026-07-01", fournisseur: "Leroy" })); // doublon exact
+    await repo.create(ctx(A), base({ montantTtc: "200.00", dateDepense: "2026-07-02", fournisseur: "Leroy" })); // date ≠
+    await repo.create(ctx(B), base({ userId: UB, montantTtc: "200.00", dateDepense: "2026-07-01", fournisseur: "Leroy" })); // autre tenant
+    const found = await repo.findDoublons(ctx(A), { montantTtc: 200, dateDepense: "2026-07-01", fournisseur: "Leroy" });
+    expect(found.length).toBe(2); // d1 + le ±0.01
+    const sansD1 = await repo.findDoublons(ctx(A), { montantTtc: 200, dateDepense: "2026-07-01", fournisseur: "Leroy", excludeId: d1.id });
+    expect(sansD1.every((d) => d.id !== d1.id)).toBe(true);
+  });
+
+  it("getStats : agrège le mois (total/nb/catégories), scopé tenant", async () => {
+    await repo.create(ctx(A), base({ montantTtc: "100.00", dateDepense: "2026-08-05", categorie: "carburant", fournisseur: "Total" }));
+    await repo.create(ctx(A), base({ montantTtc: "300.00", dateDepense: "2026-08-20", categorie: "materiaux", fournisseur: "Point P" }));
+    await repo.create(ctx(B), base({ userId: UB, montantTtc: "999.00", dateDepense: "2026-08-10", categorie: "carburant" })); // autre tenant
+    const stats = await repo.getStats(ctx(A), "2026-08");
+    expect(stats.mois).toBe("2026-08");
+    expect(stats.totalMois).toBe(400);
+    expect(stats.nbDepensesMois).toBe(2);
+    expect(stats.parCategorie.map((c) => c.categorie).sort()).toEqual(["carburant", "materiaux"]);
+    expect(stats.topDepenses[0].montant_ttc).toBe("300.00");
+    expect(stats.topFournisseurs.some((f) => f.fournisseur === "Point P")).toBe(true);
+    expect(stats.totalMois).not.toBe(1399); // la dépense de B exclue
+  });
 });
