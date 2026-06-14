@@ -52,8 +52,8 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
   it("batch : new-stack seulement si TOUS les domaines sont activés ; mixte → legacy (sûreté)", () => {
     // vehicules activé par défaut + notifications activé par défaut → batch entièrement new-stack
     expect(decideTarget("/api/trpc/vehicules.list,notifications.list", {})).toBe("new-stack");
-    // vehicules (ON) + clients (OFF) → batch mixte → legacy (legacy sert tout)
-    expect(decideTarget("/api/trpc/vehicules.list,clients.list", {})).toBe("legacy");
+    // vehicules (ON) + devis (OFF, non activé par défaut) → batch mixte → legacy (legacy sert tout)
+    expect(decideTarget("/api/trpc/vehicules.list,devis.list", {})).toBe("legacy");
   });
 
   it("domaine non porté → legacy même si listé (sûreté)", () => {
@@ -68,8 +68,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
   });
 
   it("isolation : activer un domaine n'en détourne pas un autre", () => {
+    // `articles` + `devis` ne sont PAS activés par défaut → on peut tester l'isolation via env.
     const env = { NEW_STACK_DOMAINS: "articles" };
     expect(decideTarget("/api/trpc/articles.list", env)).toBe("new-stack");
-    expect(decideTarget("/api/trpc/clients.list", env)).toBe("legacy");
+    expect(decideTarget("/api/trpc/devis.list", env)).toBe("legacy");
   });
 });

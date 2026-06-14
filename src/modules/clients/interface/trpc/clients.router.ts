@@ -9,6 +9,7 @@ import {
   getEncoursMap,
 } from "../../application/read-use-cases";
 import { creerClient, modifierClient, supprimerClient } from "../../application/write-use-cases";
+import { importerClients } from "../../application/import-use-cases";
 
 // Bornes alignées sur `ClientInputSchema` (shared/validation.ts) — defense-in-depth côté
 // transport. Le format e-mail (et le « nom requis ») sont aussi validés au use-case
@@ -91,5 +92,28 @@ export function createClientsRouter(repo: IClientRepository) {
         await supprimerClient(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // Import en masse (parité client `trpc.clients.importFromExcel`). Lignes déjà parsées côté
+    // client (max 5000). Best-effort par ligne → { imported, skipped }. Bornes defense-in-depth.
+    importFromExcel: protectedProcedure
+      .input(
+        z.object({
+          clients: z
+            .array(
+              z.object({
+                nom: z.string().max(200),
+                prenom: z.string().max(200).optional(),
+                email: z.string().email().max(320).optional(),
+                telephone: z.string().max(40).optional(),
+                adresse: z.string().max(500).optional(),
+                codePostal: z.string().max(20).optional(),
+                ville: z.string().max(200).optional(),
+                notes: z.string().max(5000).optional(),
+              }),
+            )
+            .max(5000, "Import limité à 5000 clients par envoi"),
+        }),
+      )
+      .mutation(({ ctx, input }) => importerClients(repo, ctx.tenant, input.clients)),
   });
 }

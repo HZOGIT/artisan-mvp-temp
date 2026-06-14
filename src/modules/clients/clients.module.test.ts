@@ -43,6 +43,7 @@ describe("clients.module", () => {
       "getById",
       "getEncours",
       "getEncoursMap",
+      "importFromExcel",
       "list",
       "search",
       "update",

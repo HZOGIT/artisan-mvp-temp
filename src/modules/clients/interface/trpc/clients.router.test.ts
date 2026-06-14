@@ -156,4 +156,27 @@ describe.skipIf(!URL)("clients.router e2e (HTTP → tRPC → use-case → repo �
     expect(maj.email).toBe("plein@a.fr");
     expect(maj.telephone).toBe("0102030405");
   });
+
+  it("importFromExcel (parité client) : best-effort par ligne → {imported, skipped}, scopé tenant ; 401", async () => {
+    const tA = await token(UA);
+    expect((await callMutation(server, "clients.importFromExcel", { clients: [] })).statusCode).toBe(401);
+    const sfx = Date.now();
+    const res = await callMutation(
+      server,
+      "clients.importFromExcel",
+      {
+        clients: [
+          { nom: `Import1-${sfx}`, email: `i1-${sfx}@a.fr`, ville: "Lyon" },
+          { nom: `Import2-${sfx}`, telephone: "0606060606" },
+          { nom: "" }, // ligne invalide (nom vide) → skipped (creerClient lève ValidationError)
+        ],
+      },
+      tA,
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.json().result.data).toEqual({ imported: 2, skipped: 1 });
+    // les 2 importés apparaissent dans la liste scopée A
+    const noms = (await callQuery(server, "clients.list", undefined, tA)).json().result.data as Array<{ nom: string }>;
+    expect(noms.map((c) => c.nom)).toEqual(expect.arrayContaining([`Import1-${sfx}`, `Import2-${sfx}`]));
+  });
 });
