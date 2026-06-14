@@ -3,6 +3,8 @@ import type { DevisMailingDeps } from "./application/envoyer-devis-email";
 import type { DevisToFactureConverter } from "./application/devis-to-facture-converter";
 import type { IModeleDevisRepository } from "../modeles-devis/application/modele-devis-repository";
 import type { IRelanceDevisRepository } from "../relances-devis/application/relance-devis-repository";
+import type { DevisSignatureReader } from "./application/devis-signature-reader";
+import type { DevisIaDeps } from "./application/generer-lignes-ia";
 import { createDevisRouter } from "./interface/trpc/devis.router";
 
 // Wiring DI du module devis : assemble le routeur tRPC à partir du repository, des dépendances
@@ -16,6 +18,9 @@ export interface DevisModuleDeps {
   readonly modeleRepository: IModeleDevisRepository;
   // Relances de devis exposées sous `devis.*` — repo partagé du domaine relancesDevis.
   readonly relanceRepository: IRelanceDevisRepository;
+  // Lecture signature (getDevisNonSignes) + dépendances IA (genererLignesIA).
+  readonly signatureReader: DevisSignatureReader;
+  readonly ia: DevisIaDeps;
 }
 
 export interface DevisModule {
@@ -26,6 +31,14 @@ export interface DevisModule {
 export function createDevisModule(deps: DevisModuleDeps): DevisModule {
   return {
     deps,
-    router: createDevisRouter(deps.repository, deps.mailing, deps.converter, deps.modeleRepository, deps.relanceRepository),
+    router: createDevisRouter(
+      deps.repository,
+      deps.mailing,
+      deps.converter,
+      deps.modeleRepository,
+      deps.relanceRepository,
+      deps.signatureReader,
+      deps.ia,
+    ),
   };
 }

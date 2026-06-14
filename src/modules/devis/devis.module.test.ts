@@ -29,6 +29,8 @@ const stubRelanceRepo = {
   delete: async () => false,
   ownsDevis: async () => false,
 } as unknown as import("../relances-devis/application/relance-devis-repository").IRelanceDevisRepository;
+const stubSignatureReader = { getByDevisId: async () => null };
+const stubIa = { llm: { complete: async () => "", stream: async function* () {} }, rateLimiter: { check: async () => true } };
 
 const stubRepo: IDevisRepository = {
   list: async () => [],
@@ -50,7 +52,7 @@ const stubRepo: IDevisRepository = {
 
 describe("devis.module", () => {
   it("createDevisModule câble le repository injecté", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo, relanceRepository: stubRelanceRepo });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo, relanceRepository: stubRelanceRepo, signatureReader: stubSignatureReader, ia: stubIa });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -73,7 +75,7 @@ describe("devis.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo, relanceRepository: stubRelanceRepo });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo, relanceRepository: stubRelanceRepo, signatureReader: stubSignatureReader, ia: stubIa });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "accepter",
@@ -89,7 +91,9 @@ describe("devis.module", () => {
       "envoyerRelance",
       "envoyerRelancesAutomatiques",
       "expirer",
+      "genererLignesIA",
       "getById",
+      "getDevisNonSignes",
       "getLignes",
       "getModeleWithLignes",
       "getModeles",

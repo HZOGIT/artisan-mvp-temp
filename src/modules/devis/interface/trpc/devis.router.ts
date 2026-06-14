@@ -9,6 +9,9 @@ import { listModelesDevis, getModeleDevisAvecLignes } from "../../../modeles-dev
 import { creerModeleDevis, ajouterLigneModeleDevis } from "../../../modeles-devis/application/write-use-cases";
 import type { IRelanceDevisRepository } from "../../../relances-devis/application/relance-devis-repository";
 import { envoyerRelanceDevis, envoyerRelancesAutomatiques } from "../../application/relances-devis";
+import { genererLignesDevisIA, type DevisIaDeps } from "../../application/generer-lignes-ia";
+import { getDevisNonSignes } from "../../application/get-devis-non-signes";
+import type { DevisSignatureReader } from "../../application/devis-signature-reader";
 import {
   creerDevis,
   modifierDevis,
@@ -86,6 +89,8 @@ export function createDevisRouter(
   converter: DevisToFactureConverter,
   modeleRepo: IModeleDevisRepository,
   relanceRepo: IRelanceDevisRepository,
+  signatureReader: DevisSignatureReader,
+  ia: DevisIaDeps,
 ) {
   // Dépendances de relance (réutilise les readers/email/rate-limiter du mailing + le repo relances).
   const relanceDeps = {
@@ -96,6 +101,7 @@ export function createDevisRouter(
     email: mailing.email,
     rateLimiter: mailing.rateLimiter,
   };
+  const nonSignesDeps = { devisRepo: repo, clientReader: mailing.clientReader, signatureReader };
   return router({
     list: protectedProcedure.query(({ ctx }) => listDevis(repo, ctx.tenant)),
 
@@ -211,6 +217,16 @@ export function createDevisRouter(
     envoyerRelancesAutomatiques: protectedProcedure
       .input(z.object({ joursMinimum: z.number().int().min(0).optional(), joursEntreRelances: z.number().int().min(0).optional() }))
       .mutation(({ ctx, input }) => envoyerRelancesAutomatiques(relanceDeps, ctx.tenant, input)),
+
+    // Devis non signés (≥ N jours) enrichis client + signature — parité `getDevisNonSignes`.
+    getDevisNonSignes: protectedProcedure
+      .input(z.object({ joursMinimum: z.number().int().min(0).optional() }).optional())
+      .query(({ ctx, input }) => getDevisNonSignes(nonSignesDeps, ctx.tenant, input ?? {})),
+
+    // Génération IA de lignes de devis depuis une description (LECTURE SEULE, non persistée).
+    genererLignesIA: protectedProcedure
+      .input(z.object({ description: z.string().min(5).max(5000), surface: z.number().optional(), budget: z.number().optional() }))
+      .mutation(({ ctx, input }) => genererLignesDevisIA(ia, ctx.tenant, input)),
 
     // Convertit un devis accepté en facture brouillon (cross-domaine) — parité `convertToFacture`.
     // 404 devis hors tenant ; Conflict si non accepté ou déjà converti (invariants factures).

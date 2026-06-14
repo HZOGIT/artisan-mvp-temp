@@ -56,6 +56,7 @@ import {
   ArtisanReaderDrizzle as SharedArtisanReaderDrizzle,
   ClientReaderDrizzle as SharedClientReaderDrizzle,
 } from "./shared/readers/contact-readers-drizzle";
+import { DevisSignatureReaderDrizzle } from "./modules/devis/infra/devis-signature-reader-drizzle";
 import type { IDevisRepository } from "./modules/devis/application/devis-repository";
 import { createFacturesModule } from "./modules/factures/factures.module";
 import { FactureRepositoryDrizzle } from "./modules/factures/infra/facture-repository-drizzle";
@@ -289,6 +290,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     modeleRepository: modeleDevisRepo,
     // Relances exposées sous `devis.*` : repo partagé avec le module relancesDevis.
     relanceRepository: relanceDevisRepo,
+    // getDevisNonSignes : lecture signature (signatures_devis, scopée par le devis parent possédé).
+    signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
+    // genererLignesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan).
+    ia: { llm: deps.llm ?? new GeminiLlmAdapter(), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
   });
   // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
   // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.
