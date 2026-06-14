@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IFactureRepository } from "../../application/facture-repository";
 import type { IDevisReader } from "../../application/devis-reader";
+import type { ComptaPort } from "../../application/compta-port";
 import { listFactures, getFacture, listLignesFacture } from "../../application/read-use-cases";
 import {
   creerFacture,
@@ -80,7 +81,7 @@ const ligneUpdateSchema = z.object({
 // Routeur tRPC du domaine factures. Transport mince : valide les inputs (zod), délègue aux
 // use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
 // laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
-export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
@@ -177,11 +178,13 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     enregistrerPaiement: protectedProcedure
       .input(z.object({ id: z.number().int(), montant: decimal, date: isoDate.optional(), mode: z.string().max(50).optional() }))
       .mutation(({ ctx, input }) =>
-        enregistrerPaiementFacture(repo, ctx.tenant, input.id, {
-          montant: input.montant,
-          date: toDate(input.date),
-          mode: input.mode ?? null,
-        }),
+        enregistrerPaiementFacture(
+          repo,
+          ctx.tenant,
+          input.id,
+          { montant: input.montant, date: toDate(input.date), mode: input.mode ?? null },
+          compta,
+        ),
       ),
   });
 }

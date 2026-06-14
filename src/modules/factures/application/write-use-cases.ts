@@ -2,6 +2,8 @@ import { ConflictError, NotFoundError, ValidationError } from "../../../shared/e
 import type { TenantContext } from "../../../shared/tenant";
 import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./facture-repository";
 import type { IDevisReader } from "./devis-reader";
+import type { ComptaPort } from "./compta-port";
+import { NOOP_COMPTA } from "./compta-port";
 import { calculerMontantsAvoirLigne } from "./montants";
 import type {
   Facture,
@@ -139,6 +141,7 @@ export async function enregistrerPaiementFacture(
   ctx: TenantContext,
   id: number,
   input: EnregistrerPaiementInput,
+  compta: ComptaPort = NOOP_COMPTA,
 ): Promise<Facture> {
   const facture = await getFactureOwned(repo, ctx, id);
   if (facture.statut !== "envoyee" && facture.statut !== "en_retard") {
@@ -157,6 +160,12 @@ export async function enregistrerPaiementFacture(
     statut: soldee ? "payee" : facture.statut,
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
+  // À la solde (passage `payee`) : génère les écritures FEC (vente + encaissement) via le port
+  // compta (no-op tant que le domaine compta n'est pas porté — seam d'effet de bord).
+  if (soldee) {
+    await compta.genererEcrituresVente(ctx, id);
+    await compta.genererEcrituresEncaissement(ctx, id);
+  }
   return updated;
 }
 
