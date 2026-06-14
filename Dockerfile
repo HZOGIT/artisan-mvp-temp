@@ -17,6 +17,10 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig*.json ./
 COPY src ./src
 COPY drizzle ./drizzle
+# `server/_core/{pdfGenerator,emailService}` sont bundlés en sidecars (legacy-pdf.mjs / legacy-email.mjs)
+# consommés par les adapters legacy du new-stack (PDF facture/devis, envoi email). Imports type-only
+# côté pdfGenerator → le graphe legacy `../db` n'est PAS tiré.
+COPY server ./server
 RUN pnpm build:newstack
 
 # ── Runtime : deps de prod + bundle, utilisateur non-root ────────────────────

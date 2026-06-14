@@ -7,7 +7,7 @@
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
     "build": "vite build && esbuild server/_core/index.ts server/_core/fix-duplicates.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "build:server": "esbuild server/_core/index.ts server/_core/fix-duplicates.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "build:newstack": "esbuild src/server.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/server.mjs",
+    "build:newstack": "esbuild src/server.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/server.mjs && esbuild server/_core/pdfGenerator.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/legacy-pdf.mjs && esbuild server/_core/emailService.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/legacy-email.mjs",
     "start:newstack": "node dist-newstack/server.mjs",
     "start": "node dist/fix-duplicates.js && NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",

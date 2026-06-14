@@ -15,7 +15,10 @@ type LegacyEmailModule = {
   }) => Promise<{ success: boolean; message: string }>;
 };
 
-const LEGACY_EMAIL_MODULE: string = "../../../server/_core/emailService";
+// ⚠️ Résolu relativement au module COURANT (`import.meta.url`) → fonctionne depuis le bundle déployé
+// `dist-newstack/server.mjs` (sibling `legacy-email.mjs`). L'ancien chemin relatif `../../../server/…`
+// se cassait après bundling (résolu en `/server/…`, absent du conteneur). Bundle produit au build.
+const LEGACY_EMAIL_MODULE: string = new URL("./legacy-email.mjs", import.meta.url).href;
 
 export class LegacyEmailAdapter implements EmailPort {
   async send(message: EmailMessage): Promise<void> {
@@ -41,7 +44,8 @@ type LegacyPdfModule = {
   generateBonCommandePDF: (data: unknown) => Buffer;
 };
 
-const LEGACY_PDF_MODULE: string = "../../../server/_core/pdfGenerator";
+// Idem : sibling `legacy-pdf.mjs` du bundle déployé (cf. note LEGACY_EMAIL_MODULE).
+const LEGACY_PDF_MODULE: string = new URL("./legacy-pdf.mjs", import.meta.url).href;
 
 export class LegacyPdfAdapter implements PdfPort {
   async render(template: string, data: Record<string, unknown>): Promise<Buffer> {

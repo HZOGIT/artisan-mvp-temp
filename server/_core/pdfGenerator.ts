@@ -1,6 +1,8 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur } from "../db";
+// `import type` : ces noms ne servent QUE d'annotations de type → élidés au build. Évite de tirer le
+// graphe legacy `../db` (mysql/drizzle…) dans le bundle standalone `legacy-pdf.mjs` du new-stack.
+import type { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur } from "../db";
 import type { Fournisseur } from "../../drizzle/schema";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 
