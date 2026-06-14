@@ -59,5 +59,28 @@ export function createArticlesRouter(repo: IArticleRepository) {
         await supprimerArticle(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // ── Surface parité client : articles « artisan » (catalogue propre au tenant) ─────────────────
+    // Le client appelle ces clés (cf. legacy `articlesRouter`). Mêmes use-cases tenant-scopés que
+    // list/create/update/delete (anti-IDOR via ctx.tenant ; 404 hors tenant).
+    getArtisanArticles: protectedProcedure.query(({ ctx }) => listArticles(repo, ctx.tenant)),
+
+    createArtisanArticle: protectedProcedure
+      .input(createSchema)
+      .mutation(({ ctx, input }) => creerArticle(repo, ctx.tenant, input)),
+
+    updateArtisanArticle: protectedProcedure
+      .input(z.object({ id: z.number().int() }).and(updateSchema))
+      .mutation(({ ctx, input }) => {
+        const { id, ...data } = input;
+        return modifierArticle(repo, ctx.tenant, id, data);
+      }),
+
+    deleteArtisanArticle: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await supprimerArticle(repo, ctx.tenant, input.id);
+        return { success: true };
+      }),
   });
 }

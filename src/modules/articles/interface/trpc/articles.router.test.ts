@@ -104,6 +104,27 @@ describe.skipIf(!URL)("articles.router e2e (HTTP → tRPC → use-case → repo 
     expect((await mut(server, "articles.update", { id: 999999999, designation: "x" }, tA)).statusCode).toBe(404);
   });
 
+  it("alias parité client : getArtisanArticles/createArtisanArticle/update/delete = surface tenant", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // create via la clé client → présent dans getArtisanArticles
+    const created = await mut(server, "articles.createArtisanArticle", { reference: ref(), designation: "Via client", prixUnitaireHT: "7.00" }, tA);
+    expect(created.statusCode).toBe(200);
+    const id = created.json().result.data.id as number;
+    const liste = (await q(server, "articles.getArtisanArticles", undefined, tA)).json().result.data as Array<{ id: number }>;
+    expect(liste.some((x) => x.id === id)).toBe(true);
+    // update via la clé client (propriétaire)
+    expect((await mut(server, "articles.updateArtisanArticle", { id, designation: "MAJ client" }, tA)).json().result.data.designation).toBe("MAJ client");
+    // isolation : B ne modifie/supprime pas via les alias
+    expect((await mut(server, "articles.updateArtisanArticle", { id, designation: "hack" }, tB)).statusCode).toBe(404);
+    expect((await mut(server, "articles.deleteArtisanArticle", { id }, tB)).statusCode).toBe(404);
+    // delete via la clé client (propriétaire)
+    expect((await mut(server, "articles.deleteArtisanArticle", { id }, tA)).json().result.data).toEqual({ success: true });
+    expect((await q(server, "articles.getById", { id }, tA)).statusCode).toBe(404);
+    // sans cookie → 401
+    expect((await q(server, "articles.getArtisanArticles", undefined)).statusCode).toBe(401);
+  });
+
   it("byCategorie : filtre scopé tenant ; catégorie inconnue → []", async () => {
     const tA = await token(UA);
     const tB = await token(UB);

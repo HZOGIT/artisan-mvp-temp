@@ -23,9 +23,20 @@ describe("articles.module", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByCategorie", "update"]);
   });
 
-  it("expose un routeur tRPC assemblé (CRUD + byCategorie)", () => {
+  it("expose un routeur tRPC assemblé (CRUD + byCategorie + alias artisan-articles client)", () => {
     const module = createArticlesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["byCategorie", "create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual([
+      "byCategorie",
+      "create",
+      "createArtisanArticle",
+      "delete",
+      "deleteArtisanArticle",
+      "getArtisanArticles",
+      "getById",
+      "list",
+      "update",
+      "updateArtisanArticle",
+    ]);
   });
 });
