@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IPrevisionCARepository } from "../../application/prevision-ca-repository";
-import { listPrevisions, previsionsParAnnee, getPrevision } from "../../application/read-use-cases";
+import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique } from "../../application/read-use-cases";
 import { creerPrevision, modifierPrevision, supprimerPrevision } from "../../application/write-use-cases";
 
 const methode = z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"]);
@@ -62,5 +62,16 @@ export function createPrevisionsCARouter(repo: IPrevisionCARepository) {
         await supprimerPrevision(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // ── Surface parité client (forecasting) — lectures ───────────────────────────────────────────
+    // `getPrevisions {annee?}` : prévisions de l'année (défaut année courante).
+    getPrevisions: protectedProcedure
+      .input(z.object({ annee: z.number().int().min(2000).max(2100) }).optional())
+      .query(({ ctx, input }) => getPrevisions(repo, ctx.tenant, input?.annee)),
+
+    // `getHistorique {nombreMois=24}` : historique de CA mensuel agrégé (récent d'abord).
+    getHistorique: protectedProcedure
+      .input(z.object({ nombreMois: z.number().int().min(1).max(120).default(24) }).optional())
+      .query(({ ctx, input }) => getHistorique(repo, ctx.tenant, input?.nombreMois ?? 24)),
   });
 }

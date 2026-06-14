@@ -1,6 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IPrevisionCARepository } from "../application/prevision-ca-repository";
-import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput } from "../domain/prevision-ca";
+import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput, HistoriqueCA } from "../domain/prevision-ca";
 
 // Implémentation in-memory du repository previsions-ca (tests sans DB). Reproduit les invariants du
 // repo Drizzle : scope par artisanId, artisanId forcé, défauts montants "0.00", confiance null, update
@@ -69,5 +69,20 @@ export class FakePrevisionCARepository implements IPrevisionCARepository {
     if (idx === -1) return false;
     this.store.splice(idx, 1);
     return true;
+  }
+
+  // Historique de CA (table distincte) — injecté en test via `seedHistorique`.
+  private readonly historique: HistoriqueCA[] = [];
+
+  // Aide de test : ajoute une ligne d'historique de CA pour un tenant.
+  seedHistorique(entry: HistoriqueCA): void {
+    this.historique.push(entry);
+  }
+
+  async listHistorique(ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]> {
+    return this.historique
+      .filter((h) => h.artisanId === ctx.artisanId)
+      .sort((a, b) => b.annee - a.annee || b.mois - a.mois)
+      .slice(0, nombreMois);
   }
 }

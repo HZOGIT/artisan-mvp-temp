@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput } from "../domain/prevision-ca";
+import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput, HistoriqueCA } from "../domain/prevision-ca";
 
 // Port du repository previsions-ca (prévisions de CA par période). Chaque méthode exige le
 // TenantContext (scope tenant + RLS). `previsions_ca` possède un `artisanId` → double cloisonnement
@@ -16,4 +16,8 @@ export interface IPrevisionCARepository {
   update(ctx: TenantContext, id: number, input: UpdatePrevisionInput): Promise<PrevisionCA | null>;
   // false si la prévision n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+
+  // Historique de CA mensuel agrégé du tenant (table `historique_ca`), trié récent d'abord, borné
+  // aux `nombreMois` derniers mois. [] si aucun historique.
+  listHistorique(ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]>;
 }

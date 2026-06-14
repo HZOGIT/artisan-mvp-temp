@@ -41,3 +41,19 @@ export interface UpdatePrevisionInput {
   readonly methodeCalcul?: PrevisionMethode;
   readonly confiance?: string | null;
 }
+
+// Historique de CA mensuel agrégé (table `historique_ca`, RLS sur artisanId). Lecture seule côté
+// new-stack pour l'instant (le recalcul `calculerHistoriqueCAMensuel` reste à porter — agrège les
+// factures payées). Montants `numeric` exposés en string.
+export interface HistoriqueCA {
+  readonly id: number;
+  readonly artisanId: number;
+  readonly mois: number; // 1-12
+  readonly annee: number;
+  readonly caTotal: string;
+  readonly nombreFactures: number;
+  readonly nombreClients: number;
+  readonly panierMoyen: string;
+  readonly tauxConversion: string | null;
+  readonly createdAt: Date;
+}

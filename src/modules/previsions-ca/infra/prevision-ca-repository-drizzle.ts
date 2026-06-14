@@ -1,13 +1,29 @@
 import { and, desc, eq } from "drizzle-orm";
-import { previsionsCA } from "../../../../drizzle/schema.pg";
+import { previsionsCA, historiqueCA } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IPrevisionCARepository } from "../application/prevision-ca-repository";
-import type { CreatePrevisionInput, PrevisionCA, PrevisionMethode, UpdatePrevisionInput } from "../domain/prevision-ca";
+import type { CreatePrevisionInput, PrevisionCA, PrevisionMethode, UpdatePrevisionInput, HistoriqueCA } from "../domain/prevision-ca";
 
 type PrevisionRow = typeof previsionsCA.$inferSelect;
 type PrevisionInsert = typeof previsionsCA.$inferInsert;
+type HistoriqueRow = typeof historiqueCA.$inferSelect;
+
+function toHistorique(r: HistoriqueRow): HistoriqueCA {
+  return {
+    id: r.id,
+    artisanId: r.artisanId,
+    mois: r.mois,
+    annee: r.annee,
+    caTotal: r.caTotal ?? "0.00",
+    nombreFactures: r.nombreFactures ?? 0,
+    nombreClients: r.nombreClients ?? 0,
+    panierMoyen: r.panierMoyen ?? "0.00",
+    tauxConversion: r.tauxConversion ?? null,
+    createdAt: r.createdAt,
+  };
+}
 
 // Traduit une ligne PG (colonnes camelCase, pas de snake_case) → domaine. Défauts montants "0.00".
 function toPrevision(r: PrevisionRow): PrevisionCA {
@@ -126,6 +142,18 @@ export class PrevisionCARepositoryDrizzle implements IPrevisionCARepository {
         .where(and(eq(previsionsCA.id, id), eq(previsionsCA.artisanId, ctx.artisanId)))
         .returning({ id: previsionsCA.id });
       return deleted.length > 0;
+    });
+  }
+
+  listHistorique(ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(historiqueCA)
+        .where(eq(historiqueCA.artisanId, ctx.artisanId))
+        .orderBy(desc(historiqueCA.annee), desc(historiqueCA.mois))
+        .limit(nombreMois);
+      return rows.map(toHistorique);
     });
   }
 }
