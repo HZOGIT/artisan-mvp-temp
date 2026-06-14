@@ -279,6 +279,38 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callMutation(server, "depenses.approuverNoteFrais", { id: idAutre }, tB)).statusCode).toBe(404);
   });
 
+  it("payerNoteFrais (parité client) : approuvee→payee + datePaiement ; 409 si non approuvée ; idempotent ; 404 ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const AUTRE = 9890198;
+    // note APPROUVÉE (seedée approuvee côté admin) → payable
+    const idAppr = (
+      await admin.query(
+        "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin, statut) values ($1,$2,'NF-PAY','A payer','2027-10-01','2027-10-31','approuvee') returning id",
+        [artisanA, AUTRE],
+      )
+    ).rows[0].id as number;
+    // 401 sans cookie
+    expect((await callMutation(server, "depenses.payerNoteFrais", { id: idAppr })).statusCode).toBe(401);
+    // payer → payee + datePaiement
+    const pay = await callMutation(server, "depenses.payerNoteFrais", { id: idAppr }, tA);
+    expect(pay.statusCode).toBe(200);
+    expect(pay.json().result.data.statut).toBe("payee");
+    expect(pay.json().result.data.datePaiement).not.toBeNull();
+    // idempotent : re-payer reste payee (200)
+    expect((await callMutation(server, "depenses.payerNoteFrais", { id: idAppr }, tA)).json().result.data.statut).toBe("payee");
+    // payer une note NON approuvée (soumise) → 409
+    const idSoumise = (
+      await admin.query(
+        "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin, statut) values ($1,$2,'NF-PAY2','Soumise','2027-10-01','2027-10-31','soumise') returning id",
+        [artisanA, AUTRE],
+      )
+    ).rows[0].id as number;
+    expect((await callMutation(server, "depenses.payerNoteFrais", { id: idSoumise }, tA)).statusCode).toBe(409);
+    // hors tenant → 404
+    expect((await callMutation(server, "depenses.payerNoteFrais", { id: idAppr }, tB)).statusCode).toBe(404);
+  });
+
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
     const tA = await token(UA);
     const created = await callMutation(

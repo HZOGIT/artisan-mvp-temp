@@ -22,7 +22,7 @@ import { creerRegle, supprimerRegle } from "../../../regles-categorisation/appli
 // porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
 import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
 import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
-import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais } from "../../../notes-de-frais/application/write-use-cases";
+import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais, payerNoteDeFrais } from "../../../notes-de-frais/application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -258,6 +258,12 @@ export function createDepensesRouter(
     rejeterNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int(), commentaire: z.string().min(1).max(2000) }))
       .mutation(({ ctx, input }) => rejeterNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire)),
+
+    // Paiement d'une note de frais (parité client). Transition `approuvee→payee` + datePaiement ;
+    // idempotent (déjà payee → no-op) ; 409 si non approuvée ; hors tenant → 404.
+    payerNoteFrais: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => payerNoteDeFrais(noteRepo, ctx.tenant, input.id)),
 
     // ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
     // On appelle donc directement le repo (getById → null) plutôt que le use-case `getNoteDeFrais`

@@ -75,6 +75,6 @@ describe("depenses.module", () => {
   it("expose les procédures de catégories (parité client trpc.depenses.*Categorie)", () => {
     const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record);
-    expect(procedures).toEqual(expect.arrayContaining(["getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais"]));
+    expect(procedures).toEqual(expect.arrayContaining(["getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais", "payerNoteFrais"]));
   });
 });
