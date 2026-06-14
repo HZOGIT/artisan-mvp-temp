@@ -232,6 +232,53 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callMutation(server, "depenses.soumettreNoteFrais", { id }, tB)).statusCode).toBe(404);
   });
 
+  it("approuver/rejeterNoteFrais (parité client) : ⚠️ ANTI self-approbation (403), soumise→approuvee/rejetee, 409, 404, 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const AUTRE_USER = 9890199; // demandeur ≠ approbateur (UA), même artisan A
+    // note SOUMISE créée par un AUTRE user de l'artisan A → UA peut l'approuver (pas self)
+    const idAutre = (
+      await admin.query(
+        "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin, statut) values ($1,$2,'NF-AP1','Frais autre','2027-07-01','2027-07-31','soumise') returning id",
+        [artisanA, AUTRE_USER],
+      )
+    ).rows[0].id as number;
+    // 401 sans cookie
+    expect((await callMutation(server, "depenses.approuverNoteFrais", { id: idAutre })).statusCode).toBe(401);
+    // approuver par UA (≠ demandeur) → approuvee
+    const appr = await callMutation(server, "depenses.approuverNoteFrais", { id: idAutre, commentaire: "OK" }, tA);
+    expect(appr.statusCode).toBe(200);
+    expect(appr.json().result.data.statut).toBe("approuvee");
+    expect(appr.json().result.data.commentaireApprobateur).toBe("OK");
+
+    // ⚠️ ANTI self-approbation : note SOUMISE dont le demandeur EST UA → UA ne peut pas l'approuver (403)
+    const idSelf = (
+      await admin.query(
+        "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin, statut) values ($1,$2,'NF-SELF','Ma note','2027-07-01','2027-07-31','soumise') returning id",
+        [artisanA, UA],
+      )
+    ).rows[0].id as number;
+    expect((await callMutation(server, "depenses.approuverNoteFrais", { id: idSelf }, tA)).statusCode).toBe(403);
+    expect((await callMutation(server, "depenses.rejeterNoteFrais", { id: idSelf, commentaire: "non" }, tA)).statusCode).toBe(403);
+
+    // rejeter (par un autre demandeur) → rejetee + commentaire ; rejeter sans commentaire → 400
+    const idRej = (
+      await admin.query(
+        "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin, statut) values ($1,$2,'NF-REJ','A rejeter','2027-08-01','2027-08-31','soumise') returning id",
+        [artisanA, AUTRE_USER],
+      )
+    ).rows[0].id as number;
+    expect((await callMutation(server, "depenses.rejeterNoteFrais", { id: idRej }, tA)).statusCode).toBe(400); // commentaire requis
+    const rej = await callMutation(server, "depenses.rejeterNoteFrais", { id: idRej, commentaire: "Justificatif manquant" }, tA);
+    expect(rej.statusCode).toBe(200);
+    expect(rej.json().result.data.statut).toBe("rejetee");
+
+    // approuver une note NON soumise (brouillon) → 409 ; hors tenant → 404
+    const idBrouillon = (await callMutation(server, "depenses.createNoteFrais", { titre: "Brou", periodeDebut: "2027-09-01", periodeFin: "2027-09-30" }, tA)).json().result.data.id as number;
+    expect((await callMutation(server, "depenses.approuverNoteFrais", { id: idBrouillon }, tA)).statusCode).toBe(409);
+    expect((await callMutation(server, "depenses.approuverNoteFrais", { id: idAutre }, tB)).statusCode).toBe(404);
+  });
+
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
     const tA = await token(UA);
     const created = await callMutation(

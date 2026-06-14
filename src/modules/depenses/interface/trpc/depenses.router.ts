@@ -22,7 +22,7 @@ import { creerRegle, supprimerRegle } from "../../../regles-categorisation/appli
 // porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
 import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
 import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
-import { creerNoteDeFrais, soumettreNoteDeFrais } from "../../../notes-de-frais/application/write-use-cases";
+import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais } from "../../../notes-de-frais/application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -246,6 +246,18 @@ export function createDepensesRouter(
     soumettreNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => soumettreNoteDeFrais(noteRepo, ctx.tenant, input.id)),
+
+    // Approbation/rejet d'une note de frais (parité client). ⚠️ INVARIANT SENSIBLE — **anti
+    // self-approbation** : l'approbateur (ctx.userId) ≠ le demandeur (note.userId) → sinon 403
+    // (porté par le use-case). Transition `soumise→approuvee|rejetee` (sinon 409), idempotent,
+    // hors tenant → 404. `rejeterNoteFrais` exige un commentaire (motif).
+    approuverNoteFrais: protectedProcedure
+      .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
+      .mutation(({ ctx, input }) => approuverNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire ?? undefined)),
+
+    rejeterNoteFrais: protectedProcedure
+      .input(z.object({ id: z.number().int(), commentaire: z.string().min(1).max(2000) }))
+      .mutation(({ ctx, input }) => rejeterNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire)),
 
     // ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
     // On appelle donc directement le repo (getById → null) plutôt que le use-case `getNoteDeFrais`
