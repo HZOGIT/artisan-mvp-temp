@@ -3,6 +3,7 @@
 // graphe legacy dans le typecheck de src/** (gate propre), tout en câblant au runtime.
 import type { EmailPort, EmailMessage } from "./email";
 import type { PdfPort } from "./pdf";
+import type { LlmPort, LlmCompleteOptions } from "./llm";
 
 type LegacyEmailModule = {
   sendEmail: (p: {
@@ -54,6 +55,52 @@ export class LegacyPdfAdapter implements PdfPort {
         return mod.generateBonCommandePDF(data);
       default:
         throw new Error(`Template PDF inconnu : ${template}`);
+    }
+  }
+}
+
+// Adapter LLM sur Google GenAI (Gemini). Import via variable-de-chemin (string non-littéral) → le
+// SDK n'est PAS tiré dans le typecheck de src/** ; on type structurellement ce qu'on utilise. La clé
+// vient de l'env (`GEMINI_API_KEY`), jamais committée. Modèle par défaut `gemini-2.5-flash`.
+type GenAiClient = {
+  models: {
+    generateContent(req: unknown): Promise<{ text?: string }>;
+    generateContentStream(req: unknown): Promise<AsyncIterable<{ text?: string }>>;
+  };
+};
+type GenAiModule = { GoogleGenAI: new (opts: { apiKey: string }) => GenAiClient };
+
+const GENAI_MODULE: string = "@google/genai";
+
+export class GeminiLlmAdapter implements LlmPort {
+  private async client(): Promise<GenAiClient> {
+    const mod = (await import(GENAI_MODULE)) as GenAiModule;
+    return new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
+  }
+
+  private request(prompt: string, opts?: LlmCompleteOptions) {
+    return {
+      model: opts?.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        ...(opts?.system ? { systemInstruction: opts.system } : {}),
+        temperature: opts?.temperature ?? 0.4,
+        maxOutputTokens: opts?.maxOutputTokens ?? 1000,
+      },
+    };
+  }
+
+  async complete(prompt: string, opts?: LlmCompleteOptions): Promise<string> {
+    const ai = await this.client();
+    const res = await ai.models.generateContent(this.request(prompt, opts));
+    return res.text ?? "";
+  }
+
+  async *stream(prompt: string, opts?: LlmCompleteOptions): AsyncIterable<string> {
+    const ai = await this.client();
+    const s = await ai.models.generateContentStream(this.request(prompt, opts));
+    for await (const chunk of s) {
+      if (chunk.text) yield chunk.text;
     }
   }
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { FakeEmailPort, FakeSmsPort, InMemoryStoragePort, FakePdfPort } from "./fakes";
+import { FakeEmailPort, FakeSmsPort, InMemoryStoragePort, FakePdfPort, FakeLlmPort } from "./fakes";
 import type { EmailPort } from "./email";
+import type { LlmPort } from "./llm";
 
 // Use-case fictif : dépend uniquement du PORT (interface), pas d'une impl concrète.
 async function envoyerBienvenue(email: EmailPort, to: string): Promise<void> {
@@ -45,6 +46,29 @@ describe("ports — découplage use-case / infra", () => {
     expect(out.toString()).toContain("facture");
     expect(pdf.rendered).toHaveLength(1);
     expect(pdf.rendered[0].data).toEqual({ numero: "FAC-1", total: 1200 });
+  });
+
+  it("LlmPort : un use-case dépend du PORT ; le fake renvoie une complétion + capte le prompt", async () => {
+    // use-case fictif : dépend uniquement de l'interface LlmPort.
+    async function suggererTitre(llm: LlmPort, sujet: string): Promise<string> {
+      return llm.complete(`Donne un titre pour : ${sujet}`, { temperature: 0.2 });
+    }
+    const llm = new FakeLlmPort('{"titre":"Réfection toiture"}');
+    const out = await suggererTitre(llm, "devis toiture");
+    expect(out).toContain("Réfection toiture");
+    expect(llm.prompts[0]).toContain("devis toiture");
+  });
+
+  it("LlmPort.stream : les fragments concaténés reconstituent la réponse", async () => {
+    const llm = new FakeLlmPort("Bonjour, je suis l'assistant Operioz.");
+    let acc = "";
+    let chunks = 0;
+    for await (const frag of llm.stream("salut")) {
+      acc += frag;
+      chunks++;
+    }
+    expect(acc).toBe("Bonjour, je suis l'assistant Operioz.");
+    expect(chunks).toBeGreaterThan(1); // bien un flux (plusieurs fragments)
   });
 
   it("EmailPort transporte une pièce jointe (PDF) ; rétro-compatible sans pièce jointe", async () => {

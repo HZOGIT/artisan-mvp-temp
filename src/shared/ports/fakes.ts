@@ -4,6 +4,7 @@ import type { SmsPort, SmsMessage } from "./sms";
 import type { StoragePort, PutOptions } from "./storage";
 import type { PdfPort } from "./pdf";
 import type { RateLimiterPort } from "./rate-limiter";
+import type { LlmPort } from "./llm";
 
 export class FakeEmailPort implements EmailPort {
   readonly sent: EmailMessage[] = [];
@@ -62,5 +63,29 @@ export class FakePdfPort implements PdfPort {
   async render(template: string, data: Record<string, unknown>): Promise<Buffer> {
     this.rendered.push({ template, data });
     return Buffer.from(`PDF<${template}>${JSON.stringify(data)}`);
+  }
+}
+
+// LLM factice déterministe : renvoie une réponse scriptée et mémorise les prompts (assertions).
+// Aucun appel réseau. `responses` = une réponse fixe, ou une file (une par appel `complete`/`stream`).
+export class FakeLlmPort implements LlmPort {
+  readonly prompts: string[] = [];
+  private readonly queue: string[];
+  constructor(responses: string | string[] = "réponse simulée") {
+    this.queue = Array.isArray(responses) ? [...responses] : [responses];
+  }
+  private next(): string {
+    // File à plusieurs entrées → consomme ; sinon réponse fixe réutilisée.
+    return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
+  }
+  async complete(prompt: string): Promise<string> {
+    this.prompts.push(prompt);
+    return this.next();
+  }
+  async *stream(prompt: string): AsyncIterable<string> {
+    this.prompts.push(prompt);
+    const text = this.next();
+    // Découpe en fragments pour simuler le flux (concaténés = texte complet).
+    for (const part of text.match(/[\s\S]{1,8}/g) ?? [text]) yield part;
   }
 }
