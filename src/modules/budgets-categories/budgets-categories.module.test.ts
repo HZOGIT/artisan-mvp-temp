@@ -22,4 +22,10 @@ describe("budgets-categories.module", () => {
   it("le port expose CRUD + listByMois attendus", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByMois", "update"]);
   });
+
+  it("expose un routeur tRPC assemblé (CRUD + byMois)", () => {
+    const module = createBudgetsCategoriesModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["byMois", "create", "delete", "getById", "list", "update"]);
+  });
 });

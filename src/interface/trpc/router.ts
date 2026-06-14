@@ -27,6 +27,7 @@ import type { RelancesDevisModule } from "../../modules/relances-devis/relances-
 import type { CategoriesDepensesModule } from "../../modules/categories-depenses/categories-depenses.module";
 import type { ContratsMaintenanceModule } from "../../modules/contrats-maintenance/contrats-maintenance.module";
 import type { DemandesContactModule } from "../../modules/demandes-contact/demandes-contact.module";
+import type { BudgetsCategoriesModule } from "../../modules/budgets-categories/budgets-categories.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -57,6 +58,7 @@ export interface AppRouterDeps {
   readonly categoriesDepenses: CategoriesDepensesModule;
   readonly contratsMaintenance: ContratsMaintenanceModule;
   readonly demandesContact: DemandesContactModule;
+  readonly budgetsCategories: BudgetsCategoriesModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -96,6 +98,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     categoriesDepenses: deps.categoriesDepenses.router,
     contratsMaintenance: deps.contratsMaintenance.router,
     demandesContact: deps.demandesContact.router,
+    budgetsCategories: deps.budgetsCategories.router,
   });
 }
 

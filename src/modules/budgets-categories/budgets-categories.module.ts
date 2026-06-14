@@ -1,15 +1,17 @@
 import type { IBudgetCategorieRepository } from "./application/budget-categorie-repository";
+import { createBudgetsCategoriesRouter } from "./interface/trpc/budgets-categories.router";
 
-// Wiring DI du module budgets-categories. À l'étape scaffold, le module ne porte que ses
-// dépendances ; le routeur tRPC sera assemblé et exposé à l'étape interface (5/9).
+// Wiring DI du module budgets-categories : assemble le routeur tRPC (CRUD catalogue + byMois) à partir
+// du repository injecté.
 export interface BudgetsCategoriesModuleDeps {
   readonly repository: IBudgetCategorieRepository;
 }
 
 export interface BudgetsCategoriesModule {
   readonly deps: BudgetsCategoriesModuleDeps;
+  readonly router: ReturnType<typeof createBudgetsCategoriesRouter>;
 }
 
 export function createBudgetsCategoriesModule(deps: BudgetsCategoriesModuleDeps): BudgetsCategoriesModule {
-  return { deps };
+  return { deps, router: createBudgetsCategoriesRouter(deps.repository) };
 }

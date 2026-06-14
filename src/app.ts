@@ -91,6 +91,9 @@ import type { IContratRepository } from "./modules/contrats-maintenance/applicat
 import { createDemandesContactModule } from "./modules/demandes-contact/demandes-contact.module";
 import { DemandeContactRepositoryDrizzle } from "./modules/demandes-contact/infra/demande-contact-repository-drizzle";
 import type { IDemandeContactRepository } from "./modules/demandes-contact/application/demande-contact-repository";
+import { createBudgetsCategoriesModule } from "./modules/budgets-categories/budgets-categories.module";
+import { BudgetCategorieRepositoryDrizzle } from "./modules/budgets-categories/infra/budget-categorie-repository-drizzle";
+import type { IBudgetCategorieRepository } from "./modules/budgets-categories/application/budget-categorie-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -131,6 +134,7 @@ export interface AppDeps extends ContextDeps {
   readonly categorieDepenseRepo?: ICategorieDepenseRepository;
   readonly contratRepo?: IContratRepository;
   readonly demandeContactRepo?: IDemandeContactRepository;
+  readonly budgetCategorieRepo?: IBudgetCategorieRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -235,7 +239,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const demandesContact = createDemandesContactModule({
     repository: deps.demandeContactRepo ?? new DemandeContactRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact });
+  const budgetsCategories = createBudgetsCategoriesModule({
+    repository: deps.budgetCategorieRepo ?? new BudgetCategorieRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
