@@ -31,7 +31,7 @@
 | modelesEmail | modelesEmail | ✅ name-match | 6 |
 | modelesDevis | modelesDevis | ⚠️ pas de top-level legacy | 5 |
 | configRelances | configRelances | ⚠️ pas de top-level legacy | 2 |
-| rdvEnLigne | rdv | ⚠️ renommer → `rdv` | 8 |
+| rdv | rdv | ✅ name-match | 8 |
 | relancesDevis | relances | ⚠️ renommer → `relances` | 5 |
 | categoriesDepenses | categoriesDepenses | ⚠️ pas de top-level legacy | 5 |
 | contratsMaintenance | contrats | ⚠️ renommer → `contrats` | 9 |
@@ -40,9 +40,9 @@
 | reglesCategorisation | reglesCategorisation | ⚠️ pas de top-level legacy | 5 |
 | previsions | previsions | ✅ name-match | 6 |
 
-**Name-match (flippables après parité)** : 19 — vehicules, avis, badges, techniciens, notifications, fournisseurs, commandesFournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail, previsions
+**Name-match (flippables après parité)** : 20 — vehicules, avis, badges, techniciens, notifications, fournisseurs, commandesFournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail, rdv, previsions
 
-**À réconcilier (renommage / sous-routeur)** : 11 — notesDeFrais, ecritures, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation
+**À réconcilier (renommage / sous-routeur)** : 10 — notesDeFrais, ecritures, modelesDevis, configRelances, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation
 
 ## 2. Procédures servies par le nouveau stack (par domaine)
 
@@ -68,7 +68,7 @@
 - **modelesEmail** (6) : `byType`, `create`, `delete`, `getById`, `list`, `update`
 - **modelesDevis** (5) : `create`, `delete`, `getById`, `list`, `update`
 - **configRelances** (2) : `get`, `update`
-- **rdvEnLigne** (8) : `annuler`, `confirmer`, `create`, `delete`, `getById`, `list`, `refuser`, `update`
+- **rdv** (8) : `annuler`, `confirmer`, `create`, `delete`, `getById`, `list`, `refuser`, `update`
 - **relancesDevis** (5) : `byDevis`, `create`, `delete`, `getById`, `list`
 - **categoriesDepenses** (5) : `create`, `delete`, `getById`, `list`, `update`
 - **contratsMaintenance** (9) : `annuler`, `create`, `delete`, `getById`, `list`, `reactiver`, `suspendre`, `terminer`, `update`

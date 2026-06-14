@@ -11,7 +11,7 @@
 export const MIGRATED = [
   "vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks",
   "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures",
-  "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne",
+  "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv",
   "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories",
   "reglesCategorisation", "previsions",
 ];

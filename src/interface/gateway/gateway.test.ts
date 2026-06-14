@@ -500,24 +500,24 @@ describe("bascule du domaine configRelances (flag gateway)", () => {
   });
 });
 
-describe("bascule du domaine rdvEnLigne (flag gateway)", () => {
-  it("rdvEnLigne routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
-    expect(shouldRouteToNewStack("rdvEnLigne", 7, NO_FLAGS)).toBe(false);
-    const canary: FeatureFlags = { rdvEnLigne: { enabled: false, tenantAllowlist: [7] } };
-    expect(shouldRouteToNewStack("rdvEnLigne", 7, canary)).toBe(true);
-    expect(shouldRouteToNewStack("rdvEnLigne", 8, canary)).toBe(false);
-    const global: FeatureFlags = { rdvEnLigne: { enabled: true, tenantDenylist: [3] } };
-    expect(shouldRouteToNewStack("rdvEnLigne", 1, global)).toBe(true);
-    expect(shouldRouteToNewStack("rdvEnLigne", 3, global)).toBe(false);
+describe("bascule du domaine rdv (flag gateway)", () => {
+  it("rdv routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("rdv", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { rdv: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("rdv", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("rdv", 8, canary)).toBe(false);
+    const global: FeatureFlags = { rdv: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("rdv", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("rdv", 3, global)).toBe(false);
   });
 
-  it("les chemins tRPC du domaine rdvEnLigne extraient bien le domaine (dont confirmer/refuser)", () => {
-    expect(domainFromTrpcPath("rdvEnLigne.create")).toBe("rdvEnLigne");
-    expect(domainFromTrpcPath("/rdvEnLigne.confirmer")).toBe("rdvEnLigne");
+  it("les chemins tRPC du domaine rdv extraient bien le domaine (dont confirmer/refuser)", () => {
+    expect(domainFromTrpcPath("rdv.create")).toBe("rdv");
+    expect(domainFromTrpcPath("/rdv.confirmer")).toBe("rdv");
   });
 
-  it("parse env : rdvEnLigne enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
-    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "rdvEnLigne" } as NodeJS.ProcessEnv).rdvEnLigne).toEqual({ enabled: true });
+  it("parse env : rdv enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "rdv" } as NodeJS.ProcessEnv).rdv).toEqual({ enabled: true });
     // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `rdvenligne`) — même limitation que notesDeFrais.
   });
@@ -691,7 +691,7 @@ describe("canary env camelCase recanonicalisé (NEW_STACK_CANARY_<DOMAINE>)", ()
     expect(parseFlagsFromEnv({ NEW_STACK_CANARY_REGLESCATEGORISATION: "7,8" } as NodeJS.ProcessEnv).reglesCategorisation?.tenantAllowlist).toEqual([7, 8]);
     expect(parseFlagsFromEnv({ NEW_STACK_CANARY_PREVISIONS: "9" } as NodeJS.ProcessEnv).previsions?.tenantAllowlist).toEqual([9]);
     expect(parseFlagsFromEnv({ NEW_STACK_CANARY_NOTESDEFRAIS: "3" } as NodeJS.ProcessEnv).notesDeFrais?.tenantAllowlist).toEqual([3]);
-    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_RDVENLIGNE: "5" } as NodeJS.ProcessEnv).rdvEnLigne?.tenantAllowlist).toEqual([5]);
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_RDV: "5" } as NodeJS.ProcessEnv).rdv?.tenantAllowlist).toEqual([5]);
     expect(parseFlagsFromEnv({ NEW_STACK_CANARY_MODELESEMAIL: "2" } as NodeJS.ProcessEnv).modelesEmail?.tenantAllowlist).toEqual([2]);
   });
 
@@ -708,7 +708,7 @@ describe("canary env camelCase recanonicalisé (NEW_STACK_CANARY_<DOMAINE>)", ()
 
 describe("registre des domaines migrés", () => {
   it("les 30 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne", "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }

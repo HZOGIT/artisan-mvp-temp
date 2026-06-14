@@ -30,7 +30,7 @@ function q(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?:
   return app.inject({ method: "GET", url: `/api/trpc/${path}${qs}`, headers: tok ? { cookie: `token=${tok}` } : {} });
 }
 
-describe.skipIf(!URL)("rdvEnLigne.router e2e (HTTP → tRPC → use-case → repo → RLS + état machine)", () => {
+describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → RLS + état machine)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   let server: ReturnType<typeof buildApp>;
@@ -64,10 +64,10 @@ describe.skipIf(!URL)("rdvEnLigne.router e2e (HTTP → tRPC → use-case → rep
   });
 
   const creer = async (tok: string, over: Record<string, unknown> = {}) =>
-    mut(server, "rdvEnLigne.create", { clientId: clientA, titre: "Dépannage", dateProposee: DATE, ...over }, tok);
+    mut(server, "rdv.create", { clientId: clientA, titre: "Dépannage", dateProposee: DATE, ...over }, tok);
 
-  it("sans cookie → rdvEnLigne.list 401", async () => {
-    expect((await q(server, "rdvEnLigne.list", undefined)).statusCode).toBe(401);
+  it("sans cookie → rdv.list 401", async () => {
+    expect((await q(server, "rdv.list", undefined)).statusCode).toBe(401);
   });
 
   it("create (clientId du tenant) + getById → statut en_attente, défauts", async () => {
@@ -78,7 +78,7 @@ describe.skipIf(!URL)("rdvEnLigne.router e2e (HTTP → tRPC → use-case → rep
     expect(r.statut).toBe("en_attente");
     expect(r.dureeEstimee).toBe(60);
     expect(r.urgence).toBe("normale");
-    expect((await q(server, "rdvEnLigne.getById", { id: r.id }, tA)).json().result.data.titre).toBe("Dépannage");
+    expect((await q(server, "rdv.getById", { id: r.id }, tA)).json().result.data.titre).toBe("Dépannage");
   });
 
   it("ANTI-IDOR : create avec un clientId d'un AUTRE tenant → 404", async () => {
@@ -96,18 +96,18 @@ describe.skipIf(!URL)("rdvEnLigne.router e2e (HTTP → tRPC → use-case → rep
     const tA = await token(UA);
     const tB = await token(UB);
     const id = (await creer(tA, { titre: "Secret" })).json().result.data.id as number;
-    expect((await q(server, "rdvEnLigne.getById", { id }, tB)).statusCode).toBe(404);
-    expect((await q(server, "rdvEnLigne.list", undefined, tB)).json().result.data).toEqual([]);
-    expect((await mut(server, "rdvEnLigne.update", { id, titre: "hack" }, tB)).statusCode).toBe(404);
-    expect((await mut(server, "rdvEnLigne.confirmer", { id }, tB)).statusCode).toBe(404);
-    expect((await mut(server, "rdvEnLigne.delete", { id }, tB)).statusCode).toBe(404);
-    expect((await q(server, "rdvEnLigne.getById", { id }, tA)).json().result.data.titre).toBe("Secret");
+    expect((await q(server, "rdv.getById", { id }, tB)).statusCode).toBe(404);
+    expect((await q(server, "rdv.list", undefined, tB)).json().result.data).toEqual([]);
+    expect((await mut(server, "rdv.update", { id, titre: "hack" }, tB)).statusCode).toBe(404);
+    expect((await mut(server, "rdv.confirmer", { id }, tB)).statusCode).toBe(404);
+    expect((await mut(server, "rdv.delete", { id }, tB)).statusCode).toBe(404);
+    expect((await q(server, "rdv.getById", { id }, tA)).json().result.data.titre).toBe("Secret");
   });
 
   it("update ne change pas le statut", async () => {
     const tA = await token(UA);
     const id = (await creer(tA)).json().result.data.id as number;
-    const maj = await mut(server, "rdvEnLigne.update", { id, titre: "Modifié", dureeEstimee: 90 }, tA);
+    const maj = await mut(server, "rdv.update", { id, titre: "Modifié", dureeEstimee: 90 }, tA);
     expect(maj.json().result.data.titre).toBe("Modifié");
     expect(maj.json().result.data.statut).toBe("en_attente"); // inchangé
   });
@@ -116,17 +116,17 @@ describe.skipIf(!URL)("rdvEnLigne.router e2e (HTTP → tRPC → use-case → rep
     const tA = await token(UA);
     // confirmer depuis en_attente
     const id1 = (await creer(tA)).json().result.data.id as number;
-    expect((await mut(server, "rdvEnLigne.confirmer", { id: id1 }, tA)).json().result.data.statut).toBe("confirme");
+    expect((await mut(server, "rdv.confirmer", { id: id1 }, tA)).json().result.data.statut).toBe("confirme");
     // annuler depuis confirme
-    expect((await mut(server, "rdvEnLigne.annuler", { id: id1 }, tA)).json().result.data.statut).toBe("annule");
+    expect((await mut(server, "rdv.annuler", { id: id1 }, tA)).json().result.data.statut).toBe("annule");
     // refuser sans motif → 400 (zod min(1))
     const id2 = (await creer(tA)).json().result.data.id as number;
-    expect((await mut(server, "rdvEnLigne.refuser", { id: id2 }, tA)).statusCode).toBe(400);
+    expect((await mut(server, "rdv.refuser", { id: id2 }, tA)).statusCode).toBe(400);
     // refuser avec motif → refuse + motif
-    const refuse = await mut(server, "rdvEnLigne.refuser", { id: id2, motifRefus: "Indisponible" }, tA);
+    const refuse = await mut(server, "rdv.refuser", { id: id2, motifRefus: "Indisponible" }, tA);
     expect(refuse.json().result.data.statut).toBe("refuse");
     expect(refuse.json().result.data.motifRefus).toBe("Indisponible");
     // confirmer depuis un statut terminal (refuse) → 409
-    expect((await mut(server, "rdvEnLigne.confirmer", { id: id2 }, tA)).statusCode).toBe(409);
+    expect((await mut(server, "rdv.confirmer", { id: id2 }, tA)).statusCode).toBe(409);
   });
 });

@@ -97,7 +97,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     modelesEmail: deps.modelesEmail.router,
     modelesDevis: deps.modelesDevis.router,
     configRelances: deps.configRelances.router,
-    rdvEnLigne: deps.rdvEnLigne.router,
+    rdv: deps.rdvEnLigne.router,
     relancesDevis: deps.relancesDevis.router,
     categoriesDepenses: deps.categoriesDepenses.router,
     contratsMaintenance: deps.contratsMaintenance.router,
