@@ -3,7 +3,7 @@ import { factures, facturesLignes, clients, devis, parametresArtisan } from "../
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository, PaiementPatch } from "../application/facture-repository";
+import type { IFactureRepository, PaiementPatch, CreateAvoirInput } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -209,6 +209,95 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         await tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, compteurFacture: compteur });
       }
       return `${prefixe}-${String(compteur).padStart(5, "0")}`;
+    });
+  }
+
+  nextNumeroAvoir(ctx: TenantContext): Promise<string> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Parité legacy `getNextAvoirNumber` : préfixe/compteur dédiés ; MAX scopé typeDocument='avoir'.
+      const [params] = await tx
+        .select({ prefixe: parametresArtisan.prefixeAvoir, compteur: parametresArtisan.compteurAvoir })
+        .from(parametresArtisan)
+        .where(eq(parametresArtisan.artisanId, ctx.artisanId))
+        .limit(1);
+      const prefixe = params?.prefixe || "AV";
+      const compteurParam = (params?.compteur ?? 0) + 1;
+
+      const [maxRow] = await tx
+        .select({ maxNum: sql<string | null>`max(${factures.numero})` })
+        .from(factures)
+        .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.typeDocument, "avoir")));
+      let maxFromDb = 0;
+      const m = maxRow?.maxNum?.match(/-(\d+)$/);
+      if (m) maxFromDb = parseInt(m[1], 10) + 1;
+
+      const compteur = Math.max(compteurParam, maxFromDb);
+      if (params) {
+        await tx.update(parametresArtisan).set({ compteurAvoir: compteur }).where(eq(parametresArtisan.artisanId, ctx.artisanId));
+      } else {
+        await tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, compteurAvoir: compteur });
+      }
+      return `${prefixe}-${String(compteur).padStart(5, "0")}`;
+    });
+  }
+
+  listAvoirs(ctx: TenantContext, factureOrigineId: number): Promise<Facture[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(factures)
+        .where(
+          and(
+            eq(factures.artisanId, ctx.artisanId),
+            eq(factures.typeDocument, "avoir"),
+            eq(factures.factureOrigineId, factureOrigineId),
+          ),
+        );
+      return rows.map(toFacture);
+    });
+  }
+
+  createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // La facture d'origine doit appartenir au tenant (anti-IDOR-FK).
+      if (!(await this.ownsFacture(tx, ctx, input.factureOrigineId))) return null;
+      const totaux = calculerTotaux(input.lignes);
+      const [avoir] = await tx
+        .insert(factures)
+        .values({
+          artisanId: ctx.artisanId,
+          clientId: input.clientId,
+          numero: input.numero,
+          typeDocument: "avoir",
+          factureOrigineId: input.factureOrigineId,
+          statut: "validee",
+          objet: input.objet,
+          notes: input.notes,
+          conditionsPaiement: input.conditionsPaiement,
+          totalHT: totaux.totalHT,
+          totalTVA: totaux.totalTVA,
+          totalTTC: totaux.totalTTC,
+          montantPaye: "0.00",
+        })
+        .returning();
+      for (let i = 0; i < input.lignes.length; i++) {
+        const l = input.lignes[i];
+        await tx.insert(facturesLignes).values({
+          factureId: avoir.id,
+          ordre: i,
+          designation: l.designation,
+          description: l.description,
+          quantite: l.quantite,
+          unite: l.unite ?? "unité",
+          prixUnitaireHT: l.prixUnitaireHT,
+          tauxTVA: l.tauxTVA,
+          montantHT: l.montantHT,
+          montantTVA: l.montantTVA,
+          montantTTC: l.montantTTC,
+          type: "produit",
+        });
+      }
+      return toFacture(avoir);
     });
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculerMontantsLigne, calculerTotaux } from "./montants";
+import { calculerMontantsLigne, calculerTotaux, calculerMontantsAvoirLigne } from "./montants";
 
 describe("factures — calcul des montants de ligne (pur)", () => {
   it("ligne produit : HT = q×pu, TVA = HT×taux/100, TTC = HT+TVA", () => {
@@ -38,5 +38,25 @@ describe("factures — calcul des totaux (pur)", () => {
   it("invariant totalTTC = totalHT + totalTVA", () => {
     const t = calculerTotaux([{ montantHT: "1234.56", montantTVA: "246.91", montantTTC: "1481.47" }]);
     expect(Number(t.totalTTC)).toBeCloseTo(Number(t.totalHT) + Number(t.totalTVA), 2);
+  });
+});
+
+describe("factures — montants d'avoir (pur, négatifs)", () => {
+  it("ligne d'avoir : prixUnitaireHT et montants négatifs (note de crédit)", () => {
+    expect(calculerMontantsAvoirLigne("2", "100.00", "20")).toEqual({
+      prixUnitaireHT: "-100.00",
+      montantHT: "-200.00",
+      montantTVA: "-40.00",
+      montantTTC: "-240.00",
+    });
+  });
+
+  it("normalise les entrées déjà négatives (valeur absolue puis négation)", () => {
+    expect(calculerMontantsAvoirLigne("-2", "-100.00", "20")).toEqual({
+      prixUnitaireHT: "-100.00",
+      montantHT: "-200.00",
+      montantTVA: "-40.00",
+      montantTTC: "-240.00",
+    });
   });
 });

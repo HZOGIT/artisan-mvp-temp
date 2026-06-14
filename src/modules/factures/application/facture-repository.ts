@@ -33,6 +33,13 @@ export interface IFactureRepository {
   enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null>;
   // Prochain numéro de facture, scopé tenant, généré serveur (parité `getNextFactureNumber`).
   nextNumero(ctx: TenantContext): Promise<string>;
+  // Prochain numéro d'AVOIR (préfixe + compteur dédiés, parité `getNextAvoirNumber`).
+  nextNumeroAvoir(ctx: TenantContext): Promise<string>;
+  // Avoirs émis sur une facture d'origine (typeDocument='avoir'), scopés tenant.
+  listAvoirs(ctx: TenantContext, factureOrigineId: number): Promise<Facture[]>;
+  // Crée un avoir (note de crédit) + ses lignes (montants négatifs déjà calculés) dans une
+  // transaction — null si la facture d'origine n'appartient pas au tenant.
+  createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null>;
   // true si le client référencé appartient au tenant (anti-IDOR-FK).
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
   // true si le devis référencé appartient au tenant (anti-IDOR-FK sur le lien devis→facture).
@@ -54,4 +61,29 @@ export interface PaiementPatch {
   readonly datePaiement: Date | null;
   readonly modePaiement: string | null;
   readonly statut: FactureStatut;
+}
+
+// Ligne d'avoir avec montants NÉGATIFS déjà calculés (par le use-case).
+export interface AvoirLigneData {
+  readonly designation: string;
+  readonly description: string | null;
+  readonly quantite: string;
+  readonly unite: string | null;
+  readonly prixUnitaireHT: string; // négatif
+  readonly tauxTVA: string;
+  readonly montantHT: string; // négatif
+  readonly montantTVA: string; // négatif
+  readonly montantTTC: string; // négatif
+}
+
+// Entrée de création d'un avoir (numéro/totaux déjà calculés par le use-case ; statut "validee",
+// typeDocument "avoir" posés par l'infra).
+export interface CreateAvoirInput {
+  readonly factureOrigineId: number;
+  readonly clientId: number;
+  readonly numero: string;
+  readonly objet: string | null;
+  readonly notes: string | null;
+  readonly conditionsPaiement: string | null;
+  readonly lignes: readonly AvoirLigneData[];
 }

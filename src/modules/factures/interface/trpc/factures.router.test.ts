@@ -175,4 +175,24 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect(p2.json().result.data.statut).toBe("payee");
     expect(p2.json().result.data.montantPaye).toBe("120.00");
   });
+
+  it("creerAvoir : note de crédit négative AV- liée à l'origine ; brouillon → 409 ; cross-tenant → 404", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }, tA);
+    // origine brouillon → avoir interdit (409)
+    expect((await callMutation(server, "factures.creerAvoir", { factureOrigineId: id, lignes: [{ designation: "x", quantite: "1", prixUnitaireHT: "10" }] }, tA)).statusCode).toBe(409);
+    await callMutation(server, "factures.envoyer", { id }, tA);
+    // avoir total → montants négatifs, typeDocument avoir, numéro AV-
+    const av = await callMutation(server, "factures.creerAvoir", { factureOrigineId: id, lignes: [{ designation: "Remboursement", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }] }, tA);
+    expect(av.statusCode).toBe(200);
+    const data = av.json().result.data as { typeDocument: string; numero: string; totalTTC: string; factureOrigineId: number };
+    expect(data.typeDocument).toBe("avoir");
+    expect(data.numero).toMatch(/^AV-\d{5}$/);
+    expect(data.totalTTC).toBe("-120.00");
+    expect(data.factureOrigineId).toBe(id);
+    // cross-tenant : B ne peut pas avoir la facture de A
+    expect((await callMutation(server, "factures.creerAvoir", { factureOrigineId: id, lignes: [{ designation: "Vol", quantite: "1", prixUnitaireHT: "1" }] }, tB)).statusCode).toBe(404);
+  });
 });

@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository, PaiementPatch } from "../application/facture-repository";
+import type { IFactureRepository, PaiementPatch, CreateAvoirInput } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -20,6 +20,7 @@ export class FakeFactureRepository implements IFactureRepository {
   private seq = 0;
   private ligneSeq = 0;
   private compteur = new Map<number, number>();
+  private avoirCompteur = new Map<number, number>();
   private ownedClients = new Set<string>();
   private ownedDevis = new Set<string>();
 
@@ -133,6 +134,75 @@ export class FakeFactureRepository implements IFactureRepository {
     const compteur = Math.max(compteurParam, maxFromDb);
     this.compteur.set(ctx.artisanId, compteur);
     return `FAC-${String(compteur).padStart(5, "0")}`;
+  }
+
+  async nextNumeroAvoir(ctx: TenantContext): Promise<string> {
+    const compteurParam = (this.avoirCompteur.get(ctx.artisanId) ?? 0) + 1;
+    let maxFromDb = 0;
+    for (const f of this.factureStore.filter((x) => x.artisanId === ctx.artisanId && x.typeDocument === "avoir")) {
+      const m = f.numero.match(/-(\d+)$/);
+      if (m) maxFromDb = Math.max(maxFromDb, parseInt(m[1], 10) + 1);
+    }
+    const compteur = Math.max(compteurParam, maxFromDb);
+    this.avoirCompteur.set(ctx.artisanId, compteur);
+    return `AV-${String(compteur).padStart(5, "0")}`;
+  }
+
+  async listAvoirs(ctx: TenantContext, factureOrigineId: number): Promise<Facture[]> {
+    return this.factureStore.filter(
+      (f) => f.artisanId === ctx.artisanId && f.typeDocument === "avoir" && f.factureOrigineId === factureOrigineId,
+    );
+  }
+
+  async createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null> {
+    if (!(await this.getById(ctx, input.factureOrigineId))) return null;
+    const totaux = calculerTotaux(input.lignes);
+    const now = new Date();
+    const avoir: Facture = {
+      id: ++this.seq,
+      artisanId: ctx.artisanId,
+      clientId: input.clientId,
+      devisId: null,
+      numero: input.numero,
+      dateFacture: now,
+      dateEcheance: null,
+      statut: "validee",
+      typeDocument: "avoir",
+      factureOrigineId: input.factureOrigineId,
+      objet: input.objet,
+      referenceClient: null,
+      siretDestinataire: null,
+      conditionsPaiement: input.conditionsPaiement,
+      notes: input.notes,
+      totalHT: totaux.totalHT,
+      totalTVA: totaux.totalTVA,
+      totalTTC: totaux.totalTTC,
+      montantPaye: "0.00",
+      datePaiement: null,
+      modePaiement: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.factureStore.push(avoir);
+    input.lignes.forEach((l, i) => {
+      this.lignesStore.push({
+        id: ++this.ligneSeq,
+        factureId: avoir.id,
+        ordre: i,
+        reference: null,
+        designation: l.designation,
+        description: l.description,
+        quantite: l.quantite,
+        unite: l.unite ?? "unité",
+        prixUnitaireHT: l.prixUnitaireHT,
+        tauxTVA: l.tauxTVA,
+        montantHT: l.montantHT,
+        montantTVA: l.montantTVA,
+        montantTTC: l.montantTTC,
+        type: "produit",
+      });
+    });
+    return avoir;
   }
 
   async ownsClient(ctx: TenantContext, clientId: number): Promise<boolean> {

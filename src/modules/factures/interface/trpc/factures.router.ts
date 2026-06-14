@@ -11,6 +11,7 @@ import {
   supprimerLigneFacture,
   changerStatutFacture,
   enregistrerPaiementFacture,
+  creerAvoir,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -137,6 +138,33 @@ export function createFacturesRouter(repo: IFactureRepository) {
     marquerEnRetard: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "en_retard")),
+
+    // Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs.
+    creerAvoir: protectedProcedure
+      .input(
+        z.object({
+          factureOrigineId: z.number().int(),
+          objet: z.string().max(500).nullish(),
+          notes: z.string().max(5000).nullish(),
+          lignes: z
+            .array(
+              z.object({
+                designation: z.string().min(1).max(500),
+                quantite: decimal,
+                prixUnitaireHT: decimal,
+                tauxTVA: decimal.optional(),
+                unite: z.string().max(20).nullish(),
+                description: z.string().max(5000).nullish(),
+              }),
+            )
+            .min(1)
+            .max(500),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { factureOrigineId, ...data } = input;
+        return creerAvoir(repo, ctx.tenant, factureOrigineId, data);
+      }),
 
     // Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée.
     enregistrerPaiement: protectedProcedure

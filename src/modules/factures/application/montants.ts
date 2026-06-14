@@ -36,6 +36,26 @@ export interface TotauxFacture {
   readonly totalTTC: string;
 }
 
+// Montants d'une ligne d'AVOIR (note de crédit) — montants **négatifs** (parité legacy
+// `createAvoir`). Le `prixUnitaireHT` est stocké négatif (−|pu|), la quantité reste positive.
+export interface MontantsAvoirLigne extends MontantsLigne {
+  readonly prixUnitaireHT: string; // négatif
+}
+
+export function calculerMontantsAvoirLigne(quantite: string, prixUnitaireHT: string, tauxTVA: string): MontantsAvoirLigne {
+  const q = Math.abs(Number(quantite) || 0);
+  const pu = Math.abs(Number(prixUnitaireHT) || 0);
+  const taux = Number(tauxTVA) || 0;
+  const ht = -(q * pu);
+  const tva = ht * (taux / 100);
+  return {
+    prixUnitaireHT: (-pu).toFixed(2),
+    montantHT: ht.toFixed(2),
+    montantTVA: tva.toFixed(2),
+    montantTTC: (ht + tva).toFixed(2),
+  };
+}
+
 export function calculerTotaux(
   lignes: readonly { montantHT: string; montantTVA: string; montantTTC: string }[],
 ): TotauxFacture {

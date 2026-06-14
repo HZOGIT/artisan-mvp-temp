@@ -1,6 +1,7 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository } from "./facture-repository";
+import type { IFactureRepository, AvoirLigneData } from "./facture-repository";
+import { calculerMontantsAvoirLigne } from "./montants";
 import type {
   Facture,
   FactureLigne,
@@ -156,6 +157,84 @@ export async function enregistrerPaiementFacture(
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
   return updated;
+}
+
+// Entrée de création d'un avoir (note de crédit) sur une facture d'origine.
+export type CreerAvoirInput = {
+  readonly lignes: readonly {
+    readonly designation: string;
+    readonly quantite: string;
+    readonly prixUnitaireHT: string;
+    readonly tauxTVA?: string;
+    readonly unite?: string | null;
+    readonly description?: string | null;
+  }[];
+  readonly objet?: string | null;
+  readonly notes?: string | null;
+};
+
+// Émet un avoir sur une facture d'origine (parité legacy `createAvoir`). ⚠️ Invariants :
+//  - la facture d'origine doit appartenir au tenant (anti-IDOR-FK) et **ne pas être brouillon**
+//    (on supprime/modifie un brouillon, on ne l'avoir pas) → Conflict ;
+//  - au moins une ligne valide ; montants de l'avoir **négatifs** (note de crédit) ;
+//  - **anti-sur-avoir** : le cumul des avoirs (déjà émis + nouveau, en valeur absolue) ne peut
+//    dépasser le total TTC de la facture d'origine → Validation/Conflict.
+export async function creerAvoir(
+  repo: IFactureRepository,
+  ctx: TenantContext,
+  factureOrigineId: number,
+  input: CreerAvoirInput,
+): Promise<Facture> {
+  const origine = await getFactureOwned(repo, ctx, factureOrigineId);
+  if (origine.statut === "brouillon") {
+    throw new ConflictError("Impossible d'émettre un avoir sur un brouillon (modifiez ou supprimez le brouillon)");
+  }
+  if (!input.lignes.length) throw new ValidationError("Un avoir doit comporter au moins une ligne");
+
+  // Lignes d'avoir à montants négatifs.
+  const lignes: AvoirLigneData[] = input.lignes.map((l) => {
+    assertLigneValide(l.designation, l.prixUnitaireHT, l.quantite);
+    const m = calculerMontantsAvoirLigne(l.quantite, l.prixUnitaireHT, l.tauxTVA ?? "20.00");
+    return {
+      designation: l.designation,
+      description: l.description ?? null,
+      quantite: String(Math.abs(Number(l.quantite) || 0)),
+      unite: l.unite ?? null,
+      prixUnitaireHT: m.prixUnitaireHT,
+      tauxTVA: l.tauxTVA ?? "20.00",
+      montantHT: m.montantHT,
+      montantTVA: m.montantTVA,
+      montantTTC: m.montantTTC,
+    };
+  });
+
+  // Anti-sur-avoir : cumul des avoirs ≤ total TTC de la facture d'origine.
+  const factureTotal = Math.abs(Number(origine.totalTTC) || 0);
+  const dejaCouvert = (await repo.listAvoirs(ctx, factureOrigineId)).reduce(
+    (sum, a) => sum + Math.abs(Number(a.totalTTC) || 0),
+    0,
+  );
+  const soldeRestant = factureTotal - dejaCouvert;
+  if (soldeRestant <= 0.01) {
+    throw new ConflictError("Le solde de cette facture est entièrement couvert par les avoirs existants");
+  }
+  const nouveauMontant = lignes.reduce((sum, l) => sum + Math.abs(Number(l.montantTTC) || 0), 0);
+  if (nouveauMontant > soldeRestant + 0.01) {
+    throw new ValidationError(`Le montant de l'avoir dépasse le solde disponible (${soldeRestant.toFixed(2)})`);
+  }
+
+  const numero = await repo.nextNumeroAvoir(ctx);
+  const avoir = await repo.createAvoir(ctx, {
+    factureOrigineId,
+    clientId: origine.clientId,
+    numero,
+    objet: input.objet ?? `Avoir sur facture ${origine.numero}`,
+    notes: input.notes ?? null,
+    conditionsPaiement: origine.conditionsPaiement,
+    lignes,
+  });
+  if (!avoir) throw new NotFoundError("Facture d'origine introuvable");
+  return avoir;
 }
 
 export async function changerStatutFacture(

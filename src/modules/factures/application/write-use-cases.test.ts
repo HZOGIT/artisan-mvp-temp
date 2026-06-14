@@ -9,6 +9,7 @@ import {
   supprimerLigneFacture,
   changerStatutFacture,
   enregistrerPaiementFacture,
+  creerAvoir,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
@@ -172,5 +173,44 @@ describe("factures — use-cases d'écriture", () => {
     await expect(enregistrerPaiementFacture(repo, A, f.id, { montant: "10.00" })).rejects.toBeInstanceOf(ConflictError);
     const id = await factureEmise(repo);
     await expect(enregistrerPaiementFacture(repo, B, id, { montant: "10.00" })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("creerAvoir — note de crédit à montants négatifs, numéro AV-, liée à l'origine", async () => {
+    const repo = repoWithClient(A, 100);
+    const id = await factureEmise(repo); // facture émise de 120.00 TTC
+    const avoir = await creerAvoir(repo, A, id, { lignes: [{ designation: "Remboursement", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }] });
+    expect(avoir.typeDocument).toBe("avoir");
+    expect(avoir.numero).toBe("AV-00001");
+    expect(avoir.factureOrigineId).toBe(id);
+    expect(avoir.statut).toBe("validee");
+    expect(avoir.totalHT).toBe("-100.00");
+    expect(avoir.totalTTC).toBe("-120.00");
+  });
+
+  it("creerAvoir — sur un brouillon → Conflict ; origine d'un autre tenant → NotFound ; sans ligne → Validation", async () => {
+    const repo = repoWithClient(A, 100);
+    const brouillon = await creerFacture(repo, A, { clientId: 100 });
+    await ajouterLigneFacture(repo, A, brouillon.id, { designation: "L", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
+    await expect(creerAvoir(repo, A, brouillon.id, { lignes: [{ designation: "x", quantite: "1", prixUnitaireHT: "10" }] })).rejects.toBeInstanceOf(ConflictError);
+    const id = await factureEmise(repo);
+    await expect(creerAvoir(repo, B, id, { lignes: [{ designation: "x", quantite: "1", prixUnitaireHT: "10" }] })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(creerAvoir(repo, A, id, { lignes: [] })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("creerAvoir — anti-sur-avoir : un avoir total puis un second dépassant le solde → Conflict/Validation", async () => {
+    const repo = repoWithClient(A, 100);
+    const id = await factureEmise(repo); // 120.00 TTC
+    // avoir partiel de 60.00 TTC (50 HT @20%)
+    await creerAvoir(repo, A, id, { lignes: [{ designation: "Partiel", quantite: "1", prixUnitaireHT: "50.00", tauxTVA: "20" }] });
+    // second avoir de 60.00 TTC → solde exactement couvert (OK)
+    await creerAvoir(repo, A, id, { lignes: [{ designation: "Solde", quantite: "1", prixUnitaireHT: "50.00", tauxTVA: "20" }] });
+    // tout est couvert → un 3e avoir → Conflict (solde épuisé)
+    await expect(creerAvoir(repo, A, id, { lignes: [{ designation: "Trop", quantite: "1", prixUnitaireHT: "10.00", tauxTVA: "20" }] })).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("creerAvoir — un avoir dépassant le total de la facture → Validation", async () => {
+    const repo = repoWithClient(A, 100);
+    const id = await factureEmise(repo); // 120.00 TTC
+    await expect(creerAvoir(repo, A, id, { lignes: [{ designation: "Excessif", quantite: "1", prixUnitaireHT: "200.00", tauxTVA: "20" }] })).rejects.toBeInstanceOf(ValidationError);
   });
 });
