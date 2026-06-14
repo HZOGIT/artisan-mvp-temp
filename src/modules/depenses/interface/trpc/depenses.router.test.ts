@@ -50,6 +50,7 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     await admin.query('delete from depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from categories_depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from budgets_categories where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from regles_categorisation where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from chantiers where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -137,6 +138,19 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     const carb = data.find((b) => b.categorie === "Carburant")!;
     expect(carb).toMatchObject({ budget: 500, reel: 200, ecart: 300, pct: 40 });
     expect((await callQuery(server, "depenses.getBudgets", { mois: "2026-08" })).statusCode).toBe(401); // sans cookie
+  });
+
+  it("règles de catégorisation (parité client) : 401 / getRegles scopé / create→list / isolation / delete", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    expect((await callQuery(server, "depenses.getRegles", undefined)).statusCode).toBe(401);
+    expect((await callQuery(server, "depenses.getRegles", undefined, tA)).json().result.data).toEqual([]);
+    expect((await callMutation(server, "depenses.createRegle", { motifLibelle: "ESSENCE", categorie: "Carburant" }, tA)).json().result.data).toEqual({ success: true });
+    const listA = (await callQuery(server, "depenses.getRegles", undefined, tA)).json().result.data as Array<{ id: number; motifLibelle: string; categorie: string }>;
+    expect(listA).toContainEqual(expect.objectContaining({ motifLibelle: "ESSENCE", categorie: "Carburant" }));
+    expect((await callQuery(server, "depenses.getRegles", undefined, tB)).json().result.data).toEqual([]); // isolation
+    expect((await callMutation(server, "depenses.deleteRegle", { id: listA[0].id }, tA)).json().result.data).toEqual({ success: true });
+    expect((await callQuery(server, "depenses.getRegles", undefined, tA)).json().result.data).toEqual([]);
   });
 
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {

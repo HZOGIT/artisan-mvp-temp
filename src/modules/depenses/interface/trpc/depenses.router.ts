@@ -14,6 +14,10 @@ import type { IBudgetCategorieRepository } from "../../../budgets-categories/app
 import { budgetsParMois } from "../../../budgets-categories/application/read-use-cases";
 import { creerBudget, modifierBudget } from "../../../budgets-categories/application/write-use-cases";
 import { budgetsRealises } from "../../application/budgets-realises-use-case";
+// Composition : règles de catégorisation auto via `trpc.depenses.getRegles/createRegle/deleteRegle`.
+import type { IRegleCategorisationRepository } from "../../../regles-categorisation/application/regle-categorisation-repository";
+import { listRegles } from "../../../regles-categorisation/application/read-use-cases";
+import { creerRegle, supprimerRegle } from "../../../regles-categorisation/application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -99,6 +103,7 @@ export function createDepensesRouter(
   repo: IDepenseRepository,
   categorieRepo: ICategorieDepenseRepository,
   budgetRepo: IBudgetCategorieRepository,
+  regleRepo: IRegleCategorisationRepository,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -180,6 +185,23 @@ export function createDepensesRouter(
         const existant = (await budgetsParMois(budgetRepo, ctx.tenant, input.mois)).find((b) => b.categorie === input.categorie);
         if (existant) await modifierBudget(budgetRepo, ctx.tenant, existant.id, { budget: montant });
         else await creerBudget(budgetRepo, ctx.tenant, { categorie: input.categorie, mois: input.mois, budget: montant });
+        return { success: true };
+      }),
+
+    // ── Règles de catégorisation auto (parité client : trpc.depenses.getRegles/...) ────
+    getRegles: protectedProcedure.query(({ ctx }) => listRegles(regleRepo, ctx.tenant)),
+
+    createRegle: protectedProcedure
+      .input(z.object({ motifLibelle: z.string().max(255), categorie: z.string().max(50) }))
+      .mutation(async ({ ctx, input }) => {
+        await creerRegle(regleRepo, ctx.tenant, { motifLibelle: input.motifLibelle, categorie: input.categorie });
+        return { success: true };
+      }),
+
+    deleteRegle: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await supprimerRegle(regleRepo, ctx.tenant, input.id);
         return { success: true };
       }),
   });

@@ -201,10 +201,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // mêmes instances.
   const categorieDepenseRepo = deps.categorieDepenseRepo ?? new CategorieDepenseRepositoryDrizzle(getDbHandle().db);
   const budgetCategorieRepo = deps.budgetCategorieRepo ?? new BudgetCategorieRepositoryDrizzle(getDbHandle().db);
+  const regleCategorisationRepo = deps.regleCategorisationRepo ?? new RegleCategorisationRepositoryDrizzle(getDbHandle().db);
   const depenses = createDepensesModule({
     repository: deps.depenseRepo ?? new DepenseRepositoryDrizzle(getDbHandle().db),
     categorieRepository: categorieDepenseRepo,
     budgetRepository: budgetCategorieRepo,
+    regleRepository: regleCategorisationRepo,
   });
   const devis = createDevisModule({
     repository: deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db),
@@ -258,7 +260,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: budgetCategorieRepo,
   });
   const reglesCategorisation = createReglesCategorisationModule({
-    repository: deps.regleCategorisationRepo ?? new RegleCategorisationRepositoryDrizzle(getDbHandle().db),
+    repository: regleCategorisationRepo,
   });
   const previsionsCA = createPrevisionsCAModule({
     repository: deps.previsionCARepo ?? new PrevisionCARepositoryDrizzle(getDbHandle().db),
