@@ -18,6 +18,7 @@ import type { DevisModule } from "../../modules/devis/devis.module";
 import type { FacturesModule } from "../../modules/factures/factures.module";
 import type { EcrituresModule } from "../../modules/ecritures/ecritures.module";
 import type { ArticlesModule } from "../../modules/articles/articles.module";
+import type { ParametresModule } from "../../modules/parametres/parametres.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -39,6 +40,7 @@ export interface AppRouterDeps {
   readonly factures: FacturesModule;
   readonly ecritures: EcrituresModule;
   readonly articles: ArticlesModule;
+  readonly parametres: ParametresModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -69,6 +71,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     factures: deps.factures.router,
     ecritures: deps.ecritures.router,
     articles: deps.articles.router,
+    parametres: deps.parametres.router,
   });
 }
 

@@ -64,6 +64,9 @@ import type { IEcritureRepository } from "./modules/ecritures/application/ecritu
 import { createArticlesModule } from "./modules/articles/articles.module";
 import { ArticleRepositoryDrizzle } from "./modules/articles/infra/article-repository-drizzle";
 import type { IArticleRepository } from "./modules/articles/application/article-repository";
+import { createParametresModule } from "./modules/parametres/parametres.module";
+import { ParametresRepositoryDrizzle } from "./modules/parametres/infra/parametres-repository-drizzle";
+import type { IParametresRepository } from "./modules/parametres/application/parametres-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -95,6 +98,7 @@ export interface AppDeps extends ContextDeps {
   readonly compta?: ComptaPort;
   readonly ecritureRepo?: IEcritureRepository;
   readonly articleRepo?: IArticleRepository;
+  readonly parametresRepo?: IParametresRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -172,7 +176,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const articles = createArticlesModule({
     repository: deps.articleRepo ?? new ArticleRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles });
+  const parametres = createParametresModule({
+    repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

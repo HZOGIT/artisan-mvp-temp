@@ -18,6 +18,12 @@ describe("parametres.module", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["get", "upsert"]);
   });
 
+  it("expose un routeur tRPC assemblé (get/update)", () => {
+    const module = createParametresModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["get", "update"]);
+  });
+
   it("defaultParametres aligne les défauts de la table et n'expose pas de compteur modifiable", () => {
     const d = defaultParametres(42);
     expect(d.artisanId).toBe(42);
