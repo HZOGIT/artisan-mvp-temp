@@ -71,6 +71,7 @@ describe("factures.module", () => {
       "addLigne",
       "convertirDepuisDevis",
       "create",
+      "createAvoir",
       "creerAvoir",
       "delete",
       "deleteLigne",

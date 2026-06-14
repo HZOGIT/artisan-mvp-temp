@@ -78,6 +78,26 @@ const ligneUpdateSchema = z.object({
   type: ligneTypeEnum.optional(),
 });
 
+// Schéma d'avoir partagé par `creerAvoir` et son alias client `createAvoir` (même use-case).
+const avoirInputSchema = z.object({
+  factureOrigineId: z.number().int(),
+  objet: z.string().max(500).nullish(),
+  notes: z.string().max(5000).nullish(),
+  lignes: z
+    .array(
+      z.object({
+        designation: z.string().min(1).max(500),
+        quantite: decimal,
+        prixUnitaireHT: decimal,
+        tauxTVA: decimal.optional(),
+        unite: z.string().max(20).nullish(),
+        description: z.string().max(5000).nullish(),
+      }),
+    )
+    .min(1)
+    .max(500),
+});
+
 // Routeur tRPC du domaine factures. Transport mince : valide les inputs (zod), délègue aux
 // use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
 // laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
@@ -159,31 +179,16 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .mutation(({ ctx, input }) => convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId)),
 
     // Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs.
-    creerAvoir: protectedProcedure
-      .input(
-        z.object({
-          factureOrigineId: z.number().int(),
-          objet: z.string().max(500).nullish(),
-          notes: z.string().max(5000).nullish(),
-          lignes: z
-            .array(
-              z.object({
-                designation: z.string().min(1).max(500),
-                quantite: decimal,
-                prixUnitaireHT: decimal,
-                tauxTVA: decimal.optional(),
-                unite: z.string().max(20).nullish(),
-                description: z.string().max(5000).nullish(),
-              }),
-            )
-            .min(1)
-            .max(500),
-        }),
-      )
-      .mutation(({ ctx, input }) => {
-        const { factureOrigineId, ...data } = input;
-        return creerAvoir(repo, ctx.tenant, factureOrigineId, data);
-      }),
+    creerAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
+      const { factureOrigineId, ...data } = input;
+      return creerAvoir(repo, ctx.tenant, factureOrigineId, data);
+    }),
+
+    // Alias de surface (parité client `trpc.factures.createAvoir`) : même use-case que `creerAvoir`.
+    createAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
+      const { factureOrigineId, ...data } = input;
+      return creerAvoir(repo, ctx.tenant, factureOrigineId, data);
+    }),
 
     // Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée.
     enregistrerPaiement: protectedProcedure

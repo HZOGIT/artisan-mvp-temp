@@ -257,6 +257,19 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "factures.getAvoirsByFacture", { factureId: id }, tB)).json().result.data).toEqual([]);
   });
 
+  it("createAvoir (alias parité client) : délègue au même use-case que creerAvoir (409 sur brouillon, anti-IDOR 404, 401)", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const lignes = [{ designation: "Remb", quantite: "1", prixUnitaireHT: "30.00", tauxTVA: "20.00" }];
+    const id = (await callMutation(server, "factures.create", { clientId: clientA, objet: "Origine alias" }, tA)).json().result.data.id as number;
+    // 401 sans cookie
+    expect((await callMutation(server, "factures.createAvoir", { factureOrigineId: id, lignes })).statusCode).toBe(401);
+    // même garde que creerAvoir : pas d'avoir sur un brouillon → 409
+    expect((await callMutation(server, "factures.createAvoir", { factureOrigineId: id, lignes }, tA)).statusCode).toBe(409);
+    // anti-IDOR : B ne crée pas d'avoir sur la facture de A → 404
+    expect((await callMutation(server, "factures.createAvoir", { factureOrigineId: id, lignes }, tB)).statusCode).toBe(404);
+  });
+
   it("getAuditLog (parité client) : entrées triées récent→ancien, scopées ; hors tenant → [] ; 401", async () => {
     const tA = await token(UA);
     const tB = await token(UB);
