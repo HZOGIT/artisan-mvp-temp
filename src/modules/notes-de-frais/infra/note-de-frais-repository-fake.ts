@@ -1,6 +1,7 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch } from "../application/note-de-frais-repository";
 import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
+import { computeNextNoteFraisNumero } from "../application/numero";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
 // tenant et les valeurs par défaut PG (`statut` → brouillon, montants → "0", dates workflow
@@ -8,6 +9,14 @@ import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from
 export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
   private store: NoteDeFrais[] = [];
   private seq = 0;
+
+  async nextNumero(ctx: TenantContext): Promise<string> {
+    // Dernière note du tenant (par id décroissant) → numéro suivant (parité legacy).
+    const last = this.store
+      .filter((n) => n.artisanId === ctx.artisanId)
+      .reduce<NoteDeFrais | null>((acc, n) => (acc === null || n.id > acc.id ? n : acc), null);
+    return computeNextNoteFraisNumero(last?.numero ?? "");
+  }
 
   async list(ctx: TenantContext): Promise<NoteDeFrais[]> {
     return this.store.filter((n) => n.artisanId === ctx.artisanId);

@@ -22,6 +22,7 @@ import { creerRegle, supprimerRegle } from "../../../regles-categorisation/appli
 // porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
 import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
 import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
+import { creerNoteDeFrais } from "../../../notes-de-frais/application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -214,6 +215,30 @@ export function createDepensesRouter(
     // Read seul pour l'instant ; les mutations (create/soumettre/approuver/rejeter/payer) viendront
     // en slices dédiés en préservant l'anti self-approbation porté par le domaine notes-de-frais.
     listNotesFrais: protectedProcedure.query(({ ctx }) => listNotesDeFrais(noteRepo, ctx.tenant)),
+
+    // Création d'une note de frais (parité client : trpc.depenses.createNoteFrais). ⚠️ `numero`
+    // est généré CÔTÉ SERVEUR (noteRepo.nextNumero) — jamais fourni par le client — et `userId`
+    // est forcé au créateur dans le use-case (anti-IDOR demandeur). `depenseIds` est accepté mais
+    // ignoré pour l'instant : la cascade dépenses↔note (marquage des lignes) sort de ce slice et
+    // sera ajoutée avec addDepenseToNoteFrais/removeDepenseFromNoteFrais.
+    createNoteFrais: protectedProcedure
+      .input(
+        z.object({
+          titre: z.string().min(1).max(255),
+          periodeDebut: isoDate,
+          periodeFin: isoDate,
+          depenseIds: z.array(z.number().int()).max(1000).optional(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const numero = await noteRepo.nextNumero(ctx.tenant);
+        return creerNoteDeFrais(noteRepo, ctx.tenant, {
+          numero,
+          titre: input.titre,
+          periodeDebut: input.periodeDebut,
+          periodeFin: input.periodeFin,
+        });
+      }),
 
     // ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
     // On appelle donc directement le repo (getById → null) plutôt que le use-case `getNoteDeFrais`

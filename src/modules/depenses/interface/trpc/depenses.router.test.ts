@@ -184,6 +184,28 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect(resB.json().result.data).toBeNull();
   });
 
+  it("createNoteFrais (parité client) : numéro généré serveur (NDF-), userId forcé au créateur, 401 sans cookie", async () => {
+    const tA = await token(UA);
+    expect(
+      (await callMutation(server, "depenses.createNoteFrais", { titre: "X", periodeDebut: "2027-05-01", periodeFin: "2027-05-31" })).statusCode,
+    ).toBe(401);
+    const created = await callMutation(
+      server,
+      "depenses.createNoteFrais",
+      { titre: "Note créée", periodeDebut: "2027-05-01", periodeFin: "2027-05-31" },
+      tA,
+    );
+    expect(created.statusCode).toBe(200);
+    const note = created.json().result.data as { id: number; numero: string; userId: number; statut: string; titre: string };
+    expect(note.numero).toMatch(/^NDF-\d{5}$/); // numérotation maîtrisée côté serveur (parité legacy)
+    expect(note.userId).toBe(UA); // demandeur forcé au créateur (anti-IDOR)
+    expect(note.statut).toBe("brouillon");
+    expect(note.titre).toBe("Note créée");
+    // visible dans la liste scopée tenant
+    const listA = (await callQuery(server, "depenses.listNotesFrais", undefined, tA)).json().result.data as Array<{ id: number }>;
+    expect(listA).toContainEqual(expect.objectContaining({ id: note.id }));
+  });
+
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
     const tA = await token(UA);
     const created = await callMutation(

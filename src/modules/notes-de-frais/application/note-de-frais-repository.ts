@@ -32,4 +32,7 @@ export interface INoteDeFraisRepository {
   // note n'appartient pas au tenant. ⚠️ Les gardes (anti self-approbation, transitions valides,
   // idempotence) sont portées par les use-cases ; l'infra applique seulement le patch.
   setWorkflow(ctx: TenantContext, id: number, patch: NoteDeFraisWorkflowPatch): Promise<NoteDeFrais | null>;
+  // Prochain numéro de note de frais (`NDF-00001`), scopé tenant, généré côté serveur (jamais fourni
+  // par le client) → numérotation comptable maîtrisée (parité legacy `getNextNoteFraisNumero`).
+  nextNumero(ctx: TenantContext): Promise<string>;
 }

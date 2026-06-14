@@ -5,6 +5,7 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch } from "../application/note-de-frais-repository";
 import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
+import { computeNextNoteFraisNumero } from "../application/numero";
 
 type NoteRow = typeof notesDeFrais.$inferSelect;
 
@@ -33,6 +34,18 @@ function toNoteDeFrais(r: NoteRow): NoteDeFrais {
 // `artisan_id` (snake_case). ⚠️ `update` ne touche que les métadonnées (`UpdateNoteDeFraisInput`
 // exclut statut/dates workflow/commentaire) → le workflow d'approbation est porté ailleurs.
 export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
+  nextNumero(ctx: TenantContext): Promise<string> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ numero: notesDeFrais.numero })
+        .from(notesDeFrais)
+        .where(eq(notesDeFrais.artisan_id, ctx.artisanId))
+        .orderBy(desc(notesDeFrais.id))
+        .limit(1);
+      return computeNextNoteFraisNumero(row?.numero ?? "");
+    });
+  }
+
   constructor(private readonly db: DbClient) {}
 
   list(ctx: TenantContext): Promise<NoteDeFrais[]> {
