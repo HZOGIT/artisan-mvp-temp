@@ -61,6 +61,9 @@ import { FactureReaderDrizzle } from "./modules/ecritures/infra/facture-reader-d
 import { ComptaEcrituresAdapter } from "./modules/ecritures/infra/compta-ecritures-adapter";
 import { createEcrituresModule } from "./modules/ecritures/ecritures.module";
 import type { IEcritureRepository } from "./modules/ecritures/application/ecriture-repository";
+import { createArticlesModule } from "./modules/articles/articles.module";
+import { ArticleRepositoryDrizzle } from "./modules/articles/infra/article-repository-drizzle";
+import type { IArticleRepository } from "./modules/articles/application/article-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -91,6 +94,7 @@ export interface AppDeps extends ContextDeps {
   readonly devisReader?: IDevisReader;
   readonly compta?: ComptaPort;
   readonly ecritureRepo?: IEcritureRepository;
+  readonly articleRepo?: IArticleRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -165,7 +169,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const ecritures = createEcrituresModule({
     repository: deps.ecritureRepo ?? new EcritureRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures });
+  const articles = createArticlesModule({
+    repository: deps.articleRepo ?? new ArticleRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
