@@ -339,6 +339,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const articles = createArticlesModule({
     repository: articleRepo,
+    // suggererArticlesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan) +
+    // lecture du métier de l'artisan (contexte spécialisé). Injectables en test (FakeLlmPort).
+    ia: {
+      llm: deps.llm ?? new GeminiLlmAdapter(),
+      rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+      artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+    },
   });
   const parametres = createParametresModule({
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),

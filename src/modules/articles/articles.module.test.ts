@@ -35,6 +35,7 @@ describe("articles.module", () => {
       "getArtisanArticles",
       "getById",
       "list",
+      "suggererArticlesIA",
       "update",
       "updateArtisanArticle",
     ]);
