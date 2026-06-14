@@ -100,4 +100,12 @@ export class FakeModeleDevisRepository implements IModeleDevisRepository {
     this.lignes.delete(id);
     return true;
   }
+
+  async addLigne(ctx: TenantContext, modeleId: number, input: CreateModeleDevisLigneInput): Promise<ModeleDevisLigne | null> {
+    if (!this.owned(ctx, modeleId)) return null;
+    const existantes = this.lignes.get(modeleId) ?? [];
+    const ligne = this.toLigne(modeleId, input, existantes.length + 1);
+    this.lignes.set(modeleId, [...existantes, ligne]);
+    return ligne;
+  }
 }

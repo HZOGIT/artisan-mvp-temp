@@ -1,5 +1,11 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { CreateModeleDevisInput, ModeleDevis, UpdateModeleDevisInput } from "../domain/modele-devis";
+import type {
+  CreateModeleDevisInput,
+  CreateModeleDevisLigneInput,
+  ModeleDevis,
+  ModeleDevisLigne,
+  UpdateModeleDevisInput,
+} from "../domain/modele-devis";
 
 // Port du repository modeles-devis (agrégat en-tête + lignes). Chaque méthode exige le
 // TenantContext (scope tenant + RLS). `modeles_devis` possède un `artisanId` (double cloisonnement
@@ -15,4 +21,7 @@ export interface IModeleDevisRepository {
   update(ctx: TenantContext, id: number, input: UpdateModeleDevisInput): Promise<ModeleDevis | null>;
   // false si le modèle n'appartient pas au tenant (supprime aussi ses lignes).
   delete(ctx: TenantContext, id: number): Promise<boolean>;
+  // Ajoute UNE ligne à un modèle possédé (sans toucher aux autres lignes — ≠ `update` qui remplace
+  // l'ensemble). null si le modèle n'appartient pas au tenant (anti-IDOR via le parent).
+  addLigne(ctx: TenantContext, modeleId: number, input: CreateModeleDevisLigneInput): Promise<ModeleDevisLigne | null>;
 }

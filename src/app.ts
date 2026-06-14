@@ -202,6 +202,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // Repo factures partagé : module factures + composé par contrats (generateFacture) ET devis
   // (convertToFacture). Hoisté pour éviter le TDZ (devis se compose avant le module factures).
   const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
+  // Repo modèles de devis partagé : module modelesDevis + composé par devis (getModeles/…).
+  const modeleDevisRepo = deps.modeleDevisRepo ?? new ModeleDevisRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
   });
@@ -281,6 +283,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
     // `factureRepo` (hoisté) + lecteur devis vu factures.
     converter: new FacturesDevisToFactureConverter(factureRepo, new DevisReaderDrizzle(getDbHandle().db)),
+    // Modèles de devis exposés sous `devis.*` : repo partagé avec le module modelesDevis.
+    modeleRepository: modeleDevisRepo,
   });
   // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
   // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.
@@ -316,7 +320,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.modeleEmailRepo ?? new ModeleEmailRepositoryDrizzle(getDbHandle().db),
   });
   const modelesDevis = createModelesDevisModule({
-    repository: deps.modeleDevisRepo ?? new ModeleDevisRepositoryDrizzle(getDbHandle().db),
+    repository: modeleDevisRepo,
   });
   const configRelances = createConfigRelancesModule({
     repository: deps.configRelancesRepo ?? new ConfigRelancesRepositoryDrizzle(getDbHandle().db),

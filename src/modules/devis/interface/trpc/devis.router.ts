@@ -4,6 +4,9 @@ import type { IDevisRepository } from "../../application/devis-repository";
 import { listDevis, getDevisDetail, listLignesDevis } from "../../application/read-use-cases";
 import { envoyerDevisParEmail, type DevisMailingDeps } from "../../application/envoyer-devis-email";
 import type { DevisToFactureConverter } from "../../application/devis-to-facture-converter";
+import type { IModeleDevisRepository } from "../../../modeles-devis/application/modele-devis-repository";
+import { listModelesDevis, getModeleDevisAvecLignes } from "../../../modeles-devis/application/read-use-cases";
+import { creerModeleDevis, ajouterLigneModeleDevis } from "../../../modeles-devis/application/write-use-cases";
 import {
   creerDevis,
   modifierDevis,
@@ -75,7 +78,12 @@ const ligneUpdateSchema = z.object({
 // Routeur tRPC du domaine devis. Transport mince : valide les inputs (zod), délègue aux use-cases
 // (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-acceptation via
 // ctx.tenant), laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
-export function createDevisRouter(repo: IDevisRepository, mailing: DevisMailingDeps, converter: DevisToFactureConverter) {
+export function createDevisRouter(
+  repo: IDevisRepository,
+  mailing: DevisMailingDeps,
+  converter: DevisToFactureConverter,
+  modeleRepo: IModeleDevisRepository,
+) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDevis(repo, ctx.tenant)),
 
@@ -143,6 +151,45 @@ export function createDevisRouter(repo: IDevisRepository, mailing: DevisMailingD
     expirer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
+
+    // ── Modèles de devis (gabarits réutilisables) exposés sous `devis.*` (parité client) ──────────
+    getModeles: protectedProcedure.query(({ ctx }) => listModelesDevis(modeleRepo, ctx.tenant)),
+
+    getModeleWithLignes: protectedProcedure
+      .input(z.object({ modeleId: z.number().int() }))
+      .query(({ ctx, input }) => getModeleDevisAvecLignes(modeleRepo, ctx.tenant, input.modeleId)),
+
+    createModele: protectedProcedure
+      .input(z.object({ nom: z.string().min(1).max(255), description: z.string().max(2000).optional(), notes: z.string().max(5000).optional() }))
+      .mutation(({ ctx, input }) => creerModeleDevis(modeleRepo, ctx.tenant, input)),
+
+    // Le client envoie des NOMBRES (quantite/prix/TVA/remise) ; le domaine attend des décimaux string.
+    addLigneToModele: protectedProcedure
+      .input(
+        z.object({
+          modeleId: z.number().int(),
+          articleId: z.number().int().optional(),
+          designation: z.string().min(1).max(255),
+          description: z.string().max(5000).optional(),
+          quantite: z.number().default(1),
+          unite: z.string().max(20).default("unité"),
+          prixUnitaireHT: z.number().default(0),
+          tauxTVA: z.number().min(0).max(100).default(20),
+          remise: z.number().min(0).max(100).optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        ajouterLigneModeleDevis(modeleRepo, ctx.tenant, input.modeleId, {
+          articleId: input.articleId ?? null,
+          designation: input.designation,
+          description: input.description ?? null,
+          quantite: String(input.quantite),
+          unite: input.unite,
+          prixUnitaireHT: String(input.prixUnitaireHT),
+          tauxTVA: String(input.tauxTVA),
+          remise: input.remise !== undefined ? String(input.remise) : undefined,
+        }),
+      ),
 
     // Convertit un devis accepté en facture brouillon (cross-domaine) — parité `convertToFacture`.
     // 404 devis hors tenant ; Conflict si non accepté ou déjà converti (invariants factures).

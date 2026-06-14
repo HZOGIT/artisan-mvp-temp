@@ -150,6 +150,15 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
     return toModele(header, lignes.map(toLigne));
   }
 
+  addLigne(ctx: TenantContext, modeleId: number, input: CreateModeleDevisLigneInput): Promise<ModeleDevisLigne | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Scope via le parent : insertion seulement si le modèle appartient au tenant (anti-IDOR).
+      if (!(await this.owns(tx, ctx, modeleId))) return null;
+      const [row] = await tx.insert(modelesDevisLignes).values(ligneValues(modeleId, input)).returning();
+      return toLigne(row);
+    });
+  }
+
   private async owns(tx: DbClient, ctx: TenantContext, id: number): Promise<boolean> {
     const [row] = await tx
       .select({ id: modelesDevis.id })

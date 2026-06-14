@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { FakeModeleDevisRepository } from "../infra/modele-devis-repository-fake";
-import { creerModeleDevis, modifierModeleDevis, supprimerModeleDevis } from "./write-use-cases";
-import { listModelesDevis, getModeleDevis } from "./read-use-cases";
+import { creerModeleDevis, modifierModeleDevis, supprimerModeleDevis, ajouterLigneModeleDevis } from "./write-use-cases";
+import { listModelesDevis, getModeleDevis, getModeleDevisAvecLignes } from "./read-use-cases";
+import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 const A = ctx(1);
+const B = ctx(2);
 const ligne = (over = {}) => ({ designation: "Prestation", quantite: "1.00", prixUnitaireHT: "10.00", ...over });
 const nbDefauts = async (repo: FakeModeleDevisRepository) => (await listModelesDevis(repo, A)).filter((m) => m.isDefault).length;
 
@@ -70,5 +72,33 @@ describe("modeles-devis — write use-cases", () => {
     const reload1 = await getModeleDevis(repo, A, m1.id);
     expect(reload1.isDefault).toBe(false);
     expect(reload1.lignes).toHaveLength(2); // lignes préservées
+  });
+
+  it("ajouterLigneModeleDevis : ajoute UNE ligne (sans toucher aux autres) ; getModeleDevisAvecLignes la reflète", async () => {
+    const repo = new FakeModeleDevisRepository();
+    const m = await creerModeleDevis(repo, A, { nom: "Trame", lignes: [ligne({ designation: "L1" })] });
+    const ajoutee = await ajouterLigneModeleDevis(repo, A, m.id, { designation: "L2", quantite: "3", prixUnitaireHT: "50" });
+    expect(ajoutee.designation).toBe("L2");
+    const detail = await getModeleDevisAvecLignes(repo, A, m.id);
+    expect(detail.lignes).toHaveLength(2);
+    expect(detail.lignes.map((l) => l.designation)).toEqual(["L1", "L2"]);
+  });
+
+  it("ajouterLigneModeleDevis : modèle hors tenant → NotFound (anti-IDOR via parent)", async () => {
+    const repo = new FakeModeleDevisRepository();
+    const m = await creerModeleDevis(repo, A, { nom: "Trame" });
+    await expect(ajouterLigneModeleDevis(repo, B, m.id, { designation: "X" })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("ajouterLigneModeleDevis : désignation vide → Validation", async () => {
+    const repo = new FakeModeleDevisRepository();
+    const m = await creerModeleDevis(repo, A, { nom: "Trame" });
+    await expect(ajouterLigneModeleDevis(repo, A, m.id, { designation: "  " })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("getModeleDevisAvecLignes : modèle d'un autre tenant → NotFound", async () => {
+    const repo = new FakeModeleDevisRepository();
+    const m = await creerModeleDevis(repo, A, { nom: "Trame" });
+    await expectCrossTenantDenied(() => getModeleDevisAvecLignes(repo, B, m.id));
   });
 });

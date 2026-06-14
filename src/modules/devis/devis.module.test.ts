@@ -11,6 +11,16 @@ const stubMailing: DevisMailingDeps = {
   rateLimiter: { check: async () => true },
 };
 const stubConverter = { convertir: async () => ({ id: 1, numero: "FAC-00001" }) };
+const stubModeleRepo = {
+  list: async () => [],
+  getById: async () => null,
+  create: async () => {
+    throw new Error("non implémenté (stub)");
+  },
+  update: async () => null,
+  delete: async () => false,
+  addLigne: async () => null,
+} as unknown as import("../modeles-devis/application/modele-devis-repository").IModeleDevisRepository;
 
 const stubRepo: IDevisRepository = {
   list: async () => [],
@@ -31,7 +41,7 @@ const stubRepo: IDevisRepository = {
 
 describe("devis.module", () => {
   it("createDevisModule câble le repository injecté", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -53,13 +63,15 @@ describe("devis.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter, modeleRepository: stubModeleRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "accepter",
       "addLigne",
+      "addLigneToModele",
       "convertToFacture",
       "create",
+      "createModele",
       "delete",
       "deleteLigne",
       "duplicate",
@@ -67,6 +79,8 @@ describe("devis.module", () => {
       "expirer",
       "getById",
       "getLignes",
+      "getModeleWithLignes",
+      "getModeles",
       "list",
       "refuser",
       "sendByEmail",

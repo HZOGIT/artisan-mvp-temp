@@ -77,4 +77,15 @@ describe.skipIf(!URL)("ModeleDevisRepositoryDrizzle (PG, RLS + agrégat header+l
     const orphelines = await admin.query('select count(*)::int as n from modeles_devis_lignes where "modeleId"=$1', [m.id]);
     expect(orphelines.rows[0].n).toBe(0);
   });
+
+  it("addLigne : ajoute UNE ligne au modèle possédé (sans toucher aux autres) ; null si hors tenant", async () => {
+    const m = await repo.create(ctx(A), { nom: "Trame", lignes: [ligne({ designation: "L1" })] });
+    const ajoutee = await repo.addLigne(ctx(A), m.id, { designation: "L2", quantite: "3.00", prixUnitaireHT: "50.00" });
+    expect(ajoutee?.designation).toBe("L2");
+    expect(ajoutee?.modeleId).toBe(m.id);
+    expect((await repo.getById(ctx(A), m.id))?.lignes.map((l) => l.designation)).toEqual(["L1", "L2"]);
+    // anti-IDOR via le parent : B ne peut pas ajouter de ligne au modèle de A
+    expect(await repo.addLigne(ctx(B), m.id, { designation: "Hack" })).toBeNull();
+    expect((await repo.getById(ctx(A), m.id))?.lignes).toHaveLength(2);
+  });
 });

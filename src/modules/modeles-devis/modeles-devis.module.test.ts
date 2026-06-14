@@ -10,6 +10,7 @@ const stubRepo: IModeleDevisRepository = {
   },
   update: async () => null,
   delete: async () => false,
+  addLigne: async () => null,
 };
 
 describe("modeles-devis.module", () => {
@@ -19,7 +20,7 @@ describe("modeles-devis.module", () => {
   });
 
   it("le port expose l'agrégat CRUD attendu (list léger / getById complet)", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["addLigne", "create", "delete", "getById", "list", "update"]);
   });
 
   it("expose un routeur tRPC assemblé (CRUD agrégat)", () => {
