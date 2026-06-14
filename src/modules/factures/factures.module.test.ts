@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { createFacturesModule } from "./factures.module";
 import type { IFactureRepository } from "./application/facture-repository";
+import type { IDevisReader } from "./application/devis-reader";
+
+const stubReader: IDevisReader = {
+  getDevis: async () => null,
+  getLignes: async () => [],
+};
 
 const stubRepo: IFactureRepository = {
   list: async () => [],
@@ -28,7 +34,7 @@ const stubRepo: IFactureRepository = {
 
 describe("factures.module", () => {
   it("createFacturesModule câble le repository injecté", () => {
-    const module = createFacturesModule({ repository: stubRepo });
+    const module = createFacturesModule({ repository: stubRepo, devisReader: stubReader });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -57,10 +63,11 @@ describe("factures.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
-    const module = createFacturesModule({ repository: stubRepo });
+    const module = createFacturesModule({ repository: stubRepo, devisReader: stubReader });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "addLigne",
+      "convertirDepuisDevis",
       "create",
       "creerAvoir",
       "delete",

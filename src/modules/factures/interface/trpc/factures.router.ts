@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IFactureRepository } from "../../application/facture-repository";
+import type { IDevisReader } from "../../application/devis-reader";
 import { listFactures, getFacture, listLignesFacture } from "../../application/read-use-cases";
 import {
   creerFacture,
@@ -12,6 +13,7 @@ import {
   changerStatutFacture,
   enregistrerPaiementFacture,
   creerAvoir,
+  convertirDevisEnFacture,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -78,7 +80,7 @@ const ligneUpdateSchema = z.object({
 // Routeur tRPC du domaine factures. Transport mince : valide les inputs (zod), délègue aux
 // use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
 // laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
-export function createFacturesRouter(repo: IFactureRepository) {
+export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
 
@@ -138,6 +140,11 @@ export function createFacturesRouter(repo: IFactureRepository) {
     marquerEnRetard: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "en_retard")),
+
+    // Convertir un devis accepté en facture (cross-domaine : lit le devis via le reader injecté).
+    convertirDepuisDevis: protectedProcedure
+      .input(z.object({ devisId: z.number().int() }))
+      .mutation(({ ctx, input }) => convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId)),
 
     // Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs.
     creerAvoir: protectedProcedure

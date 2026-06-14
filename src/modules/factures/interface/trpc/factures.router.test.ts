@@ -48,6 +48,7 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
   const purge = async (uid: number) => {
     await admin.query('delete from factures_lignes where "factureId" in (select id from factures where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
     await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from devis_lignes where "devisId" in (select id from devis where "artisanId" in (select id from artisans where "userId"=$1))', [uid]);
     await admin.query('delete from devis where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from parametres_artisan where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
@@ -194,5 +195,42 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     expect(data.factureOrigineId).toBe(id);
     // cross-tenant : B ne peut pas avoir la facture de A
     expect((await callMutation(server, "factures.creerAvoir", { factureOrigineId: id, lignes: [{ designation: "Vol", quantite: "1", prixUnitaireHT: "1" }] }, tB)).statusCode).toBe(404);
+  });
+
+  it("convertirDepuisDevis : devis accepté → facture (lignes copiées) ; non accepté → 409 ; cross-tenant → 404 ; double → 409", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // Seed un devis ACCEPTÉ de A + une ligne (via admin, bypass RLS).
+    const devisId = (
+      await admin.query(
+        'insert into devis ("artisanId","clientId",numero,statut,"objet","totalHT","totalTVA","totalTTC") values ($1,$2,$3,$4,$5,$6,$7,$8) returning id',
+        [artisanA, clientA, "DEV-CONV-A", "accepte", "Chantier X", "200.00", "40.00", "240.00"],
+      )
+    ).rows[0].id as number;
+    await admin.query(
+      'insert into devis_lignes ("devisId",ordre,designation,quantite,"prixUnitaireHT","tauxTVA","montantHT","montantTVA","montantTTC",type) values ($1,0,$2,$3,$4,$5,$6,$7,$8,$9)',
+      [devisId, "Pose", "2.00", "100.00", "20.00", "200.00", "40.00", "240.00", "produit"],
+    );
+    // Devis brouillon (A) pour le test "non accepté".
+    const devisBrouillon = (
+      await admin.query('insert into devis ("artisanId","clientId",numero,statut) values ($1,$2,$3,$4) returning id', [artisanA, clientA, "DEV-BR-A", "brouillon"])
+    ).rows[0].id as number;
+
+    // conversion OK
+    const res = await callMutation(server, "factures.convertirDepuisDevis", { devisId }, tA);
+    expect(res.statusCode).toBe(200);
+    const f = res.json().result.data as { id: number; typeDocument: string; numero: string; totalTTC: string; devisId: number; statut: string };
+    expect(f.typeDocument).toBe("facture");
+    expect(f.numero).toMatch(/^FAC-\d{5}$/);
+    expect(f.statut).toBe("brouillon");
+    expect(f.devisId).toBe(devisId);
+    expect(f.totalTTC).toBe("240.00"); // totaux = ceux du devis
+    expect((await callQuery(server, "factures.getLignes", { factureId: f.id }, tA)).json().result.data.length).toBe(1);
+    // double conversion → 409
+    expect((await callMutation(server, "factures.convertirDepuisDevis", { devisId }, tA)).statusCode).toBe(409);
+    // devis non accepté → 409
+    expect((await callMutation(server, "factures.convertirDepuisDevis", { devisId: devisBrouillon }, tA)).statusCode).toBe(409);
+    // cross-tenant : B ne convertit pas le devis de A → 404
+    expect((await callMutation(server, "factures.convertirDepuisDevis", { devisId }, tB)).statusCode).toBe(404);
   });
 });
