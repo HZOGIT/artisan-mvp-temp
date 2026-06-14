@@ -27,4 +27,10 @@ describe("modeles-email.module", () => {
   it("l'enum des types de modèle est aligné sur le schéma (5 valeurs)", () => {
     expect(TYPES_MODELE_EMAIL).toEqual(["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"]);
   });
+
+  it("expose un routeur tRPC assemblé (CRUD + byType)", () => {
+    const module = createModelesEmailModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["byType", "create", "delete", "getById", "list", "update"]);
+  });
 });

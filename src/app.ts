@@ -67,6 +67,9 @@ import type { IArticleRepository } from "./modules/articles/application/article-
 import { createParametresModule } from "./modules/parametres/parametres.module";
 import { ParametresRepositoryDrizzle } from "./modules/parametres/infra/parametres-repository-drizzle";
 import type { IParametresRepository } from "./modules/parametres/application/parametres-repository";
+import { createModelesEmailModule } from "./modules/modeles-email/modeles-email.module";
+import { ModeleEmailRepositoryDrizzle } from "./modules/modeles-email/infra/modele-email-repository-drizzle";
+import type { IModeleEmailRepository } from "./modules/modeles-email/application/modele-email-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -99,6 +102,7 @@ export interface AppDeps extends ContextDeps {
   readonly ecritureRepo?: IEcritureRepository;
   readonly articleRepo?: IArticleRepository;
   readonly parametresRepo?: IParametresRepository;
+  readonly modeleEmailRepo?: IModeleEmailRepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -179,7 +183,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const parametres = createParametresModule({
     repository: deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres });
+  const modelesEmail = createModelesEmailModule({
+    repository: deps.modeleEmailRepo ?? new ModeleEmailRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
