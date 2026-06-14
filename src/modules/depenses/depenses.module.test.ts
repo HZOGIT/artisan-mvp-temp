@@ -5,6 +5,12 @@ import type { ICategorieDepenseRepository } from "../categories-depenses/applica
 import type { IBudgetCategorieRepository } from "../budgets-categories/application/budget-categorie-repository";
 import type { IRegleCategorisationRepository } from "../regles-categorisation/application/regle-categorisation-repository";
 import type { INoteDeFraisRepository } from "../notes-de-frais/application/note-de-frais-repository";
+import type { ITransactionBancaireRepository } from "./application/transaction-bancaire-repository";
+
+const stubTransactionRepo: ITransactionBancaireRepository = {
+  list: async () => [],
+  ignorer: async () => {},
+};
 
 const stubRepo: IDepenseRepository = {
   list: async () => [],
@@ -71,7 +77,7 @@ const stubNoteRepo: INoteDeFraisRepository = {
 
 describe("depenses.module", () => {
   it("createDepensesModule câble le repository injecté", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo, transactionRepository: stubTransactionRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -80,8 +86,8 @@ describe("depenses.module", () => {
   });
 
   it("expose les procédures de catégories (parité client trpc.depenses.*Categorie)", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo, transactionRepository: stubTransactionRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record);
-    expect(procedures).toEqual(expect.arrayContaining(["checkDoublons", "stats", "getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais", "payerNoteFrais", "addDepenseToNoteFrais", "removeDepenseFromNoteFrais", "copierBudgetsMois", "creerIndemniteKm"]));
+    expect(procedures).toEqual(expect.arrayContaining(["checkDoublons", "stats", "getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais", "payerNoteFrais", "addDepenseToNoteFrais", "removeDepenseFromNoteFrais", "copierBudgetsMois", "creerIndemniteKm", "getTransactionsBancaires", "ignorerTransaction"]));
   });
 });

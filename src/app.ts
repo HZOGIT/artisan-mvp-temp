@@ -51,6 +51,8 @@ import { createChantiersModule } from "./modules/chantiers/chantiers.module";
 import { ChantierRepositoryDrizzle } from "./modules/chantiers/infra/chantier-repository-drizzle";
 import type { IChantierRepository } from "./modules/chantiers/application/chantier-repository";
 import { createDepensesModule } from "./modules/depenses/depenses.module";
+import { TransactionBancaireRepositoryDrizzle } from "./modules/depenses/infra/transaction-bancaire-repository-drizzle";
+import type { ITransactionBancaireRepository } from "./modules/depenses/application/transaction-bancaire-repository";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -151,6 +153,7 @@ export interface AppDeps extends ContextDeps {
   readonly noteDeFraisRepo?: INoteDeFraisRepository;
   readonly chantierRepo?: IChantierRepository;
   readonly depenseRepo?: IDepenseRepository;
+  readonly transactionBancaireRepo?: ITransactionBancaireRepository;
   readonly devisRepo?: IDevisRepository;
   readonly factureRepo?: IFactureRepository;
   readonly devisReader?: IDevisReader;
@@ -302,6 +305,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     budgetRepository: budgetCategorieRepo,
     regleRepository: regleCategorisationRepo,
     noteRepository: noteDeFraisRepo,
+    transactionRepository: deps.transactionBancaireRepo ?? new TransactionBancaireRepositoryDrizzle(getDbHandle().db),
   });
   const devis = createDevisModule({
     repository: devisRepo,

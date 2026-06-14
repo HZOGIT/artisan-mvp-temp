@@ -23,6 +23,8 @@ import { creerRegle, supprimerRegle } from "../../../regles-categorisation/appli
 import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
 import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
 import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais, payerNoteDeFrais, ajouterDepenseANote, retirerDepenseDeNote } from "../../../notes-de-frais/application/write-use-cases";
+import type { ITransactionBancaireRepository } from "../../application/transaction-bancaire-repository";
+import { getTransactionsBancaires, ignorerTransaction } from "../../application/transactions-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -110,6 +112,7 @@ export function createDepensesRouter(
   budgetRepo: IBudgetCategorieRepository,
   regleRepo: IRegleCategorisationRepository,
   noteRepo: INoteDeFraisRepository,
+  transactionRepo: ITransactionBancaireRepository,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -331,5 +334,14 @@ export function createDepensesRouter(
     removeDepenseFromNoteFrais: protectedProcedure
       .input(z.object({ noteId: z.number().int(), depenseId: z.number().int() }))
       .mutation(({ ctx, input }) => retirerDepenseDeNote(noteRepo, ctx.tenant, input.noteId, input.depenseId)),
+
+    // ── Transactions bancaires (lecture + ignorer ; import/conversion = slices dédiés) ─────────────
+    getTransactionsBancaires: protectedProcedure
+      .input(z.object({ releveId: z.number().int() }).optional())
+      .query(({ ctx, input }) => getTransactionsBancaires(transactionRepo, ctx.tenant, input?.releveId)),
+
+    ignorerTransaction: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => ignorerTransaction(transactionRepo, ctx.tenant, input.id)),
   });
 }
