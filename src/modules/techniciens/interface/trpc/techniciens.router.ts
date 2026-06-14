@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { ITechnicienRepository } from "../../application/technicien-repository";
-import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables, listHabilitations } from "../../application/read-use-cases";
+import { listTechniciens, getTechnicien, listDisponibilites, getDernierePosition, listerUtilisateursLiables, listHabilitations, getStatsTechnicien } from "../../application/read-use-cases";
 import { creerTechnicien, modifierTechnicien, supprimerTechnicien, definirDisponibilite, enregistrerPosition, ajouterHabilitation, supprimerHabilitation } from "../../application/write-use-cases";
 
 const couleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
@@ -137,5 +137,10 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
         await supprimerHabilitation(repo, ctx.tenant, input.technicienId, input.id);
         return { success: true };
       }),
+
+    // Stats d'activité d'un technicien (interventions par statut). Anti-IDOR : hors tenant → 404.
+    getStats: protectedProcedure
+      .input(z.object({ technicienId: z.number().int() }))
+      .query(({ ctx, input }) => getStatsTechnicien(repo, ctx.tenant, input.technicienId)),
   });
 }

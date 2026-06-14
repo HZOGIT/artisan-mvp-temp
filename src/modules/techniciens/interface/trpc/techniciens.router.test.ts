@@ -65,6 +65,8 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
   afterAll(async () => {
     await server.close();
     for (const aId of [artisanA, artisanB]) {
+      await admin.query('delete from interventions where "artisanId"=$1', [aId]);
+      await admin.query('delete from clients where "artisanId"=$1', [aId]);
       await admin.query('delete from habilitations_techniciens where "artisanId"=$1', [aId]);
       await admin.query('delete from disponibilites_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
       await admin.query('delete from positions_techniciens where "technicienId" in (select id from techniciens where "artisanId"=$1)', [aId]);
@@ -236,5 +238,28 @@ describe.skipIf(!URL)("techniciens.router e2e (HTTP → tRPC → use-case → re
     // A supprime → success ; re-supprimer → 404 (introuvable)
     expect((await callMutation(server, "techniciens.deleteHabilitation", { technicienId: techA, id: hab.id }, tA)).statusCode).toBe(200);
     expect((await callMutation(server, "techniciens.deleteHabilitation", { technicienId: techA, id: hab.id }, tA)).statusCode).toBe(404);
+  });
+
+  it("getStats (parité client) : comptes d'interventions par statut, scopé technicien owné ; anti-IDOR → 404 ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const techA = (await callMutation(server, "techniciens.create", { nom: "Stats A" }, tA)).json().result.data.id as number;
+    const techB = (await callMutation(server, "techniciens.create", { nom: "Stats B" }, tB)).json().result.data.id as number;
+    // 401 sans cookie
+    expect((await callQuery(server, "techniciens.getStats", { technicienId: techA })).statusCode).toBe(401);
+    // seed interventions de A pour techA : 2 terminées, 1 en_cours, 1 planifiee, 1 annulee + 1 sur un autre tech
+    const autreTech = (await callMutation(server, "techniciens.create", { nom: "Autre" }, tA)).json().result.data.id as number;
+    const clientA = (await admin.query('insert into clients ("artisanId", nom) values ($1,$2) returning id', [artisanA, "Client Stats"])).rows[0].id as number;
+    await admin.query(
+      `insert into interventions ("artisanId","clientId","technicienId",statut,titre,"dateDebut") values
+       ($1,$4,$2,'terminee','i1',now()),($1,$4,$2,'terminee','i2',now()),($1,$4,$2,'en_cours','i3',now()),($1,$4,$2,'planifiee','i4',now()),($1,$4,$2,'annulee','i5',now()),($1,$4,$3,'terminee','autre',now())`,
+      [artisanA, techA, autreTech, clientA],
+    );
+    const stats = (await callQuery(server, "techniciens.getStats", { technicienId: techA }, tA)).json().result.data as { total: number; terminees: number; enCours: number; planifiees: number };
+    expect(stats).toEqual({ total: 5, terminees: 2, enCours: 1, planifiees: 1 }); // l'intervention de autreTech n'est pas comptée
+    // ANTI-IDOR : A demande les stats du technicien de B → 404
+    expect((await callQuery(server, "techniciens.getStats", { technicienId: techB }, tA)).statusCode).toBe(404);
+    // technicien sans intervention → compteurs à 0
+    expect((await callQuery(server, "techniciens.getStats", { technicienId: techB }, tB)).json().result.data).toEqual({ total: 0, terminees: 0, enCours: 0, planifiees: 0 });
   });
 });

@@ -5,6 +5,9 @@ import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibili
 import type { Position, EnregistrerPositionInput } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
+import type { TechnicienStats } from "../domain/stats";
+
+type InterventionStatut = "planifiee" | "en_cours" | "terminee" | "annulee";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
 // scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
@@ -13,11 +16,18 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
   private dispos: Disponibilite[] = [];
   private positions: Position[] = [];
   private habilitations: Array<HabilitationTechnicien & { artisanId: number }> = [];
+  // Interventions simulées pour les stats : {artisanId, technicienId, statut}.
+  private interventions: Array<{ artisanId: number; technicienId: number; statut: InterventionStatut }> = [];
   private usersLiables = new Map<number, UtilisateurLiable[]>();
   private seq = 0;
   private dispoSeq = 0;
   private posSeq = 0;
   private habSeq = 0;
+
+  // Utilitaire de test (hors port) : déclare une intervention (pour statsTechnicien).
+  seedIntervention(artisanId: number, technicienId: number, statut: InterventionStatut): void {
+    this.interventions.push({ artisanId, technicienId, statut });
+  }
 
   // Utilitaire de test (hors port) : déclare les users liables d'un tenant.
   seedUsersLiables(artisanId: number, list: UtilisateurLiable[]): void {
@@ -167,5 +177,16 @@ export class FakeTechnicienRepository implements ITechnicienRepository {
     const before = this.habilitations.length;
     this.habilitations = this.habilitations.filter((h) => !(h.id === id && h.technicienId === technicienId));
     return this.habilitations.length < before;
+  }
+
+  async statsTechnicien(ctx: TenantContext, technicienId: number): Promise<TechnicienStats | null> {
+    if (!(await this.owns(ctx, technicienId))) return null;
+    const mine = this.interventions.filter((i) => i.artisanId === ctx.artisanId && i.technicienId === technicienId);
+    return {
+      total: mine.length,
+      terminees: mine.filter((i) => i.statut === "terminee").length,
+      enCours: mine.filter((i) => i.statut === "en_cours").length,
+      planifiees: mine.filter((i) => i.statut === "planifiee").length,
+    };
   }
 }

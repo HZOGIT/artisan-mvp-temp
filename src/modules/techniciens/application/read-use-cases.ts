@@ -6,6 +6,7 @@ import type { Disponibilite } from "../domain/disponibilite";
 import type { Position } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 import type { HabilitationTechnicien } from "../domain/habilitation";
+import type { TechnicienStats } from "../domain/stats";
 
 // Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
 // par le `TenantContext` (le repo l'applique). `getTechnicien` sur une ressource d'un
@@ -57,4 +58,16 @@ export function listHabilitations(
   technicienId: number,
 ): Promise<HabilitationTechnicien[]> {
   return repo.listHabilitations(ctx, technicienId);
+}
+
+// Stats d'activité d'un technicien (comptes d'interventions par statut). ⚠️ Anti-IDOR : technicien
+// hors tenant → NotFoundError→404 (parité legacy `getStats` qui lève NOT_FOUND).
+export async function getStatsTechnicien(
+  repo: ITechnicienRepository,
+  ctx: TenantContext,
+  technicienId: number,
+): Promise<TechnicienStats> {
+  const stats = await repo.statsTechnicien(ctx, technicienId);
+  if (!stats) throw new NotFoundError("Technicien introuvable");
+  return stats;
 }

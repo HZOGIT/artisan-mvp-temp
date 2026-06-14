@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import {
   techniciens,
   positionsTechniciens,
@@ -7,6 +7,7 @@ import {
   objectifsTechniciens,
   classementTechniciens,
   habilitationsTechniciens,
+  interventions,
   users,
   artisans,
 } from "../../../../drizzle/schema.pg";
@@ -19,6 +20,7 @@ import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibili
 import type { Position, EnregistrerPositionInput } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
+import type { TechnicienStats } from "../domain/stats";
 
 type TechnicienRow = typeof techniciens.$inferSelect;
 type DispoRow = typeof disponibilitesTechniciens.$inferSelect;
@@ -316,6 +318,28 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
         .where(and(eq(habilitationsTechniciens.id, id), eq(habilitationsTechniciens.technicienId, technicienId)))
         .returning({ id: habilitationsTechniciens.id });
       return deleted.length > 0;
+    });
+  }
+
+  statsTechnicien(ctx: TenantContext, technicienId: number): Promise<TechnicienStats | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      if (!(await this.ownsTechnicien(tx, ctx, technicienId))) return null;
+      // Agrégat en 1 requête (COUNT FILTER par statut), scopé artisanId + technicienId.
+      const [row] = await tx
+        .select({
+          total: sql<number>`count(*)::int`,
+          terminees: sql<number>`(count(*) filter (where ${interventions.statut} = 'terminee'))::int`,
+          enCours: sql<number>`(count(*) filter (where ${interventions.statut} = 'en_cours'))::int`,
+          planifiees: sql<number>`(count(*) filter (where ${interventions.statut} = 'planifiee'))::int`,
+        })
+        .from(interventions)
+        .where(and(eq(interventions.artisanId, ctx.artisanId), eq(interventions.technicienId, technicienId)));
+      return {
+        total: row?.total ?? 0,
+        terminees: row?.terminees ?? 0,
+        enCours: row?.enCours ?? 0,
+        planifiees: row?.planifiees ?? 0,
+      };
     });
   }
 

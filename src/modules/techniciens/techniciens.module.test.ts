@@ -18,6 +18,7 @@ const stubRepo: ITechnicienRepository = {
   listHabilitations: async () => [],
   ajouterHabilitation: async () => null,
   supprimerHabilitation: async () => false,
+  statsTechnicien: async () => null,
 };
 
 describe("techniciens.module", () => {
@@ -39,6 +40,7 @@ describe("techniciens.module", () => {
       "listDisponibilites",
       "listHabilitations",
       "setDisponibilite",
+      "statsTechnicien",
       "supprimerHabilitation",
       "update",
     ]);
@@ -59,6 +61,7 @@ describe("techniciens.module", () => {
       "getDisponibilites",
       "getHabilitations",
       "getLinkableUsers",
+      "getStats",
       "list",
       "setDisponibilite",
       "update",

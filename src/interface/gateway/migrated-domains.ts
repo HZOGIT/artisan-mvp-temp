@@ -29,4 +29,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "conges", // parité vérifiée : list/getById/create/update/delete/approuver/refuser/annuler + enAttente ⊇ appels client
   "badges", // parité vérifiée : list/create/getBadgesTechnicien/getClassement/calculerClassement + getObjectifsTechnicien ⊇ appels client
   "stocks", // parité vérifiée : CRUD/adjustQuantity/getMouvements/getLowStock + getEntrant/generateAlerts/getRapportCommande ⊇ appels client
+  "techniciens", // parité vérifiée : CRUD/getAll/getLinkableUsers + habilitations(get/add/delete) + getStats ⊇ appels client
 ] as const;

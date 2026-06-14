@@ -4,6 +4,7 @@ import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibili
 import type { Position, EnregistrerPositionInput } from "../domain/position";
 import type { UtilisateurLiable } from "../domain/utilisateur-liable";
 import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
+import type { TechnicienStats } from "../domain/stats";
 
 // Port du repository techniciens. Chaque méthode exige le TenantContext (scope tenant +
 // RLS). `techniciens` possède un `artisanId` → double cloisonnement RLS + filtre.
@@ -47,4 +48,8 @@ export interface ITechnicienRepository {
   // Supprime une habilitation (scopée au technicien owné) — false si technicien hors tenant
   // ou habilitation introuvable.
   supprimerHabilitation(ctx: TenantContext, technicienId: number, id: number): Promise<boolean>;
+
+  // Comptes d'interventions par statut pour un technicien (dérivé du domaine interventions, agrégat
+  // SQL scopé artisanId+technicienId). null si le technicien n'appartient pas au tenant (anti-IDOR).
+  statsTechnicien(ctx: TenantContext, technicienId: number): Promise<TechnicienStats | null>;
 }
