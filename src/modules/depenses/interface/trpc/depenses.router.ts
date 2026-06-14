@@ -27,6 +27,8 @@ import type { ITransactionBancaireRepository } from "../../application/transacti
 import { getTransactionsBancaires, ignorerTransaction, importReleve, convertirTransaction } from "../../application/transactions-use-cases";
 import type { FecReader } from "../../application/fec-reader";
 import { exportFecAchats } from "../../application/fec";
+import type { VisionPort, RateLimiterPort } from "../../../../shared/ports";
+import { analyserJustificatif } from "../../application/analyser-justificatif";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -116,6 +118,7 @@ export function createDepensesRouter(
   noteRepo: INoteDeFraisRepository,
   transactionRepo: ITransactionBancaireRepository,
   fecReader: FecReader,
+  ocr?: { vision: VisionPort; rateLimiter: RateLimiterPort },
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -367,5 +370,14 @@ export function createDepensesRouter(
     exportFecAchats: protectedProcedure
       .input(z.object({ dateDebut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ"), dateFin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date AAAA-MM-JJ") }))
       .mutation(({ ctx, input }) => exportFecAchats(fecReader, ctx.tenant, input.dateDebut, input.dateFin)),
+
+    // ── OCR justificatif (vision) — anti-IDOR depenseId + rate-limit IA ; sans seam → dégradé ──────
+    analyserJustificatif: protectedProcedure
+      .input(z.object({ imageBase64: z.string().min(1), depenseId: z.number().int().optional() }))
+      .mutation(({ ctx, input }) =>
+        ocr
+          ? analyserJustificatif({ vision: ocr.vision, rateLimiter: ocr.rateLimiter, depenseRepo: repo }, ctx.tenant, input)
+          : Promise.resolve({ success: false, data: {}, error: "OCR non disponible" }),
+      ),
   });
 }

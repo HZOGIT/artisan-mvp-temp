@@ -4,6 +4,7 @@
 import type { EmailPort, EmailMessage } from "./email";
 import type { PdfPort } from "./pdf";
 import type { LlmPort, LlmCompleteOptions } from "./llm";
+import type { VisionPort, VisionRequest } from "./vision";
 
 type LegacyEmailModule = {
   sendEmail: (p: {
@@ -108,5 +109,23 @@ export class GeminiLlmAdapter implements LlmPort {
     for await (const chunk of s) {
       if (chunk.text) yield chunk.text;
     }
+  }
+}
+
+// Adapter vision sur Gemini : image transmise en `inlineData` (mimeType + base64) + prompt texte.
+// Même import variable-de-chemin que GeminiLlmAdapter (graphe SDK hors typecheck src).
+export class GeminiVisionAdapter implements VisionPort {
+  async analyzeImage(req: VisionRequest): Promise<string> {
+    const mod = (await import(GENAI_MODULE)) as GenAiModule;
+    const ai = new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
+    const res = await ai.models.generateContent({
+      model: req.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview",
+      contents: [{ role: "user", parts: [{ inlineData: { mimeType: req.mimeType, data: req.base64 } }, { text: req.prompt }] }],
+      config: {
+        ...(req.system ? { systemInstruction: req.system } : {}),
+        maxOutputTokens: req.maxOutputTokens ?? 1000,
+      },
+    });
+    return res.text ?? "";
   }
 }

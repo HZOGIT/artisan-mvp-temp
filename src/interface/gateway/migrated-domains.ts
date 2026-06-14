@@ -41,4 +41,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "chantiers", // parité vérifiée : CRUD + pointages(3)/suivi(4)/phases(4)/interventions-liées(4)/documents(3)/getStatistiques/calculerAvancement ⊇ 16 appels client
   "articles", // parité vérifiée : artisan(get/create/update/delete) + bibliothèque(getBibliotheque/search public + create/update/delete/import admin) + suggererArticlesIA ⊇ 8 appels client
   "previsions", // parité vérifiée : getHistorique/getPrevisions/getComparaison/calculer/getTresoreriePrevisionnelle ⊇ 5 appels client (forecasting)
+  "depenses", // parité vérifiée : CRUD + stats/checkDoublons + notes-de-frais(workflow+links) + budgets(set/copier) + categories + regles + indemnitéKm + transactions bancaires(get/ignorer/import/convertir) + FEC export + OCR analyserJustificatif ⊇ 28 appels client
 ] as const;

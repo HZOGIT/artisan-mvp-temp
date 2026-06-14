@@ -5,6 +5,7 @@ import type { IRegleCategorisationRepository } from "../regles-categorisation/ap
 import type { INoteDeFraisRepository } from "../notes-de-frais/application/note-de-frais-repository";
 import type { ITransactionBancaireRepository } from "./application/transaction-bancaire-repository";
 import type { FecReader } from "./application/fec-reader";
+import type { VisionPort, RateLimiterPort } from "../../shared/ports";
 import { createDepensesRouter } from "./interface/trpc/depenses.router";
 
 // Wiring DI du module depenses : assemble le routeur tRPC à partir des repositories injectés.
@@ -19,6 +20,9 @@ export interface DepensesModuleDeps {
   readonly noteRepository: INoteDeFraisRepository;
   readonly transactionRepository: ITransactionBancaireRepository;
   readonly fecReader: FecReader;
+  // Seam OCR (analyserJustificatif) : modèle vision + rate-limiter IA. Optionnel : sans lui, la
+  // procédure renvoie une dégradation `{success:false}`.
+  readonly ocr?: { readonly vision: VisionPort; readonly rateLimiter: RateLimiterPort };
 }
 
 export interface DepensesModule {
@@ -37,6 +41,7 @@ export function createDepensesModule(deps: DepensesModuleDeps): DepensesModule {
       deps.noteRepository,
       deps.transactionRepository,
       deps.fecReader,
+      deps.ocr,
     ),
   };
 }

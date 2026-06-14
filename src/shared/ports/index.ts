@@ -4,5 +4,6 @@ export * from "./storage";
 export * from "./pdf";
 export * from "./rate-limiter";
 export * from "./llm";
+export * from "./vision";
 export * from "./fakes";
 export * from "./adapters";

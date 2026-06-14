@@ -349,4 +349,13 @@ export class DepenseRepositoryDrizzle implements IDepenseRepository {
       };
     });
   }
+
+  setOcr(ctx: TenantContext, id: number, data: unknown): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(depenses)
+        .set({ ocr_brut: JSON.stringify(data ?? {}).slice(0, 5000), ocr_traite: true })
+        .where(and(eq(depenses.id, id), eq(depenses.artisan_id, ctx.artisanId)));
+    });
+  }
 }

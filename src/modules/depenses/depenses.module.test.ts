@@ -37,6 +37,7 @@ const stubRepo: IDepenseRepository = {
     mois: "2026-06", totalMois: 0, nbDepensesMois: 0, aRembourser: 0, tvaRecuperable: 0,
     totalMoisPrecedent: 0, variation: null, totalAnnee: 0, parCategorie: [], topDepenses: [], topFournisseurs: [], parMois: [],
   }),
+  setOcr: async () => {},
 };
 
 const stubCategorieRepo: ICategorieDepenseRepository = {
@@ -91,12 +92,12 @@ describe("depenses.module", () => {
   });
 
   it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "findDoublons", "getById", "getStats", "list", "nextNumero", "ownsRef", "realisesParCategorie", "update"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "findDoublons", "getById", "getStats", "list", "nextNumero", "ownsRef", "realisesParCategorie", "setOcr", "update"]);
   });
 
   it("expose les procédures de catégories (parité client trpc.depenses.*Categorie)", () => {
     const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo, transactionRepository: stubTransactionRepo, fecReader: stubFecReader });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record);
-    expect(procedures).toEqual(expect.arrayContaining(["checkDoublons", "stats", "getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais", "payerNoteFrais", "addDepenseToNoteFrais", "removeDepenseFromNoteFrais", "copierBudgetsMois", "creerIndemniteKm", "getTransactionsBancaires", "ignorerTransaction", "importReleve", "convertirTransaction", "exportFecAchats"]));
+    expect(procedures).toEqual(expect.arrayContaining(["checkDoublons", "stats", "getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais", "getNoteFraisById", "createNoteFrais", "soumettreNoteFrais", "approuverNoteFrais", "rejeterNoteFrais", "payerNoteFrais", "addDepenseToNoteFrais", "removeDepenseFromNoteFrais", "copierBudgetsMois", "creerIndemniteKm", "getTransactionsBancaires", "ignorerTransaction", "importReleve", "convertirTransaction", "exportFecAchats", "analyserJustificatif"]));
   });
 });

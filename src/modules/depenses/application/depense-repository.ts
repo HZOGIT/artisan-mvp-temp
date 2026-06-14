@@ -34,4 +34,7 @@ export interface IDepenseRepository {
   // Statistiques agrégées du mois `YYYY-MM` (total, par catégorie, top dépenses/fournisseurs,
   // évolution sur 6 mois…), scopé tenant. Parité legacy `getDepensesStats`.
   getStats(ctx: TenantContext, mois: string): Promise<DepenseStats>;
+  // Enregistre le résultat OCR d'une dépense (`ocr_brut` JSON tronqué 5000, `ocr_traite=true`),
+  // scopé tenant. No-op si la dépense n'appartient pas au tenant. Parité `markDepenseOcrTraite`.
+  setOcr(ctx: TenantContext, id: number, data: unknown): Promise<void>;
 }

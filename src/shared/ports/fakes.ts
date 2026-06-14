@@ -5,6 +5,7 @@ import type { StoragePort, PutOptions } from "./storage";
 import type { PdfPort } from "./pdf";
 import type { RateLimiterPort } from "./rate-limiter";
 import type { LlmPort } from "./llm";
+import type { VisionPort, VisionRequest } from "./vision";
 
 export class FakeEmailPort implements EmailPort {
   readonly sent: EmailMessage[] = [];
@@ -87,5 +88,22 @@ export class FakeLlmPort implements LlmPort {
     const text = this.next();
     // Découpe en fragments pour simuler le flux (concaténés = texte complet).
     for (const part of text.match(/[\s\S]{1,8}/g) ?? [text]) yield part;
+  }
+}
+
+// Vision factice déterministe : renvoie une réponse scriptée et capture les requêtes (assertions).
+// Aucun appel réseau. `responses` = réponse fixe ou file (une par appel). `throwOn` force une erreur.
+export class FakeVisionPort implements VisionPort {
+  readonly requests: VisionRequest[] = [];
+  private readonly queue: string[];
+  private readonly err?: Error;
+  constructor(responses: string | string[] = "{}", opts?: { throwError?: Error }) {
+    this.queue = Array.isArray(responses) ? [...responses] : [responses];
+    this.err = opts?.throwError;
+  }
+  async analyzeImage(req: VisionRequest): Promise<string> {
+    this.requests.push(req);
+    if (this.err) throw this.err;
+    return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
   }
 }

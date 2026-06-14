@@ -127,8 +127,8 @@ import type { FacturesCAReader } from "./modules/previsions-ca/application/factu
 import { TresorerieReaderDrizzle } from "./modules/previsions-ca/infra/tresorerie-reader-drizzle";
 import type { TresorerieReader } from "./modules/previsions-ca/application/tresorerie-reader";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
-import type { EmailPort, RateLimiterPort, LlmPort } from "./shared/ports";
-import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter } from "./shared/ports";
+import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
+import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
 
 export interface AppDeps extends ContextDeps {
   // Repos injectables (tests). Par défaut, repos Drizzle sur le client par défaut
@@ -142,6 +142,7 @@ export interface AppDeps extends ContextDeps {
   // Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe).
   readonly llm?: LlmPort;
   readonly iaRateLimiter?: RateLimiterPort;
+  readonly ocrVision?: VisionPort;
   readonly lienBaseUrl?: string;
   readonly badgeRepo?: IBadgeRepository;
   readonly technicienRepo?: ITechnicienRepository;
@@ -310,6 +311,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     noteRepository: noteDeFraisRepo,
     transactionRepository: deps.transactionBancaireRepo ?? new TransactionBancaireRepositoryDrizzle(getDbHandle().db),
     fecReader: deps.fecReader ?? new FecReaderDrizzle(getDbHandle().db),
+    // OCR justificatif : Gemini vision + rate-limiter IA dédié (injectables en test : FakeVisionPort).
+    ocr: deps.ocrVision
+      ? { vision: deps.ocrVision, rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) }
+      : { vision: new GeminiVisionAdapter(), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
   });
   const devis = createDevisModule({
     repository: devisRepo,

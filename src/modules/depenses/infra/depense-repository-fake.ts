@@ -127,6 +127,12 @@ export class FakeDepenseRepository implements IDepenseRepository {
       }));
   }
 
+  async setOcr(ctx: TenantContext, id: number, data: unknown): Promise<void> {
+    this.store = this.store.map((d) =>
+      d.id === id && d.artisanId === ctx.artisanId ? { ...d, ocrBrut: JSON.stringify(data ?? {}).slice(0, 5000), ocrTraite: true } : d,
+    );
+  }
+
   // ⚠️ Version simplifiée (suffisante pour les tests de use-case : défaut du mois + délégation).
   // L'agrégation fidèle est validée par le test DB du repo Drizzle.
   async getStats(ctx: TenantContext, mois: string): Promise<DepenseStats> {
