@@ -24,7 +24,7 @@ import type { INoteDeFraisRepository } from "../../../notes-de-frais/application
 import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
 import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais, payerNoteDeFrais, ajouterDepenseANote, retirerDepenseDeNote } from "../../../notes-de-frais/application/write-use-cases";
 import type { ITransactionBancaireRepository } from "../../application/transaction-bancaire-repository";
-import { getTransactionsBancaires, ignorerTransaction } from "../../application/transactions-use-cases";
+import { getTransactionsBancaires, ignorerTransaction, importReleve, convertirTransaction } from "../../application/transactions-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -343,5 +343,21 @@ export function createDepensesRouter(
     ignorerTransaction: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => ignorerTransaction(transactionRepo, ctx.tenant, input.id)),
+
+    importReleve: protectedProcedure
+      .input(z.object({ nomFichier: z.string().max(255), contenuCsv: z.string().max(5_000_000, "Fichier trop volumineux (max ~5 Mo)") }))
+      .mutation(({ ctx, input }) => importReleve({ transactionRepo, regleRepo }, ctx.tenant, input)),
+
+    // ⚠️ Idempotence anti double-dépense (FEC/TVA) : refuse si déjà convertie.
+    convertirTransaction: protectedProcedure
+      .input(
+        z.object({
+          transactionId: z.number().int(),
+          categorie: z.string().min(1).max(100),
+          fournisseur: z.string().max(255).optional(),
+          description: z.string().max(5000).optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) => convertirTransaction({ transactionRepo, depenseRepo: repo }, ctx.tenant, input)),
   });
 }

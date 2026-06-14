@@ -1,10 +1,10 @@
 import { and, desc, eq } from "drizzle-orm";
-import { transactionsBancaires } from "../../../../drizzle/schema.pg";
+import { transactionsBancaires, relevesBancaires } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ITransactionBancaireRepository } from "../application/transaction-bancaire-repository";
-import type { TransactionBancaire, TransactionType } from "../domain/transaction-bancaire";
+import type { TransactionBancaire, TransactionType, ReleveItem, ImportReleveResult } from "../domain/transaction-bancaire";
 
 type Row = typeof transactionsBancaires.$inferSelect;
 
@@ -42,12 +42,62 @@ export class TransactionBancaireRepositoryDrizzle implements ITransactionBancair
     });
   }
 
+  getById(ctx: TenantContext, id: number): Promise<TransactionBancaire | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(transactionsBancaires)
+        .where(and(eq(transactionsBancaires.id, id), eq(transactionsBancaires.artisan_id, ctx.artisanId)))
+        .limit(1);
+      return row ? toTransaction(row) : null;
+    });
+  }
+
   ignorer(ctx: TenantContext, id: number): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
       await tx
         .update(transactionsBancaires)
         .set({ ignoree: true })
         .where(and(eq(transactionsBancaires.id, id), eq(transactionsBancaires.artisan_id, ctx.artisanId)));
+    });
+  }
+
+  createReleve(ctx: TenantContext, nomFichier: string, items: ReleveItem[]): Promise<ImportReleveResult> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [releve] = await tx
+        .insert(relevesBancaires)
+        .values({ artisan_id: ctx.artisanId, nom_fichier: nomFichier, nb_transactions: items.length, statut: "en_cours" })
+        .returning({ id: relevesBancaires.id });
+      const releveId = releve?.id;
+      if (!releveId) return { releveId: 0, nbImportees: 0 };
+      let nbImportees = 0;
+      for (const t of items) {
+        try {
+          await tx.insert(transactionsBancaires).values({
+            artisan_id: ctx.artisanId,
+            releve_id: releveId,
+            date_transaction: t.dateTransaction,
+            libelle: t.libelle,
+            montant: String(Math.abs(t.montant)), // stocké en valeur absolue (parité legacy)
+            type_transaction: t.typeTransaction,
+            categorie_suggeree: t.categorieSuggeree,
+          });
+          nbImportees++;
+        } catch {
+          /* ligne en erreur ignorée (parité) */
+        }
+      }
+      await tx.update(relevesBancaires).set({ nb_importees: nbImportees, statut: "termine" }).where(eq(relevesBancaires.id, releveId));
+      return { releveId, nbImportees };
+    });
+  }
+
+  lierDepense(ctx: TenantContext, transactionId: number, depenseId: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .update(transactionsBancaires)
+        .set({ depense_id: depenseId })
+        .where(and(eq(transactionsBancaires.id, transactionId), eq(transactionsBancaires.artisan_id, ctx.artisanId)));
     });
   }
 }
