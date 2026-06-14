@@ -38,6 +38,7 @@ import type { StatistiquesModule } from "../../modules/statistiques/statistiques
 import type { CalendrierModule } from "../../modules/calendrier/calendrier.module";
 import type { EmailsModule } from "../../modules/emails/emails.module";
 import type { SearchModule } from "../../modules/search/search.module";
+import type { GeolocalisationModule } from "../../modules/geolocalisation/geolocalisation.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -79,6 +80,7 @@ export interface AppRouterDeps {
   readonly calendrier: CalendrierModule;
   readonly emails: EmailsModule;
   readonly search: SearchModule;
+  readonly geolocalisation: GeolocalisationModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -129,6 +131,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     calendrier: deps.calendrier.router,
     emails: deps.emails.router,
     search: deps.search.router,
+    geolocalisation: deps.geolocalisation.router,
   });
 }
 

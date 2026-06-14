@@ -2,7 +2,7 @@
 // montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
 // cibler qu'un domaine présent ici (sinon le routage enverrait vers un domaine inexistant
 // du nouveau stack). Mis à jour à chaque domaine livré (étape 9/9 du gabarit).
-export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search"] as const;
+export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation"] as const;
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
@@ -50,4 +50,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "calendrier", // parité vérifiée : getIcalFeed/regenerateIcalFeed (jeton de flux iCal du tenant) ⊇ 2 appels client
   "emails", // parité vérifiée : list (journal d'envois scopé tenant, filtres entité + limite) ⊇ 1 appel client
   "search", // parité vérifiée : global (recherche cross-domaine clients/devis/factures/interventions/fournisseurs) ⊇ 1 appel client
+  "geolocalisation", // parité vérifiée : getPositions (techniciens du tenant + dernière position, RGPD lecture seule) ⊇ 1 appel client
 ] as const;
