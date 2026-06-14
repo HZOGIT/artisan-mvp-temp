@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IArticleRepository } from "../../application/article-repository";
-import { listArticles, getArticle } from "../../application/read-use-cases";
+import { listArticles, getArticle, articlesParCategorie } from "../../application/read-use-cases";
 import { creerArticle, modifierArticle, supprimerArticle } from "../../application/write-use-cases";
 
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -37,6 +37,10 @@ export function createArticlesRouter(repo: IArticleRepository) {
     getById: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getArticle(repo, ctx.tenant, input.id)),
+
+    byCategorie: protectedProcedure
+      .input(z.object({ categorie: z.string().min(1).max(100) }))
+      .query(({ ctx, input }) => articlesParCategorie(repo, ctx.tenant, input.categorie)),
 
     create: protectedProcedure
       .input(createSchema)

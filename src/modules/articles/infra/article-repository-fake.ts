@@ -12,6 +12,10 @@ export class FakeArticleRepository implements IArticleRepository {
     return this.store.filter((a) => a.artisanId === ctx.artisanId);
   }
 
+  async listByCategorie(ctx: TenantContext, categorie: string): Promise<Article[]> {
+    return this.store.filter((a) => a.artisanId === ctx.artisanId && a.categorie === categorie);
+  }
+
   async getById(ctx: TenantContext, id: number): Promise<Article | null> {
     return this.store.find((a) => a.id === id && a.artisanId === ctx.artisanId) ?? null;
   }

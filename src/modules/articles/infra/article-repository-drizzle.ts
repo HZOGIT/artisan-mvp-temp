@@ -40,6 +40,17 @@ export class ArticleRepositoryDrizzle implements IArticleRepository {
     });
   }
 
+  listByCategorie(ctx: TenantContext, categorie: string): Promise<Article[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(articlesArtisan)
+        .where(and(eq(articlesArtisan.artisanId, ctx.artisanId), eq(articlesArtisan.categorie, categorie)))
+        .orderBy(asc(articlesArtisan.designation), asc(articlesArtisan.id));
+      return rows.map(toArticle);
+    });
+  }
+
   getById(ctx: TenantContext, id: number): Promise<Article | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx

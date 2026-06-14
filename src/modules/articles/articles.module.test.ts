@@ -4,6 +4,7 @@ import type { IArticleRepository } from "./application/article-repository";
 
 const stubRepo: IArticleRepository = {
   list: async () => [],
+  listByCategorie: async () => [],
   getById: async () => null,
   create: async () => {
     throw new Error("non implémenté (stub)");
@@ -18,13 +19,13 @@ describe("articles.module", () => {
     expect(module.deps.repository).toBe(stubRepo);
   });
 
-  it("le port expose les opérations CRUD attendues", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "update"]);
+  it("le port expose les opérations CRUD + filtre catégorie attendues", () => {
+    expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "listByCategorie", "update"]);
   });
 
-  it("expose un routeur tRPC assemblé (procédures CRUD)", () => {
+  it("expose un routeur tRPC assemblé (CRUD + byCategorie)", () => {
     const module = createArticlesModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["byCategorie", "create", "delete", "getById", "list", "update"]);
   });
 });

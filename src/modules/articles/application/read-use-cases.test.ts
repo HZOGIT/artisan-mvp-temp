@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeArticleRepository } from "../infra/article-repository-fake";
-import { listArticles, getArticle } from "./read-use-cases";
+import { listArticles, getArticle, articlesParCategorie } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -37,5 +37,15 @@ describe("articles — use-cases de lecture", () => {
   it("getArticle sur un id inexistant → NotFound", async () => {
     const repo = new FakeArticleRepository();
     await expect(getArticle(repo, A, 999999)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("articlesParCategorie : filtre scopé tenant ; catégorie inconnue → [] ; autre tenant → []", async () => {
+    const repo = new FakeArticleRepository();
+    await repo.create(A, base({ designation: "Plomberie 1", categorie: "plomberie" }));
+    await repo.create(A, base({ designation: "Elec 1", categorie: "elec" }));
+    await repo.create(B, base({ designation: "Plomberie B", categorie: "plomberie" }));
+    expect((await articlesParCategorie(repo, A, "plomberie")).map((a) => a.designation)).toEqual(["Plomberie 1"]);
+    expect(await articlesParCategorie(repo, A, "inconnue")).toEqual([]);
+    expect((await articlesParCategorie(repo, B, "plomberie")).map((a) => a.designation)).toEqual(["Plomberie B"]);
   });
 });

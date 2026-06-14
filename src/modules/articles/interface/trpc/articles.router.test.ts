@@ -103,4 +103,17 @@ describe.skipIf(!URL)("articles.router e2e (HTTP → tRPC → use-case → repo 
     expect((await q(server, "articles.getById", { id }, tA)).statusCode).toBe(404);
     expect((await mut(server, "articles.update", { id: 999999999, designation: "x" }, tA)).statusCode).toBe(404);
   });
+
+  it("byCategorie : filtre scopé tenant ; catégorie inconnue → []", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    await mut(server, "articles.create", { reference: ref(), designation: "Plomberie X", prixUnitaireHT: "3.00", categorie: "plomberie-cat" }, tA);
+    await mut(server, "articles.create", { reference: ref(), designation: "Elec X", prixUnitaireHT: "4.00", categorie: "elec-cat" }, tA);
+    const plomberie = (await q(server, "articles.byCategorie", { categorie: "plomberie-cat" }, tA)).json().result.data as Array<{ designation: string }>;
+    expect(plomberie.every((a) => a.designation !== "Elec X")).toBe(true);
+    expect(plomberie.some((a) => a.designation === "Plomberie X")).toBe(true);
+    expect((await q(server, "articles.byCategorie", { categorie: "inexistante" }, tA)).json().result.data).toEqual([]);
+    // cross-tenant : B ne voit pas la catégorie de A
+    expect((await q(server, "articles.byCategorie", { categorie: "plomberie-cat" }, tB)).json().result.data).toEqual([]);
+  });
 });

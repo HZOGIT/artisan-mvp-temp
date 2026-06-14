@@ -11,6 +11,12 @@ export function listArticles(repo: IArticleRepository, ctx: TenantContext): Prom
   return repo.list(ctx);
 }
 
+// Catalogue filtré par catégorie (scopé tenant). Une catégorie inconnue renvoie [] (pas une
+// erreur métier).
+export function articlesParCategorie(repo: IArticleRepository, ctx: TenantContext, categorie: string): Promise<Article[]> {
+  return repo.listByCategorie(ctx, categorie);
+}
+
 export async function getArticle(repo: IArticleRepository, ctx: TenantContext, id: number): Promise<Article> {
   const article = await repo.getById(ctx, id);
   if (!article) throw new NotFoundError("Article introuvable");
