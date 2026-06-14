@@ -4,6 +4,7 @@ import type { IDepenseRepository } from "./application/depense-repository";
 import type { ICategorieDepenseRepository } from "../categories-depenses/application/categorie-depense-repository";
 import type { IBudgetCategorieRepository } from "../budgets-categories/application/budget-categorie-repository";
 import type { IRegleCategorisationRepository } from "../regles-categorisation/application/regle-categorisation-repository";
+import type { INoteDeFraisRepository } from "../notes-de-frais/application/note-de-frais-repository";
 
 const stubRepo: IDepenseRepository = {
   list: async () => [],
@@ -49,9 +50,20 @@ const stubRegleRepo: IRegleCategorisationRepository = {
   delete: async () => false,
 };
 
+const stubNoteRepo: INoteDeFraisRepository = {
+  list: async () => [],
+  getById: async () => null,
+  create: async () => {
+    throw new Error("non implémenté (stub)");
+  },
+  update: async () => null,
+  delete: async () => false,
+  setWorkflow: async () => null,
+};
+
 describe("depenses.module", () => {
   it("createDepensesModule câble le repository injecté", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -60,8 +72,8 @@ describe("depenses.module", () => {
   });
 
   it("expose les procédures de catégories (parité client trpc.depenses.*Categorie)", () => {
-    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo });
+    const module = createDepensesModule({ repository: stubRepo, categorieRepository: stubCategorieRepo, budgetRepository: stubBudgetRepo, regleRepository: stubRegleRepo, noteRepository: stubNoteRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record);
-    expect(procedures).toEqual(expect.arrayContaining(["getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle"]));
+    expect(procedures).toEqual(expect.arrayContaining(["getCategories", "createCategorie", "updateCategorie", "deleteCategorie", "setBudget", "getBudgets", "getRegles", "createRegle", "deleteRegle", "listNotesFrais"]));
   });
 });

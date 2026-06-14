@@ -190,23 +190,24 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const conges = createCongesModule({
     repository: deps.congeRepo ?? new CongeRepositoryDrizzle(getDbHandle().db),
   });
+  // Repos partagés (catégories/budgets/règles de dépense + notes de frais) : les domaines dédiés ET le
+  // routeur depenses (parité client `trpc.depenses.*`) consomment les mêmes instances.
+  const categorieDepenseRepo = deps.categorieDepenseRepo ?? new CategorieDepenseRepositoryDrizzle(getDbHandle().db);
+  const budgetCategorieRepo = deps.budgetCategorieRepo ?? new BudgetCategorieRepositoryDrizzle(getDbHandle().db);
+  const regleCategorisationRepo = deps.regleCategorisationRepo ?? new RegleCategorisationRepositoryDrizzle(getDbHandle().db);
+  const noteDeFraisRepo = deps.noteDeFraisRepo ?? new NoteDeFraisRepositoryDrizzle(getDbHandle().db);
   const notesDeFrais = createNotesDeFraisModule({
-    repository: deps.noteDeFraisRepo ?? new NoteDeFraisRepositoryDrizzle(getDbHandle().db),
+    repository: noteDeFraisRepo,
   });
   const chantiers = createChantiersModule({
     repository: deps.chantierRepo ?? new ChantierRepositoryDrizzle(getDbHandle().db),
   });
-  // Repos catégories + budgets de dépense partagés : les domaines categoriesDepenses/budgetsCategories
-  // ET le routeur depenses (parité client `trpc.depenses.*Categorie` / `setBudget`) consomment les
-  // mêmes instances.
-  const categorieDepenseRepo = deps.categorieDepenseRepo ?? new CategorieDepenseRepositoryDrizzle(getDbHandle().db);
-  const budgetCategorieRepo = deps.budgetCategorieRepo ?? new BudgetCategorieRepositoryDrizzle(getDbHandle().db);
-  const regleCategorisationRepo = deps.regleCategorisationRepo ?? new RegleCategorisationRepositoryDrizzle(getDbHandle().db);
   const depenses = createDepensesModule({
     repository: deps.depenseRepo ?? new DepenseRepositoryDrizzle(getDbHandle().db),
     categorieRepository: categorieDepenseRepo,
     budgetRepository: budgetCategorieRepo,
     regleRepository: regleCategorisationRepo,
+    noteRepository: noteDeFraisRepo,
   });
   const devis = createDevisModule({
     repository: deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db),

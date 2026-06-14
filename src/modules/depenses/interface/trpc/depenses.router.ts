@@ -18,6 +18,10 @@ import { budgetsRealises } from "../../application/budgets-realises-use-case";
 import type { IRegleCategorisationRepository } from "../../../regles-categorisation/application/regle-categorisation-repository";
 import { listRegles } from "../../../regles-categorisation/application/read-use-cases";
 import { creerRegle, supprimerRegle } from "../../../regles-categorisation/application/write-use-cases";
+// Composition : notes de frais via `trpc.depenses.listNotesFrais/...` (workflow anti self-approbation
+// porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
+import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
+import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -104,6 +108,7 @@ export function createDepensesRouter(
   categorieRepo: ICategorieDepenseRepository,
   budgetRepo: IBudgetCategorieRepository,
   regleRepo: IRegleCategorisationRepository,
+  noteRepo: INoteDeFraisRepository,
 ) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDepenses(repo, ctx.tenant)),
@@ -204,5 +209,10 @@ export function createDepensesRouter(
         await supprimerRegle(regleRepo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // ── Notes de frais (parité client : trpc.depenses.listNotesFrais/...) ──────────────
+    // Read seul pour l'instant ; les mutations (create/soumettre/approuver/rejeter/payer) viendront
+    // en slices dédiés en préservant l'anti self-approbation porté par le domaine notes-de-frais.
+    listNotesFrais: protectedProcedure.query(({ ctx }) => listNotesDeFrais(noteRepo, ctx.tenant)),
   });
 }

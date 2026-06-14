@@ -51,6 +51,7 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     await admin.query('delete from categories_depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from budgets_categories where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from regles_categorisation where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from notes_de_frais where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from chantiers where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -151,6 +152,19 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
     expect((await callQuery(server, "depenses.getRegles", undefined, tB)).json().result.data).toEqual([]); // isolation
     expect((await callMutation(server, "depenses.deleteRegle", { id: listA[0].id }, tA)).json().result.data).toEqual({ success: true });
     expect((await callQuery(server, "depenses.getRegles", undefined, tA)).json().result.data).toEqual([]);
+  });
+
+  it("listNotesFrais (parité client) : 401 / scopé tenant (A voit sa note, B ne la voit pas)", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    await admin.query(
+      "insert into notes_de_frais (artisan_id, user_id, numero, titre, periode_debut, periode_fin) values ($1,$2,'NF-PARITE','Frais A','2027-03-01','2027-03-31')",
+      [artisanA, UA],
+    );
+    expect((await callQuery(server, "depenses.listNotesFrais", undefined)).statusCode).toBe(401);
+    const listA = (await callQuery(server, "depenses.listNotesFrais", undefined, tA)).json().result.data as Array<{ titre: string }>;
+    expect(listA).toContainEqual(expect.objectContaining({ titre: "Frais A" }));
+    expect((await callQuery(server, "depenses.listNotesFrais", undefined, tB)).json().result.data).toEqual([]); // isolation
   });
 
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
