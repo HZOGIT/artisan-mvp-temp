@@ -8,6 +8,12 @@ import {
   modifierIntervention,
   supprimerIntervention,
 } from "../../application/write-use-cases";
+import {
+  getEquipeIntervention,
+  getEquipesArtisan,
+  ajouterMembreEquipe,
+  retirerMembreEquipe,
+} from "../../application/equipe-use-cases";
 
 // Dates reçues en string ISO (sélecteur front) → `Date`, avec rejet propre des dates
 // invalides (parité legacy : `new Date("garbage")` ne doit pas finir en timestamp NOT NULL).
@@ -87,6 +93,24 @@ export function createInterventionsRouter(repo: IInterventionRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerIntervention(repo, ctx.tenant, input.id);
+        return { success: true };
+      }),
+
+    // ── Équipe d'intervention (sous-ressource ; anti-IDOR via intervention parente + technicien du tenant) ──
+    getEquipe: protectedProcedure
+      .input(z.object({ interventionId: z.number().int() }))
+      .query(({ ctx, input }) => getEquipeIntervention(repo, ctx.tenant, input.interventionId)),
+
+    getEquipesByArtisan: protectedProcedure.query(({ ctx }) => getEquipesArtisan(repo, ctx.tenant)),
+
+    ajouterMembreEquipe: protectedProcedure
+      .input(z.object({ interventionId: z.number().int(), technicienId: z.number().int(), role: z.string().max(50).nullish() }))
+      .mutation(({ ctx, input }) => ajouterMembreEquipe(repo, ctx.tenant, input)),
+
+    retirerMembreEquipe: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await retirerMembreEquipe(repo, ctx.tenant, input.id);
         return { success: true };
       }),
   });

@@ -1,10 +1,17 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import { interventions, clients, techniciens, devis, factures } from "../../../../drizzle/schema.pg";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { interventions, clients, techniciens, devis, factures, interventionsTechniciens } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IInterventionRepository, InterventionRefKind } from "../application/intervention-repository";
-import type { Intervention, CreateInterventionInput, UpdateInterventionInput } from "../domain/intervention";
+import type {
+  Intervention,
+  CreateInterventionInput,
+  UpdateInterventionInput,
+  EquipeMembre,
+  EquipeMembreArtisan,
+  AjouterMembreEquipeInput,
+} from "../domain/intervention";
 
 type InterventionRow = typeof interventions.$inferSelect;
 
@@ -130,6 +137,101 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
         .where(and(eq(interventions.artisanId, ctx.artisanId), eq(interventions.technicienId, technicienId)))
         .orderBy(desc(interventions.dateDebut), desc(interventions.id));
       return rows.map(toIntervention);
+    });
+  }
+
+  listEquipe(ctx: TenantContext, interventionId: number): Promise<EquipeMembre[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select({
+          id: interventionsTechniciens.id,
+          technicienId: interventionsTechniciens.technicienId,
+          role: interventionsTechniciens.role,
+          nom: techniciens.nom,
+          prenom: techniciens.prenom,
+        })
+        .from(interventionsTechniciens)
+        .leftJoin(techniciens, eq(interventionsTechniciens.technicienId, techniciens.id))
+        .where(and(eq(interventionsTechniciens.interventionId, interventionId), eq(interventionsTechniciens.artisanId, ctx.artisanId)))
+        .orderBy(asc(interventionsTechniciens.id));
+      return rows.map((r) => ({ id: r.id, technicienId: r.technicienId, role: r.role ?? null, nom: r.nom ?? null, prenom: r.prenom ?? null }));
+    });
+  }
+
+  listEquipesArtisan(ctx: TenantContext): Promise<EquipeMembreArtisan[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select({
+          id: interventionsTechniciens.id,
+          interventionId: interventionsTechniciens.interventionId,
+          technicienId: interventionsTechniciens.technicienId,
+          role: interventionsTechniciens.role,
+          nom: techniciens.nom,
+          prenom: techniciens.prenom,
+        })
+        .from(interventionsTechniciens)
+        .leftJoin(techniciens, eq(interventionsTechniciens.technicienId, techniciens.id))
+        .where(eq(interventionsTechniciens.artisanId, ctx.artisanId))
+        .orderBy(asc(interventionsTechniciens.id));
+      return rows.map((r) => ({
+        id: r.id,
+        interventionId: r.interventionId,
+        technicienId: r.technicienId,
+        role: r.role ?? null,
+        nom: r.nom ?? null,
+        prenom: r.prenom ?? null,
+      }));
+    });
+  }
+
+  addMembreEquipe(ctx: TenantContext, input: AjouterMembreEquipeInput): Promise<EquipeMembre> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Idempotent : si (intervention, technicien) existe déjà dans le tenant, on le renvoie.
+      const enrich = async (id: number): Promise<EquipeMembre> => {
+        const [m] = await tx
+          .select({
+            id: interventionsTechniciens.id,
+            technicienId: interventionsTechniciens.technicienId,
+            role: interventionsTechniciens.role,
+            nom: techniciens.nom,
+            prenom: techniciens.prenom,
+          })
+          .from(interventionsTechniciens)
+          .leftJoin(techniciens, eq(interventionsTechniciens.technicienId, techniciens.id))
+          .where(eq(interventionsTechniciens.id, id))
+          .limit(1);
+        return { id: m.id, technicienId: m.technicienId, role: m.role ?? null, nom: m.nom ?? null, prenom: m.prenom ?? null };
+      };
+      const [existing] = await tx
+        .select({ id: interventionsTechniciens.id })
+        .from(interventionsTechniciens)
+        .where(
+          and(
+            eq(interventionsTechniciens.interventionId, input.interventionId),
+            eq(interventionsTechniciens.technicienId, input.technicienId),
+            eq(interventionsTechniciens.artisanId, ctx.artisanId),
+          ),
+        )
+        .limit(1);
+      if (existing) return enrich(existing.id);
+      const [inserted] = await tx
+        .insert(interventionsTechniciens)
+        .values({
+          artisanId: ctx.artisanId,
+          interventionId: input.interventionId,
+          technicienId: input.technicienId,
+          role: input.role ?? null,
+        })
+        .returning({ id: interventionsTechniciens.id });
+      return enrich(inserted.id);
+    });
+  }
+
+  removeMembreEquipe(ctx: TenantContext, id: number): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx
+        .delete(interventionsTechniciens)
+        .where(and(eq(interventionsTechniciens.id, id), eq(interventionsTechniciens.artisanId, ctx.artisanId)));
     });
   }
 }

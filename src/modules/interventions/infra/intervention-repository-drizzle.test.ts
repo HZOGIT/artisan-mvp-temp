@@ -21,8 +21,12 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
   let clientA = 0;
   let clientB = 0;
 
+  let techA = 0;
+
   const cleanup = async () => {
+    await admin.query('delete from interventions_techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from interventions where "artisanId" in ($1,$2)', [A, B]);
+    await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
   };
 
@@ -31,6 +35,7 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
     // clientId est NOT NULL : on seed un client réel par tenant pour respecter la FK.
     clientA = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [A, "Client A"])).rows[0].id;
     clientB = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [B, "Client B"])).rows[0].id;
+    techA = (await admin.query('insert into techniciens ("artisanId",nom,prenom) values ($1,$2,$3) returning id', [A, "Martin", "Léa"])).rows[0].id;
   });
 
   afterAll(async () => {
@@ -92,6 +97,28 @@ describe.skipIf(!URL)("InterventionRepositoryDrizzle (PG, RLS + scope tenant)", 
     await repo.create(ctx(A), { clientId: clientA, titre: "Pas à moi", dateDebut: new Date("2026-06-14T09:00:00Z") });
     const mine = await repo.listByTechnicien(ctx(A), techId);
     expect(mine.map((x) => x.id)).toEqual([iMine.id]);
+    await admin.query('delete from interventions where "technicienId"=$1', [techId]);
     await admin.query('delete from techniciens where id=$1', [techId]);
+  });
+
+  it("équipe : add (idempotent + nom joint) / list / remove scopés tenant", async () => {
+    const i = await repo.create(ctx(A), { clientId: clientA, titre: "Chantier équipe", dateDebut: new Date("2026-06-15T08:00:00Z") });
+    const m = await repo.addMembreEquipe(ctx(A), { interventionId: i.id, technicienId: techA, role: "aide" });
+    expect(m.technicienId).toBe(techA);
+    expect(m.role).toBe("aide");
+    expect(m.nom).toBe("Martin"); // jointure technicien
+    expect(m.prenom).toBe("Léa");
+    // idempotent : (intervention, technicien) déjà présent → même liaison
+    const again = await repo.addMembreEquipe(ctx(A), { interventionId: i.id, technicienId: techA });
+    expect(again.id).toBe(m.id);
+    expect(await repo.listEquipe(ctx(A), i.id)).toHaveLength(1);
+    // isolation : B ne voit pas l'équipe de A
+    expect(await repo.listEquipe(ctx(B), i.id)).toEqual([]);
+    expect((await repo.listEquipesArtisan(ctx(B))).some((x) => x.interventionId === i.id)).toBe(false);
+    // remove cross-tenant = no-op ; remove tenant = effectif
+    await repo.removeMembreEquipe(ctx(B), m.id);
+    expect(await repo.listEquipe(ctx(A), i.id)).toHaveLength(1);
+    await repo.removeMembreEquipe(ctx(A), m.id);
+    expect(await repo.listEquipe(ctx(A), i.id)).toHaveLength(0);
   });
 });
