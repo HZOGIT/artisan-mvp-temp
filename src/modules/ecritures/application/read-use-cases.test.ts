@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeEcritureRepository } from "../infra/ecriture-repository-fake";
-import { listEcritures, listEcrituresFacture, balanceComptable, grandLivreComptable } from "./read-use-cases";
+import { listEcritures, listEcrituresFacture, balanceComptable, grandLivreComptable, genererExportFEC } from "./read-use-cases";
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateEcritureInput } from "../domain/ecriture";
 
@@ -62,5 +62,20 @@ describe("ecritures — use-cases de lecture", () => {
     expect(gl.length).toBe(1);
     expect(gl[0].numeroCompte).toBe("411000");
     expect(await grandLivreComptable(repo, B, "411000")).toEqual([]); // pas d'écriture de B
+  });
+
+  it("genererExportFEC : filtre par période + scopé tenant (header + lignes dans la fenêtre)", async () => {
+    const repo = new FakeEcritureRepository();
+    await repo.createMany(A, [
+      { dateEcriture: new Date("2026-06-15T00:00:00Z"), journal: "VE", numeroCompte: "411000", libelle: "Dans", debit: "120.00", factureId: 501 },
+      { dateEcriture: new Date("2026-01-01T00:00:00Z"), journal: "VE", numeroCompte: "411000", libelle: "Avant", debit: "50.00", factureId: 502 },
+    ]);
+    const fec = await genererExportFEC(repo, A, new Date("2026-06-01T00:00:00Z"), new Date("2026-06-30T23:59:59Z"));
+    const lines = fec.split("\n");
+    expect(lines.length).toBe(2); // header + 1 ligne (celle de juin)
+    expect(lines[1]).toContain("Dans");
+    expect(lines[1]).not.toContain("Avant");
+    // tenant B : aucune écriture → header seul
+    expect((await genererExportFEC(repo, B, new Date("2026-01-01"), new Date("2026-12-31"))).split("\n").length).toBe(1);
   });
 });
