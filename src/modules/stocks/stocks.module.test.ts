@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createStocksModule } from "./stocks.module";
 import type { IStockRepository } from "./application/stock-repository";
+import type { INotificationRepository } from "../notifications/application/notification-repository";
 
 const stubRepo: IStockRepository = {
   list: async () => [],
@@ -17,9 +18,14 @@ const stubRepo: IStockRepository = {
   listEntrant: async () => [],
 };
 
+// Stub minimal du repo notifications (composé par stocks pour generateAlerts).
+const stubNotifRepo = {
+  creer: async () => ({}) as never,
+} as unknown as INotificationRepository;
+
 describe("stocks.module", () => {
   it("createStocksModule câble le repository injecté", () => {
-    const module = createStocksModule({ repository: stubRepo });
+    const module = createStocksModule({ repository: stubRepo, notificationRepository: stubNotifRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -39,12 +45,13 @@ describe("stocks.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité)", () => {
-    const module = createStocksModule({ repository: stubRepo });
+    const module = createStocksModule({ repository: stubRepo, notificationRepository: stubNotifRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "adjustQuantity",
       "create",
       "delete",
+      "generateAlerts",
       "getById",
       "getEntrant",
       "getLowStock",

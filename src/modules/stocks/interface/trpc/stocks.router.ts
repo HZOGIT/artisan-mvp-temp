@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IStockRepository } from "../../application/stock-repository";
+import type { INotificationRepository } from "../../../notifications/application/notification-repository";
+import { genererAlertesStock } from "../../application/alertes-use-cases";
 import {
   listStocks,
   getStock,
@@ -47,8 +49,9 @@ const updateSchema = z.object({
 
 // Routeur tRPC du domaine stocks. Transport mince : valide les inputs (zod), délègue aux
 // use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400). Repository injecté (DI) → testable.
-export function createStocksRouter(repo: IStockRepository) {
+// (NotFound→404, Validation→400). Repositories injectés (DI) → `repo` (stocks) + `notificationRepo`
+// (composé pour generateAlerts, qui crée des notifications « Stock bas »).
+export function createStocksRouter(repo: IStockRepository, notificationRepo: INotificationRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listStocks(repo, ctx.tenant)),
 
@@ -101,5 +104,9 @@ export function createStocksRouter(repo: IStockRepository) {
 
     // Quantités en commande (non reçues) par stock (parité client trpc.stocks.getEntrant).
     getEntrant: protectedProcedure.query(({ ctx }) => listStockEntrant(repo, ctx.tenant)),
+
+    // Génère une notification « Stock bas » par stock sous le seuil (parité client + legacy).
+    // Cross-domaine : compose le repo notifications. Renvoie { alertsCreated }.
+    generateAlerts: protectedProcedure.mutation(({ ctx }) => genererAlertesStock(repo, notificationRepo, ctx.tenant)),
   });
 }

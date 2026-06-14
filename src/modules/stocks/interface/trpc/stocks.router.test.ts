@@ -58,6 +58,7 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
   afterAll(async () => {
     await server.close();
     for (const aId of [artisanA, artisanB]) {
+      await admin.query('delete from notifications where "artisanId"=$1', [aId]);
       await admin.query('delete from lignes_commandes_fournisseurs where "commandeId" in (select id from commandes_fournisseurs where "artisanId"=$1)', [aId]);
       await admin.query('delete from commandes_fournisseurs where "artisanId"=$1', [aId]);
       await admin.query('delete from fournisseurs where "artisanId"=$1', [aId]);
@@ -217,6 +218,31 @@ describe.skipIf(!URL)("stocks.router e2e (HTTP → tRPC → use-case → repo �
     // aucun stock de B (réf "B-…") ne fuite vers A
     expect(lowRefs.some((r) => r.startsWith("B-"))).toBe(false);
     expect(rupRefs.some((r) => r.startsWith("B-"))).toBe(false);
+  });
+
+  it("generateAlerts (parité client) : 1 notification 'alerte' par stock bas, scopé tenant ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    // 401 sans cookie
+    expect((await callMutation(server, "stocks.generateAlerts", undefined)).statusCode).toBe(401);
+    // purge les notifications de A pour un compte déterministe, puis crée 2 stocks bas distincts
+    await admin.query('delete from notifications where "artisanId"=$1', [artisanA]);
+    const sfx = Date.now();
+    await callMutation(server, "stocks.create", { reference: `GA1-${sfx}`, designation: "Bas 1", quantiteEnStock: "1", seuilAlerte: "5" }, tA);
+    await callMutation(server, "stocks.create", { reference: `GA2-${sfx}`, designation: "Bas 2", quantiteEnStock: "0", seuilAlerte: "5" }, tA);
+    // nb de stocks bas réels de A (d'autres tests ont pu en créer)
+    const basCount = Number((await admin.query('select count(*)::int as n from stocks where "artisanId"=$1 and "quantiteEnStock" <= "seuilAlerte"', [artisanA])).rows[0].n);
+    expect(basCount).toBeGreaterThanOrEqual(2);
+
+    const res = await callMutation(server, "stocks.generateAlerts", undefined, tA);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().result.data.alertsCreated).toBe(basCount);
+    // autant de notifications 'alerte' créées pour A
+    const notifA = Number((await admin.query(`select count(*)::int as n from notifications where "artisanId"=$1 and type='alerte'`, [artisanA])).rows[0].n);
+    expect(notifA).toBe(basCount);
+    // isolation : B n'a reçu aucune notification du fait de l'action de A
+    const notifB = Number((await admin.query(`select count(*)::int as n from notifications where "artisanId"=$1 and type='alerte'`, [artisanB])).rows[0].n);
+    expect(notifB).toBe(0);
   });
 
   it("getEntrant (parité client) : Σ(quantite-quantiteRecue) des commandes non soldées, scopé tenant ; 401", async () => {

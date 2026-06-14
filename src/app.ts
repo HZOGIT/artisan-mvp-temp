@@ -170,8 +170,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const techniciens = createTechniciensModule({
     repository: deps.technicienRepo ?? new TechnicienRepositoryDrizzle(getDbHandle().db),
   });
+  // Repo notifications partagé : utilisé par le module notifications ET composé par stocks
+  // (generateAlerts crée des notifications « Stock bas »). Une seule instance pour cohérence.
+  const notificationRepo = deps.notificationRepo ?? new NotificationRepositoryDrizzle(getDbHandle().db);
   const notifications = createNotificationsModule({
-    repository: deps.notificationRepo ?? new NotificationRepositoryDrizzle(getDbHandle().db),
+    repository: notificationRepo,
   });
   const fournisseurs = createFournisseursModule({
     repository: deps.fournisseurRepo ?? new FournisseurRepositoryDrizzle(getDbHandle().db),
@@ -181,6 +184,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const stocks = createStocksModule({
     repository: deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db),
+    notificationRepository: notificationRepo,
   });
   const clients = createClientsModule({
     repository: deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db),
