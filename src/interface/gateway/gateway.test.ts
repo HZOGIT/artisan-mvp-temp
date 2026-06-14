@@ -592,9 +592,32 @@ describe("bascule du domaine contratsMaintenance (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine demandesContact (flag gateway)", () => {
+  it("demandesContact routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("demandesContact", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { demandesContact: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("demandesContact", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("demandesContact", 8, canary)).toBe(false);
+    const global: FeatureFlags = { demandesContact: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("demandesContact", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("demandesContact", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine demandesContact extraient bien le domaine (dont convertir)", () => {
+    expect(domainFromTrpcPath("demandesContact.create")).toBe("demandesContact");
+    expect(domainFromTrpcPath("/demandesContact.convertir")).toBe("demandesContact");
+  });
+
+  it("parse env : demandesContact enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "demandesContact" } as NodeJS.ProcessEnv).demandesContact).toEqual({ enabled: true });
+    // NB : le canary via NEW_STACK_CANARY_<DOMAINE> ne fonctionne pas pour un domaine camelCase
+    // (le parseur lowercase le suffixe → clé `demandescontact`) — même limitation que notesDeFrais.
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 26 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne", "relancesDevis", "categoriesDepenses", "contratsMaintenance"]) {
+  it("les 27 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdvEnLigne", "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
