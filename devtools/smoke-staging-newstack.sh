@@ -52,6 +52,16 @@ else
   echo "  ✖ réponse NON superjson (clients.list) — transformer manquant ! body=$(printf '%s' "$body" | head -c 200)"; fail=1
 fi
 
+# 2c) devisOptions.getByDevisId : nécessite un devisId POSSÉDÉ (anti-IDOR via le devis parent). On sème
+# (idempotent) un client + un devis pour A, puis on attend 200 (liste vide = endpoint OK end-to-end).
+$PG "insert into clients (\"artisanId\", nom) select $AA, 'Smoke DevisOptions' where not exists (select 1 from clients where \"artisanId\"=$AA and nom='Smoke DevisOptions');" >/dev/null
+SMOKE_CID=$($PG "select id from clients where \"artisanId\"=$AA and nom='Smoke DevisOptions' limit 1;")
+$PG "insert into devis (\"artisanId\", \"clientId\", numero) select $AA, $SMOKE_CID, 'SMOKE-DO-1' where not exists (select 1 from devis where \"artisanId\"=$AA and numero='SMOKE-DO-1');" >/dev/null
+SMOKE_DID=$($PG "select id from devis where \"artisanId\"=$AA and numero='SMOKE-DO-1' limit 1;")
+codeDO=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
+  "$NEWSTACK_URL/api/trpc/devisOptions.getByDevisId?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22devisId%22%3A$SMOKE_DID%7D%7D%7D")
+[ "$codeDO" = "200" ] && echo "  ✓ devisOptions.getByDevisId (devis possédé) -> 200" || { echo "  ✖ devisOptions.getByDevisId -> $codeDO (attendu 200)"; fail=1; }
+
 # 3) Contrôle d'isolation : l'auth fonctionne aussi pour B (tenant distinct) — 200 (ses propres données).
 codeB=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_B" \
   "$NEWSTACK_URL/api/trpc/vehicules.list?batch=1&input=%7B%7D")

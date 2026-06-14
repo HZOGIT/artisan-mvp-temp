@@ -31,6 +31,7 @@ import type { BudgetsCategoriesModule } from "../../modules/budgets-categories/b
 import type { ReglesCategorisationModule } from "../../modules/regles-categorisation/regles-categorisation.module";
 import type { PrevisionsCAModule } from "../../modules/previsions-ca/previsions-ca.module";
 import type { ArtisanModule } from "../../modules/artisan/artisan.module";
+import type { DevisOptionsModule } from "../../modules/devis-options/devis-options.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -65,6 +66,7 @@ export interface AppRouterDeps {
   readonly reglesCategorisation: ReglesCategorisationModule;
   readonly previsionsCA: PrevisionsCAModule;
   readonly artisan: ArtisanModule;
+  readonly devisOptions: DevisOptionsModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -108,6 +110,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     reglesCategorisation: deps.reglesCategorisation.router,
     previsions: deps.previsionsCA.router,
     artisan: deps.artisan.router,
+    devisOptions: deps.devisOptions.router,
   });
 }
 

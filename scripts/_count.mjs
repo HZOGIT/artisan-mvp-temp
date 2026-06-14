@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const B=process.env.BASE||'https://staging.operioz.com';
+const br=await chromium.launch({args:['--no-sandbox']});
+const c=await br.newContext({baseURL:B,ignoreHTTPSErrors:true});
+await c.request.post('/api/trpc/auth.signin?batch=1',{headers:{'content-type':'application/json'},data:{'0':{json:{email:'dev@operioz.com',password:process.env.E2E_PASS}}}});
+const p=await c.newPage();
+await p.goto('/assistant',{waitUntil:'networkidle',timeout:25000}); await p.waitForTimeout(1500);
+const n=await p.getByRole('button',{name:'Nouvelle conversation'}).count();
+const ta=await p.locator('textarea').count();
+console.log('boutons "Nouvelle conversation" sur /assistant:', n, n===1?'✅ (1 seule instance)':'❌');
+console.log('textareas (instances chat):', ta);
+await br.close(); process.exit(n===1?0:1);
