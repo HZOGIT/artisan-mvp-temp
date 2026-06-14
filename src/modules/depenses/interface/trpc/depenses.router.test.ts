@@ -5,6 +5,7 @@ import { buildApp } from "../../../../app";
 import { createDbClient } from "../../../../shared/db";
 import { DrizzleTenantResolver } from "../../../../shared/tenant/drizzle-tenant-resolver";
 import { DepenseRepositoryDrizzle } from "../../infra/depense-repository-drizzle";
+import { CategorieDepenseRepositoryDrizzle } from "../../../categories-depenses/infra/categorie-depense-repository-drizzle";
 
 const URL = process.env.DATABASE_URL;
 const APP_URL =
@@ -47,6 +48,7 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
 
   const purge = async (uid: number) => {
     await admin.query('delete from depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
+    await admin.query('delete from categories_depenses where artisan_id in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from chantiers where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -70,7 +72,12 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
         "Chantier B",
       ])
     ).rows[0].id;
-    server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), depenseRepo: new DepenseRepositoryDrizzle(app.db) });
+    server = buildApp({
+      jwtSecret: SECRET,
+      resolver: new DrizzleTenantResolver(app.db),
+      depenseRepo: new DepenseRepositoryDrizzle(app.db),
+      categorieDepenseRepo: new CategorieDepenseRepositoryDrizzle(app.db),
+    });
   });
 
   afterAll(async () => {
@@ -82,6 +89,22 @@ describe.skipIf(!URL)("depenses.router e2e (HTTP → tRPC → use-case → repo 
 
   it("sans cookie → depenses.list 401", async () => {
     expect((await callQuery(server, "depenses.list", undefined)).statusCode).toBe(401);
+  });
+
+  it("catégories (parité client trpc.depenses.*Categorie) : 401 / scopé / create→list / isolation / update+delete", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    expect((await callQuery(server, "depenses.getCategories", undefined)).statusCode).toBe(401);
+    expect((await callQuery(server, "depenses.getCategories", undefined, tA)).json().result.data).toEqual([]);
+    const created = await callMutation(server, "depenses.createCategorie", { nom: "Carburant", couleur: "#112233", plafondMensuel: 500 }, tA);
+    expect(created.statusCode).toBe(200);
+    const id = created.json().result.data.id as number;
+    const listA = (await callQuery(server, "depenses.getCategories", undefined, tA)).json().result.data as Array<{ id: number; nom: string }>;
+    expect(listA).toContainEqual(expect.objectContaining({ id, nom: "Carburant" }));
+    expect((await callQuery(server, "depenses.getCategories", undefined, tB)).json().result.data).toEqual([]); // isolation
+    expect((await callMutation(server, "depenses.updateCategorie", { id, actif: false }, tA)).json().result.data).toEqual({ success: true });
+    expect((await callMutation(server, "depenses.deleteCategorie", { id }, tA)).json().result.data).toEqual({ success: true });
+    expect((await callQuery(server, "depenses.getCategories", undefined, tA)).json().result.data).toEqual([]);
   });
 
   it("create dérive TVA/TTC côté serveur + list scopé tenant A", async () => {
