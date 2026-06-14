@@ -117,3 +117,6 @@ terraform/terraform.tfstate
 terraform/terraform.tfstate.backup
 terraform/terraform.tfvars
 .env
+
+# Bundle du nouveau stack (esbuild)
+dist-newstack

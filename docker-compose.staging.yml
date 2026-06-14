@@ -80,6 +80,32 @@ services:
       postgres:
         condition: service_healthy
 
+  # Nouveau stack clean-archi (Fastify + tRPC 11 + Drizzle pg), déployé À CÔTÉ du legacy.
+  # Tourne sous le rôle non-superuser app_tenant (soumis RLS). Tous les flags de bascule sont OFF
+  # par défaut → le legacy reste la route publique tant que le tunnel pointe sur `app`. Exposé sur le
+  # port hôte 3010 pour smoke-test ; la bascule du trafic (tunnel/edge) est une étape séparée.
+  new-stack:
+    image: operioz-newstack:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEW_STACK_PORT: "3001"
+      HOST: 0.0.0.0
+      # Rôle applicatif non-superuser → soumis aux policies RLS (isolation tenant).
+      APP_DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
+      DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
+    # JWT_SECRET (mêmes cookies que le legacy) + autres secrets via .env.staging.
+    env_file:
+      - .env.staging
+    ports:
+      - "3010:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped

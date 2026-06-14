@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-newstack
+.git
+.github
+**/*.test.ts
+coverage
+.env
+.env.*
+terraform
+docs
+*.log
