@@ -96,6 +96,9 @@ import { BcryptPasswordHasher } from "./shared/ports/password-hasher-bcrypt";
 import { createComptabiliteModule } from "./modules/comptabilite/comptabilite.module";
 import { ComptabiliteReaderDrizzle } from "./modules/comptabilite/infra/comptabilite-reader-drizzle";
 import type { IComptabiliteReader } from "./modules/comptabilite/application/comptabilite-reader";
+import { createAuthModule } from "./modules/auth/auth.module";
+import { AuthRepositoryDrizzle } from "./modules/auth/infra/auth-repository-drizzle";
+import type { IAuthRepository } from "./modules/auth/application/auth-repository";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -232,6 +235,7 @@ export interface AppDeps extends ContextDeps {
   readonly rapportRepo?: IRapportRepository;
   readonly utilisateurRepo?: IUtilisateurRepository;
   readonly comptabiliteReader?: IComptabiliteReader;
+  readonly authRepo?: IAuthRepository;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -522,7 +526,17 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const comptabilite = createComptabiliteModule({
     reader: deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite });
+  // Auth (SENSIBLE — lockout possible) : JWT émis avec le MÊME secret que le legacy (cookie inter-
+  // opérable) ; bcrypt + EmailPort + rate-limiter reset + APP_URL de confiance pour le lien de reset.
+  const auth = createAuthModule({
+    repository: deps.authRepo ?? new AuthRepositoryDrizzle(getDbHandle().db),
+    hasher: new BcryptPasswordHasher(),
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
+    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

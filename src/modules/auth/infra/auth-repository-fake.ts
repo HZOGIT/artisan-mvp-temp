@@ -12,6 +12,7 @@ type FakeAuthUser = { -readonly [K in keyof AuthUser]: AuthUser[K] } & {
 export class FakeAuthRepository implements IAuthRepository {
   private readonly users: FakeAuthUser[] = [];
   public touched: number[] = [];
+  public bootstrapped: number[] = [];
 
   seed(u: Partial<FakeAuthUser> & { id: number; email: string }): FakeAuthUser {
     const full: FakeAuthUser = { name: null, prenom: null, role: "artisan", artisanId: null, actif: true, password: null, ...u };
@@ -82,5 +83,18 @@ export class FakeAuthRepository implements IAuthRepository {
       u.actif = false;
       u.email = neutralizedEmail;
     }
+  }
+
+  async createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }> {
+    const id = (this.users.reduce((m, u) => Math.max(m, u.id), 0) || 0) + 1;
+    const u = this.seed({ id, email: data.email, password: data.passwordHash, name: data.name ?? null, role: "artisan" });
+    return { id: u.id, email: u.email };
+  }
+
+  async bootstrapAccount(userId: number): Promise<void> {
+    // Modèle simplifié : lie un artisan fictif au user (suffisant pour les tests d'orchestration).
+    const u = this.users.find((x) => x.id === userId);
+    if (u && u.artisanId == null) u.artisanId = 1000 + userId;
+    this.bootstrapped.push(userId);
   }
 }

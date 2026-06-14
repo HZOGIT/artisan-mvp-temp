@@ -5,7 +5,7 @@ import { FakePasswordHasher } from "../../../shared/ports/password-hasher-bcrypt
 import { verifyAuthToken } from "../../../shared/tenant/jwt";
 import { FakeAuthRepository } from "../infra/auth-repository-fake";
 import type { AuthDeps } from "./use-cases";
-import { deleteAccount, forgotPassword, me, resetPassword, signin, updateEmail, updatePassword } from "./use-cases";
+import { deleteAccount, forgotPassword, me, resetPassword, signin, signup, updateEmail, updatePassword } from "./use-cases";
 
 const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 const makeDeps = (repo: FakeAuthRepository): AuthDeps => ({ repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET });
@@ -43,6 +43,22 @@ describe("auth use-cases", () => {
     await expect(signin(deps, { email: "ok@t.fr", password: "mauvais" })).rejects.toBeInstanceOf(UnauthorizedError);
     await expect(signin(deps, { email: "oauth@t.fr", password: "x" })).rejects.toBeInstanceOf(UnauthorizedError);
     expect(repo.touched).toEqual([]); // aucun login réussi
+  });
+
+  it("signup : email libre → crée user + bootstrap + JWT + email bienvenue ; email pris → ConflictError", async () => {
+    const repo = new FakeAuthRepository();
+    const email = new FakeEmailPort();
+    const deps: AuthDeps = { repo, hasher: new FakePasswordHasher(), jwtSecret: SECRET, email, appUrl: "https://app.test" };
+    const { user, token } = await signup(deps, { email: "new@t.fr", password: "secret6", name: "Léa" });
+    expect(user.email).toBe("new@t.fr");
+    expect(await verifyAuthToken(token, SECRET)).toMatchObject({ email: "new@t.fr" });
+    expect(repo.bootstrapped).toEqual([user.id]); // provisionnement appelé
+    expect(email.sent[0].subject).toContain("Bienvenue");
+    // Le mot de passe est haché (jamais en clair).
+    expect((await repo.findCredentials("new@t.fr"))?.password).toBe("hashed:secret6");
+    // Email déjà pris → 409, pas de 2e bootstrap.
+    await expect(signup(deps, { email: "new@t.fr", password: "secret6" })).rejects.toBeInstanceOf(ConflictError);
+    expect(repo.bootstrapped).toEqual([user.id]);
   });
 
   it("updateEmail : OK si libre ou inchangé ; ConflictError si pris par un autre", async () => {

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../../../../interface/trpc/trpc";
 import { clearAuthCookie, setAuthCookie } from "../../../../interface/http/auth-cookie";
 import type { AuthDeps } from "../../application/use-cases";
-import { deleteAccount, forgotPassword, me, resetPassword, signin, updateEmail, updatePassword } from "../../application/use-cases";
+import { deleteAccount, forgotPassword, me, resetPassword, signin, signup, updateEmail, updatePassword } from "../../application/use-cases";
 
 // Routeur tRPC `auth` (slice session : me/signin/logout — publics). Le cookie `token` est posé/effacé
 // via `ctx.res` (Fastify). signup/updateEmail/updatePassword/forgotPassword/resetPassword/deleteAccount
@@ -17,6 +17,15 @@ export function createAuthRouter(deps: AuthDeps) {
       .input(z.object({ email: z.string().email(), password: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const { user, token } = await signin(deps, input);
+        if (ctx.res) setAuthCookie(ctx.res, token);
+        return { success: true as const, user };
+      }),
+
+    // Signup : crée le compte + provisionne (bootstrap), émet le JWT et pose le cookie. Email pris → 409.
+    signup: publicProcedure
+      .input(z.object({ email: z.string().email(), password: z.string().min(6), name: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const { user, token } = await signup(deps, input);
         if (ctx.res) setAuthCookie(ctx.res, token);
         return { success: true as const, user };
       }),

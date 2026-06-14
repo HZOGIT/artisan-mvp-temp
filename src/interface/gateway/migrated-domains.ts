@@ -2,7 +2,7 @@
 // montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
 // cibler qu'un domaine présent ici (sinon le routage enverrait vers un domaine inexistant
 // du nouveau stack). Mis à jour à chaque domaine livré (étape 9/9 du gabarit).
-export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs", "comptabilite"] as const;
+export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs", "comptabilite", "auth"] as const;
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
@@ -55,4 +55,6 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "rapports", // parité vérifiée : list/create/delete/toggleFavori/executer (rapports personnalisables, anti-IDOR via RLS) ⊇ 5 appels client
   "utilisateurs", // parité vérifiée : list/invite/updateRole/toggleActif/getPermissions/updatePermissions/resetPermissions (gate utilisateurs.gerer ; tables HORS RLS, scope artisanId explicite) ⊇ 7 appels client
   "comptabilite", // parité vérifiée : getGrandLivre/getBalance/getJournalVentes/getRapportTVA/getDeclarationTVADetail/getFecPreview (gate comptabilite.voir ; FEC opposable Σdébit=Σcrédit, lecture seule) ⊇ 6 appels client
+  // NB : `auth` est MONTÉ (MIGRATED_DOMAINS, 9 procs) mais **PAS activé ici** : domaine LOCKOUT-critique
+  // → on l'ajoute à DEFAULT_ENABLED seulement après un smoke signin/signup/me bout-en-bout (firing dédié).
 ] as const;

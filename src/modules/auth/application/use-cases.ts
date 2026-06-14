@@ -5,7 +5,7 @@ import type { PasswordHasher } from "../../../shared/ports/password-hasher";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import { signAuthToken } from "../../../shared/tenant/jwt";
 import type { TokenClaims } from "../../../shared/tenant";
-import { resetPasswordEmail } from "./emails";
+import { resetPasswordEmail, welcomeEmail } from "./emails";
 import type { AuthMe, AuthUser } from "../domain/auth";
 import type { IAuthRepository } from "./auth-repository";
 
@@ -50,6 +50,28 @@ export async function signin(deps: AuthDeps, input: { email: string; password: s
   const token = await signAuthToken({ userId: cred.id, email: cred.email ?? "" }, deps.jwtSecret, deps.tokenTtl ?? "7d");
   const user = await deps.repo.getById(cred.id);
   if (!user) throw new UnauthorizedError("Invalid email or password");
+  return { user, token };
+}
+
+// Inscription : email unique (409) → hash bcrypt → création user → **bootstrap** (artisan + essai +
+// permissions owner) → JWT + (cookie posé par l'interface). Email de bienvenue best-effort. Parité legacy.
+export async function signup(deps: AuthDeps, input: { email: string; password: string; name?: string }): Promise<{ user: AuthUser; token: string }> {
+  if ((await deps.repo.findIdByEmail(input.email)) !== null) {
+    throw new ConflictError("Email already in use");
+  }
+  const passwordHash = await deps.hasher.hash(input.password);
+  const created = await deps.repo.createUser({ email: input.email, passwordHash, name: input.name ?? null });
+  // Provisionne le compte (artisan + abonnement d'essai + permissions owner) — requis pour utiliser l'app.
+  await deps.repo.bootstrapAccount(created.id);
+  const token = await signAuthToken({ userId: created.id, email: created.email ?? input.email }, deps.jwtSecret, deps.tokenTtl ?? "7d");
+  if (deps.email) {
+    try {
+      await deps.email.send({ to: input.email, subject: "Bienvenue sur Operioz ! 🎉", body: welcomeEmail(input.name, deps.appUrl) });
+    } catch {
+      /* best-effort */
+    }
+  }
+  const user = (await deps.repo.getById(created.id)) ?? { id: created.id, email: created.email, name: input.name ?? null, prenom: null, role: "artisan", artisanId: null, actif: true };
   return { user, token };
 }
 

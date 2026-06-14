@@ -1,8 +1,9 @@
 import { and, eq, gte } from "drizzle-orm";
-import { users } from "../../../../drizzle/schema.pg";
+import { artisans, permissionsUtilisateur, subscriptions, users } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
+import { ALL_PERMISSIONS } from "../../../../shared/permissions";
 
 // Repo auth Drizzle. `users` est HORS RLS (auth précède la résolution du tenant) → accès direct par
 // id/email. Aucune écriture tenant ; seul `lastSignedIn` est mis à jour au login.
@@ -60,5 +61,48 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
 
   async softDelete(userId: number, neutralizedEmail: string): Promise<void> {
     await this.db.update(users).set({ actif: false, email: neutralizedEmail }).where(eq(users.id, userId));
+  }
+
+  async createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }> {
+    const [row] = await this.db
+      .insert(users)
+      .values({ email: data.email, password: data.passwordHash, name: data.name ?? null, loginMethod: "email", lastSignedIn: new Date() })
+      .returning({ id: users.id, email: users.email });
+    return { id: row.id, email: row.email ?? null };
+  }
+
+  // Provisionne le compte propriétaire (idempotent). ⚠️ `artisans`/`subscriptions`/`permissions_utilisateur`
+  // sont HORS RLS → accès direct scopé par les ids ; seul l'artisan est requis, le reste est best-effort.
+  async bootstrapAccount(userId: number): Promise<void> {
+    // 1. Artisan (idempotent via UNIQUE(userId)).
+    let [artisan] = await this.db.select({ id: artisans.id }).from(artisans).where(eq(artisans.userId, userId)).limit(1);
+    if (!artisan) {
+      [artisan] = await this.db.insert(artisans).values({ userId }).returning({ id: artisans.id });
+    }
+    const artisanId = artisan.id;
+    // 2. Lier le propriétaire à son entreprise (requis par subscription/permissions ; idempotent).
+    await this.db.update(users).set({ artisanId }).where(eq(users.id, userId));
+    // 3. Abonnement d'essai 14 j (si absent) — best-effort.
+    try {
+      const [sub] = await this.db.select({ id: subscriptions.id }).from(subscriptions).where(eq(subscriptions.artisan_id, artisanId)).limit(1);
+      if (!sub) {
+        const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+        await this.db
+          .insert(subscriptions)
+          .values({ artisan_id: artisanId, plan: "trial", status: "trialing", trial_ends_at: trialEndsAt, max_users: 1 })
+          .onConflictDoNothing({ target: subscriptions.artisan_id });
+      }
+    } catch {
+      /* best-effort */
+    }
+    // 4. Permissions propriétaire = TOUTES (si aucune présente) — best-effort.
+    try {
+      const existing = await this.db.select({ id: permissionsUtilisateur.id }).from(permissionsUtilisateur).where(and(eq(permissionsUtilisateur.userId, userId), eq(permissionsUtilisateur.autorise, true))).limit(1);
+      if (existing.length === 0) {
+        await this.db.insert(permissionsUtilisateur).values(ALL_PERMISSIONS.map((p) => ({ userId, permission: p, autorise: true })));
+      }
+    } catch {
+      /* best-effort */
+    }
   }
 }
