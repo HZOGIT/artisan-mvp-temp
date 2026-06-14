@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IRdvRepository } from "../../application/rdv-repository";
 import { listRdvs, getRdv } from "../../application/read-use-cases";
 import { creerRdv, modifierRdv, supprimerRdv } from "../../application/write-use-cases";
+import { confirmerRdv, refuserRdv, annulerRdv } from "../../application/transition-use-cases";
 
 const urgenceEnum = z.enum(["normale", "urgente", "tres_urgente"]);
 // `dateProposee` arrive en string ISO (transport JSON) ; `z.coerce.date()` la convertit en Date pour
@@ -56,5 +57,18 @@ export function createRdvEnLigneRouter(repo: IRdvRepository) {
         await supprimerRdv(repo, ctx.tenant, input.id);
         return { success: true };
       }),
+
+    // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
+    confirmer: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => confirmerRdv(repo, ctx.tenant, input.id)),
+
+    refuser: protectedProcedure
+      .input(z.object({ id: z.number().int(), motifRefus: z.string().min(1).max(5000) }))
+      .mutation(({ ctx, input }) => refuserRdv(repo, ctx.tenant, input.id, input.motifRefus)),
+
+    annuler: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(({ ctx, input }) => annulerRdv(repo, ctx.tenant, input.id)),
   });
 }

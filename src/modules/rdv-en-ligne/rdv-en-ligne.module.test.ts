@@ -24,9 +24,9 @@ describe("rdv-en-ligne.module", () => {
     expect(Object.keys(stubRepo).sort()).toEqual(["create", "delete", "getById", "list", "ownsClient", "setStatut", "update"]);
   });
 
-  it("expose un routeur tRPC assemblé (CRUD ; transitions en 7/9)", () => {
+  it("expose un routeur tRPC assemblé (CRUD + transitions confirmer/refuser/annuler)", () => {
     const module = createRdvEnLigneModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["create", "delete", "getById", "list", "update"]);
+    expect(procedures).toEqual(["annuler", "confirmer", "create", "delete", "getById", "list", "refuser", "update"]);
   });
 });
