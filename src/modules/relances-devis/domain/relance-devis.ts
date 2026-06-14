@@ -4,8 +4,12 @@
 // résultat (envoyé/échec) ; elle est **immuable** (aucune mise à jour). `devisId` est anti-IDOR-FK
 // (le devis doit appartenir au tenant).
 
-export type RelanceType = "email" | "notification";
-export type RelanceStatut = "envoye" | "echec";
+// Tuples alignés sur les enums Drizzle (`relanceTypeEnum` / `relanceStatutEnum`) — réutilisés pour
+// la validation use-case et les bornes zod du routeur (z.enum).
+export const TYPES_RELANCE = ["email", "notification"] as const;
+export const STATUTS_RELANCE = ["envoye", "echec"] as const;
+export type RelanceType = (typeof TYPES_RELANCE)[number];
+export type RelanceStatut = (typeof STATUTS_RELANCE)[number];
 
 export interface RelanceDevis {
   readonly id: number;
