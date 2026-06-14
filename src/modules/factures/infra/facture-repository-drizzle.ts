@@ -3,7 +3,7 @@ import { factures, facturesLignes, clients, devis, parametresArtisan } from "../
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository } from "../application/facture-repository";
+import type { IFactureRepository, PaiementPatch } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -159,6 +159,23 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
       const [row] = await tx
         .update(factures)
         .set({ statut, updatedAt: new Date() })
+        .where(and(eq(factures.id, id), eq(factures.artisanId, ctx.artisanId)))
+        .returning();
+      return row ? toFacture(row) : null;
+    });
+  }
+
+  enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .update(factures)
+        .set({
+          montantPaye: patch.montantPaye,
+          datePaiement: patch.datePaiement,
+          modePaiement: patch.modePaiement,
+          statut: patch.statut,
+          updatedAt: new Date(),
+        })
         .where(and(eq(factures.id, id), eq(factures.artisanId, ctx.artisanId)))
         .returning();
       return row ? toFacture(row) : null;

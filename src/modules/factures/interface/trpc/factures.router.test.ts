@@ -156,4 +156,23 @@ describe.skipIf(!URL)("factures.router e2e (HTTP → tRPC → use-case → repo 
     // cross-tenant : B ne transitionne pas la facture de A
     expect((await callMutation(server, "factures.envoyer", { id }, tB)).statusCode).toBe(404);
   });
+
+  it("enregistrerPaiement : partiel puis soldant → payee ; sur-paiement → 400 ; brouillon → 409", async () => {
+    const tA = await token(UA);
+    const id = (await callMutation(server, "factures.create", { clientId: clientA }, tA)).json().result.data.id as number;
+    await callMutation(server, "factures.addLigne", { factureId: id, designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }, tA);
+    // brouillon → paiement interdit (409)
+    expect((await callMutation(server, "factures.enregistrerPaiement", { id, montant: "10.00" }, tA)).statusCode).toBe(409);
+    await callMutation(server, "factures.envoyer", { id }, tA);
+    // paiement partiel : reste envoyee
+    const p1 = await callMutation(server, "factures.enregistrerPaiement", { id, montant: "50.00" }, tA);
+    expect(p1.json().result.data.statut).toBe("envoyee");
+    expect(p1.json().result.data.montantPaye).toBe("50.00");
+    // sur-paiement (50 déjà + 100 > 120) → 400
+    expect((await callMutation(server, "factures.enregistrerPaiement", { id, montant: "100.00" }, tA)).statusCode).toBe(400);
+    // paiement soldant → payee
+    const p2 = await callMutation(server, "factures.enregistrerPaiement", { id, montant: "70.00", mode: "cb" }, tA);
+    expect(p2.json().result.data.statut).toBe("payee");
+    expect(p2.json().result.data.montantPaye).toBe("120.00");
+  });
 });

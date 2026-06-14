@@ -8,6 +8,7 @@ import {
   modifierLigneFacture,
   supprimerLigneFacture,
   changerStatutFacture,
+  enregistrerPaiementFacture,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
@@ -134,5 +135,42 @@ describe("factures — use-cases d'écriture", () => {
     const f = await creerFacture(repo, A, { clientId: 100 });
     await expectCrossTenantDenied(() => changerStatutFacture(repo, B, f.id, "envoyee"));
     await expect(changerStatutFacture(repo, B, f.id, "envoyee")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  // Prépare une facture émise (envoyee) avec une ligne de 120.00 TTC (100 HT @20%).
+  async function factureEmise(repo: FakeFactureRepository): Promise<number> {
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await ajouterLigneFacture(repo, A, f.id, { designation: "Pose", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
+    await changerStatutFacture(repo, A, f.id, "envoyee");
+    return f.id;
+  }
+
+  it("enregistrerPaiement — partiel ne solde pas (statut conservé) ; cumul + soldée → payee", async () => {
+    const repo = repoWithClient(A, 100);
+    const id = await factureEmise(repo);
+    const p1 = await enregistrerPaiementFacture(repo, A, id, { montant: "50.00" });
+    expect(p1.montantPaye).toBe("50.00");
+    expect(p1.statut).toBe("envoyee"); // pas encore soldée
+    const p2 = await enregistrerPaiementFacture(repo, A, id, { montant: "70.00", mode: "virement" });
+    expect(p2.montantPaye).toBe("120.00");
+    expect(p2.statut).toBe("payee"); // soldée
+    expect(p2.modePaiement).toBe("virement");
+  });
+
+  it("enregistrerPaiement — sur-paiement → Validation ; montant ≤ 0 → Validation", async () => {
+    const repo = repoWithClient(A, 100);
+    const id = await factureEmise(repo);
+    await expect(enregistrerPaiementFacture(repo, A, id, { montant: "200.00" })).rejects.toBeInstanceOf(ValidationError);
+    await expect(enregistrerPaiementFacture(repo, A, id, { montant: "0" })).rejects.toBeInstanceOf(ValidationError);
+    await expect(enregistrerPaiementFacture(repo, A, id, { montant: "-10" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("enregistrerPaiement — facture brouillon (non émise) → Conflict ; cross-tenant → NotFound", async () => {
+    const repo = repoWithClient(A, 100);
+    const f = await creerFacture(repo, A, { clientId: 100 });
+    await ajouterLigneFacture(repo, A, f.id, { designation: "L", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" });
+    await expect(enregistrerPaiementFacture(repo, A, f.id, { montant: "10.00" })).rejects.toBeInstanceOf(ConflictError);
+    const id = await factureEmise(repo);
+    await expect(enregistrerPaiementFacture(repo, B, id, { montant: "10.00" })).rejects.toBeInstanceOf(NotFoundError);
   });
 });

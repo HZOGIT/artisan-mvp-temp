@@ -27,6 +27,10 @@ export interface IFactureRepository {
 
   // Définit le statut (transition pilotée par le use-case workflow) — null hors tenant.
   setStatut(ctx: TenantContext, id: number, statut: FactureStatut): Promise<Facture | null>;
+  // Enregistre un paiement (écrit montantPaye cumulé + date/mode + statut calculés par le
+  // use-case) — null hors tenant. Les invariants (montant > 0, anti-sur-paiement, statut
+  // soldée) sont portés par le use-case ; le repo ne fait qu'écrire le patch scopé tenant.
+  enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null>;
   // Prochain numéro de facture, scopé tenant, généré serveur (parité `getNextFactureNumber`).
   nextNumero(ctx: TenantContext): Promise<string>;
   // true si le client référencé appartient au tenant (anti-IDOR-FK).
@@ -42,4 +46,12 @@ export interface IFactureRepository {
   updateLigne(ctx: TenantContext, ligneId: number, input: UpdateFactureLigneInput): Promise<FactureLigne | null>;
   // false si la ligne ne relève pas d'une facture du tenant.
   deleteLigne(ctx: TenantContext, ligneId: number): Promise<boolean>;
+}
+
+// Patch d'enregistrement de paiement (valeurs déjà calculées par le use-case).
+export interface PaiementPatch {
+  readonly montantPaye: string;
+  readonly datePaiement: Date | null;
+  readonly modePaiement: string | null;
+  readonly statut: FactureStatut;
 }

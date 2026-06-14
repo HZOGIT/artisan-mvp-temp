@@ -10,6 +10,7 @@ import {
   modifierLigneFacture,
   supprimerLigneFacture,
   changerStatutFacture,
+  enregistrerPaiementFacture,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -136,5 +137,16 @@ export function createFacturesRouter(repo: IFactureRepository) {
     marquerEnRetard: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "en_retard")),
+
+    // Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée.
+    enregistrerPaiement: protectedProcedure
+      .input(z.object({ id: z.number().int(), montant: decimal, date: isoDate.optional(), mode: z.string().max(50).optional() }))
+      .mutation(({ ctx, input }) =>
+        enregistrerPaiementFacture(repo, ctx.tenant, input.id, {
+          montant: input.montant,
+          date: toDate(input.date),
+          mode: input.mode ?? null,
+        }),
+      ),
   });
 }

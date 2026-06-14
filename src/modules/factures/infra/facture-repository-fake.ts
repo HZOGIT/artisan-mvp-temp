@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository } from "../application/facture-repository";
+import type { IFactureRepository, PaiementPatch } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -104,6 +104,21 @@ export class FakeFactureRepository implements IFactureRepository {
     const f = await this.getById(ctx, id);
     if (!f) return null;
     const updated: Facture = { ...f, statut, updatedAt: new Date() };
+    this.factureStore = this.factureStore.map((x) => (x.id === id ? updated : x));
+    return updated;
+  }
+
+  async enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null> {
+    const f = await this.getById(ctx, id);
+    if (!f) return null;
+    const updated: Facture = {
+      ...f,
+      montantPaye: patch.montantPaye,
+      datePaiement: patch.datePaiement,
+      modePaiement: patch.modePaiement,
+      statut: patch.statut,
+      updatedAt: new Date(),
+    };
     this.factureStore = this.factureStore.map((x) => (x.id === id ? updated : x));
     return updated;
   }

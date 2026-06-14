@@ -119,6 +119,45 @@ const TRANSITIONS: Record<FactureStatut, readonly FactureStatut[]> = {
   validee: [],
 };
 
+// Entrée d'enregistrement d'un paiement. `montant` = montant de CE paiement (cumulé au déjà
+// payé). `date`/`mode` optionnels.
+export type EnregistrerPaiementInput = { readonly montant: string; readonly date?: Date | null; readonly mode?: string | null };
+
+const EPS = 0.005; // tolérance de comparaison au centime
+
+// Enregistre un paiement (partiel ou soldant). ⚠️ Invariants financiers :
+//  - la facture doit être émise (`envoyee`/`en_retard`) → sinon Conflict (pas de paiement d'un
+//    brouillon/annulée/déjà soldée) ;
+//  - montant > 0 ; **anti-sur-paiement** : montantPaye cumulé ≤ totalTTC → sinon Validation ;
+//  - passage à `payee` UNIQUEMENT si soldée (cumul == totalTTC) ; sinon le statut est conservé.
+//  ⚠️ Durcissement vs legacy `markAsPaid` (qui écrasait montantPaye et passait `payee`
+//  inconditionnellement, même partiel) — voir finding.
+export async function enregistrerPaiementFacture(
+  repo: IFactureRepository,
+  ctx: TenantContext,
+  id: number,
+  input: EnregistrerPaiementInput,
+): Promise<Facture> {
+  const facture = await getFactureOwned(repo, ctx, id);
+  if (facture.statut !== "envoyee" && facture.statut !== "en_retard") {
+    throw new ConflictError("Seule une facture émise (envoyée ou en retard) peut recevoir un paiement");
+  }
+  const montant = Number(input.montant);
+  if (!Number.isFinite(montant) || montant <= 0) throw new ValidationError("Le montant du paiement doit être strictement positif");
+  const total = Number(facture.totalTTC) || 0;
+  const cumul = (Number(facture.montantPaye) || 0) + montant;
+  if (cumul > total + EPS) throw new ValidationError("Le montant payé dépasse le total TTC de la facture (sur-paiement)");
+  const soldee = total > 0 && cumul >= total - EPS;
+  const updated = await repo.enregistrerPaiement(ctx, id, {
+    montantPaye: cumul.toFixed(2),
+    datePaiement: input.date ?? (soldee ? new Date() : facture.datePaiement),
+    modePaiement: input.mode ?? facture.modePaiement,
+    statut: soldee ? "payee" : facture.statut,
+  });
+  if (!updated) throw new NotFoundError("Facture introuvable");
+  return updated;
+}
+
 export async function changerStatutFacture(
   repo: IFactureRepository,
   ctx: TenantContext,
