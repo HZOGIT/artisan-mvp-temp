@@ -569,24 +569,24 @@ describe("bascule du domaine categoriesDepenses (flag gateway)", () => {
   });
 });
 
-describe("bascule du domaine contratsMaintenance (flag gateway)", () => {
-  it("contratsMaintenance routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
-    expect(shouldRouteToNewStack("contratsMaintenance", 7, NO_FLAGS)).toBe(false);
-    const canary: FeatureFlags = { contratsMaintenance: { enabled: false, tenantAllowlist: [7] } };
-    expect(shouldRouteToNewStack("contratsMaintenance", 7, canary)).toBe(true);
-    expect(shouldRouteToNewStack("contratsMaintenance", 8, canary)).toBe(false);
-    const global: FeatureFlags = { contratsMaintenance: { enabled: true, tenantDenylist: [3] } };
-    expect(shouldRouteToNewStack("contratsMaintenance", 1, global)).toBe(true);
-    expect(shouldRouteToNewStack("contratsMaintenance", 3, global)).toBe(false);
+describe("bascule du domaine contrats (flag gateway)", () => {
+  it("contrats routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("contrats", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { contrats: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("contrats", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("contrats", 8, canary)).toBe(false);
+    const global: FeatureFlags = { contrats: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("contrats", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("contrats", 3, global)).toBe(false);
   });
 
-  it("les chemins tRPC du domaine contratsMaintenance extraient bien le domaine (dont suspendre)", () => {
-    expect(domainFromTrpcPath("contratsMaintenance.create")).toBe("contratsMaintenance");
-    expect(domainFromTrpcPath("/contratsMaintenance.suspendre")).toBe("contratsMaintenance");
+  it("les chemins tRPC du domaine contrats extraient bien le domaine (dont suspendre)", () => {
+    expect(domainFromTrpcPath("contrats.create")).toBe("contrats");
+    expect(domainFromTrpcPath("/contrats.suspendre")).toBe("contrats");
   });
 
-  it("parse env : contratsMaintenance enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
-    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "contratsMaintenance" } as NodeJS.ProcessEnv).contratsMaintenance).toEqual({ enabled: true });
+  it("parse env : contrats enabled via NEW_STACK_DOMAINS (la casse du nom est préservée)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "contrats" } as NodeJS.ProcessEnv).contrats).toEqual({ enabled: true });
     // NB historique (corrigé depuis — cf. describe « canary env camelCase recanonicalisé ») :
     // (le parseur lowercase le suffixe → clé `contratsmaintenance`) — même limitation que notesDeFrais.
   });
@@ -708,7 +708,7 @@ describe("canary env camelCase recanonicalisé (NEW_STACK_CANARY_<DOMAINE>)", ()
 
 describe("registre des domaines migrés", () => {
   it("les 30 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relancesDevis", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }

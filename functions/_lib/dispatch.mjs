@@ -12,7 +12,7 @@ export const MIGRATED = [
   "vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks",
   "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures",
   "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv",
-  "relancesDevis", "categoriesDepenses", "contratsMaintenance", "demandesContact", "budgetsCategories",
+  "relancesDevis", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories",
   "reglesCategorisation", "previsions",
 ];
 const MIGRATED_SET = new Set(MIGRATED);

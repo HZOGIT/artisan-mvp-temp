@@ -100,7 +100,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     rdv: deps.rdvEnLigne.router,
     relancesDevis: deps.relancesDevis.router,
     categoriesDepenses: deps.categoriesDepenses.router,
-    contratsMaintenance: deps.contratsMaintenance.router,
+    contrats: deps.contratsMaintenance.router,
     demandesContact: deps.demandesContact.router,
     budgetsCategories: deps.budgetsCategories.router,
     reglesCategorisation: deps.reglesCategorisation.router,

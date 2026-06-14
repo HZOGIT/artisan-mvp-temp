@@ -34,15 +34,15 @@
 | rdv | rdv | ✅ name-match | 8 |
 | relancesDevis | relances | ⚠️ renommer → `relances` | 5 |
 | categoriesDepenses | categoriesDepenses | ⚠️ pas de top-level legacy | 5 |
-| contratsMaintenance | contrats | ⚠️ renommer → `contrats` | 9 |
+| contrats | contrats | ✅ name-match | 9 |
 | demandesContact | demandesContact | ⚠️ pas de top-level legacy | 9 |
 | budgetsCategories | budgetsCategories | ⚠️ pas de top-level legacy | 6 |
 | reglesCategorisation | reglesCategorisation | ⚠️ pas de top-level legacy | 5 |
 | previsions | previsions | ✅ name-match | 6 |
 
-**Name-match (flippables après parité)** : 20 — vehicules, avis, badges, techniciens, notifications, fournisseurs, commandesFournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail, rdv, previsions
+**Name-match (flippables après parité)** : 21 — vehicules, avis, badges, techniciens, notifications, fournisseurs, commandesFournisseurs, stocks, clients, interventions, conges, chantiers, depenses, devis, factures, articles, parametres, modelesEmail, rdv, contrats, previsions
 
-**À réconcilier (renommage / sous-routeur)** : 10 — notesDeFrais, ecritures, modelesDevis, configRelances, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation
+**À réconcilier (renommage / sous-routeur)** : 9 — notesDeFrais, ecritures, modelesDevis, configRelances, relancesDevis, categoriesDepenses, demandesContact, budgetsCategories, reglesCategorisation
 
 ## 2. Procédures servies par le nouveau stack (par domaine)
 
@@ -71,7 +71,7 @@
 - **rdv** (8) : `annuler`, `confirmer`, `create`, `delete`, `getById`, `list`, `refuser`, `update`
 - **relancesDevis** (5) : `byDevis`, `create`, `delete`, `getById`, `list`
 - **categoriesDepenses** (5) : `create`, `delete`, `getById`, `list`, `update`
-- **contratsMaintenance** (9) : `annuler`, `create`, `delete`, `getById`, `list`, `reactiver`, `suspendre`, `terminer`, `update`
+- **contrats** (9) : `annuler`, `create`, `delete`, `getById`, `list`, `reactiver`, `suspendre`, `terminer`, `update`
 - **demandesContact** (9) : `byStatut`, `convertir`, `create`, `delete`, `getById`, `list`, `marquerContacte`, `marquerPerdu`, `update`
 - **budgetsCategories** (6) : `byMois`, `create`, `delete`, `getById`, `list`, `update`
 - **reglesCategorisation** (5) : `create`, `delete`, `getById`, `list`, `update`

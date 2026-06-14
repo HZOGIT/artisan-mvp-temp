@@ -30,7 +30,7 @@ function q(app: ReturnType<typeof buildApp>, path: string, input: unknown, tok?:
   return app.inject({ method: "GET", url: `/api/trpc/${path}${qs}`, headers: tok ? { cookie: `token=${tok}` } : {} });
 }
 
-describe.skipIf(!URL)("contratsMaintenance.router e2e (HTTP → tRPC → use-case → repo → RLS + état machine)", () => {
+describe.skipIf(!URL)("contrats.router e2e (HTTP → tRPC → use-case → repo → RLS + état machine)", () => {
   const admin = new Pool({ connectionString: URL });
   const app = createDbClient(APP_URL!);
   let server: ReturnType<typeof buildApp>;
@@ -64,10 +64,10 @@ describe.skipIf(!URL)("contratsMaintenance.router e2e (HTTP → tRPC → use-cas
   });
 
   const creer = (tok: string, over: Record<string, unknown> = {}) =>
-    mut(server, "contratsMaintenance.create", { clientId: clientA, titre: "Entretien", montantHT: "300.00", periodicite: "annuel", dateDebut: DATE, ...over }, tok);
+    mut(server, "contrats.create", { clientId: clientA, titre: "Entretien", montantHT: "300.00", periodicite: "annuel", dateDebut: DATE, ...over }, tok);
 
-  it("sans cookie → contratsMaintenance.list 401", async () => {
-    expect((await q(server, "contratsMaintenance.list", undefined)).statusCode).toBe(401);
+  it("sans cookie → contrats.list 401", async () => {
+    expect((await q(server, "contrats.list", undefined)).statusCode).toBe(401);
   });
 
   it("create (clientId du tenant) + getById → statut actif + reference CTR-xxxxx + défauts", async () => {
@@ -79,7 +79,7 @@ describe.skipIf(!URL)("contratsMaintenance.router e2e (HTTP → tRPC → use-cas
     expect(c.reference).toMatch(/^CTR-\d{5}$/);
     expect(c.type).toBe("entretien");
     expect(c.tauxTVA).toBe("20.00");
-    expect((await q(server, "contratsMaintenance.getById", { id: c.id }, tA)).json().result.data.titre).toBe("Entretien");
+    expect((await q(server, "contrats.getById", { id: c.id }, tA)).json().result.data.titre).toBe("Entretien");
   });
 
   it("ANTI-IDOR : create avec un clientId d'un AUTRE tenant → 404", async () => {
@@ -98,18 +98,18 @@ describe.skipIf(!URL)("contratsMaintenance.router e2e (HTTP → tRPC → use-cas
     const tA = await token(UA);
     const tB = await token(UB);
     const id = (await creer(tA, { titre: "Secret" })).json().result.data.id as number;
-    expect((await q(server, "contratsMaintenance.getById", { id }, tB)).statusCode).toBe(404);
-    expect((await q(server, "contratsMaintenance.list", undefined, tB)).json().result.data).toEqual([]);
-    expect((await mut(server, "contratsMaintenance.update", { id, titre: "hack" }, tB)).statusCode).toBe(404);
-    expect((await mut(server, "contratsMaintenance.suspendre", { id }, tB)).statusCode).toBe(404);
-    expect((await mut(server, "contratsMaintenance.delete", { id }, tB)).statusCode).toBe(404);
-    expect((await q(server, "contratsMaintenance.getById", { id }, tA)).json().result.data.titre).toBe("Secret");
+    expect((await q(server, "contrats.getById", { id }, tB)).statusCode).toBe(404);
+    expect((await q(server, "contrats.list", undefined, tB)).json().result.data).toEqual([]);
+    expect((await mut(server, "contrats.update", { id, titre: "hack" }, tB)).statusCode).toBe(404);
+    expect((await mut(server, "contrats.suspendre", { id }, tB)).statusCode).toBe(404);
+    expect((await mut(server, "contrats.delete", { id }, tB)).statusCode).toBe(404);
+    expect((await q(server, "contrats.getById", { id }, tA)).json().result.data.titre).toBe("Secret");
   });
 
   it("update ne change pas le statut ni la reference", async () => {
     const tA = await token(UA);
     const created = (await creer(tA)).json().result.data as { id: number; reference: string };
-    const maj = await mut(server, "contratsMaintenance.update", { id: created.id, titre: "Modifié", montantHT: "350.00" }, tA);
+    const maj = await mut(server, "contrats.update", { id: created.id, titre: "Modifié", montantHT: "350.00" }, tA);
     expect(maj.json().result.data.titre).toBe("Modifié");
     expect(maj.json().result.data.statut).toBe("actif"); // inchangé
     expect(maj.json().result.data.reference).toBe(created.reference); // inchangée
@@ -118,10 +118,10 @@ describe.skipIf(!URL)("contratsMaintenance.router e2e (HTTP → tRPC → use-cas
   it("transitions via l'API : suspendre/reactiver/terminer ; terminal → 409", async () => {
     const tA = await token(UA);
     const id = (await creer(tA)).json().result.data.id as number;
-    expect((await mut(server, "contratsMaintenance.suspendre", { id }, tA)).json().result.data.statut).toBe("suspendu");
-    expect((await mut(server, "contratsMaintenance.reactiver", { id }, tA)).json().result.data.statut).toBe("actif");
-    expect((await mut(server, "contratsMaintenance.terminer", { id }, tA)).json().result.data.statut).toBe("termine");
+    expect((await mut(server, "contrats.suspendre", { id }, tA)).json().result.data.statut).toBe("suspendu");
+    expect((await mut(server, "contrats.reactiver", { id }, tA)).json().result.data.statut).toBe("actif");
+    expect((await mut(server, "contrats.terminer", { id }, tA)).json().result.data.statut).toBe("termine");
     // depuis terminal (termine) → 409
-    expect((await mut(server, "contratsMaintenance.suspendre", { id }, tA)).statusCode).toBe(409);
+    expect((await mut(server, "contrats.suspendre", { id }, tA)).statusCode).toBe(409);
   });
 });
