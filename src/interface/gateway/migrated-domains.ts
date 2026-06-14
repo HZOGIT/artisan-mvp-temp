@@ -2,7 +2,7 @@
 // montés dans `createAppRouter`. Sert de garde-fou pour la bascule : un flag ne devrait
 // cibler qu'un domaine présent ici (sinon le routage enverrait vers un domaine inexistant
 // du nouveau stack). Mis à jour à chaque domaine livré (étape 9/9 du gabarit).
-export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions"] as const;
+export const MIGRATED_DOMAINS = ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandesFournisseurs", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv", "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories", "reglesCategorisation", "previsions", "artisan"] as const;
 
 export type MigratedDomain = (typeof MIGRATED_DOMAINS)[number];
 
@@ -42,4 +42,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "articles", // parité vérifiée : artisan(get/create/update/delete) + bibliothèque(getBibliotheque/search public + create/update/delete/import admin) + suggererArticlesIA ⊇ 8 appels client
   "previsions", // parité vérifiée : getHistorique/getPrevisions/getComparaison/calculer/getTresoreriePrevisionnelle ⊇ 5 appels client (forecasting)
   "depenses", // parité vérifiée : CRUD + stats/checkDoublons + notes-de-frais(workflow+links) + budgets(set/copier) + categories + regles + indemnitéKm + transactions bancaires(get/ignorer/import/convertir) + FEC export + OCR analyserJustificatif ⊇ 28 appels client
+  "artisan", // parité vérifiée : getProfile/updateProfile (profil entreprise du tenant) ⊇ 2 appels client
 ] as const;

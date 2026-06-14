@@ -55,6 +55,9 @@ import { TransactionBancaireRepositoryDrizzle } from "./modules/depenses/infra/t
 import type { ITransactionBancaireRepository } from "./modules/depenses/application/transaction-bancaire-repository";
 import { FecReaderDrizzle } from "./modules/depenses/infra/fec-reader-drizzle";
 import type { FecReader } from "./modules/depenses/application/fec-reader";
+import { createArtisanModule } from "./modules/artisan/artisan.module";
+import { ArtisanRepositoryDrizzle } from "./modules/artisan/infra/artisan-repository-drizzle";
+import type { IArtisanRepository } from "./modules/artisan/application/artisan-repository";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -178,6 +181,7 @@ export interface AppDeps extends ContextDeps {
   readonly budgetCategorieRepo?: IBudgetCategorieRepository;
   readonly regleCategorisationRepo?: IRegleCategorisationRepository;
   readonly previsionCARepo?: IPrevisionCARepository;
+  readonly artisanRepo?: IArtisanRepository;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -422,7 +426,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // `getTresoreriePrevisionnelle` : créances + avoirs + dépenses récurrentes (reader cross-domaine).
     tresorerieReader: deps.tresorerieReader ?? new TresorerieReaderDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA });
+  const artisan = createArtisanModule({
+    repository: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

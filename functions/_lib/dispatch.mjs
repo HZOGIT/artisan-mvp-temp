@@ -14,7 +14,7 @@ export const MIGRATED = [
   "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures",
   "ecritures", "articles", "parametres", "modelesEmail", "modelesDevis", "configRelances", "rdv",
   "relances", "categoriesDepenses", "contrats", "demandesContact", "budgetsCategories",
-  "reglesCategorisation", "previsions",
+  "reglesCategorisation", "previsions", "artisan",
 ];
 const MIGRATED_SET = new Set(MIGRATED);
 
@@ -22,7 +22,7 @@ const MIGRATED_SET = new Set(MIGRATED);
 // (src/interface/gateway/migrated-domains.ts). Parité de surface vérifiée (diff appels client vs
 // procédures montées). On élargit cette liste domaine par domaine au fil de la parité.
 export const DEFAULT_ENABLED = [
-  "vehicules", "notifications", "fournisseurs", "parametres", "modelesEmail", "relances", "conges", "badges", "stocks", "techniciens", "rdv", "clients", "factures", "contrats", "commandesFournisseurs", "devis", "avis", "interventions", "chantiers", "articles", "previsions", "depenses",
+  "vehicules", "notifications", "fournisseurs", "parametres", "modelesEmail", "relances", "conges", "badges", "stocks", "techniciens", "rdv", "clients", "factures", "contrats", "commandesFournisseurs", "devis", "avis", "interventions", "chantiers", "articles", "previsions", "depenses", "artisan",
 ];
 
 const TRPC_PREFIX = "/api/trpc/";
