@@ -156,4 +156,14 @@ export class PrevisionCARepositoryDrizzle implements IPrevisionCARepository {
       return rows.map(toHistorique);
     });
   }
+
+  listHistoriqueAnnee(ctx: TenantContext, annee: number): Promise<HistoriqueCA[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(historiqueCA)
+        .where(and(eq(historiqueCA.artisanId, ctx.artisanId), eq(historiqueCA.annee, annee)));
+      return rows.map(toHistorique);
+    });
+  }
 }

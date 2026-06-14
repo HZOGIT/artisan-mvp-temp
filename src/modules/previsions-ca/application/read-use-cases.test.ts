@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { FakePrevisionCARepository } from "../infra/prevision-ca-repository-fake";
-import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique } from "./read-use-cases";
+import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique, getComparaison, computeComparaison } from "./read-use-cases";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
-import type { HistoriqueCA } from "../domain/prevision-ca";
+import type { HistoriqueCA, PrevisionCA } from "../domain/prevision-ca";
 
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 const A = ctx(1);
@@ -42,6 +42,34 @@ describe("previsions-ca — read use-cases", () => {
     expect((await getPrevisions(repo, A)).map((p) => p.mois)).toEqual([5]);
     // annee explicite
     expect((await getPrevisions(repo, A, anneeCourante - 1)).map((p) => p.mois)).toEqual([6]);
+  });
+
+  it("computeComparaison (pur) : prévu vs réalisé, écart + % arrondis (parité legacy)", () => {
+    const prev = (mois: number, caPrev: string): PrevisionCA => ({
+      id: mois, artisanId: 1, mois, annee: 2026, caPrevisionnel: caPrev, caRealise: "0.00", ecart: "0.00", ecartPourcentage: "0.00", methodeCalcul: "moyenne_mobile", confiance: null, createdAt: new Date(), updatedAt: new Date(),
+    });
+    const hist = (mois: number, caTotal: string): HistoriqueCA => ({
+      id: mois, artisanId: 1, mois, annee: 2026, caTotal, nombreFactures: 1, nombreClients: 1, panierMoyen: "0.00", tauxConversion: null, createdAt: new Date(),
+    });
+    const res = computeComparaison([prev(1, "1000.00"), prev(2, "2000.00"), prev(3, "0.00")], [hist(1, "1200.00"), hist(3, "500.00")]);
+    // mois 1 : réalisé 1200 vs prévu 1000 → écart +200, +20%
+    expect(res[0]).toEqual({ mois: 1, caPrevisionnel: 1000, caRealise: 1200, ecart: 200, ecartPourcentage: 20 });
+    // mois 2 : pas d'historique → réalisé 0, écart -2000, -100%
+    expect(res[1]).toEqual({ mois: 2, caPrevisionnel: 2000, caRealise: 0, ecart: -2000, ecartPourcentage: -100 });
+    // mois 3 : prévu 0 → ecartPourcentage 0 (pas de division par zéro)
+    expect(res[2]).toEqual({ mois: 3, caPrevisionnel: 0, caRealise: 500, ecart: 500, ecartPourcentage: 0 });
+  });
+
+  it("getComparaison : compose previsions + historique de l'année, scopé tenant", async () => {
+    const repo = new FakePrevisionCARepository();
+    await repo.create(A, { mois: 1, annee: 2026, caPrevisionnel: "1000.00" });
+    repo.seedHistorique({ id: 1, artisanId: 1, mois: 1, annee: 2026, caTotal: "1500.00", nombreFactures: 2, nombreClients: 1, panierMoyen: "750.00", tauxConversion: null, createdAt: new Date() });
+    // autre tenant : ne doit pas polluer
+    await repo.create(B, { mois: 1, annee: 2026, caPrevisionnel: "9999.00" });
+    const res = await getComparaison(repo, A, 2026);
+    expect(res).toEqual([{ mois: 1, caPrevisionnel: 1000, caRealise: 1500, ecart: 500, ecartPourcentage: 50 }]);
+    // B voit sa propre prévision, sans historique → réalisé 0
+    expect(await getComparaison(repo, B, 2026)).toEqual([{ mois: 1, caPrevisionnel: 9999, caRealise: 0, ecart: -9999, ecartPourcentage: -100 }]);
   });
 
   it("getHistorique : récent d'abord, borné à nombreMois, scopé tenant", async () => {

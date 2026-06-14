@@ -88,5 +88,9 @@ describe.skipIf(!URL)("PrevisionCARepositoryDrizzle (PG, RLS + camelCase)", () =
     expect(hist[0].panierMoyen).toBe("1000.00");
     // isolation : B ne voit pas l'historique de A
     expect((await repo.listHistorique(ctx(B), 24)).every((h) => h.caTotal === "9999.00")).toBe(true);
+    // listHistoriqueAnnee : filtre l'année, scopé tenant
+    const ann = await repo.listHistoriqueAnnee(ctx(A), 2025);
+    expect(ann.map((h) => h.mois).sort((a, b) => a - b)).toEqual([11, 12]);
+    expect(await repo.listHistoriqueAnnee(ctx(B), 2025)).toEqual([]);
   });
 });

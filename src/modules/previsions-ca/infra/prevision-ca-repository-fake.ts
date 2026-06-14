@@ -85,4 +85,8 @@ export class FakePrevisionCARepository implements IPrevisionCARepository {
       .sort((a, b) => b.annee - a.annee || b.mois - a.mois)
       .slice(0, nombreMois);
   }
+
+  async listHistoriqueAnnee(ctx: TenantContext, annee: number): Promise<HistoriqueCA[]> {
+    return this.historique.filter((h) => h.artisanId === ctx.artisanId && h.annee === annee);
+  }
 }

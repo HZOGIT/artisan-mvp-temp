@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IPrevisionCARepository } from "../../application/prevision-ca-repository";
-import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique } from "../../application/read-use-cases";
+import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique, getComparaison } from "../../application/read-use-cases";
 import { creerPrevision, modifierPrevision, supprimerPrevision } from "../../application/write-use-cases";
 
 const methode = z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"]);
@@ -73,5 +73,10 @@ export function createPrevisionsCARouter(repo: IPrevisionCARepository) {
     getHistorique: protectedProcedure
       .input(z.object({ nombreMois: z.number().int().min(1).max(120).default(24) }).optional())
       .query(({ ctx, input }) => getHistorique(repo, ctx.tenant, input?.nombreMois ?? 24)),
+
+    // `getComparaison {annee}` : prévu (previsions_ca) vs réalisé (historique_ca), mois par mois.
+    getComparaison: protectedProcedure
+      .input(z.object({ annee: z.number().int().min(2000).max(2100) }))
+      .query(({ ctx, input }) => getComparaison(repo, ctx.tenant, input.annee)),
   });
 }

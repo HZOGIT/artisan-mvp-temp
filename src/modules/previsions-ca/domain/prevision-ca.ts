@@ -57,3 +57,13 @@ export interface HistoriqueCA {
   readonly tauxConversion: string | null;
   readonly createdAt: Date;
 }
+
+// Comparaison prévu vs réalisé pour un mois (agrégat lecture seule, montants en nombre). Parité
+// legacy `getComparaisonPrevisionsRealise`.
+export interface ComparaisonMois {
+  readonly mois: number;
+  readonly caPrevisionnel: number;
+  readonly caRealise: number;
+  readonly ecart: number; // caRealise - caPrevisionnel
+  readonly ecartPourcentage: number;
+}

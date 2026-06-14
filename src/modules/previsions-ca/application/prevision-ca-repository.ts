@@ -20,4 +20,6 @@ export interface IPrevisionCARepository {
   // Historique de CA mensuel agrégé du tenant (table `historique_ca`), trié récent d'abord, borné
   // aux `nombreMois` derniers mois. [] si aucun historique.
   listHistorique(ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]>;
+  // Historique de CA d'une année donnée (pour la comparaison prévu vs réalisé). [] si aucun.
+  listHistoriqueAnnee(ctx: TenantContext, annee: number): Promise<HistoriqueCA[]>;
 }
