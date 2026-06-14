@@ -365,9 +365,31 @@ describe("bascule du domaine factures (flag gateway)", () => {
   });
 });
 
+describe("bascule du domaine ecritures (flag gateway)", () => {
+  it("ecritures routable vers le nouveau stack via flag (canary + enabled + denylist)", () => {
+    expect(shouldRouteToNewStack("ecritures", 7, NO_FLAGS)).toBe(false);
+    const canary: FeatureFlags = { ecritures: { enabled: false, tenantAllowlist: [7] } };
+    expect(shouldRouteToNewStack("ecritures", 7, canary)).toBe(true);
+    expect(shouldRouteToNewStack("ecritures", 8, canary)).toBe(false);
+    const global: FeatureFlags = { ecritures: { enabled: true, tenantDenylist: [3] } };
+    expect(shouldRouteToNewStack("ecritures", 1, global)).toBe(true);
+    expect(shouldRouteToNewStack("ecritures", 3, global)).toBe(false);
+  });
+
+  it("les chemins tRPC du domaine ecritures extraient bien le domaine", () => {
+    expect(domainFromTrpcPath("ecritures.list")).toBe("ecritures");
+    expect(domainFromTrpcPath("/ecritures.exportFec")).toBe("ecritures");
+  });
+
+  it("parse env : ecritures enabled + canary (lowercase → canary env fonctionnel)", () => {
+    expect(parseFlagsFromEnv({ NEW_STACK_DOMAINS: "ecritures" } as NodeJS.ProcessEnv).ecritures).toEqual({ enabled: true });
+    expect(parseFlagsFromEnv({ NEW_STACK_CANARY_ECRITURES: "7" } as NodeJS.ProcessEnv).ecritures?.tenantAllowlist).toEqual([7]);
+  });
+});
+
 describe("registre des domaines migrés", () => {
-  it("les 16 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
-    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures"]) {
+  it("les 17 domaines portés sont éligibles à la bascule, pas un domaine non porté", () => {
+    for (const d of ["vehicules", "avis", "badges", "techniciens", "notifications", "fournisseurs", "commandes", "stocks", "clients", "interventions", "conges", "notesDeFrais", "chantiers", "depenses", "devis", "factures", "ecritures"]) {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
