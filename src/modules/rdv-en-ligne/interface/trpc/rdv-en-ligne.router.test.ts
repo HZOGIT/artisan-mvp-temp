@@ -38,6 +38,7 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
   let clientB = 0;
 
   const purge = async (uid: number) => {
+    await admin.query('delete from interventions where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from rdv_en_ligne where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
@@ -128,6 +129,29 @@ describe.skipIf(!URL)("rdv.router e2e (HTTP → tRPC → use-case → repo → R
     expect(refuse.json().result.data.motifRefus).toBe("Indisponible");
     // confirmer depuis un statut terminal (refuse) → 409
     expect((await mut(server, "rdv.confirmer", { id: id2 }, tA)).statusCode).toBe(409);
+  });
+
+  it("confirm (parité client) : crée une intervention planifiée + statut confirme + interventionId ; en_attente requis ; cross-tenant 404 ; 401", async () => {
+    const tA = await token(UA);
+    const tB = await token(UB);
+    const id = (await creer(tA)).json().result.data.id as number;
+    // 401 sans cookie
+    expect((await mut(server, "rdv.confirm", { rdvId: id })).statusCode).toBe(401);
+    // confirm → intervention créée + RDV confirme avec interventionId
+    const res = await mut(server, "rdv.confirm", { rdvId: id }, tA);
+    expect(res.statusCode).toBe(200);
+    const rdv = res.json().result.data as { statut: string; interventionId: number | null };
+    expect(rdv.statut).toBe("confirme");
+    expect(rdv.interventionId).toBeGreaterThan(0);
+    // l'intervention existe et pointe le bon client/titre (vérif DB admin)
+    const inter = (await admin.query('select "clientId", titre, statut from interventions where id=$1', [rdv.interventionId])).rows[0];
+    expect(inter.statut).toBe("planifiee");
+    expect(inter.clientId).toBe(clientA);
+    // re-confirm (déjà confirme, ≠ en_attente) → 400
+    expect((await mut(server, "rdv.confirm", { rdvId: id }, tA)).statusCode).toBe(400);
+    // cross-tenant : B ne peut pas confirmer le RDV de A → 404
+    const id2 = (await creer(tA)).json().result.data.id as number;
+    expect((await mut(server, "rdv.confirm", { rdvId: id2 }, tB)).statusCode).toBe(404);
   });
 
   it("getStats / getPendingCount (parité client) : comptes par statut scopés tenant ; 401", async () => {

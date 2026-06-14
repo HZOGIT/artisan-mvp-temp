@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createRdvEnLigneModule } from "./rdv-en-ligne.module";
 import type { IRdvRepository } from "./application/rdv-repository";
+import type { IInterventionRepository } from "../interventions/application/intervention-repository";
 
 const stubRepo: IRdvRepository = {
   list: async () => [],
@@ -14,9 +15,14 @@ const stubRepo: IRdvRepository = {
   ownsClient: async () => false,
 };
 
+// Stub minimal du repo interventions (composé par rdv pour `confirm`).
+const stubInterventionRepo = {
+  create: async () => ({}) as never,
+} as unknown as IInterventionRepository;
+
 describe("rdv-en-ligne.module", () => {
   it("createRdvEnLigneModule câble le repository injecté", () => {
-    const module = createRdvEnLigneModule({ repository: stubRepo });
+    const module = createRdvEnLigneModule({ repository: stubRepo, interventionRepository: stubInterventionRepo });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -25,8 +31,8 @@ describe("rdv-en-ligne.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (CRUD + transitions confirmer/refuser/annuler)", () => {
-    const module = createRdvEnLigneModule({ repository: stubRepo });
+    const module = createRdvEnLigneModule({ repository: stubRepo, interventionRepository: stubInterventionRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["annuler", "confirmer", "create", "delete", "getById", "getPendingCount", "getStats", "list", "refuser", "update"]);
+    expect(procedures).toEqual(["annuler", "confirm", "confirmer", "create", "delete", "getById", "getPendingCount", "getStats", "list", "refuser", "update"]);
   });
 });

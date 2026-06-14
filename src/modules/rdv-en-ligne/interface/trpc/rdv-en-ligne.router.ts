@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IRdvRepository } from "../../application/rdv-repository";
+import type { IInterventionRepository } from "../../../interventions/application/intervention-repository";
 import { listRdvs, getRdv, getRdvStats, getRdvPendingCount } from "../../application/read-use-cases";
 import { creerRdv, modifierRdv, supprimerRdv } from "../../application/write-use-cases";
 import { confirmerRdv, refuserRdv, annulerRdv } from "../../application/transition-use-cases";
+import { confirmerRdvAvecIntervention } from "../../application/confirm-use-cases";
 
 const urgenceEnum = z.enum(["normale", "urgente", "tres_urgente"]);
 // `dateProposee` arrive en string ISO (transport JSON) ; `z.coerce.date()` la convertit en Date pour
@@ -32,7 +34,7 @@ const updateSchema = z.object({
 // use-cases (scoping tenant via ctx.tenant + anti-IDOR clientId au use-case), laisse remonter les
 // Domain errors (NotFound→404, Validation→400). ⚠️ Les transitions de statut (confirmer/refuser/
 // annuler) seront exposées en 7/9 (procédures dédiées). Repo injecté.
-export function createRdvEnLigneRouter(repo: IRdvRepository) {
+export function createRdvEnLigneRouter(repo: IRdvRepository, interventionRepo: IInterventionRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listRdvs(repo, ctx.tenant)),
 
@@ -67,6 +69,12 @@ export function createRdvEnLigneRouter(repo: IRdvRepository) {
     confirmer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => confirmerRdv(repo, ctx.tenant, input.id)),
+
+    // Confirmation « métier » (parité client `trpc.rdv.confirm`) : crée l'intervention planifiée +
+    // passe le RDV à confirme avec le lien interventionId. Garde en_attente (sinon 400).
+    confirm: protectedProcedure
+      .input(z.object({ rdvId: z.number().int() }))
+      .mutation(({ ctx, input }) => confirmerRdvAvecIntervention(repo, interventionRepo, ctx.tenant, input.rdvId)),
 
     refuser: protectedProcedure
       .input(z.object({ id: z.number().int(), motifRefus: z.string().min(1).max(5000) }))

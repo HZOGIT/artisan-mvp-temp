@@ -35,7 +35,7 @@ async function appliquerTransition(
   if (!peutTransitionner(rdv.statut, cible)) {
     throw new ConflictError(`Transition de statut invalide depuis « ${rdv.statut} »`);
   }
-  const updated = await repo.setStatut(ctx, id, cible, motifRefus);
+  const updated = await repo.setStatut(ctx, id, cible, { motifRefus });
   if (!updated) throw new NotFoundError("Rendez-vous introuvable");
   return updated;
 }

@@ -3,7 +3,7 @@ import { rdvEnLigne, clients } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IRdvRepository } from "../application/rdv-repository";
+import type { IRdvRepository, SetStatutOptions } from "../application/rdv-repository";
 import type { CreateRdvInput, Rdv, RdvStatut, RdvUrgence, UpdateRdvInput } from "../domain/rdv";
 
 type RdvRow = typeof rdvEnLigne.$inferSelect;
@@ -93,10 +93,11 @@ export class RdvRepositoryDrizzle implements IRdvRepository {
     });
   }
 
-  setStatut(ctx: TenantContext, id: number, statut: RdvStatut, motifRefus?: string | null): Promise<Rdv | null> {
+  setStatut(ctx: TenantContext, id: number, statut: RdvStatut, options?: SetStatutOptions): Promise<Rdv | null> {
     return withTenant(this.db, ctx, async (tx) => {
       const set: Partial<typeof rdvEnLigne.$inferInsert> = { statut, updatedAt: new Date() };
-      if (motifRefus !== undefined) set.motifRefus = motifRefus;
+      if (options?.motifRefus !== undefined) set.motifRefus = options.motifRefus;
+      if (options?.interventionId !== undefined) set.interventionId = options.interventionId;
       const [row] = await tx
         .update(rdvEnLigne)
         .set(set)

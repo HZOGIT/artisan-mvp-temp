@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IRdvRepository } from "../application/rdv-repository";
+import type { IRdvRepository, SetStatutOptions } from "../application/rdv-repository";
 import type { CreateRdvInput, Rdv, RdvStatut, UpdateRdvInput } from "../domain/rdv";
 
 // Implémentation in-memory du repository rdv-en-ligne (tests sans DB). Reproduit les invariants du
@@ -68,13 +68,14 @@ export class FakeRdvRepository implements IRdvRepository {
     return next;
   }
 
-  async setStatut(ctx: TenantContext, id: number, statut: RdvStatut, motifRefus?: string | null): Promise<Rdv | null> {
+  async setStatut(ctx: TenantContext, id: number, statut: RdvStatut, options?: SetStatutOptions): Promise<Rdv | null> {
     const idx = this.store.findIndex((r) => r.id === id && r.artisanId === ctx.artisanId);
     if (idx === -1) return null;
     const next: Rdv = {
       ...this.store[idx],
       statut,
-      ...(motifRefus !== undefined ? { motifRefus } : {}),
+      ...(options?.motifRefus !== undefined ? { motifRefus: options.motifRefus } : {}),
+      ...(options?.interventionId !== undefined ? { interventionId: options.interventionId } : {}),
       updatedAt: new Date(),
     };
     this.store[idx] = next;

@@ -65,7 +65,7 @@ describe.skipIf(!URL)("RdvRepositoryDrizzle (PG, RLS + état machine + anti-IDOR
     expect(maj?.titre).toBe("Modifié");
     expect(maj?.dureeEstimee).toBe(90);
     expect(maj?.statut).toBe("en_attente"); // inchangé
-    const refuse = await repo.setStatut(ctx(A), r.id, "refuse", "Indisponible");
+    const refuse = await repo.setStatut(ctx(A), r.id, "refuse", { motifRefus: "Indisponible" });
     expect(refuse?.statut).toBe("refuse");
     expect(refuse?.motifRefus).toBe("Indisponible");
   });

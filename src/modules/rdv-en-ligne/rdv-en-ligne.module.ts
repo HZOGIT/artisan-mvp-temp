@@ -1,10 +1,12 @@
 import type { IRdvRepository } from "./application/rdv-repository";
+import type { IInterventionRepository } from "../interventions/application/intervention-repository";
 import { createRdvEnLigneRouter } from "./interface/trpc/rdv-en-ligne.router";
 
-// Wiring DI du module rdv-en-ligne : assemble le routeur tRPC (CRUD) à partir du repository injecté.
-// ⚠️ Les transitions de statut (confirmer/refuser/annuler) seront ajoutées au routeur en 7/9.
+// Wiring DI du module rdv-en-ligne : assemble le routeur tRPC à partir du repository injecté.
+// `interventionRepository` est composé : `confirm` crée une intervention planifiée liée au RDV.
 export interface RdvEnLigneModuleDeps {
   readonly repository: IRdvRepository;
+  readonly interventionRepository: IInterventionRepository;
 }
 
 export interface RdvEnLigneModule {
@@ -13,5 +15,5 @@ export interface RdvEnLigneModule {
 }
 
 export function createRdvEnLigneModule(deps: RdvEnLigneModuleDeps): RdvEnLigneModule {
-  return { deps, router: createRdvEnLigneRouter(deps.repository) };
+  return { deps, router: createRdvEnLigneRouter(deps.repository, deps.interventionRepository) };
 }

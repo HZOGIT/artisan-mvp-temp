@@ -42,7 +42,7 @@ describe("FakeRdvRepository (CRUD + état machine + anti-IDOR, sans DB)", () => 
     const maj = await repo.update(A, r.id, { titre: "Modifié" });
     expect(maj?.titre).toBe("Modifié");
     expect(maj?.statut).toBe("en_attente"); // inchangé par update
-    const refuse = await repo.setStatut(A, r.id, "refuse", "Indisponible");
+    const refuse = await repo.setStatut(A, r.id, "refuse", { motifRefus: "Indisponible" });
     expect(refuse?.statut).toBe("refuse");
     expect(refuse?.motifRefus).toBe("Indisponible");
   });

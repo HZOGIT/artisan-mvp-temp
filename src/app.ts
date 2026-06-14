@@ -193,8 +193,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const clients = createClientsModule({
     repository: deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db),
   });
+  // Repo interventions partagé : module interventions ET composé par rdv (`confirm` crée une
+  // intervention planifiée liée au RDV).
+  const interventionRepo = deps.interventionRepo ?? new InterventionRepositoryDrizzle(getDbHandle().db);
   const interventions = createInterventionsModule({
-    repository: deps.interventionRepo ?? new InterventionRepositoryDrizzle(getDbHandle().db),
+    repository: interventionRepo,
   });
   const conges = createCongesModule({
     repository: deps.congeRepo ?? new CongeRepositoryDrizzle(getDbHandle().db),
@@ -253,6 +256,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const rdvEnLigne = createRdvEnLigneModule({
     repository: deps.rdvRepo ?? new RdvRepositoryDrizzle(getDbHandle().db),
+    interventionRepository: interventionRepo,
   });
   const relancesDevis = createRelancesDevisModule({
     repository: deps.relanceDevisRepo ?? new RelanceDevisRepositoryDrizzle(getDbHandle().db),
