@@ -17,6 +17,9 @@ RUN pnpm install --frozen-lockfile
 COPY tsconfig*.json ./
 COPY src ./src
 COPY drizzle ./drizzle
+# `shared/` (racine) = constantes pures partagées legacy↔new-stack (ex. `shared/permissions.ts` :
+# ROLE_TEMPLATES/ALL_PERMISSIONS), importé en relatif depuis src/** → requis au bundle esbuild.
+COPY shared ./shared
 # `server/_core/{pdfGenerator,emailService}` sont bundlés en sidecars (legacy-pdf.mjs / legacy-email.mjs)
 # consommés par les adapters legacy du new-stack (PDF facture/devis, envoi email). Imports type-only
 # côté pdfGenerator → le graphe legacy `../db` n'est PAS tiré.
