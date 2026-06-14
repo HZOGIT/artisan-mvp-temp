@@ -1,19 +1,37 @@
-# dev and staging tunnels + missing records not picked up by the auto-scan.
+# staging records + misc records not picked up by the auto-scan.
 # All other operioz.com records were auto-imported by Cloudflare and are NOT
 # managed by Terraform (safe — Terraform won't touch them).
+#
+# Architecture staging (split front/back) :
+#   staging.operioz.com          -> Cloudflare Pages (projet "artisan-staging",
+#                                   gere via wrangler / API, hors Terraform)
+#   staging-backend.operioz.com  -> tunnel artisan-staging -> app:3000 (API)
 
-resource "cloudflare_dns_record" "dev_tunnel" {
+# Front : staging.operioz.com -> Cloudflare Pages (CNAME proxie vers le projet).
+resource "cloudflare_dns_record" "staging_tunnel" {
   zone_id = cloudflare_zone.operioz.id
-  name    = "dev"
+  name    = "staging"
   type    = "CNAME"
-  content = "${cloudflare_zero_trust_tunnel_cloudflared.dev.id}.cfargotunnel.com"
+  content = "artisan-staging.pages.dev"
   proxied = true
   ttl     = 1
 }
 
-resource "cloudflare_dns_record" "staging_tunnel" {
+# Backend : staging-backend.operioz.com -> tunnel artisan-staging.
+resource "cloudflare_dns_record" "staging_backend" {
   zone_id = cloudflare_zone.operioz.id
-  name    = "staging"
+  name    = "staging-backend"
+  type    = "CNAME"
+  content = "${cloudflare_zero_trust_tunnel_cloudflared.staging.id}.cfargotunnel.com"
+  proxied = true
+  ttl     = 1
+}
+
+# Nouveau stack clean-archi : staging-newstack.operioz.com -> tunnel artisan-staging
+# (ingress -> new-stack:3001). Additif, n'affecte pas staging/-backend.
+resource "cloudflare_dns_record" "staging_newstack" {
+  zone_id = cloudflare_zone.operioz.id
+  name    = "staging-newstack"
   type    = "CNAME"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.staging.id}.cfargotunnel.com"
   proxied = true

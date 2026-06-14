@@ -3,10 +3,6 @@ output "nameservers" {
   value       = cloudflare_zone.operioz.name_servers
 }
 
-output "dev_tunnel_id" {
-  value = cloudflare_zero_trust_tunnel_cloudflared.dev.id
-}
-
 output "staging_tunnel_id" {
   value = cloudflare_zero_trust_tunnel_cloudflared.staging.id
 }
