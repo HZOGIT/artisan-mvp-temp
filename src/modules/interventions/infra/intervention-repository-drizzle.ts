@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, ne, sql } from "drizzle-orm";
 import { interventions, clients, techniciens, devis, factures, interventionsTechniciens, couleursInterventions } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
@@ -136,6 +136,23 @@ export class InterventionRepositoryDrizzle implements IInterventionRepository {
         .from(interventions)
         .where(and(eq(interventions.artisanId, ctx.artisanId), eq(interventions.technicienId, technicienId)))
         .orderBy(desc(interventions.dateDebut), desc(interventions.id));
+      return rows.map(toIntervention);
+    });
+  }
+
+  listJour(ctx: TenantContext, dayStart: Date, dayEnd: Date): Promise<Intervention[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(interventions)
+        .where(
+          and(
+            eq(interventions.artisanId, ctx.artisanId),
+            gte(interventions.dateDebut, dayStart),
+            lte(interventions.dateDebut, dayEnd),
+            ne(interventions.statut, "annulee"),
+          ),
+        );
       return rows.map(toIntervention);
     });
   }

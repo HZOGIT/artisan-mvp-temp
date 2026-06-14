@@ -37,4 +37,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "commandesFournisseurs", // parité vérifiée : CRUD/getLignes/updateStatut/recevoir/setStatutFacturation/getEnRetard/getPerformances/listDevisAcceptes/sendEmail/genererDepuisDevisIA ⊇ appels client
   "devis", // parité vérifiée : CRUD/lignes/getById(enrichi)/transitions/sendByEmail/convertToFacture/duplicate/modeles(4)/relances(2)/getDevisNonSignes/genererLignesIA ⊇ appels client
   "avis", // parité vérifiée : list/getAll/getById/getStats/repondre/moderer/envoyerDemandeParClient + PUBLICS getDemandeInfo/submitAvis (token) ⊇ appels client
+  "interventions", // parité vérifiée : CRUD/getMine + équipe(4)/couleurs(2)/assignerTechnicien/getSuggestionsTechniciens(géo) ⊇ appels client
 ] as const;

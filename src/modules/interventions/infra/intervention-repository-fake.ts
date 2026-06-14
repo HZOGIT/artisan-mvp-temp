@@ -96,6 +96,12 @@ export class FakeInterventionRepository implements IInterventionRepository {
     return this.store.filter((i) => i.artisanId === ctx.artisanId && i.technicienId === technicienId);
   }
 
+  async listJour(ctx: TenantContext, dayStart: Date, dayEnd: Date): Promise<Intervention[]> {
+    return this.store.filter(
+      (i) => i.artisanId === ctx.artisanId && i.statut !== "annulee" && i.dateDebut >= dayStart && i.dateDebut <= dayEnd,
+    );
+  }
+
   private nom(technicienId: number): { nom: string | null; prenom: string | null } {
     return this.technicienNoms.get(String(technicienId)) ?? { nom: null, prenom: null };
   }

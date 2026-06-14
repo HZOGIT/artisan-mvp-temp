@@ -190,8 +190,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const badges = createBadgesModule({
     repository: deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db),
   });
+  // Repo techniciens partagé : module techniciens + composé par interventions (getSuggestionsTechniciens :
+  // positions GPS + dispo, scopé tenant). Hoisté avant interventions.
+  const technicienRepo = deps.technicienRepo ?? new TechnicienRepositoryDrizzle(getDbHandle().db);
   const techniciens = createTechniciensModule({
-    repository: deps.technicienRepo ?? new TechnicienRepositoryDrizzle(getDbHandle().db),
+    repository: technicienRepo,
   });
   // Repo notifications partagé : utilisé par le module notifications ET composé par stocks
   // (generateAlerts crée des notifications « Stock bas »). Une seule instance pour cohérence.
@@ -263,6 +266,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const interventions = createInterventionsModule({
     repository: interventionRepo,
     congeRepository: congeRepo,
+    technicienRepository: technicienRepo,
   });
   const conges = createCongesModule({
     repository: congeRepo,

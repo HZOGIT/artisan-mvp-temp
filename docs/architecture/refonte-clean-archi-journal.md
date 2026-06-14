@@ -46,19 +46,19 @@ Tout rapport d'itération (ntfy ET Linear) DOIT inclure, en plus du résumé de 
 | Socle clean-archi (TenantContext, withTenant/RLS, rôle `app_tenant`, gateway + dispatcher edge) | 13 % | 100 % | 13,0 % |
 | 30 domaines cœur migrés clean-archi (tests verts) | 29 % | 100 % | 29,0 % |
 | Déploiement new-stack en staging (derrière dispatcher) | 7 % | 100 % | 7,0 % |
-| Parité fonctionnelle (réconciliation 13 noms + parité procédures 30 domaines + migration 29 routeurs legacy-only) | 26 % | ~20 % | ~5,2 % |
+| Parité fonctionnelle (réconciliation 13 noms + parité procédures 30 domaines + migration 29 routeurs legacy-only) | 26 % | ~24 % | ~6,2 % |
 | Surface hors-tRPC (auth+JWT, webhooks Stripe/**abonnement**, uploads/OCR, PDF/iCal, vitrine/portail) | 13 % | ~6 % | ~0,8 % |
-| Bascule staging (domaines ON progressifs + smoke vert → trafic new-stack) | 8 % | ~70 % | ~5,6 % |
+| Bascule staging (domaines ON progressifs + smoke vert → trafic new-stack) | 8 % | ~75 % | ~6,0 % |
 | Extinction legacy (suppression `server/`, OPE-255) | 4 % | 0 % | 0 % |
-| **TOTAL** | **100 %** | | **≈ 63 %** |
+| **TOTAL** | **100 %** | | **≈ 65 %** |
 
 ## État du déploiement staging — qui sert quoi AUJOURD'HUI (2026-06-14)
 > Deux backends derrière le dispatcher edge (`functions/api/[[path]].js`) : **legacy** `staging-backend.operioz.com` et **new-stack** `staging-newstack.operioz.com`. Le dispatcher est **batch-aware** : il route un (batch de) procédure(s) vers le new-stack **uniquement si TOUS ses domaines y sont servis ET activés** (sinon legacy, qui sert tout → jamais de procédure manquante). Les domaines activés par défaut = `STAGING_NEW_STACK_DEFAULT_DOMAINS` (parité de surface vérifiée) ; déploiement du routage = `./devtools/deploy-staging-pages.sh` (wrangler — Pages en **direct upload**, PAS git) ; déploiement du backend = `./devtools/deploy-staging-newstack.sh` (rebuild `--build` + smoke authentifié). En-tête `x-operioz-backend` sur chaque réponse pour vérifier la bascule (`new-stack` confirmé en ligne pour `contrats`, `factures` et les 12 autres domaines activés).
 
 | Module / logique cœur | Migré clean-archi | Déployé new-stack | **Sert le trafic staging** |
 |---|---|---|---|
-| **…16 domaines précédents… + avis** (parité vérifiée ; `avis` inclut la **surface PUBLIQUE par token** getDemandeInfo/submitAvis) | ✅ | ✅ | **🟢 new-stack** (activés, 17 domaines) |
-| 13 autres domaines migrés (depenses, interventions, chantiers, `ecritures`, articles, …) | ✅ | ✅ (prêt) | **legacy** (parité incomplète → pas encore activés) |
+| **…17 domaines précédents… + interventions** (parité vérifiée ; `avis` = surface PUBLIQUE token ; `interventions` = équipe/couleurs/assigner/suggestions géo) | ✅ | ✅ | **🟢 new-stack** (activés, 18 domaines) |
+| 12 autres domaines migrés (depenses, chantiers, `ecritures`, articles, previsions, …) | ✅ | ✅ (prêt) | **legacy** (parité incomplète → pas encore activés) |
 | **Abonnement / Stripe** (subscription, webhooks, billing) | ❌ | ❌ | **legacy** |
 | Auth / sessions / JWT / révocation | ❌ | ❌ | **legacy** |
 | Comptabilité FEC / export / déclaration TVA | ❌ (`ecritures` seules migrées) | ❌ | **legacy** |
@@ -68,7 +68,7 @@ Tout rapport d'itération (ntfy ET Linear) DOIT inclure, en plus du résumé de 
 | Génération PDF / iCal | ❌ | ❌ | **legacy** |
 | Vitrine / portail public | partiel (`demandesContact` migré) | partiel | **legacy** |
 
-**À retenir** : **17 domaines servent désormais le trafic staging via le new-stack** (parité de surface vérifiée ; `avis` y ajoute la **première surface PUBLIQUE par token** — portail). Les 13 autres domaines migrés restent sur le legacy tant que leur parité fine n'est pas complète (sinon un appel client tomberait sur une procédure absente). **Processus par itération** : implémenter les procédures manquantes d'un domaine → quand il couvre 100 % des appels client, l'ajouter à `STAGING_NEW_STACK_DEFAULT_DOMAINS` → `deploy-staging-newstack.sh` + `git push` → smoke. Les logiques cœur sensibles (abonnement/Stripe, auth, FEC/TVA, signature, assistant) restent à migrer (surface hors-tRPC, priorité (4)).
+**À retenir** : **18 domaines servent désormais le trafic staging via le new-stack** (parité de surface vérifiée ; `avis` = surface PUBLIQUE par token ; `interventions` = équipe/couleurs/affectation/suggestions géo). Les 12 autres domaines migrés restent sur le legacy tant que leur parité fine n'est pas complète (sinon un appel client tomberait sur une procédure absente). **Processus par itération** : implémenter les procédures manquantes d'un domaine → quand il couvre 100 % des appels client, l'ajouter à `STAGING_NEW_STACK_DEFAULT_DOMAINS` → `deploy-staging-newstack.sh` + `git push` → smoke. Les logiques cœur sensibles (abonnement/Stripe, auth, FEC/TVA, signature, assistant) restent à migrer (surface hors-tRPC, priorité (4)).
 
 ---
 
@@ -855,8 +855,13 @@ Chaque itération doit **déployer le nouveau stack et l'utiliser réellement** 
 ## ⚠️ DOUBLE BLOCKER — `commandesFournisseurs` (sendEmail = PDF/pièce jointe + IA) : DOMAINE NON ACTIVABLE pour l'instant
 Les 2 procs restants sont bloqués sur des ports lourds non portés : (1) **`sendEmail`** génère un **PDF bon de commande** (`generateBonCommandePDF`, port Pdf non porté) ET l'envoie en **pièce jointe** via Resend (l'`EmailPort` actuel `send({to,subject,body})` **ne supporte pas les pièces jointes**) + rate-limit ; envoyer sans le PDF romprait la parité fonctionnelle. (2) **`genererDepuisDevisIA`** = **IA/LLM** (port LLM non porté). → `commandesFournisseurs` reste **inactif** jusqu'au portage des ports **Pdf** (+ EmailPort avec pièces jointes) et **LLM** (« assistant/IA en dernier »). Reads `getPerformances`/`listDevisAcceptes` faits (servis par le legacy en attendant). (Findings loggés OPE-240.)
 
-## Prochaine action : **(G-interventions-3) `getSuggestionsTechniciens` (GÉO/RGPD) → ACTIVER `interventions` (18ᵉ)**
-> `interventions` est à **1 procédure** (équipe + couleurs + assignerTechnicien FAITES). Reste **`getSuggestionsTechniciens {latitude, longitude, dateIntervention}`** — ⚠️ **GÉO/RGPD sensible** (cf. audit `geolocalisation-rgpd-salaries`).
+## Prochaine action : **(H) `chantiers` — sous-ressources (pointages/suivis/phases/stats) → ACTIVER (19ᵉ)**
+> `interventions` ACTIVÉ (18ᵉ). 18/30 domaines servent le new-stack. Cible suivante non sensible : **`chantiers`** (manque ~11 procs, toutes des sous-ressources de chantier — non sensibles).
+
+`chantiers` manque (vs `trpc.chantiers.*`) : `getInterventions`/`getAllInterventionsChantier` (interventions liées au chantier), `getPhases`, `getPointages`/`addPointage`/`deletePointage` (pointages temps), `getSuivi`/`createSuivi`/`updateSuivi`/`deleteSuivi` (suivi/avancement), `getStatistiques`. **Découper** (gros) : (1) cartographier les tables (chantiers_pointages, chantiers_suivis, chantiers_phases ? — `grep` schema) + diff legacy `server/routers.ts` chantiersRouter ; (2) sous-ressource **pointages** (port repo + drizzle + fake + use-cases anti-IDOR via chantier parent) ; (3) **suivis** ; (4) phases + interventions liées + statistiques ; puis activer. Recette habituelle. **Alternatives non bloquées** : `articles` (bibliothèque + `suggererArticlesIA` → LlmPort prêt), `previsions` (forecasting reads), `depenses` (lignes/budgets/stats hors OCR/FEC). **Sensibles en DERNIER** : comptabilité (FEC/TVA — exposer `ecritures` sous `comptabilite.*`), auth+JWT (OPE-238), Stripe (OPE-236), signature, assistant SSE.
+
+### (archive) (G-interventions-3) `getSuggestionsTechniciens` → **`interventions` ACTIVÉ (18ᵉ)** — FAIT (2026-06-14)
+Dernière procédure (GÉO/RGPD) : **`getSuggestionsTechniciens {latitude, longitude, dateIntervention}`** — classe les techniciens **actifs** du tenant par **proximité** (`technicienRepo.getDernierePosition` → **distance haversine** pure) **et disponibilité** (conflit si autre intervention du technicien à ±2h le même jour, via `interventionRepo.listJour`). ⚠️ **RGPD** : positions techniciens **scopées tenant par construction** (`getDernierePosition` vérifie l'ownership) → jamais cross-tenant. Sortie parité legacy `{technicien:{id,nom,couleur,specialite}, distance, tempsTrajet, disponible, position, score}` triée par score. `haversineKm` pur (testé). Repo `listJour` ajouté (jour, hors annulées) ; module compose `technicienRepo` (buildApp hoiste, partagé techniciens↔interventions). Tests : tri distance/dispo, exclusion inactifs, occupé→indispo, haversine. **Couverture `trpc.interventions.*` complète** → activé (`STAGING_NEW_STACK_DEFAULT_DOMAINS` + edge `DEFAULT_ENABLED` + smoke `interventions.list`) ; déployé backend+Pages ; **`x-operioz-backend: new-stack` confirmé en ligne**. Gate `tsc src` vert + **`vitest run src` 1578/1578**.
 
 Legacy `db.getSuggestionsTechniciens(artisanId, lat, lng, date)` : classe les techniciens du tenant par **proximité** (dernière position GPS connue → distance haversine) **et disponibilité** (pas en congé approuvé / pas en double-booking sur la date). Approche clean-archi : composer le domaine **techniciens** (`getDernierePosition`/positions — déjà migré, RGPD : positions techniciens hautement sensibles, scope tenant STRICT) + `congeRepo` + interventions. Use-case **pur** pour le tri distance + dispo ; reader positions dédié. ⚠️ **Minimisation RGPD** : ne renvoyer que ce que le legacy renvoie (id/nom/distance/dispo), pas les coordonnées brutes si évitable. Tests via fakes (tri par distance, exclusion indispo). Puis **couverture `trpc.interventions.*` complète → ACTIVER `interventions`** (`STAGING_NEW_STACK_DEFAULT_DOMAINS` + edge `DEFAULT_ENABLED` + smoke + deploy + en-tête). **Ensuite** : `chantiers`/`articles`/`previsions`/`depenses` (parité), sensibles en DERNIER (comptabilité FEC/TVA, auth, Stripe, signature, assistant).
 

@@ -32,6 +32,9 @@ export interface IInterventionRepository {
   findTechnicienIdForUser(ctx: TenantContext): Promise<number | null>;
   // Interventions du tenant assignées à un technicien donné (scopé).
   listByTechnicien(ctx: TenantContext, technicienId: number): Promise<Intervention[]>;
+  // Interventions du tenant démarrant dans la fenêtre [dayStart, dayEnd] (hors annulées) — base de la
+  // détection de disponibilité (suggestions techniciens). Scopé tenant.
+  listJour(ctx: TenantContext, dayStart: Date, dayEnd: Date): Promise<Intervention[]>;
 
   // ── Équipe d'intervention (table `interventions_techniciens`, scopée tenant) ─────────────────
   // Membres d'équipe d'une intervention (jointure technicien pour nom/prénom), triés par id de liaison.
