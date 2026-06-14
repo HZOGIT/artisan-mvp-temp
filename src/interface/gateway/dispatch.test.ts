@@ -50,4 +50,18 @@ describe("resolveDispatchTarget (décision de dispatch legacy↔nouveau stack)",
     expect(resolveDispatchTarget(`${MIGRE}.list`, undefined, { [MIGRE]: { enabled: true } })).toBe("new-stack");
     expect(resolveDispatchTarget(`${MIGRE}.list`, undefined, { [MIGRE]: { enabled: false, tenantAllowlist: [7] } })).toBe("legacy");
   });
+
+  // INVARIANT d'isolation des flags : activer UN domaine ne doit JAMAIS détourner un autre domaine
+  // vers le nouveau stack (pas de fuite cross-domaine du flag). Vérifié sur les 30 domaines.
+  it("activer un domaine ne route que ce domaine vers le nouveau stack (zéro fuite cross-domaine)", () => {
+    for (const d of MIGRATED_DOMAINS) {
+      const flags: FeatureFlags = { [d]: { enabled: true } };
+      expect(resolveDispatchTarget(`${d}.list`, 1, flags)).toBe("new-stack");
+      // tous les AUTRES domaines restent en legacy avec ce flag isolé
+      for (const autre of MIGRATED_DOMAINS) {
+        if (autre === d) continue;
+        expect(resolveDispatchTarget(`${autre}.list`, 1, flags)).toBe("legacy");
+      }
+    }
+  });
 });
