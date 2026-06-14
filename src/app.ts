@@ -51,6 +51,7 @@ import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repos
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
 import { DevisRepositoryDrizzle } from "./modules/devis/infra/devis-repository-drizzle";
+import { FacturesDevisToFactureConverter } from "./modules/devis/infra/factures-devis-to-facture-converter";
 import {
   ArtisanReaderDrizzle as SharedArtisanReaderDrizzle,
   ClientReaderDrizzle as SharedClientReaderDrizzle,
@@ -198,6 +199,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // ajustement stock + matching articleId).
   const stockRepo = deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db);
   const articleRepo = deps.articleRepo ?? new ArticleRepositoryDrizzle(getDbHandle().db);
+  // Repo factures partagé : module factures + composé par contrats (generateFacture) ET devis
+  // (convertToFacture). Hoisté pour éviter le TDZ (devis se compose avant le module factures).
+  const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
   const fournisseurs = createFournisseursModule({
     repository: fournisseurRepo,
   });
@@ -274,15 +278,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: deps.emailPort ?? new LegacyEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
+    // convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
+    // `factureRepo` (hoisté) + lecteur devis vu factures.
+    converter: new FacturesDevisToFactureConverter(factureRepo, new DevisReaderDrizzle(getDbHandle().db)),
   });
   // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
   // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.
   const compta =
     deps.compta ??
     new ComptaEcrituresAdapter(new EcritureRepositoryDrizzle(getDbHandle().db), new FactureReaderDrizzle(getDbHandle().db));
-  // Repo factures partagé : module factures ET composé par contrats (generateFacture réutilise
-  // les use-cases factures via le ContratFactureGenerator).
-  const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
   const factures = createFacturesModule({
     repository: factureRepo,
     devisReader: deps.devisReader ?? new DevisReaderDrizzle(getDbHandle().db),

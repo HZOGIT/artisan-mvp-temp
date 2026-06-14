@@ -8,6 +8,7 @@ import {
   modifierLigneDevis,
   supprimerLigneDevis,
   changerStatutDevis,
+  dupliquerDevis,
 } from "./write-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
@@ -127,5 +128,28 @@ describe("devis — use-cases d'écriture", () => {
     const d = await creerDevis(repo, A, { clientId: 100 });
     await expectCrossTenantDenied(() => changerStatutDevis(repo, B, d.id, "envoye"));
     await expect(changerStatutDevis(repo, B, d.id, "envoye")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("dupliquerDevis : nouveau brouillon, numéro serveur, objet (copie), validité +30j, lignes copiées", async () => {
+    const repo = repoWithClient(A, 100);
+    const origine = await creerDevis(repo, A, { clientId: 100, objet: "Réno cuisine" });
+    await ajouterLigneDevis(repo, A, origine.id, { designation: "Pose", prixUnitaireHT: "300.00", quantite: "2" });
+    await changerStatutDevis(repo, A, origine.id, "envoye"); // l'origine peut être dans un autre statut
+
+    const copie = await dupliquerDevis(repo, A, origine.id, () => new Date("2026-06-14T00:00:00Z"));
+    expect(copie.id).not.toBe(origine.id);
+    expect(copie.numero).toBe("DEV-00002");
+    expect(copie.statut).toBe("brouillon"); // toujours un nouveau brouillon
+    expect(copie.objet).toBe("Réno cuisine (copie)");
+    expect(copie.dateValidite?.toISOString().slice(0, 10)).toBe("2026-07-14"); // +30 j
+    // lignes copiées + totaux recalculés (2 × 300 = 600 HT)
+    expect(await repo.listLignes(A, copie.id)).toHaveLength(1);
+    expect(copie.totalHT).toBe("600.00");
+  });
+
+  it("dupliquerDevis : devis hors tenant → NotFound", async () => {
+    const repo = repoWithClient(A, 100);
+    const d = await creerDevis(repo, A, { clientId: 100 });
+    await expectCrossTenantDenied(() => dupliquerDevis(repo, B, d.id));
   });
 });

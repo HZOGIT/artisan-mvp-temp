@@ -146,3 +146,45 @@ export async function supprimerLigneDevis(
   const ok = await repo.deleteLigne(ctx, ligneId);
   if (!ok) throw new NotFoundError("Ligne introuvable");
 }
+
+// Duplique un devis (parité legacy `devis.duplicate`) : nouveau devis **brouillon**, numéro généré
+// serveur, objet suffixé « (copie) », validité +30 j, lignes copiées (totaux recalculés par le repo
+// à chaque `addLigne`). ⚠️ Scopé tenant (404 hors tenant) ; le client de l'origine est réutilisé
+// (déjà possédé) — pas de nouvelle vérification d'ownership FK.
+export async function dupliquerDevis(
+  repo: IDevisRepository,
+  ctx: TenantContext,
+  devisId: number,
+  maintenant: () => Date = () => new Date(),
+): Promise<Devis> {
+  const origine = await getDevisOwned(repo, ctx, devisId);
+  const numero = await repo.nextNumero(ctx);
+  const dateValidite = new Date(maintenant());
+  dateValidite.setDate(dateValidite.getDate() + 30);
+  const copie = await repo.create(ctx, {
+    clientId: origine.clientId,
+    numero,
+    objet: origine.objet ? `${origine.objet} (copie)` : "(copie)",
+    referenceClient: origine.referenceClient,
+    conditionsPaiement: origine.conditionsPaiement,
+    notes: origine.notes,
+    dateValidite,
+  });
+  const lignes = await repo.listLignes(ctx, origine.id);
+  for (const l of lignes) {
+    await repo.addLigne(ctx, copie.id, {
+      designation: l.designation,
+      description: l.description,
+      reference: l.reference,
+      quantite: l.quantite,
+      unite: l.unite,
+      prixUnitaireHT: l.prixUnitaireHT,
+      tauxTVA: l.tauxTVA,
+      ordre: l.ordre,
+      type: l.type,
+    });
+  }
+  // Relit le devis (totaux recalculés par les addLigne) pour renvoyer l'état à jour.
+  const fresh = await repo.getById(ctx, copie.id);
+  return fresh ?? copie;
+}

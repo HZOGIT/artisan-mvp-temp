@@ -10,6 +10,7 @@ const stubMailing: DevisMailingDeps = {
   email: { send: async () => {} },
   rateLimiter: { check: async () => true },
 };
+const stubConverter = { convertir: async () => ({ id: 1, numero: "FAC-00001" }) };
 
 const stubRepo: IDevisRepository = {
   list: async () => [],
@@ -30,7 +31,7 @@ const stubRepo: IDevisRepository = {
 
 describe("devis.module", () => {
   it("createDevisModule câble le repository injecté", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -52,14 +53,16 @@ describe("devis.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (procédures parité CRUD + lignes + transitions)", () => {
-    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing });
+    const module = createDevisModule({ repository: stubRepo, mailing: stubMailing, converter: stubConverter });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "accepter",
       "addLigne",
+      "convertToFacture",
       "create",
       "delete",
       "deleteLigne",
+      "duplicate",
       "envoyer",
       "expirer",
       "getById",

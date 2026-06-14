@@ -3,6 +3,7 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDevisRepository } from "../../application/devis-repository";
 import { listDevis, getDevisDetail, listLignesDevis } from "../../application/read-use-cases";
 import { envoyerDevisParEmail, type DevisMailingDeps } from "../../application/envoyer-devis-email";
+import type { DevisToFactureConverter } from "../../application/devis-to-facture-converter";
 import {
   creerDevis,
   modifierDevis,
@@ -11,6 +12,7 @@ import {
   modifierLigneDevis,
   supprimerLigneDevis,
   changerStatutDevis,
+  dupliquerDevis,
 } from "../../application/write-use-cases";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
@@ -73,7 +75,7 @@ const ligneUpdateSchema = z.object({
 // Routeur tRPC du domaine devis. Transport mince : valide les inputs (zod), délègue aux use-cases
 // (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-acceptation via
 // ctx.tenant), laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
-export function createDevisRouter(repo: IDevisRepository, mailing: DevisMailingDeps) {
+export function createDevisRouter(repo: IDevisRepository, mailing: DevisMailingDeps, converter: DevisToFactureConverter) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDevis(repo, ctx.tenant)),
 
@@ -141,6 +143,17 @@ export function createDevisRouter(repo: IDevisRepository, mailing: DevisMailingD
     expirer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "expire")),
+
+    // Convertit un devis accepté en facture brouillon (cross-domaine) — parité `convertToFacture`.
+    // 404 devis hors tenant ; Conflict si non accepté ou déjà converti (invariants factures).
+    convertToFacture: protectedProcedure
+      .input(z.object({ devisId: z.number().int() }))
+      .mutation(({ ctx, input }) => converter.convertir(ctx.tenant, input.devisId)),
+
+    // Duplique un devis (nouveau brouillon, numéro serveur, lignes copiées) — parité `duplicate`.
+    duplicate: protectedProcedure
+      .input(z.object({ devisId: z.number().int() }))
+      .mutation(({ ctx, input }) => dupliquerDevis(repo, ctx.tenant, input.devisId)),
 
     // Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.
     // ownership 404 / client.email 400 / rate-limit 429 ; passe `envoye` si brouillon.
