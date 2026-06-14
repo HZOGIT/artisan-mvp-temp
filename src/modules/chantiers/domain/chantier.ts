@@ -140,3 +140,48 @@ export interface UpdateSuiviInput {
   readonly dateFin?: string | null;
   readonly commentaire?: string | null;
 }
+
+// ── Phases de chantier (planification / découpage en lots) ────────────────────────────────────
+// Table `phases_chantier` : ⚠️ **SANS artisanId** → scopée UNIQUEMENT via le chantier parent
+// (anti-IDOR ; pas de RLS sur cette table). Les colonnes `date*` = jour PG (YYYY-MM-DD) ;
+// `budgetPhase`/`coutReel`/`heuresPrevues` = décimaux string.
+export type PhaseStatut = "a_faire" | "en_cours" | "termine" | "annule";
+
+export interface ChantierPhase {
+  readonly id: number;
+  readonly chantierId: number;
+  readonly nom: string;
+  readonly description: string | null;
+  readonly ordre: number;
+  readonly dateDebutPrevue: string | null;
+  readonly dateFinPrevue: string | null;
+  readonly dateDebutReelle: string | null;
+  readonly dateFinReelle: string | null;
+  readonly statut: PhaseStatut;
+  readonly avancement: number;
+  readonly budgetPhase: string | null;
+  readonly coutReel: string | null;
+  readonly heuresPrevues: string | null;
+  readonly createdAt: Date;
+}
+
+export interface CreatePhaseInput {
+  readonly chantierId: number;
+  readonly nom: string;
+  readonly description?: string | null;
+  readonly ordre?: number;
+  readonly dateDebutPrevue?: string | null;
+  readonly dateFinPrevue?: string | null;
+  readonly budgetPhase?: string | null;
+  readonly heuresPrevues?: string | null;
+}
+
+export interface UpdatePhaseInput {
+  readonly nom?: string;
+  readonly statut?: PhaseStatut;
+  readonly avancement?: number;
+  readonly dateDebutReelle?: string | null;
+  readonly dateFinReelle?: string | null;
+  readonly coutReel?: string | null;
+  readonly heuresPrevues?: string | null;
+}

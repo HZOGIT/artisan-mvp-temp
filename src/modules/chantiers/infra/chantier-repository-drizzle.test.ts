@@ -28,6 +28,7 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
   const cleanup = async () => {
     await admin.query('delete from pointages_chantier where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from suivi_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
+    await admin.query('delete from phases_chantier where "chantierId" in (select id from chantiers where "artisanId" in ($1,$2))', [A, B]);
     await admin.query('delete from chantiers where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from techniciens where "artisanId" in ($1,$2)', [A, B]);
     await admin.query('delete from clients where "artisanId" in ($1,$2)', [A, B]);
@@ -138,5 +139,33 @@ describe.skipIf(!URL)("ChantierRepositoryDrizzle (PG, RLS + scope tenant)", () =
     expect(await repo.deleteSuivi(ctx(A), s.id)).toBe(true);
     expect(await repo.deleteSuivi(ctx(A), s.id)).toBe(false);
     expect((await repo.listSuivi(ctx(A), c.id)).map((x) => x.id)).toEqual([s2.id]);
+  });
+
+  it("phases : add/list/get/update/delete (table sans artisanId, scope via chantier parent)", async () => {
+    const c = await repo.create(ctx(A), { clientId: clientA, reference: ref(), nom: "Phasable" });
+    const p = await repo.addPhase(ctx(A), { chantierId: c.id, nom: "Gros œuvre", ordre: 2, budgetPhase: "5000.00", dateDebutPrevue: "2026-09-02" });
+    expect(p.statut).toBe("a_faire"); // défaut PG
+    expect(p.avancement).toBe(0);
+    expect(p.coutReel).toBe("0.00");
+    expect(p.budgetPhase).toBe("5000.00");
+    expect(p.dateDebutPrevue).toBe("2026-09-02");
+    const p2 = await repo.addPhase(ctx(A), { chantierId: c.id, nom: "Finitions", ordre: 1 });
+    // listPhases ordonné par `ordre` puis id
+    expect((await repo.listPhases(ctx(A), c.id)).map((x) => x.nom)).toEqual(["Finitions", "Gros œuvre"]);
+    // getPhaseById (non scopé tenant : la table n'a pas d'artisanId)
+    expect((await repo.getPhaseById(ctx(A), p.id))?.nom).toBe("Gros œuvre");
+    // update partiel
+    const maj = await repo.updatePhase(ctx(A), p.id, { statut: "termine", avancement: 100, coutReel: "5200.00" });
+    expect(maj?.statut).toBe("termine");
+    expect(maj?.avancement).toBe(100);
+    expect(maj?.coutReel).toBe("5200.00");
+    expect(maj?.nom).toBe("Gros œuvre"); // champ non fourni préservé
+    // update sans champ → renvoie la phase inchangée (pas de SET vide)
+    const noop = await repo.updatePhase(ctx(A), p.id, {});
+    expect(noop?.statut).toBe("termine");
+    // delete idempotent
+    expect(await repo.deletePhase(ctx(A), p.id)).toBe(true);
+    expect(await repo.deletePhase(ctx(A), p.id)).toBe(false);
+    expect((await repo.listPhases(ctx(A), c.id)).map((x) => x.id)).toEqual([p2.id]);
   });
 });

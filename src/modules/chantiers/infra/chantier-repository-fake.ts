@@ -9,6 +9,9 @@ import type {
   ChantierSuivi,
   CreateSuiviInput,
   UpdateSuiviInput,
+  ChantierPhase,
+  CreatePhaseInput,
+  UpdatePhaseInput,
 } from "../domain/chantier";
 
 // Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
@@ -185,5 +188,63 @@ export class FakeChantierRepository implements IChantierRepository {
     const before = this.suivis.length;
     this.suivis = this.suivis.filter((s) => s.id !== id);
     return this.suivis.length < before;
+  }
+
+  // ⚠️ phases_chantier sans artisanId : ces méthodes ne scopent PAS (le use-case garde l'ownership).
+  private phases: ChantierPhase[] = [];
+  private phaseSeq = 0;
+
+  async listPhases(_ctx: TenantContext, chantierId: number): Promise<ChantierPhase[]> {
+    return this.phases.filter((p) => p.chantierId === chantierId).sort((a, b) => a.ordre - b.ordre || a.id - b.id);
+  }
+
+  async getPhaseById(_ctx: TenantContext, id: number): Promise<ChantierPhase | null> {
+    return this.phases.find((p) => p.id === id) ?? null;
+  }
+
+  async addPhase(_ctx: TenantContext, input: CreatePhaseInput): Promise<ChantierPhase> {
+    const p: ChantierPhase = {
+      id: ++this.phaseSeq,
+      chantierId: input.chantierId,
+      nom: input.nom,
+      description: input.description ?? null,
+      ordre: input.ordre ?? 1,
+      dateDebutPrevue: input.dateDebutPrevue ?? null,
+      dateFinPrevue: input.dateFinPrevue ?? null,
+      dateDebutReelle: null,
+      dateFinReelle: null,
+      statut: "a_faire",
+      avancement: 0,
+      budgetPhase: input.budgetPhase ?? null,
+      coutReel: "0.00",
+      heuresPrevues: input.heuresPrevues ?? null,
+      createdAt: new Date(),
+    };
+    this.phases.push(p);
+    return p;
+  }
+
+  async updatePhase(_ctx: TenantContext, id: number, input: UpdatePhaseInput): Promise<ChantierPhase | null> {
+    const idx = this.phases.findIndex((p) => p.id === id);
+    if (idx === -1) return null;
+    const cur = this.phases[idx];
+    const next: ChantierPhase = {
+      ...cur,
+      ...(input.nom !== undefined ? { nom: input.nom } : {}),
+      ...(input.statut !== undefined ? { statut: input.statut } : {}),
+      ...(input.avancement !== undefined ? { avancement: input.avancement } : {}),
+      ...(input.dateDebutReelle !== undefined ? { dateDebutReelle: input.dateDebutReelle } : {}),
+      ...(input.dateFinReelle !== undefined ? { dateFinReelle: input.dateFinReelle } : {}),
+      ...(input.coutReel !== undefined ? { coutReel: input.coutReel } : {}),
+      ...(input.heuresPrevues !== undefined ? { heuresPrevues: input.heuresPrevues } : {}),
+    };
+    this.phases[idx] = next;
+    return next;
+  }
+
+  async deletePhase(_ctx: TenantContext, id: number): Promise<boolean> {
+    const before = this.phases.length;
+    this.phases = this.phases.filter((p) => p.id !== id);
+    return this.phases.length < before;
   }
 }

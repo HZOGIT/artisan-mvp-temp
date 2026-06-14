@@ -8,6 +8,9 @@ import type {
   ChantierSuivi,
   CreateSuiviInput,
   UpdateSuiviInput,
+  ChantierPhase,
+  CreatePhaseInput,
+  UpdatePhaseInput,
 } from "../domain/chantier";
 
 // Port du repository chantiers. Chaque méthode exige le TenantContext (scope tenant + RLS).
@@ -50,4 +53,17 @@ export interface IChantierRepository {
   updateSuivi(ctx: TenantContext, id: number, input: UpdateSuiviInput): Promise<ChantierSuivi | null>;
   // Supprime une étape de suivi par id (ownership vérifiée en amont) — false si absente.
   deleteSuivi(ctx: TenantContext, id: number): Promise<boolean>;
+
+  // ── Phases (`phases_chantier`, SANS artisanId → scopé via le chantier parent par le use-case) ─
+  // Phases d'un chantier (triées par ordre). ⚠️ Le use-case vérifie l'ownership du chantier AVANT.
+  listPhases(ctx: TenantContext, chantierId: number): Promise<ChantierPhase[]>;
+  // Lit une phase par id (NON scopé tenant). Le use-case s'en sert pour récupérer `chantierId`
+  // puis vérifier l'ownership du chantier (anti-IDOR). null si absente.
+  getPhaseById(ctx: TenantContext, id: number): Promise<ChantierPhase | null>;
+  // Crée une phase (ownership du chantier vérifiée par le use-case).
+  addPhase(ctx: TenantContext, input: CreatePhaseInput): Promise<ChantierPhase>;
+  // Met à jour une phase par id (ownership vérifiée en amont) — null si absente.
+  updatePhase(ctx: TenantContext, id: number, input: UpdatePhaseInput): Promise<ChantierPhase | null>;
+  // Supprime une phase par id (ownership vérifiée en amont) — false si absente.
+  deletePhase(ctx: TenantContext, id: number): Promise<boolean>;
 }

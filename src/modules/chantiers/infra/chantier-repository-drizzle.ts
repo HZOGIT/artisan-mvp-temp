@@ -23,6 +23,10 @@ import type {
   SuiviStatut,
   CreateSuiviInput,
   UpdateSuiviInput,
+  ChantierPhase,
+  PhaseStatut,
+  CreatePhaseInput,
+  UpdatePhaseInput,
 } from "../domain/chantier";
 
 type PointageRow = typeof pointagesChantier.$inferSelect;
@@ -57,6 +61,28 @@ function toSuivi(r: SuiviRow): ChantierSuivi {
     commentaire: r.commentaire ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+  };
+}
+
+type PhaseRow = typeof phasesChantier.$inferSelect;
+
+function toPhase(r: PhaseRow): ChantierPhase {
+  return {
+    id: r.id,
+    chantierId: r.chantierId,
+    nom: r.nom,
+    description: r.description ?? null,
+    ordre: r.ordre ?? 1,
+    dateDebutPrevue: r.dateDebutPrevue ?? null,
+    dateFinPrevue: r.dateFinPrevue ?? null,
+    dateDebutReelle: r.dateDebutReelle ?? null,
+    dateFinReelle: r.dateFinReelle ?? null,
+    statut: (r.statut ?? "a_faire") as PhaseStatut,
+    avancement: r.avancement ?? 0,
+    budgetPhase: r.budgetPhase ?? null,
+    coutReel: r.coutReel ?? null,
+    heuresPrevues: r.heuresPrevues ?? null,
+    createdAt: r.createdAt,
   };
 }
 
@@ -298,6 +324,73 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
   deleteSuivi(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const deleted = await tx.delete(suiviChantier).where(eq(suiviChantier.id, id)).returning({ id: suiviChantier.id });
+      return deleted.length > 0;
+    });
+  }
+
+  // ⚠️ `phases_chantier` n'a PAS d'artisanId : pas de scoping tenant au SQL — l'ownership (via le
+  // chantier parent) est garanti par le use-case AVANT l'appel (anti-IDOR).
+  listPhases(ctx: TenantContext, chantierId: number): Promise<ChantierPhase[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select()
+        .from(phasesChantier)
+        .where(eq(phasesChantier.chantierId, chantierId))
+        .orderBy(asc(phasesChantier.ordre), asc(phasesChantier.id));
+      return rows.map(toPhase);
+    });
+  }
+
+  getPhaseById(ctx: TenantContext, id: number): Promise<ChantierPhase | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx.select().from(phasesChantier).where(eq(phasesChantier.id, id)).limit(1);
+      return row ? toPhase(row) : null;
+    });
+  }
+
+  addPhase(ctx: TenantContext, input: CreatePhaseInput): Promise<ChantierPhase> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .insert(phasesChantier)
+        .values({
+          chantierId: input.chantierId,
+          nom: input.nom,
+          description: input.description ?? null,
+          ordre: input.ordre ?? undefined,
+          dateDebutPrevue: input.dateDebutPrevue ?? null,
+          dateFinPrevue: input.dateFinPrevue ?? null,
+          budgetPhase: input.budgetPhase ?? null,
+          heuresPrevues: input.heuresPrevues ?? null,
+        })
+        .returning();
+      return toPhase(row);
+    });
+  }
+
+  updatePhase(ctx: TenantContext, id: number, input: UpdatePhaseInput): Promise<ChantierPhase | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const set: Partial<typeof phasesChantier.$inferInsert> = {};
+      if (input.nom !== undefined) set.nom = input.nom;
+      if (input.statut !== undefined) set.statut = input.statut;
+      if (input.avancement !== undefined) set.avancement = input.avancement;
+      if (input.dateDebutReelle !== undefined) set.dateDebutReelle = input.dateDebutReelle;
+      if (input.dateFinReelle !== undefined) set.dateFinReelle = input.dateFinReelle;
+      if (input.coutReel !== undefined) set.coutReel = input.coutReel;
+      if (input.heuresPrevues !== undefined) set.heuresPrevues = input.heuresPrevues;
+      // `phases_chantier` n'a pas d'`updatedAt` → si rien à modifier, renvoyer la phase telle quelle
+      // (évite un `SET` vide invalide).
+      if (Object.keys(set).length === 0) {
+        const [cur] = await tx.select().from(phasesChantier).where(eq(phasesChantier.id, id)).limit(1);
+        return cur ? toPhase(cur) : null;
+      }
+      const [row] = await tx.update(phasesChantier).set(set).where(eq(phasesChantier.id, id)).returning();
+      return row ? toPhase(row) : null;
+    });
+  }
+
+  deletePhase(ctx: TenantContext, id: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const deleted = await tx.delete(phasesChantier).where(eq(phasesChantier.id, id)).returning({ id: phasesChantier.id });
       return deleted.length > 0;
     });
   }

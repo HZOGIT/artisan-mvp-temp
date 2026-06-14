@@ -5,8 +5,10 @@ import { listChantiers, getChantier } from "../../application/read-use-cases";
 import { creerChantier, modifierChantier, supprimerChantier } from "../../application/write-use-cases";
 import { getPointagesChantier, ajouterPointage, supprimerPointage } from "../../application/pointages-use-cases";
 import { getSuiviChantier, creerSuivi, modifierSuivi, supprimerSuivi } from "../../application/suivi-use-cases";
+import { getPhasesChantier, creerPhase, modifierPhase, supprimerPhase } from "../../application/phases-use-cases";
 
 const suiviStatutEnum = z.enum(["a_faire", "en_cours", "termine"]);
+const phaseStatutEnum = z.enum(["a_faire", "en_cours", "termine", "annule"]);
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -161,6 +163,51 @@ export function createChantiersRouter(repo: IChantierRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerSuivi(repo, ctx.tenant, input.id);
+        return { success: true };
+      }),
+
+    // ── Phases (planification/lots) — sous-ressource scopée via le chantier parent (anti-IDOR) ────
+    getPhases: protectedProcedure
+      .input(z.object({ chantierId: z.number().int() }))
+      .query(({ ctx, input }) => getPhasesChantier(repo, ctx.tenant, input.chantierId)),
+
+    createPhase: protectedProcedure
+      .input(
+        z.object({
+          chantierId: z.number().int(),
+          nom: z.string().min(1).max(255),
+          description: z.string().max(65535).nullish(),
+          ordre: z.number().int().optional(),
+          dateDebutPrevue: z.string().nullish(),
+          dateFinPrevue: z.string().nullish(),
+          budgetPhase: decimal.nullish(),
+          heuresPrevues: decimal.nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => creerPhase(repo, ctx.tenant, input)),
+
+    updatePhase: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int(),
+          nom: z.string().min(1).max(255).optional(),
+          statut: phaseStatutEnum.optional(),
+          avancement: z.number().int().min(0).max(100).optional(),
+          dateDebutReelle: z.string().nullish(),
+          dateFinReelle: z.string().nullish(),
+          coutReel: decimal.nullish(),
+          heuresPrevues: decimal.nullish(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { id, ...data } = input;
+        return modifierPhase(repo, ctx.tenant, id, data);
+      }),
+
+    deletePhase: protectedProcedure
+      .input(z.object({ id: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        await supprimerPhase(repo, ctx.tenant, input.id);
         return { success: true };
       }),
   });
