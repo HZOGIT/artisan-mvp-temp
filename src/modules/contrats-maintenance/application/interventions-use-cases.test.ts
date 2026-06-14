@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { FakeContratRepository } from "../infra/contrat-repository-fake";
+import { FacturesContratFactureGenerator } from "../infra/factures-contrat-facture-generator";
+import { FakeFactureRepository } from "../../factures/infra/facture-repository-fake";
 import {
   listContratsAFacturer,
   getInterventionsContrat,
   creerInterventionContrat,
   modifierInterventionContrat,
+  genererFactureContrat,
+  addMonthsClamped,
 } from "./interventions-use-cases";
 import { NotFoundError } from "../../../shared/errors";
 import { expectCrossTenantDenied } from "../../../shared/testing";
@@ -81,5 +85,48 @@ describe("contrats — interventions & à-facturer use-cases", () => {
     expect(out[0].joursRetard).toBe(1);
     // isolation : B ne voit rien
     expect(await listContratsAFacturer(repo, B)).toEqual([]);
+  });
+
+  it("addMonthsClamped : clamp de fin de mois (31 jan + 1 mois → 28 fév)", () => {
+    expect(addMonthsClamped(new Date("2026-01-31T00:00:00Z"), 1).getDate()).toBe(28);
+    expect(addMonthsClamped(new Date("2026-03-15T00:00:00Z"), 3).getMonth()).toBe(5); // juin
+  });
+
+  it("genererFactureContrat : facture émise (sans FEC) + récurrente + prochainFacturation avancée", async () => {
+    const repo = new FakeContratRepository();
+    repo.seedClient(A.artisanId, 100, "Durand");
+    const c = await repo.create(
+      A,
+      base({ clientId: 100, montantHT: "200.00", tauxTVA: "20.00", periodicite: "mensuel" }),
+      "CTR-00001",
+    );
+    // Adapter réel branché sur le repo factures (fake) : compose les use-cases factures.
+    const factureRepo = new FakeFactureRepository();
+    factureRepo.registerClient(A.artisanId, 100); // anti-IDOR de creerFacture
+    const gen = new FacturesContratFactureGenerator(factureRepo);
+
+    const now = new Date("2026-06-14T10:00:00Z");
+    const ref = await genererFactureContrat(repo, gen, A, c.id, () => now);
+
+    // Facture créée, émise, avec totaux dérivés de la ligne (HT 200 / TTC 240) — SANS écriture FEC.
+    const facture = await factureRepo.getById(A, ref.id);
+    expect(facture?.statut).toBe("envoyee");
+    expect(facture?.totalHT).toBe("200.00");
+    expect(facture?.totalTTC).toBe("240.00");
+    expect((await factureRepo.listLignes(A, ref.id))).toHaveLength(1);
+    // Facture récurrente enregistrée (mensuel → periodeFin = +1 mois).
+    expect(repo.facturesRecurrentes).toHaveLength(1);
+    expect(repo.facturesRecurrentes[0].factureId).toBe(ref.id);
+    expect(repo.facturesRecurrentes[0].periodeFin.getMonth()).toBe(6); // juillet (juin + 1)
+    // prochainFacturation avancée à la fin de période.
+    expect((await repo.getById(A, c.id))?.prochainFacturation?.getMonth()).toBe(6);
+  });
+
+  it("genererFactureContrat : 404 si le contrat n'appartient pas au tenant", async () => {
+    const repo = new FakeContratRepository();
+    repo.seedClient(A.artisanId, 100);
+    const c = await repo.create(A, base({ clientId: 100 }), "CTR-00001");
+    const gen = new FacturesContratFactureGenerator(new FakeFactureRepository());
+    await expect(genererFactureContrat(repo, gen, B, c.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 });

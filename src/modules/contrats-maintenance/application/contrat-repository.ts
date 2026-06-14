@@ -13,6 +13,16 @@ import type {
 // dérivés par le use-case (logique pure), pas par le repo.
 export type ContratAFacturerRow = Contrat & { readonly clientNom: string };
 
+// Entrée d'enregistrement d'une facture récurrente (table `factures_recurrentes`, sans artisanId →
+// scopée via le contrat parent du tenant, ownership vérifié en amont par le use-case).
+export interface RecordFactureRecurrenteInput {
+  readonly contratId: number;
+  readonly factureId: number;
+  readonly periodeDebut: Date;
+  readonly periodeFin: Date;
+  readonly genereeAutomatiquement?: boolean;
+}
+
 // Port du repository contrats-maintenance. Chaque méthode exige le TenantContext (scope tenant +
 // RLS). `contrats_maintenance` possède un `artisanId` → double cloisonnement RLS + filtre.
 // `clientId` est validé via `ownsClient` (anti-IDOR-FK) ; `reference` est générée serveur via
@@ -47,4 +57,8 @@ export interface IContratRepository {
   createIntervention(ctx: TenantContext, input: CreateContratInterventionInput): Promise<ContratIntervention>;
   // Met à jour une intervention — null si hors tenant.
   updateIntervention(ctx: TenantContext, id: number, input: UpdateContratInterventionInput): Promise<ContratIntervention | null>;
+
+  // Enregistre une facture récurrente liée à un contrat (`factures_recurrentes`). L'ownership du
+  // contrat est vérifié par le use-case ; le repo écrit le lien scopé tenant.
+  recordFactureRecurrente(ctx: TenantContext, input: RecordFactureRecurrenteInput): Promise<void>;
 }

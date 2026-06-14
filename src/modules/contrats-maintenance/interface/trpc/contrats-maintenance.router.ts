@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IContratRepository } from "../../application/contrat-repository";
+import type { ContratFactureGenerator } from "../../application/contrat-facture-generator";
 import { listContrats, getContrat } from "../../application/read-use-cases";
 import { creerContrat, modifierContrat, supprimerContrat } from "../../application/write-use-cases";
 import { suspendreContrat, reactiverContrat, terminerContrat, annulerContrat } from "../../application/transition-use-cases";
@@ -9,6 +10,7 @@ import {
   getInterventionsContrat,
   creerInterventionContrat,
   modifierInterventionContrat,
+  genererFactureContrat,
 } from "../../application/interventions-use-cases";
 
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
@@ -54,7 +56,7 @@ const updateSchema = z.object({
 // aux use-cases (scoping tenant via ctx.tenant + anti-IDOR clientId + référence serveur au use-case),
 // laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions
 // de statut (suspendre/reactiver/terminer/annuler) seront exposées en 7/9. Repo injecté.
-export function createContratsMaintenanceRouter(repo: IContratRepository) {
+export function createContratsMaintenanceRouter(repo: IContratRepository, factureGen: ContratFactureGenerator) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listContrats(repo, ctx.tenant)),
 
@@ -99,6 +101,11 @@ export function createContratsMaintenanceRouter(repo: IContratRepository) {
 
     // Contrats arrivés à échéance de facturation (enrichis client/TTC/retard) — parité `getAFacturer`.
     getAFacturer: protectedProcedure.query(({ ctx }) => listContratsAFacturer(repo, ctx.tenant)),
+
+    // Génère une facture émise pour un contrat (récurrente) — parité `generateFacture`. ⚠️ pas d'écriture FEC.
+    generateFacture: protectedProcedure
+      .input(z.object({ contratId: z.number().int() }))
+      .mutation(({ ctx, input }) => genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId)),
 
     // ── Sous-ressource interventions du contrat (ownership via contrat parent ; anti-IDOR id↔contrat) ──
     getInterventions: protectedProcedure

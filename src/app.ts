@@ -90,6 +90,7 @@ import { CategorieDepenseRepositoryDrizzle } from "./modules/categories-depenses
 import type { ICategorieDepenseRepository } from "./modules/categories-depenses/application/categorie-depense-repository";
 import { createContratsMaintenanceModule } from "./modules/contrats-maintenance/contrats-maintenance.module";
 import { ContratRepositoryDrizzle } from "./modules/contrats-maintenance/infra/contrat-repository-drizzle";
+import { FacturesContratFactureGenerator } from "./modules/contrats-maintenance/infra/factures-contrat-facture-generator";
 import type { IContratRepository } from "./modules/contrats-maintenance/application/contrat-repository";
 import { createDemandesContactModule } from "./modules/demandes-contact/demandes-contact.module";
 import { DemandeContactRepositoryDrizzle } from "./modules/demandes-contact/infra/demande-contact-repository-drizzle";
@@ -238,8 +239,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const compta =
     deps.compta ??
     new ComptaEcrituresAdapter(new EcritureRepositoryDrizzle(getDbHandle().db), new FactureReaderDrizzle(getDbHandle().db));
+  // Repo factures partagé : module factures ET composé par contrats (generateFacture réutilise
+  // les use-cases factures via le ContratFactureGenerator).
+  const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
   const factures = createFacturesModule({
-    repository: deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db),
+    repository: factureRepo,
     devisReader: deps.devisReader ?? new DevisReaderDrizzle(getDbHandle().db),
     compta,
     // Envoi par email (PDF en PJ) : lecture artisan/client scopée + PdfPort/EmailPort legacy +
@@ -285,6 +289,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const contratsMaintenance = createContratsMaintenanceModule({
     repository: deps.contratRepo ?? new ContratRepositoryDrizzle(getDbHandle().db),
+    // generateFacture : réutilise le domaine factures (numéro serveur + totaux dérivés), facture émise
+    // SANS écritures FEC (parité legacy). Partage l'instance `factureRepo` du module factures.
+    factureGenerator: new FacturesContratFactureGenerator(factureRepo),
   });
   const demandesContact = createDemandesContactModule({
     repository: deps.demandeContactRepo ?? new DemandeContactRepositoryDrizzle(getDbHandle().db),

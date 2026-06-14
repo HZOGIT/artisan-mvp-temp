@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IContratRepository, ContratAFacturerRow } from "../application/contrat-repository";
+import type { IContratRepository, ContratAFacturerRow, RecordFactureRecurrenteInput } from "../application/contrat-repository";
 import type {
   Contrat,
   ContratStatut,
@@ -22,6 +22,8 @@ export class FakeContratRepository implements IContratRepository {
   private readonly refCounter = new Map<number, number>();
   private readonly interventions: ContratIntervention[] = [];
   private interventionSeq = 0;
+  // Factures récurrentes enregistrées (exposées pour les assertions de test).
+  readonly facturesRecurrentes: RecordFactureRecurrenteInput[] = [];
 
   seedClient(artisanId: number, clientId: number, nom = "Client"): void {
     if (!this.clientsByArtisan.has(artisanId)) this.clientsByArtisan.set(artisanId, new Set());
@@ -180,5 +182,9 @@ export class FakeContratRepository implements IContratRepository {
     };
     this.interventions[idx] = next;
     return next;
+  }
+
+  async recordFactureRecurrente(_ctx: TenantContext, input: RecordFactureRecurrenteInput): Promise<void> {
+    this.facturesRecurrentes.push({ ...input, genereeAutomatiquement: input.genereeAutomatiquement ?? false });
   }
 }

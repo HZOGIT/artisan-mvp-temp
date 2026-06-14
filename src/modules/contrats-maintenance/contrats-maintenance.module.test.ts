@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { createContratsMaintenanceModule } from "./contrats-maintenance.module";
 import type { IContratRepository } from "./application/contrat-repository";
+import type { ContratFactureGenerator } from "./application/contrat-facture-generator";
+
+const stubFactureGen: ContratFactureGenerator = {
+  genererFactureEmise: async () => ({ id: 1, numero: "FAC-00001" }),
+};
 
 const stubRepo: IContratRepository = {
   list: async () => [],
@@ -20,11 +25,12 @@ const stubRepo: IContratRepository = {
     throw new Error("non implémenté (stub)");
   },
   updateIntervention: async () => null,
+  recordFactureRecurrente: async () => {},
 };
 
 describe("contrats-maintenance.module", () => {
   it("createContratsMaintenanceModule câble le repository injecté", () => {
-    const module = createContratsMaintenanceModule({ repository: stubRepo });
+    const module = createContratsMaintenanceModule({ repository: stubRepo, factureGenerator: stubFactureGen });
     expect(module.deps.repository).toBe(stubRepo);
   });
 
@@ -40,6 +46,7 @@ describe("contrats-maintenance.module", () => {
       "listInterventions",
       "nextReference",
       "ownsClient",
+      "recordFactureRecurrente",
       "setStatut",
       "update",
       "updateIntervention",
@@ -47,13 +54,14 @@ describe("contrats-maintenance.module", () => {
   });
 
   it("expose un routeur tRPC assemblé (CRUD + transitions + getAFacturer + interventions)", () => {
-    const module = createContratsMaintenanceModule({ repository: stubRepo });
+    const module = createContratsMaintenanceModule({ repository: stubRepo, factureGenerator: stubFactureGen });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
     expect(procedures).toEqual([
       "annuler",
       "create",
       "createIntervention",
       "delete",
+      "generateFacture",
       "getAFacturer",
       "getById",
       "getInterventions",

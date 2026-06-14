@@ -1,9 +1,11 @@
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
+import type { ContratFactureGenerator, FactureGenereeRef } from "./contrat-facture-generator";
 import type {
   ContratIntervention,
   ContratAFacturer,
+  ContratPeriodicite,
   CreateContratInterventionInput,
   UpdateContratInterventionInput,
 } from "../domain/contrat";
@@ -51,6 +53,60 @@ export async function creerInterventionContrat(
 ): Promise<ContratIntervention> {
   if (!(await repo.getById(ctx, input.contratId))) throw new NotFoundError("Contrat introuvable");
   return repo.createIntervention(ctx, input);
+}
+
+// Nombre de mois d'une période de facturation, par périodicité.
+const MOIS_PAR_PERIODICITE: Record<ContratPeriodicite, number> = { mensuel: 1, trimestriel: 3, semestriel: 6, annuel: 12 };
+
+// Ajout de `n` mois avec clamp de fin de mois (équivalent relativedelta — parité legacy
+// `addMonthsClamped`) : évite le débordement (31 jan + 1 mois → 28/29 fév, pas 2/3 mars). Pur.
+export function addMonthsClamped(base: Date, n: number): Date {
+  const day = base.getDate();
+  const r = new Date(base);
+  r.setDate(1);
+  r.setMonth(r.getMonth() + n);
+  const lastDayOfTargetMonth = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+  r.setDate(Math.min(day, lastDayOfTargetMonth));
+  return r;
+}
+
+// Génère une facture (émise) pour un contrat (parité legacy `contrats.generateFacture`) :
+//  - ownership du contrat (404 sinon) ;
+//  - crée une facture **émise** via le `ContratFactureGenerator` (1 ligne = prestation du contrat,
+//    totaux dérivés, numéro serveur ; ⚠️ PAS d'écritures FEC — parité legacy) ;
+//  - enregistre la **facture récurrente** (période courante → period+1 selon la périodicité, clamp) ;
+//  - **avance `prochainFacturation`** à la fin de période.
+// Horloge injectable (`maintenant`) pour des tests déterministes.
+export async function genererFactureContrat(
+  repo: IContratRepository,
+  factureGen: ContratFactureGenerator,
+  ctx: TenantContext,
+  contratId: number,
+  maintenant: () => Date = () => new Date(),
+): Promise<FactureGenereeRef> {
+  const contrat = await repo.getById(ctx, contratId);
+  if (!contrat) throw new NotFoundError("Contrat introuvable");
+
+  const facture = await factureGen.genererFactureEmise(ctx, {
+    clientId: contrat.clientId,
+    objet: `${contrat.titre} - ${contrat.reference}`,
+    designation: contrat.titre,
+    description: contrat.description,
+    montantHT: contrat.montantHT,
+    tauxTVA: contrat.tauxTVA,
+  });
+
+  const now = maintenant();
+  const periodeFin = addMonthsClamped(now, MOIS_PAR_PERIODICITE[contrat.periodicite] ?? 1);
+  await repo.recordFactureRecurrente(ctx, {
+    contratId,
+    factureId: facture.id,
+    periodeDebut: now,
+    periodeFin,
+    genereeAutomatiquement: false,
+  });
+  await repo.update(ctx, contratId, { prochainFacturation: periodeFin });
+  return facture;
 }
 
 // Met à jour une intervention. ⚠️ Anti-IDOR (parité legacy/OPE-89) : le contrat parent doit être du

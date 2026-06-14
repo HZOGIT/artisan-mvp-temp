@@ -22,7 +22,7 @@ const MIGRATED_SET = new Set(MIGRATED);
 // (src/interface/gateway/migrated-domains.ts). Parité de surface vérifiée (diff appels client vs
 // procédures montées). On élargit cette liste domaine par domaine au fil de la parité.
 export const DEFAULT_ENABLED = [
-  "vehicules", "notifications", "fournisseurs", "parametres", "modelesEmail", "relances", "conges", "badges", "stocks", "techniciens", "rdv", "clients", "factures",
+  "vehicules", "notifications", "fournisseurs", "parametres", "modelesEmail", "relances", "conges", "badges", "stocks", "techniciens", "rdv", "clients", "factures", "contrats",
 ];
 
 const TRPC_PREFIX = "/api/trpc/";

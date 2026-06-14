@@ -1,9 +1,9 @@
 import { and, asc, desc, eq, lte, sql } from "drizzle-orm";
-import { contratsMaintenance, clients, interventionsContrat } from "../../../../drizzle/schema.pg";
+import { contratsMaintenance, clients, interventionsContrat, facturesRecurrentes } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IContratRepository, ContratAFacturerRow } from "../application/contrat-repository";
+import type { IContratRepository, ContratAFacturerRow, RecordFactureRecurrenteInput } from "../application/contrat-repository";
 import type {
   Contrat,
   ContratPeriodicite,
@@ -285,6 +285,18 @@ export class ContratRepositoryDrizzle implements IContratRepository {
         .where(and(eq(interventionsContrat.id, id), eq(interventionsContrat.artisanId, ctx.artisanId)))
         .returning();
       return row ? toIntervention(row) : null;
+    });
+  }
+
+  recordFactureRecurrente(ctx: TenantContext, input: RecordFactureRecurrenteInput): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      await tx.insert(facturesRecurrentes).values({
+        contratId: input.contratId,
+        factureId: input.factureId,
+        periodeDebut: input.periodeDebut,
+        periodeFin: input.periodeFin,
+        genereeAutomatiquement: input.genereeAutomatiquement ?? false,
+      });
     });
   }
 }
