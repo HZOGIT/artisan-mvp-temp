@@ -4,7 +4,9 @@ import type { IPrevisionCARepository } from "../../application/prevision-ca-repo
 import { listPrevisions, previsionsParAnnee, getPrevision, getPrevisions, getHistorique, getComparaison } from "../../application/read-use-cases";
 import { creerPrevision, modifierPrevision, supprimerPrevision } from "../../application/write-use-cases";
 import { calculerPrevisions } from "../../application/calculer-use-case";
+import { getTresoreriePrevisionnelle } from "../../application/tresorerie-use-case";
 import type { FacturesCAReader } from "../../application/factures-ca-reader";
+import type { TresorerieReader } from "../../application/tresorerie-reader";
 
 const methode = z.enum(["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"]);
 const montantPos = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant positif décimal invalide");
@@ -35,7 +37,7 @@ const updateSchema = z.object({
 // Routeur tRPC du domaine previsions-ca (prévisions de CA par période). Transport mince : valide les
 // inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain
 // errors (NotFound→404, Validation→400). Repo injecté.
-export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesCAReader?: FacturesCAReader) {
+export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesCAReader?: FacturesCAReader, tresorerieReader?: TresorerieReader) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listPrevisions(repo, ctx.tenant)),
 
@@ -90,5 +92,10 @@ export function createPrevisionsCARouter(repo: IPrevisionCARepository, facturesC
           ? calculerPrevisions({ repo, facturesReader: facturesCAReader }, ctx.tenant, input.methode)
           : Promise.resolve({ message: "Pas assez de données historiques pour calculer les prévisions" }),
       ),
+
+    // `getTresoreriePrevisionnelle {semaines=8}` : flux net hebdo (encaissements − décaissements).
+    getTresoreriePrevisionnelle: protectedProcedure
+      .input(z.object({ semaines: z.number().int().min(1).max(26).default(8) }).optional())
+      .query(({ ctx, input }) => getTresoreriePrevisionnelle(tresorerieReader, ctx.tenant, input?.semaines ?? 8)),
   });
 }

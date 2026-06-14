@@ -111,3 +111,40 @@ export interface CalculPrevisionsResult {
   readonly annee?: number;
   readonly message?: string;
 }
+
+// ── Trésorerie prévisionnelle (flux net hebdomadaire) ─────────────────────────────────────────
+// Créance = facture non soldée (encaissement attendu à `dateEcheance`, reste dû = totalTTC−montantPaye).
+export interface Creance {
+  readonly dateEcheance: string | null;
+  readonly totalTTC: string;
+  readonly montantPaye: string;
+}
+
+// Dépense récurrente (décaissement attendu, expansé selon la fréquence à partir de `prochaineOccurrence`).
+export interface DepenseRecurrente {
+  readonly montantTtc: string;
+  readonly frequence: string | null; // mensuelle | trimestrielle | annuelle
+  readonly prochaineOccurrence: string | null;
+}
+
+// Données brutes (scopées tenant) nécessaires au calcul de la trésorerie prévisionnelle.
+export interface TresorerieData {
+  readonly creances: Creance[];
+  readonly avoirsTotalTTC: string[]; // totalTTC des avoirs (crédits client) — nettés contre les entrées
+  readonly depensesRecurrentes: DepenseRecurrente[];
+}
+
+export interface TresorerieSemaine {
+  readonly debut: string; // YYYY-MM-DD (début de la semaine)
+  readonly entrees: number;
+  readonly sorties: number;
+  readonly net: number;
+  readonly cumulatif: number;
+}
+
+export interface TresoreriePrevisionnelle {
+  readonly semaines: TresorerieSemaine[];
+  readonly totalEntrees: number;
+  readonly totalSorties: number;
+  readonly totalNet: number;
+}

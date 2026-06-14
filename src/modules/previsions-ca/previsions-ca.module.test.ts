@@ -36,6 +36,6 @@ describe("previsions-ca.module", () => {
   it("expose un routeur tRPC assemblé (CRUD + byAnnee)", () => {
     const module = createPrevisionsCAModule({ repository: stubRepo });
     const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
-    expect(procedures).toEqual(["byAnnee", "calculer", "create", "delete", "getById", "getComparaison", "getHistorique", "getPrevisions", "list", "update"]);
+    expect(procedures).toEqual(["byAnnee", "calculer", "create", "delete", "getById", "getComparaison", "getHistorique", "getPrevisions", "getTresoreriePrevisionnelle", "list", "update"]);
   });
 });

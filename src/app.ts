@@ -120,6 +120,8 @@ import { createPrevisionsCAModule } from "./modules/previsions-ca/previsions-ca.
 import { PrevisionCARepositoryDrizzle } from "./modules/previsions-ca/infra/prevision-ca-repository-drizzle";
 import { FacturesCAReaderDrizzle } from "./modules/previsions-ca/infra/factures-ca-reader-drizzle";
 import type { FacturesCAReader } from "./modules/previsions-ca/application/factures-ca-reader";
+import { TresorerieReaderDrizzle } from "./modules/previsions-ca/infra/tresorerie-reader-drizzle";
+import type { TresorerieReader } from "./modules/previsions-ca/application/tresorerie-reader";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort } from "./shared/ports";
 import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter } from "./shared/ports";
@@ -170,6 +172,7 @@ export interface AppDeps extends ContextDeps {
   readonly regleCategorisationRepo?: IRegleCategorisationRepository;
   readonly previsionCARepo?: IPrevisionCARepository;
   readonly facturesCAReader?: FacturesCAReader;
+  readonly tresorerieReader?: TresorerieReader;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -403,6 +406,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.previsionCARepo ?? new PrevisionCARepositoryDrizzle(getDbHandle().db),
     // `calculer` agrège le CA réalisé depuis les factures PAYÉES (reader cross-domaine, scopé tenant).
     facturesCAReader: deps.facturesCAReader ?? new FacturesCAReaderDrizzle(getDbHandle().db),
+    // `getTresoreriePrevisionnelle` : créances + avoirs + dépenses récurrentes (reader cross-domaine).
+    tresorerieReader: deps.tresorerieReader ?? new TresorerieReaderDrizzle(getDbHandle().db),
   });
   const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA });
 
