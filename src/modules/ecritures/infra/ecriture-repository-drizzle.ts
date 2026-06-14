@@ -4,7 +4,7 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IEcritureRepository } from "../application/ecriture-repository";
-import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
+import type { EcritureComptable, CreateEcritureInput, JournalComptable } from "../domain/ecriture";
 
 type EcritureRow = typeof ecrituresComptables.$inferSelect;
 
@@ -82,6 +82,22 @@ export class EcritureRepositoryDrizzle implements IEcritureRepository {
       const deleted = await tx
         .delete(ecrituresComptables)
         .where(and(eq(ecrituresComptables.artisanId, ctx.artisanId), eq(ecrituresComptables.factureId, factureId)))
+        .returning({ id: ecrituresComptables.id });
+      return deleted.length;
+    });
+  }
+
+  deleteByFactureJournal(ctx: TenantContext, factureId: number, journal: JournalComptable): Promise<number> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const deleted = await tx
+        .delete(ecrituresComptables)
+        .where(
+          and(
+            eq(ecrituresComptables.artisanId, ctx.artisanId),
+            eq(ecrituresComptables.factureId, factureId),
+            eq(ecrituresComptables.journal, journal),
+          ),
+        )
         .returning({ id: ecrituresComptables.id });
       return deleted.length;
     });

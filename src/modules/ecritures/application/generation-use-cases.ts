@@ -2,7 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IEcritureRepository } from "./ecriture-repository";
 import type { IFactureReader } from "./facture-reader";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
-import { COMPTE_CLIENT, COMPTE_VENTES, compteTvaCollectee } from "./comptes";
+import { COMPTE_CLIENT, COMPTE_VENTES, COMPTE_BANQUE, compteTvaCollectee } from "./comptes";
 
 // Génération des écritures comptables de VENTE d'une facture (parité legacy
 // `genererEcrituresFacture`). ⚠️ CŒUR FEC — invariant **Σ débit = Σ crédit** par pièce.
@@ -74,5 +74,38 @@ export async function genererEcrituresVente(
 
   // Idempotence : purge puis réinsertion de la pièce.
   await ecritureRepo.deleteByFacture(ctx, factureId);
+  return ecritureRepo.createMany(ctx, lignes);
+}
+
+// Génération des écritures d'ENCAISSEMENT au règlement (parité legacy
+// `genererEcrituresEncaissement`). Journal **BQ** : **512 Banque débit** / **411 Clients crédit**
+// (TTC réglé), lettrées entre elles. Ne génère que si la facture est **payée** et TTC > 0 (un
+// avoir [TTC ≤ 0] n'a pas d'encaissement). **Idempotence sélective** : purge les écritures BQ de
+// la facture avant insert, sans toucher la pièce de vente (VE).
+export async function genererEcrituresEncaissement(
+  ecritureRepo: IEcritureRepository,
+  factureReader: IFactureReader,
+  ctx: TenantContext,
+  factureId: number,
+): Promise<EcritureComptable[]> {
+  const facture = await factureReader.getFacture(ctx, factureId);
+  if (!facture) return [];
+
+  // Idempotence sélective (BQ uniquement — on ne touche pas la vente VE).
+  await ecritureRepo.deleteByFactureJournal(ctx, factureId, "BQ");
+
+  const ttc = Number(facture.totalTTC) || 0;
+  if (facture.statut !== "payee" || ttc <= 0) return []; // pas réglée / avoir → pas d'encaissement
+
+  const dateEcriture = facture.datePaiement ?? facture.dateFacture;
+  const pieceRef = facture.numero;
+  const libelle = `Règlement ${pieceRef}`;
+  const lettrage = `VL${factureId}`;
+  const base = { dateEcriture, journal: "BQ" as const, pieceRef, libelle, factureId, lettrage };
+  const montant = ttc.toFixed(2);
+  const lignes: CreateEcritureInput[] = [
+    { ...base, numeroCompte: COMPTE_BANQUE.compte, libelleCompte: COMPTE_BANQUE.lib, debit: montant },
+    { ...base, numeroCompte: COMPTE_CLIENT.compte, libelleCompte: COMPTE_CLIENT.lib, credit: montant },
+  ];
   return ecritureRepo.createMany(ctx, lignes);
 }

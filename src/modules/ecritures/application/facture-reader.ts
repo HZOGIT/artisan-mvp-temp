@@ -11,6 +11,8 @@ export interface FactureReadModel {
   readonly numero: string;
   readonly dateFacture: Date;
   readonly typeDocument: string; // "facture" | "avoir"
+  readonly statut: string; // brouillon|validee|envoyee|payee|en_retard|annulee
+  readonly datePaiement: Date | null;
   readonly totalHT: string;
   readonly totalTVA: string;
   readonly totalTTC: string;

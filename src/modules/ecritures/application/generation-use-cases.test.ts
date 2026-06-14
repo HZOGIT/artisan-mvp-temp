@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { FakeEcritureRepository } from "../infra/ecriture-repository-fake";
 import { FakeFactureReader } from "../infra/facture-reader-fake";
-import { genererEcrituresVente } from "./generation-use-cases";
+import { genererEcrituresVente, genererEcrituresEncaissement } from "./generation-use-cases";
 import type { EcritureComptable } from "../domain/ecriture";
 import type { TenantContext } from "../../../shared/tenant";
 import type { FactureReadModel } from "./facture-reader";
@@ -11,7 +11,8 @@ const B: TenantContext = { artisanId: 2, userId: 20 };
 
 const facture = (over: Partial<FactureReadModel> = {}): FactureReadModel => ({
   id: 501, artisanId: 1, numero: "FAC-00001", dateFacture: new Date("2026-06-14T00:00:00Z"),
-  typeDocument: "facture", totalHT: "100.00", totalTVA: "20.00", totalTTC: "120.00", ...over,
+  typeDocument: "facture", statut: "payee", datePaiement: new Date("2026-06-20T00:00:00Z"),
+  totalHT: "100.00", totalTVA: "20.00", totalTTC: "120.00", ...over,
 });
 
 // Invariant FEC : Σ débit = Σ crédit, et aucun montant négatif.
@@ -89,5 +90,49 @@ describe("ecritures — génération écritures de VENTE (FEC)", () => {
     reader.register(facture({ artisanId: 1 }), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
     expect(await genererEcrituresVente(repo, reader, B, 501)).toEqual([]);
     expect((await repo.list(B))).toEqual([]);
+  });
+});
+
+describe("ecritures — génération écritures d'ENCAISSEMENT (FEC)", () => {
+  it("facture payée : 512 débit / 411 crédit (TTC) lettrés ; Σdébit=Σcrédit", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture({ statut: "payee" }));
+    const ecr = await genererEcrituresEncaissement(repo, reader, A, 501);
+    expect(ecr.length).toBe(2);
+    const banque = ecr.find((e) => e.numeroCompte === "512000")!;
+    const client = ecr.find((e) => e.numeroCompte === "411000")!;
+    expect(banque.debit).toBe("120.00");
+    expect(banque.journal).toBe("BQ");
+    expect(client.credit).toBe("120.00");
+    expect(banque.lettrage).toBe("VL501");
+    expect(client.lettrage).toBe("VL501");
+    assertEquilibre(ecr);
+  });
+
+  it("facture NON payée → aucune écriture d'encaissement", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture({ statut: "envoyee" }));
+    expect(await genererEcrituresEncaissement(repo, reader, A, 501)).toEqual([]);
+  });
+
+  it("avoir (TTC ≤ 0) → aucune écriture d'encaissement", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture({ statut: "payee", typeDocument: "avoir", totalTTC: "-120.00" }));
+    expect(await genererEcrituresEncaissement(repo, reader, A, 501)).toEqual([]);
+  });
+
+  it("idempotence sélective : régénère BQ sans toucher la pièce de VENTE (VE)", async () => {
+    const repo = new FakeEcritureRepository();
+    const reader = new FakeFactureReader();
+    reader.register(facture({ statut: "payee" }), [{ tauxTVA: "20.00", montantTVA: "20.00" }]);
+    await genererEcrituresVente(repo, reader, A, 501); // 3 lignes VE
+    await genererEcrituresEncaissement(repo, reader, A, 501); // 2 lignes BQ
+    await genererEcrituresEncaissement(repo, reader, A, 501); // re-génère BQ
+    const all = await repo.listByFacture(A, 501);
+    expect(all.filter((e) => e.journal === "VE").length).toBe(3); // VE intacte
+    expect(all.filter((e) => e.journal === "BQ").length).toBe(2); // BQ régénérée (pas doublée)
   });
 });

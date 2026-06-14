@@ -7,6 +7,7 @@ const stubRepo: IEcritureRepository = {
   listByFacture: async () => [],
   createMany: async () => [],
   deleteByFacture: async () => 0,
+  deleteByFactureJournal: async () => 0,
 };
 
 describe("ecritures.module", () => {
@@ -16,6 +17,6 @@ describe("ecritures.module", () => {
   });
 
   it("le port expose les opérations attendues (lecture + batch + idempotence)", () => {
-    expect(Object.keys(stubRepo).sort()).toEqual(["createMany", "deleteByFacture", "list", "listByFacture"]);
+    expect(Object.keys(stubRepo).sort()).toEqual(["createMany", "deleteByFacture", "deleteByFactureJournal", "list", "listByFacture"]);
   });
 });

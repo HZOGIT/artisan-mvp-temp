@@ -44,4 +44,12 @@ export class FakeEcritureRepository implements IEcritureRepository {
     this.store = this.store.filter((e) => !(e.artisanId === ctx.artisanId && e.factureId === factureId));
     return before - this.store.length;
   }
+
+  async deleteByFactureJournal(ctx: TenantContext, factureId: number, journal: EcritureComptable["journal"]): Promise<number> {
+    const before = this.store.length;
+    this.store = this.store.filter(
+      (e) => !(e.artisanId === ctx.artisanId && e.factureId === factureId && e.journal === journal),
+    );
+    return before - this.store.length;
+  }
 }
