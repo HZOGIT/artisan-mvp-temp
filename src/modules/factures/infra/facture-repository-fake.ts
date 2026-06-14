@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository, PaiementPatch, CreateAvoirInput } from "../application/facture-repository";
+import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -203,6 +203,63 @@ export class FakeFactureRepository implements IFactureRepository {
       });
     });
     return avoir;
+  }
+
+  async existsForDevis(ctx: TenantContext, devisId: number): Promise<boolean> {
+    return this.factureStore.some(
+      (f) => f.artisanId === ctx.artisanId && f.devisId === devisId && f.typeDocument === "facture",
+    );
+  }
+
+  async createFromDevis(ctx: TenantContext, input: CreateFromDevisInput): Promise<Facture | null> {
+    if (!this.ownedClients.has(`${ctx.artisanId}:${input.clientId}`)) return null;
+    const totaux = calculerTotaux(input.lignes);
+    const now = new Date();
+    const facture: Facture = {
+      id: ++this.seq,
+      artisanId: ctx.artisanId,
+      clientId: input.clientId,
+      devisId: input.devisId,
+      numero: input.numero,
+      dateFacture: now,
+      dateEcheance: null,
+      statut: "brouillon",
+      typeDocument: "facture",
+      factureOrigineId: null,
+      objet: input.objet,
+      referenceClient: input.referenceClient,
+      siretDestinataire: null,
+      conditionsPaiement: input.conditionsPaiement,
+      notes: input.notes,
+      totalHT: totaux.totalHT,
+      totalTVA: totaux.totalTVA,
+      totalTTC: totaux.totalTTC,
+      montantPaye: "0.00",
+      datePaiement: null,
+      modePaiement: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.factureStore.push(facture);
+    input.lignes.forEach((l) => {
+      this.lignesStore.push({
+        id: ++this.ligneSeq,
+        factureId: facture.id,
+        ordre: l.ordre,
+        reference: l.reference,
+        designation: l.designation,
+        description: l.description,
+        quantite: l.quantite,
+        unite: l.unite,
+        prixUnitaireHT: l.prixUnitaireHT,
+        tauxTVA: l.tauxTVA,
+        montantHT: l.montantHT,
+        montantTVA: l.montantTVA,
+        montantTTC: l.montantTTC,
+        type: l.type as "produit" | "section" | "note",
+      });
+    });
+    return facture;
   }
 
   async ownsClient(ctx: TenantContext, clientId: number): Promise<boolean> {

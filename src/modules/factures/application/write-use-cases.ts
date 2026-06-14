@@ -1,6 +1,7 @@
 import { ConflictError, NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository, AvoirLigneData } from "./facture-repository";
+import type { IFactureRepository, AvoirLigneData, CopiedLigneData } from "./facture-repository";
+import type { IDevisReader } from "./devis-reader";
 import { calculerMontantsAvoirLigne } from "./montants";
 import type {
   Facture,
@@ -235,6 +236,55 @@ export async function creerAvoir(
   });
   if (!avoir) throw new NotFoundError("Facture d'origine introuvable");
   return avoir;
+}
+
+// Convertit un devis ACCEPTÉ en facture (parité legacy `createFactureFromDevis`, **durci**).
+// ⚠️ Invariants : devis du tenant (anti-IDOR-FK → NotFound) ; **devis `accepte`** sinon Conflict
+// (on ne facture qu'un devis accepté — le legacy ne le vérifiait pas) ; **anti-doublon** : un
+// devis déjà facturé → Conflict (le legacy autorisait des conversions multiples). Lignes copiées
+// (montants du devis), totaux recalculés des lignes côté infra, statut facture `brouillon`.
+export async function convertirDevisEnFacture(
+  factureRepo: IFactureRepository,
+  devisReader: IDevisReader,
+  ctx: TenantContext,
+  devisId: number,
+): Promise<Facture> {
+  const devis = await devisReader.getDevis(ctx, devisId);
+  if (!devis) throw new NotFoundError("Devis introuvable");
+  if (devis.statut !== "accepte") {
+    throw new ConflictError("Seul un devis accepté peut être converti en facture");
+  }
+  if (await factureRepo.existsForDevis(ctx, devisId)) {
+    throw new ConflictError("Ce devis a déjà été converti en facture");
+  }
+  const lignesDevis = await devisReader.getLignes(ctx, devisId);
+  const lignes: CopiedLigneData[] = lignesDevis.map((l) => ({
+    ordre: l.ordre,
+    reference: l.reference,
+    designation: l.designation,
+    description: l.description,
+    quantite: l.quantite,
+    unite: l.unite,
+    prixUnitaireHT: l.prixUnitaireHT,
+    tauxTVA: l.tauxTVA,
+    montantHT: l.montantHT,
+    montantTVA: l.montantTVA,
+    montantTTC: l.montantTTC,
+    type: l.type,
+  }));
+  const numero = await factureRepo.nextNumero(ctx);
+  const facture = await factureRepo.createFromDevis(ctx, {
+    devisId: devis.id,
+    clientId: devis.clientId,
+    numero,
+    objet: devis.objet,
+    referenceClient: devis.referenceClient,
+    conditionsPaiement: devis.conditionsPaiement,
+    notes: devis.notes,
+    lignes,
+  });
+  if (!facture) throw new NotFoundError("Client du devis introuvable");
+  return facture;
 }
 
 export async function changerStatutFacture(

@@ -3,7 +3,7 @@ import { factures, facturesLignes, clients, devis, parametresArtisan } from "../
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IFactureRepository, PaiementPatch, CreateAvoirInput } from "../application/facture-repository";
+import type { IFactureRepository, PaiementPatch, CreateAvoirInput, CreateFromDevisInput } from "../application/facture-repository";
 import type {
   Facture,
   FactureLigne,
@@ -298,6 +298,66 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
         });
       }
       return toFacture(avoir);
+    });
+  }
+
+  existsForDevis(ctx: TenantContext, devisId: number): Promise<boolean> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(factures)
+        .where(and(eq(factures.artisanId, ctx.artisanId), eq(factures.devisId, devisId), eq(factures.typeDocument, "facture")));
+      return (row?.n ?? 0) > 0;
+    });
+  }
+
+  createFromDevis(ctx: TenantContext, input: CreateFromDevisInput): Promise<Facture | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Le client référencé (hérité du devis) doit appartenir au tenant (anti-IDOR-FK).
+      const [cli] = await tx
+        .select({ id: clients.id })
+        .from(clients)
+        .where(and(eq(clients.id, input.clientId), eq(clients.artisanId, ctx.artisanId)))
+        .limit(1);
+      if (!cli) return null;
+      const totaux = calculerTotaux(input.lignes);
+      const [facture] = await tx
+        .insert(factures)
+        .values({
+          artisanId: ctx.artisanId,
+          clientId: input.clientId,
+          devisId: input.devisId,
+          numero: input.numero,
+          typeDocument: "facture",
+          statut: "brouillon",
+          objet: input.objet,
+          referenceClient: input.referenceClient,
+          conditionsPaiement: input.conditionsPaiement,
+          notes: input.notes,
+          totalHT: totaux.totalHT,
+          totalTVA: totaux.totalTVA,
+          totalTTC: totaux.totalTTC,
+          montantPaye: "0.00",
+        })
+        .returning();
+      for (const l of input.lignes) {
+        await tx.insert(facturesLignes).values({
+          factureId: facture.id,
+          ordre: l.ordre,
+          reference: l.reference,
+          designation: l.designation,
+          description: l.description,
+          quantite: l.quantite,
+          unite: l.unite,
+          prixUnitaireHT: l.prixUnitaireHT,
+          tauxTVA: l.tauxTVA,
+          montantHT: l.montantHT,
+          montantTVA: l.montantTVA,
+          montantTTC: l.montantTTC,
+          type: l.type as "produit" | "section" | "note",
+        });
+      }
+      return toFacture(facture);
     });
   }
 

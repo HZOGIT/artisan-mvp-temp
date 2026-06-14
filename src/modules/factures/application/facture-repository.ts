@@ -44,6 +44,12 @@ export interface IFactureRepository {
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
   // true si le devis référencé appartient au tenant (anti-IDOR-FK sur le lien devis→facture).
   ownsDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
+  // true s'il existe déjà une facture (typeDocument='facture') liée à ce devis (anti-doublon
+  // de conversion), scopé tenant.
+  existsForDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
+  // Crée une facture à partir d'un devis (lignes copiées, totaux recalculés des lignes,
+  // statut brouillon, devisId lié) — null si le devis n'appartient pas au tenant.
+  createFromDevis(ctx: TenantContext, input: CreateFromDevisInput): Promise<Facture | null>;
 
   // Lignes d'une facture — [] si la facture n'appartient pas au tenant.
   listLignes(ctx: TenantContext, factureId: number): Promise<FactureLigne[]>;
@@ -74,6 +80,35 @@ export interface AvoirLigneData {
   readonly montantHT: string; // négatif
   readonly montantTVA: string; // négatif
   readonly montantTTC: string; // négatif
+}
+
+// Ligne copiée d'un devis vers une facture (montants déjà calculés côté devis).
+export interface CopiedLigneData {
+  readonly ordre: number;
+  readonly reference: string | null;
+  readonly designation: string;
+  readonly description: string | null;
+  readonly quantite: string;
+  readonly unite: string;
+  readonly prixUnitaireHT: string;
+  readonly tauxTVA: string;
+  readonly montantHT: string;
+  readonly montantTVA: string;
+  readonly montantTTC: string;
+  readonly type: string;
+}
+
+// Entrée de conversion devis→facture (numéro déjà généré ; totaux recalculés des lignes par
+// l'infra ; statut "brouillon", typeDocument "facture" posés par l'infra).
+export interface CreateFromDevisInput {
+  readonly devisId: number;
+  readonly clientId: number;
+  readonly numero: string;
+  readonly objet: string | null;
+  readonly referenceClient: string | null;
+  readonly conditionsPaiement: string | null;
+  readonly notes: string | null;
+  readonly lignes: readonly CopiedLigneData[];
 }
 
 // Entrée de création d'un avoir (numéro/totaux déjà calculés par le use-case ; statut "validee",
