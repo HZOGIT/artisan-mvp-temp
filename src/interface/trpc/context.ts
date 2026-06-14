@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader } from "../../shared/tenant";
+import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader, type PermissionsReader } from "../../shared/tenant";
 
 // Contexte tRPC du nouveau stack. Construit à partir de la requête Fastify :
 // - extrait le cookie `token`, le vérifie (claims) ;
@@ -12,12 +12,16 @@ export interface AppContext {
   readonly claims: TokenClaims | null;
   readonly tenant: TenantContext | null;
   readonly role: string | null;
+  // Permissions de l'utilisateur courant (codes `domaine.action`), résolues depuis `permissions_utilisateur`.
+  // Sert au seam `permissionProcedure`. Vide si non authentifié ou aucun reader injecté.
+  readonly permissions: readonly string[];
 }
 
 export interface ContextDeps {
   readonly jwtSecret?: string;
   readonly resolver?: TenantResolver;
   readonly roleReader?: UserRoleReader;
+  readonly permissionsReader?: PermissionsReader;
 }
 
 export function makeCreateContext(deps: ContextDeps = {}) {
@@ -29,6 +33,8 @@ export function makeCreateContext(deps: ContextDeps = {}) {
     // Rôle résolu via le roleReader (INDÉPENDANT du tenant) ; repli sur `tenant.role` (déjà résolu)
     // si aucun roleReader n'est injecté, afin de ne pas régresser le câblage/les tests existants.
     const role = claims ? (deps.roleReader ? await deps.roleReader.getRole(claims.userId) : tenant?.role ?? null) : null;
-    return { claims, tenant, role };
+    // Permissions résolues comme le rôle (INDÉPENDANT du tenant) ; vide si pas de reader/auth.
+    const permissions = claims && deps.permissionsReader ? await deps.permissionsReader.getPermissions(claims.userId) : [];
+    return { claims, tenant, role, permissions };
   };
 }

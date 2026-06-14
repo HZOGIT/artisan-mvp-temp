@@ -6,6 +6,7 @@ import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
 import { getDbHandle } from "./shared/db";
 import { DrizzleTenantResolver } from "./shared/tenant/drizzle-tenant-resolver";
 import { DrizzleUserRoleReader, type UserRoleReader } from "./shared/tenant/role-reader";
+import { DrizzlePermissionsReader } from "./shared/tenant/permissions-reader";
 import { VehiculeRepositoryDrizzle } from "./modules/vehicules/infra/vehicule-repository-drizzle";
 import type { IVehiculeRepository } from "./modules/vehicules/application/vehicule-repository";
 import { AvisRepositoryDrizzle } from "./modules/avis/infra/avis-repository-drizzle";
@@ -513,6 +514,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
         // Rôle résolu indépendamment du tenant (admin staff sans artisan) → garde `adminProcedure`.
         roleReader: deps.roleReader ?? new DrizzleUserRoleReader(getDbHandle().db),
+        // Permissions résolues idem (table `permissions_utilisateur`) → garde `permissionProcedure`.
+        permissionsReader: deps.permissionsReader ?? new DrizzlePermissionsReader(getDbHandle().db),
       }),
     },
   });

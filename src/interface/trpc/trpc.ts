@@ -59,3 +59,28 @@ export const protectedProcedure = t.procedure.use(mapDomainErrors).use(requireTe
 
 // Procédure ADMIN (staff Operioz) : mapping erreurs domaine + exigence du rôle admin (sans tenant).
 export const adminProcedure = t.procedure.use(mapDomainErrors).use(requireAdmin);
+
+// Fabrique de middleware d'autorisation PAR PERMISSION (parité legacy `requirePermission`) : le rôle
+// `admin` court-circuite tout ; sinon l'utilisateur doit posséder TOUTES les permissions requises
+// (codes `domaine.action`, résolus dans `ctx.permissions`), sinon FORBIDDEN. À composer APRÈS
+// `requireTenant` (les domaines consommateurs scopent par tenant).
+function requirePermission(...requiredPerms: string[]) {
+  return t.middleware(({ ctx, next }) => {
+    if (!ctx.claims) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentification requise" });
+    }
+    if (ctx.role === "admin") return next(); // admin bypasse toutes les permissions
+    const has = requiredPerms.every((p) => ctx.permissions.includes(p));
+    if (!has) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Vous n'avez pas la permission requise" });
+    }
+    return next();
+  });
+}
+
+// Procédure protégée GATÉE PAR PERMISSION(S) : erreurs domaine + tenant requis + permission(s)
+// requise(s). Sert aux surfaces sensibles (gestion utilisateurs `utilisateurs.gerer`, comptabilité
+// `comptabilite.voir`, exports `exports.voir`…).
+export function permissionProcedure(...perms: string[]) {
+  return t.procedure.use(mapDomainErrors).use(requireTenant).use(requirePermission(...perms));
+}
