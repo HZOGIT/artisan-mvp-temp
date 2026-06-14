@@ -97,6 +97,9 @@ import type { IBudgetCategorieRepository } from "./modules/budgets-categories/ap
 import { createReglesCategorisationModule } from "./modules/regles-categorisation/regles-categorisation.module";
 import { RegleCategorisationRepositoryDrizzle } from "./modules/regles-categorisation/infra/regle-categorisation-repository-drizzle";
 import type { IRegleCategorisationRepository } from "./modules/regles-categorisation/application/regle-categorisation-repository";
+import { createPrevisionsCAModule } from "./modules/previsions-ca/previsions-ca.module";
+import { PrevisionCARepositoryDrizzle } from "./modules/previsions-ca/infra/prevision-ca-repository-drizzle";
+import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort } from "./shared/ports";
 import { LegacyEmailAdapter, SlidingWindowRateLimiter } from "./shared/ports";
 
@@ -139,6 +142,7 @@ export interface AppDeps extends ContextDeps {
   readonly demandeContactRepo?: IDemandeContactRepository;
   readonly budgetCategorieRepo?: IBudgetCategorieRepository;
   readonly regleCategorisationRepo?: IRegleCategorisationRepository;
+  readonly previsionCARepo?: IPrevisionCARepository;
 }
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
@@ -249,7 +253,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const reglesCategorisation = createReglesCategorisationModule({
     repository: deps.regleCategorisationRepo ?? new RegleCategorisationRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation });
+  const previsionsCA = createPrevisionsCAModule({
+    repository: deps.previsionCARepo ?? new PrevisionCARepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

@@ -28,4 +28,10 @@ describe("previsions-ca.module", () => {
     const methodes: PrevisionMethode[] = ["moyenne_mobile", "regression_lineaire", "saisonnalite", "manuel"];
     expect(methodes).toHaveLength(4);
   });
+
+  it("expose un routeur tRPC assemblé (CRUD + byAnnee)", () => {
+    const module = createPrevisionsCAModule({ repository: stubRepo });
+    const procedures = Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort();
+    expect(procedures).toEqual(["byAnnee", "create", "delete", "getById", "list", "update"]);
+  });
 });

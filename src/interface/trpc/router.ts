@@ -29,6 +29,7 @@ import type { ContratsMaintenanceModule } from "../../modules/contrats-maintenan
 import type { DemandesContactModule } from "../../modules/demandes-contact/demandes-contact.module";
 import type { BudgetsCategoriesModule } from "../../modules/budgets-categories/budgets-categories.module";
 import type { ReglesCategorisationModule } from "../../modules/regles-categorisation/regles-categorisation.module";
+import type { PrevisionsCAModule } from "../../modules/previsions-ca/previsions-ca.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -61,6 +62,7 @@ export interface AppRouterDeps {
   readonly demandesContact: DemandesContactModule;
   readonly budgetsCategories: BudgetsCategoriesModule;
   readonly reglesCategorisation: ReglesCategorisationModule;
+  readonly previsionsCA: PrevisionsCAModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -102,6 +104,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     demandesContact: deps.demandesContact.router,
     budgetsCategories: deps.budgetsCategories.router,
     reglesCategorisation: deps.reglesCategorisation.router,
+    previsionsCA: deps.previsionsCA.router,
   });
 }
 
