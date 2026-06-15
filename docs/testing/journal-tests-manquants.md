@@ -66,7 +66,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - [ ] `src/modules/devis/application/devis-to-facture-converter.ts`
 - [x] `src/modules/ecritures/application/comptes.ts` → `comptes.test.ts` (6 cas) ✅ it.2
 - [x] `src/modules/notes-de-frais/application/numero.ts` → `numero.test.ts` (5 cas) ✅ it.1
-- [ ] `src/modules/rdv-en-ligne/application/confirm-use-cases.ts`
+- [x] `src/modules/rdv-en-ligne/application/confirm-use-cases.ts` → `confirm-use-cases.test.ts` (4 cas) ✅ it.5
 - [x] `src/modules/rdv-en-ligne/application/propose-use-cases.ts` → `propose-use-cases.test.ts` (4 cas) ✅ it.4
 - [x] `src/modules/stocks/application/alertes-use-cases.ts` → `alertes-use-cases.test.ts` (4 cas) ✅ it.3
 - [ ] `src/modules/subscription/application/use-cases.ts`
@@ -75,7 +75,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - _Écartés (ports/interfaces, pas de logique à tester)_ : `assistant/agentic-port.ts`,
   `factures/compta-port.ts`, `factures/contact-readers.ts`.
 
-**Prochaine cible : `src/modules/rdv-en-ligne/application/confirm-use-cases.ts`** (confirmation RDV → intervention).
+**Prochaine cible : `src/modules/depenses/application/budgets-realises-use-case.ts`** (calcul budgets réalisés).
 
 ---
 
@@ -85,3 +85,4 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - `2026-06-15 16:43:09Z` **[done]** ecritures/comptes — compteTvaCollectee + constantes PCG couverts (6 cas), commit 2d9c68a sur staging.
 - `2026-06-15 16:53:30Z` **[done]** stocks/alertes — genererAlertesStock couvert (4 cas : vide, 1 notif/item, scope tenant, pas de dedup).
 - `2026-06-15 17:03:27Z` **[done]** rdv-en-ligne/propose — proposerAutreCreneau couvert (4 cas : anti-IDOR, bornes date, validation avant mutation, copie+refus).
+- `2026-06-15 17:13:15Z` **[done]** rdv-en-ligne/confirm — confirmerRdvAvecIntervention couvert (4 cas : anti-IDOR, garde statut, création intervention planifiée + lien, durée défaut 60).
