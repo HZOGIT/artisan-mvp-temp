@@ -66,7 +66,7 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     const env = { NEW_STACK_DOMAINS: NON_DEFAULT };
     expect(decideTarget("/api/auth/login", env)).toBe("legacy");
     expect(decideTarget("/api/webhooks/stripe", env)).toBe("legacy");
-    expect(decideTarget("/api/upload-logo", env)).toBe("legacy");
+    expect(decideTarget("/api/fonts/roboto", env)).toBe("legacy"); // route HORS-tRPC non migrée
     expect(decideTarget("/", env)).toBe("legacy");
   });
 
@@ -79,6 +79,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // webhook Stripe signé → new-stack
     expect(decideTarget("/api/stripe/webhook", {})).toBe("new-stack");
     expect(matchesMigratedRoute("/api/stripe/webhook")).toBe(true);
+    // upload logo (auth cookie) → new-stack
+    expect(decideTarget("/api/upload-logo", {})).toBe("new-stack");
+    expect(matchesMigratedRoute("/api/upload-logo")).toBe(true);
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe

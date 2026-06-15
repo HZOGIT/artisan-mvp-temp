@@ -123,6 +123,8 @@ import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-rout
 import { SubscriptionWebhookWriterDrizzle } from "./modules/subscription/infra/subscription-webhook-writer-drizzle";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
+import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
+import { ArtisanLogoWriterDrizzle } from "./modules/artisan/infra/artisan-logo-writer-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -665,6 +667,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, deps.emailPort ?? new LegacyEmailAdapter()),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+  });
+
+  // §4 HORS-tRPC : upload/suppression du logo artisan (`/api/upload-logo`, auth cookie JWT). Stocké
+  // en data-URL base64 dans `artisans.logo` (parité legacy ; pas de StoragePort).
+  registerUploadLogoRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    writer: new ArtisanLogoWriterDrizzle(getDbHandle().db),
   });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).

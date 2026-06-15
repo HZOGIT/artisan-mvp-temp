@@ -12,6 +12,8 @@ export const MIGRATED_ROUTES: readonly MigratedRoute[] = [
   { name: "ical", pattern: /^\/api\/calendar\/.+\.ics$/ },
   // Webhook Stripe signé (`/api/stripe/webhook`) — vérif signature fail-closed + sync subscriptions/factures.
   { name: "stripe-webhook", pattern: /^\/api\/stripe\/webhook$/ },
+  // Upload/suppression du logo artisan (`/api/upload-logo`, auth cookie JWT).
+  { name: "upload-logo", pattern: /^\/api\/upload-logo$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
