@@ -98,13 +98,14 @@ isSearchable, bibliotheque) restent **L1 seul**. → Rétro-complétion sans obj
 ### Logique transverse (domain / shared) sans test — NOUVEAU FRONT (scan it.19)
 - [x] `shared/date/add-months-clamped.ts` → `add-months-clamped.test.ts` (8 cas) ✅ it.19
 - [x] `shared/ia/sanitize-ia-error.ts` → `sanitize-ia-error.test.ts` (6 cas) ✅ it.20
-- [ ] `shared/zip/zip-entries.ts` · `shared/pdf/facturx.ts` · `shared/pdf/pdf-generator.ts`
+- [x] `shared/pdf/facturx.ts` → `facturx.test.ts` (6 cas) ✅ it.21
+- [ ] `shared/zip/zip-entries.ts` · `shared/pdf/pdf-generator.ts`
 - [ ] `parametres/domain/parametres.ts` · `config-relances/domain/config-relances.ts` · `assistant/domain/assistant.ts` · `devis-ia/domain/analyse-photos.ts`
 - _Écartés_ : `shared/testing/trpc-inject.ts` (outil de test), `shared/db/client.ts` (adapter infra).
 
 🏁 **Les 4 colonnes critiques prioritaires sont COMPLÈTES** (portail, signature, abonnement, auth).
 
-**Prochaine cible : `shared/pdf/facturx.ts`** (L1 ; génération XML Factur-X / conformité e-facture — logique métier sensible). Si trop couplé au binaire PDF, replier sur `parametres/domain/parametres.ts` ou `config-relances/domain/config-relances.ts`.
+**Prochaine cible : `shared/zip/zip-entries.ts`** (L1 ; construction d'archive ZIP — vérifier logique pure vs binaire). Sinon `parametres/domain/parametres.ts` puis `config-relances/domain/config-relances.ts`.
 
 ---
 
@@ -131,3 +132,4 @@ isSearchable, bibliotheque) restent **L1 seul**. → Rétro-complétion sans obj
 - `2026-06-15 21:35:40Z` **[done]** clients import-use-cases L1 — importerClients couvert (4 cas : tout valide, best-effort skip lignes invalides, tableau vide, scope tenant). Rétro-complétion vérifiée sans objet (rdv/stocks/depenses/commandes ont déjà L2+L3).
 - `2026-06-15 22:05:06Z` **[done]** shared/date add-months-clamped L1 — addMonthsClamped couvert (8 cas : ajout simple, clamp fin de mois bissextile/non, rollover année, n négatif, n=0, pureté). Backlog application L1 épuisé → nouveau front domain/shared.
 - `2026-06-15 22:34:26Z` **[done]** shared/ia sanitize-ia-error L1 — sanitizeIaError couvert (6 cas : extraction .message, chaîne brute, fallback null/undefined, masquage image base64 + blob long […], troncature 200). Sécurité : pas de fuite de payloads dans les erreurs IA.
+- `2026-06-15 23:04:42Z` **[done]** shared/pdf facturx L1 — generateFacturXML couvert (6 cas : profil minimum/380/EUR/FR, dates CII 102, montants 2 déc + taux défaut, SIRET/TVA conditionnels, échappement XML anti-injection, échéance optionnelle).
