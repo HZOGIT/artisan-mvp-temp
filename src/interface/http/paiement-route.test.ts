@@ -11,6 +11,7 @@ const TOKEN = "payroute-9991151-xxxxxxxxxxxxxxxxxxxxxxxxxxx";
 describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token portail)", () => {
   const admin = new Pool({ connectionString: URL });
   let app: ReturnType<typeof buildApp>;
+  const stripe = new FakeStripePort();
   let factureId = 0;
 
   const cleanup = async () => {
@@ -27,7 +28,7 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
     const clientId = (await admin.query('insert into clients ("artisanId",nom,email) values ($1,$2,$3) returning id', [artisanId, "Durand", "c@test.com"])).rows[0].id;
     factureId = (await admin.query('insert into factures ("artisanId","clientId",numero,statut,"totalTTC") values ($1,$2,$3,$4,$5) returning id', [artisanId, clientId, "FAC-R", "envoyee", "240.00"])).rows[0].id;
     await admin.query('insert into client_portal_access ("clientId","artisanId",token,email,"expiresAt","isActive") values ($1,$2,$3,$4, now() + interval \'7 days\', true)', [clientId, artisanId, TOKEN, "c@test.com"]);
-    app = buildApp({ stripePort: new FakeStripePort() });
+    app = buildApp({ stripePort: stripe });
   });
   afterAll(async () => {
     await app?.close();
@@ -68,5 +69,28 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
     const { rows } = await admin.query("select statut, \"tokenPaiement\" from paiements_stripe where \"factureId\"=$1 order by id desc limit 1", [factureId]);
     expect(rows[0].statut).toBe("en_attente");
     expect(rows[0].tokenPaiement).toHaveLength(32);
+  });
+
+  it("origin des redirections Stripe : x-forwarded-host (hôte PUBLIC) prime sur host (hôte interne proxy)", async () => {
+    // Régression : derrière le dispatcher Pages, `host` = hôte INTERNE du new-stack ; bâtir la
+    // redirection dessus renvoie l'utilisateur vers le BACKEND (→ 404 sur /portail/*). Le dispatcher
+    // pose `x-forwarded-host` = hôte public d'origine → c'est lui qui DOIT déterminer l'origin.
+    const before = stripe.invoiceCheckouts.length;
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/paiement/create-checkout-session",
+      headers: {
+        "content-type": "application/json",
+        host: "staging-newstack.operioz.com", // hôte interne (posé par fetch côté dispatcher)
+        "x-forwarded-host": "staging.operioz.com", // hôte public (posé par le dispatcher)
+        "x-forwarded-proto": "https",
+      },
+      payload: JSON.stringify({ factureId, token: TOKEN }),
+    });
+    expect(res.statusCode).toBe(200);
+    const captured = stripe.invoiceCheckouts[stripe.invoiceCheckouts.length - 1];
+    expect(stripe.invoiceCheckouts.length).toBe(before + 1);
+    expect(captured.origin).toBe("https://staging.operioz.com");
+    expect(captured.origin).not.toContain("newstack");
   });
 });
