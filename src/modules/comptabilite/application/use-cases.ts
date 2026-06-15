@@ -3,7 +3,9 @@ import { assembleDeclarationTVA, computeBalance, computeGrandLivre, computeRappo
 import type { CompteGrandLivre, DeclarationTVADetail, Ecriture, LigneBalance, RapportTVA } from "../domain/comptabilite";
 import { buildFec, fecPreview, fecFileName } from "../domain/fec";
 import type { FecPreview, FecConformite } from "../domain/fec";
+import { buildFacturesCsv, csvFileName } from "../domain/csv-export";
 import type { IComptabiliteReader, Periode } from "./comptabilite-reader";
+import type { FacturesCsvReader } from "./factures-csv-reader";
 
 type Clock = () => Date;
 
@@ -65,4 +67,17 @@ export async function getFecExport(reader: IComptabiliteReader, ctx: TenantConte
   const [fecData, config, siret] = await Promise.all([reader.fecInput(ctx, p), reader.fecConfig(ctx), reader.siret(ctx)]);
   const result = buildFec(fecData, config);
   return { content: result.content, conformite: result.conformite, fileName: fecFileName(siret, p.dateFin) };
+}
+
+export interface CsvExport {
+  readonly content: string;
+  readonly fileName: string;
+}
+
+// Export CSV des factures de la période (parité legacy `/api/comptabilite/export-csv`). Lecture seule ;
+// même période par défaut que le FEC (année fiscale). Anti-injection CSV porté par `buildFacturesCsv`.
+export async function getFacturesCsvExport(reader: FacturesCsvReader, ctx: TenantContext, input?: { dateDebut?: Date; dateFin?: Date }, now: Clock = () => new Date()): Promise<CsvExport> {
+  const p = resolvePeriodeFec(input, now());
+  const rows = await reader.listFacturesPeriode(ctx, p);
+  return { content: buildFacturesCsv(rows), fileName: csvFileName(p.dateDebut, p.dateFin) };
 }

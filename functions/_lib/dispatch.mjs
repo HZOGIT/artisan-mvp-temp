@@ -39,6 +39,8 @@ export const MIGRATED_ROUTES = [
   { name: "upload-logo", pattern: /^\/api\/upload-logo$/ },
   // Export FEC opposable (`/api/comptabilite/fec`, auth cookie JWT, Σdébit=Σcrédit).
   { name: "comptabilite-fec", pattern: /^\/api\/comptabilite\/fec$/ },
+  // Export CSV des factures (`/api/comptabilite/export-csv`, auth cookie JWT, anti-injection CSV).
+  { name: "comptabilite-csv", pattern: /^\/api\/comptabilite\/export-csv$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

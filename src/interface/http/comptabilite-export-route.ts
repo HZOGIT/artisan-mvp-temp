@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import type { IComptabiliteReader } from "../../modules/comptabilite/application/comptabilite-reader";
-import { getFecExport } from "../../modules/comptabilite/application/use-cases";
+import type { FacturesCsvReader } from "../../modules/comptabilite/application/factures-csv-reader";
+import { getFecExport, getFacturesCsvExport } from "../../modules/comptabilite/application/use-cases";
 import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface ComptaExportDeps extends CookieAuthDeps {
   readonly reader: IComptabiliteReader;
+  readonly csvReader: FacturesCsvReader;
 }
 
 // Parse une date de query (YYYY-MM-DD ou ISO) ; undefined si absente/invalide.
@@ -40,5 +42,25 @@ export function registerComptabiliteExportRoute(app: FastifyInstance, deps: Comp
       .header("Content-Disposition", `attachment; filename="${exp.fileName}"`)
       // BOM UTF-8 : aide les outils comptables (DGFiP Test Compta Demat) à détecter l'encodage.
       .send("﻿" + exp.content);
+  });
+
+  // Export CSV des factures de la période (Date;Numéro;Client;HT;TVA;TTC;Statut). Anti-injection CSV.
+  app.get("/api/comptabilite/export-csv", async (req, reply) => {
+    const auth = await authArtisanFromCookie(req, deps);
+    if (auth.status === "unauthenticated") return reply.code(401).send({ error: "Non authentifié" });
+    if (auth.status === "no-artisan") return reply.code(404).send({ error: "Artisan non trouvé" });
+
+    const q = (req.query ?? {}) as Record<string, unknown>;
+    let exp;
+    try {
+      exp = await getFacturesCsvExport(deps.csvReader, { artisanId: auth.artisanId, userId: auth.userId }, { dateDebut: parseDate(q.dateDebut), dateFin: parseDate(q.dateFin) });
+    } catch {
+      return reply.code(500).send({ error: "Erreur lors de l'export CSV" });
+    }
+
+    return reply
+      .header("Content-Type", "text/csv; charset=utf-8")
+      .header("Content-Disposition", `attachment; filename="${exp.fileName}"`)
+      .send(exp.content); // le BOM est déjà inclus par buildFacturesCsv
   });
 }

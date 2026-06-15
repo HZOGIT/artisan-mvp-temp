@@ -21,6 +21,8 @@ describe.skipIf(!URL)("GET /api/comptabilite/fec (export FEC, auth cookie)", () 
   let app: ReturnType<typeof buildApp>;
 
   const cleanup = async () => {
+    await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId" = $1)', [UID]);
+    await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId" = $1)', [UID]);
     await admin.query('delete from artisans where "userId" = $1', [UID]);
     await admin.query("delete from users where id = $1", [UID]);
   };
@@ -28,7 +30,10 @@ describe.skipIf(!URL)("GET /api/comptabilite/fec (export FEC, auth cookie)", () 
   beforeAll(async () => {
     await cleanup();
     await admin.query("insert into users (id, email) values ($1, $2)", [UID, `u${UID}@test.fr`]);
-    await admin.query('insert into artisans ("userId", siret) values ($1, $2)', [UID, "11122233300044"]);
+    const aid = (await admin.query('insert into artisans ("userId", siret) values ($1, $2) returning id', [UID, "11122233300044"])).rows[0].id;
+    // une facture dans la période pour l'export CSV (avec un nom client à risque d'injection CSV)
+    const clientId = (await admin.query('insert into clients ("artisanId", nom) values ($1, $2) returning id', [aid, "Durand;Test"])).rows[0].id;
+    await admin.query('insert into factures ("artisanId","clientId",numero,statut,"dateFacture","totalHT","totalTVA","totalTTC") values ($1,$2,$3,$4,$5,$6,$7,$8)', [aid, clientId, "FAC-CSV-1", "payee", "2026-03-15", "100.00", "20.00", "120.00"]);
     app = buildApp({ jwtSecret: SECRET });
   });
   afterAll(async () => {
@@ -52,5 +57,22 @@ describe.skipIf(!URL)("GET /api/comptabilite/fec (export FEC, auth cookie)", () 
     expect(res.headers["x-fec-equilibre"]).toBe("1");
     expect(res.headers["x-fec-debit"]).toBe(res.headers["x-fec-credit"]);
     expect(res.body).toContain("JournalCode\tJournalLib"); // entête FEC 18 colonnes
+  });
+
+  it("export-csv sans cookie → 401", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/comptabilite/export-csv" });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("export-csv avec cookie → 200 text/csv + facture + nom client neutralisé (anti-injection)", async () => {
+    const token = await signToken(UID);
+    const res = await app.inject({ method: "GET", url: "/api/comptabilite/export-csv?dateDebut=2026-01-01&dateFin=2026-06-30", headers: { cookie: `token=${token}` } });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/csv");
+    expect(res.headers["content-disposition"]).toContain("factures_20260101_20260630.csv");
+    expect(res.body).toContain("Date;Numéro;Client;HT;TVA;TTC;Statut");
+    expect(res.body).toContain("FAC-CSV-1");
+    // le nom client contient `;` → échappé entre guillemets (anti-rupture de structure)
+    expect(res.body).toContain('"Durand;Test"');
   });
 });
