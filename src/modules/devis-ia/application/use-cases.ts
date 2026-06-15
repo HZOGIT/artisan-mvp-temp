@@ -1,7 +1,10 @@
-import { NotFoundError } from "../../../shared/errors";
+import { NotFoundError, TooManyRequestsError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
+import type { VisionPort } from "../../../shared/ports/vision";
+import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import type { IDevisIARepository } from "./devis-ia-repository";
 import type { AddPhotoInput, Analyse, AnalyseDetail, CreateAnalyseInput, Photo, Suggestion, UpdateSuggestionInput } from "../domain/devis-ia";
+import { buildImageBlocks, buildSystemPrompt, parseAnalyseResponse, sanitizeVisionError, matchBibliotheque } from "../domain/analyse-photos";
 
 export function listAnalyses(repo: IDevisIARepository, ctx: TenantContext): Promise<Analyse[]> {
   return repo.listAnalyses(ctx);
@@ -44,4 +47,74 @@ export async function genererDevis(repo: IDevisIARepository, ctx: TenantContext,
   if (!(await repo.getAnalyseOwned(ctx, params.analyseId))) throw new NotFoundError("Analyse non trouvée");
   if (!(await repo.ownsClient(ctx, params.clientId))) throw new NotFoundError("Client introuvable");
   return repo.createDevisFromAnalyse(ctx, params);
+}
+
+export interface AnalyserPhotosDeps {
+  readonly repo: IDevisIARepository;
+  readonly vision: VisionPort;
+  readonly rateLimiter: { check(key: string): Promise<boolean> };
+  readonly artisanReader: ArtisanReader;
+  readonly bibliotheque: { list(filtre?: unknown): Promise<Array<{ id: number; nom: string }>> };
+}
+
+// Analyse les photos d'une analyse via l'IA Vision (parité legacy `analyserPhotos`). Ownership (404),
+// rate-limit IA (429). Statut `en_cours` → appel Vision multi-image (prompt métier) → parse JSON →
+// enregistre résultats + suggestions (match bibliothèque) → statut `termine`. Sur échec Vision/parse :
+// statut `erreur` + Error 500 (message sanitisé, sans payload base64). 400 si aucune photo.
+export async function analyserPhotos(deps: AnalyserPhotosDeps, ctx: TenantContext, analyseId: number): Promise<{ success: true; nombreTravaux: number }> {
+  if (!(await deps.repo.getAnalyseOwned(ctx, analyseId))) throw new NotFoundError("Analyse non trouvée");
+  if (!(await deps.rateLimiter.check(`ia:${ctx.artisanId}`))) throw new TooManyRequestsError("Limite atteinte");
+
+  await deps.repo.setStatut(ctx, analyseId, "en_cours");
+
+  const urls = await deps.repo.listPhotoUrls(ctx, analyseId);
+  if (urls.length === 0) {
+    await deps.repo.setStatut(ctx, analyseId, "erreur");
+    throw new ValidationError("Aucune photo à analyser");
+  }
+
+  const artisan = await deps.artisanReader.getArtisan(ctx);
+  const metier = (artisan?.metier as string | null | undefined) || (artisan?.specialite as string | null | undefined) || null;
+  const system = buildSystemPrompt(metier);
+
+  let responseText: string;
+  try {
+    responseText = await deps.vision.analyzeImages({ images: buildImageBlocks(urls), prompt: "Analyse ces photos de chantier et identifie les travaux nécessaires.", system, maxOutputTokens: 4000 });
+  } catch (e) {
+    await deps.repo.setStatut(ctx, analyseId, "erreur");
+    throw new Error(`Appel IA echoue : ${sanitizeVisionError(e)}`);
+  }
+
+  const travaux = parseAnalyseResponse(responseText);
+  if (!travaux) {
+    await deps.repo.setStatut(ctx, analyseId, "erreur");
+    throw new Error("Reponse IA non parsable ou format inattendu (champ 'travaux' absent)");
+  }
+
+  const catalogue = await deps.bibliotheque.list();
+  for (const travail of travaux) {
+    const resultatId = await deps.repo.saveResultat(ctx, {
+      analyseId,
+      typeTravauxDetecte: String(travail.type ?? ""),
+      descriptionTravaux: String(travail.description ?? ""),
+      urgence: String(travail.urgence ?? "moyenne"),
+      confiance: String(travail.confiance ?? "0"),
+      rawResponse: travail,
+    });
+    for (const article of travail.articles ?? []) {
+      await deps.repo.saveSuggestion(ctx, {
+        resultatId,
+        articleId: matchBibliotheque(catalogue, article.nom),
+        nomArticle: String(article.nom ?? ""),
+        description: String(article.description ?? ""),
+        quantiteSuggeree: String(article.quantite ?? "1"),
+        unite: String(article.unite ?? "unité"),
+        prixEstime: String(article.prixEstime ?? "0"),
+        confiance: String(travail.confiance ?? "0"),
+      });
+    }
+  }
+
+  await deps.repo.setStatut(ctx, analyseId, "termine");
+  return { success: true, nombreTravaux: travaux.length };
 }

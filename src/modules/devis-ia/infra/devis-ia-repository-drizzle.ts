@@ -3,7 +3,7 @@ import { analysesPhotosChantier, photosAnalyse, resultatsAnalyseIA, suggestionsA
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { IDevisIARepository } from "../application/devis-ia-repository";
+import type { IDevisIARepository, SaveResultatData, SaveSuggestionData } from "../application/devis-ia-repository";
 import { genererLignesDevis } from "../domain/devis-ia";
 import type { AddPhotoInput, Analyse, AnalyseDetail, CreateAnalyseInput, Photo, Resultat, ResultatAvecSuggestions, Suggestion, DevisGenere, UpdateSuggestionInput } from "../domain/devis-ia";
 
@@ -132,6 +132,37 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
       await tx.delete(devisGenereIA).where(eq(devisGenereIA.analyseId, params.analyseId));
       await tx.insert(devisGenereIA).values({ analyseId: params.analyseId, devisId: created.id, montantEstime: devisData.totalTTC.toFixed(2) });
       return { devisId: created.id, montantEstime: devisData.totalTTC };
+    });
+  }
+
+  listPhotoUrls(ctx: TenantContext, analyseId: number): Promise<string[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [a] = await tx.select({ id: analysesPhotosChantier.id }).from(analysesPhotosChantier).where(and(eq(analysesPhotosChantier.id, analyseId), eq(analysesPhotosChantier.artisanId, ctx.artisanId))).limit(1);
+      if (!a) return [];
+      const rows = await tx.select({ url: photosAnalyse.url }).from(photosAnalyse).where(eq(photosAnalyse.analyseId, analyseId)).orderBy(asc(photosAnalyse.ordre));
+      return rows.map((r) => r.url);
+    });
+  }
+
+  async setStatut(ctx: TenantContext, analyseId: number, statut: "en_cours" | "termine" | "erreur"): Promise<void> {
+    await withTenant(this.db, ctx, async (tx) => {
+      await tx.update(analysesPhotosChantier).set({ statut }).where(and(eq(analysesPhotosChantier.id, analyseId), eq(analysesPhotosChantier.artisanId, ctx.artisanId)));
+    });
+  }
+
+  saveResultat(ctx: TenantContext, data: SaveResultatData): Promise<number> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [r] = await tx
+        .insert(resultatsAnalyseIA)
+        .values({ analyseId: data.analyseId, typeTravauxDetecte: data.typeTravauxDetecte, descriptionTravaux: data.descriptionTravaux, urgence: data.urgence as never, confiance: data.confiance, rawResponse: data.rawResponse })
+        .returning({ id: resultatsAnalyseIA.id });
+      return r.id;
+    });
+  }
+
+  async saveSuggestion(ctx: TenantContext, data: SaveSuggestionData): Promise<void> {
+    await withTenant(this.db, ctx, async (tx) => {
+      await tx.insert(suggestionsArticlesIA).values({ resultatId: data.resultatId, articleId: data.articleId ?? null, nomArticle: data.nomArticle, description: data.description, quantiteSuggeree: data.quantiteSuggeree, unite: data.unite, prixEstime: data.prixEstime, confiance: data.confiance });
     });
   }
 }

@@ -5,7 +5,7 @@ import type { StoragePort, PutOptions } from "./storage";
 import type { PdfPort } from "./pdf";
 import type { RateLimiterPort } from "./rate-limiter";
 import type { LlmPort } from "./llm";
-import type { VisionPort, VisionRequest } from "./vision";
+import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 
 export class FakeEmailPort implements EmailPort {
   readonly sent: EmailMessage[] = [];
@@ -103,6 +103,12 @@ export class FakeVisionPort implements VisionPort {
   }
   async analyzeImage(req: VisionRequest): Promise<string> {
     this.requests.push(req);
+    if (this.err) throw this.err;
+    return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
+  }
+  readonly multiRequests: VisionMultiRequest[] = [];
+  async analyzeImages(req: VisionMultiRequest): Promise<string> {
+    this.multiRequests.push(req);
     if (this.err) throw this.err;
     return this.queue.length > 1 ? this.queue.shift()! : this.queue[0] ?? "";
   }

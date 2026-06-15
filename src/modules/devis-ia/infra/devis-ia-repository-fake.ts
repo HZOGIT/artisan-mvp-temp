@@ -84,4 +84,26 @@ export class DevisIARepositoryFake implements IDevisIARepository {
     this.createdDevis.push({ devisId, analyseId: params.analyseId });
     return { devisId, montantEstime: data.totalTTC };
   }
+
+  // ── analyserPhotos ──
+  readonly statutHistory: Array<{ analyseId: number; statut: string }> = [];
+  readonly savedResultats: Array<{ id: number; analyseId: number; data: unknown }> = [];
+  readonly savedSuggestions: Array<{ resultatId: number; articleId: number | null; nomArticle: string }> = [];
+  async listPhotoUrls(ctx: TenantContext, analyseId: number): Promise<string[]> {
+    if (!(await this.getAnalyseOwned(ctx, analyseId))) return [];
+    return this.photos.filter((p) => p.analyseId === analyseId).map((p) => p.url);
+  }
+  async setStatut(_ctx: TenantContext, analyseId: number, statut: "en_cours" | "termine" | "erreur"): Promise<void> {
+    this.statutHistory.push({ analyseId, statut });
+    const i = this.analyses.findIndex((a) => a.id === analyseId);
+    if (i >= 0) this.analyses[i] = { ...this.analyses[i], statut };
+  }
+  async saveResultat(_ctx: TenantContext, data: { analyseId: number; typeTravauxDetecte: string; descriptionTravaux: string; urgence: string; confiance: string; rawResponse: unknown }): Promise<number> {
+    const id = this.seq++;
+    this.savedResultats.push({ id, analyseId: data.analyseId, data });
+    return id;
+  }
+  async saveSuggestion(_ctx: TenantContext, data: { resultatId: number; articleId: number | null; nomArticle: string; description: string; quantiteSuggeree: string; unite: string; prixEstime: string; confiance: string }): Promise<void> {
+    this.savedSuggestions.push({ resultatId: data.resultatId, articleId: data.articleId, nomArticle: data.nomArticle });
+  }
 }

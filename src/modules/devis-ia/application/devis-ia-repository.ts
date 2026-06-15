@@ -22,4 +22,34 @@ export interface IDevisIARepository {
   // Crée un devis (brouillon) à partir des suggestions SÉLECTIONNÉES d'une analyse possédée + lie
   // analyse→devis. Renvoie null si l'analyse n'est pas au tenant OU si aucune suggestion sélectionnée.
   createDevisFromAnalyse(ctx: TenantContext, params: { analyseId: number; clientId: number; suggestionIds?: number[] }): Promise<{ devisId: number; montantEstime: number } | null>;
+
+  // ── analyserPhotos (Vision) ──
+  // URLs des photos d'une analyse possédée (pour l'appel Vision). [] si analyse hors tenant.
+  listPhotoUrls(ctx: TenantContext, analyseId: number): Promise<string[]>;
+  // Met à jour le statut de l'analyse (possédée).
+  setStatut(ctx: TenantContext, analyseId: number, statut: "en_cours" | "termine" | "erreur"): Promise<void>;
+  // Enregistre un résultat d'analyse → renvoie son id (pour rattacher les suggestions).
+  saveResultat(ctx: TenantContext, data: SaveResultatData): Promise<number>;
+  // Enregistre une suggestion d'article rattachée à un résultat.
+  saveSuggestion(ctx: TenantContext, data: SaveSuggestionData): Promise<void>;
+}
+
+export interface SaveResultatData {
+  readonly analyseId: number;
+  readonly typeTravauxDetecte: string;
+  readonly descriptionTravaux: string;
+  readonly urgence: string;
+  readonly confiance: string;
+  readonly rawResponse: unknown;
+}
+
+export interface SaveSuggestionData {
+  readonly resultatId: number;
+  readonly articleId: number | null;
+  readonly nomArticle: string;
+  readonly description: string;
+  readonly quantiteSuggeree: string;
+  readonly unite: string;
+  readonly prixEstime: string;
+  readonly confiance: string;
 }

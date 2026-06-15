@@ -133,6 +133,8 @@ import { PortalSchedulingReaderDrizzle } from "./modules/client-portal/infra/por
 import { createIntegrationsComptablesModule } from "./modules/integrations-comptables/integrations-comptables.module";
 import { IntegrationsComptablesRepositoryDrizzle } from "./modules/integrations-comptables/infra/integrations-comptables-repository-drizzle";
 import { getFecExport } from "./modules/comptabilite/application/use-cases";
+import { createDevisIAModule } from "./modules/devis-ia/devis-ia.module";
+import { DevisIARepositoryDrizzle } from "./modules/devis-ia/infra/devis-ia-repository-drizzle";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
@@ -731,7 +733,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repo: new IntegrationsComptablesRepositoryDrizzle(getDbHandle().db),
     fec: { getFecContent: async (ctx, period) => (await getFecExport(comptabiliteReader, ctx, period)).content },
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables });
+  // Module `devisIA` (analyse photos chantier → suggestions → devis). Vision multimodal + bibliothèque
+  // (match articles) + métier (ArtisanReader) + rate-limit IA. Tables SOUS RLS (anti-IDOR par l'analyse).
+  const devisIA = createDevisIAModule({
+    repo: new DevisIARepositoryDrizzle(getDbHandle().db),
+    vision: deps.ocrVision ?? new GeminiVisionAdapter(),
+    rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+    artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+    bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

@@ -4,7 +4,7 @@
 import type { EmailPort, EmailMessage } from "./email";
 import type { PdfPort } from "./pdf";
 import type { LlmPort, LlmCompleteOptions } from "./llm";
-import type { VisionPort, VisionRequest } from "./vision";
+import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 
 type LegacyEmailModule = {
   sendEmail: (p: {
@@ -121,6 +121,23 @@ export class GeminiVisionAdapter implements VisionPort {
     const res = await ai.models.generateContent({
       model: req.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview",
       contents: [{ role: "user", parts: [{ inlineData: { mimeType: req.mimeType, data: req.base64 } }, { text: req.prompt }] }],
+      config: {
+        ...(req.system ? { systemInstruction: req.system } : {}),
+        maxOutputTokens: req.maxOutputTokens ?? 1000,
+      },
+    });
+    return res.text ?? "";
+  }
+
+  async analyzeImages(req: VisionMultiRequest): Promise<string> {
+    const mod = (await import(GENAI_MODULE)) as GenAiModule;
+    const ai = new mod.GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY ?? "" });
+    const imageParts = req.images.map((img) =>
+      img.base64 !== undefined ? { inlineData: { mimeType: img.mimeType, data: img.base64 } } : { fileData: { mimeType: img.mimeType, fileUri: img.fileUri ?? "" } },
+    );
+    const res = await ai.models.generateContent({
+      model: req.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview",
+      contents: [{ role: "user", parts: [...imageParts, { text: req.prompt }] }],
       config: {
         ...(req.system ? { systemInstruction: req.system } : {}),
         maxOutputTokens: req.maxOutputTokens ?? 1000,

@@ -31,8 +31,8 @@ describe("resolveDispatchTarget (décision de dispatch legacy↔nouveau stack)",
   });
 
   it("domaine NON porté par le nouveau stack → legacy même si un flag l'active (sûreté)", () => {
-    const flags: FeatureFlags = { devisIA: { enabled: true } };
-    expect(resolveDispatchTarget("devisIA.list", 1, flags)).toBe("legacy");
+    const flags: FeatureFlags = { supportZZZ: { enabled: true } };
+    expect(resolveDispatchTarget("supportZZZ.list", 1, flags)).toBe("legacy");
   });
 
   it("chemin sans préfixe de domaine (health/whoami/racine) → legacy", () => {
@@ -84,8 +84,8 @@ describe("resolveBatchDispatchTarget (décision batch-aware, httpBatchLink)", ()
   });
 
   it("batch avec un domaine NON porté par le nouveau stack → legacy", () => {
-    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, devisIA: { enabled: true } };
-    expect(resolveBatchDispatchTarget(`${MIGRE}.list,devisIA.list`, 1, flags)).toBe("legacy");
+    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, supportZZZ: { enabled: true } };
+    expect(resolveBatchDispatchTarget(`${MIGRE}.list,supportZZZ.list`, 1, flags)).toBe("legacy");
   });
 
   it("chemin sans domaine (health/whoami) → legacy", () => {

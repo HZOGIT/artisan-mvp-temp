@@ -57,6 +57,7 @@ import type { InterventionsMobileModule } from "../../modules/interventions-mobi
 import type { VitrineModule } from "../../modules/vitrine/vitrine.module";
 import type { ClientPortalModule } from "../../modules/client-portal/client-portal.module";
 import type { IntegrationsComptablesModule } from "../../modules/integrations-comptables/integrations-comptables.module";
+import type { DevisIAModule } from "../../modules/devis-ia/devis-ia.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -117,6 +118,7 @@ export interface AppRouterDeps {
   readonly vitrine: VitrineModule;
   readonly clientPortal: ClientPortalModule;
   readonly integrationsComptables: IntegrationsComptablesModule;
+  readonly devisIA: DevisIAModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -187,6 +189,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     vitrine: deps.vitrine.router,
     clientPortal: deps.clientPortal.router,
     integrationsComptables: deps.integrationsComptables.router,
+    devisIA: deps.devisIA.router,
   });
 }
 
