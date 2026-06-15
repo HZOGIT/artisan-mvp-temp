@@ -5,11 +5,13 @@ import {
   deletedUpsertFields,
 } from "../domain/webhook";
 import type { SubscriptionWebhookWriter } from "./subscription-webhook-writer";
+import type { WebhookPaymentWriter } from "./webhook-payment-writer";
 
-// Dépendances du traitement webhook Stripe (abonnement). `webhookSecret` injecté (jamais lu à vide).
+// Dépendances du traitement webhook Stripe. `webhookSecret` injecté (jamais lu à vide).
 export interface StripeWebhookDeps {
   readonly stripe: StripePort;
   readonly writer: SubscriptionWebhookWriter;
+  readonly paymentWriter: WebhookPaymentWriter;
   readonly webhookSecret: string;
 }
 
@@ -48,9 +50,13 @@ export async function processStripeWebhook(
       await handleUpsert(deps, event.data.object);
     } else if (event.type === "customer.subscription.deleted") {
       await handleDeleted(deps, event.data.object);
+    } else if (event.type === "checkout.session.completed") {
+      await handleCheckoutCompleted(deps, event.data.object);
+    } else if (event.type === "payment_intent.payment_failed") {
+      await handlePaymentFailed(deps, event.data.object);
     }
-    // Autres types (checkout.session/invoice/payment_intent/trial_will_end…) : no-op à ce stade
-    // (slice B). Le webhook ne sera routé vers le new-stack qu'une fois tous les events portés.
+    // Autres types (invoice.*/trial_will_end…) : no-op à ce stade. Le webhook ne sera routé vers le
+    // new-stack qu'une fois TOUS les events legacy portés (sinon paiements/factures perdus).
     return { http: 200, body: { received: true } };
   } catch {
     return { http: 500, body: { error: "Webhook handler failed" } };
@@ -74,4 +80,31 @@ async function handleDeleted(deps: StripeWebhookDeps, sub: Record<string, unknow
   const artisanId = await resolveArtisanId(deps, sub);
   if (!artisanId) return;
   await deps.writer.applyDeleted(artisanId, deletedUpsertFields());
+}
+
+// `checkout.session.completed` (parité legacy) : paiement par token → facture payée + notification.
+// Métadonnées requises (token_paiement + facture_id) sinon skip. Le paiement est résolu par token
+// (capacité), l'artisanId/factureId viennent du paiement (source de vérité, pas du metadata).
+async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<string, unknown>): Promise<void> {
+  const metadata = (session.metadata ?? {}) as Record<string, unknown>;
+  const token = metadata.token_paiement ? String(metadata.token_paiement) : null;
+  if (!token || !metadata.facture_id) return;
+  const resolved = await deps.paymentWriter.resolvePaiement(token);
+  if (!resolved) return;
+  await deps.paymentWriter.completeCheckout({
+    artisanId: resolved.artisanId,
+    paiementId: resolved.paiementId,
+    factureId: resolved.factureId,
+    stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
+  });
+}
+
+// `payment_intent.payment_failed` (parité legacy) : paiement par token → echoue.
+async function handlePaymentFailed(deps: StripeWebhookDeps, pi: Record<string, unknown>): Promise<void> {
+  const metadata = (pi.metadata ?? {}) as Record<string, unknown>;
+  const token = metadata.token_paiement ? String(metadata.token_paiement) : null;
+  if (!token) return;
+  const resolved = await deps.paymentWriter.resolvePaiement(token);
+  if (!resolved) return;
+  await deps.paymentWriter.failPaiement({ artisanId: resolved.artisanId, paiementId: resolved.paiementId });
 }

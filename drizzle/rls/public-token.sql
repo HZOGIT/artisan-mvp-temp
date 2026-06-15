@@ -9,6 +9,13 @@ drop policy if exists public_token_select on "demandes_avis";
 create policy public_token_select on "demandes_avis" for select
   using ("tokenDemande" = nullif(current_setting('app.public_token', true), ''));
 
+-- paiements_stripe : lecture publique du paiement par son `tokenPaiement` (webhook Stripe checkout /
+-- payment_intent — pas de cookie tenant). Le token EST la capacité : on résout l'artisanId du paiement
+-- puis les effets (facture/notif) repassent sous `withTenant(artisanId)`. PERMISSIVE (s'OR avec tenant_isolation).
+drop policy if exists public_token_select on "paiements_stripe";
+create policy public_token_select on "paiements_stripe" for select
+  using ("tokenPaiement" = nullif(current_setting('app.public_token', true), ''));
+
 -- devis : lecture publique du devis RATTACHÉ à la signature dont le token est présenté (portail de
 -- signature de devis). `signatures_devis` est HORS RLS (lisible librement) → la capacité = le token
 -- de signature ; cette policy autorise à lire LE devis lié à ce token (pour résoudre artisanId +

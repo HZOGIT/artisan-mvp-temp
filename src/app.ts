@@ -121,6 +121,7 @@ import { registerIcalRoute } from "./interface/http/ical-route";
 import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
 import { SubscriptionWebhookWriterDrizzle } from "./modules/subscription/infra/subscription-webhook-writer-drizzle";
+import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -659,6 +660,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerStripeWebhookRoute(app, {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
+    paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
   });
 
