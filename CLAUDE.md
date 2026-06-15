@@ -62,3 +62,41 @@ jamais un ntfy public en clair.
    ./devtools/agents/notify.sh qa-browser REQUEST_REVIEW "tests prêts pour feature X"
 3. qa-browser fait le QA navigateur, puis prévient l'humain :
    ./devtools/agents/notify.sh human TASK_DONE "QA OK sur feature X, prêt à merger"
+
+## Déboguer un problème front/intégration — utiliser un VRAI navigateur
+
+Pour tout bug remonté côté **utilisateur** (page qui charge à l'infini, lien « expiré »,
+404 après une redirection, section vide…), **reproduis-le avec un vrai navigateur AVANT de
+diagnostiquer**. Un `curl` au niveau API peut mentir : il ne reproduit pas ce que le SPA envoie
+réellement (cookies host-only, lots tRPC complets, redirections, service worker, en-têtes du proxy).
+
+### Setup Playwright (docker, prêt à l'emploi)
+
+    ./scripts/pw-run.sh scripts/staging-e2e-sweep.mjs
+
+- `scripts/pw-run.sh <script.mjs> [VAR=val …]` exécute le script dans l'image
+  `mcr.microsoft.com/playwright` (repo monté en lecture seule), zéro install locale.
+- `scripts/staging-e2e-sweep.mjs` se connecte (`dev@operioz.com`, `E2E_PASS=Azerqsdf1234!`)
+  et balaie toutes les routes SPA en collectant : erreurs console, `pageerror`, réponses
+  `/api` 4xx-5xx, pages blanches. Sortie : `routes testées: N | issues: M` + un JSON détaillé.
+- Une **passe automatique toutes les 5 min** (cron de session) rejoue ce balayage et n'alerte
+  (ntfy) que s'il y a des `issues` — silence = tout vert.
+
+### Méthode (ce qui a marché, ce qui a piégé)
+
+1. **Reproduis dans le navigateur**, pas seulement en API. Deux incidents réels où le curl trompait :
+   - *Dashboard infini / portail « expiré »* → cause = `Fastify maxParamLength` (défaut 100) qui
+     404-ait les **longs** lots `httpBatchLink` (`/api/trpc/p1,p2,…,pN`). Un curl avec un lot **court**
+     (< 100 car.) répondait 200 → faux négatif. Seul le **vrai** lot du SPA (ou un long lot répliqué)
+     déclenchait le 404. Fix : `Fastify({ maxParamLength: 5000 })`.
+   - *404 après paiement Stripe (`/portail/<token>?paiement=succes`)* → cause = le dispatcher Pages
+     supprime l'en-tête `host`, donc le backend bâtissait `success_url` sur l'hôte **interne**
+     (`staging-newstack`) → Stripe renvoyait le navigateur vers le **backend**. Fix : le dispatcher
+     pose `x-forwarded-host`/`x-forwarded-proto` (hôte public) et le backend les privilégie.
+2. **Cookie d'auth = `token`** (PAS `auth_token`) — cf. `src/interface/http/auth-cookie.ts`.
+3. **Vérifie au plus près du vrai chemin** : passe par l'edge public (`https://staging.operioz.com`),
+   pas seulement par le backend en direct, pour inclure dispatcher + en-têtes + service worker.
+4. **Confirme la correction de bout en bout** (ex. récupérer la session Stripe via l'API pour lire
+   `success_url`), puis rejoue le balayage navigateur (`issues: 0`) avant de clore.
+5. **Ajoute un garde-fou** (test anti-régression) qui reproduit le déclencheur réel — long lot tRPC,
+   `x-forwarded-host` qui prime sur `host`, etc.
