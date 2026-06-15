@@ -107,6 +107,7 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // PDF devis portail (public par token) → new-stack
     expect(decideTarget("/api/portail/abc123/devis/42/pdf", {})).toBe("new-stack");
     expect(decideTarget("/api/portail/abc123/devis/42", {})).toBe("legacy"); // pas le PDF
+    expect(decideTarget("/api/portail/abc123/factures/42/pdf", {})).toBe("new-stack");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe

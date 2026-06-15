@@ -139,6 +139,7 @@ import { registerCommandePdfRoute } from "./interface/http/commande-pdf-route";
 import { registerContratPdfRoute } from "./interface/http/contrat-pdf-route";
 import { registerInterventionPdfRoute } from "./interface/http/intervention-pdf-route";
 import { registerPortailDevisPdfRoute } from "./interface/http/portail-devis-pdf-route";
+import { registerPortailFacturePdfRoute } from "./interface/http/portail-facture-pdf-route";
 import { getParametres } from "./modules/parametres/application/read-use-cases";
 import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
@@ -825,6 +826,20 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerPortailDevisPdfRoute(app, {
     accessReader: new PortalPaymentReaderDrizzle(getDbHandle().db),
     devisReader: devisRepo,
+    clientReader: clientRepo,
+    artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    cgvReader: {
+      getCgv: async (cgvCtx) => (await getParametres(deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db), cgvCtx)).conditionsGenerales ?? null,
+    },
+    pdf: new JsPdfAdapter(),
+    rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
+  });
+
+  // §4 HORS-tRPC PUBLIQUE : PDF d'une facture depuis le portail client (`/api/portail/:token/factures/:id/pdf`,
+  // token = capacité, rate-limit IP). MONTÉ mais PAS routé tant qu'absent de MIGRATED_ROUTES.
+  registerPortailFacturePdfRoute(app, {
+    accessReader: new PortalPaymentReaderDrizzle(getDbHandle().db),
+    factureReader: factureRepo,
     clientReader: clientRepo,
     artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
     cgvReader: {

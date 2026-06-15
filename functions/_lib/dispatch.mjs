@@ -63,6 +63,8 @@ export const MIGRATED_ROUTES = [
   { name: "intervention-bon-pdf", pattern: /^\/api\/interventions\/[^/]+\/bon-pdf$/ },
   // PDF d'un devis depuis le portail client (`/api/portail/:token/devis/:id/pdf`, PUBLIC par token, jsPDF).
   { name: "portail-devis-pdf", pattern: /^\/api\/portail\/[^/]+\/devis\/[^/]+\/pdf$/ },
+  // PDF d'une facture depuis le portail client (`/api/portail/:token/factures/:id/pdf`, PUBLIC par token, jsPDF).
+  { name: "portail-facture-pdf", pattern: /^\/api\/portail\/[^/]+\/factures\/[^/]+\/pdf$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
