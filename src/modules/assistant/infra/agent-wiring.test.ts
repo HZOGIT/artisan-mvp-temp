@@ -8,6 +8,9 @@ import { FakeDevisRepository } from "../../devis/infra/devis-repository-fake";
 import { FakeFactureRepository } from "../../factures/infra/facture-repository-fake";
 import { FakeDevisReader } from "../../factures/infra/devis-reader-fake";
 import { FakeCommandeRepository } from "../../commandes/infra/commande-repository-fake";
+import { buildAssistantWriteHandlersFromRepos as buildWrites } from "./agent-wiring";
+import { FakeEmailPort, FakePdfPort, FakeRateLimiter } from "../../../shared/ports";
+import type { DevisMailingDeps } from "../../devis/application/envoyer-devis-email";
 // Vérif de PARITÉ STRUCTURELLE (compile-time) : les interfaces des repos migrés satisfont les ports
 // `*ForAgent`. Si un repo dérive (renomme `list`, change un type), la compilation casse ici.
 import type { IClientRepository } from "../../clients/application/client-repository";
@@ -140,5 +143,65 @@ describe("agent-wiring — écritures câblées (Phase 3b-i)", () => {
     // fournisseur 999 absent → le use-case migré refuse (ownership) → {ok:false}, jamais une exception non captée.
     const res = await reg.execute("creer_commande_fournisseur", { fournisseurId: 999, lignes: [{ designation: "Tube", quantite: 2, prixUnitaireHT: 10 }] }, ctx);
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("agent-wiring — envois câblés (Phase 3b-iii) → registry agentique COMPLET", () => {
+  function devisMailing(email: FakeEmailPort): DevisMailingDeps {
+    return {
+      artisanReader: { getArtisan: async () => ({ id: 1, nomEntreprise: "ACME", email: "pro@acme.fr" }) },
+      clientReader: { getClient: async () => ({ id: 100, nom: "Durand", prenom: "Marie", email: "marie@x.fr" }) },
+      pdf: new FakePdfPort(),
+      email,
+      rateLimiter: new FakeRateLimiter(),
+    };
+  }
+
+  it("les 11 écritures sont câblées quand repos + mailing fournis (registry COMPLET)", () => {
+    const factureRepo = new FakeFactureRepository();
+    const wr = {
+      clientRepo: new FakeClientRepository(),
+      interventionRepo: new FakeInterventionRepository(),
+      devisRepo: new FakeDevisRepository(),
+      factureRepo,
+      devisReader: new FakeDevisReader(),
+      commandeRepo: new FakeCommandeRepository(),
+    };
+    const email = new FakeEmailPort();
+    const mailing = {
+      devis: devisMailing(email),
+      facture: { ...devisMailing(email) },
+      relance: { artisanReader: devisMailing(email).artisanReader, clientReader: devisMailing(email).clientReader, email, rateLimiter: new FakeRateLimiter() },
+      commande: { repo: wr.commandeRepo, fournisseurRepo: { list: async () => [], getById: async () => null } as never, artisanReader: { getArtisan: async () => ({ id: 1, nomEntreprise: "ACME", email: "pro@acme.fr" }) }, pdf: new FakePdfPort(), email, rateLimiter: new FakeRateLimiter() },
+    };
+    const handlers = buildWrites(wr, mailing);
+    expect(Object.keys(handlers).sort()).toEqual(
+      [
+        "creer_client",
+        "creer_intervention",
+        "modifier_intervention",
+        "creer_devis",
+        "creer_et_envoyer_devis",
+        "creer_facture",
+        "envoyer_devis",
+        "envoyer_facture",
+        "envoyer_relance",
+        "creer_commande_fournisseur",
+        "envoyer_commande_fournisseur",
+      ].sort(),
+    );
+    expect(Object.keys(handlers)).toHaveLength(11);
+  });
+
+  it("envoyer_devis exécuté de bout en bout (use-case migré + email) → ok + email envoyé", async () => {
+    const devisRepo = new FakeDevisRepository();
+    const d = await devisRepo.create(ctx, { clientId: 100, numero: "D-1" });
+    const email = new FakeEmailPort();
+    const wr = { clientRepo: new FakeClientRepository(), interventionRepo: new FakeInterventionRepository(), devisRepo };
+    const reg = buildAssistantAgentRegistry(repos(), buildWrites(wr, { devis: devisMailing(email) }));
+    const res = await reg.execute("envoyer_devis", { devisId: d.id }, ctx);
+    expect(res.ok).toBe(true);
+    expect(email.sent).toHaveLength(1);
+    expect(email.sent[0].to).toBe("marie@x.fr");
   });
 });

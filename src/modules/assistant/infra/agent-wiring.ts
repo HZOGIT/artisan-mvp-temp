@@ -25,6 +25,10 @@ import type { IDevisReader } from "../../factures/application/devis-reader";
 import { creerFacture, ajouterLigneFacture, modifierFacture, convertirDevisEnFacture } from "../../factures/application/write-use-cases";
 import type { ICommandeRepository } from "../../commandes/application/commande-repository";
 import { creerCommande } from "../../commandes/application/write-use-cases";
+import { envoyerDevisParEmail, type DevisMailingDeps } from "../../devis/application/envoyer-devis-email";
+import { envoyerFactureParEmail, type FactureMailingDeps } from "../../factures/application/envoyer-facture-email";
+import { envoyerRelanceFacture, type RelanceMailingDeps } from "../../factures/application/envoyer-relance-facture";
+import { envoyerCommandeParEmail, type CommandeMailingDeps } from "../../commandes/application/envoyer-commande-email";
 
 // Câblage de l'assistant agentique : adapte les repos/use-cases DÉJÀ MIGRÉS aux ports `*ForAgent` et
 // construit le registry. Les repos migrés satisfont STRUCTURELLEMENT les interfaces de lecture (méthode
@@ -65,9 +69,18 @@ export interface AssistantAgentWriteRepos {
   readonly commandeRepo?: ICommandeRepository;
 }
 
+// Mailing deps (construits dans buildApp pour les routes d'envoi) requis pour câbler les ENVOIS. Un
+// sender n'est câblé que si son mailing (et son repo) est fourni. La relance n'attache PAS de PDF.
+export interface AssistantAgentMailing {
+  readonly devis?: DevisMailingDeps;
+  readonly facture?: FactureMailingDeps;
+  readonly relance?: RelanceMailingDeps;
+  readonly commande?: CommandeMailingDeps; // embarque repo + fournisseurRepo
+}
+
 // Adapte les use-cases d'écriture migrés aux ports `*ForAgent` (wrappers triviaux ; ownership/validation
-// dans les use-cases). Un outil n'est câblé que si ses repos sont fournis.
-export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos): AssistantWriteDeps {
+// dans les use-cases). Un outil n'est câblé que si ses repos/mailing sont fournis.
+export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos, mailing: AssistantAgentMailing = {}): AssistantWriteDeps {
   const { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader, commandeRepo } = repos;
   return {
     clients: { create: (ctx, input) => creerClient(clientRepo, ctx, input) },
@@ -110,12 +123,24 @@ export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos): Assist
           },
         }
       : {}),
+    // ── Envois (PDF via PdfPort, email via EmailPort, statut, rate-limit ; portés par les use-cases). ──
+    ...(mailing.devis
+      ? { devisSender: { envoyer: (ctx, id, m) => envoyerDevisParEmail(devisRepo, mailing.devis!, ctx, { devisId: id, customMessage: m, attachPdf: true }) } }
+      : {}),
+    ...(factureRepo && mailing.facture
+      ? { factureSender: { envoyer: (ctx, id, m) => envoyerFactureParEmail(factureRepo, mailing.facture!, ctx, { factureId: id, customMessage: m, attachPdf: true }) } }
+      : {}),
+    ...(factureRepo && mailing.relance
+      ? { relanceSender: { envoyer: (ctx, id, m) => envoyerRelanceFacture(factureRepo, mailing.relance!, ctx, { factureId: id, customMessage: m }) } }
+      : {}),
+    // `envoyerCommandeParEmail` n'accepte pas de message personnalisé (le use-case migré l'a dropé) → ignoré.
+    ...(mailing.commande ? { commandeSender: { envoyer: (ctx, id) => envoyerCommandeParEmail(mailing.commande!, ctx, id) } } : {}),
   };
 }
 
-// Handlers d'écriture câblés depuis les repos migrés (Phase 3b-i).
-export function buildAssistantWriteHandlersFromRepos(repos: AssistantAgentWriteRepos): Record<string, ToolHandler> {
-  return buildAssistantWriteHandlers(buildAssistantWriteDeps(repos));
+// Handlers d'écriture câblés depuis les repos migrés (+ mailing pour les envois).
+export function buildAssistantWriteHandlersFromRepos(repos: AssistantAgentWriteRepos, mailing: AssistantAgentMailing = {}): Record<string, ToolHandler> {
+  return buildAssistantWriteHandlers(buildAssistantWriteDeps(repos, mailing));
 }
 
 // Construit le registry agentique : lectures câblées (toujours) + écritures (opt-in — Phase 3b fournit
