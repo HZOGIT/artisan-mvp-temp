@@ -80,21 +80,23 @@ Légende colonne : ✅ couvert · ⬜ manquant · — non applicable. (état au 
 | 1 | **Portail client public** (`client-portal`) | ✅ | ✅ | ✅ | (PoC) | **COLONNE COMPLÈTE** (L2 it.10-12, L3 router it.13). L4 = PoC portail OPE-316 |
 | 2 | **Signature devis** (`signature`) | ✅ | ✅ | ✅ | (PoC) | **COLONNE COMPLÈTE** (L3 : e2e.test getDevis/signDevis + router.test it.14 admin/refuse) |
 | 3 | **Abonnement / billing** (`subscription`) | ✅ | ✅ | ✅ | — | **COLONNE COMPLÈTE** (L1 effects.test + webhook ; L3 it.15). event-notifier = port (écarté) |
-| 4 | **Auth / session** (`auth`) | 🟡 | ✅ | ⬜ | — | L1 emails.ts ✅ it.16 ; **reste L3** auth.router (signin/me/logout, 401) |
+| 4 | **Auth / session** (`auth`) | ✅ | ✅ | ✅ | — | **COLONNE COMPLÈTE** (L1 emails it.16 ; L3 router it.17 : me/signin/gardes) |
 | 5 | **Paiement Stripe** (`paiement`) | ✅ | ✅ | ✅ (route HTTP) | (PoC) | colonne ~complète ; vérifier portal-payment-writer drizzle |
 | 6 | **Facturation** (`factures`) | ✅ | ✅ | ✅ | ⬜ | L4 couvert par le PoC devis→paiement ; rien d'urgent |
 | 7 | **Devis** (`devis`) | ✅ | ✅ | ✅ | ⬜ | idem — colonne complète hors L4 |
 
-### Rétro-complétion (use-cases déjà testés L1 seul — it.1→9) — APRÈS les colonnes critiques
-Ajouter L2/L3 là où la feature a repo+router : `stocks/alertes`, `depenses/budgets-realises`,
-`commandes/devis-acceptes`, `rdv-en-ligne` (propose/confirm). Les fonctions pures (numero, comptes,
-isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router → rien à ajouter).
+### Rétro-complétion (use-cases déjà testés L1 seul — it.1→9) — EN COURS (toutes colonnes critiques ✅)
+Ajouter L2/L3 là où la feature a repo+router, **après avoir vérifié que le niveau n'existe pas déjà** :
+`rdv-en-ligne` (L3 rdv router ? + L2 rdv-repository-drizzle ?), `stocks/alertes`, `depenses/budgets-realises`,
+`commandes/devis-acceptes`. Les fonctions pures (numero, comptes, isSearchable, bibliotheque délégation)
+restent **L1 seul** (pas de repo/router → rien à ajouter).
 
 ### Use-cases L1 encore nus (non critiques — plus bas)
 `clients/import-use-cases`, `contrats-maintenance/contrat-facture-generator`, `devis/devis-to-facture-converter`.
 
-**Prochaine cible : `auth` — L3 : `auth.router.test.ts`** (signin → cookie + me 200 ; me sans cookie → public OK mais user null ; mauvais mot de passe → 401/erreur ; signup). Clôt la colonne auth.
-(NB : `subscription-event-notifier.ts` = port/interface → écarté, rien à tester ; colonne abonnement close.)
+🏁 **Les 4 colonnes critiques prioritaires sont COMPLÈTES** (portail, signature, abonnement, auth).
+
+**Prochaine cible : rétro-complétion — `rdv-en-ligne`** : vérifier les niveaux manquants (L2 `rdv-repository-drizzle.test.ts` ? L3 `rdv-en-ligne` router ?) et compléter celui qui manque. Si tout existe déjà, passer à `stocks`/`depenses`/`commandes`.
 
 ---
 
@@ -117,3 +119,4 @@ isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router
 - `2026-06-15 19:35:14Z` **[done]** signature L3 router — COLONNE COMPLÈTE — 5 cas e2e (createSignatureLink admin 401+idempotent, getSignatureByDevis, refuseDevis token→refuse+400 immutable+404). Sans dupliquer signature.e2e. Signature = 2e colonne complète.
 - `2026-06-15 20:05:39Z` **[done]** subscription L3 router — 4 cas e2e billing (5 procédures protégées 401 sans cookie, getCurrent défaut trial, createPortal/cancel sans Customer→404). L1 use-cases déjà couvert par effects.test.
 - `2026-06-15 20:34:38Z` **[done]** auth L1 emails — welcomeEmail/resetPasswordEmail couverts (5 cas : interpolation nom, fallback URL, anti-XSS échappement HTML, resetUrl+validité). subscription-event-notifier = port (écarté), colonne abonnement close.
+- `2026-06-15 21:05:30Z` **[done]** auth L3 router — 4 COLONNES CRITIQUES COMPLÈTES — 6 cas e2e auth (me null/authentifié, signin 401 mauvais pw + email inconnu, signin OK, updateEmail 401). Portail+signature+abonnement+auth = colonnes complètes. Bascule en rétro-complétion.
