@@ -16,9 +16,10 @@ import {
 // Elle réimplémente la décision de dispatch dans `functions/_lib/dispatch.mjs`. Ce test garantit que
 // cette réimplémentation reste alignée sur le registre + la sémantique du gateway clean-archi.
 
-// Un domaine migré qui n'est PAS activé par défaut (pour les cas « OFF par défaut »).
-const NON_DEFAULT = MIGRATED_DOMAINS.find((d) => !STAGING_NEW_STACK_DEFAULT_DOMAINS.includes(d as never))!; // ex. "avis"
 const DEFAULT_ON = STAGING_NEW_STACK_DEFAULT_DOMAINS[0]; // ex. "vehicules"
+// C4 : la bascule progressive est terminée → `DEFAULT_ENABLED == MIGRATED` (aucun domaine porté OFF
+// par défaut). Un domaine NON porté (faux) sert de cas « hors new-stack ».
+const NON_MIGRE = "supportZZZ";
 
 describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gateway src", () => {
   it("la table MIGRATED de l'edge == MIGRATED_DOMAINS (même ensemble + cardinalité)", () => {
@@ -31,6 +32,11 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(EDGE_DEFAULT_ENABLED.length).toBe(STAGING_NEW_STACK_DEFAULT_DOMAINS.length);
     // Tout domaine activé par défaut DOIT être un domaine migré (sinon routage vers l'inexistant).
     for (const d of EDGE_DEFAULT_ENABLED) expect(MIGRATED_DOMAINS).toContain(d);
+  });
+
+  it("C4 mono-stack : DEFAULT_ENABLED == MIGRATED (tous les domaines portés servis par défaut)", () => {
+    expect(new Set(EDGE_DEFAULT_ENABLED)).toEqual(new Set(EDGE_MIGRATED));
+    expect(new Set(STAGING_NEW_STACK_DEFAULT_DOMAINS)).toEqual(new Set(MIGRATED_DOMAINS));
   });
 
   it("domainFromTrpcPath/domainsFromTrpcPath extraient le(s) domaine(s) ; vide hors /api/trpc", () => {
@@ -46,16 +52,15 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(decideTarget(`/api/trpc/${DEFAULT_ON}.list`, {})).toBe("new-stack");
   });
 
-  it("OFF par défaut : un domaine migré NON activé part en legacy ; activé via NEW_STACK_DOMAINS → new-stack", () => {
-    expect(decideTarget(`/api/trpc/${NON_DEFAULT}.list`, {})).toBe("legacy");
-    expect(decideTarget(`/api/trpc/${NON_DEFAULT}.list`, { NEW_STACK_DOMAINS: NON_DEFAULT })).toBe("new-stack");
+  it("tous les domaines MIGRÉS → new-stack par défaut (mono-stack) ; un domaine NON porté → legacy", () => {
+    for (const d of MIGRATED_DOMAINS) expect(decideTarget(`/api/trpc/${d}.list`, {})).toBe("new-stack");
+    expect(decideTarget(`/api/trpc/${NON_MIGRE}.list`, {})).toBe("legacy");
+    expect(decideTarget(`/api/trpc/${NON_MIGRE}.list`, { NEW_STACK_DOMAINS: NON_MIGRE })).toBe("legacy"); // non porté → reste legacy
   });
 
-  it("batch : new-stack seulement si TOUS les domaines sont activés ; mixte → legacy (sûreté)", () => {
-    // vehicules activé par défaut + notifications activé par défaut → batch entièrement new-stack
+  it("batch : new-stack si tous les domaines sont portés ; un domaine NON porté → legacy (sûreté)", () => {
     expect(decideTarget("/api/trpc/vehicules.list,notifications.list", {})).toBe("new-stack");
-    // vehicules (ON) + NON_DEFAULT (OFF, non activé par défaut) → batch mixte → legacy (legacy sert tout)
-    expect(decideTarget(`/api/trpc/vehicules.list,${NON_DEFAULT}.list`, {})).toBe("legacy");
+    expect(decideTarget(`/api/trpc/vehicules.list,${NON_MIGRE}.list`, {})).toBe("legacy");
   });
 
   it("domaine non porté → legacy même si listé (sûreté)", () => {
@@ -64,7 +69,7 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
   });
 
   it("hors-tRPC NON migré → legacy (auth, webhooks, front, uploads)", () => {
-    const env = { NEW_STACK_DOMAINS: NON_DEFAULT };
+    const env = { NEW_STACK_DOMAINS: NON_MIGRE };
     expect(decideTarget("/api/auth/login", env)).toBe("legacy");
     expect(decideTarget("/api/webhooks/stripe", env)).toBe("legacy");
     expect(decideTarget("/", env)).toBe("legacy");
@@ -125,10 +130,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(matchesMigratedRoute("/api/calendar/")).toBe(false);
   });
 
-  it("isolation : activer un domaine n'en détourne pas un autre", () => {
-    // `articles` + NON_DEFAULT ne sont PAS activés par défaut → on teste l'isolation via env.
+  it("isolation : un domaine NON porté reste legacy même si un autre est activé via env", () => {
     const env = { NEW_STACK_DOMAINS: "articles" };
-    expect(decideTarget("/api/trpc/articles.list", env)).toBe("new-stack");
-    expect(decideTarget(`/api/trpc/${NON_DEFAULT}.list`, env)).toBe("legacy");
+    expect(decideTarget("/api/trpc/articles.list", env)).toBe("new-stack"); // porté → new-stack
+    expect(decideTarget(`/api/trpc/${NON_MIGRE}.list`, env)).toBe("legacy"); // non porté → legacy
   });
 });

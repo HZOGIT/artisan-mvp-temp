@@ -19,10 +19,15 @@ export const MIGRATED = [
 const MIGRATED_SET = new Set(MIGRATED);
 
 // Domaines servis par défaut par le nouveau stack en staging. == STAGING_NEW_STACK_DEFAULT_DOMAINS
-// (src/interface/gateway/migrated-domains.ts). Parité de surface vérifiée (diff appels client vs
-// procédures montées). On élargit cette liste domaine par domaine au fil de la parité.
+// (src/interface/gateway/migrated-domains.ts). C4 (dispatcher mono-stack) : la liste est désormais
+// ÉGALE à `MIGRATED` — TOUS les domaines portés sont servis par défaut (la bascule progressive par
+// flag est terminée ; les 8 derniers ajoutés [ecritures/notesDeFrais/modelesDevis/configRelances/
+// categoriesDepenses/demandesContact/budgetsCategories/reglesCategorisation] sont des sous-ressources
+// new-stack jamais appelées top-level par le client — leur activation est sans effet sur le trafic
+// actuel et rend le dispatcher cohérent : aucun domaine porté ne tombe en legacy).
 export const DEFAULT_ENABLED = [
   "vehicules", "notifications", "fournisseurs", "parametres", "modelesEmail", "relances", "conges", "badges", "stocks", "techniciens", "rdv", "clients", "factures", "contrats", "commandesFournisseurs", "devis", "avis", "interventions", "chantiers", "articles", "previsions", "depenses", "artisan", "devisOptions", "activites", "modules", "statistiques", "calendrier", "emails", "search", "geolocalisation", "dashboard", "rapports", "utilisateurs", "comptabilite", "auth", "subscription", "signature", "conseilsIA", "assistant", "chat", "support", "devices", "alertesPrevisions", "importErp", "interventionsMobile", "vitrine", "clientPortal", "integrationsComptables", "devisIA",
+  "notesDeFrais", "ecritures", "modelesDevis", "configRelances", "categoriesDepenses", "demandesContact", "budgetsCategories", "reglesCategorisation",
 ];
 
 const TRPC_PREFIX = "/api/trpc/";
