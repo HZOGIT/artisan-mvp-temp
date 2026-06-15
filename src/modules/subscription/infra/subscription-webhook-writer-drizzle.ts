@@ -47,4 +47,15 @@ export class SubscriptionWebhookWriterDrizzle implements SubscriptionWebhookWrit
       .set({ plan: f.plan, status: f.status, cancel_at_period_end: f.cancelAtPeriodEnd, updated_at: new Date() })
       .where(eq(subscriptions.artisan_id, artisanId));
   }
+
+  async setStatusAndPeriod(artisanId: number, f: { status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }): Promise<void> {
+    await this.db
+      .update(subscriptions)
+      .set({ status: f.status, current_period_start: f.currentPeriodStart, current_period_end: f.currentPeriodEnd, updated_at: new Date() })
+      .where(eq(subscriptions.artisan_id, artisanId));
+  }
+
+  async setStatus(artisanId: number, status: string): Promise<void> {
+    await this.db.update(subscriptions).set({ status, updated_at: new Date() }).where(eq(subscriptions.artisan_id, artisanId));
+  }
 }

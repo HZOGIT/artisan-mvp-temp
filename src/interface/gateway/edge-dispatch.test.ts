@@ -76,9 +76,13 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // flux iCal public → new-stack (le jeton EST la capacité, pas de cookie)
     expect(decideTarget("/api/calendar/abc123def456.ics", {})).toBe("new-stack");
     expect(matchesMigratedRoute("/api/calendar/abc123def456.ics")).toBe(true);
+    // webhook Stripe signé → new-stack
+    expect(decideTarget("/api/stripe/webhook", {})).toBe("new-stack");
+    expect(matchesMigratedRoute("/api/stripe/webhook")).toBe(true);
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe
+    expect(decideTarget("/api/stripe/webhook/extra", {})).toBe("legacy"); // pas exact
     expect(matchesMigratedRoute("/api/calendar/")).toBe(false);
   });
 

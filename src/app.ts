@@ -122,6 +122,7 @@ import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
 import { SubscriptionWebhookWriterDrizzle } from "./modules/subscription/infra/subscription-webhook-writer-drizzle";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
+import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -661,7 +662,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
+    notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, deps.emailPort ?? new LegacyEmailAdapter()),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).

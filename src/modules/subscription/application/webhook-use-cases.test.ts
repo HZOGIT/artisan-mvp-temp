@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FakeStripePort } from "../../../shared/ports/stripe-adapter";
 import { FakeSubscriptionWebhookWriter } from "../infra/subscription-webhook-writer-fake";
 import { FakeWebhookPaymentWriter } from "../infra/webhook-payment-writer-fake";
+import { FakeSubscriptionEventNotifier } from "../infra/subscription-event-notifier-fake";
 import { processStripeWebhook } from "./webhook-use-cases";
 
 const SIG = "valid-sig";
@@ -11,7 +12,8 @@ function build() {
   const stripe = new FakeStripePort();
   const writer = new FakeSubscriptionWebhookWriter();
   const paymentWriter = new FakeWebhookPaymentWriter();
-  return { stripe, writer, paymentWriter, deps: { stripe, writer, paymentWriter, webhookSecret: SECRET } };
+  const notifier = new FakeSubscriptionEventNotifier();
+  return { stripe, writer, paymentWriter, notifier, deps: { stripe, writer, paymentWriter, notifier, webhookSecret: SECRET, appUrl: "https://app.test" } };
 }
 
 const raw = (event: unknown) => Buffer.from(JSON.stringify(event), "utf8");
@@ -75,12 +77,47 @@ describe("processStripeWebhook (fail-closed + sync abonnement)", () => {
     expect(writer.deletes).toEqual([{ artisanId: 7, plan: "expired", status: "canceled" }]);
   });
 
-  it("event non géré (invoice.payment_succeeded) → 200 {received} sans effet (slice C)", async () => {
-    const { deps, writer } = build();
-    const event = { id: "evt_6", type: "invoice.payment_succeeded", data: { object: {} } };
+  it("invoice.payment_succeeded : renouvellement (status active + period) + email best-effort", async () => {
+    const { deps, writer, stripe, notifier } = build();
+    writer.seedCustomer("cus_inv", 11);
+    stripe.retrievedSubscription = { status: "active", currentPeriodStart: new Date("2026-06-01"), currentPeriodEnd: new Date("2026-07-01") };
+    const event = { id: "evt_inv1", type: "invoice.payment_succeeded", data: { object: { subscription: "sub_1", customer: "cus_inv" } } };
     const r = await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
     expect(r.http).toBe(200);
-    expect(r.body).toEqual({ received: true });
+    expect(writer.statusAndPeriods[0]).toMatchObject({ artisanId: 11, status: "active" });
+    expect(notifier.emails[0]?.subject).toContain("Paiement confirme");
+  });
+
+  it("invoice.payment_succeeded : sans subscription → ignoré (paiement facture unitaire)", async () => {
+    const { deps, writer } = build();
+    const event = { id: "evt_inv2", type: "invoice.payment_succeeded", data: { object: { customer: "cus_x" } } };
+    await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
+    expect(writer.statusAndPeriods).toHaveLength(0);
+  });
+
+  it("invoice.payment_failed : past_due + notif erreur + email", async () => {
+    const { deps, writer, notifier } = build();
+    writer.seedCustomer("cus_fail", 12);
+    const event = { id: "evt_inv3", type: "invoice.payment_failed", data: { object: { subscription: "sub_2", customer: "cus_fail" } } };
+    await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
+    expect(writer.statuses).toEqual([{ artisanId: 12, status: "past_due" }]);
+    expect(notifier.notifs[0]).toMatchObject({ artisanId: 12, type: "erreur" });
+    expect(notifier.emails[0]?.subject).toContain("Probleme de paiement");
+  });
+
+  it("customer.subscription.trial_will_end : notif info + email rappel", async () => {
+    const { deps, notifier } = build();
+    const event = { id: "evt_trial", type: "customer.subscription.trial_will_end", data: { object: { customer: "cus_t", metadata: { artisanId: "13" } } } };
+    await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
+    expect(notifier.notifs[0]).toMatchObject({ artisanId: 13, type: "info" });
+    expect(notifier.emails[0]?.subject).toContain("essai Operioz se termine");
+  });
+
+  it("event vraiment inconnu → 200 {received} sans effet", async () => {
+    const { deps, writer } = build();
+    const event = { id: "evt_unk", type: "charge.refunded", data: { object: {} } };
+    const r = await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
+    expect(r.http).toBe(200);
     expect(writer.upserts).toHaveLength(0);
   });
 

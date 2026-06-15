@@ -33,6 +33,8 @@ const TRPC_PREFIX = "/api/trpc/";
 export const MIGRATED_ROUTES = [
   // Flux iCal public d'abonnement au calendrier des interventions (`/api/calendar/:token.ics`).
   { name: "ical", pattern: /^\/api\/calendar\/.+\.ics$/ },
+  // Webhook Stripe signé (`/api/stripe/webhook`) — vérif signature fail-closed + sync subscriptions/factures.
+  { name: "stripe-webhook", pattern: /^\/api\/stripe\/webhook$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

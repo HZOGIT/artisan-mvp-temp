@@ -45,4 +45,6 @@ export interface StripePort {
   createBillingPortalSession(params: { customerId: string; returnUrl: string }): Promise<{ url: string | null }>;
   // Bascule `cancel_at_period_end` sur l'abonnement Stripe (annulation/réactivation en fin de période).
   setCancelAtPeriodEnd(subscriptionId: string, cancel: boolean): Promise<void>;
+  // Recharge l'abonnement Stripe (webhook `invoice.payment_succeeded` → `current_period_*` à jour).
+  retrieveSubscription(subscriptionId: string): Promise<{ status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }>;
 }

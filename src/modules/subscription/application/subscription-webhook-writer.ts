@@ -9,4 +9,8 @@ export interface SubscriptionWebhookWriter {
   applyUpsert(artisanId: number, fields: SubscriptionUpsertFields): Promise<void>;
   // Extinction (plan expired / canceled) sans toucher au reste.
   applyDeleted(artisanId: number, fields: { plan: string; status: string; cancelAtPeriodEnd: boolean }): Promise<void>;
+  // Renouvellement (invoice payée) : status active + dates de période, sans toucher au plan/limites.
+  setStatusAndPeriod(artisanId: number, fields: { status: string; currentPeriodStart: Date | null; currentPeriodEnd: Date | null }): Promise<void>;
+  // Échec de paiement (invoice failed) : status past_due.
+  setStatus(artisanId: number, status: string): Promise<void>;
 }
