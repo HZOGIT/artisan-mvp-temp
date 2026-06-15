@@ -105,3 +105,4 @@ isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router
 - `2026-06-15 17:33:36Z` **[done]** commandes/devis-acceptes — listerDevisAcceptes couvert (4 cas : filtre accepte, enrichissement nom client, fallback Client, mapping objet/total/date).
 - `2026-06-15 17:43:07Z` **[done]** articles/public-article-search — isSearchable couvert (4 cas : >=2 char, trop court, trim espaces, requête valide entourée d'espaces).
 - `2026-06-15 17:53:36Z` **[done]** articles/bibliotheque — use-cases catalogue couverts (6 cas : délégation list/search/create/delete/import + NotFound sur update inexistant).
+- `2026-06-15 18:02:38Z` **[info]** boucle réorientée — Colonne de tests (L1/L2/L3/L4) par cas d'usage, priorité CRITIQUES. Cron 18363af8. Prochaine: client-portal L2 RLS. commit b5f4927.
