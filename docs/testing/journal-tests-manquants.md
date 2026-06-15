@@ -79,8 +79,8 @@ Légende colonne : ✅ couvert · ⬜ manquant · — non applicable. (état au 
 |---|---|----|--------|----------------|--------|------|
 | 1 | **Portail client public** (`client-portal`) | ✅ | ✅ | ✅ | (PoC) | **COLONNE COMPLÈTE** (L2 it.10-12, L3 router it.13). L4 = PoC portail OPE-316 |
 | 2 | **Signature devis** (`signature`) | ✅ | ✅ | ✅ | (PoC) | **COLONNE COMPLÈTE** (L3 : e2e.test getDevis/signDevis + router.test it.14 admin/refuse) |
-| 3 | **Abonnement / billing** (`subscription`) | 🟡 | ✅ | ✅ | — | L1 use-cases déjà couvert (effects.test) + L3 router it.15 ; **reste L1** subscription-event-notifier |
-| 4 | **Auth / session** (`auth`) | ⬜ | ✅ | ⬜ | — | **L1** emails.ts → **L3** auth.router (signin/me/logout, 401) |
+| 3 | **Abonnement / billing** (`subscription`) | ✅ | ✅ | ✅ | — | **COLONNE COMPLÈTE** (L1 effects.test + webhook ; L3 it.15). event-notifier = port (écarté) |
+| 4 | **Auth / session** (`auth`) | 🟡 | ✅ | ⬜ | — | L1 emails.ts ✅ it.16 ; **reste L3** auth.router (signin/me/logout, 401) |
 | 5 | **Paiement Stripe** (`paiement`) | ✅ | ✅ | ✅ (route HTTP) | (PoC) | colonne ~complète ; vérifier portal-payment-writer drizzle |
 | 6 | **Facturation** (`factures`) | ✅ | ✅ | ✅ | ⬜ | L4 couvert par le PoC devis→paiement ; rien d'urgent |
 | 7 | **Devis** (`devis`) | ✅ | ✅ | ✅ | ⬜ | idem — colonne complète hors L4 |
@@ -93,8 +93,8 @@ isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router
 ### Use-cases L1 encore nus (non critiques — plus bas)
 `clients/import-use-cases`, `contrats-maintenance/contrat-facture-generator`, `devis/devis-to-facture-converter`.
 
-**Prochaine cible : `subscription` — fin L1 : `subscription-event-notifier.test.ts`** (fake `subscription-event-notifier-fake` dispo). Clôt la colonne abonnement. Puis feature #4 `auth` : L1 `emails.ts` → L3 `auth.router`.
-(NB : `use-cases.ts` est déjà couvert par `effects.test.ts` — ne pas recréer.)
+**Prochaine cible : `auth` — L3 : `auth.router.test.ts`** (signin → cookie + me 200 ; me sans cookie → public OK mais user null ; mauvais mot de passe → 401/erreur ; signup). Clôt la colonne auth.
+(NB : `subscription-event-notifier.ts` = port/interface → écarté, rien à tester ; colonne abonnement close.)
 
 ---
 
@@ -116,3 +116,4 @@ isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router
 - `2026-06-15 19:06:43Z` **[done]** client-portal L3 router — COLONNE COMPLÈTE — 5 cas e2e tRPC (verifyAccess valid/invalid, getDevis public + 401 token inconnu, generateAccess 401 sans cookie + happy path admin). Portail public = 1re colonne L1+L2+L3 complète.
 - `2026-06-15 19:35:14Z` **[done]** signature L3 router — COLONNE COMPLÈTE — 5 cas e2e (createSignatureLink admin 401+idempotent, getSignatureByDevis, refuseDevis token→refuse+400 immutable+404). Sans dupliquer signature.e2e. Signature = 2e colonne complète.
 - `2026-06-15 20:05:39Z` **[done]** subscription L3 router — 4 cas e2e billing (5 procédures protégées 401 sans cookie, getCurrent défaut trial, createPortal/cancel sans Customer→404). L1 use-cases déjà couvert par effects.test.
+- `2026-06-15 20:34:38Z` **[done]** auth L1 emails — welcomeEmail/resetPasswordEmail couverts (5 cas : interpolation nom, fallback URL, anti-XSS échappement HTML, resetUrl+validité). subscription-event-notifier = port (écarté), colonne abonnement close.
