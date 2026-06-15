@@ -133,10 +133,13 @@ autres agents ») — non redétaillée ici.
   Réf : [`docs/testing/journal-tests-manquants.md`](docs/testing/journal-tests-manquants.md) — runbook,
   backlog, « prochaine cible », log d'itérations. **Relu à chaque réveil**, écrit à chaque pas. Le cron
   ne porte aucun état métier : juste « relis le journal et fais la prochaine cible ».
-- **Une cible propre par itération** : un fichier `src/**` sans test (logique réelle, pas un port) →
-  test selon la couche (use-case+fakes / repo Drizzle+RLS / router e2e) → exécuté contre le **PG local
-  bootstrappé** (`DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp`,
-  rôle `app_tenant` + RLS déjà en place) → commit chirurgical sur `staging`.
+- **Colonne de tests par cas d'usage, par criticité** : on ne se limite PAS à l'unitaire. Par feature
+  on vise un slice vertical **L1 unit (fakes) + L2 repo Drizzle/RLS + L3 router e2e (tRPC/HTTP) + L4
+  navigateur (chemins critiques seulement)**. On **commence par les cas d'usage critiques** (portail
+  public, signature, paiement, abonnement, auth, facturation, devis) puis on rétro-complète. Une
+  itération avance la colonne d'UNE feature (1–3 fichiers). Exécution contre le **PG local bootstrappé**
+  (`DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp`, rôle `app_tenant`
+  + RLS) → commit chirurgical sur `staging`. Détail/ordre : `docs/testing/journal-tests-manquants.md`.
 - **Déployer uniquement un fix `src/`** (`./devtools/deploy-staging-newstack.sh`) ; un ajout de test
   pur ne change pas le runtime → pas de déploiement.
 - **Documenter sur 4 canaux** : (1) le journal `.md`, (2) **Linear** — issue parent de suivi (OPE-318)

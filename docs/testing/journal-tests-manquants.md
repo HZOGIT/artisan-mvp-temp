@@ -5,10 +5,23 @@
 > Agent : `ope-316-spike-testing`. Branche : **staging** (rester dessus).
 
 ## Mission
-Explorer les tests manquants du new-stack, les implémenter (conventions existantes), les exécuter,
-déployer les **fix** sur staging, recommencer. Un autre agent peut travailler en parallèle →
-**ne toucher que ce qui me concerne** (mes fichiers de test), rebaser avant d'éditer, ne jamais
-committer le travail d'un autre.
+Pour CHAQUE cas d'usage, implémenter une **COLONNE de tests** (pas seulement l'unitaire), en
+**commençant par les cas d'usage CRITIQUES** de l'application, puis **rétro-compléter** les colonnes
+incomplètes. Exécuter, déployer les **fix** sur staging, recommencer. Un autre agent peut travailler en
+parallèle → **ne toucher que ce qui me concerne** (mes fichiers de test), rebaser avant d'éditer.
+
+## Approche « colonne de tests » (décidée avec l'humain le 2026-06-15)
+Par feature, on vise un slice vertical — **3 niveaux + 1 conditionnel** :
+
+| Niveau | Prouve | Outillage | Quand |
+|---|---|---|---|
+| **L1** unitaire use-case | branches/règles/validation/bornes/anti-IDOR logique | Vitest + fakes | toujours |
+| **L2** intégration repo + RLS | persistance, scope tenant, IDOR-FK, isolation cross-tenant réelle | PG local + `app_tenant` + `expectCrossTenantDenied` | si repo Drizzle |
+| **L3** e2e tRPC (router) | 401/400/404/409, cross-tenant 404, superjson | `injectTrpc` + PG | si router tRPC (ou route HTTP → `app.inject`) |
+| **L4** e2e navigateur | parcours utilisateur réel via l'edge public | Playwright (`pw-run.sh`) | **chemins critiques seulement** |
+
+**Règle** : fonction pure → L1 seul ; use-case avec repo+router → L1+L2+L3 ; chemin critique → +L4.
+Une itération **avance la colonne d'UNE feature** (1 à 3 fichiers ; grosse feature = 2 itérations).
 
 ## Canaux de documentation (4)
 1. **Journal** (ce fichier) — log d'itérations en bas.
@@ -25,12 +38,14 @@ export DATABASE_URL="postgres://artisan_user:artisan_password@localhost:5432/art
 git fetch origin && git rebase origin/staging      # se resynchroniser (coordination multi-agents)
 ./devtools/agents/listen.sh ope-316-spike-testing --drain   # lire mes messages, agir si besoin
 ```
-1. **Choisir UNE cible** dans le backlog (fichier source `src/**` sans test sibling, logique réelle —
-   PAS un port/interface). Vérifier qu'aucun autre agent ne l'a prise (git log récent, bus).
-2. **Écrire le test** selon la couche, en s'appuyant sur les patterns canon :
-   - use-case pur → `*.test.ts` + **fakes** (`infra/*-fake.ts`, `src/shared/ports/fakes.ts`). Réf : `src/modules/devis/application/write-use-cases.test.ts`.
-   - repo Drizzle → `*-drizzle.test.ts` + RLS + `expectCrossTenantDenied`. Réf : `src/modules/devis/infra/devis-repository-drizzle.test.ts`.
-   - router → `*.router.test.ts` via `injectTrpc`. Réf : `src/modules/devis/interface/trpc/devis.router.test.ts`.
+1. **Prendre la FEATURE en tête du backlog critique** (cf. « Backlog par criticité ») et identifier le
+   **niveau de colonne manquant le plus prioritaire** (L2 RLS / L3 router / L1 / L4). Vérifier qu'aucun
+   autre agent ne l'a prise (git log récent, bus). Ne PAS recréer un niveau déjà couvert.
+2. **Écrire le test du niveau visé**, patterns canon :
+   - L1 use-case → `*.test.ts` + **fakes**. Réf : `src/modules/devis/application/write-use-cases.test.ts`.
+   - L2 repo Drizzle → `*-drizzle.test.ts` + RLS + `expectCrossTenantDenied`. Réf : `src/modules/devis/infra/devis-repository-drizzle.test.ts`.
+   - L3 router tRPC → `*.router.test.ts` via `injectTrpc`. Réf : `src/modules/devis/interface/trpc/devis.router.test.ts`. (Route HTTP → `app.inject`, réf : `src/interface/http/paiement-route.test.ts`.)
+   - L4 navigateur → `scripts/e2e/*.journey.mjs` (chemins critiques). Réf : `scripts/e2e/devis-to-paiement.journey.mjs`.
 3. **Exécuter** : `pnpm exec tsc -p tsconfig.src.json` (rapide, optionnel) + `pnpm exec vitest run <fichier>`.
    - Rouge à cause du test → corriger le test.
    - Rouge à cause d'un **vrai bug** dans `src/` → fix **minimal**, le signaler (tag `fix`), et **déployer**.
@@ -53,29 +68,29 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - **Après push, RE-VÉRIFIER `origin/staging`** (`git fetch && git log origin/staging --oneline | grep <hash>`) :
   des agents concurrents peuvent **reset la branche** et perdre mon commit → le **cherry-pick** pour le récupérer.
 
-## Backlog — fichiers source sans test (à trier : garder la logique, écarter les ports)
-> Recalculable :
-> `for f in $(find src/modules -path '*/application/*.ts' ! -name '*.test.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`
+## Backlog par CRITICITÉ — compléter les COLONNES (ordre = priorité)
+Légende colonne : ✅ couvert · ⬜ manquant · — non applicable. (état au 2026-06-15, à revérifier.)
 
-- [x] `src/modules/articles/application/bibliotheque-use-cases.ts` → `bibliotheque-use-cases.test.ts` (6 cas) ✅ it.9
-- [x] `src/modules/articles/application/public-article-search.ts` → `public-article-search.test.ts` (4 cas) ✅ it.8
-- [ ] `src/modules/clients/application/import-use-cases.ts`
-- [x] `src/modules/commandes/application/devis-acceptes-use-cases.ts` → `devis-acceptes-use-cases.test.ts` (4 cas) ✅ it.7
-- [ ] `src/modules/contrats-maintenance/application/contrat-facture-generator.ts`
-- [x] `src/modules/depenses/application/budgets-realises-use-case.ts` → `budgets-realises-use-case.test.ts` (4 cas) ✅ it.6
-- [ ] `src/modules/devis/application/devis-to-facture-converter.ts`
-- [x] `src/modules/ecritures/application/comptes.ts` → `comptes.test.ts` (6 cas) ✅ it.2
-- [x] `src/modules/notes-de-frais/application/numero.ts` → `numero.test.ts` (5 cas) ✅ it.1
-- [x] `src/modules/rdv-en-ligne/application/confirm-use-cases.ts` → `confirm-use-cases.test.ts` (4 cas) ✅ it.5
-- [x] `src/modules/rdv-en-ligne/application/propose-use-cases.ts` → `propose-use-cases.test.ts` (4 cas) ✅ it.4
-- [x] `src/modules/stocks/application/alertes-use-cases.ts` → `alertes-use-cases.test.ts` (4 cas) ✅ it.3
-- [ ] `src/modules/subscription/application/use-cases.ts`
-- [ ] `src/modules/subscription/application/subscription-event-notifier.ts`
-- [ ] `src/modules/auth/application/emails.ts`
-- _Écartés (ports/interfaces, pas de logique à tester)_ : `assistant/agentic-port.ts`,
-  `factures/compta-port.ts`, `factures/contact-readers.ts`.
+| # | Feature critique | L1 | L2 RLS | L3 router/HTTP | L4 nav | Trous à combler (prioritaire) |
+|---|---|----|--------|----------------|--------|------|
+| 1 | **Portail client public** (`client-portal`) | ✅ | ⬜ | ⬜ | ⬜ | **L2** portal-access/docs/scheduling drizzle (token=capacité, RLS) → **L3** client-portal.router |
+| 2 | **Signature devis** (`signature`) | ✅ | ✅ | ⬜ | (PoC) | **L3** signature.router (public par token : getDevisForSignature/signDevis/refuse) |
+| 3 | **Abonnement / billing** (`subscription`) | ⬜ | ✅ | ⬜ | — | **L1** use-cases.ts + subscription-event-notifier → **L3** subscription.router |
+| 4 | **Auth / session** (`auth`) | ⬜ | ✅ | ⬜ | — | **L1** emails.ts → **L3** auth.router (signin/me/logout, 401) |
+| 5 | **Paiement Stripe** (`paiement`) | ✅ | ✅ | ✅ (route HTTP) | (PoC) | colonne ~complète ; vérifier portal-payment-writer drizzle |
+| 6 | **Facturation** (`factures`) | ✅ | ✅ | ✅ | ⬜ | L4 couvert par le PoC devis→paiement ; rien d'urgent |
+| 7 | **Devis** (`devis`) | ✅ | ✅ | ✅ | ⬜ | idem — colonne complète hors L4 |
 
-**Prochaine cible : `src/modules/clients/application/import-use-cases.ts`** (import clients en masse).
+### Rétro-complétion (use-cases déjà testés L1 seul — it.1→9) — APRÈS les colonnes critiques
+Ajouter L2/L3 là où la feature a repo+router : `stocks/alertes`, `depenses/budgets-realises`,
+`commandes/devis-acceptes`, `rdv-en-ligne` (propose/confirm). Les fonctions pures (numero, comptes,
+isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router → rien à ajouter).
+
+### Use-cases L1 encore nus (non critiques — plus bas)
+`clients/import-use-cases`, `contrats-maintenance/contrat-facture-generator`, `devis/devis-to-facture-converter`.
+
+**Prochaine cible : `client-portal` — L2 RLS, démarrer par `portal-access-repository-drizzle.test.ts`**
+(résolution du token = accès {clientId,artisanId}, expiration, anti-IDOR cross-tenant). Puis docs/scheduling readers (L2), puis `client-portal.router` (L3).
 
 ---
 
