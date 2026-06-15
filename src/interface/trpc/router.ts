@@ -49,6 +49,7 @@ import type { SignatureModule } from "../../modules/signature/signature.module";
 import type { ConseilsIaModule } from "../../modules/conseils-ia/conseils-ia.module";
 import type { AssistantModule } from "../../modules/assistant/assistant.module";
 import type { ChatModule } from "../../modules/chat/chat.module";
+import type { SupportModule } from "../../modules/support/support.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -101,6 +102,7 @@ export interface AppRouterDeps {
   readonly conseilsIa: ConseilsIaModule;
   readonly assistant: AssistantModule;
   readonly chat: ChatModule;
+  readonly support: SupportModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -163,6 +165,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     conseilsIA: deps.conseilsIa.procedure,
     assistant: deps.assistant.router,
     chat: deps.chat.router,
+    support: deps.support.router,
   });
 }
 

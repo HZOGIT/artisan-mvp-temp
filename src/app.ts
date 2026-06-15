@@ -115,6 +115,7 @@ import { createAssistantModule } from "./modules/assistant/assistant.module";
 import { AssistantThreadsRepositoryDrizzle } from "./modules/assistant/infra/assistant-threads-repository-drizzle";
 import { AssistantDataReaderDrizzle } from "./modules/assistant/infra/assistant-data-reader-drizzle";
 import { createChatModule } from "./modules/chat/chat.module";
+import { createSupportModule } from "./modules/support/support.module";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
@@ -658,7 +659,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     ),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat });
+  // Module `support` (formulaire de contact → email à la boîte support). Sans table : EmailPort legacy
+  // + rate-limiter anti-flood (5 / 15 min, parité legacy) + boîte support (env SUPPORT_EMAIL).
+  const support = createSupportModule({
+    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
+    destinataire: process.env.SUPPORT_EMAIL ?? "support@operioz.com",
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
