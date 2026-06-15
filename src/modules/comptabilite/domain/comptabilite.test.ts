@@ -64,6 +64,16 @@ describe("comptabilite domain (pur)", () => {
     expect(r).toEqual({ tvaCollectee: 25.5, tvaDeductible: 8, tvaNette: 17.5 });
   });
 
+  it("computeRapportTVA : un AVOIR (44571 au DÉBIT) RÉDUIT la TVA collectée (nette débit/crédit)", () => {
+    const r = computeRapportTVA([
+      ec({ numeroCompte: "445711", credit: "20.00" }), // facture : TVA collectée +20
+      ec({ numeroCompte: "445711", debit: "5.00" }), // avoir : TVA collectée −5
+      ec({ numeroCompte: "445660", debit: "8.00" }), // achat : TVA déductible +8
+      ec({ numeroCompte: "445660", credit: "3.00" }), // avoir d'achat : TVA déductible −3
+    ]);
+    expect(r).toEqual({ tvaCollectee: 15, tvaDeductible: 5, tvaNette: 10 });
+  });
+
   it("assembleDeclarationTVA : arrondi 2 déc., total collectée + nette", () => {
     const d = assembleDeclarationTVA(
       [

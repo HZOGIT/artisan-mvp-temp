@@ -88,13 +88,16 @@ export function computeBalance(ecritures: readonly Ecriture[]): LigneBalance[] {
   return Array.from(comptes.values()).sort((a, b) => a.numeroCompte.localeCompare(b.numeroCompte));
 }
 
-// Rapport TVA simplifié depuis les écritures : collectée (44571x au crédit) − déductible (44566x au débit).
+// Rapport TVA simplifié depuis les écritures : collectée = SOLDE des comptes 44571x (crédit − débit),
+// déductible = SOLDE des comptes 44566x (débit − crédit). ⚠️ On NETTE débit/crédit : un AVOIR génère
+// une écriture INVERSE (TVA collectée au débit) qui DOIT réduire la TVA collectée — sinon la note de
+// crédit ne diminue jamais la TVA déclarée (sur-déclaration).
 export function computeRapportTVA(ecritures: readonly Ecriture[]): RapportTVA {
   let tvaCollectee = 0;
   let tvaDeductible = 0;
   for (const e of ecritures) {
-    if (e.numeroCompte.startsWith("44571")) tvaCollectee += num(e.credit);
-    else if (e.numeroCompte.startsWith("44566")) tvaDeductible += num(e.debit);
+    if (e.numeroCompte.startsWith("44571")) tvaCollectee += num(e.credit) - num(e.debit);
+    else if (e.numeroCompte.startsWith("44566")) tvaDeductible += num(e.debit) - num(e.credit);
   }
   return { tvaCollectee, tvaDeductible, tvaNette: tvaCollectee - tvaDeductible };
 }
