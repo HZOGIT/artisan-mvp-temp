@@ -63,6 +63,28 @@ jamais un ntfy public en clair.
 3. qa-browser fait le QA navigateur, puis prévient l'humain :
    ./devtools/agents/notify.sh human TASK_DONE "QA OK sur feature X, prêt à merger"
 
+### Travailler sans détruire le travail des autres agents (branche partagée)
+
+Plusieurs agents poussent **en parallèle sur la même branche `staging`**. Règle d'or :
+**ne touche QUE ce qui te concerne**, laisse intact tout le reste.
+
+- **Commit chirurgical.** Toujours `git add <chemins explicites>` de TES fichiers. **Jamais**
+  `git add -A` / `git add .` / `git commit -a` : tu emporterais les fichiers non commités ou en
+  cours d'édition d'un autre agent (prompts `devtools/prompts/`, audits `docs/billing/`,
+  `docs/testing/`, etc.). Un `git status` peut montrer des `M`/`??` qui ne sont **pas à toi** —
+  laisse-les.
+- **Ne réécris jamais l'historique partagé.** Pas de `git reset --hard`, `rebase`, `commit --amend`
+  ni `push --force` sur `staging` : tu ferais disparaître les commits des autres.
+- **Revérifie `origin` après push.** Un reset concurrent peut faire disparaître TON commit de la
+  lignée poussée (déjà vu). Confirme : `git fetch origin staging` puis
+  `git show origin/staging:<fichier> | grep <marqueur>`. Si ton commit a sauté, il reste
+  récupérable : `git cat-file -t <sha>` puis `git cherry-pick <sha>`.
+- **Après un déploiement, source git == bundle live.** Le déploiement build depuis la copie de
+  travail, qui peut diverger de l'historique si un autre agent t'a reset sous les pieds. Vérifie
+  que le fix est bien dans `origin/staging` ET dans l'artefact déployé.
+- En cas de doute sur la propriété d'un fichier, **ne le commit pas** ; demande sur le bus
+  (`notify.sh`) ou laisse-le à son auteur.
+
 ## Déboguer un problème front/intégration — utiliser un VRAI navigateur
 
 Pour tout bug remonté côté **utilisateur** (page qui charge à l'infini, lien « expiré »,
