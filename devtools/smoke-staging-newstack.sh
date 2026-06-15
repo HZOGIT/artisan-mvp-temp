@@ -62,6 +62,18 @@ codeDO=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
   "$NEWSTACK_URL/api/trpc/devisOptions.getByDevisId?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22devisId%22%3A$SMOKE_DID%7D%7D%7D")
 [ "$codeDO" = "200" ] && echo "  ✓ devisOptions.getByDevisId (devis possédé) -> 200" || { echo "  ✖ devisOptions.getByDevisId -> $codeDO (attendu 200)"; fail=1; }
 
+# 2c-bis) signature.getDevisForSignature : surface PUBLIQUE par token (SANS cookie). Sème (idempotent)
+# un lien de signature pour le devis smoke de A, puis résout par token → 200 (prouve la policy RLS
+# public-token sur `devis` + la résolution token→devis sous le rôle app_tenant). Sans la policy, le
+# rôle app_tenant ne verrait pas le devis → 404. On vérifie aussi qu'un token bidon → 404.
+$PG "insert into signatures_devis (\"devisId\", token, \"expiresAt\") select $SMOKE_DID, 'smoke-sig-tok-$AA-aaaaaaaaaaaaaaaaaaaaaa', now() + interval '30 days' where not exists (select 1 from signatures_devis where \"devisId\"=$SMOKE_DID);" >/dev/null
+SIG_TOKEN=$($PG "select token from signatures_devis where \"devisId\"=$SMOKE_DID limit 1;")
+SIG_INPUT="%7B%220%22%3A%7B%22json%22%3A%7B%22token%22%3A%22${SIG_TOKEN}%22%7D%7D%7D"
+codeSig=$(curl -s -o /dev/null -w "%{http_code}" "$NEWSTACK_URL/api/trpc/signature.getDevisForSignature?batch=1&input=$SIG_INPUT")
+[ "$codeSig" = "200" ] && echo "  ✓ signature.getDevisForSignature (token public, sans cookie) -> 200" || { echo "  ✖ signature.getDevisForSignature -> $codeSig (attendu 200 ; policy RLS public-token sur devis appliquée ?)"; fail=1; }
+codeSigBad=$(curl -s -o /dev/null -w "%{http_code}" "$NEWSTACK_URL/api/trpc/signature.getDevisForSignature?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22token%22%3A%22tok-bidon-zzzzzzzzzzzzzzzzzzzzzzzzzz%22%7D%7D%7D")
+[ "$codeSigBad" = "404" ] && echo "  ✓ signature.getDevisForSignature (token inconnu) -> 404 (anti-oracle)" || { echo "  ✖ signature.getDevisForSignature token inconnu -> $codeSigBad (attendu 404)"; fail=1; }
+
 # 2d) search.global : nécessite un `query` (≥2 chars). Vérifie 200 (recherche scopée tenant A).
 codeSearch=$(curl -s -o /dev/null -w "%{http_code}" --cookie "token=$TOKEN_A" \
   "$NEWSTACK_URL/api/trpc/search.global?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22query%22%3A%22zz%22%7D%7D%7D")
