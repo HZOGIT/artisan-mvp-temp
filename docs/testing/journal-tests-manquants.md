@@ -60,7 +60,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - [ ] `src/modules/articles/application/bibliotheque-use-cases.ts`
 - [ ] `src/modules/articles/application/public-article-search.ts`
 - [ ] `src/modules/clients/application/import-use-cases.ts`
-- [ ] `src/modules/commandes/application/devis-acceptes-use-cases.ts`
+- [x] `src/modules/commandes/application/devis-acceptes-use-cases.ts` → `devis-acceptes-use-cases.test.ts` (4 cas) ✅ it.7
 - [ ] `src/modules/contrats-maintenance/application/contrat-facture-generator.ts`
 - [x] `src/modules/depenses/application/budgets-realises-use-case.ts` → `budgets-realises-use-case.test.ts` (4 cas) ✅ it.6
 - [ ] `src/modules/devis/application/devis-to-facture-converter.ts`
@@ -75,7 +75,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - _Écartés (ports/interfaces, pas de logique à tester)_ : `assistant/agentic-port.ts`,
   `factures/compta-port.ts`, `factures/contact-readers.ts`.
 
-**Prochaine cible : `src/modules/commandes/application/devis-acceptes-use-cases.ts`** (devis acceptés → commandes).
+**Prochaine cible : `src/modules/articles/application/public-article-search.ts`** (recherche articles publique).
 
 ---
 
@@ -87,3 +87,4 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - `2026-06-15 17:03:27Z` **[done]** rdv-en-ligne/propose — proposerAutreCreneau couvert (4 cas : anti-IDOR, bornes date, validation avant mutation, copie+refus).
 - `2026-06-15 17:13:15Z` **[done]** rdv-en-ligne/confirm — confirmerRdvAvecIntervention couvert (4 cas : anti-IDOR, garde statut, création intervention planifiée + lien, durée défaut 60).
 - `2026-06-15 17:23:48Z` **[done]** depenses/budgets-realises — budgetsRealises couvert (4 cas : croisement budget/réel+pct, sans dépense, budget 0 sans div/0, scope tenant).
+- `2026-06-15 17:33:36Z` **[done]** commandes/devis-acceptes — listerDevisAcceptes couvert (4 cas : filtre accepte, enrichissement nom client, fallback Client, mapping objet/total/date).
