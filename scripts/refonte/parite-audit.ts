@@ -62,10 +62,17 @@ function main(): void {
 
   const lines: string[] = [];
   lines.push("# Refonte — backlog de parité & dépréciation legacy", "");
+  lines.push("> ✅ **EXTINCTION DU LEGACY ACHEVÉE.** `server/` (legacy Express) a été supprimé ; le stack");
+  lines.push("> est unique (Fastify + tRPC 11 + Drizzle pg + RLS). `LEGACY_ROUTERS` ci-dessous est un");
+  lines.push("> **snapshot FIGÉ** de l'ancien `server/routers.ts` (conservé pour la traçabilité de l'audit,");
+  lines.push("> il n'est plus lu en direct). Lecture des colonnes : « ✅ name-match » = la clé tRPC du new");
+  lines.push("> stack == celle appelée par le client ; « ⚠️ sous-routeur de … » / « ⚠️ pas de top-level");
+  lines.push("> legacy » = **bénin** (sous-ressource montée sous son parent, ou domaine new-stack sans");
+  lines.push("> équivalent legacy top-level) — PAS un gap. La § 3 (« legacy-only ») ne liste plus que des");
+  lines.push("> routeurs MORTS (0 appel client). **→ zéro gap de parité réel.**", "");
   lines.push("> Généré par `scripts/refonte/parite-audit.ts`. Pour CHAQUE domaine : statut de");
   lines.push("> correspondance du nom (la clé tRPC appelée par le client) + procédures servies par le");
-  lines.push("> nouveau stack. La parité fine des procédures (legacy vs new) est un diff manuel par");
-  lines.push("> domaine (cf. `server/routers.ts`).", "");
+  lines.push("> nouveau stack.", "");
 
   lines.push("## 1. Domaines migrés — correspondance de nom", "");
   lines.push("| Domaine (new stack) | Clé client | Statut | # procédures new |");
@@ -94,11 +101,13 @@ function main(): void {
   lines.push("");
 
   const legacyOnly = LEGACY_ROUTERS.filter((r) => !MIGRATED_DOMAINS.includes(r) && !Object.values(RENAMES).includes(r));
-  lines.push("## 3. Routeurs tRPC legacy SANS équivalent clean-archi (à migrer)", "");
-  lines.push(`${legacyOnly.length} routeurs → 100% legacy tant que non migrés :`, "");
+  lines.push("## 3. Routeurs tRPC legacy SANS équivalent clean-archi", "");
+  lines.push(`${legacyOnly.length} routeurs présents dans le snapshot legacy mais pas dans le new-stack —`);
+  lines.push("**MORTS (0 appel client, vérifié), droppables** ; le legacy étant éteint, ils ne sont servis");
+  lines.push("nulle part (`portail` est superseded par `clientPortal` migré ; push notifications non utilisé) :", "");
   lines.push(legacyOnly.map((r) => `\`${r}\``).join(", "), "");
-  lines.push("> + toute la surface HORS tRPC : auth (login/signup/reset), webhooks Stripe, uploads,");
-  lines.push("> PDF/iCal publics, vitrine/portail publics (tokens). À migrer en routes Fastify dédiées.", "");
+  lines.push("> Surface HORS tRPC (auth login/signup/reset, webhooks Stripe, uploads, PDF/iCal publics,");
+  lines.push("> vitrine/portail publics par token) : **portée en routes Fastify dédiées** (cf. journal).", "");
 
   const out = "docs/architecture/refonte-parite-backlog.md";
   writeFileSync(out, lines.join("\n"));
