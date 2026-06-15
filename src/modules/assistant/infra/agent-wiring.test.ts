@@ -5,6 +5,9 @@ import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos, type
 import { FakeClientRepository } from "../../clients/infra/client-repository-fake";
 import { FakeInterventionRepository } from "../../interventions/infra/intervention-repository-fake";
 import { FakeDevisRepository } from "../../devis/infra/devis-repository-fake";
+import { FakeFactureRepository } from "../../factures/infra/facture-repository-fake";
+import { FakeDevisReader } from "../../factures/infra/devis-reader-fake";
+import { FakeCommandeRepository } from "../../commandes/infra/commande-repository-fake";
 // Vérif de PARITÉ STRUCTURELLE (compile-time) : les interfaces des repos migrés satisfont les ports
 // `*ForAgent`. Si un repo dérive (renomme `list`, change un type), la compilation casse ici.
 import type { IClientRepository } from "../../clients/application/client-repository";
@@ -110,6 +113,32 @@ describe("agent-wiring — écritures câblées (Phase 3b-i)", () => {
     const reg = buildAssistantAgentRegistry(repos(), buildAssistantWriteHandlersFromRepos(writeRepos()));
     // clientId 999 n'existe pas → le use-case migré refuse (ownership FK).
     const res = await reg.execute("creer_intervention", { clientId: 999, titre: "X", dateDebut: "2026-07-01T08:00:00", dateFin: "2026-07-01T10:00:00" }, ctx);
+    expect(res.ok).toBe(false);
+  });
+
+  it("factures + commandes câblées quand les repos sont fournis (6 écritures)", async () => {
+    const wr = {
+      clientRepo: new FakeClientRepository(),
+      interventionRepo: new FakeInterventionRepository(),
+      devisRepo: new FakeDevisRepository(),
+      factureRepo: new FakeFactureRepository(),
+      devisReader: new FakeDevisReader(),
+      commandeRepo: new FakeCommandeRepository(),
+    };
+    const reg = buildAssistantAgentRegistry(repos(), buildAssistantWriteHandlersFromRepos(wr));
+    for (const name of ["creer_client", "creer_intervention", "modifier_intervention", "creer_devis", "creer_facture", "creer_commande_fournisseur"]) {
+      expect(reg.tools.some((t) => t.name === name), name).toBe(true);
+    }
+    // envois pas encore câblés (3b-iii) : absents
+    expect(reg.tools.some((t) => t.name === "envoyer_devis")).toBe(false);
+  });
+
+  it("creer_commande_fournisseur exécuté de bout en bout (use-case migré) → ok ou refus métier (pas d'exception)", async () => {
+    const commandeRepo = new FakeCommandeRepository();
+    const wr = { clientRepo: new FakeClientRepository(), interventionRepo: new FakeInterventionRepository(), devisRepo: new FakeDevisRepository(), commandeRepo };
+    const reg = buildAssistantAgentRegistry(repos(), buildAssistantWriteHandlersFromRepos(wr));
+    // fournisseur 999 absent → le use-case migré refuse (ownership) → {ok:false}, jamais une exception non captée.
+    const res = await reg.execute("creer_commande_fournisseur", { fournisseurId: 999, lignes: [{ designation: "Tube", quantite: 2, prixUnitaireHT: 10 }] }, ctx);
     expect(res.ok).toBe(false);
   });
 });

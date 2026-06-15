@@ -20,6 +20,11 @@ import type { InterventionStatut } from "../../interventions/domain/intervention
 import { creerIntervention, modifierIntervention } from "../../interventions/application/write-use-cases";
 import type { IDevisRepository } from "../../devis/application/devis-repository";
 import { creerDevis, ajouterLigneDevis } from "../../devis/application/write-use-cases";
+import type { IFactureRepository } from "../../factures/application/facture-repository";
+import type { IDevisReader } from "../../factures/application/devis-reader";
+import { creerFacture, ajouterLigneFacture, modifierFacture, convertirDevisEnFacture } from "../../factures/application/write-use-cases";
+import type { ICommandeRepository } from "../../commandes/application/commande-repository";
+import { creerCommande } from "../../commandes/application/write-use-cases";
 
 // Câblage de l'assistant agentique : adapte les repos/use-cases DÉJÀ MIGRÉS aux ports `*ForAgent` et
 // construit le registry. Les repos migrés satisfont STRUCTURELLEMENT les interfaces de lecture (méthode
@@ -48,18 +53,22 @@ export function buildAssistantReadDeps(repos: AssistantAgentReadRepos): Assistan
   };
 }
 
-// Repos d'ÉCRITURE (Phase 3b-i : clients/interventions/devis — sans envoi email). Étendu en 3b-ii
-// (factures + envois + commandes, qui exigent aussi les mailing deps).
+// Repos d'ÉCRITURE. `clientRepo`/`interventionRepo`/`devisRepo` requis (3b-i) ; `factureRepo`+`devisReader`
+// (conversion devis→facture) et `commandeRepo` optionnels (3b-ii créations). Les ENVOIS (3b-iii) exigent
+// en plus les mailing deps (cf. `AssistantAgentSenders`).
 export interface AssistantAgentWriteRepos {
   readonly clientRepo: IClientRepository;
   readonly interventionRepo: IInterventionRepository;
   readonly devisRepo: IDevisRepository;
+  readonly factureRepo?: IFactureRepository;
+  readonly devisReader?: IDevisReader;
+  readonly commandeRepo?: ICommandeRepository;
 }
 
 // Adapte les use-cases d'écriture migrés aux ports `*ForAgent` (wrappers triviaux ; ownership/validation
-// dans les use-cases). Phase 3b-i : creer_client, creer_intervention, modifier_intervention, creer_devis.
+// dans les use-cases). Un outil n'est câblé que si ses repos sont fournis.
 export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos): AssistantWriteDeps {
-  const { clientRepo, interventionRepo, devisRepo } = repos;
+  const { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader, commandeRepo } = repos;
   return {
     clients: { create: (ctx, input) => creerClient(clientRepo, ctx, input) },
     clientsById: clientRepo,
@@ -74,6 +83,33 @@ export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos): Assist
       },
       getById: (ctx, id) => devisRepo.getById(ctx, id),
     },
+    ...(factureRepo && devisReader
+      ? {
+          factures: {
+            creer: (ctx, input) => creerFacture(factureRepo, ctx, input),
+            ajouterLigne: async (ctx, factureId, ligne) => {
+              await ajouterLigneFacture(factureRepo, ctx, factureId, ligne);
+            },
+            convertirDevis: (ctx, devisId) => convertirDevisEnFacture(factureRepo, devisReader, ctx, devisId),
+            setObjet: async (ctx, factureId, objet) => {
+              await modifierFacture(factureRepo, ctx, factureId, { objet });
+            },
+            getById: (ctx, id) => factureRepo.getById(ctx, id),
+          },
+        }
+      : {}),
+    ...(commandeRepo
+      ? {
+          commandes: {
+            // `numero` est généré par le repo à la création (CMD-xxxxx) ; le type `string | null` est
+            // permissif → on coerce (jamais nul en pratique).
+            creer: async (ctx, input) => {
+              const c = await creerCommande(commandeRepo, ctx, input);
+              return { id: c.id, numero: c.numero ?? "", totalTTC: c.totalTTC ?? "0" };
+            },
+          },
+        }
+      : {}),
   };
 }
 
