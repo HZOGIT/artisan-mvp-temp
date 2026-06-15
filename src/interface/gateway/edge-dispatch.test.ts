@@ -82,10 +82,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // upload logo (auth cookie) → new-stack
     expect(decideTarget("/api/upload-logo", {})).toBe("new-stack");
     expect(matchesMigratedRoute("/api/upload-logo")).toBe(true);
-    // exports comptabilité (auth cookie) → new-stack ; facturx (PDF) pas encore migré → legacy
+    // exports comptabilité (auth cookie) → new-stack (Factur-X traité plus bas)
     expect(decideTarget("/api/comptabilite/fec", {})).toBe("new-stack");
     expect(decideTarget("/api/comptabilite/export-csv", {})).toBe("new-stack");
-    expect(decideTarget("/api/comptabilite/facturx/42", {})).toBe("legacy");
     // paiement (public par token) → new-stack
     expect(decideTarget("/api/paiement/status/42", {})).toBe("new-stack");
     expect(decideTarget("/api/paiement/create-checkout-session", {})).toBe("new-stack");
@@ -108,6 +107,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(decideTarget("/api/portail/abc123/devis/42/pdf", {})).toBe("new-stack");
     expect(decideTarget("/api/portail/abc123/devis/42", {})).toBe("legacy"); // pas le PDF
     expect(decideTarget("/api/portail/abc123/factures/42/pdf", {})).toBe("new-stack");
+    // Factur-X (auth cookie) → new-stack ; XML et PDF distincts, pas de collision de motif
+    expect(decideTarget("/api/comptabilite/facturx-xml/42", {})).toBe("new-stack");
+    expect(decideTarget("/api/comptabilite/facturx/42", {})).toBe("new-stack");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe

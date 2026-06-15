@@ -42,6 +42,10 @@ export const MIGRATED_ROUTES: readonly MigratedRoute[] = [
   { name: "portail-devis-pdf", pattern: /^\/api\/portail\/[^/]+\/devis\/[^/]+\/pdf$/ },
   // PDF d'une facture depuis le portail client (`/api/portail/:token/factures/:id/pdf`, PUBLIC par token, jsPDF).
   { name: "portail-facture-pdf", pattern: /^\/api\/portail\/[^/]+\/factures\/[^/]+\/pdf$/ },
+  // Factur-X XML CII d'une facture (`/api/comptabilite/facturx-xml/:id`, auth cookie JWT, EN 16931).
+  { name: "facturx-xml", pattern: /^\/api\/comptabilite\/facturx-xml\/[^/]+$/ },
+  // PDF Factur-X d'une facture (`/api/comptabilite/facturx/:id`, auth cookie JWT, jsPDF).
+  { name: "facturx-pdf", pattern: /^\/api\/comptabilite\/facturx\/[^/]+$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

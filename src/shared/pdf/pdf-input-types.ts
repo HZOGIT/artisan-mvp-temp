@@ -30,6 +30,10 @@ export interface Facture {
   dateEcheance?: any;
   referenceClient?: any;
   statut?: any;
+  // Lus par le générateur Factur-X (CII) :
+  totalHT?: any;
+  totalTVA?: any;
+  totalTTC?: any;
 }
 
 export interface Artisan {
@@ -41,6 +45,7 @@ export interface Artisan {
   telephone?: any;
   siret?: any;
   tauxTVA?: any;
+  numeroTVA?: any; // Factur-X (CII)
   conditionsGenerales?: any;
 }
 
