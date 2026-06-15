@@ -1,5 +1,5 @@
 import { and, desc, eq, gte } from "drizzle-orm";
-import { clientPortalAccess, factures, paiementsStripe } from "../../../../drizzle/schema.pg";
+import { artisans, clientPortalAccess, clients, factures, paiementsStripe } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withPublicToken, withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
@@ -8,6 +8,8 @@ import type {
   PortalAccess,
   FacturePaiementStatut,
   DernierPaiement,
+  FactureCheckout,
+  ClientContact,
 } from "../application/portal-payment-reader";
 
 // Lectures paiement portail. `resolveAccessByToken` lit `client_portal_access` sous la policy
@@ -64,5 +66,32 @@ export class PortalPaymentReaderDrizzle implements PortalPaymentReader {
         .limit(1);
       return p ? { statut: p.statut ?? "en_attente", paidAt: p.paidAt ?? null } : null;
     });
+  }
+
+  getFactureCheckout(ctx: TenantContext, factureId: number): Promise<FactureCheckout | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [f] = await tx
+        .select({ clientId: factures.clientId, numero: factures.numero, statut: factures.statut, totalTTC: factures.totalTTC })
+        .from(factures)
+        .where(and(eq(factures.id, factureId), eq(factures.artisanId, ctx.artisanId)))
+        .limit(1);
+      return f ? { clientId: f.clientId, numero: f.numero, statut: f.statut ?? "brouillon", totalTTC: f.totalTTC ?? "0.00" } : null;
+    });
+  }
+
+  getClientContact(ctx: TenantContext, clientId: number): Promise<ClientContact | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [c] = await tx
+        .select({ email: clients.email, nom: clients.nom, prenom: clients.prenom })
+        .from(clients)
+        .where(and(eq(clients.id, clientId), eq(clients.artisanId, ctx.artisanId)))
+        .limit(1);
+      return c ? { email: c.email ?? null, nom: c.nom, prenom: c.prenom ?? null } : null;
+    });
+  }
+
+  async getArtisanNom(ctx: TenantContext): Promise<string | null> {
+    const [a] = await this.db.select({ nomEntreprise: artisans.nomEntreprise }).from(artisans).where(eq(artisans.id, ctx.artisanId)).limit(1);
+    return a?.nomEntreprise ?? null;
   }
 }

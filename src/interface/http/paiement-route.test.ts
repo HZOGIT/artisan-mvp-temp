@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { Pool } from "pg";
 import { buildApp } from "../../app";
+import { FakeStripePort } from "../../shared/ports/stripe-adapter";
 
 const URL = process.env.DATABASE_URL;
 const UID = 9991151;
@@ -13,6 +14,7 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
   let factureId = 0;
 
   const cleanup = async () => {
+    await admin.query('delete from paiements_stripe where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
     await admin.query('delete from client_portal_access where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
     await admin.query('delete from factures where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
@@ -21,11 +23,11 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
 
   beforeAll(async () => {
     await cleanup();
-    const artisanId = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UID])).rows[0].id;
-    const clientId = (await admin.query('insert into clients ("artisanId",nom) values ($1,$2) returning id', [artisanId, "Durand"])).rows[0].id;
+    const artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2) returning id', [UID, "Plomberie X"])).rows[0].id;
+    const clientId = (await admin.query('insert into clients ("artisanId",nom,email) values ($1,$2,$3) returning id', [artisanId, "Durand", "c@test.com"])).rows[0].id;
     factureId = (await admin.query('insert into factures ("artisanId","clientId",numero,statut,"totalTTC") values ($1,$2,$3,$4,$5) returning id', [artisanId, clientId, "FAC-R", "envoyee", "240.00"])).rows[0].id;
     await admin.query('insert into client_portal_access ("clientId","artisanId",token,email,"expiresAt","isActive") values ($1,$2,$3,$4, now() + interval \'7 days\', true)', [clientId, artisanId, TOKEN, "c@test.com"]);
-    app = buildApp();
+    app = buildApp({ stripePort: new FakeStripePort() });
   });
   afterAll(async () => {
     await app?.close();
@@ -47,5 +49,24 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
     const res = await app.inject({ method: "GET", url: `/api/paiement/status/${factureId}?token=${TOKEN}` });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ factureId, statutFacture: "envoyee", montantTTC: "240.00" });
+  });
+
+  it("create-checkout-session : body incomplet → 400", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/paiement/create-checkout-session", headers: { "content-type": "application/json" }, payload: JSON.stringify({ factureId }) });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("create-checkout-session : token inconnu → 403", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/paiement/create-checkout-session", headers: { "content-type": "application/json" }, payload: JSON.stringify({ factureId, token: "absent-zzzzzzzz" }) });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it("create-checkout-session : facture payable → 200 {url} + ligne paiement en_attente créée", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/paiement/create-checkout-session", headers: { "content-type": "application/json" }, payload: JSON.stringify({ factureId, token: TOKEN }) });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().url).toContain("checkout.stripe.test");
+    const { rows } = await admin.query("select statut, \"tokenPaiement\" from paiements_stripe where \"factureId\"=$1 order by id desc limit 1", [factureId]);
+    expect(rows[0].statut).toBe("en_attente");
+    expect(rows[0].tokenPaiement).toHaveLength(32);
   });
 });

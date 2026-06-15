@@ -32,6 +32,22 @@ export interface StripeWebhookEvent {
   readonly data: { readonly object: Record<string, unknown> };
 }
 
+// Paiement d'une facture par un CLIENT (Checkout mode `payment`, ≠ subscription). Le webhook
+// `checkout.session.completed` (déjà porté) lit `metadata.token_paiement`/`facture_id` pour solder.
+export interface CreateInvoiceCheckoutParams {
+  readonly factureId: number;
+  readonly numeroFacture: string;
+  readonly montantTTC: number;
+  readonly clientEmail: string;
+  readonly clientName: string;
+  readonly artisanName: string;
+  readonly artisanId: number;
+  readonly userId: number;
+  readonly origin: string;
+  readonly tokenPaiement: string;
+  readonly portalToken: string;
+}
+
 export interface StripePort {
   // Vérifie la signature d'un webhook (HMAC `STRIPE_WEBHOOK_SECRET`) et renvoie l'évènement.
   // ⚠️ **fail-closed** : LÈVE une exception si la signature est invalide → l'appelant rejette (400).
@@ -41,6 +57,8 @@ export interface StripePort {
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
   // Crée une session Checkout (mode subscription). Renvoie l'URL de redirection (null possible).
   createCheckoutSession(params: CreateCheckoutParams): Promise<{ url: string | null }>;
+  // Crée une session Checkout (mode `payment`) pour le paiement d'une facture. Renvoie url + sessionId.
+  createInvoiceCheckout(params: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }>;
   // Crée une session du portail de facturation (gérer carte/factures). Renvoie l'URL.
   createBillingPortalSession(params: { customerId: string; returnUrl: string }): Promise<{ url: string | null }>;
   // Bascule `cancel_at_period_end` sur l'abonnement Stripe (annulation/réactivation en fin de période).

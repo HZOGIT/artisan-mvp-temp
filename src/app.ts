@@ -129,6 +129,7 @@ import { registerComptabiliteExportRoute } from "./interface/http/comptabilite-e
 import { FacturesCsvReaderDrizzle } from "./modules/comptabilite/infra/factures-csv-reader-drizzle";
 import { registerPaiementRoute } from "./interface/http/paiement-route";
 import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-payment-reader-drizzle";
+import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-payment-writer-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -690,8 +691,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     csvReader: new FacturesCsvReaderDrizzle(getDbHandle().db),
   });
 
-  // §4 HORS-tRPC : statut de paiement d'une facture (portail client, public par token). Lecture seule.
-  registerPaiementRoute(app, { reader: new PortalPaymentReaderDrizzle(getDbHandle().db) });
+  // §4 HORS-tRPC : statut de paiement + ouverture d'un Checkout (portail client, public par token).
+  registerPaiementRoute(app, {
+    reader: new PortalPaymentReaderDrizzle(getDbHandle().db),
+    writer: new PortalPaymentWriterDrizzle(getDbHandle().db),
+    stripe: deps.stripePort ?? new StripeAdapter(),
+    rateLimiter: new SlidingWindowRateLimiter(20, 60 * 1000),
+    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+  });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).
   app.decorate("appRouter", appRouter);

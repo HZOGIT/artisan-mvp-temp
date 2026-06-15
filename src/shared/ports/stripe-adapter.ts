@@ -1,4 +1,4 @@
-import type { CreateCheckoutParams, CreateCustomerParams, StripePort, StripeWebhookEvent } from "./stripe";
+import type { CreateCheckoutParams, CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
 
 // Adapter Stripe : instancie le SDK `stripe` via un import variable-de-chemin (le SDK n'entre PAS dans
 // le typecheck de src/**), avec la clé `STRIPE_SECRET_KEY` (réutilisée du legacy). Mappe le port vers
@@ -7,7 +7,7 @@ const STRIPE_MODULE = "stripe";
 
 type StripeSDK = {
   customers: { create(p: unknown): Promise<{ id: string }> };
-  checkout: { sessions: { create(p: unknown): Promise<{ url: string | null }> } };
+  checkout: { sessions: { create(p: unknown): Promise<{ id: string; url: string | null }> } };
   billingPortal: { sessions: { create(p: unknown): Promise<{ url: string | null }> } };
   subscriptions: {
     update(id: string, p: unknown): Promise<unknown>;
@@ -60,6 +60,41 @@ export class StripeAdapter implements StripePort {
     return s.billingPortal.sessions.create({ customer: p.customerId, return_url: p.returnUrl });
   }
 
+  // Checkout mode `payment` pour payer une facture (parité legacy `createCheckoutSession`).
+  async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
+    const s = await this.sdk();
+    const session = await s.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      customer_email: p.clientEmail || undefined,
+      client_reference_id: String(p.factureId),
+      allow_promotion_codes: true,
+      locale: "fr",
+      line_items: [
+        {
+          price_data: {
+            currency: "eur",
+            product_data: { name: `Facture ${p.numeroFacture}`, description: `Paiement de facture pour ${p.clientName} - ${p.artisanName}` },
+            unit_amount: Math.round(p.montantTTC * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        facture_id: String(p.factureId),
+        artisan_id: String(p.artisanId),
+        user_id: String(p.userId),
+        customer_email: p.clientEmail,
+        customer_name: p.clientName,
+        numero_facture: p.numeroFacture,
+        token_paiement: p.tokenPaiement,
+      },
+      success_url: `${p.origin}/portail/${p.portalToken}?paiement=succes&factureId=${p.factureId}`,
+      cancel_url: `${p.origin}/portail/${p.portalToken}?paiement=annule`,
+    });
+    return { url: session.url, sessionId: session.id };
+  }
+
   async setCancelAtPeriodEnd(subscriptionId: string, cancel: boolean): Promise<void> {
     const s = await this.sdk();
     await s.subscriptions.update(subscriptionId, { cancel_at_period_end: cancel });
@@ -94,6 +129,12 @@ export class FakeStripePort implements StripePort {
   async createCheckoutSession(p: CreateCheckoutParams): Promise<{ url: string | null }> {
     this.checkouts.push(p);
     return { url: `https://checkout.stripe.test/session_${++this.seq}` };
+  }
+  public invoiceCheckouts: CreateInvoiceCheckoutParams[] = [];
+  async createInvoiceCheckout(p: CreateInvoiceCheckoutParams): Promise<{ url: string | null; sessionId: string }> {
+    this.invoiceCheckouts.push(p);
+    const id = `cs_invoice_${++this.seq}`;
+    return { url: `https://checkout.stripe.test/${id}`, sessionId: id };
   }
   async createBillingPortalSession(p: { customerId: string; returnUrl: string }): Promise<{ url: string | null }> {
     this.portals.push(p);

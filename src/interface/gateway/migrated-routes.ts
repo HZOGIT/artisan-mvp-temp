@@ -20,6 +20,8 @@ export const MIGRATED_ROUTES: readonly MigratedRoute[] = [
   { name: "comptabilite-csv", pattern: /^\/api\/comptabilite\/export-csv$/ },
   // Statut de paiement d'une facture (`/api/paiement/status/:factureId`, public par token portail).
   { name: "paiement-status", pattern: /^\/api\/paiement\/status\/[^/]+$/ },
+  // Ouverture d'un Checkout Stripe pour payer une facture (`/api/paiement/create-checkout-session`).
+  { name: "paiement-checkout", pattern: /^\/api\/paiement\/create-checkout-session$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
