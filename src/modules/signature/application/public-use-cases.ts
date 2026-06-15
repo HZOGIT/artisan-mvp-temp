@@ -1,13 +1,25 @@
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
+import type { EmailPort } from "../../../shared/ports/email";
+import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { TenantContext } from "../../../shared/tenant";
 import type { Signature } from "../domain/signature";
+import { buildSignedDevisArtisanEmail, buildRefusedDevisArtisanEmail } from "../domain/signature";
 import type { SignaturePublicReader, SignatureDevisView } from "./signature-public-reader";
+import type { SignaturePublicWriter } from "./signature-public-writer";
+import type { SignatureNotificationWriter } from "./signature-repository";
 
 // Dépendances de la surface PUBLIQUE par token (portail de signature).
 export interface SignaturePublicDeps {
   readonly reader: SignaturePublicReader;
+  readonly writer: SignaturePublicWriter;
+  readonly rateLimiter: RateLimiterPort;
+  readonly notifications: SignatureNotificationWriter;
+  readonly email: EmailPort;
   readonly maintenant?: () => Date;
 }
+
+const clientFullName = (client: { prenom: string | null; nom: string } | null): string =>
+  client ? `${client.prenom ?? ""} ${client.nom}`.trim() : "Le client";
 
 export interface DevisForSignature extends SignatureDevisView {
   readonly signature: Signature;
@@ -45,4 +57,148 @@ export async function getDevisForSignature(
   if (!view) throw new NotFoundError("Devis non trouvé");
 
   return { ...view, signature: resolution.signature };
+}
+
+// Contexte tenant résolu par le token (artisanId fictif userId=0, le token EST la capacité).
+function tenantOf(artisanId: number): TenantContext {
+  return { artisanId, userId: 0 };
+}
+
+// `signature.selectDevisOption` (PUBLIC) : le client choisit une option/variante AVANT de signer.
+// - token inconnu → 404 ; **déjà signé (`signedAt`) → 400** ; expiré → 400.
+// - l'option doit appartenir AU devis de la signature (sinon 404, anti-IDOR).
+// - anti-flood : rate-limit par signature (`sig:<id>`).
+export async function selectDevisOption(
+  deps: SignaturePublicDeps,
+  input: { token: string; optionId: number },
+): Promise<{ success: boolean; optionId: number }> {
+  const resolution = await deps.reader.resolveByToken(input.token);
+  if (!resolution) throw new NotFoundError("Lien de signature invalide");
+  if (resolution.signature.signedAt) throw new ValidationError("Ce devis a déjà été signé");
+  const now = (deps.maintenant ?? (() => new Date()))();
+  if (now > resolution.signature.expiresAt) throw new ValidationError("Ce lien a expiré");
+
+  const ctx = tenantOf(resolution.artisanId);
+  const ownerDevisId = await deps.writer.getOptionDevisId(ctx, input.optionId);
+  if (ownerDevisId === null || ownerDevisId !== resolution.devisId) {
+    throw new NotFoundError("Option non trouvée");
+  }
+  if (!(await deps.rateLimiter.check(`sig:${resolution.signature.id}`))) {
+    throw new TooManyRequestsError("Trop de requêtes. Réessayez dans quelques minutes.");
+  }
+  await deps.writer.selectOption(ctx, resolution.devisId, input.optionId);
+  return { success: true, optionId: input.optionId };
+}
+
+// `signature.signDevis` (PUBLIC) : le client signe le devis.
+// - token inconnu → 404 ; **statut ≠ `en_attente` → 400** (immutabilité/anti-rejeu) ; expiré → 400.
+// - capture IP probante + UA (résolus au routeur depuis ctx) ; signatures_devis→accepte ET devis→accepte
+//   en transaction sous le tenant (garde SQL `statut='en_attente'`).
+// - notification + email artisan best-effort (ne casse pas la signature).
+export async function signDevis(
+  deps: SignaturePublicDeps,
+  input: {
+    token: string;
+    signatureData: string;
+    signataireName: string;
+    signataireEmail: string;
+    ipAddress: string;
+    userAgent: string;
+  },
+): Promise<{ success: boolean; signature: Signature }> {
+  const resolution = await deps.reader.resolveByToken(input.token);
+  if (!resolution) throw new NotFoundError("Lien de signature invalide");
+  if (resolution.signature.statut !== "en_attente") {
+    throw new ValidationError("Ce devis a déjà été traité");
+  }
+  const now = (deps.maintenant ?? (() => new Date()))();
+  if (now > resolution.signature.expiresAt) throw new ValidationError("Ce lien de signature a expiré");
+
+  const ctx = tenantOf(resolution.artisanId);
+  const signature = await deps.writer.signDevis(ctx, {
+    token: input.token,
+    devisId: resolution.devisId,
+    signatureData: input.signatureData,
+    signataireName: input.signataireName,
+    signataireEmail: input.signataireEmail,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+  });
+
+  await notifyArtisanBestEffort(deps, ctx, resolution.devisId, async (view) => {
+    await deps.notifications.notify(ctx, {
+      type: "succes",
+      titre: "Devis signé !",
+      message: `Le devis ${view.devis.numero} a été accepté et signé par ${input.signataireName}`,
+      lien: `/devis/${resolution.devisId}`,
+    });
+    if (view.artisan?.email) {
+      const { subject, body } = buildSignedDevisArtisanEmail({
+        devisNumero: view.devis.numero,
+        signataireName: input.signataireName,
+        signataireEmail: input.signataireEmail,
+      });
+      await deps.email.send({ to: view.artisan.email, subject, body });
+    }
+  });
+
+  return { success: true, signature };
+}
+
+// `signature.refuseDevis` (PUBLIC) : le client refuse le devis (+ motif optionnel).
+export async function refuseDevis(
+  deps: SignaturePublicDeps,
+  input: { token: string; motifRefus: string | null; ipAddress: string; userAgent: string },
+): Promise<{ success: boolean; signature: Signature }> {
+  const resolution = await deps.reader.resolveByToken(input.token);
+  if (!resolution) throw new NotFoundError("Lien de signature invalide");
+  if (resolution.signature.statut !== "en_attente") {
+    throw new ValidationError("Ce devis a déjà été traité");
+  }
+
+  const ctx = tenantOf(resolution.artisanId);
+  const signature = await deps.writer.refuseDevis(ctx, {
+    token: input.token,
+    devisId: resolution.devisId,
+    motifRefus: input.motifRefus,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+  });
+
+  await notifyArtisanBestEffort(deps, ctx, resolution.devisId, async (view) => {
+    const clientName = clientFullName(view.client);
+    const motifSuffix = input.motifRefus ? ` — Motif : ${input.motifRefus}` : "";
+    await deps.notifications.notify(ctx, {
+      type: "alerte",
+      titre: "Devis refusé",
+      message: `Le devis ${view.devis.numero} a été refusé par ${clientName}${motifSuffix}`,
+      lien: `/devis/${resolution.devisId}`,
+    });
+    if (view.artisan?.email) {
+      const { subject, body } = buildRefusedDevisArtisanEmail({
+        devisNumero: view.devis.numero,
+        clientName,
+        motifRefus: input.motifRefus,
+      });
+      await deps.email.send({ to: view.artisan.email, subject, body });
+    }
+  });
+
+  return { success: true, signature };
+}
+
+// Notifie l'artisan (notification + email) après sign/refuse — **best-effort** : un échec (vue
+// introuvable, email KO) n'altère jamais le résultat de la mutation déjà persistée.
+async function notifyArtisanBestEffort(
+  deps: SignaturePublicDeps,
+  ctx: TenantContext,
+  devisId: number,
+  effect: (view: SignatureDevisView) => Promise<void>,
+): Promise<void> {
+  try {
+    const view = await deps.reader.getDevisView(ctx, devisId);
+    if (view) await effect(view);
+  } catch {
+    /* best-effort */
+  }
 }

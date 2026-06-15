@@ -1,9 +1,29 @@
 import { describe, it, expect } from "vitest";
-import { NotFoundError, ValidationError } from "../../../shared/errors";
+import { NotFoundError, ValidationError, TooManyRequestsError } from "../../../shared/errors";
+import type { EmailMessage, EmailPort } from "../../../shared/ports/email";
+import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { Signature } from "../domain/signature";
-import { FakeSignaturePublicReader } from "../infra/signature-public-reader-fake";
+import { FakeSignaturePublicReader, FakeSignaturePublicWriter } from "../infra/signature-public-reader-fake";
+import { FakeSignatureNotificationWriter } from "../infra/signature-repository-fake";
 import type { SignatureDevisView, SignatureTokenResolution } from "./signature-public-reader";
-import { getDevisForSignature } from "./public-use-cases";
+import { getDevisForSignature, selectDevisOption, signDevis, refuseDevis } from "./public-use-cases";
+
+class CapturingEmail implements EmailPort {
+  public sent: EmailMessage[] = [];
+  async send(m: EmailMessage): Promise<void> {
+    this.sent.push(m);
+  }
+}
+class AllowRateLimiter implements RateLimiterPort {
+  async check(): Promise<boolean> {
+    return true;
+  }
+}
+class DenyRateLimiter implements RateLimiterPort {
+  async check(): Promise<boolean> {
+    return false;
+  }
+}
 
 const NOW = new Date("2026-06-15T12:00:00Z");
 
@@ -64,12 +84,31 @@ const view: SignatureDevisView = {
   options: [],
 };
 
-function build(seed?: { token?: string; res?: SignatureTokenResolution; view?: SignatureDevisView }) {
+function build(seed?: {
+  token?: string;
+  res?: SignatureTokenResolution;
+  view?: SignatureDevisView;
+  rateLimiter?: RateLimiterPort;
+}) {
   const reader = new FakeSignaturePublicReader();
+  const writer = new FakeSignaturePublicWriter();
+  const email = new CapturingEmail();
+  const notifications = new FakeSignatureNotificationWriter();
   const token = seed?.token ?? "tok";
-  if (seed?.res !== undefined) reader.seedResolution(token, seed.res);
+  if (seed?.res !== undefined) {
+    reader.seedResolution(token, seed.res);
+    writer.seedSignature(seed.res.signature);
+  }
   if (seed?.view !== undefined) reader.seedView(seed.res?.artisanId ?? 1, seed.res?.devisId ?? 10, seed.view);
-  return { reader, deps: { reader, maintenant: () => NOW } };
+  const deps = {
+    reader,
+    writer,
+    email,
+    notifications,
+    rateLimiter: seed?.rateLimiter ?? new AllowRateLimiter(),
+    maintenant: () => NOW,
+  };
+  return { reader, writer, email, notifications, deps };
 }
 
 describe("getDevisForSignature (public)", () => {
@@ -109,9 +148,106 @@ describe("getDevisForSignature (public)", () => {
   });
 
   it("vue introuvable (devis supprimé) → NotFoundError", async () => {
-    const reader = new FakeSignaturePublicReader();
-    reader.seedResolution("tok", resolution());
-    // pas de seedView
-    await expect(getDevisForSignature({ reader, maintenant: () => NOW }, "tok")).rejects.toBeInstanceOf(NotFoundError);
+    const { deps } = build({ res: resolution() }); // pas de seedView
+    await expect(getDevisForSignature(deps, "tok")).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("selectDevisOption (public)", () => {
+  it("token inconnu → NotFoundError", async () => {
+    const { deps } = build();
+    await expect(selectDevisOption(deps, { token: "absent", optionId: 1 })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("déjà signé → ValidationError", async () => {
+    const { deps } = build({ res: resolution({ signature: signature({ signedAt: NOW }) }) });
+    await expect(selectDevisOption(deps, { token: "tok", optionId: 1 })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("lien expiré → ValidationError", async () => {
+    const { deps } = build({ res: resolution({ signature: signature({ expiresAt: new Date("2026-06-01") }) }) });
+    await expect(selectDevisOption(deps, { token: "tok", optionId: 1 })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("option d'un AUTRE devis → NotFoundError (anti-IDOR)", async () => {
+    const { deps, writer } = build({ res: resolution() });
+    writer.seedOption(99, 777); // option 99 appartient au devis 777, pas au devis 10 de la signature
+    await expect(selectDevisOption(deps, { token: "tok", optionId: 99 })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("rate-limit atteint → TooManyRequestsError", async () => {
+    const { deps, writer } = build({ res: resolution(), rateLimiter: new DenyRateLimiter() });
+    writer.seedOption(5, 10);
+    await expect(selectDevisOption(deps, { token: "tok", optionId: 5 })).rejects.toBeInstanceOf(TooManyRequestsError);
+  });
+
+  it("succès : sélectionne l'option du devis de la signature", async () => {
+    const { deps, writer } = build({ res: resolution() });
+    writer.seedOption(5, 10);
+    const out = await selectDevisOption(deps, { token: "tok", optionId: 5 });
+    expect(out).toEqual({ success: true, optionId: 5 });
+    expect(writer.selected).toEqual([{ devisId: 10, optionId: 5 }]);
+  });
+});
+
+describe("signDevis (public)", () => {
+  const signPayload = {
+    token: "tok",
+    signatureData: "data:image/png;base64,xxx",
+    signataireName: "Jean Dupont",
+    signataireEmail: "jean@test.com",
+    ipAddress: "1.2.3.4",
+    userAgent: "UA",
+  };
+
+  it("token inconnu → NotFoundError", async () => {
+    const { deps } = build();
+    await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("statut ≠ en_attente → ValidationError (immutabilité)", async () => {
+    const { deps } = build({ res: resolution({ signature: signature({ statut: "accepte" }) }), view });
+    await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("lien expiré → ValidationError", async () => {
+    const { deps } = build({ res: resolution({ signature: signature({ expiresAt: new Date("2026-06-01") }) }), view });
+    await expect(signDevis(deps, signPayload)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("succès : signe (accepte + IP/UA), notifie et email l'artisan", async () => {
+    const { deps, notifications, email } = build({ res: resolution(), view });
+    const out = await signDevis(deps, signPayload);
+    expect(out.success).toBe(true);
+    expect(out.signature.statut).toBe("accepte");
+    expect(out.signature.ipAddress).toBe("1.2.3.4");
+    expect(out.signature.signataireName).toBe("Jean Dupont");
+    expect(notifications.emitted[0]).toMatchObject({ type: "succes", artisanId: 1 });
+    expect(email.sent[0].to).toBe("pro@test.com");
+    expect(email.sent[0].subject).toContain("accepté et signé");
+  });
+
+  it("notification/email best-effort : pas de vue → signature OK quand même", async () => {
+    const { deps, email } = build({ res: resolution() }); // pas de seedView
+    const out = await signDevis(deps, signPayload);
+    expect(out.signature.statut).toBe("accepte");
+    expect(email.sent).toHaveLength(0);
+  });
+});
+
+describe("refuseDevis (public)", () => {
+  it("statut ≠ en_attente → ValidationError", async () => {
+    const { deps } = build({ res: resolution({ signature: signature({ statut: "refuse" }) }), view });
+    await expect(refuseDevis(deps, { token: "tok", motifRefus: null, ipAddress: "1.2.3.4", userAgent: "UA" })).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("succès : refuse (+ motif), notifie alerte et email l'artisan", async () => {
+    const { deps, notifications, email } = build({ res: resolution(), view });
+    const out = await refuseDevis(deps, { token: "tok", motifRefus: "Trop cher", ipAddress: "1.2.3.4", userAgent: "UA" });
+    expect(out.signature.statut).toBe("refuse");
+    expect(out.signature.motifRefus).toBe("Trop cher");
+    expect(notifications.emitted[0]).toMatchObject({ type: "alerte" });
+    expect(notifications.emitted[0].message).toContain("Trop cher");
+    expect(email.sent[0].subject).toContain("refusé");
   });
 });

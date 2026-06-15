@@ -19,6 +19,8 @@ const baseCtx = (over: Partial<AppContext>): AppContext => ({
   role: "secretaire",
   permissions: [],
   res: null,
+  clientIp: "unknown",
+  userAgent: "unknown",
   ...over,
 });
 

@@ -105,3 +105,31 @@ export function buildSignatureLinkEmail(input: SignatureLinkEmailInput): { subje
 </table></td></tr></table></body></html>`;
   return { subject, body };
 }
+
+// Email artisan « devis accepté et signé » (parité legacy `signDevis`). Notifie l'artisan du succès.
+export function buildSignedDevisArtisanEmail(input: {
+  devisNumero: string;
+  signataireName: string;
+  signataireEmail: string;
+}): { subject: string; body: string } {
+  return {
+    subject: `Devis ${input.devisNumero} accepté et signé`,
+    body: `<p>Bonjour,</p><p>Le devis <strong>${escapeHtml(input.devisNumero)}</strong> a été <strong style="color:green">accepté et signé</strong> par <strong>${escapeHtml(input.signataireName)}</strong> (${escapeHtml(input.signataireEmail)}).</p><p>Connectez-vous à votre espace pour consulter la signature.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`,
+  };
+}
+
+// Email artisan « devis refusé » (parité legacy `refuseDevis`).
+export function buildRefusedDevisArtisanEmail(input: {
+  devisNumero: string;
+  clientName: string;
+  motifRefus: string | null;
+}): { subject: string; body: string } {
+  const clientName = input.clientName || "Le client";
+  const motif = input.motifRefus
+    ? `<p><strong>Motif :</strong> ${escapeHtml(input.motifRefus)}</p>`
+    : "";
+  return {
+    subject: `Devis ${input.devisNumero} refusé par ${clientName}`,
+    body: `<p>Bonjour,</p><p>Le devis <strong>${escapeHtml(input.devisNumero)}</strong> a été <strong style="color:red">refusé</strong> par ${escapeHtml(clientName)}.</p>${motif}<p>Connectez-vous à votre espace pour plus de détails.</p><p style="color:#9ca3af;font-size:12px;">Operioz</p>`,
+  };
+}

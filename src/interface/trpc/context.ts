@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader, type PermissionsReader } from "../../shared/tenant";
+import { extractClientIp, extractUserAgent } from "../http/client-ip";
 
 // Contexte tRPC du nouveau stack. Construit à partir de la requête Fastify :
 // - extrait le cookie `token`, le vérifie (claims) ;
@@ -18,6 +19,10 @@ export interface AppContext {
   // Réponse Fastify (pour poser/effacer le cookie d'auth depuis les procédures `auth.*`). Null hors
   // d'une requête HTTP réelle (tests via createCaller) → les procédures cookie doivent rester tolérantes.
   readonly res: FastifyReply | null;
+  // IP cliente (valeur probante, cf-connecting-ip prioritaire, ≤45 car.) + User-Agent — pour la
+  // capture lors de la signature/refus de devis. "unknown" si indéterminable.
+  readonly clientIp: string;
+  readonly userAgent: string;
 }
 
 export interface ContextDeps {
@@ -38,6 +43,9 @@ export function makeCreateContext(deps: ContextDeps = {}) {
     const role = claims ? (deps.roleReader ? await deps.roleReader.getRole(claims.userId) : tenant?.role ?? null) : null;
     // Permissions résolues comme le rôle (INDÉPENDANT du tenant) ; vide si pas de reader/auth.
     const permissions = claims && deps.permissionsReader ? await deps.permissionsReader.getPermissions(claims.userId) : [];
-    return { claims, tenant, role, permissions, res: opts.res };
+    const headers = (opts.req.headers ?? {}) as Record<string, unknown>;
+    const clientIp = extractClientIp(headers, opts.req.ip ?? null);
+    const userAgent = extractUserAgent(headers);
+    return { claims, tenant, role, permissions, res: opts.res, clientIp, userAgent };
   };
 }
