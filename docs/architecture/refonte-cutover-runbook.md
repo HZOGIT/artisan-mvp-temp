@@ -1,5 +1,14 @@
 # Refonte clean-archi — runbook de cutover (legacy → nouveau stack)
 
+> ✅ **CUTOVER RÉALISÉ (mise à jour 2026-06-15) — ce runbook est HISTORIQUE.** Le **stack est désormais
+> unique : Fastify + tRPC 11 + Drizzle pg + RLS** ; le legacy Express est **éteint** (dispatcher edge
+> mono-stack — tout `/api/*` → new-stack ; services `app`+`mysql` retirés des composes dev & staging ;
+> code `server/` supprimé ; `mysql2` retiré). La bascule progressive par feature flags décrite
+> ci-dessous (et le « gap dispatcher » de 2026-06-14) appartient au PASSÉ : le dispatcher a été câblé
+> puis simplifié en mono-stack (cf. `refonte-clean-archi-journal.md`, phases C4→C5c). Reste, côté infra
+> humaine : retirer le DNS/ingress Cloudflare `staging-backend.operioz.com` (Terraform, déjà sans
+> consommateur). Le contenu ci-dessous est conservé comme trace de la procédure de bascule.
+
 > Procédure **ordonnée, idempotente, réversible** pour basculer le trafic du stack legacy (Express + tRPC sur la base) vers le nouveau stack clean-archi (**Fastify + tRPC 11 + Drizzle node-pg + RLS**), domaine par domaine, derrière les feature flags du gateway.
 >
 > ⚠️ **Exécution = opération infra/déploiement** (touche `terraform/*`, le déploiement Fastify et la config Cloudflare). Ce volet est **délégué à l'humain** : il n'est PAS exécuté ni committé par la run autonome. Ce document décrit *quoi* faire et *dans quel ordre*.

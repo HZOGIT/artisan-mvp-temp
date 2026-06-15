@@ -1,5 +1,12 @@
 # Phase C2 — Inventaire go/no-go de la surface legacy encore atteinte
 
+> ✅ **EXTINCTION RÉALISÉE (mise à jour 2026-06-15) — ce document est HISTORIQUE.** Le verdict
+> « NO-GO immédiat » ci-dessous correspondait à l'état de la phase C2 ; depuis, les **9 blockers ont
+> été portés**, `server/` (legacy Express) a été **supprimé**, `mysql2`/MySQL retirés, le dispatcher
+> edge est **mono-stack** et le **stack est unique : Fastify + tRPC 11 + Drizzle pg + RLS** (plus de
+> backend legacy). Source de vérité courante : `refonte-clean-archi-journal.md` (phases C5a→C5c). Le
+> contenu ci-dessous est conservé comme trace de l'analyse go/no-go ayant fondé l'extinction.
+
 > Établi pour décider de la **suppression de `server/`** (extinction du legacy, fil OPE-240).
 > Méthode : diff **routeur tRPC legacy** (`server/routers.ts`) + **routes REST legacy**
 > (`server/_core/index.ts`) vs **surface new-stack** (`MIGRATED` / `DEFAULT_ENABLED` du dispatcher
