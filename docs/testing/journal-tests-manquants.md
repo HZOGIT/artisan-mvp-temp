@@ -34,12 +34,15 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 3. **Exécuter** : `pnpm exec tsc -p tsconfig.src.json` (rapide, optionnel) + `pnpm exec vitest run <fichier>`.
    - Rouge à cause du test → corriger le test.
    - Rouge à cause d'un **vrai bug** dans `src/` → fix **minimal**, le signaler (tag `fix`), et **déployer**.
-4. **Commit** (scope strict : seulement mes fichiers ajoutés) sur `staging`.
+4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante.
+5. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (ajoute aussi la ligne
+   de log au journal — d'où l'ordre : broadcast AVANT le commit, pour éviter un arbre sale au prochain rebase).
+6. **Commit UNIQUE** (scope strict : `git add <mes test(s)> docs/testing/journal-tests-manquants.md`,
+   **jamais** `-A`) sur `staging`, puis push + RE-VÉRIFIER `origin/staging`.
    Message : `test(<module>): <quoi>` + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-5. **Déployer** sur staging **uniquement si un fix `src/` a été livré** : `./devtools/deploy-staging-newstack.sh`.
+7. **Déployer** sur staging **uniquement si un fix `src/` a été livré** : `./devtools/deploy-staging-newstack.sh`.
    (Un ajout de test pur ne change pas le runtime → pas de déploiement.)
-6. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` + commentaire Linear OPE-318.
-7. **Mettre à jour ce journal** : cocher la cible, fixer la suivante, logger l'itération.
+8. **Créer l'issue Linear** enfant de OPE-318 (« test(<module>): … », Done).
 
 ## Règles de coordination
 - `git rebase origin/staging` avant toute édition ; en cas de conflit sur un fichier que je n'ai pas
