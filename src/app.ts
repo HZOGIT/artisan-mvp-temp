@@ -134,6 +134,8 @@ import { registerArticlesSearchRoute } from "./interface/http/articles-search-ro
 import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/public-article-search-drizzle";
 import { registerAssistantAgentRoute } from "./interface/http/assistant-agent-route";
 import { registerVoiceToolRoute } from "./interface/http/voice-tool-route";
+import { registerVoiceTokenRoute } from "./interface/http/voice-token-route";
+import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
 import { GeminiAgenticAdapter } from "./modules/assistant/infra/gemini-agentic-adapter";
 import type { LlmAgenticPort } from "./modules/assistant/application/agentic-port";
@@ -760,6 +762,20 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     registry: agentRegistry,
+    rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+  });
+
+  // §4 HORS-tRPC : mint d'un token éphémère pour la session vocale Live (`POST /api/voice/token`). Setup
+  // Live déclare les MÊMES outils que le registry agentique. MONTÉ mais PAS routé (legacy sert encore).
+  registerVoiceTokenRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    tokenPort: new GeminiRealtimeVoiceTokenAdapter(),
+    artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+    statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
+    threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
+    threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
+    tools: agentRegistry.tools,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
   });
 

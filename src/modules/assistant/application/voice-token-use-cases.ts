@@ -26,6 +26,9 @@ export interface RealtimeVoiceTokenPort {
   mint(setup: VoiceTokenSetup): Promise<VoiceTokenMinted>;
 }
 
+// Échec du provider de mint (réseau/API) → mappé en 502 par la route (parité legacy), distinct d'un 500.
+export class RealtimeTokenError extends Error {}
+
 export interface VoiceTokenDeps {
   readonly tokenPort: RealtimeVoiceTokenPort;
   readonly artisanReader: ArtisanReader;
