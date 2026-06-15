@@ -6,3 +6,4 @@ export * from "./application/assistant-threads-repository";
 export * from "./application/assistant-data-reader";
 export * from "./application/read-use-cases";
 export * from "./application/generator-use-cases";
+export * from "./assistant.module";

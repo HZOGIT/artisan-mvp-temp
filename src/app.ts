@@ -111,6 +111,9 @@ import { SignaturePublicReaderDrizzle } from "./modules/signature/infra/signatur
 import { SignaturePublicWriterDrizzle } from "./modules/signature/infra/signature-public-writer-drizzle";
 import { createConseilsIaModule } from "./modules/conseils-ia/conseils-ia.module";
 import { ConseilsStatsReaderDrizzle } from "./modules/conseils-ia/infra/conseils-stats-reader-drizzle";
+import { createAssistantModule } from "./modules/assistant/assistant.module";
+import { AssistantThreadsRepositoryDrizzle } from "./modules/assistant/infra/assistant-threads-repository-drizzle";
+import { AssistantDataReaderDrizzle } from "./modules/assistant/infra/assistant-data-reader-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -591,7 +594,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     statsReader: new ConseilsStatsReaderDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa });
+  // Assistant IA (lectures threads/messages + 4 générateurs IA request/response). Réutilise le seam
+  // LlmPort (Gemini) + rate-limiter IA partagé (30/h par artisan, parité legacy checkRateLimit).
+  const assistant = createAssistantModule({
+    threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
+    generators: {
+      llm: deps.llm ?? new GeminiLlmAdapter(),
+      rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+      artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+      dataReader: new AssistantDataReaderDrizzle(getDbHandle().db),
+    },
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
