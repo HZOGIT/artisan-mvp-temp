@@ -321,7 +321,12 @@ export interface AppDeps extends ContextDeps {
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
-  const app = Fastify({ logger: false });
+  // ⚠️ maxParamLength : le client tRPC (`httpBatchLink`) concatène N procédures dans le segment
+  // d'URL `/api/trpc/p1,p2,…,pN`. Le défaut find-my-way (100 car.) rejette tout batch un peu long
+  // (≥ ~4 procédures) en 404 « route not found » AVANT d'atteindre le handler tRPC → le client
+  // reçoit un 404 sur tout le lot (dashboard widgets sans données, portail `valid` undefined →
+  // « expiré »). On relève la limite pour couvrir les gros batchs (≈150 procédures).
+  const app = Fastify({ logger: false, maxParamLength: 5000 });
 
   app.register(cookie);
 

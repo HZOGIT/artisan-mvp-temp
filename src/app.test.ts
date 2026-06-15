@@ -36,6 +36,21 @@ describe.skipIf(!HAS_DB)("app Fastify (scaffold + tRPC)", () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it("tRPC: batch LONG (chemin > 100 car.) → route matchée, PAS un 404 Fastify (régression maxParamLength)", async () => {
+    // `httpBatchLink` concatène les procédures dans le segment d'URL : /api/trpc/p1,p2,…,pN.
+    // Le défaut find-my-way (maxParamLength=100) 404-erait ce chemin AVANT le handler tRPC → le
+    // client recevrait un 404 sur tout le lot (dashboard sans données, portail « expiré »).
+    const procs = [
+      "clients.list", "factures.list", "devis.list", "interventions.list",
+      "notifications.list", "artisan.getProfile", "modules.getMine", "dashboard.getStats",
+    ].join(",");
+    expect(procs.length).toBeGreaterThan(100);
+    const res = await app.inject({ method: "GET", url: `/api/trpc/${procs}?batch=1&input=%7B%7D` });
+    // Sans cookie → 401 (auth requise) ou réponses d'erreur par procédure ; surtout PAS un 404
+    // « route not found » (qui signifierait que la route Fastify n'a pas matché).
+    expect(res.statusCode).not.toBe(404);
+  });
+
   // Garde-fou bascule : chaque domaine du registre MIGRATED_DOMAINS est réellement monté
   // dans le nouveau stack (procédure `list` présente → 401 auth requise, pas 404 inexistant).
   const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list", badges: "badges.list", techniciens: "techniciens.list", notifications: "notifications.list", fournisseurs: "fournisseurs.list", commandesFournisseurs: "commandesFournisseurs.list", stocks: "stocks.list", clients: "clients.list", interventions: "interventions.list", conges: "conges.list", notesDeFrais: "notesDeFrais.list", chantiers: "chantiers.list", depenses: "depenses.list", devis: "devis.list", factures: "factures.list", ecritures: "ecritures.list", articles: "articles.list", parametres: "parametres.get", modelesEmail: "modelesEmail.list", modelesDevis: "modelesDevis.list", configRelances: "configRelances.get", rdv: "rdv.list", relances: "relances.list", categoriesDepenses: "categoriesDepenses.list", contrats: "contrats.list", demandesContact: "demandesContact.list", budgetsCategories: "budgetsCategories.list", reglesCategorisation: "reglesCategorisation.list", previsions: "previsions.list", artisan: "artisan.getProfile", devisOptions: "devisOptions.getByDevisId", activites: "activites.list", modules: "modules.list", statistiques: "statistiques.getDevisStats", calendrier: "calendrier.getIcalFeed", emails: "emails.list", search: "search.global", geolocalisation: "geolocalisation.getPositions", dashboard: "dashboard.getStats", rapports: "rapports.list", utilisateurs: "utilisateurs.list", comptabilite: "comptabilite.getBalance", auth: "auth.me", subscription: "subscription.getCurrent", signature: "signature.getSignatureByDevis", conseilsIA: "conseilsIA", assistant: "assistant.getThreads", chat: "chat.getConversations", support: "support.contact", devices: "devices.list", alertesPrevisions: "alertesPrevisions.getConfig", importErp: "importErp.importClients", interventionsMobile: "interventionsMobile.getTodayInterventions", vitrine: "vitrine.getDemandesContact", clientPortal: "clientPortal.getStatus", integrationsComptables: "integrationsComptables.getConfig", devisIA: "devisIA.list" };
