@@ -89,6 +89,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // paiement (public par token) → new-stack
     expect(decideTarget("/api/paiement/status/42", {})).toBe("new-stack");
     expect(decideTarget("/api/paiement/create-checkout-session", {})).toBe("new-stack");
+    // recherche catalogue public → new-stack ; categories (dead) pas migré → legacy
+    expect(decideTarget("/api/articles/search", {})).toBe("new-stack");
+    expect(decideTarget("/api/articles/categories", {})).toBe("legacy");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe

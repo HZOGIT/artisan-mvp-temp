@@ -130,6 +130,8 @@ import { FacturesCsvReaderDrizzle } from "./modules/comptabilite/infra/factures-
 import { registerPaiementRoute } from "./interface/http/paiement-route";
 import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-payment-reader-drizzle";
 import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-payment-writer-drizzle";
+import { registerArticlesSearchRoute } from "./interface/http/articles-search-route";
+import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/public-article-search-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -698,6 +700,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     stripe: deps.stripePort ?? new StripeAdapter(),
     rateLimiter: new SlidingWindowRateLimiter(20, 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+  });
+
+  // §4 HORS-tRPC : recherche publique du catalogue de référence (`/api/articles/search`, sans auth).
+  registerArticlesSearchRoute(app, {
+    reader: new PublicArticleSearchReaderDrizzle(getDbHandle().db),
+    rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
   });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).
