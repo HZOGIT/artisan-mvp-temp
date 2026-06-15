@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { SignJWT } from "jose";
 import { Pool } from "pg";
 import { buildApp } from "../../app";
-import type { LlmPort, LlmCompleteOptions } from "../../shared/ports/llm";
+import { FakeLlmAgenticPort } from "../../modules/assistant/infra/llm-agentic-fake";
 
 const URL = process.env.DATABASE_URL;
 const SECRET = "test-secret-at-least-32-characters-long-assist";
@@ -12,20 +12,9 @@ async function signToken(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@test.fr` }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h").sign(new TextEncoder().encode(SECRET));
 }
 
-// LLM fake streamant des chunks connus (aucun réseau).
-class FakeStreamLlm implements LlmPort {
-  async complete(): Promise<string> {
-    return "Bonjour artisan";
-  }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async *stream(_p: string, _o?: LlmCompleteOptions): AsyncIterable<string> {
-    yield "Bonjour";
-    yield " artisan";
-  }
-}
-
-// E2E `POST /api/assistant/stream` (SSE) via le routeur monté. Vérifie 401 sans cookie + le flux SSE.
-describe.skipIf(!URL)("POST /api/assistant/stream (SSE, auth cookie)", () => {
+// E2E `POST /api/assistant/stream` (SSE, mode AGENTIQUE) via le routeur monté + le registry réel
+// câblé dans buildApp. Provider agentique = FakeLlmAgenticPort (aucun réseau). Vérifie 401 + flux SSE.
+describe.skipIf(!URL)("POST /api/assistant/stream (SSE agentique, auth cookie)", () => {
   const admin = new Pool({ connectionString: URL });
   let app: ReturnType<typeof buildApp>;
 
@@ -40,7 +29,7 @@ describe.skipIf(!URL)("POST /api/assistant/stream (SSE, auth cookie)", () => {
     await cleanup();
     await admin.query("insert into users (id, email) values ($1,$2)", [UID, `u${UID}@test.fr`]);
     await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2)', [UID, "Plomberie X"]);
-    app = buildApp({ jwtSecret: SECRET, llm: new FakeStreamLlm() });
+    app = buildApp({ jwtSecret: SECRET, llmAgentic: new FakeLlmAgenticPort([{ text: ["Bonjour", " artisan"] }]) });
   });
   afterAll(async () => {
     await app?.close();

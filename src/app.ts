@@ -132,7 +132,10 @@ import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-paym
 import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-payment-writer-drizzle";
 import { registerArticlesSearchRoute } from "./interface/http/articles-search-route";
 import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/public-article-search-drizzle";
-import { registerAssistantStreamRoute } from "./interface/http/assistant-stream-route";
+import { registerAssistantAgentRoute } from "./interface/http/assistant-agent-route";
+import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
+import { GeminiAgenticAdapter } from "./modules/assistant/infra/gemini-agentic-adapter";
+import type { LlmAgenticPort } from "./modules/assistant/application/agentic-port";
 import { AssistantThreadWriterDrizzle } from "./modules/assistant/infra/assistant-thread-writer-drizzle";
 import { registerVoiceRoute } from "./interface/http/voice-route";
 import { ConseilsStatsReaderDrizzle as AssistantStatsReaderDrizzle } from "./modules/conseils-ia/infra/conseils-stats-reader-drizzle";
@@ -222,6 +225,8 @@ export interface AppDeps extends ContextDeps {
   readonly rateLimiter?: RateLimiterPort;
   // Port LLM (Gemini) + rate-limiter IA dédié — injectables en test (FakeLlmPort déterministe).
   readonly llm?: LlmPort;
+  // Provider LLM AGENTIQUE (function-calling) de l'assistant ; injectable en test (FakeLlmAgenticPort).
+  readonly llmAgentic?: LlmAgenticPort;
   readonly iaRateLimiter?: RateLimiterPort;
   readonly ocrVision?: VisionPort;
   readonly lienBaseUrl?: string;
@@ -712,12 +717,36 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
   });
 
-  // §4 HORS-tRPC : chat assistant en STREAMING SSE (auth cookie JWT). MONTÉ mais PAS routé (absent de
-  // MIGRATED_ROUTES) : le legacy sert encore la version AGENTIQUE (outils) ; ici text-only (parité partielle).
-  registerAssistantStreamRoute(app, {
+  // §4 HORS-tRPC : chat assistant en STREAMING SSE — mode AGENTIQUE (function-calling, 12 lectures +
+  // 11 écritures mappées aux use-cases migrés). MONTÉ mais PAS routé (absent de MIGRATED_ROUTES) : le
+  // legacy sert encore l'agentique tant que la parité n'est pas validée → AUCUNE régression.
+  const agentEmail = deps.emailPort ?? new LegacyEmailAdapter();
+  const agentRegistry = buildAssistantAgentRegistry(
+    {
+      clients: clientRepo,
+      factures: factureRepo,
+      devis: devisRepo,
+      stocks: stockRepo,
+      fournisseurs: fournisseurRepo,
+      interventions: interventionRepo,
+      dashboardReader: new DashboardReaderDrizzle(getDbHandle().db),
+    },
+    buildAssistantWriteHandlersFromRepos(
+      { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
+      {
+        // Mailing deps (parité des routes d'envoi migrées : readers contact + PdfPort/EmailPort legacy + rate-limit).
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), pdf: new LegacyPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new LegacyPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new LegacyPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+      },
+    ),
+  );
+  registerAssistantAgentRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
-    llm: deps.llm ?? new GeminiLlmAdapter(),
+    llm: deps.llmAgentic ?? new GeminiAgenticAdapter(),
+    registry: agentRegistry,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
