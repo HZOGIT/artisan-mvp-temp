@@ -92,10 +92,11 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // recherche catalogue public → new-stack ; categories (dead) pas migré → legacy
     expect(decideTarget("/api/articles/search", {})).toBe("new-stack");
     expect(decideTarget("/api/articles/categories", {})).toBe("legacy");
-    // voice/persist (auth cookie) → new-stack ; voice/token & assistant/stream (agentique) → legacy
+    // assistant/voix AGENTIQUE basculés : assistant/stream (SSE) + voice/tool + voice/token + voice/persist → new-stack
     expect(decideTarget("/api/voice/persist", {})).toBe("new-stack");
-    expect(decideTarget("/api/voice/token", {})).toBe("legacy");
-    expect(decideTarget("/api/assistant/stream", {})).toBe("legacy");
+    expect(decideTarget("/api/voice/token", {})).toBe("new-stack");
+    expect(decideTarget("/api/voice/tool", {})).toBe("new-stack");
+    expect(decideTarget("/api/assistant/stream", {})).toBe("new-stack");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe

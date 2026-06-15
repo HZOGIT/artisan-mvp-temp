@@ -49,6 +49,12 @@ export const MIGRATED_ROUTES = [
   { name: "articles-search", pattern: /^\/api\/articles\/search$/ },
   // Persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie JWT).
   { name: "voice-persist", pattern: /^\/api\/voice\/persist$/ },
+  // Assistant IA AGENTIQUE en streaming SSE (`/api/assistant/stream`, auth cookie JWT, function-calling).
+  { name: "assistant-stream", pattern: /^\/api\/assistant\/stream$/ },
+  // Exécution d'UN outil de la session vocale Live (`/api/voice/tool`, auth cookie JWT).
+  { name: "voice-tool", pattern: /^\/api\/voice\/tool$/ },
+  // Mint d'un token éphémère pour la session vocale Live (`/api/voice/token`, auth cookie JWT, Gemini Live).
+  { name: "voice-token", pattern: /^\/api\/voice\/token$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
