@@ -141,6 +141,7 @@ import { registerInterventionPdfRoute } from "./interface/http/intervention-pdf-
 import { registerPortailDevisPdfRoute } from "./interface/http/portail-devis-pdf-route";
 import { registerPortailFacturePdfRoute } from "./interface/http/portail-facture-pdf-route";
 import { registerFacturxRoutes } from "./interface/http/facturx-route";
+import { registerExportLotRoutes } from "./interface/http/export-lot-route";
 import { getParametres } from "./modules/parametres/application/read-use-cases";
 import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
@@ -855,6 +856,19 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerFacturxRoutes(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    factureReader: factureRepo,
+    clientReader: clientRepo,
+    artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    pdf: new JsPdfAdapter(),
+  });
+
+  // §4 HORS-tRPC : exports en LOT (ZIP par période) — `/api/comptabilite/export-pdf-lot` (PDF facture)
+  // + `/api/comptabilite/export-facturx-lot` (XML CII), auth cookie. MONTÉES mais PAS routées tant
+  // qu'absentes de MIGRATED_ROUTES.
+  registerExportLotRoutes(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    factureLister: factureRepo,
     factureReader: factureRepo,
     clientReader: clientRepo,
     artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),

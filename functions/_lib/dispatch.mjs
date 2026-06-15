@@ -69,6 +69,10 @@ export const MIGRATED_ROUTES = [
   { name: "facturx-xml", pattern: /^\/api\/comptabilite\/facturx-xml\/[^/]+$/ },
   // PDF Factur-X d'une facture (`/api/comptabilite/facturx/:id`, auth cookie JWT, jsPDF).
   { name: "facturx-pdf", pattern: /^\/api\/comptabilite\/facturx\/[^/]+$/ },
+  // Export en lot des XML CII Factur-X d'une période (`/api/comptabilite/export-facturx-lot`, ZIP, auth cookie).
+  { name: "export-facturx-lot", pattern: /^\/api\/comptabilite\/export-facturx-lot$/ },
+  // Export en lot des PDF facture d'une période (`/api/comptabilite/export-pdf-lot`, ZIP, auth cookie).
+  { name: "export-pdf-lot", pattern: /^\/api\/comptabilite\/export-pdf-lot$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
