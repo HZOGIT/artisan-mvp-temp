@@ -123,6 +123,13 @@ const ymd = (d: Date | string): string => {
 };
 const n = (v: unknown): number => Number(v ?? 0) || 0;
 
+// Nom de fichier FEC réglementaire (parité legacy) : SIREN (9 chiffres, dérivé du SIRET) + "FEC" +
+// date de clôture (YYYYMMDD) + ".txt". PUR.
+export function fecFileName(siret: string | null, dateFin: Date): string {
+  const siren = (siret || "000000000").replace(/\D/g, "").slice(0, 9).padEnd(9, "0");
+  return `${siren}FEC${ymd(dateFin)}.txt`;
+}
+
 // Construit le FEC complet (3 journaux VE/AC/BQ) + le contrôle de conformité. PUR.
 export function buildFec(input: FecInput, config: FecConfig): FecResult {
   const cVentes = config.compteVentes || "706000";

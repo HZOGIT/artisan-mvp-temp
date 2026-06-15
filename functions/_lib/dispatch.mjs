@@ -37,6 +37,8 @@ export const MIGRATED_ROUTES = [
   { name: "stripe-webhook", pattern: /^\/api\/stripe\/webhook$/ },
   // Upload/suppression du logo artisan (`/api/upload-logo`, auth cookie JWT).
   { name: "upload-logo", pattern: /^\/api\/upload-logo$/ },
+  // Export FEC opposable (`/api/comptabilite/fec`, auth cookie JWT, Σdébit=Σcrédit).
+  { name: "comptabilite-fec", pattern: /^\/api\/comptabilite\/fec$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

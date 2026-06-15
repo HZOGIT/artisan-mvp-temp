@@ -125,6 +125,7 @@ import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhoo
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
 import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
 import { ArtisanLogoWriterDrizzle } from "./modules/artisan/infra/artisan-logo-writer-drizzle";
+import { registerComptabiliteExportRoute } from "./interface/http/comptabilite-export-route";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -675,6 +676,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     writer: new ArtisanLogoWriterDrizzle(getDbHandle().db),
+  });
+
+  // §4 HORS-tRPC : export FEC opposable (`/api/comptabilite/fec`, auth cookie JWT). Réutilise le
+  // générateur FEC PUR déjà porté (buildFec, Σdébit=Σcrédit) — fichier texte téléchargeable.
+  registerComptabiliteExportRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    reader: deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db),
   });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).

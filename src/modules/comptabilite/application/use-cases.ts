@@ -1,8 +1,8 @@
 import type { TenantContext } from "../../../shared/tenant";
 import { assembleDeclarationTVA, computeBalance, computeGrandLivre, computeRapportTVA } from "../domain/comptabilite";
 import type { CompteGrandLivre, DeclarationTVADetail, Ecriture, LigneBalance, RapportTVA } from "../domain/comptabilite";
-import { buildFec, fecPreview } from "../domain/fec";
-import type { FecPreview } from "../domain/fec";
+import { buildFec, fecPreview, fecFileName } from "../domain/fec";
+import type { FecPreview, FecConformite } from "../domain/fec";
 import type { IComptabiliteReader, Periode } from "./comptabilite-reader";
 
 type Clock = () => Date;
@@ -42,4 +42,27 @@ export async function getFecPreview(reader: IComptabiliteReader, ctx: TenantCont
   const p = resolvePeriode(input, now());
   const [fecData, config, siret] = await Promise.all([reader.fecInput(ctx, p), reader.fecConfig(ctx), reader.siret(ctx)]);
   return fecPreview(buildFec(fecData, config), siret);
+}
+
+// Période FEC par défaut = ANNÉE fiscale courante (1er janvier → maintenant, fin de journée) — parité
+// legacy `/api/comptabilite/fec` (≠ resolvePeriode mensuel).
+function resolvePeriodeFec(input: { dateDebut?: Date; dateFin?: Date } | undefined, now: Date): Periode {
+  const dateFin = input?.dateFin ? new Date(input.dateFin) : new Date(now);
+  dateFin.setHours(23, 59, 59, 999);
+  return { dateDebut: input?.dateDebut ?? new Date(now.getFullYear(), 0, 1), dateFin };
+}
+
+export interface FecExport {
+  readonly content: string;
+  readonly conformite: FecConformite;
+  readonly fileName: string;
+}
+
+// Export FEC fichier (parité legacy `/api/comptabilite/fec`) : génère le FEC complet (PUR, invariant
+// Σdébit=Σcrédit via `conformite.equilibre`) + le nom de fichier réglementaire. Lecture seule.
+export async function getFecExport(reader: IComptabiliteReader, ctx: TenantContext, input?: { dateDebut?: Date; dateFin?: Date }, now: Clock = () => new Date()): Promise<FecExport> {
+  const p = resolvePeriodeFec(input, now());
+  const [fecData, config, siret] = await Promise.all([reader.fecInput(ctx, p), reader.fecConfig(ctx), reader.siret(ctx)]);
+  const result = buildFec(fecData, config);
+  return { content: result.content, conformite: result.conformite, fileName: fecFileName(siret, p.dateFin) };
 }

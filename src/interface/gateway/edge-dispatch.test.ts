@@ -82,6 +82,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // upload logo (auth cookie) → new-stack
     expect(decideTarget("/api/upload-logo", {})).toBe("new-stack");
     expect(matchesMigratedRoute("/api/upload-logo")).toBe(true);
+    // export FEC (auth cookie) → new-stack ; export-csv pas encore migré → legacy
+    expect(decideTarget("/api/comptabilite/fec", {})).toBe("new-stack");
+    expect(decideTarget("/api/comptabilite/export-csv", {})).toBe("legacy");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe

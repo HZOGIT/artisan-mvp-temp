@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { TenantContext } from "../../../shared/tenant";
 import { FakeComptabiliteReader } from "../infra/comptabilite-reader-fake";
 import type { Ecriture } from "../domain/comptabilite";
-import { getBalance, getDeclarationTVADetail, getFecPreview, getGrandLivre, getJournalVentes, getRapportTVA, resolvePeriode } from "./use-cases";
+import { getBalance, getDeclarationTVADetail, getFecExport, getFecPreview, getGrandLivre, getJournalVentes, getRapportTVA, resolvePeriode } from "./use-cases";
 
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
 const NOW = new Date("2026-06-15T12:00:00Z");
@@ -67,5 +67,29 @@ describe("comptabilite use-cases", () => {
     expect(prev.totalFactures).toBe(1);
     expect(prev.conformite.equilibre).toBe(true);
     expect(prev.lines).toHaveLength(3);
+  });
+
+  it("getFecExport : FEC complet équilibré (Σdébit=Σcrédit) + nom de fichier réglementaire (SIREN+FEC+date)", async () => {
+    const reader = new FakeComptabiliteReader();
+    reader.seedSiret(1, "11122233300044");
+    reader.seedFecInput(1, {
+      factures: [{ id: 1, numero: "FAC-1", dateFacture: new Date("2026-06-10"), totalHT: "100.00", totalTVA: "20.00", totalTTC: "120.00", statut: "envoyee", datePaiement: null, typeDocument: "facture", clientId: 7, clientNom: "Durand", clientPrenom: "Jean", lignesTVA: [{ tauxTVA: "20", tva: "20.00" }] }],
+      depenses: [],
+      encaissements: [],
+    });
+    const exp = await getFecExport(reader, ctx(1), { dateDebut: new Date("2026-01-01"), dateFin: new Date("2026-06-30") }, () => NOW);
+    expect(exp.conformite.equilibre).toBe(true);
+    expect(exp.conformite.totalDebit).toBeCloseTo(exp.conformite.totalCredit, 2);
+    expect(exp.content).toContain("JournalCode\tJournalLib"); // entête FEC 18 colonnes
+    expect(exp.content).toContain("FAC-1");
+    // SIREN = 9 premiers chiffres du SIRET ; date de clôture YYYYMMDD
+    expect(exp.fileName).toBe("111222333FEC20260630.txt");
+  });
+
+  it("getFecExport : SIRET absent → SIREN par défaut 000000000", async () => {
+    const reader = new FakeComptabiliteReader();
+    reader.seedFecInput(1, { factures: [], depenses: [], encaissements: [] });
+    const exp = await getFecExport(reader, ctx(1), { dateFin: new Date("2026-03-15") }, () => NOW);
+    expect(exp.fileName).toBe("000000000FEC20260315.txt");
   });
 });
