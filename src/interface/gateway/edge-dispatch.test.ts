@@ -59,8 +59,8 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
   });
 
   it("domaine non porté → legacy même si listé (sûreté)", () => {
-    // `integrationsComptables` n'est pas (encore) porté dans le new-stack → reste legacy même listé via env.
-    expect(decideTarget("/api/trpc/integrationsComptables.list", { NEW_STACK_DOMAINS: "integrationsComptables" })).toBe("legacy");
+    // `devisIA` n'est pas (encore) porté dans le new-stack → reste legacy même listé via env.
+    expect(decideTarget("/api/trpc/devisIA.list", { NEW_STACK_DOMAINS: "devisIA" })).toBe("legacy");
   });
 
   it("hors-tRPC NON migré → legacy (auth, webhooks, front, uploads)", () => {

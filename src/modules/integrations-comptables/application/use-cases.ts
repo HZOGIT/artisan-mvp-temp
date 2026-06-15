@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { IIntegrationsComptablesRepository } from "./integrations-comptables-repository";
+import type { IIntegrationsComptablesRepository, PendingItem } from "./integrations-comptables-repository";
 import type { ConfigComptable, ExportComptableRow, FormatExport, LogicielComptable, SaveConfigInput, SaveSyncConfigInput } from "../domain/integration-comptable";
 import { buildIIF, deriveSyncStatus } from "../domain/integration-comptable";
 
@@ -61,4 +61,52 @@ export async function genererExport(deps: GenererExportDeps, ctx: TenantContext,
 
   await deps.repo.updateExport(ctx, exportRecord.id, { statut: "termine", nombreEcritures: contenu.split("\n").length - 1 });
   return { id: exportRecord.id, contenu };
+}
+
+// ── Synchronisation ──
+export function getSyncLogs(repo: IIntegrationsComptablesRepository, ctx: TenantContext): Promise<ExportComptableRow[]> {
+  return repo.listSyncLogs(ctx);
+}
+
+export interface PendingItemsResult {
+  readonly facturesEnAttente: number;
+  readonly paiementsEnAttente: number;
+  readonly erreurs: number;
+  readonly items: PendingItem[];
+}
+
+// Items en attente de synchro. ⚠️ On renvoie l'OBJET attendu par le client (`facturesEnAttente`/
+// `paiementsEnAttente`/`erreurs`/`items`) — corrige le legacy qui renvoyait un tableau nu (le client
+// lisait `.facturesEnAttente`/`.items` → toujours 0/aucun item, bug latent). Comportement intentionnel.
+export async function getPendingItems(repo: IIntegrationsComptablesRepository, ctx: TenantContext): Promise<PendingItemsResult> {
+  const items = await repo.listPendingItems(ctx);
+  return { facturesEnAttente: items.length, paiementsEnAttente: 0, erreurs: 0, items };
+}
+
+// Synchronisation manuelle (parité legacy `lancerSync`) : config requise ; sinon, crée 1 export
+// `termine` couvrant [début du mois courant, aujourd'hui] avec le logiciel/format de la config pour
+// les items en attente, et met à jour `derniereSync`. Aucune écriture comptable mutée.
+export async function lancerSync(repo: IIntegrationsComptablesRepository, ctx: TenantContext, now: Date = new Date()): Promise<{ success: boolean; nbItems: number; message: string }> {
+  const config = await repo.getConfig(ctx);
+  if (!config) return { success: false, nbItems: 0, message: "Configuration absente" };
+  const items = await repo.listPendingItems(ctx);
+  if (items.length === 0) return { success: true, nbItems: 0, message: "Rien a synchroniser" };
+  const debutMois = new Date(now.getFullYear(), now.getMonth(), 1);
+  await repo.createExport(ctx, {
+    logiciel: config.logiciel || "sage",
+    formatExport: config.formatExport || "fec",
+    periodeDebut: debutMois.toISOString().slice(0, 10),
+    periodeFin: now.toISOString().slice(0, 10),
+    nombreEcritures: items.length,
+    statut: "termine",
+  });
+  await repo.touchDerniereSync(ctx, now);
+  return { success: true, nbItems: items.length, message: `${items.length} ecritures synchronisees` };
+}
+
+// Re-marque un export en erreur comme terminé (scopé tenant). NB : version SAINE — le legacy avait un
+// bug de passage d'argument (artisanId utilisé comme exportId) ; ici on cible bien l'export `exportId`.
+export async function retrySync(repo: IIntegrationsComptablesRepository, ctx: TenantContext, exportId: number): Promise<{ success: true }> {
+  await repo.updateExport(ctx, exportId, { statut: "termine", erreur: null });
+  return { success: true };
 }

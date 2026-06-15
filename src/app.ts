@@ -130,6 +130,9 @@ import { createClientPortalModule } from "./modules/client-portal/client-portal.
 import { PortalAccessRepositoryDrizzle } from "./modules/client-portal/infra/portal-access-repository-drizzle";
 import { PortalDocsReaderDrizzle } from "./modules/client-portal/infra/portal-docs-reader-drizzle";
 import { PortalSchedulingReaderDrizzle } from "./modules/client-portal/infra/portal-scheduling-reader-drizzle";
+import { createIntegrationsComptablesModule } from "./modules/integrations-comptables/integrations-comptables.module";
+import { IntegrationsComptablesRepositoryDrizzle } from "./modules/integrations-comptables/infra/integrations-comptables-repository-drizzle";
+import { getFecExport } from "./modules/comptabilite/application/use-cases";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
@@ -595,9 +598,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // Comptabilité (SENSIBLE, gate `comptabilite.voir`) — LECTURES (grand-livre/balance/journal/TVA).
   // ⚠️ Montée mais PAS encore activée (DEFAULT_ENABLED) : il manque `getFecPreview` (générateur FEC) →
   // le trafic comptabilité reste sur le legacy tant que la parité FEC n'est pas livrée+prouvée.
-  const comptabilite = createComptabiliteModule({
-    reader: deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db),
-  });
+  const comptabiliteReader = deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db);
+  const comptabilite = createComptabiliteModule({ reader: comptabiliteReader });
   // Auth (SENSIBLE — lockout possible) : JWT émis avec le MÊME secret que le legacy (cookie inter-
   // opérable) ; bcrypt + EmailPort + rate-limiter reset + APP_URL de confiance pour le lien de reset.
   const auth = createAuthModule({
@@ -723,7 +725,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     llm: deps.llm ?? new GeminiLlmAdapter(),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal });
+  // Module `integrationsComptables` (exports/sync vers logiciels tiers). FEC réutilise le générateur du
+  // domaine comptabilité (Σdébit=Σcrédit, lecture seule). Tables SOUS RLS.
+  const integrationsComptables = createIntegrationsComptablesModule({
+    repo: new IntegrationsComptablesRepositoryDrizzle(getDbHandle().db),
+    fec: { getFecContent: async (ctx, period) => (await getFecExport(comptabiliteReader, ctx, period)).content },
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

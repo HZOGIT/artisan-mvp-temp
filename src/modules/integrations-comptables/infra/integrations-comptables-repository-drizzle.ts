@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notExists, sql } from "drizzle-orm";
 import { configurationsComptables, exportsComptables, factures, clients } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { CreateExportData, IIntegrationsComptablesRepository, UpdateExportData } from "../application/integrations-comptables-repository";
+import type { CreateExportData, IIntegrationsComptablesRepository, PendingItem, UpdateExportData } from "../application/integrations-comptables-repository";
 import type { ConfigComptable, ExportComptableRow, FactureIIF, SaveConfigInput, SaveSyncConfigInput } from "../domain/integration-comptable";
 
 type ConfigRow = typeof configurationsComptables.$inferSelect;
@@ -95,6 +95,43 @@ export class IntegrationsComptablesRepositoryDrizzle implements IIntegrationsCom
         .where(and(eq(factures.artisanId, ctx.artisanId), sql`${factures.dateFacture} BETWEEN ${dStr} AND ${fStr}`, inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"])))
         .orderBy(asc(factures.dateFacture));
       return rows.map((f) => ({ id: f.id, numero: f.numero ?? null, dateFacture: f.dateFacture, totalHT: f.totalHT ?? null, totalTVA: f.totalTVA ?? null, totalTTC: f.totalTTC ?? null, clientNom: f.clientNom ?? null, clientPrenom: f.clientPrenom ?? null }));
+    });
+  }
+
+  listSyncLogs(ctx: TenantContext): Promise<ExportComptableRow[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx.select().from(exportsComptables).where(eq(exportsComptables.artisanId, ctx.artisanId)).orderBy(desc(exportsComptables.createdAt)).limit(50);
+      return rows.map(toExport);
+    });
+  }
+
+  listPendingItems(ctx: TenantContext): Promise<PendingItem[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Factures à statut « émis » NON couvertes par un export `termine` chevauchant leur date.
+      const rows = await tx
+        .select({ id: factures.id, numero: factures.numero, dateFacture: factures.dateFacture, totalTTC: factures.totalTTC, statut: factures.statut })
+        .from(factures)
+        .where(
+          and(
+            eq(factures.artisanId, ctx.artisanId),
+            inArray(factures.statut, ["validee", "envoyee", "payee", "en_retard"]),
+            notExists(
+              tx
+                .select({ x: sql`1` })
+                .from(exportsComptables)
+                .where(and(eq(exportsComptables.artisanId, factures.artisanId), eq(exportsComptables.statut, "termine"), sql`${factures.dateFacture} BETWEEN ${exportsComptables.periodeDebut} AND ${exportsComptables.periodeFin}`)),
+            ),
+          ),
+        )
+        .orderBy(desc(factures.dateFacture))
+        .limit(200);
+      return rows.map((f) => ({ id: f.id, numero: f.numero ?? null, dateFacture: f.dateFacture, totalTTC: f.totalTTC ?? null, statut: f.statut ?? null }));
+    });
+  }
+
+  async touchDerniereSync(ctx: TenantContext, now: Date): Promise<void> {
+    await withTenant(this.db, ctx, async (tx) => {
+      await tx.update(configurationsComptables).set({ derniereSync: now }).where(eq(configurationsComptables.artisanId, ctx.artisanId));
     });
   }
 }
