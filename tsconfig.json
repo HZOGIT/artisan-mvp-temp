@@ -1,5 +1,16 @@
 {
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
+  // Typecheck legacy (dette OPE-253, non gated — le gate du code neuf = tsconfig.src.json). `server/`
+  // a été supprimé (extinction du legacy) : il ne reste que les 4 sidecars PDF/email encore bundlés
+  // au runtime par le new-stack (build:newstack → legacy-pdf.mjs / legacy-email.mjs), listés
+  // explicitement ci-dessous pour conserver leur couverture de types sans glob `server/**` trompeur.
+  "include": [
+    "client/src/**/*",
+    "shared/**/*",
+    "server/_core/pdfGenerator.ts",
+    "server/_core/fonts.ts",
+    "server/_core/emailService.ts",
+    "server/_core/env.ts"
+  ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "incremental": true,
