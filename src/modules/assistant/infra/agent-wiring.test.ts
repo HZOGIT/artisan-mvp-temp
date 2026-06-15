@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { TenantContext } from "../../../shared/tenant";
 import { FakeDashboardReader } from "../../dashboard/infra/dashboard-reader-fake";
-import { buildAssistantAgentRegistry, type AssistantAgentReadRepos } from "./agent-wiring";
+import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos, type AssistantAgentReadRepos } from "./agent-wiring";
+import { FakeClientRepository } from "../../clients/infra/client-repository-fake";
+import { FakeInterventionRepository } from "../../interventions/infra/intervention-repository-fake";
+import { FakeDevisRepository } from "../../devis/infra/devis-repository-fake";
 // Vérif de PARITÉ STRUCTURELLE (compile-time) : les interfaces des repos migrés satisfont les ports
 // `*ForAgent`. Si un repo dérive (renomme `list`, change un type), la compilation casse ici.
 import type { IClientRepository } from "../../clients/application/client-repository";
@@ -76,5 +79,37 @@ describe("agent-wiring — registry de lecture câblé", () => {
     const reg = buildAssistantAgentRegistry(repos());
     expect(reg.tools.some((t) => t.name === "creer_client")).toBe(false);
     expect((await reg.execute("creer_client", { nom: "X" }, ctx)).ok).toBe(false);
+  });
+});
+
+describe("agent-wiring — écritures câblées (Phase 3b-i)", () => {
+  function writeRepos() {
+    return { clientRepo: new FakeClientRepository(), interventionRepo: new FakeInterventionRepository(), devisRepo: new FakeDevisRepository() };
+  }
+
+  it("expose les 4 écritures clients/interventions/devis", () => {
+    const reg = buildAssistantAgentRegistry(repos(), buildAssistantWriteHandlersFromRepos(writeRepos()));
+    for (const name of ["creer_client", "creer_intervention", "modifier_intervention", "creer_devis"]) {
+      expect(reg.tools.some((t) => t.name === name)).toBe(true);
+    }
+  });
+
+  it("creer_client exécuté de bout en bout (use-case migré + repo) → ok + clientId", async () => {
+    const wr = writeRepos();
+    const reg = buildAssistantAgentRegistry(repos(), buildAssistantWriteHandlersFromRepos(wr));
+    const res = await reg.execute("creer_client", { nom: "Dupont", prenom: "Jean" }, ctx);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      const data = res.data as { clientId: number; nom: string };
+      expect(data.nom).toBe("Dupont");
+      expect(await wr.clientRepo.getById(ctx, data.clientId)).not.toBeNull();
+    }
+  });
+
+  it("creer_client cross-tenant pour l'intervention : intervention sur client absent → ok:false (anti-IDOR)", async () => {
+    const reg = buildAssistantAgentRegistry(repos(), buildAssistantWriteHandlersFromRepos(writeRepos()));
+    // clientId 999 n'existe pas → le use-case migré refuse (ownership FK).
+    const res = await reg.execute("creer_intervention", { clientId: 999, titre: "X", dateDebut: "2026-07-01T08:00:00", dateFin: "2026-07-01T10:00:00" }, ctx);
+    expect(res.ok).toBe(false);
   });
 });
