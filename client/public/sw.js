@@ -1,4 +1,7 @@
-const CACHE_NAME = 'operioz-v1';
+// Bump à chaque changement de stratégie/cassure de contrat : l'`activate` ci-dessous purge tout
+// cache dont le nom diffère → force la suppression de l'ancien cache (ex. bundle pré-superjson)
+// chez les clients ayant un SW périmé. Stratégie network-first (cf. fetch) → en ligne, toujours frais.
+const CACHE_NAME = 'operioz-v2';
 const STATIC_ASSETS = [
   '/',
   '/dashboard',

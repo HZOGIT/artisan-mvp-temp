@@ -1,0 +1,10 @@
+# Cloudflare Pages — en-têtes par chemin. Copié tel quel dans dist/public/ par vite (public/),
+# lu par Pages au déploiement.
+#
+# Le service worker et le manifeste NE doivent PAS être mis en cache HTTP : sinon la mise à jour du
+# SW traîne (le navigateur sert un vieux sw.js lors du contrôle de mise à jour) et les utilisateurs
+# restent bloqués sur un ancien bundle servi par un SW périmé. `index.html` est déjà non-caché.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/manifest.json
+  Cache-Control: no-cache, no-store, must-revalidate
