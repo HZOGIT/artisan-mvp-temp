@@ -85,18 +85,19 @@ Légende colonne : ✅ couvert · ⬜ manquant · — non applicable. (état au 
 | 6 | **Facturation** (`factures`) | ✅ | ✅ | ✅ | ⬜ | L4 couvert par le PoC devis→paiement ; rien d'urgent |
 | 7 | **Devis** (`devis`) | ✅ | ✅ | ✅ | ⬜ | idem — colonne complète hors L4 |
 
-### Rétro-complétion (use-cases déjà testés L1 seul — it.1→9) — EN COURS (toutes colonnes critiques ✅)
-Ajouter L2/L3 là où la feature a repo+router, **après avoir vérifié que le niveau n'existe pas déjà** :
-`rdv-en-ligne` (L3 rdv router ? + L2 rdv-repository-drizzle ?), `stocks/alertes`, `depenses/budgets-realises`,
-`commandes/devis-acceptes`. Les fonctions pures (numero, comptes, isSearchable, bibliotheque délégation)
-restent **L1 seul** (pas de repo/router → rien à ajouter).
+### Rétro-complétion (use-cases déjà testés L1 seul — it.1→9) — ✅ RIEN À FAIRE (vérifié it.18)
+Scan confirmé : `rdv-en-ligne`, `stocks`, `depenses`, `commandes` ont **déjà** leur L2 (drizzle) ET L3
+(router) ; mes ajouts L1 (it.3-7) comblaient les seuls trous. Les fonctions pures (numero, comptes,
+isSearchable, bibliotheque) restent **L1 seul**. → Rétro-complétion sans objet.
 
-### Use-cases L1 encore nus (non critiques — plus bas)
-`clients/import-use-cases`, `contrats-maintenance/contrat-facture-generator`, `devis/devis-to-facture-converter`.
+### Use-cases L1 encore nus (non critiques)
+- [x] `clients/import-use-cases` → `import-use-cases.test.ts` (4 cas) ✅ it.18
+- [ ] `contrats-maintenance/contrat-facture-generator` (vérifier : fonction vs classe/adapter)
+- [ ] `devis/devis-to-facture-converter` (idem — pas d'export function repéré ; peut être une classe infra)
 
 🏁 **Les 4 colonnes critiques prioritaires sont COMPLÈTES** (portail, signature, abonnement, auth).
 
-**Prochaine cible : rétro-complétion — `rdv-en-ligne`** : vérifier les niveaux manquants (L2 `rdv-repository-drizzle.test.ts` ? L3 `rdv-en-ligne` router ?) et compléter celui qui manque. Si tout existe déjà, passer à `stocks`/`depenses`/`commandes`.
+**Prochaine cible : `contrats-maintenance/contrat-facture-generator.ts`** — lire d'abord (fonction pure vs classe/adapter). Si c'est de la logique testable (génération facture récurrente depuis contrat) → L1 fakes. Sinon, `devis/devis-to-facture-converter.ts`, puis recalculer le backlog des fichiers sans test.
 
 ---
 
@@ -120,3 +121,4 @@ restent **L1 seul** (pas de repo/router → rien à ajouter).
 - `2026-06-15 20:05:39Z` **[done]** subscription L3 router — 4 cas e2e billing (5 procédures protégées 401 sans cookie, getCurrent défaut trial, createPortal/cancel sans Customer→404). L1 use-cases déjà couvert par effects.test.
 - `2026-06-15 20:34:38Z` **[done]** auth L1 emails — welcomeEmail/resetPasswordEmail couverts (5 cas : interpolation nom, fallback URL, anti-XSS échappement HTML, resetUrl+validité). subscription-event-notifier = port (écarté), colonne abonnement close.
 - `2026-06-15 21:05:30Z` **[done]** auth L3 router — 4 COLONNES CRITIQUES COMPLÈTES — 6 cas e2e auth (me null/authentifié, signin 401 mauvais pw + email inconnu, signin OK, updateEmail 401). Portail+signature+abonnement+auth = colonnes complètes. Bascule en rétro-complétion.
+- `2026-06-15 21:35:40Z` **[done]** clients import-use-cases L1 — importerClients couvert (4 cas : tout valide, best-effort skip lignes invalides, tableau vide, scope tenant). Rétro-complétion vérifiée sans objet (rdv/stocks/depenses/commandes ont déjà L2+L3).
