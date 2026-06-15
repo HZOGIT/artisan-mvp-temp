@@ -27,6 +27,19 @@ export const DEFAULT_ENABLED = [
 
 const TRPC_PREFIX = "/api/trpc/";
 
+// Routes HORS-tRPC migrées ET servies par le new-stack (le jeton/chemin EST la capacité — pas de
+// cookie tenant). On n'y inscrit une route qu'une fois portée dans `src/**` ET déployée sur le
+// backend new-stack. Mirroir-é par `src/interface/gateway/migrated-routes.ts` (parité `edge-dispatch.test`).
+export const MIGRATED_ROUTES = [
+  // Flux iCal public d'abonnement au calendrier des interventions (`/api/calendar/:token.ics`).
+  { name: "ical", pattern: /^\/api\/calendar\/.+\.ics$/ },
+];
+
+// Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
+export function matchesMigratedRoute(pathname) {
+  return typeof pathname === "string" && MIGRATED_ROUTES.some((r) => r.pattern.test(pathname));
+}
+
 // Domaines d'un chemin tRPC, BATCH inclus : "/api/trpc/a.list,b.get" → ["a","b"]. tRPC `httpBatchLink`
 // concatène les procédures d'un même tick par des virgules. Renvoie [] hors /api/trpc.
 export function domainsFromTrpcPath(pathname) {
@@ -58,6 +71,8 @@ export function enabledDomains(env) {
 // domaines (batch inclus) sont migrés ET activés. Sinon "legacy" (défaut sûr, sert tout) → un batch
 // mêlant un domaine activé et un domaine legacy part en legacy (jamais de procédure manquante).
 export function decideTarget(pathname, env) {
+  // Routes HORS-tRPC migrées (ex. flux iCal public) → new-stack, indépendamment des domaines tRPC.
+  if (matchesMigratedRoute(pathname)) return "new-stack";
   const domains = domainsFromTrpcPath(pathname);
   if (domains.length === 0) return "legacy";
   const enabled = enabledDomains(env);

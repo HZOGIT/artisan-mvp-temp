@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { MIGRATED_DOMAINS, STAGING_NEW_STACK_DEFAULT_DOMAINS } from "./migrated-domains";
+import { MIGRATED_ROUTES as SRC_MIGRATED_ROUTES, matchesMigratedRoute } from "./migrated-routes";
 // @ts-ignore — module ESM de la Pages Function (JS pur, sans types). Importé pour verrouiller la
 // parité avec le gateway src (anti-drift) : la logique edge réimplémente la décision en JS.
 import {
   MIGRATED as EDGE_MIGRATED,
   DEFAULT_ENABLED as EDGE_DEFAULT_ENABLED,
+  MIGRATED_ROUTES as EDGE_MIGRATED_ROUTES,
   decideTarget,
   domainFromTrpcPath,
   domainsFromTrpcPath,
@@ -60,11 +62,24 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(decideTarget("/api/trpc/support.list", { NEW_STACK_DOMAINS: "support" })).toBe("legacy");
   });
 
-  it("hors-tRPC → legacy (auth, webhooks, front)", () => {
+  it("hors-tRPC NON migré → legacy (auth, webhooks, front, uploads)", () => {
     const env = { NEW_STACK_DOMAINS: NON_DEFAULT };
     expect(decideTarget("/api/auth/login", env)).toBe("legacy");
     expect(decideTarget("/api/webhooks/stripe", env)).toBe("legacy");
+    expect(decideTarget("/api/upload-logo", env)).toBe("legacy");
     expect(decideTarget("/", env)).toBe("legacy");
+  });
+
+  it("routes HORS-tRPC migrées (edge == src) : `.ics` → new-stack ; chemins voisins → legacy", () => {
+    // parité anti-drift du registre de routes HORS-tRPC
+    expect(EDGE_MIGRATED_ROUTES.map((r) => r.name).sort()).toEqual(SRC_MIGRATED_ROUTES.map((r) => r.name).sort());
+    // flux iCal public → new-stack (le jeton EST la capacité, pas de cookie)
+    expect(decideTarget("/api/calendar/abc123def456.ics", {})).toBe("new-stack");
+    expect(matchesMigratedRoute("/api/calendar/abc123def456.ics")).toBe(true);
+    // chemins voisins NON migrés → legacy
+    expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
+    expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe
+    expect(matchesMigratedRoute("/api/calendar/")).toBe(false);
   });
 
   it("isolation : activer un domaine n'en détourne pas un autre", () => {
