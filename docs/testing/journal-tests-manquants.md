@@ -58,7 +58,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 > `for f in $(find src/modules -path '*/application/*.ts' ! -name '*.test.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`
 
 - [ ] `src/modules/articles/application/bibliotheque-use-cases.ts`
-- [ ] `src/modules/articles/application/public-article-search.ts`
+- [x] `src/modules/articles/application/public-article-search.ts` → `public-article-search.test.ts` (4 cas) ✅ it.8
 - [ ] `src/modules/clients/application/import-use-cases.ts`
 - [x] `src/modules/commandes/application/devis-acceptes-use-cases.ts` → `devis-acceptes-use-cases.test.ts` (4 cas) ✅ it.7
 - [ ] `src/modules/contrats-maintenance/application/contrat-facture-generator.ts`
@@ -75,7 +75,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - _Écartés (ports/interfaces, pas de logique à tester)_ : `assistant/agentic-port.ts`,
   `factures/compta-port.ts`, `factures/contact-readers.ts`.
 
-**Prochaine cible : `src/modules/articles/application/public-article-search.ts`** (recherche articles publique).
+**Prochaine cible : `src/modules/articles/application/bibliotheque-use-cases.ts`** (catalogue bibliothèque).
 
 ---
 
@@ -88,3 +88,4 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - `2026-06-15 17:13:15Z` **[done]** rdv-en-ligne/confirm — confirmerRdvAvecIntervention couvert (4 cas : anti-IDOR, garde statut, création intervention planifiée + lien, durée défaut 60).
 - `2026-06-15 17:23:48Z` **[done]** depenses/budgets-realises — budgetsRealises couvert (4 cas : croisement budget/réel+pct, sans dépense, budget 0 sans div/0, scope tenant).
 - `2026-06-15 17:33:36Z` **[done]** commandes/devis-acceptes — listerDevisAcceptes couvert (4 cas : filtre accepte, enrichissement nom client, fallback Client, mapping objet/total/date).
+- `2026-06-15 17:43:07Z` **[done]** articles/public-article-search — isSearchable couvert (4 cas : >=2 char, trop court, trim espaces, requête valide entourée d'espaces).
