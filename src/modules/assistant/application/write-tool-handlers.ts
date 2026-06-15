@@ -41,6 +41,17 @@ export interface InterventionCreateInput {
 export interface InterventionWriterForAgent {
   create(ctx: TenantContext, input: InterventionCreateInput): Promise<{ id: number; titre: string; dateDebut: Date; dateFin: Date | null }>;
 }
+// `modifier_intervention` : patch partiel (champs fournis seulement) ; ownership via le use-case migré.
+export interface InterventionUpdatePatch {
+  readonly titre?: string;
+  readonly dateDebut?: Date;
+  readonly dateFin?: Date;
+  readonly statut?: string;
+  readonly notes?: string;
+}
+export interface InterventionUpdaterForAgent {
+  modifier(ctx: TenantContext, id: number, patch: InterventionUpdatePatch): Promise<{ id: number; titre: string; statut: string }>;
+}
 
 // Devis : on s'appuie sur les use-cases migrés (création header + ajout de lignes, montants HT/TVA/TTC
 // recalculés par le repo) ; l'orchestration (header → lignes → relecture des totaux) reste ici.
@@ -107,6 +118,7 @@ export interface AssistantWriteDeps {
   readonly clients?: ClientWriterForAgent;
   readonly clientsById?: ClientByIdReaderForAgent;
   readonly interventions?: InterventionWriterForAgent;
+  readonly interventionUpdater?: InterventionUpdaterForAgent;
   readonly devis?: DevisWriterForAgent;
   readonly factures?: FactureWriterForAgent;
   readonly devisSender?: DevisSenderForAgent;
@@ -395,13 +407,46 @@ function makeEnvoyerCommande(sender: CommandeSenderForAgent): ToolHandler {
   };
 }
 
+// `modifier_intervention` : met à jour les champs fournis (titre/dates/statut/notes). Ownership via le
+// use-case migré (404 cross-tenant). Dates ISO validées. `Aucun champ` → refus (parité legacy).
+function makeModifierIntervention(updater: InterventionUpdaterForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    if (!args?.interventionId) return { ok: false, error: "interventionId est requis" };
+    const patch: { titre?: string; dateDebut?: Date; dateFin?: Date; statut?: string; notes?: string } = {};
+    if (typeof args.titre === "string") patch.titre = args.titre;
+    if (args.dateDebut != null) {
+      const d = new Date(String(args.dateDebut));
+      if (isNaN(d.getTime())) return { ok: false, error: "dateDebut invalide" };
+      patch.dateDebut = d;
+    }
+    if (args.dateFin != null) {
+      const d = new Date(String(args.dateFin));
+      if (isNaN(d.getTime())) return { ok: false, error: "dateFin invalide" };
+      patch.dateFin = d;
+    }
+    if (typeof args.statut === "string") patch.statut = args.statut;
+    if (typeof args.notes === "string") patch.notes = args.notes;
+    if (Object.keys(patch).length === 0) return { ok: false, error: "Aucun champ à modifier" };
+    try {
+      const updated = await updater.modifier(ctx, Number(args.interventionId), patch);
+      return {
+        ok: true,
+        data: { interventionId: updated.id, titre: updated.titre, statut: updated.statut, message: `Intervention #${Number(args.interventionId)} mise à jour` },
+      };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de la mise à jour de l'intervention") };
+    }
+  };
+}
+
 // Construit les handlers d'écriture câblés (par lots, risque croissant). Un outil n'est inclus que si
 // ses readers/writers sont fournis. 2a : creer_client/intervention ; 2b : creer_devis ; 2c : creer_facture ;
-// 2d : envoyer_devis/envoyer_facture ; 2e : creer_et_envoyer_devis + commandes fournisseurs.
+// 2d : envoyer_devis/envoyer_facture ; 2e : creer_et_envoyer_devis + commandes ; 2f : modifier_intervention.
 export function buildAssistantWriteHandlers(deps: AssistantWriteDeps): Record<string, ToolHandler> {
   const handlers: Record<string, ToolHandler> = {};
   if (deps.clients) handlers.creer_client = makeCreerClient(deps.clients);
   if (deps.clientsById && deps.interventions) handlers.creer_intervention = makeCreerIntervention(deps.clientsById, deps.interventions);
+  if (deps.interventionUpdater) handlers.modifier_intervention = makeModifierIntervention(deps.interventionUpdater);
   if (deps.devis) handlers.creer_devis = makeCreerDevis(deps.devis);
   if (deps.devis && deps.devisSender) handlers.creer_et_envoyer_devis = makeCreerEtEnvoyerDevis(deps.devis, deps.devisSender);
   if (deps.factures) handlers.creer_facture = makeCreerFacture(deps.factures);

@@ -17,6 +17,8 @@ import {
   type CommandeWriterForAgent,
   type CommandeLigneInput,
   type CommandeSenderForAgent,
+  type InterventionUpdaterForAgent,
+  type InterventionUpdatePatch,
 } from "./write-tool-handlers";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -300,6 +302,48 @@ describe("write-tool-handlers — commandes fournisseurs", () => {
     expect((await h.envoyer_commande_fournisseur({}, ctx)).ok).toBe(false);
     const res = await h.envoyer_commande_fournisseur({ commandeId: 31 }, ctx);
     expect(res).toEqual({ ok: true, data: { message: "Bon de commande BC-2026-0001 envoyé à f@x.fr" } });
+  });
+});
+
+class FakeInterventionUpdater implements InterventionUpdaterForAgent {
+  public patch?: InterventionUpdatePatch;
+  public id?: number;
+  constructor(private readonly fail?: string) {}
+  async modifier(_c: TenantContext, id: number, patch: InterventionUpdatePatch) {
+    if (this.fail) throw new Error(this.fail);
+    this.id = id;
+    this.patch = patch;
+    return { id, titre: patch.titre ?? "Pose", statut: patch.statut ?? "planifiee" };
+  }
+}
+
+describe("write-tool-handlers — modifier_intervention", () => {
+  it("sans interventionId → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ interventionUpdater: new FakeInterventionUpdater() });
+    expect((await h.modifier_intervention({}, ctx)).ok).toBe(false);
+  });
+
+  it("aucun champ → ok:false 'Aucun champ à modifier'", async () => {
+    const h = buildAssistantWriteHandlers({ interventionUpdater: new FakeInterventionUpdater() });
+    expect(await h.modifier_intervention({ interventionId: 7 }, ctx)).toEqual({ ok: false, error: "Aucun champ à modifier" });
+  });
+
+  it("date invalide → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ interventionUpdater: new FakeInterventionUpdater() });
+    expect((await h.modifier_intervention({ interventionId: 7, dateDebut: "pas-une-date" }, ctx)).ok).toBe(false);
+  });
+
+  it("succès : patch partiel (titre + statut) + message", async () => {
+    const updater = new FakeInterventionUpdater();
+    const h = buildAssistantWriteHandlers({ interventionUpdater: updater });
+    const res = await h.modifier_intervention({ interventionId: 7, titre: "Réparation", statut: "terminee" }, ctx);
+    expect(res).toMatchObject({ ok: true, data: { interventionId: 7, message: "Intervention #7 mise à jour" } });
+    expect(updater.patch).toEqual({ titre: "Réparation", statut: "terminee" });
+  });
+
+  it("intervention d'un autre tenant (use-case lève) → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ interventionUpdater: new FakeInterventionUpdater("Intervention introuvable") });
+    expect(await h.modifier_intervention({ interventionId: 99, titre: "X" }, ctx)).toEqual({ ok: false, error: "Intervention introuvable" });
   });
 });
 
