@@ -82,3 +82,47 @@ export interface UpdateSuggestionInput {
   readonly quantiteSuggeree?: string;
   readonly prixEstime?: string;
 }
+
+// ── Génération de devis depuis les suggestions sélectionnées (genererDevis) ──
+export interface LigneDevisIA {
+  readonly ordre: number;
+  readonly designation: string;
+  readonly quantite: number;
+  readonly unite: string;
+  readonly prixUnitaireHT: number;
+  readonly tauxTVA: number;
+  readonly montantHT: number;
+  readonly montantTVA: number;
+  readonly montantTTC: number;
+}
+
+export interface DevisIATotals {
+  readonly lignes: readonly LigneDevisIA[];
+  readonly totalHT: number;
+  readonly totalTVA: number;
+  readonly totalTTC: number;
+}
+
+// Construit les lignes + totaux d'un devis à partir des suggestions SÉLECTIONNÉES (parité legacy
+// `creerDevisDepuisAnalyseIA`). TVA fixe 20 %. `suggestionIds` optionnel restreint le sous-ensemble.
+// Renvoie null si aucune ligne (rien à générer). PUR (totaux dérivés des lignes → cohérents).
+export function genererLignesDevis(suggestions: readonly Suggestion[], suggestionIds?: readonly number[]): DevisIATotals | null {
+  const idSet = suggestionIds ? new Set(suggestionIds) : null;
+  const lignes: LigneDevisIA[] = [];
+  let totalHT = 0;
+  let totalTVA = 0;
+  for (const s of suggestions) {
+    if (idSet && !idSet.has(s.id)) continue;
+    if (!s.selectionne) continue;
+    const quantite = Number(s.quantiteSuggeree || 1);
+    const prixUnitaireHT = Number(s.prixEstime || 0);
+    const tauxTVA = 20;
+    const montantHT = quantite * prixUnitaireHT;
+    const montantTVA = montantHT * (tauxTVA / 100);
+    lignes.push({ ordre: lignes.length, designation: s.nomArticle || "", quantite, unite: s.unite || "u", prixUnitaireHT, tauxTVA, montantHT, montantTVA, montantTTC: montantHT + montantTVA });
+    totalHT += montantHT;
+    totalTVA += montantTVA;
+  }
+  if (lignes.length === 0) return null;
+  return { lignes, totalHT, totalTVA, totalTTC: totalHT + totalTVA };
+}

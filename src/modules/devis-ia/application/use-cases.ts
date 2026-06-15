@@ -36,3 +36,12 @@ export async function updateSuggestion(repo: IDevisIARepository, ctx: TenantCont
   if (!updated) throw new NotFoundError("Suggestion introuvable");
   return updated;
 }
+
+// Génère un devis (brouillon) depuis les suggestions sélectionnées d'une analyse possédée. Valide
+// l'analyse (404) ET le client rattaché (404 anti-IDOR-FK — sinon fuite PII via relecture du devis).
+// null si aucune suggestion sélectionnée (parité legacy).
+export async function genererDevis(repo: IDevisIARepository, ctx: TenantContext, params: { analyseId: number; clientId: number; suggestionIds?: number[] }): Promise<{ devisId: number; montantEstime: number } | null> {
+  if (!(await repo.getAnalyseOwned(ctx, params.analyseId))) throw new NotFoundError("Analyse non trouvée");
+  if (!(await repo.ownsClient(ctx, params.clientId))) throw new NotFoundError("Client introuvable");
+  return repo.createDevisFromAnalyse(ctx, params);
+}

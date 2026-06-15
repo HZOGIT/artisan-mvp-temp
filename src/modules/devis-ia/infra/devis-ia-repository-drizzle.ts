@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { analysesPhotosChantier, photosAnalyse, resultatsAnalyseIA, suggestionsArticlesIA, devisGenereIA, clients } from "../../../../drizzle/schema.pg";
+import { analysesPhotosChantier, photosAnalyse, resultatsAnalyseIA, suggestionsArticlesIA, devisGenereIA, clients, devis, devisLignes } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisIARepository } from "../application/devis-ia-repository";
+import { genererLignesDevis } from "../domain/devis-ia";
 import type { AddPhotoInput, Analyse, AnalyseDetail, CreateAnalyseInput, Photo, Resultat, ResultatAvecSuggestions, Suggestion, DevisGenere, UpdateSuggestionInput } from "../domain/devis-ia";
 
 type AnalyseRow = typeof analysesPhotosChantier.$inferSelect;
@@ -103,6 +104,34 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
       if (Object.keys(set).length > 0) await tx.update(suggestionsArticlesIA).set(set).where(eq(suggestionsArticlesIA.id, suggestionId));
       const [r] = await tx.select().from(suggestionsArticlesIA).where(eq(suggestionsArticlesIA.id, suggestionId)).limit(1);
       return r ? toSuggestion(r) : null;
+    });
+  }
+
+  createDevisFromAnalyse(ctx: TenantContext, params: { analyseId: number; clientId: number; suggestionIds?: number[] }): Promise<{ devisId: number; montantEstime: number } | null> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // Ownership de l'analyse (RLS + filtre).
+      const [a] = await tx.select().from(analysesPhotosChantier).where(and(eq(analysesPhotosChantier.id, params.analyseId), eq(analysesPhotosChantier.artisanId, ctx.artisanId))).limit(1);
+      if (!a) return null;
+      // Suggestions de toutes les analyses → résultats → suggestions de CETTE analyse.
+      const resultats = await tx.select({ id: resultatsAnalyseIA.id }).from(resultatsAnalyseIA).where(eq(resultatsAnalyseIA.analyseId, params.analyseId));
+      const resultatIds = resultats.map((r) => r.id);
+      const suggestions = resultatIds.length ? await tx.select().from(suggestionsArticlesIA).where(inArray(suggestionsArticlesIA.resultatId, resultatIds)) : [];
+      const devisData = genererLignesDevis(suggestions.map(toSuggestion), params.suggestionIds);
+      if (!devisData) return null;
+
+      // Numéro spécial (préfixe IA, parité legacy — distinct du compteur devis standard).
+      const numero = `IA-${Date.now().toString().slice(-8)}`;
+      const [created] = await tx
+        .insert(devis)
+        .values({ artisanId: ctx.artisanId, clientId: params.clientId, numero, statut: "brouillon", objet: a.titre || "Devis depuis analyse photos IA", totalHT: devisData.totalHT.toFixed(2), totalTVA: devisData.totalTVA.toFixed(2), totalTTC: devisData.totalTTC.toFixed(2) })
+        .returning({ id: devis.id });
+      for (const l of devisData.lignes) {
+        await tx.insert(devisLignes).values({ devisId: created.id, ordre: l.ordre, designation: l.designation, quantite: l.quantite.toFixed(2), unite: l.unite, prixUnitaireHT: l.prixUnitaireHT.toFixed(2), tauxTVA: l.tauxTVA.toFixed(2), montantHT: l.montantHT.toFixed(2), montantTVA: l.montantTVA.toFixed(2), montantTTC: l.montantTTC.toFixed(2) });
+      }
+      // Lien analyse→devis (remplace l'existant).
+      await tx.delete(devisGenereIA).where(eq(devisGenereIA.analyseId, params.analyseId));
+      await tx.insert(devisGenereIA).values({ analyseId: params.analyseId, devisId: created.id, montantEstime: devisData.totalTTC.toFixed(2) });
+      return { devisId: created.id, montantEstime: devisData.totalTTC };
     });
   }
 }

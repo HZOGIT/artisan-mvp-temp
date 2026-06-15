@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import { DevisIARepositoryFake } from "../infra/devis-ia-repository-fake";
-import { listAnalyses, getAnalyse, createAnalyse, addPhoto, updateSuggestion } from "./use-cases";
+import { listAnalyses, getAnalyse, createAnalyse, addPhoto, updateSuggestion, genererDevis } from "./use-cases";
 
 const A: TenantContext = { artisanId: 1, userId: 1 };
 const B: TenantContext = { artisanId: 2, userId: 2 };
@@ -73,5 +73,26 @@ describe("updateSuggestion (anti-IDOR comblé)", () => {
   });
   it("suggestion d'un AUTRE tenant → NotFound (le legacy n'avait AUCUNE garde)", async () => {
     await expect(updateSuggestion(seed(), A, 400, { selectionne: true })).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("genererDevis", () => {
+  it("analyse + client possédés → crée le devis depuis les suggestions sélectionnées", async () => {
+    const repo = seed();
+    await updateSuggestion(repo, A, 300, { selectionne: true }); // sélectionne la suggestion
+    const res = await genererDevis(repo, A, { analyseId: 10, clientId: 5 });
+    expect(res).not.toBeNull();
+    expect(res!.montantEstime).toBeGreaterThan(0);
+    expect(repo.createdDevis).toHaveLength(1);
+  });
+  it("aucune suggestion sélectionnée → null (parité legacy)", async () => {
+    const repo = seed(); // suggestion 300 reste selectionne:false
+    expect(await genererDevis(repo, A, { analyseId: 10, clientId: 5 })).toBeNull();
+  });
+  it("analyse hors tenant → NotFound", async () => {
+    await expect(genererDevis(seed(), A, { analyseId: 20, clientId: 5 })).rejects.toBeInstanceOf(NotFoundError);
+  });
+  it("client hors tenant → NotFound (anti-IDOR-FK, fuite PII évitée)", async () => {
+    await expect(genererDevis(seed(), A, { analyseId: 10, clientId: 999 })).rejects.toBeInstanceOf(NotFoundError);
   });
 });

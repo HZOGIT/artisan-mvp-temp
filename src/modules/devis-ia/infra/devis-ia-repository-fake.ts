@@ -1,5 +1,6 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisIARepository } from "../application/devis-ia-repository";
+import { genererLignesDevis } from "../domain/devis-ia";
 import type { AddPhotoInput, Analyse, AnalyseDetail, CreateAnalyseInput, Photo, ResultatAvecSuggestions, Suggestion, DevisGenere, UpdateSuggestionInput } from "../domain/devis-ia";
 
 interface StoredAnalyse extends Analyse {
@@ -72,5 +73,15 @@ export class DevisIARepositoryFake implements IDevisIARepository {
     this.suggestions[i] = { ...this.suggestions[i], ...(patch.selectionne !== undefined ? { selectionne: patch.selectionne } : {}), ...(patch.quantiteSuggeree !== undefined ? { quantiteSuggeree: patch.quantiteSuggeree } : {}), ...(patch.prixEstime !== undefined ? { prixEstime: patch.prixEstime } : {}) };
     const { artisanId: _a, ...rest } = this.suggestions[i];
     return rest;
+  }
+  readonly createdDevis: Array<{ devisId: number; analyseId: number }> = [];
+  async createDevisFromAnalyse(ctx: TenantContext, params: { analyseId: number; clientId: number; suggestionIds?: number[] }): Promise<{ devisId: number; montantEstime: number } | null> {
+    if (!(await this.getAnalyseOwned(ctx, params.analyseId))) return null;
+    const sugg = this.suggestions.filter((s) => s.artisanId === ctx.artisanId);
+    const data = genererLignesDevis(sugg, params.suggestionIds);
+    if (!data) return null;
+    const devisId = this.seq++;
+    this.createdDevis.push({ devisId, analyseId: params.analyseId });
+    return { devisId, montantEstime: data.totalTTC };
   }
 }

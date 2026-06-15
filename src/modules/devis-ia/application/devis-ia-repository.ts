@@ -18,4 +18,8 @@ export interface IDevisIARepository {
   // Met à jour une suggestion SI son analyse parente appartient au tenant (anti-IDOR via la chaîne
   // suggestion→résultat→analyse). null si hors tenant. ⚠️ Corrige l'IDOR latent du legacy (aucune garde).
   updateSuggestionOwned(ctx: TenantContext, suggestionId: number, patch: UpdateSuggestionInput): Promise<Suggestion | null>;
+
+  // Crée un devis (brouillon) à partir des suggestions SÉLECTIONNÉES d'une analyse possédée + lie
+  // analyse→devis. Renvoie null si l'analyse n'est pas au tenant OU si aucune suggestion sélectionnée.
+  createDevisFromAnalyse(ctx: TenantContext, params: { analyseId: number; clientId: number; suggestionIds?: number[] }): Promise<{ devisId: number; montantEstime: number } | null>;
 }
