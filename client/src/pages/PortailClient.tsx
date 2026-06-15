@@ -138,7 +138,9 @@ export default function PortailClient() {
   const sendClientMessage = trpc.clientPortal.sendClientMessage.useMutation({
     onSuccess: () => {
       setChatMessage("");
-      refetchChatMessages();
+      // refetch() ignore le flag `enabled` et réutilise l'input courant : ne pas le déclencher
+      // si aucune conversation n'est sélectionnée (sinon conversationId=null → 400 serveur).
+      if (selectedChatConv) refetchChatMessages();
       refetchChatConvs();
     },
     onError: () => toast.error("Erreur lors de l'envoi du message"),
@@ -205,7 +207,9 @@ export default function PortailClient() {
   useEffect(() => {
     if (selectedChatConv) {
       const interval = setInterval(() => {
-        refetchChatMessages();
+        // Garde anti-course : si la conversation a été désélectionnée entre deux ticks, refetch()
+        // enverrait conversationId=null (refetch ignore `enabled`) → 400. On revérifie l'id.
+        if (selectedChatConv) refetchChatMessages();
         refetchChatConvs();
       }, 10000);
       return () => clearInterval(interval);
