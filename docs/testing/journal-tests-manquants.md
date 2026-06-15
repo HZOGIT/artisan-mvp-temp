@@ -68,14 +68,14 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - [x] `src/modules/notes-de-frais/application/numero.ts` → `numero.test.ts` (5 cas) ✅ it.1
 - [ ] `src/modules/rdv-en-ligne/application/confirm-use-cases.ts`
 - [ ] `src/modules/rdv-en-ligne/application/propose-use-cases.ts`
-- [ ] `src/modules/stocks/application/alertes-use-cases.ts`
+- [x] `src/modules/stocks/application/alertes-use-cases.ts` → `alertes-use-cases.test.ts` (4 cas) ✅ it.3
 - [ ] `src/modules/subscription/application/use-cases.ts`
 - [ ] `src/modules/subscription/application/subscription-event-notifier.ts`
 - [ ] `src/modules/auth/application/emails.ts`
 - _Écartés (ports/interfaces, pas de logique à tester)_ : `assistant/agentic-port.ts`,
   `factures/compta-port.ts`, `factures/contact-readers.ts`.
 
-**Prochaine cible : `src/modules/stocks/application/alertes-use-cases.ts`** (logique d'alertes seuils).
+**Prochaine cible : `src/modules/rdv-en-ligne/application/propose-use-cases.ts`** (logique de créneaux/propositions).
 
 ---
 
@@ -83,3 +83,4 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - `2026-06-15 16:33Z` **[start]** Boucle initialisée — DB locale bootstrappée (app_tenant+RLS), pipeline test vert, helper broadcast + journal + issue Linear prêts. Cron 10 min armé.
 - `2026-06-15 16:34:54Z` **[done]** notes-de-frais/numero — computeNextNoteFraisNumero couvert (5 cas), commit 55a34f5 sur staging. Pipeline boucle validé.
 - `2026-06-15 16:43:09Z` **[done]** ecritures/comptes — compteTvaCollectee + constantes PCG couverts (6 cas), commit 2d9c68a sur staging.
+- `2026-06-15 16:53:30Z` **[done]** stocks/alertes — genererAlertesStock couvert (4 cas : vide, 1 notif/item, scope tenant, pas de dedup).
