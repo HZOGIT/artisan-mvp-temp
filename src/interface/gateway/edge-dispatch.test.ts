@@ -100,6 +100,8 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // PDF bon de commande (auth cookie) → new-stack ; chemin voisin sans /pdf → legacy
     expect(decideTarget("/api/commandes-fournisseurs/42/pdf", {})).toBe("new-stack");
     expect(decideTarget("/api/commandes-fournisseurs/42", {})).toBe("legacy");
+    expect(decideTarget("/api/contrats/7/pdf", {})).toBe("new-stack");
+    expect(decideTarget("/api/contrats/7", {})).toBe("legacy");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe
