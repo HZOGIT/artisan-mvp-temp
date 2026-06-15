@@ -77,7 +77,7 @@ Légende colonne : ✅ couvert · ⬜ manquant · — non applicable. (état au 
 
 | # | Feature critique | L1 | L2 RLS | L3 router/HTTP | L4 nav | Trous à combler (prioritaire) |
 |---|---|----|--------|----------------|--------|------|
-| 1 | **Portail client public** (`client-portal`) | ✅ | 🟡 | ⬜ | ⬜ | L2 portal-access ✅ it.10 ; **reste L2** docs/scheduling readers drizzle → **L3** client-portal.router |
+| 1 | **Portail client public** (`client-portal`) | ✅ | 🟡 | ⬜ | ⬜ | L2 portal-access ✅ it.10, docs-reader ✅ it.11 ; **reste L2** scheduling-reader → **L3** client-portal.router |
 | 2 | **Signature devis** (`signature`) | ✅ | ✅ | ⬜ | (PoC) | **L3** signature.router (public par token : getDevisForSignature/signDevis/refuse) |
 | 3 | **Abonnement / billing** (`subscription`) | ⬜ | ✅ | ⬜ | — | **L1** use-cases.ts + subscription-event-notifier → **L3** subscription.router |
 | 4 | **Auth / session** (`auth`) | ⬜ | ✅ | ⬜ | — | **L1** emails.ts → **L3** auth.router (signin/me/logout, 401) |
@@ -93,8 +93,8 @@ isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router
 ### Use-cases L1 encore nus (non critiques — plus bas)
 `clients/import-use-cases`, `contrats-maintenance/contrat-facture-generator`, `devis/devis-to-facture-converter`.
 
-**Prochaine cible : `client-portal` — suite L2 RLS : `portal-docs-reader-drizzle.test.ts`**
-(devis/factures/contrats visibles par token, scope tenant). Puis `portal-scheduling-reader` (L2), puis `client-portal.router` (L3, surface publique par token).
+**Prochaine cible : `client-portal` — fin L2 : `portal-scheduling-reader-drizzle.test.ts`**
+(créneaux/RDV visibles par token, scope tenant). Puis `client-portal.router` (L3, surface publique par token).
 
 ---
 
@@ -111,3 +111,4 @@ isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router
 - `2026-06-15 17:53:36Z` **[done]** articles/bibliotheque — use-cases catalogue couverts (6 cas : délégation list/search/create/delete/import + NotFound sur update inexistant).
 - `2026-06-15 18:02:38Z` **[info]** boucle réorientée — Colonne de tests (L1/L2/L3/L4) par cas d'usage, priorité CRITIQUES. Cron 18363af8. Prochaine: client-portal L2 RLS. commit b5f4927.
 - `2026-06-15 18:12:21Z` **[done]** client-portal L2 portal-access — RLS public-token + scope tenant couvert (7 cas : resolveByToken actif/expiré/inactif/inconnu, createAccess remplace, status/deactivate, getClientInfo cross-tenant, getArtisanPublic).
+- `2026-06-15 18:22:44Z` **[done]** client-portal L2 docs-reader — RLS docs portail couvert (5 cas : devis/factures/interventions/contrats scopés tenant+client, lien paiement en_attente, contrats sans notes, anti-IDOR cross-tenant).
