@@ -97,6 +97,10 @@ export interface DevisSenderForAgent {
 export interface FactureSenderForAgent {
   envoyer(ctx: TenantContext, factureId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
 }
+// Relance d'une facture impayée (use-case migré `envoyerRelanceFacture`, sans PDF).
+export interface RelanceSenderForAgent {
+  envoyer(ctx: TenantContext, factureId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
+}
 
 // Commande fournisseur : création (lignes inline, totaux + ownership fournisseur par le use-case
 // migré) + envoi par email (PDF via PdfPort). Legacy `prixUnitaireHT` → `prixUnitaire` migré.
@@ -123,6 +127,7 @@ export interface AssistantWriteDeps {
   readonly factures?: FactureWriterForAgent;
   readonly devisSender?: DevisSenderForAgent;
   readonly factureSender?: FactureSenderForAgent;
+  readonly relanceSender?: RelanceSenderForAgent;
   readonly commandes?: CommandeWriterForAgent;
   readonly commandeSender?: CommandeSenderForAgent;
 }
@@ -354,6 +359,19 @@ function makeEnvoyerFacture(sender: FactureSenderForAgent): ToolHandler {
   };
 }
 
+// `envoyer_relance` : relance d'une facture impayée (use-case migré, sans PDF). factureId requis.
+function makeEnvoyerRelance(sender: RelanceSenderForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    if (!args?.factureId) return { ok: false, error: "factureId est requis" };
+    try {
+      const result = await sender.envoyer(ctx, Number(args.factureId), optStr(args.messagePersonnalise));
+      return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de l'envoi de la relance") };
+    }
+  };
+}
+
 // `creer_commande_fournisseur` : crée un BC brouillon + lignes (totaux + ownership fournisseur par le
 // use-case migré). `delaiLivraison` (texte libre, sans champ migré dédié) est replié dans les notes.
 function makeCreerCommande(commandes: CommandeWriterForAgent): ToolHandler {
@@ -452,6 +470,7 @@ export function buildAssistantWriteHandlers(deps: AssistantWriteDeps): Record<st
   if (deps.factures) handlers.creer_facture = makeCreerFacture(deps.factures);
   if (deps.devisSender) handlers.envoyer_devis = makeEnvoyerDevis(deps.devisSender);
   if (deps.factureSender) handlers.envoyer_facture = makeEnvoyerFacture(deps.factureSender);
+  if (deps.relanceSender) handlers.envoyer_relance = makeEnvoyerRelance(deps.relanceSender);
   if (deps.commandes) handlers.creer_commande_fournisseur = makeCreerCommande(deps.commandes);
   if (deps.commandeSender) handlers.envoyer_commande_fournisseur = makeEnvoyerCommande(deps.commandeSender);
   return handlers;

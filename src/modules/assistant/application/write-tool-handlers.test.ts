@@ -243,6 +243,21 @@ describe("write-tool-handlers — envoyer_devis / envoyer_facture", () => {
     const res = await h.envoyer_facture({ factureId: 9 }, ctx);
     expect(res).toEqual({ ok: true, data: { message: "Facture FAC-1 envoyé(e) à c@x.fr" } });
   });
+
+  it("envoyer_relance : sans factureId → ok:false ; succès → message", async () => {
+    let seen: number | undefined;
+    const sender = {
+      envoyer: async (_c: TenantContext, id: number) => {
+        seen = id;
+        return { success: true, message: "Relance envoyée à c@x.fr — facture FAC-1, 12 j de retard" };
+      },
+    };
+    const h = buildAssistantWriteHandlers({ relanceSender: sender });
+    expect((await h.envoyer_relance({}, ctx)).ok).toBe(false);
+    const res = await h.envoyer_relance({ factureId: 9 }, ctx);
+    expect(res).toEqual({ ok: true, data: { message: "Relance envoyée à c@x.fr — facture FAC-1, 12 j de retard" } });
+    expect(seen).toBe(9);
+  });
 });
 
 describe("write-tool-handlers — creer_et_envoyer_devis", () => {
@@ -364,5 +379,38 @@ describe("write-tool-handlers — intégration registry (opt-in)", () => {
     const reg = new AssistantReadToolRegistry({});
     expect(reg.tools.some((t) => t.name === "creer_client")).toBe(false);
     expect((await reg.execute("creer_client", { nom: "Y" }, ctx)).ok).toBe(false);
+  });
+
+  it("toutes deps fournies → les 11 écritures sont câblées (registry agentique complet)", () => {
+    const okSend = { envoyer: async () => ({ success: true, message: "ok" }) };
+    const all = buildAssistantWriteHandlers({
+      clients: new FakeClientWriter(),
+      clientsById: new FakeClientById({ id: 3, nom: "DAD", prenom: "M", adresse: null, codePostal: null, ville: null }),
+      interventions: new FakeInterventionWriter(),
+      interventionUpdater: new FakeInterventionUpdater(),
+      devis: new FakeDevisWriter(),
+      factures: new FakeFactureWriter(),
+      devisSender: { envoyer: async () => ({ success: true, message: "ok" }) },
+      factureSender: okSend,
+      relanceSender: okSend,
+      commandes: new FakeCommandeWriter(),
+      commandeSender: okSend,
+    });
+    expect(Object.keys(all).sort()).toEqual(
+      [
+        "creer_client",
+        "creer_intervention",
+        "modifier_intervention",
+        "creer_devis",
+        "creer_et_envoyer_devis",
+        "creer_facture",
+        "envoyer_devis",
+        "envoyer_facture",
+        "envoyer_relance",
+        "creer_commande_fournisseur",
+        "envoyer_commande_fournisseur",
+      ].sort(),
+    );
+    expect(Object.keys(all)).toHaveLength(11);
   });
 });
