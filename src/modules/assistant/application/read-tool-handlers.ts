@@ -41,6 +41,31 @@ export interface AgentStock {
   readonly seuilAlerte: string; // ex-`seuil` legacy
   readonly unite: string;
 }
+export interface AgentFournisseur {
+  readonly id: number;
+  readonly nom: string;
+  readonly contact: string | null;
+  readonly email: string | null;
+  readonly telephone: string | null;
+  readonly ville: string | null;
+}
+export interface AgentIntervention {
+  readonly id: number;
+  readonly titre: string;
+  readonly clientId: number;
+  readonly dateDebut: Date;
+  readonly dateFin: Date | null;
+  readonly statut: string;
+  readonly adresse: string | null;
+}
+// Stats dashboard nécessaires à `get_statistiques` (DashboardStats migré est structurellement compatible).
+export interface AgentDashboardStats {
+  readonly caMonth: number;
+  readonly caYear: number;
+  readonly totalClients: number;
+  readonly devisEnCours: number;
+  readonly facturesImpayees: { readonly count: number; readonly total: number };
+}
 
 export interface ClientsReaderForAgent {
   list(ctx: TenantContext): Promise<readonly AgentClient[]>;
@@ -54,14 +79,27 @@ export interface DevisReaderForAgent {
 export interface StocksReaderForAgent {
   list(ctx: TenantContext): Promise<readonly AgentStock[]>;
 }
+export interface FournisseursReaderForAgent {
+  list(ctx: TenantContext): Promise<readonly AgentFournisseur[]>;
+}
+export interface InterventionsReaderForAgent {
+  list(ctx: TenantContext): Promise<readonly AgentIntervention[]>;
+}
+export interface StatsReaderForAgent {
+  getStats(ctx: TenantContext): Promise<AgentDashboardStats>;
+}
 
-// `clients`/`factures` requis (lectures de base) ; `devis`/`stocks` optionnels (câblés au fil de l'eau —
-// le registry n'expose au modèle que les outils dont le reader est fourni).
+// `clients`/`factures` requis (lectures de base) ; les autres sont optionnels (câblés au fil de l'eau —
+// le registry n'expose au modèle que les outils dont le reader est fourni). `get_statistiques` exige
+// `stats` + `interventions` + `stocks` (il les compose).
 export interface AssistantReadDeps {
   readonly clients: ClientsReaderForAgent;
   readonly factures: FacturesReaderForAgent;
   readonly devis?: DevisReaderForAgent;
   readonly stocks?: StocksReaderForAgent;
+  readonly fournisseurs?: FournisseursReaderForAgent;
+  readonly interventions?: InterventionsReaderForAgent;
+  readonly stats?: StatsReaderForAgent;
 }
 
 // Normalisation recherche : minuscule, sans accents (NFD + suppression des diacritiques combinants).
@@ -224,8 +262,83 @@ export function formatVerifierStocks(stocks: readonly AgentStock[]): {
   };
 }
 
-// Construit les handlers de lecture mappés aux readers migrés (scopés tenant). `devis`/`stocks` ne
-// sont câblés que si leur reader est fourni (sinon l'outil reste indisponible côté registry).
+// `lister_fournisseurs` : ≤50, `{count, fournisseurs}` (avec `contact`).
+export function formatListerFournisseurs(fournisseurs: readonly AgentFournisseur[]): { count: number; fournisseurs: object[] } {
+  const limited = fournisseurs.slice(0, 50).map((f) => ({
+    id: f.id,
+    nom: f.nom,
+    email: f.email || null,
+    telephone: f.telephone || null,
+    ville: f.ville || null,
+    contact: f.contact || null,
+  }));
+  return { count: limited.length, fournisseurs: limited };
+}
+
+// `chercher_fournisseur` : substring nom (insensible casse), ≤5, `{matches, count}` (sans `contact`).
+export function formatChercherFournisseur(fournisseurs: readonly AgentFournisseur[], rawNom: string): { matches: object[]; count: number } {
+  const query = String(rawNom || "").toLowerCase().trim();
+  const matches = fournisseurs
+    .filter((f) => (f.nom || "").toLowerCase().includes(query))
+    .slice(0, 5)
+    .map((f) => ({ id: f.id, nom: f.nom, email: f.email || null, telephone: f.telephone || null, ville: f.ville || null }));
+  return { matches, count: matches.length };
+}
+
+// `lister_interventions` : filtres statut + dateDebut≥dateMin / dateDebut≤dateMax, ≤50, `{count, interventions}`.
+export function formatListerInterventions(
+  interventions: readonly AgentIntervention[],
+  filtres: { statut?: string; dateDebut?: string; dateFin?: string },
+): { count: number; interventions: object[] } {
+  const dateMin = filtres.dateDebut ? new Date(filtres.dateDebut) : null;
+  const dateMax = filtres.dateFin ? new Date(filtres.dateFin) : null;
+  const filtered = interventions
+    .filter((i) => {
+      if (filtres.statut && i.statut !== filtres.statut) return false;
+      const d = new Date(i.dateDebut);
+      if (dateMin && d < dateMin) return false;
+      if (dateMax && d > dateMax) return false;
+      return true;
+    })
+    .slice(0, 50)
+    .map((i) => ({ id: i.id, titre: i.titre, clientId: i.clientId, dateDebut: i.dateDebut, dateFin: i.dateFin, statut: i.statut, adresse: i.adresse || null }));
+  return { count: filtered.length, interventions: filtered };
+}
+
+// Nombre d'interventions planifiées dans les 7 prochains jours (pour `get_statistiques`).
+export function countInterventionsSemaine(interventions: readonly AgentIntervention[], now: number): number {
+  const week = now + 7 * 86400000;
+  return interventions.filter((i) => {
+    const d = new Date(i.dateDebut).getTime();
+    return d >= now && d <= week && i.statut === "planifiee";
+  }).length;
+}
+
+// `get_statistiques` : compose dashboard (CA/clients/devis/impayées) + interventions à venir 7 j +
+// compteurs de stock (alerte/rupture, même classification que `verifier_stocks`).
+export function formatGetStatistiques(
+  stats: AgentDashboardStats,
+  interventionsSemaine: number,
+  stocksAlerte: number,
+  stocksRupture: number,
+  periode: string | undefined,
+): object {
+  return {
+    periode: periode || "mois+annee",
+    caMois: Number(stats.caMonth || 0).toFixed(2),
+    caAnnee: Number(stats.caYear || 0).toFixed(2),
+    totalClients: stats.totalClients,
+    devisEnCours: stats.devisEnCours,
+    facturesImpayeesNb: stats.facturesImpayees.count,
+    facturesImpayeesTotal: Number(stats.facturesImpayees.total || 0).toFixed(2),
+    interventionsSemaine,
+    stocksAlerte,
+    stocksRupture,
+  };
+}
+
+// Construit les handlers de lecture mappés aux readers migrés (scopés tenant). Les domaines optionnels
+// ne sont câblés que si leur reader est fourni (sinon l'outil reste indisponible côté registry).
 export function buildAssistantReadHandlers(deps: AssistantReadDeps): Record<string, ReadToolHandler> {
   const handlers: Record<string, ReadToolHandler> = {
     chercher_client: async (args, ctx: TenantContext) => {
@@ -265,6 +378,48 @@ export function buildAssistantReadHandlers(deps: AssistantReadDeps): Record<stri
     handlers.verifier_stocks = async (_args, ctx: TenantContext) => {
       const stocks = await stocksReader.list(ctx);
       return { ok: true, data: formatVerifierStocks(stocks) };
+    };
+  }
+
+  const fournisseursReader = deps.fournisseurs;
+  if (fournisseursReader) {
+    handlers.lister_fournisseurs = async (_args, ctx: TenantContext) => {
+      const fournisseurs = await fournisseursReader.list(ctx);
+      return { ok: true, data: formatListerFournisseurs(fournisseurs) };
+    };
+    handlers.chercher_fournisseur = async (args, ctx: TenantContext) => {
+      const raw = String(args?.nom || "").trim();
+      if (!raw) return { ok: false, error: "Le paramètre 'nom' est requis" };
+      const fournisseurs = await fournisseursReader.list(ctx);
+      return { ok: true, data: formatChercherFournisseur(fournisseurs, raw) };
+    };
+  }
+
+  const interventionsReader = deps.interventions;
+  if (interventionsReader) {
+    handlers.lister_interventions = async (args, ctx: TenantContext) => {
+      const interventions = await interventionsReader.list(ctx);
+      return {
+        ok: true,
+        data: formatListerInterventions(interventions, {
+          statut: args?.statut as string | undefined,
+          dateDebut: args?.dateDebut as string | undefined,
+          dateFin: args?.dateFin as string | undefined,
+        }),
+      };
+    };
+  }
+
+  // `get_statistiques` compose 3 readers → câblé seulement si les 3 sont fournis.
+  const statsReader = deps.stats;
+  if (statsReader && interventionsReader && stocksReader) {
+    handlers.get_statistiques = async (args, ctx: TenantContext) => {
+      const [stats, interventions, stocks] = await Promise.all([statsReader.getStats(ctx), interventionsReader.list(ctx), stocksReader.list(ctx)]);
+      const stk = formatVerifierStocks(stocks);
+      return {
+        ok: true,
+        data: formatGetStatistiques(stats, countInterventionsSemaine(interventions, Date.now()), stk.nbAlertes, stk.nbRuptures, args?.periode as string | undefined),
+      };
     };
   }
 

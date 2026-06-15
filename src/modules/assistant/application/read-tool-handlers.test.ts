@@ -12,14 +12,25 @@ import {
   formatListerDevis,
   formatListerDevisEnAttente,
   formatVerifierStocks,
+  formatListerFournisseurs,
+  formatChercherFournisseur,
+  formatListerInterventions,
+  countInterventionsSemaine,
+  formatGetStatistiques,
   type AgentClient,
   type AgentFacture,
   type AgentDevis,
   type AgentStock,
+  type AgentFournisseur,
+  type AgentIntervention,
+  type AgentDashboardStats,
   type ClientsReaderForAgent,
   type FacturesReaderForAgent,
   type DevisReaderForAgent,
   type StocksReaderForAgent,
+  type FournisseursReaderForAgent,
+  type InterventionsReaderForAgent,
+  type StatsReaderForAgent,
 } from "./read-tool-handlers";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -146,19 +157,87 @@ describe("read-tool-handlers — devis + stocks (formatters purs)", () => {
   });
 });
 
+const fournisseur = (id: number, nom: string, ville: string | null = null): AgentFournisseur => ({ id, nom, contact: "M. X", email: `f${id}@x.fr`, telephone: null, ville });
+const intervention = (id: number, statut: string, dateDebut: string): AgentIntervention => ({ id, titre: "Pose", clientId: 1, dateDebut: new Date(dateDebut), dateFin: null, statut, adresse: null });
+
+describe("read-tool-handlers — fournisseurs + interventions + statistiques (formatters purs)", () => {
+  it("lister_fournisseurs : ≤50 avec contact ; chercher_fournisseur : substring ≤5 sans contact", () => {
+    const fs = [fournisseur(1, "Plomberie Pro", "Lyon"), fournisseur(2, "Élec Plus")];
+    expect(formatListerFournisseurs(fs)).toMatchObject({ count: 2 });
+    expect((formatListerFournisseurs(fs).fournisseurs[0] as { contact: string }).contact).toBe("M. X");
+    const r = formatChercherFournisseur(fs, "plomberie");
+    expect(r.count).toBe(1);
+    expect(r.matches[0]).not.toHaveProperty("contact");
+  });
+
+  it("lister_interventions : filtre statut + bornes de date, ≤50", () => {
+    const is = [intervention(1, "planifiee", "2026-06-10"), intervention(2, "terminee", "2026-06-12"), intervention(3, "planifiee", "2026-07-01")];
+    expect(formatListerInterventions(is, {}).count).toBe(3);
+    expect(formatListerInterventions(is, { statut: "planifiee" }).count).toBe(2);
+    expect(formatListerInterventions(is, { dateDebut: "2026-06-11", dateFin: "2026-06-30" }).count).toBe(1); // seule #2
+  });
+
+  it("countInterventionsSemaine : planifiées dans les 7 jours", () => {
+    const now = new Date("2026-06-15").getTime();
+    const is = [intervention(1, "planifiee", "2026-06-17"), intervention(2, "planifiee", "2026-06-30"), intervention(3, "terminee", "2026-06-16")];
+    expect(countInterventionsSemaine(is, now)).toBe(1); // #1 seulement (dans 7 j + planifiée)
+  });
+
+  it("formatGetStatistiques : CA formaté 2 décimales + compteurs", () => {
+    const stats: AgentDashboardStats = { caMonth: 1234.5, caYear: 9876, totalClients: 7, devisEnCours: 3, facturesImpayees: { count: 2, total: 1500 } };
+    const r = formatGetStatistiques(stats, 4, 1, 2, undefined) as Record<string, unknown>;
+    expect(r).toMatchObject({ periode: "mois+annee", caMois: "1234.50", caAnnee: "9876.00", facturesImpayeesTotal: "1500.00", interventionsSemaine: 4, stocksAlerte: 1, stocksRupture: 2 });
+  });
+});
+
 describe("read-tool-handlers — handlers câblés au registry", () => {
   const clientsReader: ClientsReaderForAgent = { list: async () => CLIENTS };
   const facturesReader: FacturesReaderForAgent = { list: async () => [facture(2, 2, "envoyee", "2026-03-01", "2026-04-01")] };
   const devisReader: DevisReaderForAgent = { list: async () => [devis(2, 2, "envoye", "2026-03-01")] };
   const stocksReader: StocksReaderForAgent = { list: async () => [stock(1, "Vis", "0", "5")] };
+  const fournisseursReader: FournisseursReaderForAgent = { list: async () => [fournisseur(1, "Plomberie Pro")] };
+  const interventionsReader: InterventionsReaderForAgent = { list: async () => [intervention(1, "planifiee", "2026-06-17")] };
+  const statsReader: StatsReaderForAgent = { getStats: async () => ({ caMonth: 100, caYear: 500, totalClients: 2, devisEnCours: 1, facturesImpayees: { count: 1, total: 120 } }) };
   const registry = new AssistantReadToolRegistry(
-    buildAssistantReadHandlers({ clients: clientsReader, factures: facturesReader, devis: devisReader, stocks: stocksReader }),
+    buildAssistantReadHandlers({
+      clients: clientsReader,
+      factures: facturesReader,
+      devis: devisReader,
+      stocks: stocksReader,
+      fournisseurs: fournisseursReader,
+      interventions: interventionsReader,
+      stats: statsReader,
+    }),
   );
 
-  it("expose les 7 lectures (clients/factures/devis/stocks) + naviguer_vers dans tools", () => {
+  it("expose les 12 lectures + naviguer_vers dans tools (toutes câblées)", () => {
     expect(registry.tools.map((t) => t.name).sort()).toEqual(
-      ["chercher_client", "lister_clients", "lister_factures", "lister_factures_impayees", "lister_devis", "lister_devis_en_attente", "verifier_stocks", "naviguer_vers"].sort(),
+      [
+        "chercher_client",
+        "lister_clients",
+        "lister_factures",
+        "lister_factures_impayees",
+        "lister_devis",
+        "lister_devis_en_attente",
+        "verifier_stocks",
+        "lister_fournisseurs",
+        "chercher_fournisseur",
+        "lister_interventions",
+        "get_statistiques",
+        "naviguer_vers",
+      ].sort(),
     );
+  });
+
+  it("get_statistiques NON câblé si interventions/stocks absents", () => {
+    const reg = new AssistantReadToolRegistry(buildAssistantReadHandlers({ clients: clientsReader, factures: facturesReader, stats: statsReader }));
+    expect(reg.tools.some((t) => t.name === "get_statistiques")).toBe(false);
+  });
+
+  it("get_statistiques → ok + composition (stocks rupture comptée)", async () => {
+    const res = await registry.execute("get_statistiques", {}, ctx);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect((res.data as { stocksRupture: number }).stocksRupture).toBe(1);
   });
 
   it("devis/stocks NON câblés (reader absent) → outils absents de tools", () => {
