@@ -59,7 +59,7 @@ describe("registerAssistantAgentRoute (SSE agentique)", () => {
     await app.close();
   });
 
-  it("message valide → 200 SSE : threadId + content + toolCall (1 outil exécuté) + content final", async () => {
+  it("message valide → 200 SSE : threadId + content + toolStart/toolEnd (1 outil exécuté) + content final", async () => {
     const app = await buildTestApp([
       { text: ["Je regarde."], calls: [{ name: "lister_factures", args: {} }] },
       { text: ["Tu as 0 facture."] },
@@ -69,7 +69,8 @@ describe("registerAssistantAgentRoute (SSE agentique)", () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("text/event-stream");
     expect(res.body).toContain('data: {"content":"Je regarde."}');
-    expect(res.body).toContain('"toolCall":{"name":"lister_factures"');
+    expect(res.body).toContain('"toolStart":{"name":"lister_factures"');
+    expect(res.body).toContain('"toolEnd":{"name":"lister_factures","ok":true}');
     expect(res.body).toContain('data: {"content":"Tu as 0 facture."}');
     await app.close();
   });

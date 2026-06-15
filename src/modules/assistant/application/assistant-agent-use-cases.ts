@@ -41,14 +41,15 @@ export interface AssistantAgentInput {
   readonly threadId?: number;
 }
 
-// Évènements émis vers la couche transport (SSE). Parité legacy : `{threadId}` au début, `{content}`
-// par fragment de texte, `{toolCall}` à chaque exécution d'outil, `{invalidate}` après une écriture,
-// `{navigate}` quand `naviguer_vers` réussit (le client `useAssistantStream`/`Assistant.tsx` fait alors
-// `setLocation(navigate[?filtre])`).
+// Évènements émis vers la couche transport (SSE). **Noms alignés sur le contrat client** (`useAssistantStream`
+// / `Assistant.tsx`) : `{threadId}` au début ; `{content}` par fragment de texte ; **`{toolStart}` AVANT
+// exécution d'un outil + `{toolEnd}` APRÈS** (le client affiche l'état running/done) ; `{navigate}` quand
+// `naviguer_vers` réussit (le client fait `setLocation`) ; `{invalidate}` après une écriture (refresh caches).
 export type AssistantAgentEvent =
   | { readonly threadId: number }
   | { readonly content: string }
-  | { readonly toolCall: { readonly name: string; readonly args: Record<string, unknown> } }
+  | { readonly toolStart: { readonly name: string; readonly args: Record<string, unknown> } }
+  | { readonly toolEnd: { readonly name: string; readonly ok: boolean; readonly error?: string } }
   | { readonly invalidate: readonly string[] }
   | { readonly navigate: string; readonly filtre?: string; readonly message?: string };
 
@@ -135,9 +136,10 @@ export async function* runAssistantAgent(
     // Exécution des outils + réinjection des résultats au tour suivant.
     const results: AgenticToolResultPart[] = [];
     for (const call of calls) {
-      yield { toolCall: { name: call.name, args: call.args } };
+      yield { toolStart: { name: call.name, args: call.args } };
       const res = await deps.registry.execute(call.name, call.args, ctx);
       results.push(toResultPart(call, res));
+      yield { toolEnd: { name: call.name, ok: res.ok, ...(res.ok ? {} : { error: res.error }) } };
       if (res.ok) {
         // `naviguer_vers` → event de navigation (le client fait setLocation). Parité legacy.
         if (call.name === "naviguer_vers") {

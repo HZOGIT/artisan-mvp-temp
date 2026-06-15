@@ -60,7 +60,7 @@ describe("runAssistantAgent", () => {
     const events = await collect(runAssistantAgent(deps, ctx(1), { message: "Aide-moi" }));
     expect(events[0]).toHaveProperty("threadId");
     expect(events.slice(1)).toEqual([{ content: "Bon" }, { content: "jour" }]);
-    expect(events.some((e) => "toolCall" in e)).toBe(false);
+    expect(events.some((e) => "toolStart" in e)).toBe(false);
     expect(llm.turnInputs[0].system).toContain("MonAssistant");
     expect(llm.turnInputs[0].tools).toBe(TOOLS);
     expect(writer.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
@@ -72,11 +72,12 @@ describe("runAssistantAgent", () => {
       script: [{ text: ["Je regarde."], calls: [{ name: "lister_factures", args: {} }] }, { text: ["Tu as 2 factures."] }],
     });
     const events = await collect(runAssistantAgent(deps, ctx(7), { message: "mes factures ?" }));
-    // séquence : threadId, texte tour 1, toolCall, texte tour 2
+    // séquence : threadId, texte tour 1, toolStart, toolEnd, texte tour 2 (contrat client)
     expect(events).toEqual([
       { threadId: expect.any(Number) },
       { content: "Je regarde." },
-      { toolCall: { name: "lister_factures", args: {} } },
+      { toolStart: { name: "lister_factures", args: {} } },
+      { toolEnd: { name: "lister_factures", ok: true } },
       { content: "Tu as 2 factures." },
     ]);
     // outil exécuté sous le bon tenant
@@ -95,7 +96,8 @@ describe("runAssistantAgent", () => {
     });
     const events = await collect(runAssistantAgent(deps, ctx(1), { message: "montre mes factures impayées" }));
     expect(events).toContainEqual({ navigate: "/factures", filtre: "impayees" });
-    expect(events).toContainEqual({ toolCall: { name: "naviguer_vers", args: { page: "/factures", filtre: "impayees" } } });
+    expect(events).toContainEqual({ toolStart: { name: "naviguer_vers", args: { page: "/factures", filtre: "impayees" } } });
+    expect(events).toContainEqual({ toolEnd: { name: "naviguer_vers", ok: true } });
   });
 
   it("outil d'ÉCRITURE réussi → émet {invalidate} (clés TOOL_INVALIDATIONS)", async () => {
@@ -104,7 +106,8 @@ describe("runAssistantAgent", () => {
     });
     const events = await collect(runAssistantAgent(deps, ctx(1), { message: "crée un client Dupont" }));
     expect(events).toContainEqual({ invalidate: ["clients"] });
-    expect(events).toContainEqual({ toolCall: { name: "creer_client", args: { nom: "Dupont" } } });
+    expect(events).toContainEqual({ toolStart: { name: "creer_client", args: { nom: "Dupont" } } });
+    expect(events).toContainEqual({ toolEnd: { name: "creer_client", ok: true } });
   });
 
   it("outil en échec → pas d'invalidation, le résultat est réinjecté, la boucle continue", async () => {
