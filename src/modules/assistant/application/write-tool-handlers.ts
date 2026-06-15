@@ -57,11 +57,29 @@ export interface DevisWriterForAgent {
   getById(ctx: TenantContext, devisId: number): Promise<{ numero: string; totalTTC: string; statut: string } | null>;
 }
 
+// Facture : 2 modes — depuis un devis (conversion migrée : ⚠️ devis ACCEPTÉ requis + pas déjà
+// converti, invariant durci du module factures) ou depuis des lignes (comme `creer_devis`).
+export interface FactureLigneInput {
+  readonly designation: string;
+  readonly quantite: string;
+  readonly unite?: string;
+  readonly prixUnitaireHT: string;
+  readonly tauxTVA: string;
+}
+export interface FactureWriterForAgent {
+  creer(ctx: TenantContext, input: { clientId: number; objet: string; dateEcheance: Date }): Promise<{ id: number }>;
+  ajouterLigne(ctx: TenantContext, factureId: number, ligne: FactureLigneInput): Promise<void>;
+  convertirDevis(ctx: TenantContext, devisId: number): Promise<{ id: number }>;
+  setObjet(ctx: TenantContext, factureId: number, objet: string): Promise<void>;
+  getById(ctx: TenantContext, factureId: number): Promise<{ numero: string; totalTTC: string; statut: string; objet: string | null } | null>;
+}
+
 export interface AssistantWriteDeps {
   readonly clients?: ClientWriterForAgent;
   readonly clientsById?: ClientByIdReaderForAgent;
   readonly interventions?: InterventionWriterForAgent;
   readonly devis?: DevisWriterForAgent;
+  readonly factures?: FactureWriterForAgent;
 }
 
 // `creer_client` : crée un client (nom requis ; `type` archivé en notes, parité legacy). `{clientId,nom,message}`.
@@ -187,12 +205,64 @@ function makeCreerDevis(devis: DevisWriterForAgent): ToolHandler {
   };
 }
 
+// `creer_facture` : depuis un devis (conversion — devis ACCEPTÉ requis) OU depuis des lignes (clientId
+// + lignes). `objet` requis. Ownership client/devis assurés par les use-cases migrés (404 cross-tenant).
+function makeCreerFacture(facture: FactureWriterForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    const objet = typeof args?.objet === "string" ? args.objet : "";
+    if (!objet) return { ok: false, error: "objet est requis" };
+    try {
+      let factureId: number;
+      if (args.devisId) {
+        const created = await facture.convertirDevis(ctx, Number(args.devisId));
+        factureId = created.id;
+        const current = await facture.getById(ctx, factureId);
+        if (current && objet !== current.objet) await facture.setObjet(ctx, factureId, objet);
+      } else {
+        const clientId = Number(args.clientId);
+        const lignes = Array.isArray(args.lignes) ? (args.lignes as unknown[]) : [];
+        if (!clientId) return { ok: false, error: "clientId ou devisId requis" };
+        if (lignes.length === 0) return { ok: false, error: "Au moins une ligne est requise quand devisId n'est pas fourni" };
+        const dateEcheance = new Date(Date.now() + 30 * 86400000);
+        const created = await facture.creer(ctx, { clientId, objet, dateEcheance });
+        factureId = created.id;
+        for (const raw of lignes) {
+          const l = (raw ?? {}) as Record<string, unknown>;
+          await facture.ajouterLigne(ctx, factureId, {
+            designation: String(l.designation ?? ""),
+            quantite: String(Number(l.quantite) || 0),
+            unite: optStr(l.unite) ?? "u",
+            prixUnitaireHT: String(Number(l.prixUnitaireHT) || 0),
+            tauxTVA: String(Number(l.tauxTVA ?? 20)),
+          });
+        }
+      }
+      const full = await facture.getById(ctx, factureId);
+      const numero = full?.numero ?? "";
+      const totalTTC = full?.totalTTC ?? "0";
+      return {
+        ok: true,
+        data: {
+          factureId,
+          numero,
+          totalTTC,
+          statut: full?.statut ?? "brouillon",
+          message: `Facture ${numero} créée (${parseFloat(totalTTC || "0").toFixed(2)} € TTC)`,
+        },
+      };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de la création de la facture") };
+    }
+  };
+}
+
 // Construit les handlers d'écriture câblés (par lots, risque croissant). Un outil n'est inclus que si
-// ses readers/writers sont fournis. Phase 2a : creer_client + creer_intervention. Phase 2b : creer_devis.
+// ses readers/writers sont fournis. 2a : creer_client + creer_intervention ; 2b : creer_devis ; 2c : creer_facture.
 export function buildAssistantWriteHandlers(deps: AssistantWriteDeps): Record<string, ToolHandler> {
   const handlers: Record<string, ToolHandler> = {};
   if (deps.clients) handlers.creer_client = makeCreerClient(deps.clients);
   if (deps.clientsById && deps.interventions) handlers.creer_intervention = makeCreerIntervention(deps.clientsById, deps.interventions);
   if (deps.devis) handlers.creer_devis = makeCreerDevis(deps.devis);
+  if (deps.factures) handlers.creer_facture = makeCreerFacture(deps.factures);
   return handlers;
 }

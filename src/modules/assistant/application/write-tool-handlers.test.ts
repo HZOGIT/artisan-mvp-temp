@@ -10,6 +10,8 @@ import {
   type InterventionCreateInput,
   type DevisWriterForAgent,
   type DevisLigneInput,
+  type FactureWriterForAgent,
+  type FactureLigneInput,
 } from "./write-tool-handlers";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -134,6 +136,67 @@ describe("write-tool-handlers — creer_devis", () => {
     const h = buildAssistantWriteHandlers({ devis: new FakeDevisWriter(false) });
     const res = await h.creer_devis({ clientId: 99, objet: "X", lignes: [{ designation: "A", quantite: 1, prixUnitaireHT: 10 }] }, ctx);
     expect(res).toEqual({ ok: false, error: "Client introuvable" });
+  });
+});
+
+class FakeFactureWriter implements FactureWriterForAgent {
+  public lignes: FactureLigneInput[] = [];
+  public converted?: number;
+  public objetSet?: string;
+  constructor(private readonly opts: { convertThrows?: string; objet?: string | null } = {}) {}
+  async creer(_c: TenantContext, _input: { clientId: number; objet: string; dateEcheance: Date }) {
+    return { id: 88 };
+  }
+  async ajouterLigne(_c: TenantContext, _factureId: number, ligne: FactureLigneInput) {
+    this.lignes.push(ligne);
+  }
+  async convertirDevis(_c: TenantContext, devisId: number) {
+    if (this.opts.convertThrows) throw new Error(this.opts.convertThrows);
+    this.converted = devisId;
+    return { id: 88 };
+  }
+  async setObjet(_c: TenantContext, _factureId: number, objet: string) {
+    this.objetSet = objet;
+  }
+  async getById() {
+    return { numero: "FAC-2026-0001", totalTTC: "360.00", statut: "brouillon", objet: this.opts.objet ?? "Objet devis" };
+  }
+}
+
+describe("write-tool-handlers — creer_facture", () => {
+  it("objet manquant → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ factures: new FakeFactureWriter() });
+    expect((await h.creer_facture({ clientId: 1, lignes: [{ designation: "A", quantite: 1, prixUnitaireHT: 10 }] }, ctx)).ok).toBe(false);
+  });
+
+  it("mode lignes : crée + lignes (défauts) + message TTC", async () => {
+    const writer = new FakeFactureWriter();
+    const h = buildAssistantWriteHandlers({ factures: writer });
+    const res = await h.creer_facture({ clientId: 3, objet: "Travaux", lignes: [{ designation: "Pose", quantite: 3, prixUnitaireHT: 100 }] }, ctx);
+    expect(res).toMatchObject({ ok: true, data: { factureId: 88, numero: "FAC-2026-0001", statut: "brouillon" } });
+    expect(writer.lignes[0]).toEqual({ designation: "Pose", quantite: "3", unite: "u", prixUnitaireHT: "100", tauxTVA: "20" });
+    if (res.ok) expect((res.data as { message: string }).message).toBe("Facture FAC-2026-0001 créée (360.00 € TTC)");
+  });
+
+  it("mode lignes sans clientId → ok:false ; sans ligne → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ factures: new FakeFactureWriter() });
+    expect((await h.creer_facture({ objet: "X", lignes: [{ designation: "A", quantite: 1, prixUnitaireHT: 1 }] }, ctx)).ok).toBe(false);
+    expect((await h.creer_facture({ objet: "X", clientId: 3, lignes: [] }, ctx)).ok).toBe(false);
+  });
+
+  it("mode devis : convertit + override objet si différent", async () => {
+    const writer = new FakeFactureWriter({ objet: "Ancien objet" });
+    const h = buildAssistantWriteHandlers({ factures: writer });
+    const res = await h.creer_facture({ devisId: 12, objet: "Nouvel objet" }, ctx);
+    expect(res.ok).toBe(true);
+    expect(writer.converted).toBe(12);
+    expect(writer.objetSet).toBe("Nouvel objet");
+  });
+
+  it("mode devis : devis non accepté/cross-tenant (use-case lève) → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ factures: new FakeFactureWriter({ convertThrows: "Seul un devis accepté peut être converti en facture" }) });
+    const res = await h.creer_facture({ devisId: 12, objet: "X" }, ctx);
+    expect(res).toEqual({ ok: false, error: "Seul un devis accepté peut être converti en facture" });
   });
 });
 
