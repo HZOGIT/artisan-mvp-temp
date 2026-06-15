@@ -67,6 +67,10 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - Push best-effort : `git push origin staging` (si refus/non-fast-forward → rebase puis retry une fois).
 - **Après push, RE-VÉRIFIER `origin/staging`** (`git fetch && git log origin/staging --oneline | grep <hash>`) :
   des agents concurrents peuvent **reset la branche** et perdre mon commit → le **cherry-pick** pour le récupérer.
+- **`git rebase` peut échouer « Please commit or stash them » à cause d'un fichier non commité d'un
+  AUTRE agent** (working tree partagé, ex. `client/src/...`). Ne PAS le stash/commit. Mon commit
+  passe quand même en fast-forward ; si le push est rejeté (origin a divergé), faire
+  `git fetch && git merge --ff-only origin/staging` (ou rebase ciblé sur MES commits) puis retry.
 
 ## Backlog par CRITICITÉ — compléter les COLONNES (ordre = priorité)
 Légende colonne : ✅ couvert · ⬜ manquant · — non applicable. (état au 2026-06-15, à revérifier.)
