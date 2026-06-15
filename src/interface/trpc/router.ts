@@ -45,6 +45,7 @@ import type { UtilisateursModule } from "../../modules/utilisateurs/utilisateurs
 import type { ComptabiliteModule } from "../../modules/comptabilite/comptabilite.module";
 import type { AuthModule } from "../../modules/auth/auth.module";
 import type { SubscriptionModule } from "../../modules/subscription/subscription.module";
+import type { SignatureModule } from "../../modules/signature/signature.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -93,6 +94,7 @@ export interface AppRouterDeps {
   readonly comptabilite: ComptabiliteModule;
   readonly auth: AuthModule;
   readonly subscription: SubscriptionModule;
+  readonly signature: SignatureModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -150,6 +152,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     comptabilite: deps.comptabilite.router,
     auth: deps.auth.router,
     subscription: deps.subscription.router,
+    signature: deps.signature.router,
   });
 }
 

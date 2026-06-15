@@ -104,6 +104,11 @@ import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscrip
 import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
 import { StripeAdapter } from "./shared/ports/stripe-adapter";
 import type { StripePort } from "./shared/ports/stripe";
+import { createSignatureModule } from "./modules/signature/signature.module";
+import { SignatureRepositoryDrizzle } from "./modules/signature/infra/signature-repository-drizzle";
+import { SignatureContextReaderDrizzle, SignatureNotificationWriterDrizzle } from "./modules/signature/infra/signature-context-reader-drizzle";
+import { SignaturePublicReaderDrizzle } from "./modules/signature/infra/signature-public-reader-drizzle";
+import { SignaturePublicWriterDrizzle } from "./modules/signature/infra/signature-public-writer-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -552,7 +557,30 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     prices: pricesFromEnv(),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription });
+  // Signature électronique de devis (SENSIBLE) — surface ARTISAN protégée + surface PUBLIQUE par
+  // token (portail de signature, RLS public-token sur `devis`). `signatures_devis` est HORS RLS :
+  // l'anti-IDOR passe par l'appartenance du devis parent (lue sous RLS). Immutabilité post-signature
+  // garantie par la garde SQL `statut='en_attente'` dans les writers.
+  const signatureDb = getDbHandle().db;
+  const signatureEmail = deps.emailPort ?? new LegacyEmailAdapter();
+  const signatureNotifications = new SignatureNotificationWriterDrizzle(signatureDb);
+  const signature = createSignatureModule({
+    protectedDeps: {
+      repo: new SignatureRepositoryDrizzle(signatureDb),
+      contextReader: new SignatureContextReaderDrizzle(signatureDb),
+      email: signatureEmail,
+      notifications: signatureNotifications,
+      appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    },
+    publicDeps: {
+      reader: new SignaturePublicReaderDrizzle(signatureDb),
+      writer: new SignaturePublicWriterDrizzle(signatureDb),
+      rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
+      notifications: signatureNotifications,
+      email: signatureEmail,
+    },
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
