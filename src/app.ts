@@ -215,7 +215,8 @@ import { TresorerieReaderDrizzle } from "./modules/previsions-ca/infra/tresoreri
 import type { TresorerieReader } from "./modules/previsions-ca/application/tresorerie-reader";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
-import { LegacyEmailAdapter, LegacyPdfAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
+import { LegacyEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
+import { JsPdfAdapter } from "./shared/pdf/js-pdf-adapter";
 
 export interface AppDeps extends ContextDeps {
   // Repos injectables (tests). Par défaut, repos Drizzle sur le client par défaut
@@ -361,7 +362,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       repo: commandeRepo,
       fournisseurRepo,
       artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db),
-      pdf: new LegacyPdfAdapter(),
+      pdf: new JsPdfAdapter(),
       email: deps.emailPort ?? new LegacyEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
@@ -429,7 +430,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     mailing: {
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new SharedClientReaderDrizzle(getDbHandle().db),
-      pdf: new LegacyPdfAdapter(),
+      pdf: new JsPdfAdapter(),
       email: deps.emailPort ?? new LegacyEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
@@ -459,7 +460,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     mailing: {
       artisanReader: new ArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new ClientReaderDrizzle(getDbHandle().db),
-      pdf: new LegacyPdfAdapter(),
+      pdf: new JsPdfAdapter(),
       email: deps.emailPort ?? new LegacyEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
@@ -738,10 +739,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
       {
         // Mailing deps (parité des routes d'envoi migrées : readers contact + PdfPort/EmailPort legacy + rate-limit).
-        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), pdf: new LegacyPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-        facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new LegacyPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
         relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-        commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new LegacyPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
       },
     ),
   );
