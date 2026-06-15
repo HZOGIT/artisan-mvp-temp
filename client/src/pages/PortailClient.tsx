@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
+import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,17 +131,18 @@ export default function PortailClient() {
     { enabled: !!token && accessData?.valid }
   );
 
+  // `skipToken` désactive la query ET rend `refetch()` inerte tant qu'aucune conversation n'est
+  // sélectionnée. Indispensable ici : `refetch()` (poll 10s + onSuccess d'envoi) IGNORE le flag
+  // `enabled` et réutiliserait l'input courant — qui repasse à conversationId=null après
+  // désélection → 400 serveur. Avec skipToken, aucun appel ne peut partir avec un id null.
   const { data: chatMessages, refetch: refetchChatMessages } = trpc.clientPortal.getConversationMessages.useQuery(
-    { token: token || "", conversationId: selectedChatConv! },
-    { enabled: !!token && accessData?.valid && !!selectedChatConv }
+    !!token && accessData?.valid && selectedChatConv ? { token, conversationId: selectedChatConv } : skipToken
   );
 
   const sendClientMessage = trpc.clientPortal.sendClientMessage.useMutation({
     onSuccess: () => {
       setChatMessage("");
-      // refetch() ignore le flag `enabled` et réutilise l'input courant : ne pas le déclencher
-      // si aucune conversation n'est sélectionnée (sinon conversationId=null → 400 serveur).
-      if (selectedChatConv) refetchChatMessages();
+      refetchChatMessages(); // inerte si aucune conversation sélectionnée (input = skipToken)
       refetchChatConvs();
     },
     onError: () => toast.error("Erreur lors de l'envoi du message"),
@@ -207,9 +209,9 @@ export default function PortailClient() {
   useEffect(() => {
     if (selectedChatConv) {
       const interval = setInterval(() => {
-        // Garde anti-course : si la conversation a été désélectionnée entre deux ticks, refetch()
-        // enverrait conversationId=null (refetch ignore `enabled`) → 400. On revérifie l'id.
-        if (selectedChatConv) refetchChatMessages();
+        // refetchChatMessages est inerte si la conversation a été désélectionnée (input = skipToken),
+        // donc pas de risque d'envoyer conversationId=null malgré la course poll/désélection.
+        refetchChatMessages();
         refetchChatConvs();
       }, 10000);
       return () => clearInterval(interval);
