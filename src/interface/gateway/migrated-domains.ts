@@ -56,6 +56,5 @@ export const STAGING_NEW_STACK_DEFAULT_DOMAINS = [
   "utilisateurs", // parité vérifiée : list/invite/updateRole/toggleActif/getPermissions/updatePermissions/resetPermissions (gate utilisateurs.gerer ; tables HORS RLS, scope artisanId explicite) ⊇ 7 appels client
   "comptabilite", // parité vérifiée : getGrandLivre/getBalance/getJournalVentes/getRapportTVA/getDeclarationTVADetail/getFecPreview (gate comptabilite.voir ; FEC opposable Σdébit=Σcrédit, lecture seule) ⊇ 6 appels client
   "auth", // parité vérifiée : me/signin/signup/logout/updateEmail/updatePassword/forgotPassword/resetPassword/deleteAccount (JWT secret legacy, cookie inter-opérable) ⊇ 9 appels client. Smoke e2e OK (signup→cookie→me 200 + provisioning ; signin bon→200 / mauvais→401).
-  // NB : `subscription` est MONTÉ (MIGRATED_DOMAINS) mais **PAS activé ici** : seul `getCurrent` (lecture)
-  // est porté ; il manque createCheckout/createPortal/cancel/reactivate (effets Stripe) + le webhook signé.
+  "subscription", // parité vérifiée : getCurrent/createCheckout/createPortal/cancel/reactivate (StripePort, clés+price IDs legacy ; subscriptions HORS RLS) ⊇ 5 appels client. Smoke e2e OK (createCheckout test→URL cs_test_). Webhook /api/stripe/webhook reste legacy (§4, sync la table lue par le new-stack).
 ] as const;
