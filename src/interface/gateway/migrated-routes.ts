@@ -24,6 +24,8 @@ export const MIGRATED_ROUTES: readonly MigratedRoute[] = [
   { name: "paiement-checkout", pattern: /^\/api\/paiement\/create-checkout-session$/ },
   // Recherche publique du catalogue de référence (`/api/articles/search`, sans auth, catalogue global).
   { name: "articles-search", pattern: /^\/api\/articles\/search$/ },
+  // Persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie JWT).
+  { name: "voice-persist", pattern: /^\/api\/voice\/persist$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

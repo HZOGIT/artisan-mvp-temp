@@ -134,6 +134,7 @@ import { registerArticlesSearchRoute } from "./interface/http/articles-search-ro
 import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/public-article-search-drizzle";
 import { registerAssistantStreamRoute } from "./interface/http/assistant-stream-route";
 import { AssistantThreadWriterDrizzle } from "./modules/assistant/infra/assistant-thread-writer-drizzle";
+import { registerVoiceRoute } from "./interface/http/voice-route";
 import { ConseilsStatsReaderDrizzle as AssistantStatsReaderDrizzle } from "./modules/conseils-ia/infra/conseils-stats-reader-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
@@ -720,6 +721,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
+    threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
+  });
+
+  // §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie).
+  registerVoiceRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
   });
 

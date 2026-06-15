@@ -25,9 +25,9 @@ export class AssistantThreadWriterDrizzle implements AssistantThreadWriter {
     });
   }
 
-  addMessage(ctx: TenantContext, threadId: number, role: "user" | "assistant", transcript: string): Promise<void> {
+  addMessage(ctx: TenantContext, threadId: number, role: "user" | "assistant", transcript: string, metadata?: unknown, pricingMetadata?: unknown): Promise<void> {
     return withTenant(this.db, ctx, async (tx) => {
-      await tx.insert(aiMessages).values({ threadId, role, transcript });
+      await tx.insert(aiMessages).values({ threadId, role, transcript, metadata: metadata ?? null, pricingMetadata: pricingMetadata ?? null });
       await tx.update(aiThreads).set({ lastMessageAt: new Date() }).where(and(eq(aiThreads.id, threadId), eq(aiThreads.artisanId, ctx.artisanId)));
     });
   }
