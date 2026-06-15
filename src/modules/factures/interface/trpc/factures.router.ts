@@ -185,13 +185,13 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     // Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs.
     creerAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
-      return creerAvoir(repo, ctx.tenant, factureOrigineId, data);
+      return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
     }),
 
     // Alias de surface (parité client `trpc.factures.createAvoir`) : même use-case que `creerAvoir`.
     createAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
       const { factureOrigineId, ...data } = input;
-      return creerAvoir(repo, ctx.tenant, factureOrigineId, data);
+      return creerAvoir(repo, ctx.tenant, factureOrigineId, data, compta);
     }),
 
     // Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée.

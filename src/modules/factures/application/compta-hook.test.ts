@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeFactureRepository } from "../infra/facture-repository-fake";
-import { creerFacture, ajouterLigneFacture, changerStatutFacture, enregistrerPaiementFacture } from "./write-use-cases";
+import { creerFacture, ajouterLigneFacture, changerStatutFacture, enregistrerPaiementFacture, creerAvoir } from "./write-use-cases";
 import type { ComptaPort } from "./compta-port";
 import type { TenantContext } from "../../../shared/tenant";
 
@@ -44,6 +44,26 @@ describe("factures — hook compta (FEC) au paiement", () => {
     await enregistrerPaiementFacture(repo, A, id, { montant: "50.00" }, compta);
     expect(compta.vente).toEqual([]);
     expect(compta.encaissement).toEqual([]);
+  });
+
+  it("creerAvoir (note de crédit, statut validee) génère les écritures de l'avoir → réduit la TVA collectée", async () => {
+    const repo = new FakeFactureRepository();
+    repo.registerClient(A.artisanId, 100);
+    const compta = new FakeComptaPort();
+    const id = await factureEmise(repo); // facture émise 120.00 TTC (émission sans compta → vente vide)
+    expect(compta.vente).toEqual([]);
+    const avoir = await creerAvoir(
+      repo,
+      A,
+      id,
+      { lignes: [{ designation: "Remboursement", quantite: "1", prixUnitaireHT: "100.00", tauxTVA: "20" }] },
+      compta,
+    );
+    expect(avoir.typeDocument).toBe("avoir");
+    // L'avoir déclenche la génération de SES écritures de vente (journal VE, TVA inversée via isAvoir)
+    // → sans cet appel, la note de crédit ne réduirait jamais la TVA collectée / le grand livre.
+    expect(compta.vente).toEqual([avoir.id]);
+    expect(compta.encaissement).toEqual([]); // un avoir n'a pas d'encaissement
   });
 
   it("sans port compta fourni (défaut no-op) : le paiement reste fonctionnel", async () => {

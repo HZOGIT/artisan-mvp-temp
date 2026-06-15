@@ -231,6 +231,7 @@ export async function creerAvoir(
   ctx: TenantContext,
   factureOrigineId: number,
   input: CreerAvoirInput,
+  compta: ComptaPort = NOOP_COMPTA,
 ): Promise<Facture> {
   const origine = await getFactureOwned(repo, ctx, factureOrigineId);
   if (origine.statut === "brouillon") {
@@ -281,6 +282,15 @@ export async function creerAvoir(
     lignes,
   });
   if (!avoir) throw new NotFoundError("Facture d'origine introuvable");
+  // L'avoir est émis (`validee`) : on génère immédiatement ses écritures de vente (journal VE,
+  // TVA INVERSÉE — `genererEcrituresVente` gère `isAvoir`) pour que la note de crédit RÉDUISE la
+  // TVA collectée / le grand livre / la balance. Idempotent (purge+réinsertion). Best-effort : un
+  // échec d'écriture ne casse pas l'émission du document avoir.
+  try {
+    await compta.genererEcrituresVente(ctx, avoir.id);
+  } catch {
+    // écritures non bloquantes pour le document (cohérent avec les autres flux compta best-effort)
+  }
   return avoir;
 }
 
