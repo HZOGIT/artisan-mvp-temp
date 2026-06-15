@@ -2,3 +2,4 @@
 export * from "./domain/chat";
 export * from "./application/chat-repository";
 export * from "./application/use-cases";
+export * from "./chat.module";

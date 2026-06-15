@@ -47,3 +47,41 @@ export interface Message {
 export function apercu(contenu: string): string {
   return contenu.substring(0, 100);
 }
+
+// Échappement HTML minimal (parité legacy `safeHtml`) avant injection dans l'email de notification.
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Email « nouveau message » envoyé au client (gabarit fidèle au legacy `chatRouter.sendMessage`).
+// `contenu` tronqué à 300 caractères (+ « … » au-delà). `portalLink` = lien portail si disponible.
+export function buildNewMessageEmail(input: {
+  clientName: string;
+  artisanName: string;
+  contenu: string;
+  portalLink: string | null;
+}): { subject: string; body: string } {
+  const artisanName = input.artisanName || "votre artisan";
+  const apercuContenu = `${escapeHtml(input.contenu.substring(0, 300))}${input.contenu.length > 300 ? "..." : ""}`;
+  const cta = input.portalLink
+    ? `<p><a href="${input.portalLink}" style="background:#2980b9;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;display:inline-block">Répondre sur le portail</a></p>`
+    : "";
+  return {
+    subject: `Nouveau message de ${artisanName}`,
+    body: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+              <h2 style="color:#2980b9">Nouveau message</h2>
+              <p>Bonjour ${escapeHtml(input.clientName)},</p>
+              <p><strong>${escapeHtml(artisanName)}</strong> vous a envoyé un message :</p>
+              <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:15px 0;border-left:4px solid #2980b9">
+                <p style="margin:0">${apercuContenu}</p>
+              </div>
+              ${cta}
+              <p style="color:#999;font-size:12px">Cet email a été envoyé automatiquement.</p>
+            </div>`,
+  };
+}

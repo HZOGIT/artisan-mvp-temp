@@ -114,6 +114,9 @@ import { ConseilsStatsReaderDrizzle } from "./modules/conseils-ia/infra/conseils
 import { createAssistantModule } from "./modules/assistant/assistant.module";
 import { AssistantThreadsRepositoryDrizzle } from "./modules/assistant/infra/assistant-threads-repository-drizzle";
 import { AssistantDataReaderDrizzle } from "./modules/assistant/infra/assistant-data-reader-drizzle";
+import { createChatModule } from "./modules/chat/chat.module";
+import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
+import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -605,7 +608,19 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       dataReader: new AssistantDataReaderDrizzle(getDbHandle().db),
     },
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant });
+  // Chat support artisan↔client (request/response). Notifier email best-effort (rate-limit anti-spam
+  // 20/15 min, parité legacy checkDocumentEmailRate) + lien portail si accès actif.
+  const chatDb = getDbHandle().db;
+  const chat = createChatModule({
+    repo: new ChatRepositoryDrizzle(chatDb),
+    notifier: new ChatClientNotifierDrizzle(
+      chatDb,
+      deps.emailPort ?? new LegacyEmailAdapter(),
+      new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
+      deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    ),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

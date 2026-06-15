@@ -48,6 +48,7 @@ import type { SubscriptionModule } from "../../modules/subscription/subscription
 import type { SignatureModule } from "../../modules/signature/signature.module";
 import type { ConseilsIaModule } from "../../modules/conseils-ia/conseils-ia.module";
 import type { AssistantModule } from "../../modules/assistant/assistant.module";
+import type { ChatModule } from "../../modules/chat/chat.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -99,6 +100,7 @@ export interface AppRouterDeps {
   readonly signature: SignatureModule;
   readonly conseilsIa: ConseilsIaModule;
   readonly assistant: AssistantModule;
+  readonly chat: ChatModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -160,6 +162,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     // `conseilsIA` est une procédure RACINE (appelée `trpc.conseilsIA.useQuery()`), pas un sous-routeur.
     conseilsIA: deps.conseilsIa.procedure,
     assistant: deps.assistant.router,
+    chat: deps.chat.router,
   });
 }
 
