@@ -61,7 +61,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - [ ] `src/modules/contrats-maintenance/application/contrat-facture-generator.ts`
 - [ ] `src/modules/depenses/application/budgets-realises-use-case.ts`
 - [ ] `src/modules/devis/application/devis-to-facture-converter.ts`
-- [ ] `src/modules/ecritures/application/comptes.ts`
+- [x] `src/modules/ecritures/application/comptes.ts` → `comptes.test.ts` (6 cas) ✅ it.2
 - [x] `src/modules/notes-de-frais/application/numero.ts` → `numero.test.ts` (5 cas) ✅ it.1
 - [ ] `src/modules/rdv-en-ligne/application/confirm-use-cases.ts`
 - [ ] `src/modules/rdv-en-ligne/application/propose-use-cases.ts`
@@ -72,7 +72,7 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
 - _Écartés (ports/interfaces, pas de logique à tester)_ : `assistant/agentic-port.ts`,
   `factures/compta-port.ts`, `factures/contact-readers.ts`.
 
-**Prochaine cible : `src/modules/ecritures/application/comptes.ts`** (logique comptable pure probable).
+**Prochaine cible : `src/modules/stocks/application/alertes-use-cases.ts`** (logique d'alertes seuils).
 
 ---
 
