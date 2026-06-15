@@ -119,6 +119,8 @@ import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-driz
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
 import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
+import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
+import { SubscriptionWebhookWriterDrizzle } from "./modules/subscription/infra/subscription-webhook-writer-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -258,6 +260,7 @@ export interface AppDeps extends ContextDeps {
   readonly authRepo?: IAuthRepository;
   readonly subscriptionRepo?: ISubscriptionRepository;
   readonly stripePort?: StripePort;
+  readonly stripeWebhookSecret?: string;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -648,6 +651,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerIcalRoute(app, {
     reader: new IcalPublicReaderDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
+  });
+
+  // §4 HORS-tRPC : webhook Stripe SIGNÉ (`/api/stripe/webhook`, raw body). Vérif signature fail-closed
+  // (secret absent/invalide → refus) → sync `subscriptions`. NON routé vers le new-stack tant que tous
+  // les events legacy (checkout.session/invoice/…) ne sont pas portés (sinon webhooks perdus).
+  registerStripeWebhookRoute(app, {
+    stripe: deps.stripePort ?? new StripeAdapter(),
+    writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
+    webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
   });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).

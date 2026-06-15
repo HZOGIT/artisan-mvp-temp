@@ -1,4 +1,4 @@
-import type { CreateCheckoutParams, CreateCustomerParams, StripePort } from "./stripe";
+import type { CreateCheckoutParams, CreateCustomerParams, StripePort, StripeWebhookEvent } from "./stripe";
 
 // Adapter Stripe : instancie le SDK `stripe` via un import variable-de-chemin (le SDK n'entre PAS dans
 // le typecheck de src/**), avec la clé `STRIPE_SECRET_KEY` (réutilisée du legacy). Mappe le port vers
@@ -10,6 +10,7 @@ type StripeSDK = {
   checkout: { sessions: { create(p: unknown): Promise<{ url: string | null }> } };
   billingPortal: { sessions: { create(p: unknown): Promise<{ url: string | null }> } };
   subscriptions: { update(id: string, p: unknown): Promise<unknown> };
+  webhooks: { constructEvent(payload: Buffer, signature: string, secret: string): StripeWebhookEvent };
 };
 
 export class StripeAdapter implements StripePort {
@@ -21,6 +22,13 @@ export class StripeAdapter implements StripePort {
     const mod = (await import(STRIPE_MODULE)) as { default: new (key: string) => StripeSDK };
     this.client = new mod.default(this.secretKey);
     return this.client;
+  }
+
+  // Vérif signature via le SDK (`webhooks.constructEvent`) — LÈVE si invalide (fail-closed).
+  async constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent> {
+    const s = await this.sdk();
+    const ev = s.webhooks.constructEvent(rawBody, signature, secret);
+    return { id: ev.id, type: ev.type, data: { object: ev.data.object } };
   }
 
   async createCustomer(p: CreateCustomerParams): Promise<{ id: string }> {
@@ -60,6 +68,13 @@ export class FakeStripePort implements StripePort {
   public portals: { customerId: string; returnUrl: string }[] = [];
   public cancelToggles: { subscriptionId: string; cancel: boolean }[] = [];
   private seq = 0;
+  // Signature acceptée par le fake `constructEvent` (les autres → throw, comme une signature invalide).
+  public acceptSignature = "valid-sig";
+
+  async constructEvent(rawBody: Buffer, signature: string): Promise<StripeWebhookEvent> {
+    if (signature !== this.acceptSignature) throw new Error("Invalid signature");
+    return JSON.parse(rawBody.toString("utf8")) as StripeWebhookEvent;
+  }
 
   async createCustomer(p: CreateCustomerParams): Promise<{ id: string }> {
     this.customers.push(p);

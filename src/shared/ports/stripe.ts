@@ -24,7 +24,19 @@ export interface CreateCheckoutParams {
   readonly metadata: Record<string, string>;
 }
 
+// Évènement webhook Stripe (forme minimale exploitée par les use-cases). `data.object` = la
+// ressource (subscription/checkout.session/invoice…) selon `type`.
+export interface StripeWebhookEvent {
+  readonly id: string;
+  readonly type: string;
+  readonly data: { readonly object: Record<string, unknown> };
+}
+
 export interface StripePort {
+  // Vérifie la signature d'un webhook (HMAC `STRIPE_WEBHOOK_SECRET`) et renvoie l'évènement.
+  // ⚠️ **fail-closed** : LÈVE une exception si la signature est invalide → l'appelant rejette (400).
+  // Ne JAMAIS appeler avec un secret vide (un attaquant forgerait une signature à clé vide, OPE-79).
+  constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
   // Crée un Customer Stripe (à la 1re souscription). Renvoie son id.
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;
   // Crée une session Checkout (mode subscription). Renvoie l'URL de redirection (null possible).
