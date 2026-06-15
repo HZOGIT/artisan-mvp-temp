@@ -88,6 +88,16 @@ describe("runAssistantAgent", () => {
     expect(events.some((e) => "invalidate" in e)).toBe(false);
   });
 
+  it("naviguer_vers réussi → émet {navigate, filtre} (le client redirige) — parité legacy", async () => {
+    const { deps } = build({
+      script: [{ calls: [{ name: "naviguer_vers", args: { page: "/factures", filtre: "impayees" } }] }, { text: ["Voilà vos factures."] }],
+      handler: (name) => (name === "naviguer_vers" ? { ok: true, data: { navigate: { page: "/factures", filtre: "impayees" }, confirmation: "ok" } } : { ok: true, data: {} }),
+    });
+    const events = await collect(runAssistantAgent(deps, ctx(1), { message: "montre mes factures impayées" }));
+    expect(events).toContainEqual({ navigate: "/factures", filtre: "impayees" });
+    expect(events).toContainEqual({ toolCall: { name: "naviguer_vers", args: { page: "/factures", filtre: "impayees" } } });
+  });
+
   it("outil d'ÉCRITURE réussi → émet {invalidate} (clés TOOL_INVALIDATIONS)", async () => {
     const { deps } = build({
       script: [{ calls: [{ name: "creer_client", args: { nom: "Dupont" } }] }, { text: ["Client créé."] }],

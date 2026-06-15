@@ -42,12 +42,15 @@ export interface AssistantAgentInput {
 }
 
 // Évènements émis vers la couche transport (SSE). Parité legacy : `{threadId}` au début, `{content}`
-// par fragment de texte, `{toolCall}` à chaque exécution d'outil, `{invalidate}` après une écriture.
+// par fragment de texte, `{toolCall}` à chaque exécution d'outil, `{invalidate}` après une écriture,
+// `{navigate}` quand `naviguer_vers` réussit (le client `useAssistantStream`/`Assistant.tsx` fait alors
+// `setLocation(navigate[?filtre])`).
 export type AssistantAgentEvent =
   | { readonly threadId: number }
   | { readonly content: string }
   | { readonly toolCall: { readonly name: string; readonly args: Record<string, unknown> } }
-  | { readonly invalidate: readonly string[] };
+  | { readonly invalidate: readonly string[] }
+  | { readonly navigate: string; readonly filtre?: string; readonly message?: string };
 
 // Contenu NEUTRE des messages construits par le use-case (le contenu des messages `model` ISSUS du
 // port reste OPAQUE — round-trip pour préserver le thoughtSignature Gemini 3.x).
@@ -135,9 +138,16 @@ export async function* runAssistantAgent(
       yield { toolCall: { name: call.name, args: call.args } };
       const res = await deps.registry.execute(call.name, call.args, ctx);
       results.push(toResultPart(call, res));
-      if (res.ok && isWriteTool(call.name)) {
-        const inv = TOOL_INVALIDATIONS[call.name];
-        if (inv && inv.length) yield { invalidate: inv };
+      if (res.ok) {
+        // `naviguer_vers` → event de navigation (le client fait setLocation). Parité legacy.
+        if (call.name === "naviguer_vers") {
+          const nav = (res.data as { navigate?: { page?: string; filtre?: string; message?: string } } | undefined)?.navigate;
+          if (nav?.page) yield { navigate: nav.page, ...(nav.filtre ? { filtre: nav.filtre } : {}), ...(nav.message ? { message: nav.message } : {}) };
+        }
+        if (isWriteTool(call.name)) {
+          const inv = TOOL_INVALIDATIONS[call.name];
+          if (inv && inv.length) yield { invalidate: inv };
+        }
       }
     }
     messages.push(toolMessage(results));

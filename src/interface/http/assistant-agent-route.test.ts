@@ -73,4 +73,15 @@ describe("registerAssistantAgentRoute (SSE agentique)", () => {
     expect(res.body).toContain('data: {"content":"Tu as 0 facture."}');
     await app.close();
   });
+
+  it("naviguer_vers → event SSE {navigate} (le client redirige)", async () => {
+    const app = await buildTestApp([
+      { calls: [{ name: "naviguer_vers", args: { page: "/factures", filtre: "impayees" } }] },
+      { text: ["Voilà."] },
+    ]);
+    const token = await sign(7);
+    const res = await app.inject({ method: "POST", url: "/api/assistant/stream", headers: { "content-type": "application/json", cookie: `token=${token}` }, payload: JSON.stringify({ message: "mes impayées" }) });
+    expect(res.body).toContain('data: {"navigate":"/factures","filtre":"impayees"}');
+    await app.close();
+  });
 });
