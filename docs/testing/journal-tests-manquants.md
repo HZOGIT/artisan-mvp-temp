@@ -77,7 +77,7 @@ Légende colonne : ✅ couvert · ⬜ manquant · — non applicable. (état au 
 
 | # | Feature critique | L1 | L2 RLS | L3 router/HTTP | L4 nav | Trous à combler (prioritaire) |
 |---|---|----|--------|----------------|--------|------|
-| 1 | **Portail client public** (`client-portal`) | ✅ | ✅ | ⬜ | ⬜ | L2 complet (access it.10, docs it.11, scheduling it.12) ; **reste L3** client-portal.router |
+| 1 | **Portail client public** (`client-portal`) | ✅ | ✅ | ✅ | (PoC) | **COLONNE COMPLÈTE** (L2 it.10-12, L3 router it.13). L4 = PoC portail OPE-316 |
 | 2 | **Signature devis** (`signature`) | ✅ | ✅ | ⬜ | (PoC) | **L3** signature.router (public par token : getDevisForSignature/signDevis/refuse) |
 | 3 | **Abonnement / billing** (`subscription`) | ⬜ | ✅ | ⬜ | — | **L1** use-cases.ts + subscription-event-notifier → **L3** subscription.router |
 | 4 | **Auth / session** (`auth`) | ⬜ | ✅ | ⬜ | — | **L1** emails.ts → **L3** auth.router (signin/me/logout, 401) |
@@ -93,8 +93,8 @@ isSearchable, bibliotheque délégation) restent **L1 seul** (pas de repo/router
 ### Use-cases L1 encore nus (non critiques — plus bas)
 `clients/import-use-cases`, `contrats-maintenance/contrat-facture-generator`, `devis/devis-to-facture-converter`.
 
-**Prochaine cible : `client-portal` — L3 : `client-portal.router.test.ts`** (surface PUBLIQUE par token :
-verifyAccess/getClientInfo/getDevis/getFactures/demanderRdv... via `injectTrpc`, + admin generateAccess/getStatus/deactivate). Réf signature e2e par token. Ce sera la **colonne 1 complète**.
+**Prochaine cible : feature critique #2 `signature` — L3 : `signature.router.test.ts`**
+(surface publique par token via `injectTrpc` : getDevisForSignature/signDevis/refuseDevis/selectDevisOption + createSignatureLink admin). Réf : `signature.e2e.test.ts` (déjà là) — vérifier d'abord ce qu'il couvre pour ne pas dupliquer.
 
 ---
 
@@ -113,3 +113,4 @@ verifyAccess/getClientInfo/getDevis/getFactures/demanderRdv... via `injectTrpc`,
 - `2026-06-15 18:12:21Z` **[done]** client-portal L2 portal-access — RLS public-token + scope tenant couvert (7 cas : resolveByToken actif/expiré/inactif/inconnu, createAccess remplace, status/deactivate, getClientInfo cross-tenant, getArtisanPublic).
 - `2026-06-15 18:22:44Z` **[done]** client-portal L2 docs-reader — RLS docs portail couvert (5 cas : devis/factures/interventions/contrats scopés tenant+client, lien paiement en_attente, contrats sans notes, anti-IDOR cross-tenant).
 - `2026-06-15 18:32:20Z` **[done]** client-portal L2 scheduling — RLS planification portail couvert (3 cas : créneaux occupés filtrés, createRdv+getRdvByClient cross-tenant, chantiers+étapes visibles client). L2 client-portal COMPLET.
+- `2026-06-15 19:06:43Z` **[done]** client-portal L3 router — COLONNE COMPLÈTE — 5 cas e2e tRPC (verifyAccess valid/invalid, getDevis public + 401 token inconnu, generateAccess 401 sans cookie + happy path admin). Portail public = 1re colonne L1+L2+L3 complète.
