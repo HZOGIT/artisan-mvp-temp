@@ -60,9 +60,10 @@ export async function supprimerNoteDeFrais(
 }
 
 // --- Workflow (transitions de statut). ⚠️ Anti self-approbation sur approuver/rejeter. La
-// cascade legacy sur les `depenses` liées (marquage soumise/approuvee/remboursee) sort du
-// périmètre de ce module (domaine `depenses` non migré) — divergence consignée en finding.
-// L'intégration du montant remboursé + l'auto-numérotation sont portées séparément. ---
+// cascade legacy sur les `depenses` liées (`notes_frais_depenses` : propager soumise/approuvee/
+// rejetee/remboursee + rembourse/dateRemboursement au paiement) n'est PAS encore câblée ici. Le
+// blocage initial (domaine `depenses` non migré) est levé — `depenses` est désormais migré, donc
+// ce port redevient possible ; il reste à implémenter (suivi en finding dédié). ---
 
 const aujourdhui = (): string => new Date().toISOString().slice(0, 10);
 
