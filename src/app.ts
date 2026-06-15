@@ -138,6 +138,8 @@ import { registerVoiceTokenRoute } from "./interface/http/voice-token-route";
 import { registerCommandePdfRoute } from "./interface/http/commande-pdf-route";
 import { registerContratPdfRoute } from "./interface/http/contrat-pdf-route";
 import { registerInterventionPdfRoute } from "./interface/http/intervention-pdf-route";
+import { registerPortailDevisPdfRoute } from "./interface/http/portail-devis-pdf-route";
+import { getParametres } from "./modules/parametres/application/read-use-cases";
 import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
 import { GeminiAgenticAdapter } from "./modules/assistant/infra/gemini-agentic-adapter";
@@ -816,6 +818,20 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
     technicienReader: technicienRepo,
     pdf: new JsPdfAdapter(),
+  });
+
+  // §4 HORS-tRPC PUBLIQUE : PDF d'un devis depuis le portail client (`/api/portail/:token/devis/:id/pdf`,
+  // token = capacité, rate-limit IP). MONTÉ mais PAS routé tant qu'absent de MIGRATED_ROUTES.
+  registerPortailDevisPdfRoute(app, {
+    accessReader: new PortalPaymentReaderDrizzle(getDbHandle().db),
+    devisReader: devisRepo,
+    clientReader: clientRepo,
+    artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    cgvReader: {
+      getCgv: async (cgvCtx) => (await getParametres(deps.parametresRepo ?? new ParametresRepositoryDrizzle(getDbHandle().db), cgvCtx)).conditionsGenerales ?? null,
+    },
+    pdf: new JsPdfAdapter(),
+    rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
   // §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie).
