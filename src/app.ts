@@ -109,6 +109,8 @@ import { SignatureRepositoryDrizzle } from "./modules/signature/infra/signature-
 import { SignatureContextReaderDrizzle, SignatureNotificationWriterDrizzle } from "./modules/signature/infra/signature-context-reader-drizzle";
 import { SignaturePublicReaderDrizzle } from "./modules/signature/infra/signature-public-reader-drizzle";
 import { SignaturePublicWriterDrizzle } from "./modules/signature/infra/signature-public-writer-drizzle";
+import { createConseilsIaModule } from "./modules/conseils-ia/conseils-ia.module";
+import { ConseilsStatsReaderDrizzle } from "./modules/conseils-ia/infra/conseils-stats-reader-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -580,7 +582,16 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: signatureEmail,
     },
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature });
+  // Conseils IA (tableau de bord) — 1ère slice du chantier assistant/IA. Lecture seule, NON
+  // persistée ; dégradation silencieuse (rate-limit/erreur provider/JSON KO → {conseils:[]}).
+  // Procédure RACINE `conseilsIA` (request/response, PAS de SSE). LlmPort Gemini (variable-path).
+  const conseilsIa = createConseilsIaModule({
+    llm: deps.llm ?? new GeminiLlmAdapter(),
+    rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+    artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+    statsReader: new ConseilsStatsReaderDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
