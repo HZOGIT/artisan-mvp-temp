@@ -132,6 +132,9 @@ import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-paym
 import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-payment-writer-drizzle";
 import { registerArticlesSearchRoute } from "./interface/http/articles-search-route";
 import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/public-article-search-drizzle";
+import { registerAssistantStreamRoute } from "./interface/http/assistant-stream-route";
+import { AssistantThreadWriterDrizzle } from "./modules/assistant/infra/assistant-thread-writer-drizzle";
+import { ConseilsStatsReaderDrizzle as AssistantStatsReaderDrizzle } from "./modules/conseils-ia/infra/conseils-stats-reader-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -706,6 +709,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerArticlesSearchRoute(app, {
     reader: new PublicArticleSearchReaderDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
+  });
+
+  // §4 HORS-tRPC : chat assistant en STREAMING SSE (auth cookie JWT). MONTÉ mais PAS routé (absent de
+  // MIGRATED_ROUTES) : le legacy sert encore la version AGENTIQUE (outils) ; ici text-only (parité partielle).
+  registerAssistantStreamRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    llm: deps.llm ?? new GeminiLlmAdapter(),
+    rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+    artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+    statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
+    threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
   });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).
