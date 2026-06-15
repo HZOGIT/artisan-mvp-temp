@@ -36,6 +36,8 @@ export const MIGRATED_ROUTES: readonly MigratedRoute[] = [
   { name: "commande-pdf", pattern: /^\/api\/commandes-fournisseurs\/[^/]+\/pdf$/ },
   // PDF d'un contrat de maintenance (`/api/contrats/:id/pdf`, auth cookie JWT, jsPDF).
   { name: "contrat-pdf", pattern: /^\/api\/contrats\/[^/]+\/pdf$/ },
+  // Bon d'intervention en PDF (`/api/interventions/:id/bon-pdf`, auth cookie JWT, jsPDF).
+  { name: "intervention-bon-pdf", pattern: /^\/api\/interventions\/[^/]+\/bon-pdf$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

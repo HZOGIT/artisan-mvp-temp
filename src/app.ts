@@ -137,6 +137,7 @@ import { registerVoiceToolRoute } from "./interface/http/voice-tool-route";
 import { registerVoiceTokenRoute } from "./interface/http/voice-token-route";
 import { registerCommandePdfRoute } from "./interface/http/commande-pdf-route";
 import { registerContratPdfRoute } from "./interface/http/contrat-pdf-route";
+import { registerInterventionPdfRoute } from "./interface/http/intervention-pdf-route";
 import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
 import { GeminiAgenticAdapter } from "./modules/assistant/infra/gemini-agentic-adapter";
@@ -802,6 +803,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     contratRepo: deps.contratRepo ?? new ContratRepositoryDrizzle(getDbHandle().db),
     clientReader: clientRepo,
     artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    pdf: new JsPdfAdapter(),
+  });
+
+  // §4 HORS-tRPC : bon d'intervention en PDF (`/api/interventions/:id/bon-pdf`, auth cookie). MONTÉ mais
+  // PAS routé tant qu'absent de MIGRATED_ROUTES (3e des 8 routes PDF download).
+  registerInterventionPdfRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    interventionRepo,
+    clientReader: clientRepo,
+    artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    technicienReader: technicienRepo,
     pdf: new JsPdfAdapter(),
   });
 

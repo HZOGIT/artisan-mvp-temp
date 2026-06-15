@@ -102,6 +102,8 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(decideTarget("/api/commandes-fournisseurs/42", {})).toBe("legacy");
     expect(decideTarget("/api/contrats/7/pdf", {})).toBe("new-stack");
     expect(decideTarget("/api/contrats/7", {})).toBe("legacy");
+    expect(decideTarget("/api/interventions/9/bon-pdf", {})).toBe("new-stack");
+    expect(decideTarget("/api/interventions/9", {})).toBe("legacy"); // tRPC interventions (legacy)
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe
