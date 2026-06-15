@@ -36,6 +36,15 @@ function eur(n: number | string | null | undefined) {
   return v.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 }
 
+// Format de date sûr : ne jette jamais (une date nulle/invalide → "—" au lieu d'un crash de page
+// `RangeError: Invalid time value`). L'API new-stack renvoie des champs camelCase ; un champ absent
+// ⇒ `new Date(undefined)` ⇒ Invalid Date — d'où ce garde-fou en plus des bons noms de champs.
+function fmtDate(value: string | number | Date | null | undefined, pattern: string, opts?: { locale?: typeof fr }) {
+  if (value === null || value === undefined || value === "") return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "—" : format(d, pattern, opts);
+}
+
 export default function NotesFrais() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isNewOpen, setIsNewOpen] = useState(false);
@@ -124,12 +133,12 @@ export default function NotesFrais() {
             {detail.statut === "rejetee" && (
               <div className="mt-3 p-2 rounded bg-rose-50 border border-rose-200 text-sm text-rose-800">
                 <AlertCircle className="h-4 w-4 inline mr-1" /> Rejetée
-                {detail.commentaire_approbateur && ` : ${detail.commentaire_approbateur}`}
+                {detail.commentaireApprobateur && ` : ${detail.commentaireApprobateur}`}
               </div>
             )}
-            {detail.statut === "approuvee" && detail.commentaire_approbateur && (
+            {detail.statut === "approuvee" && detail.commentaireApprobateur && (
               <div className="mt-3 p-2 rounded bg-emerald-50 border border-emerald-200 text-sm text-emerald-800">
-                {detail.commentaire_approbateur}
+                {detail.commentaireApprobateur}
               </div>
             )}
           </CardContent>
@@ -140,11 +149,11 @@ export default function NotesFrais() {
             <CardTitle className="flex items-center justify-between">
               <span>Dépenses incluses</span>
               <span className="text-base font-normal text-muted-foreground">
-                Total : <strong className="text-primary">{eur(detail.montant_total)}</strong>
+                Total : <strong className="text-primary">{eur(detail.montantTotal)}</strong>
               </span>
             </CardTitle>
             <CardDescription>
-              Période : {format(new Date(detail.periode_debut), "dd/MM/yyyy")} → {format(new Date(detail.periode_fin), "dd/MM/yyyy")}
+              Période : {fmtDate(detail.periodeDebut, "dd/MM/yyyy")} → {fmtDate(detail.periodeFin, "dd/MM/yyyy")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -157,10 +166,10 @@ export default function NotesFrais() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{d.fournisseur || d.numero}</div>
                       <div className="text-xs text-muted-foreground">
-                        {format(new Date(d.date_depense), "dd MMM", { locale: fr })} · {d.categorie}
+                        {fmtDate(d.dateDepense, "dd MMM", { locale: fr })} · {d.categorie}
                       </div>
                     </div>
-                    <div className="font-medium">{eur(d.montant_ttc)}</div>
+                    <div className="font-medium">{eur(d.montantTtc)}</div>
                     {detail.statut === "brouillon" && (
                       <Button
                         variant="ghost"
@@ -190,7 +199,7 @@ export default function NotesFrais() {
                       onClick={() => addDepMut.mutate({ noteId: detail.id, depenseId: d.id })}
                     >
                       <Plus className="h-3 w-3 mr-1" />
-                      {d.fournisseur || d.numero} ({eur(d.montant_ttc)})
+                      {d.fournisseur || d.numero} ({eur(d.montantTtc)})
                     </Button>
                   ))}
                 </div>
@@ -312,13 +321,13 @@ export default function NotesFrais() {
               <CardContent className="space-y-2">
                 <div className="text-sm text-muted-foreground">
                   <Clock className="h-3 w-3 inline mr-1" />
-                  {format(new Date(n.periode_debut), "dd MMM", { locale: fr })}
+                  {fmtDate(n.periodeDebut, "dd MMM", { locale: fr })}
                   {" → "}
-                  {format(new Date(n.periode_fin), "dd MMM yyyy", { locale: fr })}
+                  {fmtDate(n.periodeFin, "dd MMM yyyy", { locale: fr })}
                 </div>
                 <div className="text-sm">
-                  <span className="text-muted-foreground">{n.nb_depenses || 0} dépense{(n.nb_depenses || 0) > 1 ? "s" : ""}</span>
-                  <span className="float-right font-bold text-lg">{eur(n.montant_total)}</span>
+                  <span className="text-muted-foreground">{n.nbDepenses || 0} dépense{(n.nbDepenses || 0) > 1 ? "s" : ""}</span>
+                  <span className="float-right font-bold text-lg">{eur(n.montantTotal)}</span>
                 </div>
                 <Button variant="ghost" size="sm" className="w-full">
                   <Eye className="h-3 w-3 mr-1" /> Voir le détail
@@ -381,7 +390,7 @@ export default function NotesFrais() {
                         }}
                       />
                       <span className="flex-1 truncate">{d.fournisseur || d.numero} · {d.categorie}</span>
-                      <span className="font-medium">{eur(d.montant_ttc)}</span>
+                      <span className="font-medium">{eur(d.montantTtc)}</span>
                     </label>
                   ))}
                 </div>

@@ -12,11 +12,24 @@ const BASE = process.env.BASE || 'https://staging.operioz.com';
 const EMAIL = process.env.E2E_EMAIL || 'dev@operioz.com';
 const PASS = process.env.E2E_PASS || '';
 
+// Toutes les routes SPA authentifiées, NON paramétriques (cf. `grep path= client/src/App.tsx`).
+// Exclues : les routes à paramètre (`:id`/`:token`/`:slug` — testées via repro ciblée) et les pages
+// d'auth pure (/sign-in, /signin, /signup, /forgot-password, /reset-password — redirigent si connecté).
+// But : ne plus rater une page basique (ex. /notes-de-frais cassée par un mismatch snake_case/camelCase).
 const ROUTES = [
-  '/dashboard', '/devis', '/factures', '/clients', '/interventions',
-  '/parametres', '/modules', '/comptabilite', '/stocks', '/chat',
-  '/contrats', '/calendrier', '/fournisseurs', '/depenses', '/statistiques',
-  '/techniciens', '/vehicules', '/conges', '/avis', '/documents', '/assistant',
+  '/dashboard', '/', '/aide', '/alertes-previsions', '/analyses-photos', '/articles',
+  '/assistant', '/assistant/conversations', '/avis', '/badges', '/budgets-depenses',
+  '/calendrier', '/calendrier-chantiers', '/cgu', '/cgv', '/chantiers', '/chat', '/classement',
+  '/clients', '/clients/import', '/clients/nouveau', '/commandes', '/commandes/nouvelle',
+  '/comptabilite', '/confidentialite', '/conges', '/contact', '/contrats', '/depenses',
+  '/depenses/nouvelle', '/devis', '/devis-ia', '/devis-options', '/devis/nouveau', '/documentation',
+  '/factures', '/flotte', '/fournisseurs', '/geolocalisation', '/guide', '/historique-emails',
+  '/import', '/import-releve', '/integrations-comptables', '/interventions', '/ma-vitrine',
+  '/mentions-legales', '/mobile', '/modeles-email', '/modeles-email-transactionnels', '/modules',
+  '/notes-de-frais', '/notifications', '/parametres', '/performances-fournisseurs', '/planification',
+  '/portail-gestion', '/previsions', '/profil', '/rapports', '/rdv-en-ligne', '/regles-depenses',
+  '/relances', '/statistiques', '/stocks', '/support', '/tableau-bord-depenses',
+  '/tableau-bord-sync-comptable', '/techniciens', '/utilisateurs', '/vehicules',
 ];
 
 const issues = [];
