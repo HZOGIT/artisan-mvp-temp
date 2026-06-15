@@ -117,6 +117,8 @@ import { AssistantDataReaderDrizzle } from "./modules/assistant/infra/assistant-
 import { createChatModule } from "./modules/chat/chat.module";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
+import { registerIcalRoute } from "./interface/http/ical-route";
+import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -638,6 +640,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
         permissionsReader: deps.permissionsReader ?? new DrizzlePermissionsReader(getDbHandle().db),
       }),
     },
+  });
+
+  // §4 HORS-tRPC : route publique d'abonnement iCal (`/api/calendar/:token.ics`). Le jeton EST la
+  // capacité (pas de cookie). Rate-limit IP (60/min, parité legacy). Servie par le new-stack dès que
+  // le dispatcher edge route ce chemin (sinon legacy).
+  registerIcalRoute(app, {
+    reader: new IcalPublicReaderDrizzle(getDbHandle().db),
+    rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).
