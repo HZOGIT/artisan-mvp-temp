@@ -32,6 +32,13 @@ echo "▶ Faux users staging : A=user $UA/artisan $AA · B=user $UB/artisan $AB"
 TOKEN_A=$(JWT_SECRET="$JWT_SECRET" node devtools/mint-jwt.mjs "$UA" "smoke+a@operioz.test")
 TOKEN_B=$(JWT_SECRET="$JWT_SECRET" node devtools/mint-jwt.mjs "$UB" "smoke+b@operioz.test")
 
+# Le user A représente un PROPRIÉTAIRE dans le smoke « 200 attendu » : on lui accorde (idempotent)
+# les permissions des routers gatés par permission (clients/contrats/interventions = .voir, rdv = .gerer),
+# comme un propriétaire réel les reçoit au provisioning. Sinon → 403 (le gate fonctionne, cf. tests).
+for perm in clients.voir contrats.voir interventions.voir rdv.gerer; do
+  $PG "insert into permissions_utilisateur (\"userId\", permission, autorise) select $UA, '$perm', true where not exists (select 1 from permissions_utilisateur where \"userId\"=$UA and permission='$perm');" >/dev/null
+done
+
 # 2) Smoke authentifié des domaines servis par le nouveau stack (200 attendu = endpoint OK end-to-end).
 PROCS="vehicules.list notifications.list fournisseurs.list parametres.get modelesEmail.list relances.list conges.list badges.list stocks.list techniciens.list rdv.list clients.list factures.list contrats.list commandesFournisseurs.list devis.list avis.list interventions.list chantiers.list articles.getArtisanArticles previsions.getHistorique depenses.list artisan.getProfile activites.list modules.list statistiques.getDevisStats calendrier.getIcalFeed emails.list geolocalisation.getPositions dashboard.getStats dashboard.getAlerts rapports.list auth.me subscription.getCurrent conseilsIA assistant.getThreads chat.getConversations"
 fail=0
