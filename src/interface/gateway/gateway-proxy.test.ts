@@ -19,7 +19,7 @@ describe("targetForUrl (décision du front-door, pure)", () => {
   });
 
   it("domaine NON migré → legacy même si activé (sûreté)", () => {
-    expect(targetForUrl("/api/trpc/interventionsMobile.list", { NEW_STACK_DOMAINS: "interventionsMobile" } as NodeJS.ProcessEnv)).toBe("legacy");
+    expect(targetForUrl("/api/trpc/vitrine.list", { NEW_STACK_DOMAINS: "vitrine" } as NodeJS.ProcessEnv)).toBe("legacy");
   });
 
   it("activer un domaine ne détourne pas un autre (pas de fuite)", () => {

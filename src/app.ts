@@ -122,6 +122,8 @@ import { createAlertesPrevisionsModule } from "./modules/alertes-previsions/aler
 import { AlertesPrevisionsRepositoryDrizzle } from "./modules/alertes-previsions/infra/alertes-previsions-repository-drizzle";
 import { createImportErpModule } from "./modules/import-erp/import-erp.module";
 import { ImportErpRepositoryDrizzle } from "./modules/import-erp/infra/import-erp-repository-drizzle";
+import { createInterventionsMobileModule } from "./modules/interventions-mobile/interventions-mobile.module";
+import { InterventionMobileRepositoryDrizzle } from "./modules/interventions-mobile/infra/intervention-mobile-repository-drizzle";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
@@ -678,7 +680,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const alertesPrevisions = createAlertesPrevisionsModule({ repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db) });
   // Module `importErp` (import de reprise de données : clients/devis/factures légers). Tables SOUS RLS.
   const importErp = createImportErpModule({ repo: new ImportErpRepositoryDrizzle(getDbHandle().db) });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp });
+  // Module `interventionsMobile` (app mobile technicien). Compose les repos migrés interventions/clients/
+  // techniciens + le repo dédié `interventions_mobile` (SOUS RLS). RGPD : data-min par rôle technicien.
+  const interventionsMobile = createInterventionsMobileModule({
+    interventions: interventionRepo,
+    clients: clientRepo,
+    techniciens: technicienRepo,
+    mobile: new InterventionMobileRepositoryDrizzle(getDbHandle().db),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
