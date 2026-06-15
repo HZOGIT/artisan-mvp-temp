@@ -12,6 +12,8 @@ import {
   type DevisLigneInput,
   type FactureWriterForAgent,
   type FactureLigneInput,
+  type DevisSenderForAgent,
+  type FactureSenderForAgent,
 } from "./write-tool-handlers";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -197,6 +199,44 @@ describe("write-tool-handlers — creer_facture", () => {
     const h = buildAssistantWriteHandlers({ factures: new FakeFactureWriter({ convertThrows: "Seul un devis accepté peut être converti en facture" }) });
     const res = await h.creer_facture({ devisId: 12, objet: "X" }, ctx);
     expect(res).toEqual({ ok: false, error: "Seul un devis accepté peut être converti en facture" });
+  });
+});
+
+describe("write-tool-handlers — envoyer_devis / envoyer_facture", () => {
+  it("envoyer_devis sans devisId → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ devisSender: { envoyer: async () => ({ success: true, message: "x" }) } });
+    expect((await h.envoyer_devis({}, ctx)).ok).toBe(false);
+  });
+
+  it("envoyer_devis succès → ok + message ; passe le customMessage", async () => {
+    let seen: { id: number; msg?: string } | undefined;
+    const sender: DevisSenderForAgent = {
+      envoyer: async (_c, id, msg) => {
+        seen = { id, msg };
+        return { success: true, message: `Devis DEV-1 envoyé à c@x.fr` };
+      },
+    };
+    const h = buildAssistantWriteHandlers({ devisSender: sender });
+    const res = await h.envoyer_devis({ devisId: 5, messagePersonnalise: "Bonjour" }, ctx);
+    expect(res).toEqual({ ok: true, data: { message: "Devis DEV-1 envoyé à c@x.fr" } });
+    expect(seen).toEqual({ id: 5, msg: "Bonjour" });
+  });
+
+  it("envoyer_devis : exception du use-case (ownership/email) → ok:false", async () => {
+    const sender: DevisSenderForAgent = {
+      envoyer: async () => {
+        throw new Error("Le client n'a pas d'adresse email");
+      },
+    };
+    const h = buildAssistantWriteHandlers({ devisSender: sender });
+    expect(await h.envoyer_devis({ devisId: 5 }, ctx)).toEqual({ ok: false, error: "Le client n'a pas d'adresse email" });
+  });
+
+  it("envoyer_facture succès → ok + message", async () => {
+    const sender: FactureSenderForAgent = { envoyer: async () => ({ success: true, message: "Facture FAC-1 envoyé(e) à c@x.fr" }) };
+    const h = buildAssistantWriteHandlers({ factureSender: sender });
+    const res = await h.envoyer_facture({ factureId: 9 }, ctx);
+    expect(res).toEqual({ ok: true, data: { message: "Facture FAC-1 envoyé(e) à c@x.fr" } });
   });
 });
 

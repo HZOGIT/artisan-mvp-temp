@@ -74,12 +74,27 @@ export interface FactureWriterForAgent {
   getById(ctx: TenantContext, factureId: number): Promise<{ numero: string; totalTTC: string; statut: string; objet: string | null } | null>;
 }
 
+// Envoi par email (devis/facture) : mappé aux use-cases d'envoi migrés (PDF via `PdfPort`, email via
+// `EmailPort`, statut→envoye/envoyee, rate-limit). Renvoie `{success, message}` (les erreurs lèvent).
+export interface EnvoiResultForAgent {
+  readonly success: boolean;
+  readonly message: string;
+}
+export interface DevisSenderForAgent {
+  envoyer(ctx: TenantContext, devisId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
+}
+export interface FactureSenderForAgent {
+  envoyer(ctx: TenantContext, factureId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
+}
+
 export interface AssistantWriteDeps {
   readonly clients?: ClientWriterForAgent;
   readonly clientsById?: ClientByIdReaderForAgent;
   readonly interventions?: InterventionWriterForAgent;
   readonly devis?: DevisWriterForAgent;
   readonly factures?: FactureWriterForAgent;
+  readonly devisSender?: DevisSenderForAgent;
+  readonly factureSender?: FactureSenderForAgent;
 }
 
 // `creer_client` : crée un client (nom requis ; `type` archivé en notes, parité legacy). `{clientId,nom,message}`.
@@ -256,13 +271,41 @@ function makeCreerFacture(facture: FactureWriterForAgent): ToolHandler {
   };
 }
 
+// `envoyer_devis` / `envoyer_facture` : envoi par email (PDF joint) via le use-case migré ; ownership
+// 404 / email client requis / rate-limit captés en exception → `{ok:false}`. `{message}` en succès.
+function makeEnvoyerDevis(sender: DevisSenderForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    if (!args?.devisId) return { ok: false, error: "devisId est requis" };
+    try {
+      const result = await sender.envoyer(ctx, Number(args.devisId), optStr(args.messagePersonnalise));
+      return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de l'envoi du devis") };
+    }
+  };
+}
+function makeEnvoyerFacture(sender: FactureSenderForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    if (!args?.factureId) return { ok: false, error: "factureId est requis" };
+    try {
+      const result = await sender.envoyer(ctx, Number(args.factureId), optStr(args.messagePersonnalise));
+      return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de l'envoi de la facture") };
+    }
+  };
+}
+
 // Construit les handlers d'écriture câblés (par lots, risque croissant). Un outil n'est inclus que si
-// ses readers/writers sont fournis. 2a : creer_client + creer_intervention ; 2b : creer_devis ; 2c : creer_facture.
+// ses readers/writers sont fournis. 2a : creer_client/intervention ; 2b : creer_devis ; 2c : creer_facture ;
+// 2d : envoyer_devis/envoyer_facture.
 export function buildAssistantWriteHandlers(deps: AssistantWriteDeps): Record<string, ToolHandler> {
   const handlers: Record<string, ToolHandler> = {};
   if (deps.clients) handlers.creer_client = makeCreerClient(deps.clients);
   if (deps.clientsById && deps.interventions) handlers.creer_intervention = makeCreerIntervention(deps.clientsById, deps.interventions);
   if (deps.devis) handlers.creer_devis = makeCreerDevis(deps.devis);
   if (deps.factures) handlers.creer_facture = makeCreerFacture(deps.factures);
+  if (deps.devisSender) handlers.envoyer_devis = makeEnvoyerDevis(deps.devisSender);
+  if (deps.factureSender) handlers.envoyer_facture = makeEnvoyerFacture(deps.factureSender);
   return handlers;
 }
