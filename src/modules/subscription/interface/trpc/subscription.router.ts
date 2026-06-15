@@ -1,11 +1,14 @@
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
-import type { ISubscriptionReader } from "../../application/subscription-reader";
-import { getCurrent } from "../../application/use-cases";
+import type { ISubscriptionRepository } from "../../application/subscription-reader";
+import type { SubscriptionEffectDeps } from "../../application/use-cases";
+import { cancelSubscription, getCurrent, reactivateSubscription } from "../../application/use-cases";
 
-// Routeur tRPC abonnement — slice LECTURE (`getCurrent`). Les effets Stripe (createCheckout/createPortal/
-// cancel/reactivate) + le webhook signé viennent dans des firings ultérieurs avant l'activation.
-export function createSubscriptionRouter(reader: ISubscriptionReader) {
+// Routeur tRPC abonnement. `getCurrent` (lecture) + `cancel`/`reactivate` (effets Stripe via StripePort).
+// `createCheckout`/`createPortal` viennent ensuite (firing dédié) avant l'activation.
+export function createSubscriptionRouter(repo: ISubscriptionRepository, effectDeps: SubscriptionEffectDeps) {
   return router({
-    getCurrent: protectedProcedure.query(({ ctx }) => getCurrent(reader, ctx.tenant)),
+    getCurrent: protectedProcedure.query(({ ctx }) => getCurrent(repo, ctx.tenant)),
+    cancel: protectedProcedure.mutation(({ ctx }) => cancelSubscription(effectDeps, ctx.tenant)),
+    reactivate: protectedProcedure.mutation(({ ctx }) => reactivateSubscription(effectDeps, ctx.tenant)),
   });
 }

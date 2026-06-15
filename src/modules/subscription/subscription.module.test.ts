@@ -1,17 +1,20 @@
 import { describe, it, expect } from "vitest";
 import type { TenantContext } from "../../shared/tenant";
+import { FakeStripePort } from "../../shared/ports/stripe-adapter";
 import { createSubscriptionModule } from "./subscription.module";
 import { FakeSubscriptionReader } from "./infra/subscription-reader-fake";
 import { getCurrent } from "./application/use-cases";
 
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
+const build = (repo = new FakeSubscriptionReader(), stripe = new FakeStripePort()) =>
+  createSubscriptionModule({ repository: repo, stripe, appUrl: "https://app.test" });
 
 describe("subscription.module", () => {
-  it("câble le reader injecté + expose getCurrent", () => {
-    const reader = new FakeSubscriptionReader();
-    const module = createSubscriptionModule({ reader });
-    expect(module.deps.reader).toBe(reader);
-    expect(Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record)).toEqual(["getCurrent"]);
+  it("câble le repo injecté + expose getCurrent/cancel/reactivate", () => {
+    const repo = new FakeSubscriptionReader();
+    const module = build(repo);
+    expect(module.deps.repository).toBe(repo);
+    expect(Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort()).toEqual(["cancel", "getCurrent", "reactivate"]);
   });
 
   it("getCurrent : scopé tenant (un autre tenant → défauts)", async () => {

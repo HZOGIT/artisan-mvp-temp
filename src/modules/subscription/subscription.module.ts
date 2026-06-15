@@ -1,9 +1,13 @@
-import type { ISubscriptionReader } from "./application/subscription-reader";
+import type { StripePort } from "../../shared/ports/stripe";
+import type { ISubscriptionRepository } from "./application/subscription-reader";
+import type { SubscriptionEffectDeps } from "./application/use-cases";
 import { createSubscriptionRouter } from "./interface/trpc/subscription.router";
 
-// Wiring DI du module abonnement (slice lecture).
+// Wiring DI du module abonnement (lecture `getCurrent` + effets Stripe cancel/reactivate).
 export interface SubscriptionModuleDeps {
-  readonly reader: ISubscriptionReader;
+  readonly repository: ISubscriptionRepository;
+  readonly stripe: StripePort;
+  readonly appUrl: string;
 }
 
 export interface SubscriptionModule {
@@ -12,5 +16,6 @@ export interface SubscriptionModule {
 }
 
 export function createSubscriptionModule(deps: SubscriptionModuleDeps): SubscriptionModule {
-  return { deps, router: createSubscriptionRouter(deps.reader) };
+  const effectDeps: SubscriptionEffectDeps = { repo: deps.repository, stripe: deps.stripe, appUrl: deps.appUrl };
+  return { deps, router: createSubscriptionRouter(deps.repository, effectDeps) };
 }

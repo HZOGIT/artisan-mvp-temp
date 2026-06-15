@@ -7,5 +7,7 @@ export * from "./llm";
 export * from "./vision";
 export * from "./password-hasher";
 export * from "./password-hasher-bcrypt";
+export * from "./stripe";
+export * from "./stripe-adapter";
 export * from "./fakes";
 export * from "./adapters";

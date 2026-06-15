@@ -101,7 +101,9 @@ import { AuthRepositoryDrizzle } from "./modules/auth/infra/auth-repository-driz
 import type { IAuthRepository } from "./modules/auth/application/auth-repository";
 import { createSubscriptionModule } from "./modules/subscription/subscription.module";
 import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
-import type { ISubscriptionReader } from "./modules/subscription/application/subscription-reader";
+import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
+import { StripeAdapter } from "./shared/ports/stripe-adapter";
+import type { StripePort } from "./shared/ports/stripe";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -239,7 +241,8 @@ export interface AppDeps extends ContextDeps {
   readonly utilisateurRepo?: IUtilisateurRepository;
   readonly comptabiliteReader?: IComptabiliteReader;
   readonly authRepo?: IAuthRepository;
-  readonly subscriptionReader?: ISubscriptionReader;
+  readonly subscriptionRepo?: ISubscriptionRepository;
+  readonly stripePort?: StripePort;
   readonly facturesCAReader?: FacturesCAReader;
   readonly tresorerieReader?: TresorerieReader;
 }
@@ -544,7 +547,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // explicite). MONTÉ mais PAS activé : il manque les effets Stripe (checkout/portal/cancel/reactivate)
   // + le webhook → le trafic abonnement reste sur le legacy jusqu'à parité complète.
   const subscription = createSubscriptionModule({
-    reader: deps.subscriptionReader ?? new SubscriptionReaderDrizzle(getDbHandle().db),
+    repository: deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db),
+    stripe: deps.stripePort ?? new StripeAdapter(),
+    appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
   const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription });
 
