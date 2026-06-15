@@ -62,29 +62,21 @@ tasks:
       - task: db:migrate
 
   dev:seed:
-    desc: Seed dev user dev@operioz.com / Operioz
+    desc: Seed dev user dev@operioz.com / Operioz (PostgreSQL, bcrypt)
     cmds:
-      - |
-        {{.COMPOSE}} exec mysql mysql \
-          -u {{.DB_USER}} \
-          -p{{.DB_PASS}} \
-          {{.DB_NAME}} \
-          < scripts/seed-dev-user.sql
+      - '{{.COMPOSE}} exec app sh -c "cd /app && USER_EMAIL=dev@operioz.com USER_PASSWORD=Operioz USER_NAME=''Dev Operioz'' pnpm exec tsx scripts/create-user.ts"'
 
   dev:seed:show:
     desc: Show seeded dev users
     cmds:
       - |
-        {{.COMPOSE}} exec mysql mysql \
-          -u {{.DB_USER}} \
-          -p{{.DB_PASS}} \
-          {{.DB_NAME}} \
-          -e "SELECT u.id, u.email, u.role, u.actif, a.nomEntreprise FROM users u LEFT JOIN artisans a ON a.userId = u.id;"
+        {{.COMPOSE}} exec postgres psql -U {{.DB_USER}} -d {{.DB_NAME}} \
+          -c 'SELECT u.id, u.email, u.role, u.actif, a."nomEntreprise" FROM users u LEFT JOIN artisans a ON a."userId" = u.id;'
 
   dev:db:shell:
-    desc: Open MySQL shell
+    desc: Open PostgreSQL shell
     cmds:
-      - '{{.COMPOSE}} exec mysql mysql -u {{.DB_USER}} -p{{.DB_PASS}} {{.DB_NAME}}'
+      - '{{.COMPOSE}} exec postgres psql -U {{.DB_USER}} -d {{.DB_NAME}}'
 
   dev:status:
     desc: Show container status
@@ -171,16 +163,19 @@ tasks:
       - '{{.STAGING_COMPOSE}} ps'
 
   staging:seed:
-    desc: Seed the staging DB with the dev user (dev@operioz.com / Operioz)
+    desc: Seed the staging DB with the dev user (dev@operioz.com / Operioz) — PostgreSQL, bcrypt
     dir: '{{.STAGING_DIR}}'
+    # Le conteneur new-stack est un bundle prod (sans tsx/source) → on lance le seed depuis l'hôte
+    # contre le PG staging (port hôte 5433), credentials chargés depuis .env.staging.
     cmds:
       - |
-        {{.STAGING_COMPOSE}} exec -T mysql mysql \
-          -u {{.DB_USER}} -p"$MYSQL_PASSWORD" {{.DB_NAME}} \
-          < scripts/seed-dev-user.sql
+        set -a; . ./.env.staging; set +a
+        DATABASE_URL="postgres://${POSTGRES_USER:-artisan_user}:${POSTGRES_PASSWORD:-artisan_password}@localhost:5433/artisan_mvp" \
+          USER_EMAIL=dev@operioz.com USER_PASSWORD=Operioz USER_NAME='Dev Operioz' \
+          pnpm exec tsx scripts/create-user.ts
 
   staging:db:shell:
-    desc: Open a MySQL shell on the staging DB
+    desc: Open a PostgreSQL shell on the staging DB
     dir: '{{.STAGING_DIR}}'
     cmds:
-      - '{{.STAGING_COMPOSE}} exec mysql mysql -u {{.DB_USER}} -p"$MYSQL_PASSWORD" {{.DB_NAME}}'
+      - '{{.STAGING_COMPOSE}} exec postgres psql -U {{.DB_USER}} -d {{.DB_NAME}}'
