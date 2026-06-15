@@ -41,6 +41,8 @@ export const MIGRATED_ROUTES = [
   { name: "comptabilite-fec", pattern: /^\/api\/comptabilite\/fec$/ },
   // Export CSV des factures (`/api/comptabilite/export-csv`, auth cookie JWT, anti-injection CSV).
   { name: "comptabilite-csv", pattern: /^\/api\/comptabilite\/export-csv$/ },
+  // Statut de paiement d'une facture (`/api/paiement/status/:factureId`, public par token portail).
+  { name: "paiement-status", pattern: /^\/api\/paiement\/status\/[^/]+$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

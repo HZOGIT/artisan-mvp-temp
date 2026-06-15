@@ -127,6 +127,8 @@ import { registerUploadLogoRoute } from "./interface/http/upload-logo-route";
 import { ArtisanLogoWriterDrizzle } from "./modules/artisan/infra/artisan-logo-writer-drizzle";
 import { registerComptabiliteExportRoute } from "./interface/http/comptabilite-export-route";
 import { FacturesCsvReaderDrizzle } from "./modules/comptabilite/infra/factures-csv-reader-drizzle";
+import { registerPaiementRoute } from "./interface/http/paiement-route";
+import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-payment-reader-drizzle";
 import { DepenseRepositoryDrizzle } from "./modules/depenses/infra/depense-repository-drizzle";
 import type { IDepenseRepository } from "./modules/depenses/application/depense-repository";
 import { createDevisModule } from "./modules/devis/devis.module";
@@ -687,6 +689,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     reader: deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db),
     csvReader: new FacturesCsvReaderDrizzle(getDbHandle().db),
   });
+
+  // §4 HORS-tRPC : statut de paiement d'une facture (portail client, public par token). Lecture seule.
+  registerPaiementRoute(app, { reader: new PortalPaymentReaderDrizzle(getDbHandle().db) });
 
   // Expose le routeur racine assemblé (introspection : garde-fou de cohérence des domaines montés).
   app.decorate("appRouter", appRouter);

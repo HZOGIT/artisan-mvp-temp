@@ -86,6 +86,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(decideTarget("/api/comptabilite/fec", {})).toBe("new-stack");
     expect(decideTarget("/api/comptabilite/export-csv", {})).toBe("new-stack");
     expect(decideTarget("/api/comptabilite/facturx/42", {})).toBe("legacy");
+    // statut paiement (public par token) → new-stack ; create-checkout-session pas encore migré → legacy
+    expect(decideTarget("/api/paiement/status/42", {})).toBe("new-stack");
+    expect(decideTarget("/api/paiement/create-checkout-session", {})).toBe("legacy");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe
