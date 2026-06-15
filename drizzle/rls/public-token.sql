@@ -8,3 +8,16 @@
 drop policy if exists public_token_select on "demandes_avis";
 create policy public_token_select on "demandes_avis" for select
   using ("tokenDemande" = nullif(current_setting('app.public_token', true), ''));
+
+-- devis : lecture publique du devis RATTACHÉ à la signature dont le token est présenté (portail de
+-- signature de devis). `signatures_devis` est HORS RLS (lisible librement) → la capacité = le token
+-- de signature ; cette policy autorise à lire LE devis lié à ce token (pour résoudre artisanId +
+-- afficher le devis). Les sous-ressources (client/artisan/lignes/options) se lisent ensuite sous le
+-- tenant résolu (`withTenant(artisanId)`), comme le portail d'avis. PERMISSIVE (s'OR avec tenant_isolation).
+drop policy if exists public_token_select on "devis";
+create policy public_token_select on "devis" for select
+  using (exists (
+    select 1 from "signatures_devis" s
+    where s."devisId" = "devis".id
+      and s."token" = nullif(current_setting('app.public_token', true), '')
+  ));

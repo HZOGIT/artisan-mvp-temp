@@ -3,4 +3,6 @@
 export * from "./domain/signature";
 export * from "./application/signature-repository";
 export * from "./application/use-cases";
+export * from "./application/signature-public-reader";
+export * from "./application/public-use-cases";
 export * from "./signature.module";

@@ -13,7 +13,7 @@ const c = new pg.Client({ connectionString: PG_URL });
 await c.connect();
 await c.query(sql);
 const { rows } = await c.query(
-  "select polname from pg_policy p join pg_class cl on cl.oid=p.polrelid where cl.relname='demandes_avis' order by polname",
+  "select cl.relname, p.polname from pg_policy p join pg_class cl on cl.oid=p.polrelid where p.polname='public_token_select' order by cl.relname",
 );
-console.log(`public-token RLS appliqué sur demandes_avis. Policies : ${rows.map((r) => r.polname).join(", ")}.`);
+console.log(`public-token RLS appliqué. Policies : ${rows.map((r) => `${r.relname}.${r.polname}`).join(", ")}.`);
 await c.end();
