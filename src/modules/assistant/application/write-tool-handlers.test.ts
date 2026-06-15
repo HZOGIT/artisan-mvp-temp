@@ -8,6 +8,8 @@ import {
   type InterventionWriterForAgent,
   type ClientCreateInput,
   type InterventionCreateInput,
+  type DevisWriterForAgent,
+  type DevisLigneInput,
 } from "./write-tool-handlers";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -90,6 +92,48 @@ describe("write-tool-handlers — creer_intervention", () => {
     const h = buildAssistantWriteHandlers({ clientsById: new FakeClientById(client), interventions: new FakeInterventionWriter() });
     const res = await h.creer_intervention({ clientId: 3, titre: "Pose", dateDebut: "pas-une-date", dateFin: "2026-07-01T10:00:00" }, ctx);
     expect(res).toEqual({ ok: false, error: "Format de date invalide (utiliser ISO 8601)" });
+  });
+});
+
+class FakeDevisWriter implements DevisWriterForAgent {
+  public lignes: DevisLigneInput[] = [];
+  public created?: { clientId: number; objet: string; notes?: string; dateValidite: Date };
+  constructor(private readonly ownsClient = true) {}
+  async creer(_c: TenantContext, input: { clientId: number; objet: string; notes?: string; dateValidite: Date }) {
+    if (!this.ownsClient) throw new Error("Client introuvable");
+    this.created = input;
+    return { id: 55 };
+  }
+  async ajouterLigne(_c: TenantContext, _devisId: number, ligne: DevisLigneInput) {
+    this.lignes.push(ligne);
+  }
+  async getById() {
+    return { numero: "DEV-2026-0001", totalTTC: "240.00", statut: "brouillon" };
+  }
+}
+
+describe("write-tool-handlers — creer_devis", () => {
+  it("paramètres manquants (pas de ligne) → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ devis: new FakeDevisWriter() });
+    expect((await h.creer_devis({ clientId: 1, objet: "Travaux", lignes: [] }, ctx)).ok).toBe(false);
+  });
+
+  it("succès : brouillon + lignes (défauts unite=u, tva=20) + message TTC", async () => {
+    const writer = new FakeDevisWriter();
+    const h = buildAssistantWriteHandlers({ devis: writer });
+    const res = await h.creer_devis(
+      { clientId: 3, objet: "Réfection", lignes: [{ designation: "Main d'œuvre", quantite: 2, prixUnitaireHT: 50 }] },
+      ctx,
+    );
+    expect(res).toMatchObject({ ok: true, data: { devisId: 55, numero: "DEV-2026-0001", statut: "brouillon" } });
+    if (res.ok) expect((res.data as { message: string }).message).toBe("Devis DEV-2026-0001 créé en brouillon (240.00 € TTC)");
+    expect(writer.lignes[0]).toEqual({ designation: "Main d'œuvre", quantite: "2", unite: "u", prixUnitaireHT: "50", tauxTVA: "20" });
+  });
+
+  it("client d'un autre tenant → ok:false (le use-case migré lève, capté)", async () => {
+    const h = buildAssistantWriteHandlers({ devis: new FakeDevisWriter(false) });
+    const res = await h.creer_devis({ clientId: 99, objet: "X", lignes: [{ designation: "A", quantite: 1, prixUnitaireHT: 10 }] }, ctx);
+    expect(res).toEqual({ ok: false, error: "Client introuvable" });
   });
 });
 

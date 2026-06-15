@@ -42,10 +42,26 @@ export interface InterventionWriterForAgent {
   create(ctx: TenantContext, input: InterventionCreateInput): Promise<{ id: number; titre: string; dateDebut: Date; dateFin: Date | null }>;
 }
 
+// Devis : on s'appuie sur les use-cases migrés (création header + ajout de lignes, montants HT/TVA/TTC
+// recalculés par le repo) ; l'orchestration (header → lignes → relecture des totaux) reste ici.
+export interface DevisLigneInput {
+  readonly designation: string;
+  readonly quantite: string;
+  readonly unite?: string;
+  readonly prixUnitaireHT: string;
+  readonly tauxTVA: string;
+}
+export interface DevisWriterForAgent {
+  creer(ctx: TenantContext, input: { clientId: number; objet: string; notes?: string; dateValidite: Date }): Promise<{ id: number }>;
+  ajouterLigne(ctx: TenantContext, devisId: number, ligne: DevisLigneInput): Promise<void>;
+  getById(ctx: TenantContext, devisId: number): Promise<{ numero: string; totalTTC: string; statut: string } | null>;
+}
+
 export interface AssistantWriteDeps {
   readonly clients?: ClientWriterForAgent;
   readonly clientsById?: ClientByIdReaderForAgent;
   readonly interventions?: InterventionWriterForAgent;
+  readonly devis?: DevisWriterForAgent;
 }
 
 // `creer_client` : crée un client (nom requis ; `type` archivé en notes, parité legacy). `{clientId,nom,message}`.
@@ -128,11 +144,55 @@ function makeCreerIntervention(clientsById: ClientByIdReaderForAgent, interventi
   };
 }
 
-// Construit les handlers d'écriture câblés (Phase 2a : creer_client + creer_intervention). Un outil
-// n'est inclus que si ses readers/writers sont fournis.
+// `creer_devis` : crée un devis brouillon + ses lignes (montants recalculés par le repo), validité
+// `validiteDays` jours (défaut 30). Ownership client assuré par le use-case migré (404 cross-tenant).
+function makeCreerDevis(devis: DevisWriterForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    const clientId = Number(args?.clientId);
+    const objet = typeof args?.objet === "string" ? args.objet : "";
+    const lignes = Array.isArray(args?.lignes) ? (args.lignes as unknown[]) : [];
+    if (!clientId || !objet || lignes.length === 0) {
+      return { ok: false, error: "Paramètres manquants : clientId, objet et au moins une ligne sont requis" };
+    }
+    try {
+      const validity = Number.isFinite(Number(args.validiteDays)) && Number(args.validiteDays) > 0 ? Number(args.validiteDays) : 30;
+      const dateValidite = new Date(Date.now() + validity * 86400000);
+      const created = await devis.creer(ctx, { clientId, objet, notes: optStr(args.notes), dateValidite });
+      for (const raw of lignes) {
+        const l = (raw ?? {}) as Record<string, unknown>;
+        await devis.ajouterLigne(ctx, created.id, {
+          designation: String(l.designation ?? ""),
+          quantite: String(Number(l.quantite) || 0),
+          unite: optStr(l.unite) ?? "u",
+          prixUnitaireHT: String(Number(l.prixUnitaireHT) || 0),
+          tauxTVA: String(Number(l.tauxTVA ?? 20)),
+        });
+      }
+      const full = await devis.getById(ctx, created.id);
+      const numero = full?.numero ?? "";
+      const totalTTC = full?.totalTTC ?? "0";
+      return {
+        ok: true,
+        data: {
+          devisId: created.id,
+          numero,
+          totalTTC,
+          statut: full?.statut ?? "brouillon",
+          message: `Devis ${numero} créé en brouillon (${parseFloat(totalTTC || "0").toFixed(2)} € TTC)`,
+        },
+      };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de la création du devis") };
+    }
+  };
+}
+
+// Construit les handlers d'écriture câblés (par lots, risque croissant). Un outil n'est inclus que si
+// ses readers/writers sont fournis. Phase 2a : creer_client + creer_intervention. Phase 2b : creer_devis.
 export function buildAssistantWriteHandlers(deps: AssistantWriteDeps): Record<string, ToolHandler> {
   const handlers: Record<string, ToolHandler> = {};
   if (deps.clients) handlers.creer_client = makeCreerClient(deps.clients);
   if (deps.clientsById && deps.interventions) handlers.creer_intervention = makeCreerIntervention(deps.clientsById, deps.interventions);
+  if (deps.devis) handlers.creer_devis = makeCreerDevis(deps.devis);
   return handlers;
 }
