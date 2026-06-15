@@ -14,6 +14,9 @@ import {
   type FactureLigneInput,
   type DevisSenderForAgent,
   type FactureSenderForAgent,
+  type CommandeWriterForAgent,
+  type CommandeLigneInput,
+  type CommandeSenderForAgent,
 } from "./write-tool-handlers";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -237,6 +240,66 @@ describe("write-tool-handlers — envoyer_devis / envoyer_facture", () => {
     const h = buildAssistantWriteHandlers({ factureSender: sender });
     const res = await h.envoyer_facture({ factureId: 9 }, ctx);
     expect(res).toEqual({ ok: true, data: { message: "Facture FAC-1 envoyé(e) à c@x.fr" } });
+  });
+});
+
+describe("write-tool-handlers — creer_et_envoyer_devis", () => {
+  it("crée puis envoie → message combiné", async () => {
+    const writer = new FakeDevisWriter();
+    const sender: DevisSenderForAgent = { envoyer: async () => ({ success: true, message: "Devis DEV-2026-0001 envoyé à c@x.fr" }) };
+    const h = buildAssistantWriteHandlers({ devis: writer, devisSender: sender });
+    const res = await h.creer_et_envoyer_devis({ clientId: 3, objet: "Réfection", lignes: [{ designation: "MO", quantite: 1, prixUnitaireHT: 100 }] }, ctx);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect((res.data as { message: string }).message).toContain("créé et envoyé");
+  });
+
+  it("création OK mais envoi KO → ok:false (devis conservé)", async () => {
+    const sender: DevisSenderForAgent = { envoyer: async () => ({ success: false, message: "client sans email" }) };
+    const h = buildAssistantWriteHandlers({ devis: new FakeDevisWriter(), devisSender: sender });
+    const res = await h.creer_et_envoyer_devis({ clientId: 3, objet: "X", lignes: [{ designation: "A", quantite: 1, prixUnitaireHT: 10 }] }, ctx);
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toContain("créé mais email non envoyé");
+  });
+
+  it("params manquants → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ devis: new FakeDevisWriter(), devisSender: { envoyer: async () => ({ success: true, message: "" }) } });
+    expect((await h.creer_et_envoyer_devis({ clientId: 3, objet: "X", lignes: [] }, ctx)).ok).toBe(false);
+  });
+});
+
+class FakeCommandeWriter implements CommandeWriterForAgent {
+  public input?: { fournisseurId: number; notes?: string; lignes: readonly CommandeLigneInput[] };
+  async creer(_c: TenantContext, input: { fournisseurId: number; notes?: string; lignes: readonly CommandeLigneInput[] }) {
+    this.input = input;
+    return { id: 31, numero: "BC-2026-0001", totalTTC: "600.00" };
+  }
+}
+
+describe("write-tool-handlers — commandes fournisseurs", () => {
+  it("creer_commande_fournisseur : sans fournisseur/ligne → ok:false", async () => {
+    const h = buildAssistantWriteHandlers({ commandes: new FakeCommandeWriter() });
+    expect((await h.creer_commande_fournisseur({ lignes: [{ designation: "A", quantite: 1 }] }, ctx)).ok).toBe(false);
+    expect((await h.creer_commande_fournisseur({ fournisseurId: 2, lignes: [] }, ctx)).ok).toBe(false);
+  });
+
+  it("creer_commande_fournisseur : prixUnitaireHT→prixUnitaire, delai→notes, message TTC", async () => {
+    const writer = new FakeCommandeWriter();
+    const h = buildAssistantWriteHandlers({ commandes: writer });
+    const res = await h.creer_commande_fournisseur(
+      { fournisseurId: 2, notes: "Urgent", delaiLivraison: "2 semaines", lignes: [{ designation: "Tube", quantite: 6, prixUnitaireHT: 50 }] },
+      ctx,
+    );
+    expect(res).toMatchObject({ ok: true, data: { commandeId: 31, numero: "BC-2026-0001" } });
+    expect(writer.input?.notes).toBe("Urgent — Délai : 2 semaines");
+    expect(writer.input?.lignes[0]).toEqual({ designation: "Tube", quantite: "6", unite: "u", prixUnitaire: "50", tauxTVA: "20" });
+  });
+
+  it("envoyer_commande_fournisseur : sans id → ok:false ; succès → message", async () => {
+    const sender: CommandeSenderForAgent = { envoyer: async () => ({ success: true, message: "Bon de commande BC-2026-0001 envoyé à f@x.fr" }) };
+    const h = buildAssistantWriteHandlers({ commandeSender: sender });
+    expect((await h.envoyer_commande_fournisseur({}, ctx)).ok).toBe(false);
+    const res = await h.envoyer_commande_fournisseur({ commandeId: 31 }, ctx);
+    expect(res).toEqual({ ok: true, data: { message: "Bon de commande BC-2026-0001 envoyé à f@x.fr" } });
   });
 });
 

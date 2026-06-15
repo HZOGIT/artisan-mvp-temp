@@ -87,6 +87,22 @@ export interface FactureSenderForAgent {
   envoyer(ctx: TenantContext, factureId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
 }
 
+// Commande fournisseur : création (lignes inline, totaux + ownership fournisseur par le use-case
+// migré) + envoi par email (PDF via PdfPort). Legacy `prixUnitaireHT` → `prixUnitaire` migré.
+export interface CommandeLigneInput {
+  readonly designation: string;
+  readonly quantite: string;
+  readonly unite?: string;
+  readonly prixUnitaire?: string;
+  readonly tauxTVA?: string;
+}
+export interface CommandeWriterForAgent {
+  creer(ctx: TenantContext, input: { fournisseurId: number; notes?: string; lignes: readonly CommandeLigneInput[] }): Promise<{ id: number; numero: string; totalTTC: string }>;
+}
+export interface CommandeSenderForAgent {
+  envoyer(ctx: TenantContext, commandeId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
+}
+
 export interface AssistantWriteDeps {
   readonly clients?: ClientWriterForAgent;
   readonly clientsById?: ClientByIdReaderForAgent;
@@ -95,6 +111,8 @@ export interface AssistantWriteDeps {
   readonly factures?: FactureWriterForAgent;
   readonly devisSender?: DevisSenderForAgent;
   readonly factureSender?: FactureSenderForAgent;
+  readonly commandes?: CommandeWriterForAgent;
+  readonly commandeSender?: CommandeSenderForAgent;
 }
 
 // `creer_client` : crée un client (nom requis ; `type` archivé en notes, parité legacy). `{clientId,nom,message}`.
@@ -177,45 +195,73 @@ function makeCreerIntervention(clientsById: ClientByIdReaderForAgent, interventi
   };
 }
 
-// `creer_devis` : crée un devis brouillon + ses lignes (montants recalculés par le repo), validité
-// `validiteDays` jours (défaut 30). Ownership client assuré par le use-case migré (404 cross-tenant).
+// Orchestration de création d'un devis brouillon + lignes (montants recalculés par le repo), validité
+// `validiteDays` jours (défaut 30). Lève en cas d'erreur use-case (ownership client, etc.). Réutilisée
+// par `creer_devis` et `creer_et_envoyer_devis`. `null` si paramètres manquants.
+async function creerDevisOrchestration(
+  devis: DevisWriterForAgent,
+  ctx: TenantContext,
+  args: Record<string, unknown>,
+): Promise<{ devisId: number; numero: string; totalTTC: string; statut: string } | null> {
+  const clientId = Number(args?.clientId);
+  const objet = typeof args?.objet === "string" ? args.objet : "";
+  const lignes = Array.isArray(args?.lignes) ? (args.lignes as unknown[]) : [];
+  if (!clientId || !objet || lignes.length === 0) return null;
+  const validity = Number.isFinite(Number(args.validiteDays)) && Number(args.validiteDays) > 0 ? Number(args.validiteDays) : 30;
+  const dateValidite = new Date(Date.now() + validity * 86400000);
+  const created = await devis.creer(ctx, { clientId, objet, notes: optStr(args.notes), dateValidite });
+  for (const raw of lignes) {
+    const l = (raw ?? {}) as Record<string, unknown>;
+    await devis.ajouterLigne(ctx, created.id, {
+      designation: String(l.designation ?? ""),
+      quantite: String(Number(l.quantite) || 0),
+      unite: optStr(l.unite) ?? "u",
+      prixUnitaireHT: String(Number(l.prixUnitaireHT) || 0),
+      tauxTVA: String(Number(l.tauxTVA ?? 20)),
+    });
+  }
+  const full = await devis.getById(ctx, created.id);
+  return { devisId: created.id, numero: full?.numero ?? "", totalTTC: full?.totalTTC ?? "0", statut: full?.statut ?? "brouillon" };
+}
+
+const PARAMS_DEVIS_MANQUANTS = "Paramètres manquants : clientId, objet et au moins une ligne sont requis";
+
+// `creer_devis` : crée un devis brouillon + ses lignes. Ownership client via le use-case migré.
 function makeCreerDevis(devis: DevisWriterForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
-    const clientId = Number(args?.clientId);
-    const objet = typeof args?.objet === "string" ? args.objet : "";
-    const lignes = Array.isArray(args?.lignes) ? (args.lignes as unknown[]) : [];
-    if (!clientId || !objet || lignes.length === 0) {
-      return { ok: false, error: "Paramètres manquants : clientId, objet et au moins une ligne sont requis" };
-    }
     try {
-      const validity = Number.isFinite(Number(args.validiteDays)) && Number(args.validiteDays) > 0 ? Number(args.validiteDays) : 30;
-      const dateValidite = new Date(Date.now() + validity * 86400000);
-      const created = await devis.creer(ctx, { clientId, objet, notes: optStr(args.notes), dateValidite });
-      for (const raw of lignes) {
-        const l = (raw ?? {}) as Record<string, unknown>;
-        await devis.ajouterLigne(ctx, created.id, {
-          designation: String(l.designation ?? ""),
-          quantite: String(Number(l.quantite) || 0),
-          unite: optStr(l.unite) ?? "u",
-          prixUnitaireHT: String(Number(l.prixUnitaireHT) || 0),
-          tauxTVA: String(Number(l.tauxTVA ?? 20)),
-        });
-      }
-      const full = await devis.getById(ctx, created.id);
-      const numero = full?.numero ?? "";
-      const totalTTC = full?.totalTTC ?? "0";
+      const d = await creerDevisOrchestration(devis, ctx, args);
+      if (!d) return { ok: false, error: PARAMS_DEVIS_MANQUANTS };
       return {
         ok: true,
-        data: {
-          devisId: created.id,
-          numero,
-          totalTTC,
-          statut: full?.statut ?? "brouillon",
-          message: `Devis ${numero} créé en brouillon (${parseFloat(totalTTC || "0").toFixed(2)} € TTC)`,
-        },
+        data: { devisId: d.devisId, numero: d.numero, totalTTC: d.totalTTC, statut: d.statut, message: `Devis ${d.numero} créé en brouillon (${parseFloat(d.totalTTC || "0").toFixed(2)} € TTC)` },
       };
     } catch (e) {
       return { ok: false, error: errMsg(e, "Erreur lors de la création du devis") };
+    }
+  };
+}
+
+// `creer_et_envoyer_devis` : crée le devis puis l'envoie (email `messageEmail`). Si l'envoi échoue,
+// le devis reste créé (message explicite, parité legacy).
+function makeCreerEtEnvoyerDevis(devis: DevisWriterForAgent, sender: DevisSenderForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    try {
+      const d = await creerDevisOrchestration(devis, ctx, args);
+      if (!d) return { ok: false, error: PARAMS_DEVIS_MANQUANTS };
+      const sent = await sender.envoyer(ctx, d.devisId, optStr(args.messageEmail));
+      if (!sent.success) return { ok: false, error: `Devis ${d.numero} créé mais email non envoyé : ${sent.message}` };
+      return {
+        ok: true,
+        data: {
+          devisId: d.devisId,
+          numero: d.numero,
+          totalTTC: d.totalTTC,
+          message: `Devis ${d.numero} (${parseFloat(d.totalTTC || "0").toFixed(2)} €) créé et envoyé. ${sent.message}`,
+        },
+      };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de la création/envoi du devis") };
     }
   };
 }
@@ -296,16 +342,72 @@ function makeEnvoyerFacture(sender: FactureSenderForAgent): ToolHandler {
   };
 }
 
+// `creer_commande_fournisseur` : crée un BC brouillon + lignes (totaux + ownership fournisseur par le
+// use-case migré). `delaiLivraison` (texte libre, sans champ migré dédié) est replié dans les notes.
+function makeCreerCommande(commandes: CommandeWriterForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    const fournisseurId = Number(args?.fournisseurId);
+    const lignes = Array.isArray(args?.lignes) ? (args.lignes as unknown[]) : [];
+    if (!fournisseurId || lignes.length === 0) return { ok: false, error: "fournisseurId et au moins une ligne sont requis" };
+    try {
+      const delai = optStr(args.delaiLivraison);
+      const baseNotes = optStr(args.notes);
+      const notes = [baseNotes, delai ? `Délai : ${delai}` : undefined].filter(Boolean).join(" — ") || undefined;
+      const commande = await commandes.creer(ctx, {
+        fournisseurId,
+        notes,
+        lignes: lignes.map((raw) => {
+          const l = (raw ?? {}) as Record<string, unknown>;
+          return {
+            designation: String(l.designation ?? ""),
+            quantite: String(Number(l.quantite) || 0),
+            unite: optStr(l.unite) ?? "u",
+            prixUnitaire: String(Number(l.prixUnitaireHT) || 0),
+            tauxTVA: String(Number(l.tauxTVA ?? 20)),
+          };
+        }),
+      });
+      return {
+        ok: true,
+        data: {
+          commandeId: commande.id,
+          numero: commande.numero,
+          totalTTC: commande.totalTTC,
+          message: `Bon de commande ${commande.numero} créé en brouillon (${parseFloat(commande.totalTTC || "0").toFixed(2)} € TTC)`,
+        },
+      };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de la création de la commande") };
+    }
+  };
+}
+
+// `envoyer_commande_fournisseur` : envoi par email (PDF joint) via le use-case migré.
+function makeEnvoyerCommande(sender: CommandeSenderForAgent): ToolHandler {
+  return async (args, ctx: TenantContext) => {
+    if (!args?.commandeId) return { ok: false, error: "commandeId est requis" };
+    try {
+      const result = await sender.envoyer(ctx, Number(args.commandeId), optStr(args.messagePersonnalise));
+      return result.success ? { ok: true, data: { message: result.message } } : { ok: false, error: result.message };
+    } catch (e) {
+      return { ok: false, error: errMsg(e, "Erreur lors de l'envoi de la commande") };
+    }
+  };
+}
+
 // Construit les handlers d'écriture câblés (par lots, risque croissant). Un outil n'est inclus que si
 // ses readers/writers sont fournis. 2a : creer_client/intervention ; 2b : creer_devis ; 2c : creer_facture ;
-// 2d : envoyer_devis/envoyer_facture.
+// 2d : envoyer_devis/envoyer_facture ; 2e : creer_et_envoyer_devis + commandes fournisseurs.
 export function buildAssistantWriteHandlers(deps: AssistantWriteDeps): Record<string, ToolHandler> {
   const handlers: Record<string, ToolHandler> = {};
   if (deps.clients) handlers.creer_client = makeCreerClient(deps.clients);
   if (deps.clientsById && deps.interventions) handlers.creer_intervention = makeCreerIntervention(deps.clientsById, deps.interventions);
   if (deps.devis) handlers.creer_devis = makeCreerDevis(deps.devis);
+  if (deps.devis && deps.devisSender) handlers.creer_et_envoyer_devis = makeCreerEtEnvoyerDevis(deps.devis, deps.devisSender);
   if (deps.factures) handlers.creer_facture = makeCreerFacture(deps.factures);
   if (deps.devisSender) handlers.envoyer_devis = makeEnvoyerDevis(deps.devisSender);
   if (deps.factureSender) handlers.envoyer_facture = makeEnvoyerFacture(deps.factureSender);
+  if (deps.commandes) handlers.creer_commande_fournisseur = makeCreerCommande(deps.commandes);
+  if (deps.commandeSender) handlers.envoyer_commande_fournisseur = makeEnvoyerCommande(deps.commandeSender);
   return handlers;
 }
