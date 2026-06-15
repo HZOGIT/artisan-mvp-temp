@@ -7,30 +7,9 @@
 name: artisan-staging
 
 services:
-  mysql:
-    image: mysql:8.0
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-stagingroot}
-      MYSQL_DATABASE: artisan_mvp
-      MYSQL_USER: ${MYSQL_USER:-artisan_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-artisan_password}
-    ports:
-      # Exposed on a DIFFERENT host port than dev (3306) for debugging.
-      - "3307:3306"
-    volumes:
-      - mysql_staging_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-stagingroot}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  # OPE-184 (P0.8a) — Postgres cible de la migration MySQL→PG. Provisionné AVANT
-  # le cutover : l'app reste sur mysql (DATABASE_URL ci-dessous) tant que la parité
-  # data n'est pas confirmée. Cutover = (1) ETL `scripts/pg-data-copy.mjs`, (2) flip
-  # DATABASE_URL→postgres:// + DB_DIALECT=postgresql + depends_on postgres, (3) down mysql.
+  # Postgres — base de données unique du stack (Drizzle pg + RLS). MySQL (legacy) et le
+  # service `app` (backend Express legacy) ont été retirés : la migration est complète, le
+  # trafic est 100 % new-stack (dispatcher mono-stack, `functions/_lib/dispatch.mjs`).
   postgres:
     image: postgres:18
     restart: unless-stopped
@@ -50,40 +29,10 @@ services:
       retries: 10
       start_period: 20s
 
-  app:
-    image: node:22-slim
-    working_dir: /app
-    restart: unless-stopped
-    volumes:
-      - .:/app
-      - app_staging_node_modules:/app/node_modules
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      # OPE-184 — CUTOVER : l'app staging tourne désormais sur PostgreSQL.
-      # (Ancien : mysql://…@mysql:3306. mysql conservé arrêté en filet de rollback.)
-      DB_DIALECT: postgresql
-      DATABASE_URL: postgres://${POSTGRES_USER:-artisan_user}:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp
-    env_file:
-      - .env.staging
-    # Staging : le FRONT est servi par Cloudflare Pages, donc on NE build PAS le
-    # client (vite) ici — uniquement le serveur (build:server = esbuild, ~5s au
-    # lieu de ~1min). install → build serveur → migrate (drizzle/pg) → run.
-    # `fix-duplicates` (npm start) est no-op en mode postgresql (P0.5f).
-    command: >
-      sh -c "npm install -g pnpm@10.4.1 --silent &&
-             pnpm install --frozen-lockfile &&
-             pnpm build:server &&
-             pnpm exec drizzle-kit migrate &&
-             pnpm start"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # Nouveau stack clean-archi (Fastify + tRPC 11 + Drizzle pg), déployé À CÔTÉ du legacy.
-  # Tourne sous le rôle non-superuser app_tenant (soumis RLS). Tous les flags de bascule sont OFF
-  # par défaut → le legacy reste la route publique tant que le tunnel pointe sur `app`. Exposé sur le
-  # port hôte 3010 pour smoke-test ; la bascule du trafic (tunnel/edge) est une étape séparée.
+  # Stack clean-archi (Fastify + tRPC 11 + Drizzle pg) — désormais le SEUL backend.
+  # Tourne sous le rôle non-superuser app_tenant (soumis RLS). Le tunnel `cloudflared`
+  # le sert directement (le dispatcher edge route tout `/api/*` vers le new-stack).
+  # Exposé sur le port hôte 3010 pour smoke-test.
   new-stack:
     image: operioz-newstack:latest
     build:
@@ -109,14 +58,14 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    # The artisan-staging tunnel routes staging.operioz.com -> http://app:3000
-    # (configured in Terraform, cloudflare-managed). cloudflared reaches the app
-    # by its compose service name over the shared network — no host ports.
+    # The artisan-staging tunnel routes the new-stack backend hostname -> http://new-stack:3001
+    # (configured in Terraform, cloudflare-managed). cloudflared reaches the service by its
+    # compose name over the shared network — no host ports. L'ancien ingress vers `app:3000`
+    # (backend legacy) est mort (le dispatcher edge ne cible plus que le new-stack) ; son
+    # nettoyage Terraform est traité séparément.
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN_STAGING}
     depends_on:
-      - app
+      - new-stack
 
 volumes:
-  mysql_staging_data:
   postgres_staging_data:
-  app_staging_node_modules:
