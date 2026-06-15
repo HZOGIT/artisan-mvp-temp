@@ -142,6 +142,7 @@ import { registerPortailDevisPdfRoute } from "./interface/http/portail-devis-pdf
 import { registerPortailFacturePdfRoute } from "./interface/http/portail-facture-pdf-route";
 import { registerFacturxRoutes } from "./interface/http/facturx-route";
 import { registerExportLotRoutes } from "./interface/http/export-lot-route";
+import { registerFontsRoute } from "./interface/http/fonts-route";
 import { getParametres } from "./modules/parametres/application/read-use-cases";
 import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
@@ -874,6 +875,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
     pdf: new JsPdfAdapter(),
   });
+
+  // §4 HORS-tRPC : polices Roboto (regular/bold) servies en statique pour les PDF générés côté client
+  // (`/api/fonts/:name`, PUBLIC, cache immutable). MONTÉE mais PAS routée tant qu'absente de MIGRATED_ROUTES.
+  registerFontsRoute(app);
 
   // §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie).
   registerVoiceRoute(app, {

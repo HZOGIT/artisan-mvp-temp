@@ -73,6 +73,8 @@ export const MIGRATED_ROUTES = [
   { name: "export-facturx-lot", pattern: /^\/api\/comptabilite\/export-facturx-lot$/ },
   // Export en lot des PDF facture d'une période (`/api/comptabilite/export-pdf-lot`, ZIP, auth cookie).
   { name: "export-pdf-lot", pattern: /^\/api\/comptabilite\/export-pdf-lot$/ },
+  // Polices Roboto pour les PDF générés côté client (`/api/fonts/:name`, PUBLIC, statique, cache immutable).
+  { name: "fonts", pattern: /^\/api\/fonts\/[^/]+$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?

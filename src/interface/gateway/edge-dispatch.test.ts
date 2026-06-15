@@ -66,7 +66,6 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     const env = { NEW_STACK_DOMAINS: NON_DEFAULT };
     expect(decideTarget("/api/auth/login", env)).toBe("legacy");
     expect(decideTarget("/api/webhooks/stripe", env)).toBe("legacy");
-    expect(decideTarget("/api/fonts/roboto", env)).toBe("legacy"); // route HORS-tRPC non migrée
     expect(decideTarget("/", env)).toBe("legacy");
   });
 
@@ -113,6 +112,10 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     // exports en LOT (ZIP par période, auth cookie) → new-stack ; pas de collision avec facturx/:id
     expect(decideTarget("/api/comptabilite/export-facturx-lot", {})).toBe("new-stack");
     expect(decideTarget("/api/comptabilite/export-pdf-lot", {})).toBe("new-stack");
+    // polices Roboto (PUBLIC, statique) → new-stack ; nom vide → legacy
+    expect(decideTarget("/api/fonts/roboto-regular.ttf", {})).toBe("new-stack");
+    expect(decideTarget("/api/fonts/roboto-bold.ttf", {})).toBe("new-stack");
+    expect(matchesMigratedRoute("/api/fonts/")).toBe(false);
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe
