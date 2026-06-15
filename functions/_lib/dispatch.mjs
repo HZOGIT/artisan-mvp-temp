@@ -116,15 +116,16 @@ export function enabledDomains(env) {
   return new Set([...DEFAULT_ENABLED, ...fromEnv]);
 }
 
-// Cible de dispatch : "new-stack" SEULEMENT si le chemin cible au moins un domaine ET que TOUS les
-// domaines (batch inclus) sont migrés ET activés. Sinon "legacy" (défaut sûr, sert tout) → un batch
-// mêlant un domaine activé et un domaine legacy part en legacy (jamais de procédure manquante).
+// Cible de dispatch — C4b : DISPATCHER PLEINEMENT MONO-STACK. La migration est complète (les 9 blockers
+// + toutes les routes HORS-tRPC du client sont portés ; DEFAULT_ENABLED == MIGRATED). La Pages Function
+// `functions/api/[[path]].js` ne capte QUE `/api/*` (le SPA `/` + `/assets` est servi en statique par
+// Pages, hors dispatcher) → tout `/api/*` est désormais routé vers le NEW-STACK. Un chemin inconnu y est
+// 404 proprement (comme l'était le legacy). Le legacy n'est plus JAMAIS la cible : il peut être éteint (C5).
+// NB : `pathname`/`env` conservés pour la signature stable (et un éventuel rollback ciblé par env).
 export function decideTarget(pathname, env) {
-  // Routes HORS-tRPC migrées (ex. flux iCal public) → new-stack, indépendamment des domaines tRPC.
-  if (matchesMigratedRoute(pathname)) return "new-stack";
-  const domains = domainsFromTrpcPath(pathname);
-  if (domains.length === 0) return "legacy";
-  const enabled = enabledDomains(env);
-  const allOnNewStack = domains.every((d) => MIGRATED_SET.has(d) && enabled.has(d));
-  return allOnNewStack ? "new-stack" : "legacy";
+  // Garde-fou anti-régression : on garde la résolution des domaines/routes pour la parité des registres
+  // (tests anti-drift edge↔src) ; la décision, elle, est désormais inconditionnellement « new-stack ».
+  void pathname;
+  void env;
+  return "new-stack";
 }
