@@ -62,9 +62,10 @@ export const toolMessage = (results: readonly AgenticToolResultPart[]): AgenticM
   content: { kind: "tool-results", results } satisfies SeededMessageContent,
 });
 
-// Réponse d'outil renvoyée au modèle (succès → data ; échec → {error}).
+// Réponse d'outil renvoyée au modèle : l'enveloppe `ToolResult` complète (`{ok,data}` / `{ok,error}`),
+// à parité legacy (`functionResponse.response = result`).
 function toResultPart(call: AgenticFunctionCall, res: { ok: true; data: unknown } | { ok: false; error: string }): AgenticToolResultPart {
-  return { id: call.id, name: call.name, response: res.ok ? res.data : { error: res.error } };
+  return { id: call.id, name: call.name, response: res };
 }
 
 export async function* runAssistantAgent(
