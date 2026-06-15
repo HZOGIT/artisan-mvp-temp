@@ -55,6 +55,7 @@ import type { AlertesPrevisionsModule } from "../../modules/alertes-previsions/a
 import type { ImportErpModule } from "../../modules/import-erp/import-erp.module";
 import type { InterventionsMobileModule } from "../../modules/interventions-mobile/interventions-mobile.module";
 import type { VitrineModule } from "../../modules/vitrine/vitrine.module";
+import type { ClientPortalModule } from "../../modules/client-portal/client-portal.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -113,6 +114,7 @@ export interface AppRouterDeps {
   readonly importErp: ImportErpModule;
   readonly interventionsMobile: InterventionsMobileModule;
   readonly vitrine: VitrineModule;
+  readonly clientPortal: ClientPortalModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -181,6 +183,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     importErp: deps.importErp.router,
     interventionsMobile: deps.interventionsMobile.router,
     vitrine: deps.vitrine.router,
+    clientPortal: deps.clientPortal.router,
   });
 }
 

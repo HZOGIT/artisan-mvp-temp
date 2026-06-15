@@ -19,7 +19,7 @@ describe("targetForUrl (décision du front-door, pure)", () => {
   });
 
   it("domaine NON migré → legacy même si activé (sûreté)", () => {
-    expect(targetForUrl("/api/trpc/clientPortal.list", { NEW_STACK_DOMAINS: "clientPortal" } as NodeJS.ProcessEnv)).toBe("legacy");
+    expect(targetForUrl("/api/trpc/integrationsComptables.list", { NEW_STACK_DOMAINS: "integrationsComptables" } as NodeJS.ProcessEnv)).toBe("legacy");
   });
 
   it("activer un domaine ne détourne pas un autre (pas de fuite)", () => {

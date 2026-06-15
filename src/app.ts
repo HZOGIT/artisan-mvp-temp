@@ -126,6 +126,10 @@ import { createInterventionsMobileModule } from "./modules/interventions-mobile/
 import { InterventionMobileRepositoryDrizzle } from "./modules/interventions-mobile/infra/intervention-mobile-repository-drizzle";
 import { createVitrineModule } from "./modules/vitrine/vitrine.module";
 import { VitrinePublicReaderDrizzle } from "./modules/vitrine/infra/vitrine-public-reader-drizzle";
+import { createClientPortalModule } from "./modules/client-portal/client-portal.module";
+import { PortalAccessRepositoryDrizzle } from "./modules/client-portal/infra/portal-access-repository-drizzle";
+import { PortalDocsReaderDrizzle } from "./modules/client-portal/infra/portal-docs-reader-drizzle";
+import { PortalSchedulingReaderDrizzle } from "./modules/client-portal/infra/portal-scheduling-reader-drizzle";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
@@ -659,8 +663,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // Chat support artisan↔client (request/response). Notifier email best-effort (rate-limit anti-spam
   // 20/15 min, parité legacy checkDocumentEmailRate) + lien portail si accès actif.
   const chatDb = getDbHandle().db;
+  const chatRepo = new ChatRepositoryDrizzle(chatDb);
   const chat = createChatModule({
-    repo: new ChatRepositoryDrizzle(chatDb),
+    repo: chatRepo,
     notifier: new ChatClientNotifierDrizzle(
       chatDb,
       deps.emailPort ?? new LegacyEmailAdapter(),
@@ -700,7 +705,25 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     leads: demandeContactRepo,
     clients: clientRepo,
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine });
+  // Module `clientPortal` (espace client). Admin par cookie artisan + public par TOKEN (capacité, sans
+  // cookie). Compose : accès portail (RLS public-token) + readers docs/planning dédiés + repo chat migré
+  // + clients/notifications migrés + EmailPort + LlmPort (soumettreDemandeIA) + ArtisanReader.
+  const portalAccessRepo = new PortalAccessRepositoryDrizzle(getDbHandle().db);
+  const clientPortal = createClientPortalModule({
+    defaultOrigin: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    access: portalAccessRepo,
+    docs: new PortalDocsReaderDrizzle(getDbHandle().db),
+    scheduling: new PortalSchedulingReaderDrizzle(getDbHandle().db),
+    chat: chatRepo,
+    clients: clientRepo,
+    notifications: notificationRepo,
+    artisanReader: portalAccessRepo,
+    artisanInfoReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
+    llm: deps.llm ?? new GeminiLlmAdapter(),
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",
