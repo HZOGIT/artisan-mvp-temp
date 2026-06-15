@@ -1,9 +1,9 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { notesDeFrais, notesFraisDepenses, depenses } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
-import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch } from "../application/note-de-frais-repository";
+import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch, DepenseLieeStatut } from "../application/note-de-frais-repository";
 import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
 import { computeNextNoteFraisNumero } from "../application/numero";
 
@@ -62,6 +62,27 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
         .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
         .where(and(eq(notesFraisDepenses.note_id, noteId), eq(depenses.artisan_id, ctx.artisanId), eq(depenses.remboursable, true)));
       await tx.update(notesDeFrais).set({ montant_total: String(Number(agg?.total || 0)) }).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId)));
+    });
+  }
+
+  appliquerStatutDepensesLiees(
+    ctx: TenantContext,
+    noteId: number,
+    patch: { statut: DepenseLieeStatut; rembourse?: boolean; dateRemboursement?: string },
+  ): Promise<void> {
+    return withTenant(this.db, ctx, async (tx) => {
+      // 1) la note doit appartenir au tenant (anti-IDOR ; skip silencieux sinon).
+      const [note] = await tx.select({ id: notesDeFrais.id }).from(notesDeFrais).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId))).limit(1);
+      if (!note) return;
+      // 2) propage aux dépenses REMBOURSABLES du tenant liées à la note (sous-requête sur le lien).
+      const set: Partial<typeof depenses.$inferInsert> = { statut: patch.statut };
+      if (patch.rembourse !== undefined) set.rembourse = patch.rembourse;
+      if (patch.dateRemboursement !== undefined) set.date_remboursement = patch.dateRemboursement;
+      const liees = tx.select({ id: notesFraisDepenses.depense_id }).from(notesFraisDepenses).where(eq(notesFraisDepenses.note_id, noteId));
+      await tx
+        .update(depenses)
+        .set(set)
+        .where(and(eq(depenses.artisan_id, ctx.artisanId), eq(depenses.remboursable, true), inArray(depenses.id, liees)));
     });
   }
 

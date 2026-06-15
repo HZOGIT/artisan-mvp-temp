@@ -59,11 +59,12 @@ export async function supprimerNoteDeFrais(
   if (!ok) throw new NotFoundError("Note de frais introuvable");
 }
 
-// --- Workflow (transitions de statut). ⚠️ Anti self-approbation sur approuver/rejeter. La
-// cascade legacy sur les `depenses` liées (`notes_frais_depenses` : propager soumise/approuvee/
-// rejetee/remboursee + rembourse/dateRemboursement au paiement) n'est PAS encore câblée ici. Le
-// blocage initial (domaine `depenses` non migré) est levé — `depenses` est désormais migré, donc
-// ce port redevient possible ; il reste à implémenter (suivi en finding dédié). ---
+// --- Workflow (transitions de statut). ⚠️ Anti self-approbation sur approuver/rejeter. CASCADE :
+// chaque transition propage le statut aux `depenses` REMBOURSABLES liées (`notes_frais_depenses`)
+// via `repo.appliquerStatutDepensesLiees` (parité legacy) — soumise/approuvee/rejetee, et au
+// PAIEMENT `remboursee` + `rembourse=TRUE` + `dateRemboursement`. Appliquée APRÈS la mise à jour
+// de la note (si elle échoue, pas de cascade). ⚠️ Sensible compta : les dépenses `remboursee`
+// entrent dans les charges/TVA → propagation scopée tenant + filtre `remboursable`. ---
 
 const aujourdhui = (): string => new Date().toISOString().slice(0, 10);
 
@@ -87,6 +88,7 @@ export async function soumettreNoteDeFrais(repo: INoteDeFraisRepository, ctx: Te
   if (note.statut !== "brouillon") throw new ConflictError("Cette note ne peut plus être soumise");
   const updated = await repo.setWorkflow(ctx, id, { statut: "soumise", dateSoumission: aujourdhui() });
   if (!updated) throw new NotFoundError("Note de frais introuvable");
+  await repo.appliquerStatutDepensesLiees(ctx, id, { statut: "soumise" });
   return updated;
 }
 
@@ -106,6 +108,7 @@ export async function approuverNoteDeFrais(
     commentaireApprobateur: commentaire ?? null,
   });
   if (!updated) throw new NotFoundError("Note de frais introuvable");
+  await repo.appliquerStatutDepensesLiees(ctx, id, { statut: "approuvee" });
   return updated;
 }
 
@@ -121,6 +124,7 @@ export async function rejeterNoteDeFrais(
   assertPasSelfApprobation(ctx, note);
   const updated = await repo.setWorkflow(ctx, id, { statut: "rejetee", commentaireApprobateur: commentaire });
   if (!updated) throw new NotFoundError("Note de frais introuvable");
+  await repo.appliquerStatutDepensesLiees(ctx, id, { statut: "rejetee" });
   return updated;
 }
 
@@ -128,8 +132,10 @@ export async function payerNoteDeFrais(repo: INoteDeFraisRepository, ctx: Tenant
   const note = await chargerNote(repo, ctx, id);
   if (note.statut === "payee") return note; // idempotent
   if (note.statut !== "approuvee") throw new ConflictError("Seule une note approuvée peut être payée");
-  const updated = await repo.setWorkflow(ctx, id, { statut: "payee", datePaiement: aujourdhui() });
+  const jour = aujourdhui();
+  const updated = await repo.setWorkflow(ctx, id, { statut: "payee", datePaiement: jour });
   if (!updated) throw new NotFoundError("Note de frais introuvable");
+  await repo.appliquerStatutDepensesLiees(ctx, id, { statut: "remboursee", rembourse: true, dateRemboursement: jour });
   return updated;
 }
 

@@ -86,3 +86,57 @@ describe("notes-de-frais — workflow (anti self-approbation + transitions)", ()
     await expect(payerNoteDeFrais(repo, B, n.id)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
+
+describe("notes-de-frais — CASCADE statut workflow → dépenses liées", () => {
+  // Note du tenant A avec une dépense remboursable (101) liée.
+  async function noteAvecDepense(repo: FakeNoteDeFraisRepository, depenseId = 101) {
+    const n = await repo.create(DEMANDEUR, { userId: 50, numero: "NDF-C", titre: "Frais", periodeDebut: "2026-06-01", periodeFin: "2026-06-30" });
+    repo.registerDepense(DEMANDEUR.artisanId, depenseId, { remboursable: true, montantTtc: "120.00", statut: "brouillon" });
+    await repo.addDepenseLink(DEMANDEUR, n.id, depenseId);
+    return n;
+  }
+
+  it("soumettre → dépenses liées passent `soumise`", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n = await noteAvecDepense(repo);
+    await soumettreNoteDeFrais(repo, DEMANDEUR, n.id);
+    expect(repo.depenseEtat(1, 101)?.statut).toBe("soumise");
+  });
+
+  it("approuver → `approuvee` ; rejeter → `rejetee`", async () => {
+    const repoA = new FakeNoteDeFraisRepository();
+    const nA = await noteAvecDepense(repoA);
+    await soumettreNoteDeFrais(repoA, DEMANDEUR, nA.id);
+    await approuverNoteDeFrais(repoA, APPROBATEUR, nA.id, "OK");
+    expect(repoA.depenseEtat(1, 101)?.statut).toBe("approuvee");
+
+    const repoR = new FakeNoteDeFraisRepository();
+    const nR = await noteAvecDepense(repoR);
+    await soumettreNoteDeFrais(repoR, DEMANDEUR, nR.id);
+    await rejeterNoteDeFrais(repoR, APPROBATEUR, nR.id, "Non");
+    expect(repoR.depenseEtat(1, 101)?.statut).toBe("rejetee");
+  });
+
+  it("payer → dépenses `remboursee` + `rembourse=TRUE` + `dateRemboursement`", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n = await noteAvecDepense(repo);
+    await soumettreNoteDeFrais(repo, DEMANDEUR, n.id);
+    await approuverNoteDeFrais(repo, APPROBATEUR, n.id);
+    await payerNoteDeFrais(repo, DEMANDEUR, n.id);
+    const etat = repo.depenseEtat(1, 101);
+    expect(etat?.statut).toBe("remboursee");
+    expect(etat?.rembourse).toBe(true);
+    expect(etat?.dateRemboursement).not.toBeNull();
+  });
+
+  it("isolation : payer une note du tenant A ne touche PAS une dépense (même id) du tenant B", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n = await noteAvecDepense(repo); // A: dépense 101 liée
+    repo.registerDepense(B.artisanId, 101, { remboursable: true, montantTtc: "50.00", statut: "brouillon" }); // B: dépense 101, NON liée
+    await soumettreNoteDeFrais(repo, DEMANDEUR, n.id);
+    await approuverNoteDeFrais(repo, APPROBATEUR, n.id);
+    await payerNoteDeFrais(repo, DEMANDEUR, n.id);
+    expect(repo.depenseEtat(1, 101)?.statut).toBe("remboursee"); // A touché
+    expect(repo.depenseEtat(2, 101)?.statut).toBe("brouillon"); // B intact
+  });
+});

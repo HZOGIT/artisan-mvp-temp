@@ -109,4 +109,32 @@ describe.skipIf(!URL)("NoteDeFraisRepositoryDrizzle (PG, RLS + scope tenant)", (
     await repo.removeDepenseLink(ctx(A), note.id, dRemb);
     expect((await repo.getById(ctx(A), note.id))?.montantTotal).toBe("0.00");
   });
+
+  it("appliquerStatutDepensesLiees : cascade `remboursee`+rembourse+date aux dépenses liées, scopée tenant", async () => {
+    const insDep = async (artisan: number, user: number, num: string) =>
+      (await admin.query(
+        "insert into depenses (artisan_id,user_id,numero,date_depense,categorie,montant_ttc,remboursable,statut) values ($1,$2,$3,now(),'divers','120.00',true,'brouillon') returning id",
+        [artisan, user, num],
+      )).rows[0].id as number;
+
+    const note = await repo.create(ctx(A), { userId: UA, numero: numero(), titre: "Cascade", periodeDebut: "2026-06-01", periodeFin: "2026-06-30" });
+    const dLiee = await insDep(A, UA, `DEP-CAS-${++seq}`);
+    const dNonLiee = await insDep(A, UA, `DEP-CAS-${++seq}`);
+    const dTenantB = await insDep(B, UB, `DEP-CAS-${++seq}`);
+    await repo.addDepenseLink(ctx(A), note.id, dLiee);
+
+    await repo.appliquerStatutDepensesLiees(ctx(A), note.id, { statut: "remboursee", rembourse: true, dateRemboursement: "2026-06-15" });
+
+    const liee = (await admin.query("select statut, rembourse, date_remboursement from depenses where id=$1", [dLiee])).rows[0];
+    expect(liee.statut).toBe("remboursee");
+    expect(liee.rembourse).toBe(true);
+    expect(liee.date_remboursement).not.toBeNull();
+    // dépense NON liée (même tenant) + dépense d'un AUTRE tenant : intactes.
+    expect((await admin.query("select statut from depenses where id=$1", [dNonLiee])).rows[0].statut).toBe("brouillon");
+    expect((await admin.query("select statut from depenses where id=$1", [dTenantB])).rows[0].statut).toBe("brouillon");
+
+    // anti-IDOR : un autre tenant ne peut pas déclencher la cascade sur la note de A → no-op.
+    await repo.appliquerStatutDepensesLiees(ctx(B), note.id, { statut: "rejetee" });
+    expect((await admin.query("select statut from depenses where id=$1", [dLiee])).rows[0].statut).toBe("remboursee"); // inchangé
+  });
 });

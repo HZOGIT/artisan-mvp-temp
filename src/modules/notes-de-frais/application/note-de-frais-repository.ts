@@ -44,4 +44,19 @@ export interface INoteDeFraisRepository {
   addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;
   // Retire le lien (note du tenant requise ; skip silencieux sinon) puis recalcule `montant_total`.
   removeDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;
+
+  // Propage un statut aux dépenses REMBOURSABLES liées à la note (via `notes_frais_depenses`),
+  // scopé tenant (note du tenant requise → skip silencieux sinon ; RLS sur `depenses.artisan_id`).
+  // Au remboursement, marque aussi `rembourse` + `date_remboursement`. Primitive « dumb » : la
+  // décision métier (quel statut à quelle transition) est portée par les use-cases du workflow.
+  // Parité legacy `payerNoteFrais` (cascade `depenses.statut`/`rembourse`/`date_remboursement`).
+  appliquerStatutDepensesLiees(
+    ctx: TenantContext,
+    noteId: number,
+    patch: { statut: DepenseLieeStatut; rembourse?: boolean; dateRemboursement?: string },
+  ): Promise<void>;
 }
+
+// Statuts propageables aux dépenses liées (sous-ensemble de DepenseStatut atteignable par le
+// workflow note de frais). Défini ici pour garder le port découplé du domaine `depenses`.
+export type DepenseLieeStatut = "soumise" | "approuvee" | "rejetee" | "remboursee";

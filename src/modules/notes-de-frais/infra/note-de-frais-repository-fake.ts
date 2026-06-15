@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch } from "../application/note-de-frais-repository";
+import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch, DepenseLieeStatut } from "../application/note-de-frais-repository";
 import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
 import { computeNextNoteFraisNumero } from "../application/numero";
 
@@ -9,14 +9,20 @@ import { computeNextNoteFraisNumero } from "../application/numero";
 export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
   private store: NoteDeFrais[] = [];
   private seq = 0;
-  // Dépenses connues (pour les liens) : clé `${artisanId}:${depenseId}` → {remboursable, montantTtc}.
-  private depenses = new Map<string, { remboursable: boolean; montantTtc: string }>();
+  // Dépenses connues (pour les liens) : clé `${artisanId}:${depenseId}` → état minimal.
+  private depenses = new Map<string, { remboursable: boolean; montantTtc: string; statut: string; rembourse: boolean; dateRemboursement: string | null }>();
   // Liens note↔dépense : ensemble de `${noteId}:${depenseId}`.
   private links = new Set<string>();
 
-  // Aide de test : déclare une dépense du tenant (pour addDepenseLink).
-  registerDepense(artisanId: number, depenseId: number, opts: { remboursable: boolean; montantTtc: string }): void {
-    this.depenses.set(`${artisanId}:${depenseId}`, opts);
+  // Aide de test : déclare une dépense du tenant (pour addDepenseLink / cascade workflow).
+  registerDepense(artisanId: number, depenseId: number, opts: { remboursable: boolean; montantTtc: string; statut?: string }): void {
+    this.depenses.set(`${artisanId}:${depenseId}`, { remboursable: opts.remboursable, montantTtc: opts.montantTtc, statut: opts.statut ?? "brouillon", rembourse: false, dateRemboursement: null });
+  }
+
+  // Aide de test : état d'une dépense après cascade (statut/rembourse/dateRemboursement).
+  depenseEtat(artisanId: number, depenseId: number): { statut: string; rembourse: boolean; dateRemboursement: string | null } | undefined {
+    const d = this.depenses.get(`${artisanId}:${depenseId}`);
+    return d ? { statut: d.statut, rembourse: d.rembourse, dateRemboursement: d.dateRemboursement } : undefined;
   }
 
   // Ids des dépenses liées à une note (pour les assertions de test).
@@ -49,6 +55,22 @@ export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
     if (!note) return;
     this.links.delete(`${noteId}:${depenseId}`);
     this.recompute(ctx, noteId);
+  }
+
+  async appliquerStatutDepensesLiees(
+    ctx: TenantContext,
+    noteId: number,
+    patch: { statut: DepenseLieeStatut; rembourse?: boolean; dateRemboursement?: string },
+  ): Promise<void> {
+    const note = this.store.find((n) => n.id === noteId && n.artisanId === ctx.artisanId);
+    if (!note) return; // note pas au tenant → skip
+    for (const did of this.linkedDepenseIds(noteId)) {
+      const d = this.depenses.get(`${ctx.artisanId}:${did}`);
+      if (!d || !d.remboursable) continue; // dépense pas au tenant / non remboursable → skip
+      d.statut = patch.statut;
+      if (patch.rembourse !== undefined) d.rembourse = patch.rembourse;
+      if (patch.dateRemboursement !== undefined) d.dateRemboursement = patch.dateRemboursement;
+    }
   }
 
   async nextNumero(ctx: TenantContext): Promise<string> {
