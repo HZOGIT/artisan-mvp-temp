@@ -46,12 +46,14 @@ describe.skipIf(!URL)("devis.router e2e (HTTP → tRPC → use-case → repo →
     await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
     await admin.query('delete from artisans where "userId"=$1', [uid]);
     await admin.query("delete from users where id=$1", [uid]);
+    await admin.query('delete from permissions_utilisateur where "userId"=$1', [uid]);
   };
 
   beforeAll(async () => {
     for (const uid of [UA, UB]) {
       await purge(uid);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
+      for (const __p of ["devis.creer", "factures.creer"]) await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [uid, __p]);
     }
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;

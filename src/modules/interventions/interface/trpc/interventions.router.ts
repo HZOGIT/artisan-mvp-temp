@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
+// Lecture = `interventions.voir`, écriture/affectation = `interventions.gerer` (parité legacy).
+const voir = permissionProcedure("interventions.voir");
+const gerer = permissionProcedure("interventions.gerer");
 import { ValidationError } from "../../../../shared/errors";
 import type { IInterventionRepository } from "../../application/intervention-repository";
 import { listInterventions, getIntervention, listMesInterventions } from "../../application/read-use-cases";
@@ -64,16 +67,16 @@ const updateSchema = z.object({
 // remonter les Domain errors (NotFound→404, Validation→400). Repo injecté (DI).
 export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository) {
   return router({
-    list: protectedProcedure.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
+    list: voir.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
 
     // Vue « mes interventions » : minimisation RGPD (un technicien lié ne voit que les siennes).
-    getMine: protectedProcedure.query(({ ctx }) => listMesInterventions(repo, ctx.tenant)),
+    getMine: voir.query(({ ctx }) => listMesInterventions(repo, ctx.tenant)),
 
-    getById: protectedProcedure
+    getById: voir
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getIntervention(repo, ctx.tenant, input.id)),
 
-    create: protectedProcedure
+    create: gerer
       .input(createSchema)
       .mutation(({ ctx, input }) => {
         const { dateDebut, dateFin, ...rest } = input;
@@ -84,7 +87,7 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
         });
       }),
 
-    update: protectedProcedure
+    update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, dateDebut, dateFin, ...rest } = input;
@@ -95,7 +98,7 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
         });
       }),
 
-    delete: protectedProcedure
+    delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerIntervention(repo, ctx.tenant, input.id);
@@ -103,17 +106,17 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
       }),
 
     // ── Équipe d'intervention (sous-ressource ; anti-IDOR via intervention parente + technicien du tenant) ──
-    getEquipe: protectedProcedure
+    getEquipe: voir
       .input(z.object({ interventionId: z.number().int() }))
       .query(({ ctx, input }) => getEquipeIntervention(repo, ctx.tenant, input.interventionId)),
 
-    getEquipesByArtisan: protectedProcedure.query(({ ctx }) => getEquipesArtisan(repo, ctx.tenant)),
+    getEquipesByArtisan: voir.query(({ ctx }) => getEquipesArtisan(repo, ctx.tenant)),
 
-    ajouterMembreEquipe: protectedProcedure
+    ajouterMembreEquipe: gerer
       .input(z.object({ interventionId: z.number().int(), technicienId: z.number().int(), role: z.string().max(50).nullish() }))
       .mutation(({ ctx, input }) => ajouterMembreEquipe(repo, ctx.tenant, input)),
 
-    retirerMembreEquipe: protectedProcedure
+    retirerMembreEquipe: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await retirerMembreEquipe(repo, ctx.tenant, input.id);
@@ -121,9 +124,9 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
       }),
 
     // ── Couleurs calendrier (préférence d'affichage par artisan, scopée tenant) ───────────────────
-    getCouleursCalendrier: protectedProcedure.query(({ ctx }) => getCouleursCalendrier(repo, ctx.tenant)),
+    getCouleursCalendrier: voir.query(({ ctx }) => getCouleursCalendrier(repo, ctx.tenant)),
 
-    setCouleurIntervention: protectedProcedure
+    setCouleurIntervention: gerer
       .input(z.object({ interventionId: z.number().int(), couleur: z.string().max(20) }))
       .mutation(async ({ ctx, input }) => {
         await definirCouleurIntervention(repo, ctx.tenant, input.interventionId, input.couleur);
@@ -132,13 +135,13 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
 
     // Affecte un technicien à une intervention (404 intervention / 403 technicien hors tenant) +
     // renvoie les conflits NON bloquants (double-booking + congés approuvés).
-    assignerTechnicien: protectedProcedure
+    assignerTechnicien: gerer
       .input(z.object({ interventionId: z.number().int(), technicienId: z.number().int() }))
       .mutation(({ ctx, input }) => assignerTechnicien(repo, congeRepo, ctx.tenant, input.interventionId, input.technicienId)),
 
     // Suggestions de techniciens pour une intervention géolocalisée (proximité + disponibilité).
     // ⚠️ GÉO/RGPD : positions techniciens scopées tenant (jamais cross-tenant).
-    getSuggestionsTechniciens: protectedProcedure
+    getSuggestionsTechniciens: voir
       .input(z.object({ latitude: z.number(), longitude: z.number(), dateIntervention: z.coerce.date() }))
       .query(({ ctx, input }) => getSuggestionsTechniciens(repo, technicienRepo, ctx.tenant, input)),
   });

@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
+
+// Tout le routeur rdv exige `rdv.gerer` (parité legacy ; pas de permission `rdv.voir` distincte).
+// Le propriétaire l'a (ALL_PERMISSIONS au provisioning) ; un collaborateur sans la permission → 403.
+const gerer = permissionProcedure("rdv.gerer");
 import type { IRdvRepository } from "../../application/rdv-repository";
 import type { IInterventionRepository } from "../../../interventions/application/intervention-repository";
 import type { IClientRepository } from "../../../clients/application/client-repository";
@@ -43,29 +47,29 @@ export function createRdvEnLigneRouter(
 ) {
   return router({
     // Liste enrichie du `client` (parité legacy — le client UI lit `rdv.client.prenom/nom`).
-    list: protectedProcedure.query(({ ctx }) => listRdvsAvecClient(repo, clientRepo, ctx.tenant)),
+    list: gerer.query(({ ctx }) => listRdvsAvecClient(repo, clientRepo, ctx.tenant)),
 
     // Comptes par statut + nombre en attente (parité client trpc.rdv.getStats / getPendingCount).
-    getStats: protectedProcedure.query(({ ctx }) => getRdvStats(repo, ctx.tenant)),
+    getStats: gerer.query(({ ctx }) => getRdvStats(repo, ctx.tenant)),
 
-    getPendingCount: protectedProcedure.query(({ ctx }) => getRdvPendingCount(repo, ctx.tenant)),
+    getPendingCount: gerer.query(({ ctx }) => getRdvPendingCount(repo, ctx.tenant)),
 
-    getById: protectedProcedure
+    getById: gerer
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getRdv(repo, ctx.tenant, input.id)),
 
-    create: protectedProcedure
+    create: gerer
       .input(createSchema)
       .mutation(({ ctx, input }) => creerRdv(repo, ctx.tenant, input)),
 
-    update: protectedProcedure
+    update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
         return modifierRdv(repo, ctx.tenant, id, data);
       }),
 
-    delete: protectedProcedure
+    delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerRdv(repo, ctx.tenant, input.id);
@@ -73,33 +77,33 @@ export function createRdvEnLigneRouter(
       }),
 
     // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
-    confirmer: protectedProcedure
+    confirmer: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => confirmerRdv(repo, ctx.tenant, input.id)),
 
     // Confirmation « métier » (parité client `trpc.rdv.confirm`) : crée l'intervention planifiée +
     // passe le RDV à confirme avec le lien interventionId. Garde en_attente (sinon 400).
-    confirm: protectedProcedure
+    confirm: gerer
       .input(z.object({ rdvId: z.number().int() }))
       .mutation(({ ctx, input }) => confirmerRdvAvecIntervention(repo, interventionRepo, ctx.tenant, input.rdvId)),
 
     // Refus « métier » (parité client `trpc.rdv.refuse`) : passe le RDV à refuse avec motif.
     // (Délègue au use-case de transition — en_attente→refuse. Email client ajouté au slice email.)
-    refuse: protectedProcedure
+    refuse: gerer
       .input(z.object({ rdvId: z.number().int(), motif: z.string().min(1).max(5000) }))
       .mutation(({ ctx, input }) => refuserRdv(repo, ctx.tenant, input.rdvId, input.motif)),
 
     // Proposition d'un autre créneau (parité client `trpc.rdv.proposeAutreCreneau`) : refuse l'ancien
     // RDV + crée un nouveau RDV au créneau proposé (date validée AVANT mutation). Email au slice email.
-    proposeAutreCreneau: protectedProcedure
+    proposeAutreCreneau: gerer
       .input(z.object({ rdvId: z.number().int(), nouvelleDateProposee: z.string() }))
       .mutation(({ ctx, input }) => proposerAutreCreneau(repo, ctx.tenant, input.rdvId, input.nouvelleDateProposee)),
 
-    refuser: protectedProcedure
+    refuser: gerer
       .input(z.object({ id: z.number().int(), motifRefus: z.string().min(1).max(5000) }))
       .mutation(({ ctx, input }) => refuserRdv(repo, ctx.tenant, input.id, input.motifRefus)),
 
-    annuler: protectedProcedure
+    annuler: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => annulerRdv(repo, ctx.tenant, input.id)),
   });

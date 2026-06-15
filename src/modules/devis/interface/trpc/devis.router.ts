@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, protectedProcedure, permissionProcedure } from "../../../../interface/trpc/trpc";
+// Permissions (parité legacy) : actions sur lignes/envoi/duplication = `devis.creer` ; conversion en facture = `factures.creer`.
+const devisCreer = permissionProcedure("devis.creer");
+const facturesCreer = permissionProcedure("factures.creer");
 import type { IDevisRepository } from "../../application/devis-repository";
 import { listDevis, getDevisDetail, listLignesDevis } from "../../application/read-use-cases";
 import { envoyerDevisParEmail, type DevisMailingDeps } from "../../application/envoyer-devis-email";
@@ -132,21 +135,21 @@ export function createDevisRouter(
         return { success: true };
       }),
 
-    addLigne: protectedProcedure
+    addLigne: devisCreer
       .input(z.object({ devisId: z.number().int() }).and(ligneCreateSchema))
       .mutation(({ ctx, input }) => {
         const { devisId, ...data } = input;
         return ajouterLigneDevis(repo, ctx.tenant, devisId, data);
       }),
 
-    updateLigne: protectedProcedure
+    updateLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }).and(ligneUpdateSchema))
       .mutation(({ ctx, input }) => {
         const { id, devisId, ...data } = input;
         return modifierLigneDevis(repo, ctx.tenant, devisId, id, data);
       }),
 
-    deleteLigne: protectedProcedure
+    deleteLigne: devisCreer
       .input(z.object({ id: z.number().int(), devisId: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerLigneDevis(repo, ctx.tenant, input.devisId, input.id);
@@ -230,18 +233,18 @@ export function createDevisRouter(
 
     // Convertit un devis accepté en facture brouillon (cross-domaine) — parité `convertToFacture`.
     // 404 devis hors tenant ; Conflict si non accepté ou déjà converti (invariants factures).
-    convertToFacture: protectedProcedure
+    convertToFacture: facturesCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(({ ctx, input }) => converter.convertir(ctx.tenant, input.devisId)),
 
     // Duplique un devis (nouveau brouillon, numéro serveur, lignes copiées) — parité `duplicate`.
-    duplicate: protectedProcedure
+    duplicate: devisCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(({ ctx, input }) => dupliquerDevis(repo, ctx.tenant, input.devisId)),
 
     // Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.
     // ownership 404 / client.email 400 / rate-limit 429 ; passe `envoye` si brouillon.
-    sendByEmail: protectedProcedure
+    sendByEmail: devisCreer
       .input(
         z.object({
           devisId: z.number().int(),

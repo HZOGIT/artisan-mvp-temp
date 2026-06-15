@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
+
+// Procédures gatées par permission (parité legacy) : lecture = `clients.voir`, écriture = `clients.gerer`.
+// Le propriétaire reçoit ALL_PERMISSIONS au provisioning ; un collaborateur sans la permission → 403.
+const voir = permissionProcedure("clients.voir");
+const gerer = permissionProcedure("clients.gerer");
 import type { IClientRepository } from "../../application/client-repository";
 import {
   listClients,
@@ -58,35 +63,35 @@ const updateSchema = z.object({
 // (NotFound→404, Validation→400, Conflict→409 pour une suppression refusée). Repo injecté (DI).
 export function createClientsRouter(repo: IClientRepository) {
   return router({
-    list: protectedProcedure.query(({ ctx }) => listClients(repo, ctx.tenant)),
+    list: voir.query(({ ctx }) => listClients(repo, ctx.tenant)),
 
-    getById: protectedProcedure
+    getById: voir
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getClient(repo, ctx.tenant, input.id)),
 
-    search: protectedProcedure
+    search: voir
       .input(z.object({ query: z.string().min(1).max(100) }))
       .query(({ ctx, input }) => rechercherClients(repo, ctx.tenant, input.query)),
 
     // Encours financier (reste dû des factures impayées). Lecture seule, scopée tenant.
-    getEncours: protectedProcedure
+    getEncours: voir
       .input(z.object({ clientId: z.number().int() }))
       .query(({ ctx, input }) => getEncoursClient(repo, ctx.tenant, input.clientId)),
 
-    getEncoursMap: protectedProcedure.query(({ ctx }) => getEncoursMap(repo, ctx.tenant)),
+    getEncoursMap: voir.query(({ ctx }) => getEncoursMap(repo, ctx.tenant)),
 
-    create: protectedProcedure
+    create: gerer
       .input(createSchema)
       .mutation(({ ctx, input }) => creerClient(repo, ctx.tenant, input)),
 
-    update: protectedProcedure
+    update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
         return modifierClient(repo, ctx.tenant, id, data);
       }),
 
-    delete: protectedProcedure
+    delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerClient(repo, ctx.tenant, input.id);
@@ -95,7 +100,7 @@ export function createClientsRouter(repo: IClientRepository) {
 
     // Import en masse (parité client `trpc.clients.importFromExcel`). Lignes déjà parsées côté
     // client (max 5000). Best-effort par ligne → { imported, skipped }. Bornes defense-in-depth.
-    importFromExcel: protectedProcedure
+    importFromExcel: gerer
       .input(
         z.object({
           clients: z

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
+import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
+// Lecture = `contrats.voir`, écriture/transitions/facturation = `contrats.gerer` (parité legacy).
+const voir = permissionProcedure("contrats.voir");
+const gerer = permissionProcedure("contrats.gerer");
 import type { IContratRepository } from "../../application/contrat-repository";
 import type { ContratFactureGenerator } from "../../application/contrat-facture-generator";
 import { listContrats, getContrat } from "../../application/read-use-cases";
@@ -58,24 +61,24 @@ const updateSchema = z.object({
 // de statut (suspendre/reactiver/terminer/annuler) seront exposées en 7/9. Repo injecté.
 export function createContratsMaintenanceRouter(repo: IContratRepository, factureGen: ContratFactureGenerator) {
   return router({
-    list: protectedProcedure.query(({ ctx }) => listContrats(repo, ctx.tenant)),
+    list: voir.query(({ ctx }) => listContrats(repo, ctx.tenant)),
 
-    getById: protectedProcedure
+    getById: voir
       .input(z.object({ id: z.number().int() }))
       .query(({ ctx, input }) => getContrat(repo, ctx.tenant, input.id)),
 
-    create: protectedProcedure
+    create: gerer
       .input(createSchema)
       .mutation(({ ctx, input }) => creerContrat(repo, ctx.tenant, input)),
 
-    update: protectedProcedure
+    update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
       .mutation(({ ctx, input }) => {
         const { id, ...data } = input;
         return modifierContrat(repo, ctx.tenant, id, data);
       }),
 
-    delete: protectedProcedure
+    delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerContrat(repo, ctx.tenant, input.id);
@@ -83,36 +86,36 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
       }),
 
     // Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant.
-    suspendre: protectedProcedure
+    suspendre: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => suspendreContrat(repo, ctx.tenant, input.id)),
 
-    reactiver: protectedProcedure
+    reactiver: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => reactiverContrat(repo, ctx.tenant, input.id)),
 
-    terminer: protectedProcedure
+    terminer: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => terminerContrat(repo, ctx.tenant, input.id)),
 
-    annuler: protectedProcedure
+    annuler: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => annulerContrat(repo, ctx.tenant, input.id)),
 
     // Contrats arrivés à échéance de facturation (enrichis client/TTC/retard) — parité `getAFacturer`.
-    getAFacturer: protectedProcedure.query(({ ctx }) => listContratsAFacturer(repo, ctx.tenant)),
+    getAFacturer: voir.query(({ ctx }) => listContratsAFacturer(repo, ctx.tenant)),
 
     // Génère une facture émise pour un contrat (récurrente) — parité `generateFacture`. ⚠️ pas d'écriture FEC.
-    generateFacture: protectedProcedure
+    generateFacture: gerer
       .input(z.object({ contratId: z.number().int() }))
       .mutation(({ ctx, input }) => genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId)),
 
     // ── Sous-ressource interventions du contrat (ownership via contrat parent ; anti-IDOR id↔contrat) ──
-    getInterventions: protectedProcedure
+    getInterventions: voir
       .input(z.object({ contratId: z.number().int() }))
       .query(({ ctx, input }) => getInterventionsContrat(repo, ctx.tenant, input.contratId)),
 
-    createIntervention: protectedProcedure
+    createIntervention: gerer
       .input(
         z.object({
           contratId: z.number().int(),
@@ -126,7 +129,7 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
       )
       .mutation(({ ctx, input }) => creerInterventionContrat(repo, ctx.tenant, input)),
 
-    updateIntervention: protectedProcedure
+    updateIntervention: gerer
       .input(
         z.object({
           id: z.number().int(),

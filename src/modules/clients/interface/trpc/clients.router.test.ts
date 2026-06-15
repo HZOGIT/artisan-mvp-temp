@@ -15,6 +15,8 @@ const SECRET = "test-secret-at-least-32-characters-long-xxxx";
 
 const UA = 9929001;
 const UB = 9929002;
+// Collaborateur sous-privilégié : a `clients.voir` mais PAS `clients.gerer` (prouve le gate de permission).
+const UC = 9929003;
 
 async function token(userId: number): Promise<string> {
   return new SignJWT({ userId, email: `u${userId}@t.fr` })
@@ -43,11 +45,25 @@ describe.skipIf(!URL)("clients.router e2e (HTTP → tRPC → use-case → repo �
       await admin.query('delete from devis where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [uid]);
       await admin.query('delete from artisans where "userId"=$1', [uid]);
+      await admin.query('delete from permissions_utilisateur where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
       await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [uid, `u${uid}@t.fr`]);
+      // Le propriétaire reçoit ses permissions au provisioning ; les routes clients sont gatées
+      // (`clients.voir`/`clients.gerer`) → on les accorde aux utilisateurs de test (sinon 403).
+      for (const p of ["clients.voir", "clients.gerer"]) {
+        await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [uid, p]);
+      }
     }
     artisanA = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UA])).rows[0].id;
     artisanB = (await admin.query('insert into artisans ("userId") values ($1) returning id', [UB])).rows[0].id;
+    // Collaborateur UC : `clients.voir` SEULEMENT (pas de `clients.gerer`) → prouve le gate d'écriture.
+    await admin.query('delete from clients where "artisanId" in (select id from artisans where "userId"=$1)', [UC]);
+    await admin.query('delete from artisans where "userId"=$1', [UC]);
+    await admin.query('delete from permissions_utilisateur where "userId"=$1', [UC]);
+    await admin.query("delete from users where id=$1", [UC]);
+    await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UC, `u${UC}@t.fr`]);
+    await admin.query('insert into artisans ("userId") values ($1)', [UC]); // tenant (sinon requireTenant échoue avant le gate permission)
+    await admin.query('insert into permissions_utilisateur ("userId", permission, autorise) values ($1,$2,true)', [UC, "clients.voir"]);
     server = buildApp({ jwtSecret: SECRET, resolver: new DrizzleTenantResolver(app.db), clientRepo: new ClientRepositoryDrizzle(app.db) });
   });
 
@@ -58,12 +74,22 @@ describe.skipIf(!URL)("clients.router e2e (HTTP → tRPC → use-case → repo �
       await admin.query('delete from devis where "artisanId"=$1', [aId]);
       await admin.query('delete from clients where "artisanId"=$1', [aId]);
     }
-    for (const uid of [UA, UB]) {
+    for (const uid of [UA, UB, UC]) {
       await admin.query('delete from artisans where "userId"=$1', [uid]);
+      await admin.query('delete from permissions_utilisateur where "userId"=$1', [uid]);
       await admin.query("delete from users where id=$1", [uid]);
     }
     await app.close();
     await admin.end();
+  });
+
+  it("permission gate : un collaborateur avec `clients.voir` mais SANS `clients.gerer` → list 200, create 403", async () => {
+    const tC = await token(UC);
+    // Lecture autorisée (a la permission `clients.voir`).
+    expect((await callQuery(server, "clients.list", undefined, tC)).statusCode).toBe(200);
+    // Écriture refusée (pas `clients.gerer`) → FORBIDDEN, pas un accès « authentifié = autorisé ».
+    const res = await callMutation(server, "clients.create", { nom: "X" }, tC);
+    expect(res.statusCode).toBe(403);
   });
 
   it("sans cookie → clients.list 401", async () => {
