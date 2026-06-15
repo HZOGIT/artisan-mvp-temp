@@ -1,4 +1,14 @@
-import mysql from 'mysql2/promise';
+// Seed du catalogue de référence `bibliotheque_articles` (PostgreSQL / nouvelle approche
+// clean-archi : driver pg + schéma Drizzle source unique). Le new-stack lit cette table comme
+// catalogue MÉTIER (recherche publique + suggestions IA) → on mappe l'ancienne forme MySQL
+// (reference/designation/prixUnitaireHT) vers le schéma PG (metier/categorie/sous_categorie/
+// nom/prix_base/unite). Idempotent : purge des métiers seedés puis ré-insertion.
+//   Lancer : DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
+//            pnpm exec tsx scripts/seed-articles.ts
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { inArray } from "drizzle-orm";
+import { bibliothequeArticles } from "../drizzle/schema.pg";
 
 const articles = [
   // PLOMBERIE - 100 articles
@@ -278,42 +288,48 @@ const articles = [
   { reference: "ELE-150", designation: "Passe-câble mural", description: "Passe-câble mural Ø60mm", categorie: "electricite", unite: "unité", prixUnitaireHT: "5.50" },
 ];
 
-async function seedArticles() {
-  const connection = await mysql.createConnection({ uri: process.env.DATABASE_URL, charset: 'utf8mb4' });
-  await connection.execute('SET NAMES utf8mb4');
+// Mapping ancienne catégorie MySQL (= corps de métier) → clé `metier` du contexte IA new-stack.
+const METIER_PAR_CATEGORIE: Record<string, string> = { plomberie: "plombier", electricite: "electricien" };
+const LIBELLE_CATEGORIE: Record<string, string> = { plomberie: "Plomberie", electricite: "Électricité" };
 
-  console.log('Connexion à la base de données...');
-  
+async function seedArticles() {
+  const url = process.env.DATABASE_URL || "postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp";
+  const pool = new Pool({ connectionString: url });
+  const db = drizzle(pool);
+
+  console.log("Connexion à PostgreSQL…");
   try {
-    // Vérifier si des articles existent déjà
-    const [existing] = await connection.execute('SELECT COUNT(*) as count FROM bibliotheque_articles');
-    if (existing[0].count > 0) {
-      console.log(`${existing[0].count} articles existent déjà. Suppression...`);
-      await connection.execute('DELETE FROM bibliotheque_articles');
+    const rows = articles.map((a) => ({
+      metier: METIER_PAR_CATEGORIE[a.categorie] ?? "autre",
+      categorie: LIBELLE_CATEGORIE[a.categorie] ?? a.categorie,
+      sous_categorie: "Général",
+      nom: a.designation,
+      description: a.description,
+      prix_base: a.prixUnitaireHT,
+      unite: a.unite,
+    }));
+
+    const metiers = [...new Set(rows.map((r) => r.metier))];
+    // Idempotence : on ne purge QUE les métiers seedés ici (laisse intacts les autres catalogues).
+    await db.delete(bibliothequeArticles).where(inArray(bibliothequeArticles.metier, metiers));
+    console.log(`Purge des métiers [${metiers.join(", ")}], insertion de ${rows.length} articles…`);
+
+    // Insertion en lot (chunké pour rester sous la limite de paramètres PG).
+    const TAILLE_LOT = 200;
+    for (let i = 0; i < rows.length; i += TAILLE_LOT) {
+      await db.insert(bibliothequeArticles).values(rows.slice(i, i + TAILLE_LOT));
     }
-    
-    console.log('Insertion des 250 articles...');
-    
-    for (const article of articles) {
-      await connection.execute(
-        `INSERT INTO bibliotheque_articles (reference, designation, description, categorie, unite, prixUnitaireHT, createdAt) 
-         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-        [article.reference, article.designation, article.description, article.categorie, article.unite, article.prixUnitaireHT]
-      );
-    }
-    
-    console.log(`✅ ${articles.length} articles insérés avec succès !`);
-    
-    // Vérification
-    const [count] = await connection.execute('SELECT COUNT(*) as total FROM bibliotheque_articles');
-    console.log(`Total d'articles dans la base : ${count[0].total}`);
-    
+
+    console.log(`✅ ${rows.length} articles insérés dans bibliotheque_articles (PostgreSQL).`);
   } catch (error) {
-    console.error('Erreur lors de l\'insertion des articles:', error);
+    console.error("Erreur lors de l'insertion des articles:", error);
     throw error;
   } finally {
-    await connection.end();
+    await pool.end();
   }
 }
 
-seedArticles().catch(console.error);
+seedArticles().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
