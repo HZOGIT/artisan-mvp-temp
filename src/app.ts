@@ -133,6 +133,7 @@ import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-paym
 import { registerArticlesSearchRoute } from "./interface/http/articles-search-route";
 import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/public-article-search-drizzle";
 import { registerAssistantAgentRoute } from "./interface/http/assistant-agent-route";
+import { registerVoiceToolRoute } from "./interface/http/voice-tool-route";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
 import { GeminiAgenticAdapter } from "./modules/assistant/infra/gemini-agentic-adapter";
 import type { LlmAgenticPort } from "./modules/assistant/application/agentic-port";
@@ -751,6 +752,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
+  });
+
+  // §4 HORS-tRPC : exécution d'UN outil de la session vocale Live (`POST /api/voice/tool`). Réutilise
+  // le MÊME registry agentique. Auth cookie + rate-limit IA. MONTÉ mais PAS routé (legacy sert encore).
+  registerVoiceToolRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    registry: agentRegistry,
+    rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
   });
 
   // §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie).
