@@ -99,7 +99,7 @@ import type { IComptabiliteReader } from "./modules/comptabilite/application/com
 import { createAuthModule } from "./modules/auth/auth.module";
 import { AuthRepositoryDrizzle } from "./modules/auth/infra/auth-repository-drizzle";
 import type { IAuthRepository } from "./modules/auth/application/auth-repository";
-import { createSubscriptionModule } from "./modules/subscription/subscription.module";
+import { createSubscriptionModule, pricesFromEnv } from "./modules/subscription/subscription.module";
 import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
 import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
 import { StripeAdapter } from "./shared/ports/stripe-adapter";
@@ -549,6 +549,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const subscription = createSubscriptionModule({
     repository: deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db),
     stripe: deps.stripePort ?? new StripeAdapter(),
+    prices: pricesFromEnv(),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
   const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription });

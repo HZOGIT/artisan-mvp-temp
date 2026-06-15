@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { subscriptions } from "../../../../drizzle/schema.pg";
+import { artisans, subscriptions } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ISubscriptionRepository } from "../application/subscription-reader";
@@ -37,5 +37,18 @@ export class SubscriptionReaderDrizzle implements ISubscriptionRepository {
 
   async setCancelAtPeriodEnd(ctx: TenantContext, cancel: boolean): Promise<void> {
     await this.db.update(subscriptions).set({ cancel_at_period_end: cancel }).where(eq(subscriptions.artisan_id, ctx.artisanId));
+  }
+
+  // Upsert sur la clé unique `artisan_id` (la ligne d'abonnement peut ne pas exister au 1er checkout).
+  async setStripeCustomerId(ctx: TenantContext, customerId: string): Promise<void> {
+    await this.db
+      .insert(subscriptions)
+      .values({ artisan_id: ctx.artisanId, stripe_customer_id: customerId })
+      .onConflictDoUpdate({ target: subscriptions.artisan_id, set: { stripe_customer_id: customerId } });
+  }
+
+  async getNomEntreprise(ctx: TenantContext): Promise<string | null> {
+    const [a] = await this.db.select({ nom: artisans.nomEntreprise }).from(artisans).where(eq(artisans.id, ctx.artisanId)).limit(1);
+    return a?.nom ?? null;
   }
 }

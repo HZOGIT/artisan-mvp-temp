@@ -18,4 +18,21 @@ export class FakeSubscriptionReader implements ISubscriptionRepository {
     const cur = this.byTenant.get(ctx.artisanId);
     if (cur) this.byTenant.set(ctx.artisanId, { ...cur, cancelAtPeriodEnd: cancel });
   }
+
+  async setStripeCustomerId(ctx: TenantContext, customerId: string): Promise<void> {
+    const cur = this.byTenant.get(ctx.artisanId);
+    this.byTenant.set(ctx.artisanId, { ...(cur ?? blankSub(ctx.artisanId)), stripeCustomerId: customerId });
+  }
+
+  setNomEntreprise(artisanId: number, nom: string): void {
+    this.noms.set(artisanId, nom);
+  }
+  private readonly noms = new Map<number, string>();
+  async getNomEntreprise(ctx: TenantContext): Promise<string | null> {
+    return this.noms.get(ctx.artisanId) ?? null;
+  }
+}
+
+function blankSub(artisanId: number): SubscriptionRow {
+  return { id: 0, artisanId, stripeCustomerId: null, stripeSubscriptionId: null, stripePriceId: null, plan: "trial", status: "trialing", trialEndsAt: null, currentPeriodStart: null, currentPeriodEnd: null, cancelAtPeriodEnd: false, maxUsers: 1, maxDevicesPerUser: 3, maxConcurrentSessions: 2 };
 }

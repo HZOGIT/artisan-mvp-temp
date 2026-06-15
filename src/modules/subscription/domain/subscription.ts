@@ -35,6 +35,28 @@ export interface CurrentSubscription {
   readonly stripeSubscriptionId: string | null;
 }
 
+export type SubscriptionPlan = "essentiel" | "pro" | "entreprise";
+export type SubscriptionInterval = "month" | "year";
+
+// Price IDs Stripe par plan/intervalle (depuis l'env legacy `STRIPE_PRICE_*`). `extra` = price IDs des
+// utilisateurs supplémentaires (plans pro/entreprise uniquement).
+export interface PlanPriceIds {
+  readonly month?: string;
+  readonly year?: string;
+}
+export interface SubscriptionPrices {
+  readonly essentiel: PlanPriceIds;
+  readonly pro: PlanPriceIds;
+  readonly entreprise: PlanPriceIds;
+  readonly extra: { readonly pro: PlanPriceIds; readonly entreprise: PlanPriceIds };
+}
+
+// Price ID des utilisateurs supplémentaires pour un plan donné (undefined pour essentiel). PURE.
+export function extraPriceId(prices: SubscriptionPrices, plan: SubscriptionPlan, interval: SubscriptionInterval): string | undefined {
+  if (plan === "essentiel") return undefined;
+  return prices.extra[plan]?.[interval];
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Calcule l'état d'abonnement courant (parité legacy `subscription.getCurrent`, branche « artisan

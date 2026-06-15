@@ -6,15 +6,16 @@ import { FakeSubscriptionReader } from "./infra/subscription-reader-fake";
 import { getCurrent } from "./application/use-cases";
 
 const ctx = (artisanId: number): TenantContext => ({ artisanId, userId: 1 });
+const PRICES = { essentiel: {}, pro: {}, entreprise: {}, extra: { pro: {}, entreprise: {} } };
 const build = (repo = new FakeSubscriptionReader(), stripe = new FakeStripePort()) =>
-  createSubscriptionModule({ repository: repo, stripe, appUrl: "https://app.test" });
+  createSubscriptionModule({ repository: repo, stripe, prices: PRICES, appUrl: "https://app.test" });
 
 describe("subscription.module", () => {
-  it("câble le repo injecté + expose getCurrent/cancel/reactivate", () => {
+  it("câble le repo injecté + expose les 5 procédures", () => {
     const repo = new FakeSubscriptionReader();
     const module = build(repo);
     expect(module.deps.repository).toBe(repo);
-    expect(Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort()).toEqual(["cancel", "getCurrent", "reactivate"]);
+    expect(Object.keys((module.router as { _def: { record: Record<string, unknown> } })._def.record).sort()).toEqual(["cancel", "createCheckout", "createPortal", "getCurrent", "reactivate"]);
   });
 
   it("getCurrent : scopé tenant (un autre tenant → défauts)", async () => {

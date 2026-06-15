@@ -11,4 +11,8 @@ export interface ISubscriptionReader {
 export interface ISubscriptionRepository extends ISubscriptionReader {
   // Persiste l'état `cancel_at_period_end` (miroir de l'action Stripe — cancel/reactivate).
   setCancelAtPeriodEnd(ctx: TenantContext, cancel: boolean): Promise<void>;
+  // Persiste l'id du Customer Stripe (upsert sur la ligne d'abonnement — créé au 1er checkout).
+  setStripeCustomerId(ctx: TenantContext, customerId: string): Promise<void>;
+  // Raison sociale du tenant (nom du Customer Stripe à la création). null si absente.
+  getNomEntreprise(ctx: TenantContext): Promise<string | null>;
 }
