@@ -25,6 +25,22 @@ export interface AgentFacture {
   readonly dateFacture: Date;
   readonly dateEcheance: Date | null;
 }
+export interface AgentDevis {
+  readonly id: number;
+  readonly numero: string;
+  readonly clientId: number;
+  readonly objet: string | null;
+  readonly statut: string;
+  readonly totalTTC: string;
+  readonly dateDevis: Date;
+}
+export interface AgentStock {
+  readonly id: number;
+  readonly designation: string;
+  readonly quantiteEnStock: string; // ex-`quantite` legacy
+  readonly seuilAlerte: string; // ex-`seuil` legacy
+  readonly unite: string;
+}
 
 export interface ClientsReaderForAgent {
   list(ctx: TenantContext): Promise<readonly AgentClient[]>;
@@ -32,10 +48,20 @@ export interface ClientsReaderForAgent {
 export interface FacturesReaderForAgent {
   list(ctx: TenantContext): Promise<readonly AgentFacture[]>;
 }
+export interface DevisReaderForAgent {
+  list(ctx: TenantContext): Promise<readonly AgentDevis[]>;
+}
+export interface StocksReaderForAgent {
+  list(ctx: TenantContext): Promise<readonly AgentStock[]>;
+}
 
+// `clients`/`factures` requis (lectures de base) ; `devis`/`stocks` optionnels (câblés au fil de l'eau —
+// le registry n'expose au modèle que les outils dont le reader est fourni).
 export interface AssistantReadDeps {
   readonly clients: ClientsReaderForAgent;
   readonly factures: FacturesReaderForAgent;
+  readonly devis?: DevisReaderForAgent;
+  readonly stocks?: StocksReaderForAgent;
 }
 
 // Normalisation recherche : minuscule, sans accents (NFD + suppression des diacritiques combinants).
@@ -137,9 +163,71 @@ export function formatListerFacturesImpayees(factures: readonly AgentFacture[], 
   return { count: impayees.length, factures: impayees };
 }
 
-// Construit les handlers de lecture clients + factures, mappés aux readers migrés (scopés tenant).
-export function buildAssistantReadHandlers(deps: AssistantReadDeps): Record<string, ReadToolHandler> {
+// `lister_devis` : tous les devis (filtre statut optionnel), nom client résolu, plus récent d'abord.
+export function formatListerDevis(devis: readonly AgentDevis[], names: Map<number, string>, statut: string | undefined): { count: number; devis: object[] } {
+  const wantStatut = statut ? String(statut).trim() : undefined;
+  let list = devis.map((d) => ({
+    id: d.id,
+    numero: d.numero,
+    client: names.get(d.clientId) || `#${d.clientId}`,
+    objet: d.objet,
+    statut: d.statut,
+    totalTTC: d.totalTTC,
+    dateDevis: d.dateDevis,
+  }));
+  if (wantStatut) list = list.filter((d) => d.statut === wantStatut);
+  list.sort((a, b) => new Date(b.dateDevis).getTime() - new Date(a.dateDevis).getTime());
+  return { count: list.length, devis: list };
+}
+
+// `lister_devis_en_attente` : devis `envoye`, jours depuis envoi, plus ancien (le plus en attente) d'abord.
+export function formatListerDevisEnAttente(devis: readonly AgentDevis[], now: number): { count: number; devis: object[] } {
+  const enAttente = devis
+    .filter((d) => d.statut === "envoye")
+    .map((d) => ({
+      id: d.id,
+      numero: d.numero,
+      clientId: d.clientId,
+      objet: d.objet,
+      totalTTC: d.totalTTC,
+      dateDevis: d.dateDevis,
+      joursDepuisEnvoi: d.dateDevis ? Math.floor((now - new Date(d.dateDevis).getTime()) / 86400000) : 0,
+    }))
+    .sort((a, b) => b.joursDepuisEnvoi - a.joursDepuisEnvoi);
+  return { count: enAttente.length, devis: enAttente };
+}
+
+// `verifier_stocks` : statut rupture (q≤0) | alerte (q≤seuil) | ok, + récap réappro (parité legacy).
+export function formatVerifierStocks(stocks: readonly AgentStock[]): {
+  total: number;
+  nbRuptures: number;
+  nbAlertes: number;
+  aReapprovisionner: object[];
+  tousLesArticles: object[];
+} {
+  const items = stocks.map((s) => {
+    const quantite = Number(s.quantiteEnStock ?? 0);
+    const seuil = Number(s.seuilAlerte ?? 0);
+    let statut: "rupture" | "alerte" | "ok" = "ok";
+    if (quantite <= 0) statut = "rupture";
+    else if (seuil > 0 && quantite <= seuil) statut = "alerte";
+    return { id: s.id, designation: s.designation || `Article #${s.id}`, quantite, seuil, unite: s.unite || "u", statut };
+  });
+  const ruptures = items.filter((i) => i.statut === "rupture");
+  const alertes = items.filter((i) => i.statut === "alerte");
   return {
+    total: items.length,
+    nbRuptures: ruptures.length,
+    nbAlertes: alertes.length,
+    aReapprovisionner: [...ruptures, ...alertes].slice(0, 30),
+    tousLesArticles: items.slice(0, 50),
+  };
+}
+
+// Construit les handlers de lecture mappés aux readers migrés (scopés tenant). `devis`/`stocks` ne
+// sont câblés que si leur reader est fourni (sinon l'outil reste indisponible côté registry).
+export function buildAssistantReadHandlers(deps: AssistantReadDeps): Record<string, ReadToolHandler> {
+  const handlers: Record<string, ReadToolHandler> = {
     chercher_client: async (args, ctx: TenantContext) => {
       const raw = String(args?.nom || "").trim();
       if (!raw) return { ok: false, error: "Le paramètre 'nom' est requis" };
@@ -159,4 +247,26 @@ export function buildAssistantReadHandlers(deps: AssistantReadDeps): Record<stri
       return { ok: true, data: formatListerFacturesImpayees(factures, Date.now()) };
     },
   };
+
+  const devisReader = deps.devis;
+  if (devisReader) {
+    handlers.lister_devis = async (args, ctx: TenantContext) => {
+      const [devis, clients] = await Promise.all([devisReader.list(ctx), deps.clients.list(ctx)]);
+      return { ok: true, data: formatListerDevis(devis, buildClientNameMap(clients), args?.statut as string | undefined) };
+    };
+    handlers.lister_devis_en_attente = async (_args, ctx: TenantContext) => {
+      const devis = await devisReader.list(ctx);
+      return { ok: true, data: formatListerDevisEnAttente(devis, Date.now()) };
+    };
+  }
+
+  const stocksReader = deps.stocks;
+  if (stocksReader) {
+    handlers.verifier_stocks = async (_args, ctx: TenantContext) => {
+      const stocks = await stocksReader.list(ctx);
+      return { ok: true, data: formatVerifierStocks(stocks) };
+    };
+  }
+
+  return handlers;
 }

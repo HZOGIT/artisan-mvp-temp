@@ -9,10 +9,17 @@ import {
   formatListerFacturesImpayees,
   buildClientNameMap,
   normalizeForSearch,
+  formatListerDevis,
+  formatListerDevisEnAttente,
+  formatVerifierStocks,
   type AgentClient,
   type AgentFacture,
+  type AgentDevis,
+  type AgentStock,
   type ClientsReaderForAgent,
   type FacturesReaderForAgent,
+  type DevisReaderForAgent,
+  type StocksReaderForAgent,
 } from "./read-tool-handlers";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
@@ -99,15 +106,71 @@ describe("read-tool-handlers — formatters (purs)", () => {
   });
 });
 
+const devis = (id: number, clientId: number, statut: string, dateDevis: string): AgentDevis => ({
+  id,
+  numero: `D-${id}`,
+  clientId,
+  objet: "Travaux",
+  statut,
+  totalTTC: "300.00",
+  dateDevis: new Date(dateDevis),
+});
+const stock = (id: number, designation: string, q: string, seuil: string): AgentStock => ({ id, designation, quantiteEnStock: q, seuilAlerte: seuil, unite: "u" });
+
+describe("read-tool-handlers — devis + stocks (formatters purs)", () => {
+  const names = buildClientNameMap(CLIENTS);
+
+  it("lister_devis : nom client résolu, filtre statut, plus récent d'abord", () => {
+    const ds = [devis(1, 1, "brouillon", "2026-01-01"), devis(2, 2, "envoye", "2026-03-01")];
+    const r = formatListerDevis(ds, names, undefined);
+    expect(r.count).toBe(2);
+    expect((r.devis[0] as { id: number }).id).toBe(2);
+    expect((r.devis[0] as { client: string }).client).toBe("Sophie Durand");
+    expect(formatListerDevis(ds, names, "envoye").count).toBe(1);
+  });
+
+  it("lister_devis_en_attente : statut=envoye, jours depuis envoi, plus en attente d'abord", () => {
+    const now = new Date("2026-06-15").getTime();
+    const ds = [devis(1, 1, "accepte", "2026-01-01"), devis(2, 2, "envoye", "2026-06-01"), devis(3, 3, "envoye", "2026-03-01")];
+    const r = formatListerDevisEnAttente(ds, now);
+    expect(r.count).toBe(2);
+    expect((r.devis[0] as { id: number }).id).toBe(3); // envoyé depuis plus longtemps
+  });
+
+  it("verifier_stocks : rupture (q≤0) / alerte (q≤seuil) / ok + récap réappro", () => {
+    const ss = [stock(1, "Vis", "0", "5"), stock(2, "Tube", "3", "5"), stock(3, "Joint", "50", "5")];
+    const r = formatVerifierStocks(ss);
+    expect(r).toMatchObject({ total: 3, nbRuptures: 1, nbAlertes: 1 });
+    expect(r.aReapprovisionner).toHaveLength(2); // rupture + alerte (ruptures d'abord)
+    expect((r.aReapprovisionner[0] as { statut: string }).statut).toBe("rupture");
+  });
+});
+
 describe("read-tool-handlers — handlers câblés au registry", () => {
   const clientsReader: ClientsReaderForAgent = { list: async () => CLIENTS };
   const facturesReader: FacturesReaderForAgent = { list: async () => [facture(2, 2, "envoyee", "2026-03-01", "2026-04-01")] };
-  const registry = new AssistantReadToolRegistry(buildAssistantReadHandlers({ clients: clientsReader, factures: facturesReader }));
+  const devisReader: DevisReaderForAgent = { list: async () => [devis(2, 2, "envoye", "2026-03-01")] };
+  const stocksReader: StocksReaderForAgent = { list: async () => [stock(1, "Vis", "0", "5")] };
+  const registry = new AssistantReadToolRegistry(
+    buildAssistantReadHandlers({ clients: clientsReader, factures: facturesReader, devis: devisReader, stocks: stocksReader }),
+  );
 
-  it("expose les 4 lectures clients/factures + naviguer_vers dans tools", () => {
+  it("expose les 7 lectures (clients/factures/devis/stocks) + naviguer_vers dans tools", () => {
     expect(registry.tools.map((t) => t.name).sort()).toEqual(
-      ["chercher_client", "lister_clients", "lister_factures", "lister_factures_impayees", "naviguer_vers"].sort(),
+      ["chercher_client", "lister_clients", "lister_factures", "lister_factures_impayees", "lister_devis", "lister_devis_en_attente", "verifier_stocks", "naviguer_vers"].sort(),
     );
+  });
+
+  it("devis/stocks NON câblés (reader absent) → outils absents de tools", () => {
+    const reg = new AssistantReadToolRegistry(buildAssistantReadHandlers({ clients: clientsReader, factures: facturesReader }));
+    expect(reg.tools.some((t) => t.name === "lister_devis")).toBe(false);
+    expect(reg.tools.some((t) => t.name === "verifier_stocks")).toBe(false);
+  });
+
+  it("verifier_stocks → ok + récap", async () => {
+    const res = await registry.execute("verifier_stocks", {}, ctx);
+    expect(res.ok).toBe(true);
+    if (res.ok) expect((res.data as { nbRuptures: number }).nbRuptures).toBe(1);
   });
 
   it("chercher_client sans nom → ok:false", async () => {
