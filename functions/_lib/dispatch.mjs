@@ -75,6 +75,8 @@ export const MIGRATED_ROUTES = [
   { name: "export-pdf-lot", pattern: /^\/api\/comptabilite\/export-pdf-lot$/ },
   // Polices Roboto pour les PDF générés côté client (`/api/fonts/:name`, PUBLIC, statique, cache immutable).
   { name: "fonts", pattern: /^\/api\/fonts\/[^/]+$/ },
+  // Télémétrie d'erreur fire-and-forget (`/api/voice/debug`, PUBLIC, sendBeacon, anti-flood IP).
+  { name: "voice-debug", pattern: /^\/api\/voice\/debug$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
