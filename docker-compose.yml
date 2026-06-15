@@ -1,24 +1,7 @@
 services:
-  mysql:
-    image: mysql:8.0
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: artisan_mvp
-      MYSQL_USER: ${MYSQL_USER:-artisan_user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-artisan_password}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
-  # OPE-184 — cible de la migration (coexiste avec MySQL le temps de la bascule PG-first).
+  # Postgres — base de données unique du stack (Drizzle pg + RLS). MySQL (legacy) a été retiré :
+  # la migration est complète, le backend tourne sur le nouveau stack Fastify (cf. extinction du
+  # legacy). Le port hôte 5432 est aussi celui du PG jetable utilisé par le gate (tsc/vitest).
   postgres:
     image: postgres:18
     restart: unless-stopped
@@ -39,6 +22,10 @@ services:
       retries: 10
       start_period: 20s
 
+  # Backend de dev = nouveau stack Fastify (`pnpm dev` = tsx watch src/server.ts). drizzle-kit migrate
+  # tourne en owner (DATABASE_URL → artisan_user) ; le runtime new-stack utilise APP_DATABASE_URL
+  # (rôle non-superuser app_tenant, soumis RLS — comme en staging). ⚠️ Le rôle app_tenant + les
+  # policies RLS doivent être provisionnés une fois (scripts/rls/setup-app-role.mjs, PG_URL=owner).
   app:
     image: node:22-slim
     working_dir: /app
@@ -50,7 +37,12 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development
-      DATABASE_URL: mysql://${MYSQL_USER:-artisan_user}:${MYSQL_PASSWORD:-artisan_password}@mysql:3306/artisan_mvp
+      DB_DIALECT: postgresql
+      NEW_STACK_PORT: "3000"
+      HOST: 0.0.0.0
+      # migrate (DDL) = owner ; runtime new-stack (RLS) = app_tenant.
+      DATABASE_URL: postgres://${POSTGRES_USER:-artisan_user}:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp
+      APP_DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
     env_file:
       - .env.local
     command: >
@@ -59,10 +51,9 @@ services:
              pnpm exec drizzle-kit migrate &&
              pnpm dev"
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
 
 volumes:
-  mysql_data:
   pg_data:
   app_node_modules:
