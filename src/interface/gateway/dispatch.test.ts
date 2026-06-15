@@ -31,8 +31,8 @@ describe("resolveDispatchTarget (décision de dispatch legacy↔nouveau stack)",
   });
 
   it("domaine NON porté par le nouveau stack → legacy même si un flag l'active (sûreté)", () => {
-    const flags: FeatureFlags = { devices: { enabled: true } };
-    expect(resolveDispatchTarget("devices.list", 1, flags)).toBe("legacy");
+    const flags: FeatureFlags = { importErp: { enabled: true } };
+    expect(resolveDispatchTarget("importErp.list", 1, flags)).toBe("legacy");
   });
 
   it("chemin sans préfixe de domaine (health/whoami/racine) → legacy", () => {
@@ -84,8 +84,8 @@ describe("resolveBatchDispatchTarget (décision batch-aware, httpBatchLink)", ()
   });
 
   it("batch avec un domaine NON porté par le nouveau stack → legacy", () => {
-    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, devices: { enabled: true } };
-    expect(resolveBatchDispatchTarget(`${MIGRE}.list,devices.list`, 1, flags)).toBe("legacy");
+    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, importErp: { enabled: true } };
+    expect(resolveBatchDispatchTarget(`${MIGRE}.list,importErp.list`, 1, flags)).toBe("legacy");
   });
 
   it("chemin sans domaine (health/whoami) → legacy", () => {
