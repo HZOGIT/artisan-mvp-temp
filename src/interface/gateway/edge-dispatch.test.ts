@@ -97,6 +97,9 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
     expect(decideTarget("/api/voice/token", {})).toBe("new-stack");
     expect(decideTarget("/api/voice/tool", {})).toBe("new-stack");
     expect(decideTarget("/api/assistant/stream", {})).toBe("new-stack");
+    // PDF bon de commande (auth cookie) → new-stack ; chemin voisin sans /pdf → legacy
+    expect(decideTarget("/api/commandes-fournisseurs/42/pdf", {})).toBe("new-stack");
+    expect(decideTarget("/api/commandes-fournisseurs/42", {})).toBe("legacy");
     // chemins voisins NON migrés → legacy
     expect(decideTarget("/api/calendar/abc.json", {})).toBe("legacy"); // pas .ics
     expect(decideTarget("/api/calendar.ics", {})).toBe("legacy"); // pas le bon préfixe

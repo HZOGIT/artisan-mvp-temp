@@ -135,6 +135,7 @@ import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/publi
 import { registerAssistantAgentRoute } from "./interface/http/assistant-agent-route";
 import { registerVoiceToolRoute } from "./interface/http/voice-tool-route";
 import { registerVoiceTokenRoute } from "./interface/http/voice-token-route";
+import { registerCommandePdfRoute } from "./interface/http/commande-pdf-route";
 import { GeminiRealtimeVoiceTokenAdapter } from "./modules/assistant/infra/gemini-realtime-voice-token-adapter";
 import { buildAssistantAgentRegistry, buildAssistantWriteHandlersFromRepos } from "./modules/assistant/infra/agent-wiring";
 import { GeminiAgenticAdapter } from "./modules/assistant/infra/gemini-agentic-adapter";
@@ -778,6 +779,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     tools: agentRegistry.tools,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+  });
+
+  // §4 HORS-tRPC : PDF d'un bon de commande fournisseur (`/api/commandes-fournisseurs/:id/pdf`, auth
+  // cookie). Générateur jsPDF INTERNALISÉ (`JsPdfAdapter`). MONTÉ mais PAS routé tant qu'absent de
+  // MIGRATED_ROUTES (1re des 8 routes PDF download — établit la recette).
+  registerCommandePdfRoute(app, {
+    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
+    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
+    commandeRepo,
+    fournisseurReader: fournisseurRepo,
+    artisanReader: deps.artisanRepo ?? new ArtisanRepositoryDrizzle(getDbHandle().db),
+    pdf: new JsPdfAdapter(),
   });
 
   // §4 HORS-tRPC : persistance des transcripts de la session vocale (`/api/voice/persist`, auth cookie).
