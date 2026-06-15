@@ -120,6 +120,8 @@ import { createDevicesModule } from "./modules/devices/devices.module";
 import { DeviceRepositoryDrizzle } from "./modules/devices/infra/device-repository-drizzle";
 import { createAlertesPrevisionsModule } from "./modules/alertes-previsions/alertes-previsions.module";
 import { AlertesPrevisionsRepositoryDrizzle } from "./modules/alertes-previsions/infra/alertes-previsions-repository-drizzle";
+import { createImportErpModule } from "./modules/import-erp/import-erp.module";
+import { ImportErpRepositoryDrizzle } from "./modules/import-erp/infra/import-erp-repository-drizzle";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
@@ -674,7 +676,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const devices = createDevicesModule({ repo: new DeviceRepositoryDrizzle(getDbHandle().db) });
   // Module `alertesPrevisions` (alertes du prévisionnel de trésorerie). Tables SOUS RLS (artisanId).
   const alertesPrevisions = createAlertesPrevisionsModule({ repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db) });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions });
+  // Module `importErp` (import de reprise de données : clients/devis/factures légers). Tables SOUS RLS.
+  const importErp = createImportErpModule({ repo: new ImportErpRepositoryDrizzle(getDbHandle().db) });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

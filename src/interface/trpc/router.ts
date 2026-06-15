@@ -52,6 +52,7 @@ import type { ChatModule } from "../../modules/chat/chat.module";
 import type { SupportModule } from "../../modules/support/support.module";
 import type { DevicesModule } from "../../modules/devices/devices.module";
 import type { AlertesPrevisionsModule } from "../../modules/alertes-previsions/alertes-previsions.module";
+import type { ImportErpModule } from "../../modules/import-erp/import-erp.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -107,6 +108,7 @@ export interface AppRouterDeps {
   readonly support: SupportModule;
   readonly devices: DevicesModule;
   readonly alertesPrevisions: AlertesPrevisionsModule;
+  readonly importErp: ImportErpModule;
 }
 
 // Routeur racine du nouveau stack. Les routeurs de domaines (phases 1-5) y sont montés
@@ -172,6 +174,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     support: deps.support.router,
     devices: deps.devices.router,
     alertesPrevisions: deps.alertesPrevisions.router,
+    importErp: deps.importErp.router,
   });
 }
 

@@ -712,7 +712,7 @@ describe("registre des domaines migrés", () => {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
-    expect(isMigratedDomainAvailable("importErp")).toBe(false);
+    expect(isMigratedDomainAvailable("interventionsMobile")).toBe(false);
   });
 });
 

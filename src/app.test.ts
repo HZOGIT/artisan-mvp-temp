@@ -38,7 +38,7 @@ describe.skipIf(!HAS_DB)("app Fastify (scaffold + tRPC)", () => {
 
   // Garde-fou bascule : chaque domaine du registre MIGRATED_DOMAINS est réellement monté
   // dans le nouveau stack (procédure `list` présente → 401 auth requise, pas 404 inexistant).
-  const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list", badges: "badges.list", techniciens: "techniciens.list", notifications: "notifications.list", fournisseurs: "fournisseurs.list", commandesFournisseurs: "commandesFournisseurs.list", stocks: "stocks.list", clients: "clients.list", interventions: "interventions.list", conges: "conges.list", notesDeFrais: "notesDeFrais.list", chantiers: "chantiers.list", depenses: "depenses.list", devis: "devis.list", factures: "factures.list", ecritures: "ecritures.list", articles: "articles.list", parametres: "parametres.get", modelesEmail: "modelesEmail.list", modelesDevis: "modelesDevis.list", configRelances: "configRelances.get", rdv: "rdv.list", relances: "relances.list", categoriesDepenses: "categoriesDepenses.list", contrats: "contrats.list", demandesContact: "demandesContact.list", budgetsCategories: "budgetsCategories.list", reglesCategorisation: "reglesCategorisation.list", previsions: "previsions.list", artisan: "artisan.getProfile", devisOptions: "devisOptions.getByDevisId", activites: "activites.list", modules: "modules.list", statistiques: "statistiques.getDevisStats", calendrier: "calendrier.getIcalFeed", emails: "emails.list", search: "search.global", geolocalisation: "geolocalisation.getPositions", dashboard: "dashboard.getStats", rapports: "rapports.list", utilisateurs: "utilisateurs.list", comptabilite: "comptabilite.getBalance", auth: "auth.me", subscription: "subscription.getCurrent", signature: "signature.getSignatureByDevis", conseilsIA: "conseilsIA", assistant: "assistant.getThreads", chat: "chat.getConversations", support: "support.contact", devices: "devices.list", alertesPrevisions: "alertesPrevisions.getConfig" };
+  const sampleProcedure: Record<string, string> = { vehicules: "vehicules.list", avis: "avis.list", badges: "badges.list", techniciens: "techniciens.list", notifications: "notifications.list", fournisseurs: "fournisseurs.list", commandesFournisseurs: "commandesFournisseurs.list", stocks: "stocks.list", clients: "clients.list", interventions: "interventions.list", conges: "conges.list", notesDeFrais: "notesDeFrais.list", chantiers: "chantiers.list", depenses: "depenses.list", devis: "devis.list", factures: "factures.list", ecritures: "ecritures.list", articles: "articles.list", parametres: "parametres.get", modelesEmail: "modelesEmail.list", modelesDevis: "modelesDevis.list", configRelances: "configRelances.get", rdv: "rdv.list", relances: "relances.list", categoriesDepenses: "categoriesDepenses.list", contrats: "contrats.list", demandesContact: "demandesContact.list", budgetsCategories: "budgetsCategories.list", reglesCategorisation: "reglesCategorisation.list", previsions: "previsions.list", artisan: "artisan.getProfile", devisOptions: "devisOptions.getByDevisId", activites: "activites.list", modules: "modules.list", statistiques: "statistiques.getDevisStats", calendrier: "calendrier.getIcalFeed", emails: "emails.list", search: "search.global", geolocalisation: "geolocalisation.getPositions", dashboard: "dashboard.getStats", rapports: "rapports.list", utilisateurs: "utilisateurs.list", comptabilite: "comptabilite.getBalance", auth: "auth.me", subscription: "subscription.getCurrent", signature: "signature.getSignatureByDevis", conseilsIA: "conseilsIA", assistant: "assistant.getThreads", chat: "chat.getConversations", support: "support.contact", devices: "devices.list", alertesPrevisions: "alertesPrevisions.getConfig", importErp: "importErp.importClients" };
   for (const domain of MIGRATED_DOMAINS) {
     it(`domaine migré « ${domain} » monté dans le nouveau stack (≠ 404)`, async () => {
       const res = await app.inject({ method: "GET", url: `/api/trpc/${sampleProcedure[domain]}` });
@@ -46,13 +46,15 @@ describe.skipIf(!HAS_DB)("app Fastify (scaffold + tRPC)", () => {
       // que le domaine est monté (≠ 404). `support.contact` est une MUTATION → GET = 405 (méthode non
       // supportée), ce qui prouve aussi qu'elle est montée (≠ 404). Les autres échantillons (queries
       // protégées) → 401.
-      const expected = domain === "auth" ? 200 : domain === "support" ? 405 : 401;
+      // `support`/`importErp` n'exposent que des MUTATIONS → GET = 405.
+      const mutationOnly = domain === "support" || domain === "importErp";
+      const expected = domain === "auth" ? 200 : mutationOnly ? 405 : 401;
       expect(res.statusCode).toBe(expected);
     });
   }
 
-  it("un domaine non migré (importErp) n'est PAS monté → 404", async () => {
-    const res = await app.inject({ method: "GET", url: "/api/trpc/importErp.list" });
+  it("un domaine non migré (interventionsMobile) n'est PAS monté → 404", async () => {
+    const res = await app.inject({ method: "GET", url: "/api/trpc/interventionsMobile.list" });
     expect(res.statusCode).toBe(404);
   });
 });
