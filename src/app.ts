@@ -124,6 +124,8 @@ import { createImportErpModule } from "./modules/import-erp/import-erp.module";
 import { ImportErpRepositoryDrizzle } from "./modules/import-erp/infra/import-erp-repository-drizzle";
 import { createInterventionsMobileModule } from "./modules/interventions-mobile/interventions-mobile.module";
 import { InterventionMobileRepositoryDrizzle } from "./modules/interventions-mobile/infra/intervention-mobile-repository-drizzle";
+import { createVitrineModule } from "./modules/vitrine/vitrine.module";
+import { VitrinePublicReaderDrizzle } from "./modules/vitrine/infra/vitrine-public-reader-drizzle";
 import { ChatRepositoryDrizzle } from "./modules/chat/infra/chat-repository-drizzle";
 import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-notifier-drizzle";
 import { registerIcalRoute } from "./interface/http/ical-route";
@@ -531,9 +533,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // SANS écritures FEC (parité legacy). Partage l'instance `factureRepo` du module factures.
     factureGenerator: new FacturesContratFactureGenerator(factureRepo),
   });
-  const demandesContact = createDemandesContactModule({
-    repository: deps.demandeContactRepo ?? new DemandeContactRepositoryDrizzle(getDbHandle().db),
-  });
+  const demandeContactRepo = deps.demandeContactRepo ?? new DemandeContactRepositoryDrizzle(getDbHandle().db);
+  const demandesContact = createDemandesContactModule({ repository: demandeContactRepo });
   const budgetsCategories = createBudgetsCategoriesModule({
     repository: budgetCategorieRepo,
   });
@@ -688,7 +689,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     techniciens: technicienRepo,
     mobile: new InterventionMobileRepositoryDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile });
+  // Module `vitrine` (site public de l'artisan). Public par slug : reader dédié (artisans HORS RLS +
+  // lectures scopées) + anti-flood IP + EmailPort + notifications + persistance lead. Admin : leads
+  // (délégation `demandesContact` + `clients` pour la conversion).
+  const vitrine = createVitrineModule({
+    reader: new VitrinePublicReaderDrizzle(getDbHandle().db),
+    rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
+    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    notifications: notificationRepo,
+    leads: demandeContactRepo,
+    clients: clientRepo,
+  });
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

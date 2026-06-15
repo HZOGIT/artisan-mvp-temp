@@ -31,8 +31,8 @@ describe("resolveDispatchTarget (décision de dispatch legacy↔nouveau stack)",
   });
 
   it("domaine NON porté par le nouveau stack → legacy même si un flag l'active (sûreté)", () => {
-    const flags: FeatureFlags = { vitrine: { enabled: true } };
-    expect(resolveDispatchTarget("vitrine.list", 1, flags)).toBe("legacy");
+    const flags: FeatureFlags = { clientPortal: { enabled: true } };
+    expect(resolveDispatchTarget("clientPortal.list", 1, flags)).toBe("legacy");
   });
 
   it("chemin sans préfixe de domaine (health/whoami/racine) → legacy", () => {
@@ -84,8 +84,8 @@ describe("resolveBatchDispatchTarget (décision batch-aware, httpBatchLink)", ()
   });
 
   it("batch avec un domaine NON porté par le nouveau stack → legacy", () => {
-    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, vitrine: { enabled: true } };
-    expect(resolveBatchDispatchTarget(`${MIGRE}.list,vitrine.list`, 1, flags)).toBe("legacy");
+    const flags: FeatureFlags = { [MIGRE]: { enabled: true }, clientPortal: { enabled: true } };
+    expect(resolveBatchDispatchTarget(`${MIGRE}.list,clientPortal.list`, 1, flags)).toBe("legacy");
   });
 
   it("chemin sans domaine (health/whoami) → legacy", () => {

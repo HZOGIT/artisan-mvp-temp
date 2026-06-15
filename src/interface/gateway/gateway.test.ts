@@ -712,7 +712,7 @@ describe("registre des domaines migrés", () => {
       expect(MIGRATED_DOMAINS).toContain(d);
       expect(isMigratedDomainAvailable(d)).toBe(true);
     }
-    expect(isMigratedDomainAvailable("vitrine")).toBe(false);
+    expect(isMigratedDomainAvailable("clientPortal")).toBe(false);
   });
 });
 

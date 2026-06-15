@@ -59,8 +59,8 @@ describe("edge dispatch (functions/_lib/dispatch.mjs) — parité avec le gatewa
   });
 
   it("domaine non porté → legacy même si listé (sûreté)", () => {
-    // `vitrine` n'est pas (encore) porté dans le new-stack → reste legacy même listé via env.
-    expect(decideTarget("/api/trpc/vitrine.list", { NEW_STACK_DOMAINS: "vitrine" })).toBe("legacy");
+    // `clientPortal` n'est pas (encore) porté dans le new-stack → reste legacy même listé via env.
+    expect(decideTarget("/api/trpc/clientPortal.list", { NEW_STACK_DOMAINS: "clientPortal" })).toBe("legacy");
   });
 
   it("hors-tRPC NON migré → legacy (auth, webhooks, front, uploads)", () => {
