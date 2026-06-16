@@ -124,8 +124,12 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Routeurs L3 faits (it.27-49, 23)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, geolocalisation, devis-options, interventions-mobile, alertes-previsions, support, conseils-ia, assistant, devis-ia, integrations-comptables, **import-erp** ✅ it.49.
-**Prochaine cible : `vitrine` — L3 `vitrine.router.test.ts`** (DERNIER routeur sans L3). Ensuite : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done` → si vide, **TOUS les routeurs tRPC sont couverts L3** → recalculer le scan global pour le front suivant (ou clore).
+🏁 **TOUS LES ROUTEURS tRPC SONT COUVERTS L3** (vérifié it.50 : `find src -name '*.router.ts'` sans test = **0**). 24 routeurs L3 ajoutés par la boucle (it.13-50), `vitrine` ✅ it.50 inclus.
+
+**Prochaine cible : RECALCUL DU SCAN GLOBAL** pour le front suivant. Au prochain réveil :
+- `for f in $(find src -name '*.ts' ! -name '*.test.ts' ! -name '*fake*'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || grep -qE "^export (async )?function|^export class|^export const .*=>" "$f" && [ ! -f "$t" ] && echo "$f"; done`
+- Pistes restantes probables : **interface/http/** handlers sans test (ex. route HTTP non couverte), `shared/pdf/pdf-generator` (jsPDF), `shared/**` utilitaires résiduels. Sinon, **L4 navigateur** : structurer `scripts/e2e/*.journey.mjs` pour signature / abonnement (cf. PoC OPE-316).
+- Si plus aucun gisement L1/L2/L3 : proposer à l'humain de passer la boucle en **mode garde-fou** (cohérence use-case=test, mutation testing ciblé) ou la clôturer.
 
 ---
 
@@ -181,3 +185,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 12:04:59Z` **[done]** devis-ia L3 router — 3 cas e2e : list/createAnalyse 401 sans cookie, createAnalyse 200 + getById, validation getById id<=0 → 400 + anti-IDOR addPhoto sur analyse inexistante → 404.
 - `2026-06-16 12:34:38Z` **[done]** integrations-comptables L3 router — 3 cas e2e : getConfig 401 sans cookie, 5 lectures 200 (config/exports/syncStatus/syncLogs/pendingItems), saveConfig valide 200 + genererExport logiciel hors enum → 400.
 - `2026-06-16 13:04:44Z` **[done]** import-erp L3 router — 3 cas e2e reprise : importClients 401 sans cookie, 200 + crée les clients (mapping colonne→champ), lot > 5000 lignes → 400.
+- `2026-06-16 13:35:19Z` **[done]** vitrine L3 — TOUS LES ROUTEURS COUVERTS L3 — 4 cas e2e (public submitContact validation 400 + admin leads 401/200/enum 400). Jalon : 0 routeur tRPC sans test L3 sur tout le new-stack.
