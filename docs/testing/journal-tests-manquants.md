@@ -160,12 +160,13 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] assistant `thread-writer` + `threads-repository` → test `assistant-threads-drizzle.test.ts` (4 cas) ✅ it.68 — `assistant-data-reader-drizzle.ts` DÉJÀ couvert (test sibling créé au feat d'activation, 5 cas) → COLONNE ASSISTANT L2 COMPLÈTE
 - [x] `comptabilite/infra/factures-csv-reader-drizzle.ts` → test (2 cas : période bornes incluses + tri + client, anti-IDOR) ✅ it.69
 - [x] `devis/infra/devis-signature-reader-drizzle.ts` → test (2 cas : round-trip signature par devisId, null si absent) ✅ it.70
-- [ ] **Réel restant (vérifié it.69, scan sibling+combiné) :** devis-ia, interventions-mobile, artisan/logo-writer, subscription/event-notifier.
+- [x] `devis-ia/infra/devis-ia-repository-drizzle.ts` → test (4 cas : analyse CRUD+anti-IDOR, photos ownership, détail enrichi, updateSuggestionOwned chaîne anti-IDOR) ✅ it.71
+- [ ] **Réel restant (vérifié it.71) :** interventions-mobile, artisan/logo-writer, subscription/event-notifier.
   (avis public-reader/writer = it.58 ; factures readers = it.56 ; assistant thread-writer = it.68 — couverts en tests combinés, pas en sibling.)
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `devis-ia/infra/devis-ia-repository-drizzle.ts`** (L2 ; repo devis-IA — RLS, round-trip + anti-IDOR cross-tenant). Puis interventions-mobile, artisan/logo-writer, subscription/event-notifier (4 adapters réels restants).
+**Prochaine cible : `interventions-mobile/infra/intervention-mobile-repository-drizzle.ts`** (L2 ; repo interventions mobile — RLS, round-trip + anti-IDOR cross-tenant). Puis artisan/logo-writer, subscription/event-notifier (3 adapters réels restants).
 
 ---
 
@@ -243,3 +244,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 22:04:32Z` **[test]** assistant threads L2 (RLS) — it.68 — writer + threads-repository assistant IA 4 cas verts : createThread titre tronqué 80 char, addMessage tri asc + anti-IDOR (B ne touche pas le thread de A), listThreads desc lastMessageAt (B->[]), getThreadOwned anti-IDOR (B->null). Reste data-reader. Front L2 drizzle : ~8 restants.
 - `2026-06-16 22:35:29Z` **[test]** comptabilite csv-reader L2 (RLS) — it.69 — FacturesCsvReaderDrizzle 2 cas verts : listFacturesPeriode bornes incluses + tri date asc + nom client, anti-IDOR (B->[]). Note: assistant-data-reader DÉJÀ couvert (sibling au feat) -> colonne assistant L2 complète. Réel restant : 5 adapters (devis-signature-reader, devis-ia, interventions-mobile, logo-writer, event-notifier).
 - `2026-06-16 23:04:22Z` **[test]** devis signature-reader L2 — it.70 — DevisSignatureReaderDrizzle 2 cas verts : getByDevisId round-trip (id/token/createdAt) du devis signé, null si devis sans signature ou inexistant. Réel restant : 4 adapters (devis-ia, interventions-mobile, logo-writer, event-notifier).
+- `2026-06-16 23:35:05Z` **[test]** devis-ia repo L2 (RLS+chaîne anti-IDOR) — it.71 — DevisIARepositoryDrizzle 4 cas verts : analyse CRUD+anti-IDOR (B->null/[]), addPhoto/listPhotoUrls ownership analyse parente, getAnalyseDetail enrichi (résultats->suggestions), updateSuggestionOwned anti-IDOR via chaîne suggestion->résultat->analyse(tenant). Réel restant : 3 adapters.
