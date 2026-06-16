@@ -142,7 +142,8 @@ Vérifié it.51 : **0** fichier `src/**` (fonction/classe/arrow) sans test ; **0
 Le garde-fou L2 serait ROUGE → ce sont de vraies lacunes à combler (pas un guard). Priorité aux readers/
 repos des features critiques d'abord. Liste (recalculable : `for f in $(find src -name '*-drizzle.ts' ! -name '*.test.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`) :
 - [x] `signature/infra/signature-repository-drizzle.ts` → test (3 cas, persistance hors-RLS) ✅ it.52
-- [ ] `paiement/infra/portal-payment-writer-drizzle.ts` (critique) · `devices/infra/device-repository-drizzle.ts` (sécurité)
+- [x] `paiement/infra/portal-payment-writer-drizzle.ts` → test (2 cas, RLS écriture + isolation cross-tenant) ✅ it.53
+- [ ] `devices/infra/device-repository-drizzle.ts` (sécurité)
 - [ ] `factures/infra/{client,devis,artisan}-reader-drizzle.ts` · `signature/infra/signature-context-reader-drizzle.ts`
 - [ ] avis (3), commandes/artisan-reader, ecritures/facture-reader, articles/public-article-search, vitrine/public-reader,
   calendrier/ical-public-reader, chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
@@ -151,7 +152,7 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `paiement/infra/portal-payment-writer-drizzle.ts`** (L2, feature critique paiement). Puis `devices`, puis les readers factures.
+**Prochaine cible : `devices/infra/device-repository-drizzle.ts`** (L2, sécurité sessions — RLS scope tenant + anti-IDOR). Puis readers `factures` puis le reste des 25 adapters Drizzle restants.
 
 ---
 
@@ -210,3 +211,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 13:35:19Z` **[done]** vitrine L3 — TOUS LES ROUTEURS COUVERTS L3 — 4 cas e2e (public submitContact validation 400 + admin leads 401/200/enum 400). Jalon : 0 routeur tRPC sans test L3 sur tout le new-stack.
 - `2026-06-16 14:05:29Z` **[done]** garde-fou couverture routeurs L3 — Scan global it.51 : L1/L2/L3 ÉPUISÉS (0 logique/handler/routeur sans test). Ajout meta-test router-coverage (anti-régression, 2 cas verts). Front suivant : L4/garde-fous/mutation — arbitrage humain conseillé.
 - `2026-06-16 14:35:08Z` **[done]** signature-repository-drizzle L2 — Persistance signatures_devis couverte (3 cas : create+défauts, round-trip getByToken/getByDevisId, null si absent). NOUVEAU FRONT : 27 adapters Drizzle L2 sans test (le guard L2 serait rouge → vraies lacunes).
+- `2026-06-16 15:04:54Z` **[done]** paiement portal-payment-writer L2 — RLS écriture paiements_stripe couverte (2 cas : insert en_attente scopé artisan du ctx + isolation cross-tenant en lecture B ne voit pas la ligne de A).
