@@ -147,14 +147,15 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `signature/infra/signature-context-reader-drizzle.ts` → test (4 cas, RLS lecture contexte + anti-IDOR + notif isolée) ✅ it.55
 - [x] `factures/infra/{client,devis,artisan}-reader-drizzle.ts` → test `contact-readers-drizzle.test.ts` (4 cas, RLS round-trip + anti-IDOR) ✅ it.56
 - [x] `ecritures/infra/facture-reader-drizzle.ts` → test (2 cas, RLS round-trip getFacture/getLignes + anti-IDOR) ✅ it.57
-- [ ] avis (3), commandes/artisan-reader, articles/public-article-search, vitrine/public-reader,
+- [x] avis flux public → `public-avis-flow-drizzle.test.ts` (4 cas : context-reader RLS + anti-IDOR, writer transaction 3 effets, isolation) ✅ it.58 — reste `demande-avis-repository-drizzle.ts`
+- [ ] commandes/artisan-reader, articles/public-article-search, vitrine/public-reader,
   calendrier/ical-public-reader, chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
   devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
   subscription/event-notifier, shared/readers/contact-readers.
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : avis — `public-demande-context-reader-drizzle.ts` + `public-avis-writer-drizzle.ts`** (L2 ; flux public d'avis client — feature critique, accès par token public). Reader = round-trip + anti-IDOR ; writer public = persistance scopée. (3e restant : `demande-avis-repository-drizzle.ts`.) Puis commandes/artisan-reader, puis le reste des ~19 adapters Drizzle.
+**Prochaine cible : `avis/infra/demande-avis-repository-drizzle.ts`** (L2 ; repo des demandes d'avis — RLS, round-trip + anti-IDOR cross-tenant ; ferme la colonne avis). Puis commandes/artisan-reader, puis le reste des ~18 adapters Drizzle.
 
 ---
 
@@ -219,3 +220,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 15:38:12Z` **[test]** signature-context-reader L2 (RLS) — it.55 — SignatureContextReaderDrizzle + NotificationWriter sous tenant (4 cas verts) : round-trip contexte devis/client/artisan, anti-IDOR (B->null), notif isolée RLS. Front L2 drizzle : ~23 adapters restants.
 - `2026-06-16 16:04:52Z` **[test]** factures contact-readers L2 (RLS) — it.56 — client/devis/artisan readers de la facturation (4 cas verts) : round-trip sous tenant + anti-IDOR cross-tenant (B->null/[]), lignes triées par ordre. Front L2 drizzle : ~20 adapters restants.
 - `2026-06-16 16:34:38Z` **[test]** ecritures facture-reader L2 (RLS/FEC) — it.57 — FactureReaderDrizzle (génération FEC) 2 cas verts : getFacture round-trip + anti-IDOR (B->null), getLignes taux/montant TVA scopées via la facture parente (B->[]). Front L2 drizzle : ~19 adapters restants.
+- `2026-06-16 17:04:50Z` **[test]** avis flux public L2 (RLS) — it.58 — flux public d'avis client (token), 4 cas verts : context-reader noms sous tenant + anti-IDOR (B->null client/intervention), writer transaction (avis publié + demande completee + notif), isolation RLS (B ne voit pas l'avis de A). Front L2 drizzle : ~18 restants.
