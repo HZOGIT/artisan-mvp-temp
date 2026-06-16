@@ -104,6 +104,34 @@ réellement (cookies host-only, lots tRPC complets, redirections, service worker
 - Une **passe automatique toutes les 5 min** (cron de session) rejoue ce balayage et n'alerte
   (ntfy) que s'il y a des `issues` — silence = tout vert.
 
+### Tester les **mutations** front→tRPC (pas seulement le chargement des pages)
+
+    ./scripts/pw-run.sh scripts/staging-e2e-mutations.mjs E2E_PASS='Azerqsdf1234!'
+
+- `scripts/staging-e2e-sweep.mjs` ne fait que **charger** les routes (console/pageerror/4xx-5xx/page vide).
+  Il **ne déclenche aucune action** → il ne voit PAS un bug de **contrat front↔backend** (ex. P1 du
+  2026-06-16 : le front appelait `<module>.update({statut})` alors que le backend a des mutations de
+  transition dédiées et **ignore silencieusement** `statut` → le statut ne changeait jamais, sans erreur).
+- `scripts/staging-e2e-mutations.mjs` exerce de **vraies actions dans le navigateur** (clic UI réel →
+  tRPC) puis **vérifie que l'effet PERSISTE** côté serveur (refetch). Sortie : `cas testés: N | issues: M`.
+- **Le faire tourner fait partie de la recette de test** (en plus du sweep) — quand on (re)met en place
+  les crons de testing, ils doivent lancer **les deux**.
+
+### 🔒 RÈGLE — chaque correction de bug livre un test e2e PERSISTANT (anti-régression)
+
+**Tout fix doit s'accompagner d'un test durable qui rejoue le déclencheur réel**, sinon le bug revient :
+
+1. **Bug d'intégration front↔tRPC** (mutation ignorée, mauvais endpoint appelé, mismatch de contrat,
+   page qui ne persiste pas une action) → **ajouter un cas dans `scripts/staging-e2e-mutations.mjs`**
+   (action UI réelle + assertion de persistance), pas seulement une vérif manuelle jetable.
+2. **Bug de logique backend** (use-case, calcul, garde) → **ajouter un test `vitest`** (`*.test.ts`) qui
+   reproduit le cas, exécuté par le gate `vitest run src`.
+3. **Bug de route/rendu** (page blanche, 4xx) couvert → s'assurer que la route est dans le sweep.
+
+Ne jamais clore un fix sans : (a) le test persistant ajouté/committé, (b) le test **rouge avant / vert
+après**, (c) la vérif au vrai navigateur du déclencheur d'origine. Un fix sans test anti-régression
+durable est **incomplet**.
+
 ### Méthode (ce qui a marché, ce qui a piégé)
 
 1. **Reproduis dans le navigateur**, pas seulement en API. Deux incidents réels où le curl trompait :
