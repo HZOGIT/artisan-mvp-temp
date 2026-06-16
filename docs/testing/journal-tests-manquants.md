@@ -143,7 +143,7 @@ Le garde-fou L2 serait ROUGE → ce sont de vraies lacunes à combler (pas un gu
 repos des features critiques d'abord. Liste (recalculable : `for f in $(find src -name '*-drizzle.ts' ! -name '*.test.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`) :
 - [x] `signature/infra/signature-repository-drizzle.ts` → test (3 cas, persistance hors-RLS) ✅ it.52
 - [x] `paiement/infra/portal-payment-writer-drizzle.ts` → test (2 cas, RLS écriture + isolation cross-tenant) ✅ it.53
-- [ ] `devices/infra/device-repository-drizzle.ts` (sécurité)
+- [x] `devices/infra/device-repository-drizzle.ts` → test (3 cas, anti-IDOR par user_id, hors RLS) ✅ it.54
 - [ ] `factures/infra/{client,devis,artisan}-reader-drizzle.ts` · `signature/infra/signature-context-reader-drizzle.ts`
 - [ ] avis (3), commandes/artisan-reader, ecritures/facture-reader, articles/public-article-search, vitrine/public-reader,
   calendrier/ical-public-reader, chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
@@ -152,7 +152,7 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `devices/infra/device-repository-drizzle.ts`** (L2, sécurité sessions — RLS scope tenant + anti-IDOR). Puis readers `factures` puis le reste des 25 adapters Drizzle restants.
+**Prochaine cible : `signature/infra/signature-context-reader-drizzle.ts`** (L2 ; lecture du contexte devis/client/artisan pour la création du lien de signature — feature critique). Puis readers `factures` (client/devis/artisan) puis le reste des ~24 adapters Drizzle restants.
 
 ---
 
@@ -212,3 +212,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 14:05:29Z` **[done]** garde-fou couverture routeurs L3 — Scan global it.51 : L1/L2/L3 ÉPUISÉS (0 logique/handler/routeur sans test). Ajout meta-test router-coverage (anti-régression, 2 cas verts). Front suivant : L4/garde-fous/mutation — arbitrage humain conseillé.
 - `2026-06-16 14:35:08Z` **[done]** signature-repository-drizzle L2 — Persistance signatures_devis couverte (3 cas : create+défauts, round-trip getByToken/getByDevisId, null si absent). NOUVEAU FRONT : 27 adapters Drizzle L2 sans test (le guard L2 serait rouge → vraies lacunes).
 - `2026-06-16 15:04:54Z` **[done]** paiement portal-payment-writer L2 — RLS écriture paiements_stripe couverte (2 cas : insert en_attente scopé artisan du ctx + isolation cross-tenant en lecture B ne voit pas la ligne de A).
+- `2026-06-16 15:34:52Z` **[done]** devices device-repository L2 — 3 cas e2e (hors RLS, isolation par user_id) : listByUser trié desc, deleteOwned anti-IDOR (A ne supprime pas l'appareil de B), deleteOthers garde le courant + n'affecte pas B.
