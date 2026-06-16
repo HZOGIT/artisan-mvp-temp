@@ -152,13 +152,14 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `commandes/infra/artisan-reader-drizzle.ts` → test (2 cas, RLS émetteur courant) ✅ it.60 — **COLONNE COMMANDES L2 COMPLÈTE**
 - [x] `articles/infra/public-article-search-drizzle.ts` → test (4 cas, catalogue public hors RLS : visible + ILIKE + filtres + tri) ✅ it.61
 - [x] `vitrine/infra/vitrine-public-reader-drizzle.ts` → test (5 cas : slug hors-RLS, params, avis publiés, stats, catégories) ✅ it.62
-- [ ] calendrier/ical-public-reader, chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
+- [x] `calendrier/infra/ical-public-reader-drizzle.ts` → test (3 cas : token résolu + filtre since + tri + enrichissement, isolation, token inconnu null) ✅ it.63
+- [ ] chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
   devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
   subscription/event-notifier, shared/readers/contact-readers.
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `calendrier/infra/ical-public-reader-drizzle.ts`** (L2 ; flux iCal public — hors RLS / accès par token public, round-trip simple). Puis le reste des ~14 adapters Drizzle.
+**Prochaine cible : `chat/infra/*notifier*-drizzle.ts`** (L2 ; writer notification chat — RLS, persistance scopée tenant). Vérifier le chemin exact (`find src/modules/chat/infra -name '*drizzle*'`). Puis le reste des ~13 adapters Drizzle.
 
 ---
 
@@ -228,3 +229,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 18:04:37Z` **[test]** commandes artisan-reader L2 (RLS) — it.60 — ArtisanReaderDrizzle (émetteur PDF/email bon de commande) 2 cas verts : getArtisan renvoie la ligne de l'artisan du contexte (A puis B, scope RLS), contexte sans artisan -> null. COLONNE COMMANDES L2 COMPLETE. Front L2 drizzle : ~16 restants.
 - `2026-06-16 18:34:42Z` **[test]** articles public-search L2 (hors RLS) — it.61 — PublicArticleSearchReaderDrizzle (catalogue global) 4 cas verts : visible=true + ILIKE nom/description, exclut non-visibles, tri nom asc ; filtres metier/categorie/sousCategorie. Front L2 drizzle : ~15 restants.
 - `2026-06-16 19:04:41Z` **[test]** vitrine public-reader L2 — it.62 — VitrinePublicReaderDrizzle 5 cas verts : getArtisanBySlug (hors RLS) + slug inconnu null, getVitrineParams (null sans params), getPublishedAvis (publie only, nom formaté), getPublicStats (interventions terminées only), getArticleCategories (distinctes non nulles). Front L2 drizzle : ~14 restants.
+- `2026-06-16 19:34:28Z` **[test]** calendrier ical-public-reader L2 — it.63 — IcalPublicReaderDrizzle 3 cas verts : getFeedByToken résout l'artisan par icalToken (hors RLS) + filtre since + tri asc + enrichissement client ; isolation (feed A sans intervention B) ; token inconnu -> null. Front L2 drizzle : ~13 restants.
