@@ -88,12 +88,17 @@ export default function DevisDetail() {
     { enabled: !!id }
   );
 
-  const updateMutation = trpc.devis.update.useMutation({
-    onSuccess: () => {
-      utils.devis.getById.invalidate({ id: parseInt(id || "0") });
-      toast.success("Devis mis à jour");
-    },
-  });
+  // Transitions de statut : la machine à états backend les expose en mutations DÉDIÉES — le champ
+  // `statut` n'est PAS accepté par `devis.update` (il y serait silencieusement ignoré). On route donc
+  // chaque cible vers sa mutation de transition.
+  const onStatutSuccess = () => {
+    utils.devis.getById.invalidate({ id: parseInt(id || "0") });
+    toast.success("Statut du devis mis à jour");
+  };
+  const onStatutError = (error: { message: string }) => toast.error(error.message);
+  const envoyerMutation = trpc.devis.envoyer.useMutation({ onSuccess: onStatutSuccess, onError: onStatutError });
+  const accepterMutation = trpc.devis.accepter.useMutation({ onSuccess: onStatutSuccess, onError: onStatutError });
+  const refuserMutation = trpc.devis.refuser.useMutation({ onSuccess: onStatutSuccess, onError: onStatutError });
 
   const addLineMutation = trpc.devis.addLigne.useMutation({
     onSuccess: () => {
@@ -240,7 +245,12 @@ export default function DevisDetail() {
   };
 
   const handleStatusChange = (newStatus: string) => {
-    updateMutation.mutate({ id: parseInt(id || "0"), statut: newStatus as any });
+    if (newStatus === devis?.statut) return;
+    const devisId = parseInt(id || "0");
+    if (newStatus === "envoye") envoyerMutation.mutate({ id: devisId });
+    else if (newStatus === "accepte") accepterMutation.mutate({ id: devisId });
+    else if (newStatus === "refuse") refuserMutation.mutate({ id: devisId });
+    else toast.error("Cette transition de statut n'est pas disponible.");
   };
 
   const handleConvertToFacture = () => {

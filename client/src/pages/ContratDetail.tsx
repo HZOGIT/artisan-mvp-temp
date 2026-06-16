@@ -73,12 +73,16 @@ export default function ContratDetail() {
     onError: (error) => toast.error(error.message),
   });
 
-  const updateMutation = trpc.contrats.update.useMutation({
-    onSuccess: () => {
-      toast.success("Contrat mis à jour");
-      refetch();
-    },
-    onError: (error) => toast.error(error.message),
+  // Transitions de statut : mutations DÉDIÉES (machine à états backend). Le champ `statut` n'est PAS
+  // accepté par `contrats.update` (il y serait silencieusement ignoré).
+  const onStatutError = (error: { message: string }) => toast.error(error.message);
+  const suspendreMutation = trpc.contrats.suspendre.useMutation({
+    onSuccess: () => { toast.success("Contrat suspendu"); refetch(); },
+    onError: onStatutError,
+  });
+  const reactiverMutation = trpc.contrats.reactiver.useMutation({
+    onSuccess: () => { toast.success("Contrat réactivé"); refetch(); },
+    onError: onStatutError,
   });
 
   const createInterventionMutation = trpc.contrats.createIntervention.useMutation({
@@ -170,7 +174,7 @@ export default function ContratDetail() {
               variant="outline"
               size="sm"
               className="text-orange-600"
-              onClick={() => updateMutation.mutate({ id: contrat.id, statut: "suspendu" })}
+              onClick={() => suspendreMutation.mutate({ id: contrat.id })}
             >
               Suspendre
             </Button>
@@ -180,7 +184,7 @@ export default function ContratDetail() {
               variant="outline"
               size="sm"
               className="text-green-600"
-              onClick={() => updateMutation.mutate({ id: contrat.id, statut: "actif" })}
+              onClick={() => reactiverMutation.mutate({ id: contrat.id })}
             >
               Réactiver
             </Button>

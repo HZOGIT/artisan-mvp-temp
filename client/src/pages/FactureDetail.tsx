@@ -156,16 +156,17 @@ export default function FactureDetail() {
     { enabled: !!id && !!facture }
   );
 
-  const updateMutation = trpc.factures.update.useMutation({
-    onSuccess: () => {
-      utils.factures.getById.invalidate({ id: factureId });
-      utils.factures.getAuditLog.invalidate({ factureId });
-      toast.success("Facture mise à jour");
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  // Transitions de statut : mutations DÉDIÉES (machine à états backend). Le champ `statut` n'est PAS
+  // accepté par `factures.update` (il y serait silencieusement ignoré). Le passage à « payée » se fait
+  // via l'enregistrement d'un paiement (montant requis), pas par un changement de statut direct.
+  const onStatutSuccess = () => {
+    utils.factures.getById.invalidate({ id: factureId });
+    utils.factures.getAuditLog.invalidate({ factureId });
+    toast.success("Statut de la facture mis à jour");
+  };
+  const onStatutError = (error: { message: string }) => toast.error(error.message);
+  const envoyerFactureMutation = trpc.factures.envoyer.useMutation({ onSuccess: onStatutSuccess, onError: onStatutError });
+  const marquerEnRetardMutation = trpc.factures.marquerEnRetard.useMutation({ onSuccess: onStatutSuccess, onError: onStatutError });
 
   const addLineMutation = trpc.factures.addLigne.useMutation({
     onSuccess: () => {
@@ -261,7 +262,13 @@ export default function FactureDetail() {
   };
 
   const handleStatusChange = (newStatus: string) => {
-    updateMutation.mutate({ id: factureId, statut: newStatus as any });
+    if (newStatus === "envoyee") envoyerFactureMutation.mutate({ id: factureId });
+    else if (newStatus === "en_retard") marquerEnRetardMutation.mutate({ id: factureId });
+    else if (newStatus === "payee") {
+      // « Payée » passe par l'enregistrement d'un paiement (montant requis) → ouvre la modale dédiée.
+      setPaymentData({ ...paymentData, montantPaye: String(facture?.totalTTC || 0) });
+      setIsPaymentDialogOpen(true);
+    } else toast.error("Cette transition de statut n'est pas disponible.");
   };
 
   const handleMarkAsPaid = (e: React.FormEvent) => {
