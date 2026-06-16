@@ -153,13 +153,14 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `articles/infra/public-article-search-drizzle.ts` → test (4 cas, catalogue public hors RLS : visible + ILIKE + filtres + tri) ✅ it.61
 - [x] `vitrine/infra/vitrine-public-reader-drizzle.ts` → test (5 cas : slug hors-RLS, params, avis publiés, stats, catégories) ✅ it.62
 - [x] `calendrier/infra/ical-public-reader-drizzle.ts` → test (3 cas : token résolu + filtre since + tri + enrichissement, isolation, token inconnu null) ✅ it.63
-- [ ] chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
+- [x] `chat/infra/chat-client-notifier-drizzle.ts` → test (4 cas : email+lien portail, sans email no-op, rate-limit no-op, anti-IDOR) ✅ it.64
+- [ ] import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
   devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
   subscription/event-notifier, shared/readers/contact-readers.
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `chat/infra/*notifier*-drizzle.ts`** (L2 ; writer notification chat — RLS, persistance scopée tenant). Vérifier le chemin exact (`find src/modules/chat/infra -name '*drizzle*'`). Puis le reste des ~13 adapters Drizzle.
+**Prochaine cible : `import-erp/infra/import-erp-repository-drizzle.ts`** (L2 ; repo d'import ERP — RLS, persistance/lecture scopée tenant + anti-IDOR cross-tenant). Puis integrations-comptables, alertes-previsions, puis le reste des ~12 adapters Drizzle.
 
 ---
 
@@ -230,3 +231,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 18:34:42Z` **[test]** articles public-search L2 (hors RLS) — it.61 — PublicArticleSearchReaderDrizzle (catalogue global) 4 cas verts : visible=true + ILIKE nom/description, exclut non-visibles, tri nom asc ; filtres metier/categorie/sousCategorie. Front L2 drizzle : ~15 restants.
 - `2026-06-16 19:04:41Z` **[test]** vitrine public-reader L2 — it.62 — VitrinePublicReaderDrizzle 5 cas verts : getArtisanBySlug (hors RLS) + slug inconnu null, getVitrineParams (null sans params), getPublishedAvis (publie only, nom formaté), getPublicStats (interventions terminées only), getArticleCategories (distinctes non nulles). Front L2 drizzle : ~14 restants.
 - `2026-06-16 19:34:28Z` **[test]** calendrier ical-public-reader L2 — it.63 — IcalPublicReaderDrizzle 3 cas verts : getFeedByToken résout l'artisan par icalToken (hors RLS) + filtre since + tri asc + enrichissement client ; isolation (feed A sans intervention B) ; token inconnu -> null. Front L2 drizzle : ~13 restants.
+- `2026-06-16 20:04:49Z` **[test]** chat client-notifier L2 (RLS+email) — it.64 — ChatClientNotifierDrizzle 4 cas verts : envoi email + lien portail (clé rate-limit chat:artisanId), client sans email -> no-op (pas de check), rate-limit atteint -> no-op, anti-IDOR (client d'un autre tenant -> rien). Front L2 drizzle : ~12 restants.
