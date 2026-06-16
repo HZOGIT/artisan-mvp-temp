@@ -150,14 +150,15 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] avis flux public → `public-avis-flow-drizzle.test.ts` (4 cas) ✅ it.58
 - [x] `avis/infra/demande-avis-repository-drizzle.ts` → test (3 cas, RLS ownership + anti-IDOR + creerDemande) ✅ it.59 — **COLONNE AVIS L2 COMPLÈTE**
 - [x] `commandes/infra/artisan-reader-drizzle.ts` → test (2 cas, RLS émetteur courant) ✅ it.60 — **COLONNE COMMANDES L2 COMPLÈTE**
-- [ ] articles/public-article-search, vitrine/public-reader,
+- [x] `articles/infra/public-article-search-drizzle.ts` → test (4 cas, catalogue public hors RLS : visible + ILIKE + filtres + tri) ✅ it.61
+- [ ] vitrine/public-reader,
   calendrier/ical-public-reader, chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
   devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
   subscription/event-notifier, shared/readers/contact-readers.
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `articles/infra/public-article-search-drizzle.ts`** (L2 ; recherche publique d'articles — vérifier le scope tenant/visibilité publique et l'isolation). Puis vitrine/public-reader, puis le reste des ~16 adapters Drizzle.
+**Prochaine cible : `vitrine/infra/vitrine-public-reader-drizzle.ts`** (L2 ; lecture publique de la vitrine artisan — vérifier visibilité publique + isolation/scope). Puis le reste des ~15 adapters Drizzle.
 
 ---
 
@@ -225,3 +226,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 17:04:50Z` **[test]** avis flux public L2 (RLS) — it.58 — flux public d'avis client (token), 4 cas verts : context-reader noms sous tenant + anti-IDOR (B->null client/intervention), writer transaction (avis publié + demande completee + notif), isolation RLS (B ne voit pas l'avis de A). Front L2 drizzle : ~18 restants.
 - `2026-06-16 17:36:26Z` **[test]** avis demande-repo L2 (RLS) — it.59 — DemandeAvisRepositoryDrizzle 3 cas verts : getInterventionOwned/getClientOwned anti-IDOR (B->null), getDerniereIntervention (date desc), creerDemande scopée artisan. COLONNE AVIS L2 COMPLETE. Front L2 drizzle : ~17 restants.
 - `2026-06-16 18:04:37Z` **[test]** commandes artisan-reader L2 (RLS) — it.60 — ArtisanReaderDrizzle (émetteur PDF/email bon de commande) 2 cas verts : getArtisan renvoie la ligne de l'artisan du contexte (A puis B, scope RLS), contexte sans artisan -> null. COLONNE COMMANDES L2 COMPLETE. Front L2 drizzle : ~16 restants.
+- `2026-06-16 18:34:42Z` **[test]** articles public-search L2 (hors RLS) — it.61 — PublicArticleSearchReaderDrizzle (catalogue global) 4 cas verts : visible=true + ILIKE nom/description, exclut non-visibles, tri nom asc ; filtres metier/categorie/sousCategorie. Front L2 drizzle : ~15 restants.
