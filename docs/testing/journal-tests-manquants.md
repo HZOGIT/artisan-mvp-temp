@@ -126,10 +126,21 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 
 🏁 **TOUS LES ROUTEURS tRPC SONT COUVERTS L3** (vérifié it.50 : `find src -name '*.router.ts'` sans test = **0**). 24 routeurs L3 ajoutés par la boucle (it.13-50), `vitrine` ✅ it.50 inclus.
 
-**Prochaine cible : RECALCUL DU SCAN GLOBAL** pour le front suivant. Au prochain réveil :
-- `for f in $(find src -name '*.ts' ! -name '*.test.ts' ! -name '*fake*'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || grep -qE "^export (async )?function|^export class|^export const .*=>" "$f" && [ ! -f "$t" ] && echo "$f"; done`
-- Pistes restantes probables : **interface/http/** handlers sans test (ex. route HTTP non couverte), `shared/pdf/pdf-generator` (jsPDF), `shared/**` utilitaires résiduels. Sinon, **L4 navigateur** : structurer `scripts/e2e/*.journey.mjs` pour signature / abonnement (cf. PoC OPE-316).
-- Si plus aucun gisement L1/L2/L3 : proposer à l'humain de passer la boucle en **mode garde-fou** (cohérence use-case=test, mutation testing ciblé) ou la clôturer.
+## 🏁 L1/L2/L3 ÉPUISÉS (scan global it.51)
+Vérifié it.51 : **0** fichier `src/**` (fonction/classe/arrow) sans test ; **0** handler `interface/http` sans test ;
+**0** routeur tRPC sans L3. Garde-fou anti-régression posé : `src/interface/trpc/router-coverage.test.ts` (it.51).
+
+**Front suivant possible (arbitrage humain conseillé) :**
+- **L4 navigateur** (chemins critiques restants non couverts par le PoC OPE-316) : journey **abonnement Stripe**
+  (login → checkout → URL `checkout.stripe.com`). ⚠️ dépend des price IDs Stripe configurés sur staging
+  (sinon 400) → à valider avant d'en faire un test « vert » stable. Pattern : `scripts/e2e/*.journey.mjs`.
+- **Garde-fous supplémentaires** (T2-like) : meta-test « tout `*-drizzle.ts` a un sibling test » ; cohérence
+  use-case=test.
+- **Mutation testing ciblé** (Stryker, T8) sur domaine/montants — nightly, hors boucle 30 min.
+
+**Prochaine cible : garde-fou L2 — meta-test « tout `infra/*-drizzle.ts` a un sibling `.test.ts` »**
+(même esprit que router-coverage ; vert au moment de l'écriture = protège la couverture L2). Puis, si tout
+est verrouillé, **proposer à l'humain** de clore la boucle ou de lancer le front L4/mutation.
 
 ---
 
@@ -186,3 +197,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 12:34:38Z` **[done]** integrations-comptables L3 router — 3 cas e2e : getConfig 401 sans cookie, 5 lectures 200 (config/exports/syncStatus/syncLogs/pendingItems), saveConfig valide 200 + genererExport logiciel hors enum → 400.
 - `2026-06-16 13:04:44Z` **[done]** import-erp L3 router — 3 cas e2e reprise : importClients 401 sans cookie, 200 + crée les clients (mapping colonne→champ), lot > 5000 lignes → 400.
 - `2026-06-16 13:35:19Z` **[done]** vitrine L3 — TOUS LES ROUTEURS COUVERTS L3 — 4 cas e2e (public submitContact validation 400 + admin leads 401/200/enum 400). Jalon : 0 routeur tRPC sans test L3 sur tout le new-stack.
+- `2026-06-16 14:05:29Z` **[done]** garde-fou couverture routeurs L3 — Scan global it.51 : L1/L2/L3 ÉPUISÉS (0 logique/handler/routeur sans test). Ajout meta-test router-coverage (anti-régression, 2 cas verts). Front suivant : L4/garde-fous/mutation — arbitrage humain conseillé.
