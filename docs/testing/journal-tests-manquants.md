@@ -117,12 +117,13 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - [x] `devices` → `devices.router.test.ts` (4 cas) ✅ it.29
 - [x] `comptabilite` → `comptabilite.router.test.ts` (3 cas, garde permission) ✅ it.30
 - [x] `dashboard` → `dashboard.router.test.ts` (3 cas, 6 lectures 200) ✅ it.31
-- [ ] `statistiques` · `search` · `chat`
+- [x] `statistiques` → `statistiques.router.test.ts` (2 cas) ✅ it.32
+- [ ] `search` · `chat`
 - [ ] reste : activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options,
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Prochaine cible : `statistiques` — L3 `statistiques.router.test.ts`**. Puis `search`, `chat`, puis le reste des routeurs (activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
+**Prochaine cible : `search` — L3 `search.router.test.ts`**. Puis `chat`, puis le reste des routeurs (activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
 
 ---
 
@@ -160,3 +161,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 03:04:55Z` **[done]** devices L3 router — 4 cas e2e sessions (list/revoke/revokeAll 401 sans cookie, list 200, revokeAll 200, revoke deviceId non positif → 400).
 - `2026-06-16 03:34:40Z` **[done]** comptabilite L3 router — 3 cas e2e gardé par comptabilite.voir : 401 sans cookie, 403 sans permission, 200 (balance + FEC preview) après octroi.
 - `2026-06-16 04:04:40Z` **[done]** dashboard L3 router — 3 cas e2e : getStats 401 sans cookie ; 6 lectures agrégées 200 (stats/recentActivity/monthlyCA/topClients/objectifs/alerts) ; getRecentActivity limit>500 → 400.
+- `2026-06-16 04:34:46Z` **[done]** statistiques L3 router — 2 cas e2e : getDevisStats 401 sans cookie, 200 avec cookie (agrégats tenant).
