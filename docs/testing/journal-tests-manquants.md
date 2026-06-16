@@ -119,12 +119,12 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - [x] `dashboard` → `dashboard.router.test.ts` (3 cas, 6 lectures 200) ✅ it.31
 - [x] `statistiques` → `statistiques.router.test.ts` (2 cas) ✅ it.32
 - [x] `search` → `search.router.test.ts` (3 cas) ✅ it.33
-- [ ] `chat`
+- [x] `chat` → `chat.router.test.ts` (3 cas) ✅ it.34
 - [ ] reste : activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options,
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Prochaine cible : `chat` — L3 `chat.router.test.ts`**. Puis le reste des routeurs (activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
+**Prochaine cible : `calendrier` — L3 `calendrier.router.test.ts`**. Puis le reste des routeurs (activites, alertes-previsions, assistant, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
 
 ---
 
@@ -164,3 +164,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 04:04:40Z` **[done]** dashboard L3 router — 3 cas e2e : getStats 401 sans cookie ; 6 lectures agrégées 200 (stats/recentActivity/monthlyCA/topClients/objectifs/alerts) ; getRecentActivity limit>500 → 400.
 - `2026-06-16 04:34:46Z` **[done]** statistiques L3 router — 2 cas e2e : getDevisStats 401 sans cookie, 200 avec cookie (agrégats tenant).
 - `2026-06-16 05:04:47Z` **[done]** search L3 router — 3 cas e2e : global 401 sans cookie, 200 requête valide, validation requête vide/>100 → 400.
+- `2026-06-16 05:34:46Z` **[done]** chat L3 router — 3 cas e2e messagerie : 401 sans cookie (getConversations/getMessages/sendMessage), getConversations+getUnreadCount 200, validation contenu vide + startConversation sans clientId → 400.
