@@ -127,4 +127,15 @@ describe("depenses — convertirTransaction", () => {
     // B ne voit pas la transaction de A
     await expect(convertirTransaction({ transactionRepo: trxRepo, depenseRepo: depRepo }, B, { transactionId: t.id, categorie: "x" })).rejects.toBeInstanceOf(NotFoundError);
   });
+
+  it("une transaction au CRÉDIT (encaissement) → ValidationError (pas une dépense)", async () => {
+    const trxRepo = new FakeTransactionBancaireRepository();
+    const depRepo = new FakeDepenseRepository();
+    const t = seed(trxRepo, { libelle: "VIREMENT RECU", montant: "300.00", typeTransaction: "credit" });
+    await expect(
+      convertirTransaction({ transactionRepo: trxRepo, depenseRepo: depRepo }, A, { transactionId: t.id, categorie: "x" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    // non liée → pas de dépense fictive créée
+    expect((await trxRepo.getById(A, t.id))?.depenseId).toBeNull();
+  });
 });

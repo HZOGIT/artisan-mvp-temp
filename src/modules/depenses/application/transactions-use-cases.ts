@@ -71,6 +71,11 @@ export async function convertirTransaction(
   const t = await deps.transactionRepo.getById(ctx, input.transactionId);
   if (!t) throw new NotFoundError("Transaction introuvable");
   if (t.depenseId) throw new ValidationError("Transaction déjà convertie en dépense");
+  // Une transaction au CRÉDIT est un encaissement, pas une dépense : la convertir créerait une
+  // dépense fictive (TVA déductible & FEC achats faussés). On refuse explicitement.
+  if (t.typeTransaction === "credit") {
+    throw new ValidationError("Une transaction au crédit (encaissement) ne peut pas être convertie en dépense");
+  }
 
   const montantTtc = Math.abs(Number(t.montant) || 0);
   const tauxTva = 20;
