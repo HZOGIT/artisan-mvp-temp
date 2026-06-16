@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { TenantContext } from "../../../shared/tenant";
 import { IntegrationsComptablesRepositoryFake } from "../infra/integrations-comptables-repository-fake";
 import { getConfig, saveConfig, saveSyncConfig, getSyncStatus, getExports, genererExport, type GenererExportDeps } from "./use-cases";
+import { ValidationError } from "../../../shared/errors";
 
 const ctx: TenantContext = { artisanId: 1, userId: 1 };
 
@@ -49,11 +50,18 @@ describe("genererExport", () => {
     expect(repo.exports[0].statut).toBe("termine");
   });
 
-  it("format non implémenté (csv) → contenu vide, export terminé", async () => {
+  it("format non implémenté (csv) → LÈVE + export marqué `erreur` (anti-échec silencieux, jamais de faux `termine` vide)", async () => {
     const { deps, repo } = build();
-    const res = await genererExport(deps, ctx, { logiciel: "autre", formatExport: "csv", dateDebut: "2026-01-01", dateFin: "2026-03-31" });
-    expect(res.contenu).toBe("");
-    expect(repo.exports[0].statut).toBe("termine");
+    await expect(genererExport(deps, ctx, { logiciel: "autre", formatExport: "csv", dateDebut: "2026-01-01", dateFin: "2026-03-31" })).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.exports[0].statut).toBe("erreur");
+    expect(repo.exports[0].statut).not.toBe("termine");
+  });
+
+  it("contenu vide (période sans écriture, format implémenté) → LÈVE aussi (pas de faux succès)", async () => {
+    const repo = new IntegrationsComptablesRepositoryFake({ facturesIIF: [] });
+    const deps: GenererExportDeps = { repo, fec: { getFecContent: async () => "" } };
+    await expect(genererExport(deps, ctx, { logiciel: "sage", formatExport: "fec", dateDebut: "2026-01-01", dateFin: "2026-03-31" })).rejects.toBeInstanceOf(ValidationError);
+    expect(repo.exports[0].statut).toBe("erreur");
   });
 });
 

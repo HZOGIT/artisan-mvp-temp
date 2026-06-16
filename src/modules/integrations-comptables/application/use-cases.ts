@@ -1,4 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
+import { ValidationError } from "../../../shared/errors";
 import type { IIntegrationsComptablesRepository, PendingItem } from "./integrations-comptables-repository";
 import type { ConfigComptable, ExportComptableRow, FormatExport, LogicielComptable, SaveConfigInput, SaveSyncConfigInput } from "../domain/integration-comptable";
 import { buildIIF, deriveSyncStatus } from "../domain/integration-comptable";
@@ -38,7 +39,8 @@ export interface GenererExportDeps {
 
 // Génère un export comptable (FEC opposable réutilisé du domaine compta, ou IIF QuickBooks porté pur).
 // Crée l'enregistrement d'export, génère le contenu (LECTURE SEULE — aucune écriture mutée), met à jour
-// le statut. Formats `qbo`/`csv` non implémentés (parité legacy : contenu vide). Parité `genererExport`.
+// le statut. Formats `qbo`/`csv` non encore implémentés : un contenu vide est marqué `erreur` (jamais
+// `termine`) et l'appel LÈVE → l'UI signale l'échec au lieu de livrer un fichier vide silencieusement.
 export async function genererExport(deps: GenererExportDeps, ctx: TenantContext, input: GenererExportInput): Promise<{ id: number; contenu: string }> {
   const dateDebut = new Date(input.dateDebut);
   const dateFin = new Date(input.dateFin);
@@ -57,6 +59,14 @@ export async function genererExport(deps: GenererExportDeps, ctx: TenantContext,
   } else if (input.formatExport === "iif") {
     const factures = await deps.repo.listFacturesForIIF(ctx, dateDebut, dateFin);
     contenu = buildIIF(factures);
+  }
+
+  // Garde anti-échec silencieux : un format non implémenté (`csv`/`qbo`) ou une période sans contenu ne
+  // doit JAMAIS produire un export `termine` vide (le comptable téléchargerait un fichier vide en croyant
+  // l'export réussi). On marque l'export en erreur et on lève — l'échec devient visible.
+  if (!contenu.trim()) {
+    await deps.repo.updateExport(ctx, exportRecord.id, { statut: "erreur", erreur: `Aucun contenu à exporter pour le format « ${input.formatExport} »` });
+    throw new ValidationError(`L'export au format « ${input.formatExport} » n'a produit aucun contenu (format non disponible ou période sans écriture).`);
   }
 
   await deps.repo.updateExport(ctx, exportRecord.id, { statut: "termine", nombreEcritures: contenu.split("\n").length - 1 });
