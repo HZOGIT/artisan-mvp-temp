@@ -157,13 +157,13 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `import-erp/infra/import-erp-repository-drizzle.ts` → test (4 cas : listClients anti-IDOR, createClient, createDevisLight, createFactureLight numéro légal préservé) ✅ it.65
 - [x] `integrations-comptables/infra/integrations-comptables-repository-drizzle.ts` → test (4 cas : config upsert+whitelist, exports CRUD scopé, IIF période/statuts, pending items) ✅ it.66
 - [x] `alertes-previsions/infra/alertes-previsions-repository-drizzle.ts` → test (4 cas : config upsert+whitelist, historique CRUD desc, prévision CA, CA réalisé payées) ✅ it.67
-- [ ] assistant/thread-writer,
-  devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
+- [x] assistant `thread-writer` + `threads-repository` → test `assistant-threads-drizzle.test.ts` (4 cas : titre tronqué, messages tri asc + anti-IDOR update, listThreads desc, getThreadOwned anti-IDOR) ✅ it.68 — reste `assistant-data-reader-drizzle.ts`
+- [ ] assistant/data-reader, devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
   subscription/event-notifier, shared/readers/contact-readers.
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : assistant — `assistant-thread-writer-drizzle.ts` (+ éventuellement threads-repository / data-reader)** (L2 ; RLS, persistance/lecture scopée tenant + anti-IDOR). 3 adapters drizzle dans le module. Puis le reste des ~9 adapters Drizzle.
+**Prochaine cible : `assistant/infra/assistant-data-reader-drizzle.ts`** (L2 ; lecture des données métier contextuelles pour l'assistant — RLS, round-trip + anti-IDOR ; ferme la colonne assistant). Puis le reste des ~8 adapters Drizzle.
 
 ---
 
@@ -238,3 +238,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 20:34:31Z` **[test]** import-erp repo L2 (RLS) — it.65 — ImportErpRepositoryDrizzle 4 cas verts : listClients scopé tenant (anti-IDOR), createClient persisté, createDevisLight (numéro serveur généré), createFactureLight PRÉSERVE le numéro légal d'origine sinon génère + listFactureNumeros anti-doublon. Front L2 drizzle : ~11 restants.
 - `2026-06-16 21:04:52Z` **[test]** integrations-comptables repo L2 (RLS) — it.66 — IntegrationsComptablesRepositoryDrizzle 4 cas verts : saveConfig upsert+whitelist colonnes (clé inconnue ignorée), exports CRUD scopé (création/liste desc/maj anti-IDOR), listFacturesForIIF (période+statuts émis+join client), listPendingItems (facture émise non couverte par export terminé). Front L2 drizzle : ~10 restants.
 - `2026-06-16 21:34:39Z` **[test]** alertes-previsions repo L2 (RLS) — it.67 — AlertesPrevisionsRepositoryDrizzle 4 cas verts : upsertConfig insert+update partiel+whitelist (clé inconnue ignorée), historique insert/list desc/existe (anti-IDOR), getPrevisionCA (null si absent), getCaRealiseMois (somme factures payées du mois, exclut autres statuts/mois). Front L2 drizzle : ~9 restants.
+- `2026-06-16 22:04:32Z` **[test]** assistant threads L2 (RLS) — it.68 — writer + threads-repository assistant IA 4 cas verts : createThread titre tronqué 80 char, addMessage tri asc + anti-IDOR (B ne touche pas le thread de A), listThreads desc lastMessageAt (B->[]), getThreadOwned anti-IDOR (B->null). Reste data-reader. Front L2 drizzle : ~8 restants.
