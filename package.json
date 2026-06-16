@@ -11,6 +11,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
+    "gen:api": "openapi-typescript openapi/operioz.openapi.json -o client/src/modern/shared/api/schema.d.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
@@ -79,6 +80,8 @@
     "multer": "^2.0.2",
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
+    "openapi-fetch": "^0.17.0",
+    "openapi-react-query": "^0.5.4",
     "pg": "^8.21.0",
     "react": "^19.2.1",
     "react-day-picker": "^9.11.1",
@@ -116,6 +119,7 @@
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.4",
     "esbuild": "^0.25.0",
+    "openapi-typescript": "^7.13.0",
     "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",

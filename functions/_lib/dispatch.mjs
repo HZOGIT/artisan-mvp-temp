@@ -82,6 +82,8 @@ export const MIGRATED_ROUTES = [
   { name: "fonts", pattern: /^\/api\/fonts\/[^/]+$/ },
   // Télémétrie d'erreur fire-and-forget (`/api/voice/debug`, PUBLIC, sendBeacon, anti-flood IP).
   { name: "voice-debug", pattern: /^\/api\/voice\/debug$/ },
+  // Façade REST du domaine clients (PoC OPE-366, front moderne via openapi-typescript). Auth cookie JWT.
+  { name: "rest-clients", pattern: /^\/api\/rest\/clients(\/[^/]+)?$/ },
 ];
 
 // Le chemin correspond-il à une route HORS-tRPC migrée (→ new-stack) ?
