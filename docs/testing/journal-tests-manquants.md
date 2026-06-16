@@ -115,12 +115,13 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - [x] `artisan` → `artisan.router.test.ts` (4 cas) ✅ it.27
 - [x] `utilisateurs` → `utilisateurs.router.test.ts` (4 cas, garde permission 401/403/200) ✅ it.28
 - [x] `devices` → `devices.router.test.ts` (4 cas) ✅ it.29
-- [ ] `comptabilite` · `dashboard` · `statistiques` · `search` · `chat`
+- [x] `comptabilite` → `comptabilite.router.test.ts` (3 cas, garde permission) ✅ it.30
+- [ ] `dashboard` · `statistiques` · `search` · `chat`
 - [ ] reste : activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options,
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Prochaine cible : `comptabilite` — L3 `comptabilite.router.test.ts`** (exports comptables — sensible). Puis `dashboard`, `statistiques`, `search`, `chat`, puis le reste des routeurs.
+**Prochaine cible : `dashboard` — L3 `dashboard.router.test.ts`** (agrégats home). Puis `statistiques`, `search`, `chat`, puis le reste des routeurs (activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
 
 ---
 
@@ -156,3 +157,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 02:05:31Z` **[done]** artisan L3 router — 4 cas e2e profil (getProfile/updateProfile 401 sans cookie, getProfile tenant, update reflété, validation email/spécialité 400). NOUVEAU FRONT : 24 routers tRPC sans L3 (scan global fonctions/classes = 0).
 - `2026-06-16 02:35:45Z` **[done]** utilisateurs L3 router — 4 cas e2e gardé par permission : 401 sans cookie, 403 sans utilisateurs.gerer, 200 après octroi, invite rôle hors enum → 400. Valide la chaîne auth→tenant→permission.
 - `2026-06-16 03:04:55Z` **[done]** devices L3 router — 4 cas e2e sessions (list/revoke/revokeAll 401 sans cookie, list 200, revokeAll 200, revoke deviceId non positif → 400).
+- `2026-06-16 03:34:40Z` **[done]** comptabilite L3 router — 3 cas e2e gardé par comptabilite.voir : 401 sans cookie, 403 sans permission, 200 (balance + FEC preview) après octroi.
