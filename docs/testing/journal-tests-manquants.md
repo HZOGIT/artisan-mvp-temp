@@ -116,12 +116,13 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - [x] `utilisateurs` → `utilisateurs.router.test.ts` (4 cas, garde permission 401/403/200) ✅ it.28
 - [x] `devices` → `devices.router.test.ts` (4 cas) ✅ it.29
 - [x] `comptabilite` → `comptabilite.router.test.ts` (3 cas, garde permission) ✅ it.30
-- [ ] `dashboard` · `statistiques` · `search` · `chat`
+- [x] `dashboard` → `dashboard.router.test.ts` (3 cas, 6 lectures 200) ✅ it.31
+- [ ] `statistiques` · `search` · `chat`
 - [ ] reste : activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options,
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Prochaine cible : `dashboard` — L3 `dashboard.router.test.ts`** (agrégats home). Puis `statistiques`, `search`, `chat`, puis le reste des routeurs (activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
+**Prochaine cible : `statistiques` — L3 `statistiques.router.test.ts`**. Puis `search`, `chat`, puis le reste des routeurs (activites, alertes-previsions, assistant, calendrier, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
 
 ---
 
@@ -158,3 +159,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 02:35:45Z` **[done]** utilisateurs L3 router — 4 cas e2e gardé par permission : 401 sans cookie, 403 sans utilisateurs.gerer, 200 après octroi, invite rôle hors enum → 400. Valide la chaîne auth→tenant→permission.
 - `2026-06-16 03:04:55Z` **[done]** devices L3 router — 4 cas e2e sessions (list/revoke/revokeAll 401 sans cookie, list 200, revokeAll 200, revoke deviceId non positif → 400).
 - `2026-06-16 03:34:40Z` **[done]** comptabilite L3 router — 3 cas e2e gardé par comptabilite.voir : 401 sans cookie, 403 sans permission, 200 (balance + FEC preview) après octroi.
+- `2026-06-16 04:04:40Z` **[done]** dashboard L3 router — 3 cas e2e : getStats 401 sans cookie ; 6 lectures agrégées 200 (stats/recentActivity/monthlyCA/topClients/objectifs/alerts) ; getRecentActivity limit>500 → 400.
