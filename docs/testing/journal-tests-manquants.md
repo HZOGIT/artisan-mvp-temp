@@ -104,12 +104,14 @@ isSearchable, bibliotheque) restent **L1 seul**. → Rétro-complétion sans obj
 - [x] `parametres/domain/parametres.ts` → `parametres.test.ts` (5 cas) ✅ it.23
 - [x] `config-relances/domain/config-relances.ts` → `config-relances.test.ts` (5 cas) ✅ it.24
 - [x] `assistant/domain/assistant.ts` → `assistant.test.ts` (6 cas) ✅ it.25
-- [ ] `devis-ia/domain/analyse-photos.ts`
+- [x] `devis-ia/domain/analyse-photos.ts` → `analyse-photos.test.ts` (13 cas) ✅ it.26
 - _Écartés_ : `shared/testing/trpc-inject.ts` (outil de test), `shared/db/client.ts` (adapter infra).
 
 🏁 **Les 4 colonnes critiques prioritaires sont COMPLÈTES** (portail, signature, abonnement, auth).
 
-**Prochaine cible : `devis-ia/domain/analyse-photos.ts`** (L1 ; dernier domaine de la liste). Ensuite : recalculer le scan global `src/**` (interface/http handlers, infra adapters à logique) pour le prochain front. (`shared/pdf/pdf-generator.ts` = wrapper jsPDF lourd → en dernier.)
+**Prochaine cible : RECALCULER LE SCAN GLOBAL** `src/**` — domain + shared logique épuisés. Au prochain réveil :
+`for f in $(find src -name '*.ts' ! -name '*.test.ts' ! -name '*fake*'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || grep -qE "^export (async )?function|^export const .*=>" "$f" && [ ! -f "$t" ] && echo "$f"; done`
+puis trier (écarter ports/adapters triviaux/outils) et prendre la 1re vraie logique. Candidats probables : `interface/http/*` handlers, `shared/readers/*`, infra à logique non triviale. (`shared/pdf/pdf-generator.ts` = wrapper jsPDF lourd → en dernier.)
 
 ---
 
@@ -141,3 +143,4 @@ isSearchable, bibliotheque) restent **L1 seul**. → Rétro-complétion sans obj
 - `2026-06-16 00:04:37Z` **[done]** parametres/domain L1 — defaultParametres couvert (5 cas : artisanId, préfixes DEV/FAC/AV + compteurs=1, défauts métier paiement/rappels/objectifs/couleurs, optionnels null, invariance inter-tenant).
 - `2026-06-16 00:34:37Z` **[done]** config-relances/domain L1 — defaultConfigRelances couvert (5 cas : artisanId, inactif par défaut opt-in, cadence 7/7/3, fenêtre 09:00 jours ouvrés, invariance inter-tenant).
 - `2026-06-16 01:04:49Z` **[done]** assistant/domain L1 — clampThreadsLimit/clampMessagesLimit couverts (6 cas : défaut sur undefined/0, plancher décimal, min 1 sur négatif, max borné). Quirk 0→défaut pinné.
+- `2026-06-16 01:35:00Z` **[done]** devis-ia/domain analyse-photos L1 — 5 fonctions couvertes (13 cas) : buildImageBlocks, buildSystemPrompt (métier/casse/générique), parseAnalyseResponse (markdown/extraction/null), sanitizeVisionError, matchBibliotheque. Front domain/shared épuisé.
