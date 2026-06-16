@@ -124,8 +124,8 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Routeurs L3 faits (it.27-47, 21)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, geolocalisation, devis-options, interventions-mobile, alertes-previsions, support, conseils-ia, assistant, **devis-ia** ✅ it.47 (CRUD + anti-IDOR).
-**Prochaine cible : `integrations-comptables` — L3 `integrations-comptables.router.test.ts`**. Puis import-erp, vitrine (≈ derniers routeurs sans L3).
+**Routeurs L3 faits (it.27-48, 22)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, geolocalisation, devis-options, interventions-mobile, alertes-previsions, support, conseils-ia, assistant, devis-ia, **integrations-comptables** ✅ it.48.
+**Prochaine cible : `import-erp` — L3 `import-erp.router.test.ts`**. Puis `vitrine` (DERNIER routeur sans L3). Ensuite : recalculer `find src -name '*.router.ts'` sans test → si 0, tous les routeurs sont couverts L3.
 
 ---
 
@@ -179,3 +179,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 11:04:44Z` **[done]** conseils-ia L3 router — 2 cas e2e (LLM faké) : conseilsIA 401 sans cookie, 200 structure {conseils}. Pattern FakeLlmPort validé pour les routeurs IA.
 - `2026-06-16 11:34:50Z` **[done]** assistant L3 router — 3 cas e2e (LLM faké) : getThreads/generateDevis 401 sans cookie, getThreads+suggestRelances 200, generateDevis description vide → 400.
 - `2026-06-16 12:04:59Z` **[done]** devis-ia L3 router — 3 cas e2e : list/createAnalyse 401 sans cookie, createAnalyse 200 + getById, validation getById id<=0 → 400 + anti-IDOR addPhoto sur analyse inexistante → 404.
+- `2026-06-16 12:34:38Z` **[done]** integrations-comptables L3 router — 3 cas e2e : getConfig 401 sans cookie, 5 lectures 200 (config/exports/syncStatus/syncLogs/pendingItems), saveConfig valide 200 + genererExport logiciel hors enum → 400.
