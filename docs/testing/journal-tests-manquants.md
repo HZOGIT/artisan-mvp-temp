@@ -124,8 +124,8 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Routeurs L3 faits (it.27-41)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, geolocalisation, **devis-options** ✅ it.41 (anti-IDOR).
-**Prochaine cible : `interventions-mobile` — L3 `interventions-mobile.router.test.ts`**. Puis le reste (alertes-previsions, assistant, conseils-ia, devis-ia, import-erp, integrations-comptables, support, vitrine).
+**Routeurs L3 faits (it.27-42, 16)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, geolocalisation, devis-options, **interventions-mobile** ✅ it.42.
+**Prochaine cible : `alertes-previsions` — L3 `alertes-previsions.router.test.ts`**. Puis le reste (assistant, conseils-ia, devis-ia, import-erp, integrations-comptables, support, vitrine).
 
 ---
 
@@ -173,3 +173,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 08:04:51Z` **[done]** feature-modules L3 router — 3 cas e2e modules/onboarding : list 401 sans cookie, list/getMine/getOnboardingStatus 200, toggle sans actif → 400.
 - `2026-06-16 08:34:25Z` **[done]** geolocalisation L3 router — 2 cas e2e : getPositions 401 sans cookie, 200 tableau avec cookie.
 - `2026-06-16 09:04:38Z` **[done]** devis-options L3 router — 4 cas e2e : 401 sans cookie, create 200 + getByDevisId reflète, anti-IDOR create sur devis non possédé → 404, validation nom>100 → 400.
+- `2026-06-16 09:34:40Z` **[done]** interventions-mobile L3 router — 4 cas e2e app technicien : 401 sans cookie, getTodayInterventions 200, validation interventionId non positif → 400, start sur intervention inexistante → 404.
