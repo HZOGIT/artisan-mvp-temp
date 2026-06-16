@@ -124,7 +124,8 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Prochaine cible : `calendrier` — L3 `calendrier.router.test.ts`**. Puis le reste des routeurs (activites, alertes-previsions, assistant, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, rapports, support, vitrine).
+**Routeurs L3 faits (it.27-35)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, **calendrier** ✅ it.35.
+**Prochaine cible : `rapports` — L3 `rapports.router.test.ts`**. Puis le reste (activites, alertes-previsions, assistant, conseils-ia, devis-ia, devis-options, emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, support, vitrine).
 
 ---
 
@@ -165,3 +166,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 04:34:46Z` **[done]** statistiques L3 router — 2 cas e2e : getDevisStats 401 sans cookie, 200 avec cookie (agrégats tenant).
 - `2026-06-16 05:04:47Z` **[done]** search L3 router — 3 cas e2e : global 401 sans cookie, 200 requête valide, validation requête vide/>100 → 400.
 - `2026-06-16 05:34:46Z` **[done]** chat L3 router — 3 cas e2e messagerie : 401 sans cookie (getConversations/getMessages/sendMessage), getConversations+getUnreadCount 200, validation contenu vide + startConversation sans clientId → 400.
+- `2026-06-16 06:04:47Z` **[done]** calendrier L3 router — 3 cas e2e flux iCal : 401 sans cookie, getIcalFeed 200 + path idempotent, regenerate rotation du jeton (path différent).
