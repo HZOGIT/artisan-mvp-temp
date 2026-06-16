@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ConflictError, NotFoundError } from "../../../shared/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "../../../shared/errors";
 import { FakeEmailPort } from "../../../shared/ports/fakes";
 import { FakePasswordHasher } from "../../../shared/ports/password-hasher-bcrypt";
 import type { TenantContext } from "../../../shared/tenant";
@@ -70,6 +70,19 @@ describe("utilisateurs use-cases", () => {
     // Anti-IDOR : A ne peut pas toucher un user de B.
     await expect(changerRole(deps, ctx(A), 200, "secretaire")).rejects.toBeInstanceOf(NotFoundError);
     await expect(basculerActif(deps, ctx(A), 200, false)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("PROTECTION OWNER : aucune mutation ne peut cibler le propriétaire (anti-lockout) → ForbiddenError", async () => {
+    const { deps, repo } = makeDeps();
+    repo.setOwner(A, 100); // user 100 = propriétaire de l'entreprise A
+    repo.seedUser({ id: 100, role: "artisan", artisanId: A }); // owner ciblable (users.artisanId = A, cf. provisioning)
+    await expect(changerRole(deps, ctx(A), 100, "technicien")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(basculerActif(deps, ctx(A), 100, false)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(definirPermissions(deps, ctx(A), 100, ["clients.voir"])).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(reinitialiserPermissions(deps, ctx(A), 100)).rejects.toBeInstanceOf(ForbiddenError);
+    // L'owner n'a PAS été modifié (toujours artisan + actif).
+    const list = await listUtilisateurs(deps, ctx(A));
+    expect(list.find((u) => u.id === 100)).toMatchObject({ role: "artisan", actif: true });
   });
 
   it("changerRole : réinitialise les permissions aux défauts du nouveau rôle", async () => {

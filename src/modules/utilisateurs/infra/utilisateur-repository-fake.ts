@@ -96,4 +96,8 @@ export class FakeUtilisateurRepository implements IUtilisateurRepository {
   async getNomEntreprise(ctx: TenantContext): Promise<string | null> {
     return this.noms.get(ctx.artisanId) ?? null;
   }
+
+  async getOwnerUserId(ctx: TenantContext): Promise<number | null> {
+    return this.owners.get(ctx.artisanId) ?? null;
+  }
 }

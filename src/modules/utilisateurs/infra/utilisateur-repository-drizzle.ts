@@ -16,6 +16,10 @@ export class UtilisateurRepositoryDrizzle implements IUtilisateurRepository {
     return a?.userId ?? null;
   }
 
+  getOwnerUserId(ctx: TenantContext): Promise<number | null> {
+    return this.ownerUserId(ctx);
+  }
+
   async list(ctx: TenantContext): Promise<UtilisateurListItem[]> {
     const owner = await this.ownerUserId(ctx);
     const cond = owner != null ? or(eq(users.id, owner), eq(users.artisanId, ctx.artisanId)) : eq(users.artisanId, ctx.artisanId);

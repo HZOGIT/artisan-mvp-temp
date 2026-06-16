@@ -1,4 +1,4 @@
-import { ConflictError, NotFoundError } from "../../../shared/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "../../../shared/errors";
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PasswordHasher } from "../../../shared/ports/password-hasher";
 import type { TenantContext } from "../../../shared/tenant";
@@ -16,6 +16,16 @@ export interface UtilisateurDeps {
 }
 
 const ROLE_FR: Record<string, string> = { artisan: "Artisan", secretaire: "Secrétaire", technicien: "Technicien" };
+
+// Protection du PROPRIÉTAIRE : son compte (role/actif/permissions) est immuable via la gestion des
+// utilisateurs. Sans cette garde, un collaborateur disposant de `utilisateurs.gerer` pourrait
+// désactiver/rétrograder l'owner (`artisans.userId`) → lockout/prise de contrôle du compte.
+async function assertNotOwner(deps: UtilisateurDeps, ctx: TenantContext, userId: number): Promise<void> {
+  const ownerUserId = await deps.repo.getOwnerUserId(ctx);
+  if (ownerUserId !== null && userId === ownerUserId) {
+    throw new ForbiddenError("Le compte propriétaire ne peut pas être modifié via la gestion des utilisateurs.");
+  }
+}
 
 // Échappement HTML minimal (parité legacy `safeHtml`) pour l'injection de la raison sociale dans l'email.
 function safeHtml(s: string): string {
@@ -70,6 +80,7 @@ export async function inviterUtilisateur(deps: UtilisateurDeps, ctx: TenantConte
 
 // Change le rôle d'un collaborateur (anti-IDOR strict) + réinitialise ses permissions aux défauts du rôle.
 export async function changerRole(deps: UtilisateurDeps, ctx: TenantContext, userId: number, role: CollaborateurRole): Promise<{ id: number; role: string }> {
+  await assertNotOwner(deps, ctx, userId);
   const updated = await deps.repo.updateRole(ctx, userId, role);
   if (!updated) throw new NotFoundError("Utilisateur non trouvé dans votre entreprise");
   await deps.repo.setPermissions(ctx, userId, [...(ROLE_TEMPLATES[role] ?? ROLE_TEMPLATES.artisan)]);
@@ -77,6 +88,7 @@ export async function changerRole(deps: UtilisateurDeps, ctx: TenantContext, use
 }
 
 export async function basculerActif(deps: UtilisateurDeps, ctx: TenantContext, userId: number, actif: boolean): Promise<{ id: number; actif: boolean }> {
+  await assertNotOwner(deps, ctx, userId);
   const updated = await deps.repo.toggleActif(ctx, userId, actif);
   if (!updated) throw new NotFoundError("Utilisateur non trouvé dans votre entreprise");
   return updated;
@@ -91,6 +103,7 @@ export async function lirePermissions(deps: UtilisateurDeps, ctx: TenantContext,
 
 // Définit les permissions : filtre celles du catalogue (anti-injection) puis applique (strict-owned).
 export async function definirPermissions(deps: UtilisateurDeps, ctx: TenantContext, userId: number, permissions: string[]): Promise<{ success: true; count: number }> {
+  await assertNotOwner(deps, ctx, userId);
   const valid = permissions.filter((p) => (ALL_PERMISSIONS as string[]).includes(p));
   if (!(await deps.repo.setPermissions(ctx, userId, valid))) {
     throw new NotFoundError("Utilisateur non trouvé dans votre entreprise");
@@ -100,6 +113,7 @@ export async function definirPermissions(deps: UtilisateurDeps, ctx: TenantConte
 
 // Réinitialise les permissions aux défauts du rôle.
 export async function reinitialiserPermissions(deps: UtilisateurDeps, ctx: TenantContext, userId: number): Promise<{ success: true; permissions: string[] }> {
+  await assertNotOwner(deps, ctx, userId);
   const user = await deps.repo.getManageableUser(ctx, userId);
   if (!user) throw new NotFoundError("Utilisateur non trouvé");
   const defaults = [...(ROLE_TEMPLATES[user.role] ?? ROLE_TEMPLATES.artisan)];

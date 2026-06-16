@@ -24,4 +24,7 @@ export interface IUtilisateurRepository {
   setPermissions(ctx: TenantContext, userId: number, permissions: string[]): Promise<boolean>;
   // Raison sociale du tenant (pour l'email d'invitation).
   getNomEntreprise(ctx: TenantContext): Promise<string | null>;
+  // userId du PROPRIÉTAIRE (`artisans.userId`) du tenant — pour interdire qu'un collaborateur
+  // (avec `utilisateurs.gerer`) ne désactive/rétrograde le compte owner (lockout). `null` si introuvable.
+  getOwnerUserId(ctx: TenantContext): Promise<number | null>;
 }
