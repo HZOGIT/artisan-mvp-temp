@@ -101,12 +101,13 @@ isSearchable, bibliotheque) restent **L1 seul**. → Rétro-complétion sans obj
 - [x] `shared/pdf/facturx.ts` → `facturx.test.ts` (6 cas) ✅ it.21
 - [x] `shared/zip/zip-entries.ts` → `zip-entries.test.ts` (4 cas) ✅ it.22
 - [ ] `shared/pdf/pdf-generator.ts` (probable wrapper jsPDF — vérifier testabilité)
-- [ ] `parametres/domain/parametres.ts` · `config-relances/domain/config-relances.ts` · `assistant/domain/assistant.ts` · `devis-ia/domain/analyse-photos.ts`
+- [x] `parametres/domain/parametres.ts` → `parametres.test.ts` (5 cas) ✅ it.23
+- [ ] `config-relances/domain/config-relances.ts` · `assistant/domain/assistant.ts` · `devis-ia/domain/analyse-photos.ts`
 - _Écartés_ : `shared/testing/trpc-inject.ts` (outil de test), `shared/db/client.ts` (adapter infra).
 
 🏁 **Les 4 colonnes critiques prioritaires sont COMPLÈTES** (portail, signature, abonnement, auth).
 
-**Prochaine cible : `parametres/domain/parametres.ts`** (L1 logique de domaine paramètres). Puis `config-relances/domain/config-relances.ts`, `assistant/domain/assistant.ts`, `devis-ia/domain/analyse-photos.ts`. (`shared/pdf/pdf-generator.ts` = wrapper jsPDF lourd → à évaluer en dernier.)
+**Prochaine cible : `config-relances/domain/config-relances.ts`** (L1 logique de domaine relances). Puis `assistant/domain/assistant.ts`, `devis-ia/domain/analyse-photos.ts`. (`shared/pdf/pdf-generator.ts` = wrapper jsPDF lourd → à évaluer en dernier.)
 
 ---
 
@@ -135,3 +136,4 @@ isSearchable, bibliotheque) restent **L1 seul**. → Rétro-complétion sans obj
 - `2026-06-15 22:34:26Z` **[done]** shared/ia sanitize-ia-error L1 — sanitizeIaError couvert (6 cas : extraction .message, chaîne brute, fallback null/undefined, masquage image base64 + blob long […], troncature 200). Sécurité : pas de fuite de payloads dans les erreurs IA.
 - `2026-06-15 23:04:42Z` **[done]** shared/pdf facturx L1 — generateFacturXML couvert (6 cas : profil minimum/380/EUR/FR, dates CII 102, montants 2 déc + taux défaut, SIRET/TVA conditionnels, échappement XML anti-injection, échéance optionnelle).
 - `2026-06-15 23:34:40Z` **[done]** shared/zip zip-entries L1 — zipEntries couvert (4 cas : Buffer ZIP valide magic PK + nom d'entrée, multi-fichiers, contenu binaire Buffer, liste vide → EOCD).
+- `2026-06-16 00:04:37Z` **[done]** parametres/domain L1 — defaultParametres couvert (5 cas : artisanId, préfixes DEV/FAC/AV + compteurs=1, défauts métier paiement/rappels/objectifs/couleurs, optionnels null, invariance inter-tenant).
