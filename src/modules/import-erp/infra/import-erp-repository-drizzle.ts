@@ -66,7 +66,9 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
   }
 
   async createFactureLight(ctx: TenantContext, data: ImportFactureData): Promise<void> {
-    const numero = await this.factureRepo.nextNumero(ctx);
+    // Préserve le numéro LÉGAL d'origine s'il est fourni (facture historique d'un autre logiciel) ;
+    // sinon génère un numéro serveur (parité création normale).
+    const numero = data.numero && data.numero.trim() ? data.numero.trim() : await this.factureRepo.nextNumero(ctx);
     await withTenant(this.db, ctx, async (tx) => {
       await tx.insert(facturesTable).values({
         artisanId: ctx.artisanId,
@@ -80,6 +82,13 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
         modePaiement: data.modePaiement ?? null,
         totalTTC: data.totalTTC,
       });
+    });
+  }
+
+  listFactureNumeros(ctx: TenantContext): Promise<string[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx.select({ numero: facturesTable.numero }).from(facturesTable).where(eq(facturesTable.artisanId, ctx.artisanId));
+      return rows.map((r) => r.numero);
     });
   }
 }

@@ -38,4 +38,10 @@ export class ImportErpRepositoryFake implements IImportErpRepository {
     if (this.failOn?.("facture", this.createdFactures.length)) throw new Error("insert facture échoué");
     this.createdFactures.push(data);
   }
+
+  // Numéros déjà créés (préservés) + numéros existants seedés via `existingNumeros`.
+  existingNumeros: string[] = [];
+  async listFactureNumeros(_ctx: TenantContext): Promise<string[]> {
+    return [...this.existingNumeros, ...this.createdFactures.map((f) => f.numero).filter((n): n is string => !!n)];
+  }
 }

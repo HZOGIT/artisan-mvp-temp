@@ -27,6 +27,8 @@ export interface ImportDevisData {
 // Facture « légère » importée : montant TTC brut, sans lignes. Numéro généré serveur.
 export interface ImportFactureData {
   readonly clientId: number;
+  // Numéro LÉGAL d'origine (autre logiciel) à PRÉSERVER ; si absent/vide → numéro serveur généré.
+  readonly numero?: string;
   readonly objet: string;
   readonly statut: string;
   readonly dateFacture: Date;
@@ -45,4 +47,7 @@ export interface IImportErpRepository {
   createClient(ctx: TenantContext, data: ImportClientData): Promise<void>;
   createDevisLight(ctx: TenantContext, data: ImportDevisData): Promise<void>;
   createFactureLight(ctx: TenantContext, data: ImportFactureData): Promise<void>;
+  // Numéros de facture déjà présents pour le tenant — pour refuser un doublon à l'import (le numéro
+  // émis est immuable ; on ne réattribue pas et on ne crée pas deux factures au même numéro).
+  listFactureNumeros(ctx: TenantContext): Promise<string[]>;
 }

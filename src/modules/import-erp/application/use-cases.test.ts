@@ -82,5 +82,35 @@ describe("importFactures", () => {
     expect(f.objet).toBe("Presta");
     expect(f.totalTTC).toBe("800");
     expect(f.dateEcheance.getTime() - f.dateFacture.getTime()).toBe(30 * 86_400_000);
+    // Sans `numeroFacture` mappé → pas de numéro forcé (le repo génère un numéro serveur).
+    expect(f.numero).toBeUndefined();
+  });
+
+  const mapFactureNum = { ...mapFacture, Num: "numeroFacture" };
+
+  it("PRÉSERVE le numéro légal d'origine quand il est mappé (pas de re-numérotation)", async () => {
+    const repo = new ImportErpRepositoryFake(clients);
+    const res = await importFactures(repo, ctx, {
+      mapping: mapFactureNum,
+      rows: [{ Client: "Martin", Objet: "Presta", TTC: "800", Date: "2026-02-01", Num: "2024-042" }],
+    });
+    expect(res.imported).toBe(1);
+    expect(repo.createdFactures[0].numero).toBe("2024-042");
+  });
+
+  it("REFUSE un numéro en doublon (existant ou intra-lot) → erreur, pas de ré-attribution", async () => {
+    const repo = new ImportErpRepositoryFake(clients);
+    repo.existingNumeros = ["FAC-00010"]; // déjà présent en base
+    const res = await importFactures(repo, ctx, {
+      mapping: mapFactureNum,
+      rows: [
+        { Client: "Martin", Objet: "A", TTC: "100", Date: "2026-02-01", Num: "FAC-00010" }, // doublon existant
+        { Client: "Martin", Objet: "B", TTC: "200", Date: "2026-02-02", Num: "2024-099" }, // OK
+        { Client: "Martin", Objet: "C", TTC: "300", Date: "2026-02-03", Num: "2024-099" }, // doublon intra-lot
+      ],
+    });
+    expect(res.imported).toBe(1);
+    expect(res.errors).toBe(2);
+    expect(repo.createdFactures.map((f) => f.numero)).toEqual(["2024-099"]);
   });
 });

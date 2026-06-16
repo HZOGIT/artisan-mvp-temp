@@ -98,6 +98,9 @@ export async function importDevis(repo: IImportErpRepository, ctx: TenantContext
 export async function importFactures(repo: IImportErpRepository, ctx: TenantContext, input: ImportInput): Promise<ImportResult> {
   const clients = await repo.listClients(ctx);
   const res = emptyResult();
+  // Numéros déjà présents (existants + au fil de l'import) → on REFUSE un doublon plutôt que de
+  // ré-attribuer silencieusement (numéro légal immuable). Vide tant qu'aucun `numeroFacture` n'est mappé.
+  const numerosVus = new Set(await repo.listFactureNumeros(ctx));
 
   let lineNum = 1;
   for (const row of input.rows) {
@@ -115,11 +118,19 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
         res.errorDetails.push(`Ligne ${lineNum} : client "${nomClient}" introuvable`);
         continue;
       }
+      // Numéro LÉGAL d'origine : préservé s'il est mappé ; refusé s'il existe déjà (doublon).
+      const numeroOrigine = pickField(row, input.mapping, "numeroFacture")?.trim() || undefined;
+      if (numeroOrigine && numerosVus.has(numeroOrigine)) {
+        res.errors++;
+        res.errorDetails.push(`Ligne ${lineNum} : numéro de facture "${numeroOrigine}" déjà présent (doublon)`);
+        continue;
+      }
       const dateFactStr = pickField(row, input.mapping, "dateFacture");
       const datePaiementStr = pickField(row, input.mapping, "datePaiement");
       const dateFacture = dateFactStr ? new Date(dateFactStr) : new Date();
       await repo.createFactureLight(ctx, {
         clientId: client.id,
+        numero: numeroOrigine,
         objet: pickField(row, input.mapping, "objetFacture") || "Facture importée",
         statut: pickField(row, input.mapping, "statut") || "brouillon",
         dateFacture,
@@ -128,6 +139,7 @@ export async function importFactures(repo: IImportErpRepository, ctx: TenantCont
         modePaiement: pickField(row, input.mapping, "modePaiement"),
         totalTTC: pickField(row, input.mapping, "totalTTC") || "0",
       });
+      if (numeroOrigine) numerosVus.add(numeroOrigine); // anti-doublon intra-lot
       res.imported++;
     } catch (err) {
       res.errors++;
