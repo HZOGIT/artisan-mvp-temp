@@ -157,13 +157,14 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `import-erp/infra/import-erp-repository-drizzle.ts` → test (4 cas : listClients anti-IDOR, createClient, createDevisLight, createFactureLight numéro légal préservé) ✅ it.65
 - [x] `integrations-comptables/infra/integrations-comptables-repository-drizzle.ts` → test (4 cas : config upsert+whitelist, exports CRUD scopé, IIF période/statuts, pending items) ✅ it.66
 - [x] `alertes-previsions/infra/alertes-previsions-repository-drizzle.ts` → test (4 cas : config upsert+whitelist, historique CRUD desc, prévision CA, CA réalisé payées) ✅ it.67
-- [x] assistant `thread-writer` + `threads-repository` → test `assistant-threads-drizzle.test.ts` (4 cas : titre tronqué, messages tri asc + anti-IDOR update, listThreads desc, getThreadOwned anti-IDOR) ✅ it.68 — reste `assistant-data-reader-drizzle.ts`
-- [ ] assistant/data-reader, devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
-  subscription/event-notifier, shared/readers/contact-readers.
+- [x] assistant `thread-writer` + `threads-repository` → test `assistant-threads-drizzle.test.ts` (4 cas) ✅ it.68 — `assistant-data-reader-drizzle.ts` DÉJÀ couvert (test sibling créé au feat d'activation, 5 cas) → COLONNE ASSISTANT L2 COMPLÈTE
+- [x] `comptabilite/infra/factures-csv-reader-drizzle.ts` → test (2 cas : période bornes incluses + tri + client, anti-IDOR) ✅ it.69
+- [ ] **Réel restant (vérifié it.69, scan sibling+combiné) :** devis/devis-signature-reader, devis-ia, interventions-mobile, artisan/logo-writer, subscription/event-notifier.
+  (avis public-reader/writer = it.58 ; factures readers = it.56 ; assistant thread-writer = it.68 — couverts en tests combinés, pas en sibling.)
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `assistant/infra/assistant-data-reader-drizzle.ts`** (L2 ; lecture des données métier contextuelles pour l'assistant — RLS, round-trip + anti-IDOR ; ferme la colonne assistant). Puis le reste des ~8 adapters Drizzle.
+**Prochaine cible : `devis/infra/devis-signature-reader-drizzle.ts`** (L2 ; reader du contexte de signature de devis — RLS, round-trip + anti-IDOR). Puis devis-ia, interventions-mobile, artisan/logo-writer, subscription/event-notifier (5 adapters réels restants).
 
 ---
 
@@ -239,3 +240,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 21:04:52Z` **[test]** integrations-comptables repo L2 (RLS) — it.66 — IntegrationsComptablesRepositoryDrizzle 4 cas verts : saveConfig upsert+whitelist colonnes (clé inconnue ignorée), exports CRUD scopé (création/liste desc/maj anti-IDOR), listFacturesForIIF (période+statuts émis+join client), listPendingItems (facture émise non couverte par export terminé). Front L2 drizzle : ~10 restants.
 - `2026-06-16 21:34:39Z` **[test]** alertes-previsions repo L2 (RLS) — it.67 — AlertesPrevisionsRepositoryDrizzle 4 cas verts : upsertConfig insert+update partiel+whitelist (clé inconnue ignorée), historique insert/list desc/existe (anti-IDOR), getPrevisionCA (null si absent), getCaRealiseMois (somme factures payées du mois, exclut autres statuts/mois). Front L2 drizzle : ~9 restants.
 - `2026-06-16 22:04:32Z` **[test]** assistant threads L2 (RLS) — it.68 — writer + threads-repository assistant IA 4 cas verts : createThread titre tronqué 80 char, addMessage tri asc + anti-IDOR (B ne touche pas le thread de A), listThreads desc lastMessageAt (B->[]), getThreadOwned anti-IDOR (B->null). Reste data-reader. Front L2 drizzle : ~8 restants.
+- `2026-06-16 22:35:29Z` **[test]** comptabilite csv-reader L2 (RLS) — it.69 — FacturesCsvReaderDrizzle 2 cas verts : listFacturesPeriode bornes incluses + tri date asc + nom client, anti-IDOR (B->[]). Note: assistant-data-reader DÉJÀ couvert (sibling au feat) -> colonne assistant L2 complète. Réel restant : 5 adapters (devis-signature-reader, devis-ia, interventions-mobile, logo-writer, event-notifier).
