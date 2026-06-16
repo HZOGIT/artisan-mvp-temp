@@ -10,7 +10,7 @@ import {
   genererFactureContrat,
   addMonthsClamped,
 } from "./interventions-use-cases";
-import { NotFoundError } from "../../../shared/errors";
+import { NotFoundError, ConflictError } from "../../../shared/errors";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import type { TenantContext } from "../../../shared/tenant";
 
@@ -120,6 +120,26 @@ describe("contrats — interventions & à-facturer use-cases", () => {
     expect(repo.facturesRecurrentes[0].periodeFin.getMonth()).toBe(6); // juillet (juin + 1)
     // prochainFacturation avancée à la fin de période.
     expect((await repo.getById(A, c.id))?.prochainFacturation?.getMonth()).toBe(6);
+  });
+
+  it("genererFactureContrat : 2e appel avant l'échéance → ConflictError (anti double facturation)", async () => {
+    const repo = new FakeContratRepository();
+    repo.seedClient(A.artisanId, 100, "Durand");
+    const c = await repo.create(
+      A,
+      base({ clientId: 100, montantHT: "200.00", tauxTVA: "20.00", periodicite: "mensuel" }),
+      "CTR-00001",
+    );
+    const factureRepo = new FakeFactureRepository();
+    factureRepo.registerClient(A.artisanId, 100);
+    const gen = new FacturesContratFactureGenerator(factureRepo);
+    const now = new Date("2026-06-14T10:00:00Z");
+    // 1er appel OK → prochainFacturation avancée à juillet.
+    await genererFactureContrat(repo, gen, A, c.id, () => now);
+    // 2e appel (double-clic / retry) à la MÊME date → refusé (échéance juillet non atteinte).
+    await expect(genererFactureContrat(repo, gen, A, c.id, () => now)).rejects.toBeInstanceOf(ConflictError);
+    // Pas de 2e facture récurrente → pas de double facturation.
+    expect(repo.facturesRecurrentes).toHaveLength(1);
   });
 
   it("genererFactureContrat : 404 si le contrat n'appartient pas au tenant", async () => {

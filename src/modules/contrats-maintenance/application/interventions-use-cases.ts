@@ -1,4 +1,4 @@
-import { NotFoundError } from "../../../shared/errors";
+import { NotFoundError, ConflictError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
 import type { ContratFactureGenerator, FactureGenereeRef } from "./contrat-facture-generator";
@@ -87,6 +87,14 @@ export async function genererFactureContrat(
   const contrat = await repo.getById(ctx, contratId);
   if (!contrat) throw new NotFoundError("Contrat introuvable");
 
+  const now = maintenant();
+  // Idempotence / échéance : on n'émet PAS une nouvelle facture tant que la prochaine échéance de
+  // facturation n'est pas atteinte. Sans cette garde, un double-clic / retry réseau crée DEUX factures
+  // `envoyee` (finalisées, corrigibles par avoir uniquement) → double facturation du client.
+  if (contrat.prochainFacturation && now < new Date(contrat.prochainFacturation)) {
+    throw new ConflictError("Une facture a déjà été émise pour cette période (prochaine échéance de facturation non atteinte).");
+  }
+
   const facture = await factureGen.genererFactureEmise(ctx, {
     clientId: contrat.clientId,
     objet: `${contrat.titre} - ${contrat.reference}`,
@@ -96,7 +104,6 @@ export async function genererFactureContrat(
     tauxTVA: contrat.tauxTVA,
   });
 
-  const now = maintenant();
   const periodeFin = addMonthsClamped(now, MOIS_PAR_PERIODICITE[contrat.periodicite] ?? 1);
   await repo.recordFactureRecurrente(ctx, {
     contratId,
