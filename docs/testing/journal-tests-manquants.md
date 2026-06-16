@@ -144,7 +144,8 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `signature/infra/signature-repository-drizzle.ts` → test (3 cas, persistance hors-RLS) ✅ it.52
 - [x] `paiement/infra/portal-payment-writer-drizzle.ts` → test (2 cas, RLS écriture + isolation cross-tenant) ✅ it.53
 - [x] `devices/infra/device-repository-drizzle.ts` → test (3 cas, anti-IDOR par user_id, hors RLS) ✅ it.54
-- [ ] `factures/infra/{client,devis,artisan}-reader-drizzle.ts` · `signature/infra/signature-context-reader-drizzle.ts`
+- [x] `signature/infra/signature-context-reader-drizzle.ts` → test (4 cas, RLS lecture contexte + anti-IDOR + notif isolée) ✅ it.55
+- [ ] `factures/infra/{client,devis,artisan}-reader-drizzle.ts`
 - [ ] avis (3), commandes/artisan-reader, ecritures/facture-reader, articles/public-article-search, vitrine/public-reader,
   calendrier/ical-public-reader, chat/notifier, import-erp, integrations-comptables, alertes-previsions, assistant/thread-writer,
   devis/devis-signature-reader, devis-ia, interventions-mobile, comptabilite/factures-csv-reader, artisan/logo-writer,
@@ -152,7 +153,7 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `signature/infra/signature-context-reader-drizzle.ts`** (L2 ; lecture du contexte devis/client/artisan pour la création du lien de signature — feature critique). Puis readers `factures` (client/devis/artisan) puis le reste des ~24 adapters Drizzle restants.
+**Prochaine cible : `factures/infra/client-reader-drizzle.ts`** (L2 ; reader RLS scopé tenant pour la facturation — feature critique). Test = round-trip sous tenant + anti-IDOR cross-tenant. Puis `devis-reader` / `artisan-reader` factures, puis le reste des ~23 adapters Drizzle restants.
 
 ---
 
@@ -213,3 +214,5 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 14:35:08Z` **[done]** signature-repository-drizzle L2 — Persistance signatures_devis couverte (3 cas : create+défauts, round-trip getByToken/getByDevisId, null si absent). NOUVEAU FRONT : 27 adapters Drizzle L2 sans test (le guard L2 serait rouge → vraies lacunes).
 - `2026-06-16 15:04:54Z` **[done]** paiement portal-payment-writer L2 — RLS écriture paiements_stripe couverte (2 cas : insert en_attente scopé artisan du ctx + isolation cross-tenant en lecture B ne voit pas la ligne de A).
 - `2026-06-16 15:34:52Z` **[done]** devices device-repository L2 — 3 cas e2e (hors RLS, isolation par user_id) : listByUser trié desc, deleteOwned anti-IDOR (A ne supprime pas l'appareil de B), deleteOthers garde le courant + n'affecte pas B.
+- `2026-06-16 15:37:31Z` **[done]** signature signature-context-reader L2 — RLS (4 cas) : getDevisContext round-trip devis+client+artisan sous A, anti-IDOR (B → contexte null), devis inconnu → null, notify scopée tenant + isolation RLS (B ne voit pas la notif de A). Couvre le 2nd reader/writer critique de la signature.
+- `2026-06-16 15:38:12Z` **[test]** signature-context-reader L2 (RLS) — it.55 — SignatureContextReaderDrizzle + NotificationWriter sous tenant (4 cas verts) : round-trip contexte devis/client/artisan, anti-IDOR (B->null), notif isolée RLS. Front L2 drizzle : ~23 adapters restants.
