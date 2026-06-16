@@ -124,8 +124,8 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Routeurs L3 faits (it.27-36)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, **rapports** ✅ it.36.
-**Prochaine cible : `emails` — L3 `emails.router.test.ts`**. Puis le reste (activites, alertes-previsions, assistant, conseils-ia, devis-ia, devis-options, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, support, vitrine).
+**Routeurs L3 faits (it.27-37)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, **emails** ✅ it.37.
+**Prochaine cible : `activites` — L3 `activites.router.test.ts`**. Puis le reste (alertes-previsions, assistant, conseils-ia, devis-ia, devis-options, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile, support, vitrine).
 
 ---
 
@@ -168,3 +168,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 05:34:46Z` **[done]** chat L3 router — 3 cas e2e messagerie : 401 sans cookie (getConversations/getMessages/sendMessage), getConversations+getUnreadCount 200, validation contenu vide + startConversation sans clientId → 400.
 - `2026-06-16 06:04:47Z` **[done]** calendrier L3 router — 3 cas e2e flux iCal : 401 sans cookie, getIcalFeed 200 + path idempotent, regenerate rotation du jeton (path différent).
 - `2026-06-16 06:34:40Z` **[done]** rapports L3 router — 3 cas e2e : list/create 401 sans cookie, create 200 + visible dans list, validation nom vide / type hors enum → 400.
+- `2026-06-16 07:04:47Z` **[done]** emails L3 router — 3 cas e2e journal emails : list 401 sans cookie, 200 + filtre entité, validation limit>500 / entiteType hors enum → 400.
