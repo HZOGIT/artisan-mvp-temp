@@ -124,8 +124,8 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Routeurs L3 faits (it.27-43, 17)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, geolocalisation, devis-options, interventions-mobile, **alertes-previsions** ✅ it.43.
-**Prochaine cible : `support` — L3 `support.router.test.ts`**. Puis le reste (assistant, conseils-ia, devis-ia, import-erp, integrations-comptables, vitrine).
+**Routeurs L3 faits (it.27-44, 18)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, geolocalisation, devis-options, interventions-mobile, alertes-previsions, **support** ✅ it.44.
+**Prochaine cible : `conseils-ia` — L3 `conseils-ia.router.test.ts`**. Puis le reste (assistant, devis-ia, import-erp, integrations-comptables, vitrine). NB : routeurs IA (assistant/conseils-ia/devis-ia) → vérifier s'ils nécessitent un LlmPort faké (sinon 200 risque d'appeler l'IA réelle).
 
 ---
 
@@ -175,3 +175,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 09:04:38Z` **[done]** devis-options L3 router — 4 cas e2e : 401 sans cookie, create 200 + getByDevisId reflète, anti-IDOR create sur devis non possédé → 404, validation nom>100 → 400.
 - `2026-06-16 09:34:40Z` **[done]** interventions-mobile L3 router — 4 cas e2e app technicien : 401 sans cookie, getTodayInterventions 200, validation interventionId non positif → 400, start sur intervention inexistante → 404.
 - `2026-06-16 10:04:49Z` **[done]** alertes-previsions L3 router — 3 cas e2e : getConfig/saveConfig 401 sans cookie, getConfig+getHistorique 200, saveConfig valide 200 + fréquence hors enum → 400.
+- `2026-06-16 10:34:49Z` **[done]** support L3 router — 3 cas e2e contact : 401 sans cookie, 200 valide (emailPort faké), validation message<10 / sujet hors enum / email invalide → 400.
