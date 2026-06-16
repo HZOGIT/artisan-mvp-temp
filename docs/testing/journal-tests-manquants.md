@@ -124,8 +124,8 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
   emails, feature-modules, geolocalisation, import-erp, integrations-comptables, interventions-mobile,
   rapports, support, vitrine. (Recalcul : `for f in $(find src -name '*.router.ts'); do t="${f%.ts}.test.ts"; [ -f "$t" ] || echo "$f"; done`)
 
-**Routeurs L3 faits (it.27-39)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, **feature-modules** ✅ it.39.
-**Prochaine cible : `geolocalisation` — L3 `geolocalisation.router.test.ts`**. Puis le reste (alertes-previsions, assistant, conseils-ia, devis-ia, devis-options, import-erp, integrations-comptables, interventions-mobile, support, vitrine).
+**Routeurs L3 faits (it.27-40)** : artisan, utilisateurs, devices, comptabilite, dashboard, statistiques, search, chat, calendrier, rapports, emails, activites, feature-modules, **geolocalisation** ✅ it.40.
+**Prochaine cible : `devis-options` — L3 `devis-options.router.test.ts`**. Puis le reste (alertes-previsions, assistant, conseils-ia, devis-ia, import-erp, integrations-comptables, interventions-mobile, support, vitrine).
 
 ---
 
@@ -171,3 +171,4 @@ Scan : fonctions/arrow + classes sans test = **0** (tout couvert). Restent **les
 - `2026-06-16 07:04:47Z` **[done]** emails L3 router — 3 cas e2e journal emails : list 401 sans cookie, 200 + filtre entité, validation limit>500 / entiteType hors enum → 400.
 - `2026-06-16 07:34:25Z` **[done]** activites L3 router — 3 cas e2e suivi commercial : list/create 401 sans cookie, create 200 + visible dans list, validation titre vide / type hors enum → 400.
 - `2026-06-16 08:04:51Z` **[done]** feature-modules L3 router — 3 cas e2e modules/onboarding : list 401 sans cookie, list/getMine/getOnboardingStatus 200, toggle sans actif → 400.
+- `2026-06-16 08:34:25Z` **[done]** geolocalisation L3 router — 2 cas e2e : getPositions 401 sans cookie, 200 tableau avec cookie.
