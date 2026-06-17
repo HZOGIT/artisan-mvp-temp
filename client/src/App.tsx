@@ -6,7 +6,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { trpc } from "./lib/trpc";
 import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
-import { isV2Enabled } from "./modern/shared/flag/v2-flag";
 
 // ============================================================================
 // IMPORTS EAGER — pages critiques chargées dans le bundle initial
@@ -46,14 +45,12 @@ const Stocks = lazy(() => import("./pages/Stocks"));
 const Fournisseurs = lazy(() => import("./pages/Fournisseurs"));
 const RapportCommande = lazy(() => import("./pages/RapportCommande"));
 const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
-const SignatureDevis = lazy(() => import("./pages/SignatureDevis"));
 const ModelesEmail = lazy(() => import("./pages/ModelesEmail"));
 const ModelesEmailTransactionnels = lazy(() => import("./pages/ModelesEmailTransactionnels"));
 const HistoriqueEmails = lazy(() => import("./pages/HistoriqueEmails"));
 const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFournisseurs"));
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
-const PortailClient = lazy(() => import("./pages/PortailClient"));
 const Contrats = lazy(() => import("./pages/Contrats"));
 const ContratDetail = lazy(() => import("./pages/ContratDetail"));
 const InterventionsMobile = lazy(() => import("./pages/InterventionsMobile"));
@@ -264,11 +261,11 @@ function Router() {
         <Route path="/contact" component={PageEnConstruction} />
         <Route path="/aide" component={PageEnConstruction} />
         <Route path="/guide" component={PageEnConstruction} />
-        {/* Cutover strangler-fig (OPE-403) : les liens publics par token (emails) basculent vers le
-            front neuf /v2 — query string préservée (retour Stripe ?paiement=succes, etc.). Le legacy
-            reste accessible via l'opt-out global ?v2=0. */}
-        <Route path="/signature/:token">{(p) => isV2Enabled() ? <Redirect to={`/v2/signature/${p.token}${window.location.search}`} /> : <SignatureDevis />}</Route>
-        <Route path="/devis-public/:token">{(p) => isV2Enabled() ? <Redirect to={`/v2/devis-public/${p.token}${window.location.search}`} /> : <SignatureDevis />}</Route>
+        {/* Cutover strangler-fig (OPE-403) : pages publiques par token entièrement migrées → redirection
+            INCONDITIONNELLE vers le front neuf /v2 (query string préservée pour le retour Stripe). Les
+            pages legacy SignatureDevis/PortailClient ont été SUPPRIMÉES (plus de fallback ?v2=0 ici). */}
+        <Route path="/signature/:token">{(p) => <Redirect to={`/v2/signature/${p.token}${window.location.search}`} />}</Route>
+        <Route path="/devis-public/:token">{(p) => <Redirect to={`/v2/devis-public/${p.token}${window.location.search}`} />}</Route>
         <Route path="/paiement/succes" component={PaiementSucces} />
         <Route path="/paiement/annule" component={PaiementAnnule} />
         {/* Front neuf PUBLIC (hors auth) — pages paiement `/v2/*` montées avant le catch-all authentifié. */}
@@ -278,7 +275,7 @@ function Router() {
         <Route path="/v2/devis-public/:token" component={PublicModernRouterMount} />
         <Route path="/v2/portail/:token" component={PublicModernRouterMount} />
         <Route path="/v2/home" component={PublicModernRouterMount} />
-        <Route path="/portail/:token">{(p) => isV2Enabled() ? <Redirect to={`/v2/portail/${p.token}${window.location.search}`} /> : <PortailClient />}</Route>
+        <Route path="/portail/:token">{(p) => <Redirect to={`/v2/portail/${p.token}${window.location.search}`} />}</Route>
         <Route path="/avis/:token" component={SoumettreAvis} />
         <Route path="/vitrine/:slug" component={Vitrine} />
         {/*
