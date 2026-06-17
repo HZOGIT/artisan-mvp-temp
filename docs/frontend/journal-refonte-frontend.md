@@ -134,14 +134,13 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 2 — Devis `/v2/devis`** (port conforme de `pages/Devis.tsx`). Liste +
-mutations (création/transitions de statut). **Attention contrat** : transitions de statut = mutations
-DÉDIÉES (pas `update({statut})` — cf. P1 2026-06-16) ; ajouter le cas dans `scripts/e2e/v2-mutations.mjs`.
-Découper si lourd ; pattern « gate de chargement externe » si early-returns. *(OPE-422)*
+## 🎯 PROCHAINE CIBLE : **Vague 2 — Factures `/v2/factures`** (port conforme de `pages/Factures.tsx`).
+Liste + statuts ; primitives prêtes ; réutiliser `StatutBadge` partagé. Surveiller le contrat des
+transitions de statut (mutations dédiées). Découper si lourd. *(OPE-422)*
 
 ### Vague 2 — listes + mutations *(OPE-422)*
-Devis · Factures · Interventions · Commandes · Stocks · Dépenses (primitives prêtes ; pages lourdes →
-slices). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau (Articles create/delete, Techniciens, etc.).
+- [x] **Devis → `/v2/devis`** — port conforme `pages/Devis.tsx` (`devis-page.tsx`), i18n (namespace `devis`, statuts + exports PDF/Excel), `StatutBadge` ré-exporté dans `modern/shared/ui`. Mutations delete + convertToFacture (pas de `update({statut})`). 4 gates verts, parité e2e `17|0`, déployé.
+- [ ] Factures · Interventions · Commandes · Stocks · Dépenses (primitives prêtes ; pages lourdes → slices). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau.
 
 ### Cibles suivantes (file)
 1. Vague 1 — Articles, Fournisseurs, Techniciens (i18n + kebab d'emblée ; chacune ~600-700 l. → prévoir slices + primitives dialog/table/textarea).
@@ -155,6 +154,7 @@ slices). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau (Articles creat
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Vague 2 — Devis ✅** port `/v2/devis` (i18n statuts + exports PDF/Excel, `StatutBadge` partagé, delete+convertToFacture). 4 gates verts, parité e2e `17|0`, déployé. Prochaine : Factures. *(Rappel : rejouer l'e2e APRÈS propagation du déploiement — un run trop tôt voit des chunks périmés.)*
 - **e2e mutations v2 ✅** `scripts/e2e/v2-mutations.mjs` : cas Clients update (édite Notes via modale → persistance API → REVERT, non destructif), `cas:1 | issues:0`. Sélecteur scopé `.grid.gap-4` (évite les menus sidebar) + rôles Radix (`menuitem`/`button`). Clôt la dette batchée. Test pur (pas de déploiement). Prochaine : Vague 2 (Devis).
 - **Vague 1 — Articles ✅** port `/v2/articles` (3 dialogs + import CSV, ~90 clés i18n). 4 gates verts, parité e2e `15|0`, déployé. **🎉 VAGUE 1 TERMINÉE (6/6).** Prochaine : e2e mutations (dette batchée), puis Vague 2.
 - **Vague 1 — Fournisseurs ✅** port `/v2/fournisseurs` (4 dialogs, dialog/table/textarea, i18n namespace `fournisseurs`). Supprime le double-DashboardLayout du legacy (finding). 4 gates verts, parité e2e `13|0`, déployé. Prochaine : Articles (dernière Vague 1).

@@ -13,7 +13,7 @@ describe("resolveV2Path", () => {
   });
 
   it("renvoie null pour une route non migrée", () => {
-    expect(resolveV2Path("/devis")).toBeNull();
+    expect(resolveV2Path("/stocks")).toBeNull();
     expect(resolveV2Path("/")).toBeNull();
   });
 
