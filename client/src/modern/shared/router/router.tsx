@@ -192,7 +192,14 @@ const statistiquesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/statistiques-devis/ui/statistiques-devis-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute]);
+// Mes modules — migration clean-archi de `pages/Modules.tsx`.
+const modulesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/modules",
+  component: lazyRouteComponent(() => import("../../features/modules/ui/modules-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
