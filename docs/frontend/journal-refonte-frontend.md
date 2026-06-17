@@ -467,9 +467,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   `refetchInterval`) + ui (MapView partagé + gestion impérative des marqueurs + liste + stats + légende).
   i18n namespace `geolocalisation`. **0 `any`**. Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **328**.
 
+- **Migration `planification` ✅** (20e des ~24 pages feature) — **2e page CARTE** (L déjà débloqué). Audit
+  contrat — 3 endpoints (interventions.list/getSuggestionsTechniciens/assignerTechnicien) présents. Clean-archi :
+  domain (`interventionsNonAssignees` + `conflictCounts` (alerte double-booking/congé) + **HTML purs**
+  `destMarkerHtml`/`techMarkerHtml`/`techPopupHtml` — **4 tests**) + application (suggestions gated `skipToken`
+  sur coords + assigner) + ui (recherche adresse via géocodage Nominatim + liste suggestions + carte
+  destination/techniciens + assignation). i18n namespace `planification`. **0 `any`** (1 supprimé). Route +
+  V2_ROUTES + sweep. tsc/eslint(0)/vitest **332**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
-`chantiers`/`calendrier-chantiers`, `planification` (carte — L débloqué), `devis-ia`, `analyses-photos`,
-`integrations-comptables`, `import`, `nouvelle-depense`.
+`chantiers`/`calendrier-chantiers`, `devis-ia`, `analyses-photos`, `integrations-comptables`, `import`,
+`nouvelle-depense`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
