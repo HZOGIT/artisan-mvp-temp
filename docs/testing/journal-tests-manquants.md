@@ -167,7 +167,13 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - ✅ **FRONT L2 DRIZZLE ÉPUISÉ (it.74)** : scan final → chaque `*-drizzle.ts` a un test sibling OU combiné (avis flow it.58 ; factures contact-readers it.56 ; assistant threads it.68). 0 adapter sans test.
 
 **Prochaine cible : garde-fou meta-test de couverture L2** — `src/interface/trpc/` ou `src/` : un test qui scanne tous les `*-drizzle.ts` et vérifie que chacun a un test sibling OU est listé dans une allow-list de tests combinés (avis-flow, contact-readers, assistant-threads). Rend ROUGE l'ajout futur d'un adapter Drizzle sans test (anti-régression de couverture, comme `router-coverage.test.ts` pour L3).
-**Puis (arbitrage humain requis)** : les fronts L1/L2/L3 sont complets. Reste — à décider avec l'humain : (a) L4 navigateur (parcours abonnement Stripe — dépend des price IDs staging) ; (b) mutation testing (Stryker, T8 nightly) ; (c) clore la boucle. Voir `## Décisions en attente` ci-dessous.
+**Décision humaine (2026-06-17) : CONTINUER EN AUTONOMIE.** Plus de sollicitation. La boucle :
+1. it.75 → garde-fou meta-test de couverture L2 (ci-dessus).
+2. Ensuite, à CHAQUE réveil, choisir soi-même la cible la plus utile, dans cet ordre de valeur :
+   (a) **durcir les colonnes existantes** — cas limites/branches non couverts des use-cases critiques (validation, erreurs, transitions de statut, calculs TVA/totaux) en L1/L3 ;
+   (b) **L4 navigateur** — nouveaux parcours critiques jouables sans secret externe (le parcours abonnement Stripe reste bloqué tant que les price IDs staging ne sont pas fournis → le tenter seulement si dispo) ;
+   (c) **mutation testing** (Stryker, T8 nightly) si (a)/(b) épuisés.
+   Toujours : 1 cible/itération, test rouge-avant/vert-après, scope strict, 4 canaux, issue Linear enfant OPE-318.
 
 ---
 
