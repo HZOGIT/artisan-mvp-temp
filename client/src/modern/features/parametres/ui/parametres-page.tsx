@@ -9,7 +9,7 @@ import { Label } from "@/modern/shared/ui/label";
 import { Textarea } from "@/modern/shared/ui/textarea";
 import { Switch } from "@/modern/shared/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/modern/shared/ui/tabs";
-import { AbonnementSection } from "@/components/AbonnementSection";
+import { AbonnementSection } from "@/modern/features/abonnement/ui/abonnement-section";
 import { useParametres } from "../application/use-parametres";
 import {
   parametresToForm, formToUpdateInput, buildIcalUrl, demandeStatutClass, FORM_DEFAULTS,
