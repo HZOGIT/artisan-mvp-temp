@@ -61,5 +61,21 @@
   "leadConvertir": "Convertir en client",
   "leadMarquerContacte": "Marquer contacté",
   "leadMarquerPerdu": "Marquer perdu",
-  "leadConverti": "Lead converti en client"
+  "leadConverti": "Lead converti en client",
+  "vitrineTitre": "Ma page vitrine",
+  "vitrineDesc": "Configurez votre page publique partageable avec vos clients",
+  "vitrineActive": "Vitrine active",
+  "vitrineActiveDesc": "Rendre votre page vitrine accessible au public",
+  "vitrineUrl": "URL de votre vitrine",
+  "vitrineUrlPrefix": "/vitrine/",
+  "vitrineSlugPlaceholder": "mon-entreprise",
+  "vitrineVoir": "Voir ma vitrine",
+  "vitrineDescription": "Description de l'entreprise",
+  "vitrineDescriptionPlaceholder": "Décrivez votre entreprise, votre savoir-faire...",
+  "vitrineZone": "Zone d'intervention",
+  "vitrineZonePlaceholder": "Paris et Île-de-France",
+  "vitrineExperience": "Années d'expérience",
+  "vitrineServices": "Services proposés (un par ligne)",
+  "vitrineServicesPlaceholder": "Installation plomberie\nDépannage urgent\nRénovation salle de bain",
+  "toastVitrineEnregistree": "Page vitrine enregistrée"
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, CreditCard } from "lucide-react";
+import { Settings, FileText, Bell, Save, Palette, Upload, Trash2, Image, CreditCard, Globe, ExternalLink } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";
@@ -13,6 +13,7 @@ import { AbonnementSection } from "@/modern/features/abonnement/ui/abonnement-se
 import { useParametres } from "../application/use-parametres";
 import {
   parametresToForm, formToUpdateInput, buildIcalUrl, demandeStatutClass, FORM_DEFAULTS,
+  applyVitrineToForm, formToVitrineInput,
   type ParametresForm, type DelaiPaiementType,
 } from "../domain/parametres";
 
@@ -21,8 +22,8 @@ const errMessage = (e: unknown, fallback: string) => (e instanceof Error ? e.mes
 export default function ParametresPage() {
   const { t } = useTranslation("parametres");
   const {
-    parametres, artisan, icalFeed, demandes, isLoading, refetchArtisan,
-    updateParametres, updateProfile, regenerateIcal, updateDemandeStatut, convertirDemande,
+    parametres, artisan, icalFeed, demandes, vitrineSettings, isLoading, refetchArtisan,
+    updateParametres, updateProfile, updateVitrine, regenerateIcal, updateDemandeStatut, convertirDemande,
   } = useParametres();
 
   const [formData, setFormData] = useState<ParametresForm>(FORM_DEFAULTS);
@@ -40,6 +41,11 @@ export default function ParametresPage() {
   useEffect(() => {
     if (artisan) setLogoPreview(artisan.logo || null);
   }, [artisan]);
+
+  // Réglages vitrine (OPE-504) : fusionnés dans le formulaire dès chargement.
+  useEffect(() => {
+    if (vitrineSettings) setFormData((prev) => applyVitrineToForm(prev, vitrineSettings));
+  }, [vitrineSettings]);
 
   // Toast post-checkout Stripe (?success=1 / ?canceled=1), puis on nettoie l'URL.
   useEffect(() => {
@@ -64,6 +70,7 @@ export default function ParametresPage() {
     if (formData.slug && formData.slug !== (artisan?.slug || "")) {
       updateProfile.mutate({ slug: formData.slug }, { onError: (err) => toast.error(err.message || t("toastErreurSlug")) });
     }
+    updateVitrine.mutate(formToVitrineInput(formData), { onError: (err) => toast.error(err.message) });
   };
 
   const handleLogoUpload = async (file: File) => {
@@ -253,6 +260,52 @@ export default function ParametresPage() {
                     <p className="text-sm text-muted-foreground">{t("notifEmailDesc")}</p>
                   </div>
                   <Switch checked={formData.notificationsEmail} onCheckedChange={(checked) => setFormData({ ...formData, notificationsEmail: checked })} />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5" />{t("vitrineTitre")}</CardTitle>
+                <CardDescription>{t("vitrineDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t("vitrineActive")}</Label>
+                    <p className="text-sm text-muted-foreground">{t("vitrineActiveDesc")}</p>
+                  </div>
+                  <Switch checked={formData.vitrineActive} onCheckedChange={(checked) => setFormData({ ...formData, vitrineActive: checked })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="slug">{t("vitrineUrl")}</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">{t("vitrineUrlPrefix")}</span>
+                    <Input id="slug" value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} placeholder={t("vitrineSlugPlaceholder")} className="max-w-xs" />
+                  </div>
+                  {formData.slug && (
+                    <a href={`/vitrine/${formData.slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                      <ExternalLink className="h-3 w-3" />{t("vitrineVoir")}
+                    </a>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vitrineDescription">{t("vitrineDescription")}</Label>
+                  <Textarea id="vitrineDescription" value={formData.vitrineDescription} onChange={(e) => setFormData({ ...formData, vitrineDescription: e.target.value })} placeholder={t("vitrineDescriptionPlaceholder")} rows={4} />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="vitrineZone">{t("vitrineZone")}</Label>
+                    <Input id="vitrineZone" value={formData.vitrineZone} onChange={(e) => setFormData({ ...formData, vitrineZone: e.target.value })} placeholder={t("vitrineZonePlaceholder")} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vitrineExperience">{t("vitrineExperience")}</Label>
+                    <Input id="vitrineExperience" type="number" value={formData.vitrineExperience} onChange={(e) => setFormData({ ...formData, vitrineExperience: e.target.value })} placeholder="15" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vitrineServices">{t("vitrineServices")}</Label>
+                  <Textarea id="vitrineServices" value={formData.vitrineServices} onChange={(e) => setFormData({ ...formData, vitrineServices: e.target.value })} placeholder={t("vitrineServicesPlaceholder")} rows={4} />
                 </div>
               </CardContent>
             </Card>

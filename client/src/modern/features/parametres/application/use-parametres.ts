@@ -1,5 +1,5 @@
 import { trpc } from "@/modern/shared/trpc";
-import type { Parametres, ArtisanProfile, IcalFeed, DemandeContact } from "../domain/parametres";
+import type { Parametres, ArtisanProfile, IcalFeed, DemandeContact, VitrineSettings } from "../domain/parametres";
 
 // Couche APPLICATION de la feature `parametres` (clean-archi) : SEULE couche important tRPC.
 // Agrège les 4 sous-domaines de l'onglet « général » : paramètres (singleton), profil artisan
@@ -11,9 +11,11 @@ export function useParametres() {
   const artisanQ = trpc.artisan.getProfile.useQuery();
   const icalQ = trpc.calendrier.getIcalFeed.useQuery();
   const demandesQ = trpc.vitrine.getDemandesContact.useQuery();
+  const vitrineQ = trpc.vitrine.getSettings.useQuery();
 
   const updateParametres = trpc.parametres.update.useMutation();
   const updateProfile = trpc.artisan.updateProfile.useMutation();
+  const updateVitrine = trpc.vitrine.updateSettings.useMutation({ onSuccess: () => utils.vitrine.getSettings.invalidate() });
   const regenerateIcal = trpc.calendrier.regenerateIcalFeed.useMutation({
     onSuccess: () => utils.calendrier.getIcalFeed.invalidate(),
   });
@@ -27,16 +29,19 @@ export function useParametres() {
   // `getDemandesContact` est typé `unknown[]` côté backend (finding OPE-505) → assertion vers la forme
   // consommée par l'UI (champs id/nom/email/telephone/message/statut), sans `any`.
   const demandes = (demandesQ.data ?? []) as DemandeContact[];
+  const vitrineSettings: VitrineSettings | undefined = vitrineQ.data;
 
   return {
     parametres,
     artisan,
     icalFeed,
     demandes,
+    vitrineSettings,
     isLoading: parametresQ.isLoading,
     refetchArtisan: () => utils.artisan.getProfile.invalidate(),
     updateParametres,
     updateProfile,
+    updateVitrine,
     regenerateIcal,
     updateDemandeStatut,
     convertirDemande,

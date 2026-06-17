@@ -101,7 +101,7 @@ const PARITE_PAGES = [
   { legacy: '/relances', v2: '/v2/relances-devis', markers: ['Relances Devis', 'Configuration auto'] },
   { legacy: '/calendrier', v2: '/v2/calendrier', markers: ['Calendrier', 'glissez-déposez pour replanifier'] },
   { legacy: '/devis-options', v2: '/v2/devis-options', markers: ['Variantes de devis', 'Où trouver les variantes'] },
-  { legacy: '/parametres', v2: '/v2/parametres', markers: ['Paramètres', 'Numérotation des documents', 'Synchroniser mon agenda'] },
+  { legacy: '/parametres', v2: '/v2/parametres', markers: ['Paramètres', 'Numérotation des documents', 'Ma page vitrine', 'Synchroniser mon agenda'] },
   { legacy: '/dashboard', v2: '/v2/dashboard', markers: ['CA du mois', 'Personnaliser le dashboard'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },

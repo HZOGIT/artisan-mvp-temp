@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   parametresToForm, formToUpdateInput, buildIcalUrl, demandeStatutClass, FORM_DEFAULTS,
-  type Parametres,
+  parseVitrineServices, serializeVitrineServices, applyVitrineToForm, formToVitrineInput,
+  type Parametres, type VitrineSettings,
 } from "./parametres";
 
 const params = (p: Partial<Parametres>): Parametres =>
@@ -57,5 +58,37 @@ describe("demandeStatutClass", () => {
     expect(demandeStatutClass("perdu")).toContain("gray");
     expect(demandeStatutClass("contacte")).toContain("amber");
     expect(demandeStatutClass("nouveau")).toContain("blue");
+  });
+});
+
+describe("vitrine services JSON ↔ lignes", () => {
+  it("parse JSON array → lignes, fallback brut si non-JSON", () => {
+    expect(parseVitrineServices('["A","B","C"]')).toBe("A\nB\nC");
+    expect(parseVitrineServices(null)).toBe("");
+    expect(parseVitrineServices("texte brut")).toBe("texte brut");
+  });
+  it("serialize lignes → JSON array (trim + drop vides)", () => {
+    expect(serializeVitrineServices("A\n B \n\nC")).toBe('["A","B","C"]');
+    expect(serializeVitrineServices("")).toBe("[]");
+  });
+  it("round-trip", () => {
+    expect(parseVitrineServices(serializeVitrineServices("Plomberie\nÉlec"))).toBe("Plomberie\nÉlec");
+  });
+});
+
+describe("applyVitrineToForm / formToVitrineInput", () => {
+  const v = (p: Partial<VitrineSettings>): VitrineSettings =>
+    ({ vitrineActive: false, vitrineDescription: null, vitrineZone: null, vitrineServices: null, vitrineExperience: null, ...p } as VitrineSettings);
+  it("fusionne les réglages serveur dans le formulaire", () => {
+    const f = applyVitrineToForm(FORM_DEFAULTS, v({ vitrineActive: true, vitrineDescription: "desc", vitrineServices: '["X","Y"]', vitrineExperience: 8 }));
+    expect(f.vitrineActive).toBe(true);
+    expect(f.vitrineDescription).toBe("desc");
+    expect(f.vitrineServices).toBe("X\nY");
+    expect(f.vitrineExperience).toBe("8");
+  });
+  it("mappe le formulaire vers l'input update (services en JSON, expérience number|null)", () => {
+    const input = formToVitrineInput({ ...FORM_DEFAULTS, vitrineActive: true, vitrineServices: "A\nB", vitrineExperience: "10", vitrineZone: "Z" });
+    expect(input).toMatchObject({ vitrineActive: true, vitrineServices: '["A","B"]', vitrineExperience: 10, vitrineZone: "Z" });
+    expect(formToVitrineInput({ ...FORM_DEFAULTS, vitrineExperience: "" }).vitrineExperience).toBeNull();
   });
 });
