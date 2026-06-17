@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch, useLocation } from "wouter";
+import { Route, Switch, useLocation, Redirect } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { trpc } from "./lib/trpc";
 import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
+import { isV2Enabled } from "./modern/shared/flag/v2-flag";
 
 // ============================================================================
 // IMPORTS EAGER — pages critiques chargées dans le bundle initial
@@ -263,8 +264,11 @@ function Router() {
         <Route path="/contact" component={PageEnConstruction} />
         <Route path="/aide" component={PageEnConstruction} />
         <Route path="/guide" component={PageEnConstruction} />
-        <Route path="/signature/:token" component={SignatureDevis} />
-        <Route path="/devis-public/:token" component={SignatureDevis} />
+        {/* Cutover strangler-fig (OPE-403) : les liens publics par token (emails) basculent vers le
+            front neuf /v2 — query string préservée (retour Stripe ?paiement=succes, etc.). Le legacy
+            reste accessible via l'opt-out global ?v2=0. */}
+        <Route path="/signature/:token">{(p) => isV2Enabled() ? <Redirect to={`/v2/signature/${p.token}${window.location.search}`} /> : <SignatureDevis />}</Route>
+        <Route path="/devis-public/:token">{(p) => isV2Enabled() ? <Redirect to={`/v2/devis-public/${p.token}${window.location.search}`} /> : <SignatureDevis />}</Route>
         <Route path="/paiement/succes" component={PaiementSucces} />
         <Route path="/paiement/annule" component={PaiementAnnule} />
         {/* Front neuf PUBLIC (hors auth) — pages paiement `/v2/*` montées avant le catch-all authentifié. */}
@@ -274,7 +278,7 @@ function Router() {
         <Route path="/v2/devis-public/:token" component={PublicModernRouterMount} />
         <Route path="/v2/portail/:token" component={PublicModernRouterMount} />
         <Route path="/v2/home" component={PublicModernRouterMount} />
-        <Route path="/portail/:token" component={PortailClient} />
+        <Route path="/portail/:token">{(p) => isV2Enabled() ? <Redirect to={`/v2/portail/${p.token}${window.location.search}`} /> : <PortailClient />}</Route>
         <Route path="/avis/:token" component={SoumettreAvis} />
         <Route path="/vitrine/:slug" component={Vitrine} />
         {/*
