@@ -210,13 +210,19 @@ seule couche tRPC + ui présentation, 0 `any`). Bilan : **5 bugs UI réels** tro
 (OPE-465→469), tous parqués dans « Refonte — findings & dette repérés ».
 
 ## 🎯 PROCHAINE CIBLE : **pages restantes hors Vague R** (gros morceaux différés). Au choix selon priorité :
-- **Dashboard** (`/v2` racine, ~16 widgets) — stratégie : découper en sous-composants/feature `dashboard`
-  (domain agrégats + application hooks par widget). Le plus gros chantier restant.
-- **Portail client** (`/v2/portail/:token`, PUBLIC, ~1211 l., paiement Stripe) — bien tester le flux Stripe
+- **Dashboard** (`/dashboard`, ~711 l., ~16 widgets) — stratégie : feature `dashboard` (domain agrégats +
+  application hooks par widget). Le plus gros chantier restant. **⚠️ DEMANDE HUMAINE (2026-06-17) : DÉ-BATCHER
+  les requêtes** — actuellement trop lent à afficher les différents blocs (le batch tRPC fait attendre TOUS
+  les blocs sur la requête la plus lente). → côté `application/`, faire des hooks/queries **séparés par
+  widget** (pas un seul gros lot) pour que chaque bloc s'affiche dès que SA donnée arrive (streaming visuel).
+  Vérifier l'option httpBatchLink / utiliser des queries indépendantes non batchées (ou `httpLink` ciblé).
+- **Portail client** (`/portail/:token`, PUBLIC, ~1211 l., paiement Stripe) — bien tester le flux Stripe
   (cf. CLAUDE.md : `x-forwarded-host`, success_url).
-- **Abonnement** (`/v2/abonnement`).
-Appliquer le **même gabarit clean-archi + audit §3bis** (désormais `no-trpc-in-ui` = error dès le départ).
-Commencer par celui à plus forte valeur / plus simple à dérisquer (proposer Dashboard en sous-tranches).
+- **Home** (`/`, ~1624 l.) · **Abonnement** · **DashboardAdvanced** (~498 l.).
+Appliquer le **même gabarit clean-archi + audit §3bis** (`no-trpc-in-ui` = error dès le départ). Pour une
+nouvelle page (pas un rétrofit) : créer la feature complète + **câbler la route** (router.tsx + `addChildren`),
+**`V2_ROUTES`**, **i18n** (namespace + agrégation `shared/i18n/index.ts`, pas de chaîne en dur) + **ajouter
+au sweep e2e** `PARITE_PAGES`.
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
 Rétrofitter 1 feature/itération (extraction `application/use-<feature>` + `domain` typés, `ui` sans tRPC,
@@ -255,6 +261,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Migration clean-archi — `portail-gestion` ✅ (1re page POST-Vague R, née clean-archi)** : nouvelle feature `portail-gestion` (gestion artisan des accès portail client) migrée depuis `pages/PortailGestion.tsx` (legacy en chaînes EN DUR → désormais i18n). `domain/portail-gestion.ts` (types `RouterOutputs` + fonctions PURES `filterClients`/`portalState` (actif/expiré/inactif, `now` injectable) ; **5 tests**) + `application/use-portail-gestion.ts` (SEULE couche tRPC : `usePortailClients` + `useClientPortail` par ligne : getStatus + generateAccess/deactivate) + `ui/portail-gestion-page.tsx` (page + row, **0 `any`**, i18n namespace `portailGestion`). **Câblage complet** : route TanStack `/portail-gestion` (+ addChildren) + `V2_ROUTES` (sidebar→v2) + i18n agrégé + ajout au sweep e2e `PARITE_PAGES`. **Audit §3bis 6/6 ✅** (+ kebab + i18n + route). tsc/eslint(0 err, règle `no-trpc-in-ui` en error respectée)/vitest **110**.
 - **Clean-archi — Vague R `signature` ✅ (LA DERNIÈRE 14/14) + verrou `error`** : `domain/signature.ts` (types `RouterOutputs` (`SignatureData`/`SignatureDevis`/`SignatureLigne`/`SignatureOption`) + fonctions PURES `isSignatureProcessed`/`canSubmitSignature`/`buildPdfLignes` ; **4 tests**) + `application/use-signature.ts` (SEULE couche tRPC : getDevisForSignature public + signDevis/refuseDevis/selectDevisOption). `signature-devis-page.tsx` (PUBLIC, ~600 l., canvas signature) consomme hook+domaine, **0 `any`** (dont les casts PDF `(a||{}) as any` retirés ; `options`/`conditionsPaiement`/`dateValidite` étaient déjà sur le type → casts inutiles). **🏁 `no-trpc-in-ui` passé en `error`** (verrou clean-archi). Warnings **1→0**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **105**. **FIN VAGUE R.**
 - **Clean-archi — Vague R `comptabilite` ✅ (+ findings champs)** : `domain/comptabilite.ts` (types `RouterOutputs` (Balance/GrandLivre/JournalVentes/FecPreview/TvaDetail + sous-types) + fonctions PURES `balanceTotals`/`ligneSoldeNet`/`toCsv` ; **6 tests**) + `application/use-comptabilite.ts` (SEULE couche tRPC : 6 rapports lecture seule sur une période ; exports FEC/CSV-serveur/PDF/Factur-X = endpoints REST de téléchargement, hors tRPC). `comptabilite-page.tsx` (672 l., bandeau conformité + CA3 + 4 onglets) consomme hook+domaine, **0 `any`**, plus aucun import tRPC. **🔴 FINDING** : le legacy lisait sur `getBalance`/`getGrandLivre` des champs **inexistants** (`compte`/`libelle`/`solde`/`soldeDebit`/`soldeCredit`) via `any` ; les DTO exposent `numeroCompte`/`libelleCompte`/`soldeDebiteur`/`soldeCrediteur`/`totalDebit`/`totalCredit` → **colonnes Compte/Libellé vides + Solde 0 € (balance) et en-têtes de compte vides/0 € (grand livre)**. Corrigé (+ solde net = débiteur−créditeur via `ligneSoldeNet`). Warnings `no-trpc-in-ui` **2→1**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **101**. Prochaine : `signature` (DERNIÈRE).
 - **Clean-archi — Vague R `depenses` ✅ (+ 1 bug corrigé via le typage)** : `domain/depense.ts` (types `RouterOutputs` (`Depense`/`DepenseStats`/`Categorie`/`Budget`/`KmClient`) + fonctions PURES `budgetTotal`/`indexCategoriesByNom`/`montantIndemniteKm`/`monthRange`/`buildTrajetMotif` + constantes `TARIF_KM_DEFAULT`/`STATUT_KEYS` ; **5 tests**) + `application/use-depenses.ts` (SEULE couche tRPC : list+stats+categories+budgets, delete/exportFecAchats) + `useIndemniteKm` (clients + creerIndemniteKm). `depenses-page.tsx` (2 composants : page + dialog km) consomme hook+domaine, **0 `any`**, plus aucun import tRPC ; blob FEC + toasts via `onSuccess` par appel. **🔴 FINDING** (même pattern qu'articles) : le DTO `depenses.list` est en **camelCase** (`dateDepense`/`montantTtc`/`justificatifUrl`) mais le legacy lisait du snake_case via `any` → **date "—", montant 0 €, trombone justificatif jamais affiché**. Corrigé (lectures camelCase). Warnings `no-trpc-in-ui` **3→2**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **95**. Prochaine : `comptabilite`.

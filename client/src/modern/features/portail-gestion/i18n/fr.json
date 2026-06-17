@@ -1,0 +1,19 @@
+{
+  "title": "Portail Client",
+  "subtitle": "Gérez l'accès en ligne de vos clients à leurs documents",
+  "searchPlaceholder": "Rechercher un client...",
+  "badgeActif": "Actif",
+  "badgeExpire": "Expiré",
+  "badgeInactif": "Inactif",
+  "noEmail": "Pas d'email",
+  "expireLe": "Expire le {{date}}",
+  "dernierAcces": "Dernier accès : {{date}}",
+  "copier": "Copier",
+  "voir": "Voir",
+  "renouveler": "Renouveler",
+  "envoyerAcces": "Envoyer l'accès",
+  "emailRequis": "Email requis",
+  "toastSent": "Accès portail envoyé à {{email}}",
+  "toastDeactivated": "Portail désactivé",
+  "toastLinkCopied": "Lien copié !"
+}

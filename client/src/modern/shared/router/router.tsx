@@ -136,7 +136,14 @@ const comptabiliteRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/comptabilite/ui/comptabilite-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute]);
+// Gestion du Portail Client du front neuf — migration clean-archi de `pages/PortailGestion.tsx`.
+const portailGestionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/portail-gestion",
+  component: lazyRouteComponent(() => import("../../features/portail-gestion/ui/portail-gestion-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
