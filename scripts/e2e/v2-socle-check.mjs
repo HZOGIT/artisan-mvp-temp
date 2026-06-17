@@ -96,6 +96,7 @@ const PARITE_PAGES = [
   { legacy: '/historique-emails', v2: '/v2/historique-emails', markers: ['Historique des emails', 'Derniers envois'] },
   { legacy: '/support', v2: '/v2/support', markers: ["Centre d'aide Operioz", 'Questions fréquentes', 'Nous contacter'] },
   { legacy: '/avis', v2: '/v2/avis', markers: ['Avis clients', 'Note moyenne', 'Distribution'] },
+  { legacy: '/chat', v2: '/v2/chat', markers: ['Conversations', 'Nouveau'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

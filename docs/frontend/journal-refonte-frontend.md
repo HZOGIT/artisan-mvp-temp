@@ -298,12 +298,19 @@ contact/aide/guide). + sous-routes détail/création (certaines migrées dans le
 La **sidebar est le `DashboardLayout` legacy** → ses liens pointent legacy ; pour les 30 migrés la bascule
 redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
 
-## 🎯 PROCHAINE CIBLE : **reprendre la MIGRATION des ~20 pages feature non migrées** (priorité avant toute
-suppression). Reprendre le process standard (audit contrat → clean-archi domain/application/ui → i18n →
-gates → sweep par route). Ordre suggéré par usage : `assistant`/`chat` (cœur quotidien), puis
-`chantiers`/`planification`/`rapports`/`previsions`, puis le reste. **Ensuite seulement** : suppression
-legacy (méthode éprouvée : page importée uniquement par App.tsx → retirer route+import → `git rm` →
-garde-fou `tsc -p tsconfig.json` ≤ baseline 211 + 0 import résiduel → sweep vert), puis wouter + `@/lib/trpc`.
+- **Migration `chat` (messagerie artisan ↔ client) ✅** (1ère des ~20 pages feature non migrées) : audit
+  contrat OK (8 endpoints `chat.*` + `clients.list` déjà dans le new-stack, 0 gap). Clean-archi :
+  `domain/chat.ts` (types dérivés + `filterConversations`/`clientLabel`/`normalize`/`formatChatDate`, **6 tests**) +
+  `application/use-chat.ts` (getConversations/getMessages[skipToken]/sendMessage/startConversation/archive/
+  close/reopen + clients.list, poll 10s) + `ui/chat-page.tsx` (liste filtrable + thread + dialog nouvelle conv,
+  markup à l'identique). i18n namespace `chat`. Primitive `avatar` ajoutée au barrel. Route `/v2/chat`
+  (router.tsx) + `V2_ROUTES["/chat"]` + entrée sweep. **0 `any`**. tsc/eslint(0)/vitest **241**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~19 restantes). Ordre suggéré : `assistant`
+(+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
+`geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
+Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
+V2_ROUTES + sweep → gates → deploy. **Ensuite** : suppression legacy (cf. méthode éprouvée) + wouter + `@/lib/trpc`.
 
 ### Plan Portail (slices) — audit contrat GREEN (14 endpoints clientPortal OK) :
 Page la + grosse/risquée (1211 l., PUBLIC par token, **paiement Stripe**). **Audit contrat ✅** : les **14 endpoints `clientPortal.*` existent tous** en new-stack (verifyAccess, getClientInfo, getDevis, getFactures, getInterventions, getSuiviChantiers, getCreneauxDisponibles, getMesRdv, getConversations, getConversationMessages, demanderRdv, demanderModification, sendClientMessage, soumettreDemandeIA). **Montage** : route PUBLIQUE additive dans `public-router.tsx` (`/portail/$token`, comme signature) + `App.tsx` `<Route path="/v2/portail/:token" component={PublicModernRouterMount} />`. **Non lié au trafic réel** (les liens emailés pointent vers le legacy `/portail/:token` jusqu'au cutover backend des liens) → **constructible en slices sans risque**. **Paiement = REST** `fetch('/api/paiement/create-checkout-session', {factureId, token})` → redirect Stripe (⚠️ cf. CLAUDE.md : `x-forwarded-host`/`success_url`, retour `?paiement=succes|annule`). **5 `any` legacy** à supprimer.
