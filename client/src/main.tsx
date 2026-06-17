@@ -4,7 +4,7 @@ import App from './App.tsx'
 import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { trpc } from './lib/trpc'
-import { httpBatchLink } from '@trpc/client'
+import { httpBatchLink, httpLink, splitLink } from '@trpc/client'
 import superjson from 'superjson'
 
 // Auto-reparation des chunks perimes apres deploiement.
@@ -42,18 +42,21 @@ const queryClient = new QueryClient({
   },
 })
 
+// FIX: Envoyer les cookies avec chaque requete (host-only auth cookie `token`).
+const fetchWithCreds: typeof fetch = (url, options) =>
+  fetch(url, { ...options, credentials: 'include' })
+
+// Le Dashboard tire plusieurs blocs depuis des endpoints `dashboard.*` (stats, conversion, alertes,
+// objectifs). Avec un `httpBatchLink` unique, ces requetes sont REGROUPEES dans UN seul appel HTTP qui
+// ne resout que lorsque la PLUS LENTE est prete -> tous les blocs attendent le plus lent (rendu fige).
+// On de-batche donc les `dashboard.*` via un `httpLink` dedie : chaque bloc fait sa propre requete et
+// s'affiche des que SA donnee arrive (rendu progressif). Le reste de l'app garde le batching (1 requete).
 const trpcClient = trpc.createClient({
   links: [
-    httpBatchLink({
-      url: '/api/trpc',
-      transformer: superjson,
-      // FIX: Envoyer les cookies avec chaque requete
-      fetch(url, options) {
-        return fetch(url, {
-          ...options,
-          credentials: 'include',
-        });
-      },
+    splitLink({
+      condition: (op) => op.path.startsWith('dashboard.'),
+      true: httpLink({ url: '/api/trpc', transformer: superjson, fetch: fetchWithCreds }),
+      false: httpBatchLink({ url: '/api/trpc', transformer: superjson, fetch: fetchWithCreds }),
     }),
   ],
 })
