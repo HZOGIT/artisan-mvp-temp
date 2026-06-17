@@ -1,3 +1,6 @@
 {
-  "cancel": "Annuler"
+  "cancel": "Annuler",
+  "loading": "Chargement…",
+  "error": "Une erreur est survenue.",
+  "routeNotFound": "Page introuvable (/v2)."
 }

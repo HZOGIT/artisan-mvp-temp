@@ -130,16 +130,13 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Gate ESLint du code neuf** (bootstrap). `eslint` + parser TS +
-`eslint.v2.config.mjs` ne lintant QUE `client/src/modern/**` : `no-restricted-imports` (interdire
-`@/lib/trpc`→`@/modern/shared/trpc`, `@/components/ui/*`→`@/modern/shared/ui`,
-`openapi-fetch`/`openapi-react-query`), **règle custom kebab-case** (noms de fichiers), et
-`eslint-plugin-i18next` `no-literal-string` (Clients est déjà i18n → devrait passer). Brancher dans la
-recette (gate), puis enrichir itérativement. *(demande humaine)*
+## 🎯 PROCHAINE CIBLE : **Vague 1 — ClientDetail `/v2/clients/:id`** (port conforme de `pages/ClientDetail.tsx`,
+i18n + kebab d'emblée, route enfant TanStack avec param typé). Preuve = parité visuelle vs legacy. *(OPE-421)*
 
 ### Cibles suivantes (file)
-1. Vague 1 — ClientDetail `/v2/clients/:id`, Articles, Fournisseurs, Techniciens, Notifications (i18n + kebab d'emblée).
+1. Vague 1 — Articles, Fournisseurs, Techniciens, Notifications (i18n + kebab d'emblée).
 2. Dette batchée : e2e mutation (modal édition Clients).
+3. Enrichir le gate ESLint v2 au fil des specs (ex. interdire `@/components/*` hors UI, imports relatifs profonds, etc.).
 
 > Note coordination boucle : pilotée par **CronCreate natif Claude** (job `834543d1`, toutes les 2 min, session-only → vit tant que le screen `ope-403-refonte-frontend` tourne). Le daemon bash `devtools/refonte-loop/*` est **désactivé** (ne pas le relancer).
 
@@ -148,6 +145,7 @@ recette (gate), puis enrichir itérativement. *(demande humaine)*
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Gate ESLint v2 ✅** `eslint.v2.config.mjs` (scope `client/src/modern/**`) : `no-restricted-imports` (frontière strangler : `@/lib/trpc`/`@/components/ui/*`/openapi interdits ; coutures `shared/{ui,trpc}` exemptées), **règle custom `kebab-filename`**, `i18next/no-literal-string` (jsx-text-only, exclut les glyphes). Strings socle router rétro-i18n (namespace `common`), `_demo` exempté. **eslint v2 vert** + tsc/vitest/parité `6|0`, déployé. Prochaine : ClientDetail.
 - **i18n ✅** `react-i18next` + `i18next` installés ; `shared/i18n` (init idempotent, importé par modern-router-mount) ; **un `fr.json` par module** (`features/clients/i18n/fr.json` + `shared/i18n/common/fr.json`) agrégés en namespaces ; `clients-list-page.tsx` **entièrement rétro-i18n** (libellés, toasts, modal, CSV, pluriels). Valeurs `fr` identiques → **parité e2e `6|0`** inchangée. tsconfig.v2 += `resolveJsonModule`. Déployé. Prochaine : gate ESLint v2.
 - **Vague 1 — Clients ✅** port conforme complet `pages/Clients.tsx` → `/v2/clients` (clients-list-page.tsx, kebab-case, primitives+tRPC partagés). Parité e2e `6|0`, déployé. PoC supprimé. Convention **kebab-case** + **gate ESLint v2** ajoutés à la recette (demandes humaines). Prochaine : bootstrap du gate ESLint v2.
 - **S4 ✅** primitives `modern/shared/ui` (ré-export copie conforme legacy : button/input/card/label/dropdown-menu + barrel) + test de surface. tsc v2 ✅, vitest v2 17 ✅. Pas de déploiement (bundle inchangé). **Vague 0 TERMINÉE.** Prochaine : Vague 1 Clients slice 1a (parité lecture).

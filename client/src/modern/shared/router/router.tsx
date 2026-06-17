@@ -6,6 +6,7 @@ import {
   Outlet,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 
 // Socle de routage du FRONT NEUF (refonte strangler-fig). TanStack Router prend la main sur tout le
 // sous-arbre d'URL `/v2/*` (cf. `basepath`) tandis que wouter continue de servir le legacy intact.
@@ -14,19 +15,22 @@ import {
 // Routage par CODE (pas de codegen file-based) pour rester explicite et sans plugin de build.
 
 function RouterPending() {
-  return <div className="p-6 text-sm text-muted-foreground">Chargement…</div>;
+  const { t } = useTranslation("common");
+  return <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>;
 }
 
 function RouterError({ error }: ErrorComponentProps) {
+  const { t } = useTranslation("common");
   return (
     <div className="p-6 text-sm text-destructive">
-      Une erreur est survenue. {error instanceof Error ? error.message : String(error)}
+      {t("error")} {error instanceof Error ? error.message : String(error)}
     </div>
   );
 }
 
 function RouterNotFound() {
-  return <div className="p-6 text-sm text-muted-foreground">Page introuvable (/v2).</div>;
+  const { t } = useTranslation("common");
+  return <div className="p-6 text-sm text-muted-foreground">{t("routeNotFound")}</div>;
 }
 
 const rootRoute = createRootRoute({
