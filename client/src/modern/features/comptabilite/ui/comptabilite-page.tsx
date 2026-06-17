@@ -9,47 +9,38 @@ import { Label } from "@/modern/shared/ui/label";
 import { Download, FileText, Calculator, TrendingUp, TrendingDown, Euro, FileDown, FileSpreadsheet, Eye, FileCode, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Badge } from "@/modern/shared/ui/badge";
 import { toast } from "sonner";
-import { trpc } from "@/modern/shared/trpc";
+import { useComptabilite } from "../application/use-comptabilite";
+import {
+  balanceTotals,
+  ligneSoldeNet,
+  toCsv,
+  type CsvRow,
+  type GrandLivreCompte,
+  type GrandLivreEcriture,
+  type JournalEcriture,
+  type BalanceLine,
+} from "../domain/comptabilite";
 import { format, startOfYear, endOfYear, startOfMonth, endOfMonth } from "date-fns";
 
-// Page Comptabilité & Exports du FRONT NEUF (`/v2/comptabilite`) — PORT CONFORME de
-// `pages/Comptabilite.tsx`. Lecture seule (rapports + exports). Primitives `@/modern/shared/ui`, tRPC
-// partagé, i18n (namespace `comptabilite`). Pas de double DashboardLayout (déjà fourni par le layout).
+// Page Comptabilité & Exports du FRONT NEUF (`/v2/comptabilite`) — clean-archi : présentation pure
+// (lecture seule). Les 6 rapports viennent de `useComptabilite` (couche application, seule à importer
+// tRPC) ; totaux balance & sérialisation CSV via le domaine (`../domain/comptabilite`, fonctions pures
+// testées). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`comptabilite`).
+// Les exports FEC/CSV-serveur/PDF/Factur-X passent par des endpoints REST de téléchargement (pas tRPC).
 
 export default function ComptabilitePage() {
   const { t } = useTranslation("comptabilite");
   const [dateDebut, setDateDebut] = useState(format(startOfYear(new Date()), "yyyy-MM-dd"));
   const [dateFin, setDateFin] = useState(format(endOfYear(new Date()), "yyyy-MM-dd"));
 
-  const { data: grandLivre, isLoading: loadingGL } = trpc.comptabilite.getGrandLivre.useQuery({
-    dateDebut: new Date(dateDebut),
-    dateFin: new Date(dateFin),
-  });
-
-  const { data: balance, isLoading: loadingBalance } = trpc.comptabilite.getBalance.useQuery({
-    dateDebut: new Date(dateDebut),
-    dateFin: new Date(dateFin),
-  });
-
-  const { data: rapportTVA, isLoading: loadingTVA } = trpc.comptabilite.getRapportTVA.useQuery({
-    dateDebut: new Date(dateDebut),
-    dateFin: new Date(dateFin),
-  });
-
-  const { data: journalVentes, isLoading: loadingJV } = trpc.comptabilite.getJournalVentes.useQuery({
-    dateDebut: new Date(dateDebut),
-    dateFin: new Date(dateFin),
-  });
-
-  const { data: fecPreview, isLoading: loadingFec } = trpc.comptabilite.getFecPreview.useQuery({
-    dateDebut: new Date(dateDebut),
-    dateFin: new Date(dateFin),
-  });
-
-  const { data: tvaDetail } = trpc.comptabilite.getDeclarationTVADetail.useQuery({
-    dateDebut: new Date(dateDebut),
-    dateFin: new Date(dateFin),
-  });
+  const {
+    grandLivre, loadingGL,
+    balance, loadingBalance,
+    rapportTVA, loadingTVA,
+    journalVentes, loadingJV,
+    fecPreview, loadingFec,
+    tvaDetail,
+  } = useComptabilite(dateDebut, dateFin);
 
   const conf = fecPreview?.conformite;
 
@@ -58,13 +49,10 @@ export default function ComptabilitePage() {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
   };
 
-  const exportCSV = (data: any[], filename: string) => {
-    if (!data || data.length === 0) return;
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(';'),
-      ...data.map(row => headers.map(h => row[h] || '').join(';'))
-    ].join('\n');
+  // Téléchargement CSV : sérialisation déléguée au domaine (pure, testée), déclenchement DOM côté UI.
+  const exportCSV = (rows: CsvRow[], filename: string) => {
+    const csvContent = toCsv(rows);
+    if (!csvContent) return;
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -264,7 +252,7 @@ export default function ComptabilitePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tvaDetail.parTaux.map((row: any) => (
+                {tvaDetail.parTaux.map((row) => (
                   <TableRow key={row.taux}>
                     <TableCell className="font-medium">{row.taux} %</TableCell>
                     <TableCell className="text-right">{formatMontant(row.baseHT)}</TableCell>
@@ -311,7 +299,13 @@ export default function ComptabilitePage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => balance && exportCSV(balance, 'balance')}
+                onClick={() => balance && exportCSV(balance.map((l: BalanceLine): CsvRow => ({
+                  compte: l.numeroCompte,
+                  libelle: l.libelleCompte,
+                  debit: l.debit,
+                  credit: l.credit,
+                  solde: ligneSoldeNet(l),
+                })), 'balance')}
               >
                 <Download className="h-4 w-4 mr-2" />
                 {t("exportCsv")}
@@ -332,29 +326,33 @@ export default function ComptabilitePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {balance.map((ligne: any, idx: number) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-mono">{ligne.compte}</TableCell>
-                        <TableCell>{ligne.libelle}</TableCell>
-                        <TableCell className="text-right">{formatMontant(ligne.debit)}</TableCell>
-                        <TableCell className="text-right">{formatMontant(ligne.credit)}</TableCell>
-                        <TableCell className={`text-right font-medium ${ligne.solde >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatMontant(ligne.solde)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="bg-muted/50 font-bold">
-                      <TableCell colSpan={2}>{t("total")}</TableCell>
-                      <TableCell className="text-right">
-                        {formatMontant(balance.reduce((sum: number, l: any) => sum + l.debit, 0))}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatMontant(balance.reduce((sum: number, l: any) => sum + l.credit, 0))}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatMontant(balance.reduce((sum: number, l: any) => sum + l.solde, 0))}
-                      </TableCell>
-                    </TableRow>
+                    {balance.map((ligne: BalanceLine, idx: number) => {
+                      // DTO LigneBalance : numeroCompte/libelleCompte + solde net (débiteur−créditeur).
+                      // Le legacy lisait compte/libelle/solde (inexistants) → colonnes vides + 0 €. Corrigé.
+                      const solde = ligneSoldeNet(ligne);
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell className="font-mono">{ligne.numeroCompte}</TableCell>
+                          <TableCell>{ligne.libelleCompte}</TableCell>
+                          <TableCell className="text-right">{formatMontant(ligne.debit)}</TableCell>
+                          <TableCell className="text-right">{formatMontant(ligne.credit)}</TableCell>
+                          <TableCell className={`text-right font-medium ${solde >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatMontant(solde)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {(() => {
+                      const tot = balanceTotals(balance);
+                      return (
+                        <TableRow className="bg-muted/50 font-bold">
+                          <TableCell colSpan={2}>{t("total")}</TableCell>
+                          <TableCell className="text-right">{formatMontant(tot.debit)}</TableCell>
+                          <TableCell className="text-right">{formatMontant(tot.credit)}</TableCell>
+                          <TableCell className="text-right">{formatMontant(tot.solde)}</TableCell>
+                        </TableRow>
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               ) : (
@@ -378,10 +376,10 @@ export default function ComptabilitePage() {
                 size="sm"
                 onClick={() => {
                   if (grandLivre) {
-                    const flatData = grandLivre.flatMap((gl: any) =>
-                      gl.ecritures.map((e: any) => ({
-                        compte: gl.compte,
-                        libelleCompte: gl.libelle,
+                    const flatData: CsvRow[] = grandLivre.flatMap((gl: GrandLivreCompte) =>
+                      gl.ecritures.map((e: GrandLivreEcriture) => ({
+                        compte: gl.numeroCompte,
+                        libelleCompte: gl.libelleCompte,
                         date: format(new Date(e.dateEcriture), 'dd/MM/yyyy'),
                         libelle: e.libelle,
                         piece: e.pieceRef,
@@ -402,16 +400,18 @@ export default function ComptabilitePage() {
                 <p className="text-muted-foreground">{t("loading")}</p>
               ) : grandLivre && grandLivre.length > 0 ? (
                 <div className="space-y-6">
-                  {grandLivre.map((compte: any, idx: number) => (
+                  {grandLivre.map((compte: GrandLivreCompte, idx: number) => (
                     <div key={idx} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-4">
                         <div>
-                          <span className="font-mono font-bold">{compte.compte}</span>
-                          <span className="ml-2 text-muted-foreground">{compte.libelle}</span>
+                          {/* DTO CompteGrandLivre : numeroCompte/libelleCompte + totalDebit/totalCredit.
+                              Le legacy lisait compte/libelle/soldeDebit/soldeCredit (inexistants) → vide/0 €. Corrigé. */}
+                          <span className="font-mono font-bold">{compte.numeroCompte}</span>
+                          <span className="ml-2 text-muted-foreground">{compte.libelleCompte}</span>
                         </div>
                         <div className="text-sm">
-                          <span className="text-green-600 mr-4">{t("dLabel")} {formatMontant(compte.soldeDebit)}</span>
-                          <span className="text-red-600">{t("cLabel")} {formatMontant(compte.soldeCredit)}</span>
+                          <span className="text-green-600 mr-4">{t("dLabel")} {formatMontant(compte.totalDebit)}</span>
+                          <span className="text-red-600">{t("cLabel")} {formatMontant(compte.totalCredit)}</span>
                         </div>
                       </div>
                       <Table>
@@ -425,7 +425,7 @@ export default function ComptabilitePage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {compte.ecritures.map((ecriture: any, eIdx: number) => (
+                          {compte.ecritures.map((ecriture: GrandLivreEcriture, eIdx: number) => (
                             <TableRow key={eIdx}>
                               <TableCell>{format(new Date(ecriture.dateEcriture), 'dd/MM/yyyy')}</TableCell>
                               <TableCell>{ecriture.libelle}</TableCell>
@@ -462,7 +462,7 @@ export default function ComptabilitePage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => journalVentes && exportCSV(journalVentes.map((e: any) => ({
+                onClick={() => journalVentes && exportCSV(journalVentes.map((e: JournalEcriture): CsvRow => ({
                   date: format(new Date(e.dateEcriture), 'dd/MM/yyyy'),
                   compte: e.numeroCompte,
                   libelle: e.libelle,
@@ -491,7 +491,7 @@ export default function ComptabilitePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {journalVentes.map((ecriture: any, idx: number) => (
+                    {journalVentes.map((ecriture: JournalEcriture, idx: number) => (
                       <TableRow key={idx}>
                         <TableCell>{format(new Date(ecriture.dateEcriture), 'dd/MM/yyyy')}</TableCell>
                         <TableCell className="font-mono">{ecriture.numeroCompte}</TableCell>
@@ -633,7 +633,7 @@ export default function ComptabilitePage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {fecPreview.lines.map((line: any, idx: number) => (
+                        {fecPreview.lines.map((line, idx: number) => (
                           <TableRow key={idx}>
                             <TableCell className="font-mono text-xs">{line.ecritureNum}</TableCell>
                             <TableCell className="font-mono text-xs">{line.ecritureDate}</TableCell>

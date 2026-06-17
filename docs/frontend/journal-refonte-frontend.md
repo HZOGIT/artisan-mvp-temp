@@ -203,14 +203,16 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague R — feature `comptabilite`** (rétrofit clean-archi). Lecture seule
-(conformité FEC, TVA/CA3, 4 onglets, exports). Extraire `domain/comptabilite.ts` (types `RouterOutputs` +
-règles pures : totaux/agrégats, formatage) + `application/use-comptabilite.ts` (SEULE couche tRPC : les
-queries + éventuels exports + invalidation), faire consommer `comptabilite-page.tsx` (plus de `trpc`
-direct, **0 `any`**, warning `no-trpc-in-ui` disparaît). **Audit §3bis 6/6 obligatoire + consigné.**
-Garder parité e2e verte. Gabarit = `use-depenses` / `use-stocks`. **AVANT-DERNIÈRE feature** ; reste après :
-`signature` (public). Quand les **2 warnings** tombent à 0 → passer `local/no-trpc-in-ui` en **`error`**
-(et le documenter). NB : `paiement` est déjà propre (pages succès/annule sans tRPC).
+## 🎯 PROCHAINE CIBLE : **Vague R — feature `signature` (LA DERNIÈRE)** — page PUBLIQUE `/v2/signature/:token`
+(`signature-devis-page.tsx`, ~605 l.). Extraire `domain/signature.ts` (types `RouterOutputs` + règles pures :
+calculs montants/options/formules, états) + `application/use-signature.ts` (SEULE couche tRPC :
+`signature.getDevisForSignature` + `signer`/`refuser` + invalidation), faire consommer la page (plus de
+`trpc` direct, **0 `any`**, dernier warning `no-trpc-in-ui` disparaît). **Audit §3bis 6/6 obligatoire +
+consigné.** Garder parité e2e verte (montage déterministe `signature.getDevisForSignature`). Attention :
+le legacy lisait `devis.dateDevis` (inexistant → corrigé en `createdAt`) ; vérifier les autres champs.
+Gabarit = `use-comptabilite` / `use-depenses`. **🏁 QUAND le warning tombe à 0 → passer
+`local/no-trpc-in-ui` en `error` dans `eslint.v2.config.mjs` (verrou définitif) + documenter. FIN DE LA
+VAGUE R.** NB : `paiement` est déjà propre (pages succès/annule sans tRPC).
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
 Rétrofitter 1 feature/itération (extraction `application/use-<feature>` + `domain` typés, `ui` sans tRPC,
@@ -249,6 +251,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Clean-archi — Vague R `comptabilite` ✅ (+ findings champs)** : `domain/comptabilite.ts` (types `RouterOutputs` (Balance/GrandLivre/JournalVentes/FecPreview/TvaDetail + sous-types) + fonctions PURES `balanceTotals`/`ligneSoldeNet`/`toCsv` ; **6 tests**) + `application/use-comptabilite.ts` (SEULE couche tRPC : 6 rapports lecture seule sur une période ; exports FEC/CSV-serveur/PDF/Factur-X = endpoints REST de téléchargement, hors tRPC). `comptabilite-page.tsx` (672 l., bandeau conformité + CA3 + 4 onglets) consomme hook+domaine, **0 `any`**, plus aucun import tRPC. **🔴 FINDING** : le legacy lisait sur `getBalance`/`getGrandLivre` des champs **inexistants** (`compte`/`libelle`/`solde`/`soldeDebit`/`soldeCredit`) via `any` ; les DTO exposent `numeroCompte`/`libelleCompte`/`soldeDebiteur`/`soldeCrediteur`/`totalDebit`/`totalCredit` → **colonnes Compte/Libellé vides + Solde 0 € (balance) et en-têtes de compte vides/0 € (grand livre)**. Corrigé (+ solde net = débiteur−créditeur via `ligneSoldeNet`). Warnings `no-trpc-in-ui` **2→1**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **101**. Prochaine : `signature` (DERNIÈRE).
 - **Clean-archi — Vague R `depenses` ✅ (+ 1 bug corrigé via le typage)** : `domain/depense.ts` (types `RouterOutputs` (`Depense`/`DepenseStats`/`Categorie`/`Budget`/`KmClient`) + fonctions PURES `budgetTotal`/`indexCategoriesByNom`/`montantIndemniteKm`/`monthRange`/`buildTrajetMotif` + constantes `TARIF_KM_DEFAULT`/`STATUT_KEYS` ; **5 tests**) + `application/use-depenses.ts` (SEULE couche tRPC : list+stats+categories+budgets, delete/exportFecAchats) + `useIndemniteKm` (clients + creerIndemniteKm). `depenses-page.tsx` (2 composants : page + dialog km) consomme hook+domaine, **0 `any`**, plus aucun import tRPC ; blob FEC + toasts via `onSuccess` par appel. **🔴 FINDING** (même pattern qu'articles) : le DTO `depenses.list` est en **camelCase** (`dateDepense`/`montantTtc`/`justificatifUrl`) mais le legacy lisait du snake_case via `any` → **date "—", montant 0 €, trombone justificatif jamais affiché**. Corrigé (lectures camelCase). Warnings `no-trpc-in-ui` **3→2**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **95**. Prochaine : `comptabilite`.
 - **Clean-archi — Vague R `stocks` ✅** (la plus grosse page, ~782 l.) : `domain/stock.ts` (types `RouterOutputs` (`Stock`/`Mouvement`/`StockEntrant`) + fonctions PURES `filterStocks`/`isLowStock`/`totalStockValue`/`indexEntrantByStock`/`previsionnel` ; **5 tests**) + `application/use-stocks.ts` (SEULE couche tRPC : list+lowStock+entrant, create/update/delete/adjustQuantity/generateAlerts) + `useMouvements` (historique d'1 fiche, query dépendante isolée). `stocks-page.tsx` (Tabs + KPIs + alertes + 4 dialogs) consomme hook+domaine, **0 `any`**, plus aucun import tRPC ; fix `adjustQuantity` quantite en `String` conservé. Warnings `no-trpc-in-ui` **4→3**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **90**. Prochaine : `depenses`.
 - **Clean-archi — Vague R `commandes` ✅ (+ 1 finding)** : `domain/commande.ts` (types `RouterOutputs` (`Commande`/`CommandeFournisseur`) + fonctions PURES `filterCommandes`/`isCommandeStatut` + `STATUT_KEYS` ; **5 tests**) + `application/use-commandes.ts` (SEULE couche tRPC : list commandes+fournisseurs, delete/sendEmail). `commandes-page.tsx` consomme hook+domaine, **0 `any`** (dont `formatCurrency(value:any)` typé), plus aucun import tRPC. **🔴 FINDING** : le DTO `commandesFournisseurs.list` n'expose **pas** `fournisseurNom` (seulement `fournisseurId`) ; le legacy lisait `cmd.fournisseurNom` via `any` → undefined → **colonne fournisseur vide ("-") + recherche par fournisseur cassée**. Corrigé : nom résolu via la liste des fournisseurs (résolveur injecté au domaine). Warnings `no-trpc-in-ui` **5→4**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **85**. Prochaine : `stocks`.
