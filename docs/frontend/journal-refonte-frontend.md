@@ -161,6 +161,7 @@ l'ancien code entièrement quand la parité est validée partout.)*
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Sidebar → v2 e2e ✅** durci : `scripts/e2e/v2-socle-check.mjs` clique la nav MOBILE (boutons directs) — « Clients » → `/v2/clients`, « Accueil » (non migré) → reste `/dashboard`. `cas:23 | issues:0`. Dette de test sidebar levée. (Test pur, pas de déploiement.)
 - **Sidebar → v2 ✅** (demande humaine + recette) : `DashboardLayout` résout sa navigation via `resolveV2Path` → tout lien de route migrée mène à `/v2`, item actif surligné sur `/v2`. Liens profonds tapés à la main restent legacy sauf `?v2=1`.
 - **Vague 2 — Interventions ✅** port `/v2/interventions` (dialogs + gestion d'équipe, i18n, StatutBadge partagé). 4 gates verts, parité e2e `21|0`, déployé. Prochaine : Commandes.
 - **Vague 2 — Factures ✅** port `/v2/factures` (i18n, StatutBadge partagé, alerte encours + stats + filtres + export CSV, create+delete). 4 gates verts, parité e2e `19|0`, déployé. Prochaine : Interventions.

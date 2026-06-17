@@ -146,8 +146,34 @@ if (new URL(page.url()).pathname !== '/v2/clients') {
   add({ route: '/clients?v2=1', type: 'bascule', text: `flag ON mais pas de bascule, URL=${page.url()}` });
 }
 
+// --- Sidebar → v2 : la nav redirige vers `/v2` quand la route est migrée (registre V2_ROUTES) ---
+// On cible la nav MOBILE (boutons directs `handleNavigate`, faciles à cliquer de façon fiable).
+let sidebarCount = 0;
+await page.setViewportSize({ width: 390, height: 844 });
+const navBtn = (label) => page.locator('nav[aria-label="Navigation mobile"] button', { hasText: label }).first();
+
+// « Clients » (route migrée) → doit mener à /v2/clients.
+sidebarCount++;
+current = 'sidebar Clients';
+await page.goto('/dashboard', { waitUntil: 'networkidle', timeout: 25000 });
+await page.waitForTimeout(1000);
+await navBtn('Clients').click();
+await page.waitForTimeout(1200);
+if (new URL(page.url()).pathname !== '/v2/clients') {
+  add({ route: 'sidebar/clients', type: 'sidebar', text: `attendu /v2/clients, obtenu ${page.url()}` });
+}
+
+// « Accueil » (route NON migrée) → reste /dashboard (legacy).
+sidebarCount++;
+current = 'sidebar Accueil';
+await navBtn('Accueil').click();
+await page.waitForTimeout(1000);
+if (new URL(page.url()).pathname !== '/dashboard') {
+  add({ route: 'sidebar/dashboard', type: 'sidebar', text: `attendu /dashboard (non migré), obtenu ${page.url()}` });
+}
+
 await browser.close();
-const total = cases.length + pariteCount + basculeCount;
+const total = cases.length + pariteCount + basculeCount + sidebarCount;
 console.log(`cas testés: ${total} | issues: ${issues.length}`);
 if (issues.length) console.log(JSON.stringify(issues, null, 2));
 process.exit(issues.length ? 1 : 0);
