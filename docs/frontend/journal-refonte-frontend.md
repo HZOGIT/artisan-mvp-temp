@@ -387,8 +387,16 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   `@/lib/generateGuidePDF.ts` (bloquait le typecheck v2 via l'import ; 0 nouvelle erreur build). Route +
   V2_ROUTES + sweep. tsc/eslint(0)/vitest **287**.
 
+- **Migration `ma-vitrine` (page publique + avis) ✅** (11e des ~24 pages feature) : audit contrat — 9
+  endpoints présents MAIS **gap découvert** : les champs `vitrine*` ne sont PAS dans `parametres.get`
+  (legacy) → ils vivent dans le module **`vitrine`** (`vitrine.getSettings`/`updateSettings`, OPE-504) →
+  hook recâblé sur `vitrine.*`. Clean-archi : domain (`parseServices`/`buildVitrineUrl`/`avisStatutClass`/
+  `formatDate`, **4 tests**) + application (vitrine settings + artisan profil/slug + avis getAll/repondre/
+  moderer/envoyerDemande + clients) + ui (lien public + perso + liste d'avis + 2 dialogs). i18n namespace
+  `maVitrine`. Route + V2_ROUTES + sweep. **0 `any`**. tsc/eslint(0)/vitest **291**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Sans carte/charts :
-`nouvelle-depense`, `ma-vitrine`, `tableau-bord-sync-comptable`, `devis-ia`, `import`…
+`nouvelle-depense`, `tableau-bord-sync-comptable`, `devis-ia`, `import`, `performances-fournisseurs`…
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
