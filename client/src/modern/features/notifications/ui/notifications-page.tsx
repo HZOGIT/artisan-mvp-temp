@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { trpc } from "@/modern/shared/trpc";
+import type { LucideIcon } from "lucide-react";
+import { useNotifications } from "../application/use-notifications";
+import { relativeDateDescriptor, type NotifFilter, type Notification } from "../domain/notification";
 import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { ScrollArea } from "@/modern/shared/ui/scroll-area";
@@ -12,12 +14,12 @@ import {
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
-// Page Notifications du FRONT NEUF (`/v2/notifications`) — PORT CONFORME de `pages/Notifications.tsx`
-// (parité visuelle stricte). JSX/Tailwind copiés à l'identique ; plomberie repointée : primitives
-// `@/modern/shared/ui`, tRPC `@/modern/shared/trpc`, libellés i18n (namespace `notifications`,
-// catalogue `fr` = textes actuels à l'identique). Données déjà servies par tRPC côté legacy.
+// Page Notifications du FRONT NEUF (`/v2/notifications`) — clean-archi : présentation pure. Données &
+// mutations via `useNotifications` (couche application, seule à importer tRPC) ; le calcul de date
+// relative vient du domaine (`relativeDateDescriptor`, pur & testé). Parité visuelle stricte :
+// JSX/Tailwind à l'identique. Libellés via i18n (namespace `notifications`).
 
-const typeIcon: Record<string, any> = {
+const typeIcon: Record<string, LucideIcon> = {
   succes: CheckCircle,
   alerte: AlertTriangle,
   rappel: Clock,
@@ -33,44 +35,32 @@ const typeColor: Record<string, string> = {
   erreur: "text-red-500",
 };
 
+// Présentation : mappe le descripteur PUR du domaine vers les libellés i18n (et le format de repli).
 function formatRelativeDate(date: string | Date, t: TFunction<"notifications">) {
-  const d = new Date(date);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return t("relInstant");
-  if (diffMin < 60) return t("relMinutes", { n: diffMin });
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return t("relHours", { n: diffH });
-  const diffD = Math.floor(diffH / 24);
-  if (diffD === 1) return t("relYesterday");
-  if (diffD < 7) return t("relDays", { n: diffD });
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  const r = relativeDateDescriptor(date);
+  switch (r.kind) {
+    case "instant": return t("relInstant");
+    case "minutes": return t("relMinutes", { n: r.n });
+    case "hours": return t("relHours", { n: r.n });
+    case "yesterday": return t("relYesterday");
+    case "days": return t("relDays", { n: r.n });
+    case "date": return r.value.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  }
 }
 
 export default function NotificationsPage() {
   const { t } = useTranslation("notifications");
   const [, setLocation] = useLocation();
-  const [filter, setFilter] = useState<"toutes" | "nonlues">("toutes");
+  const [filter, setFilter] = useState<NotifFilter>("toutes");
 
-  const { data: notifications = [], refetch } = trpc.notifications.list.useQuery({
-    nonLuesUniquement: filter === "nonlues",
-    limit: 100,
-  });
-  const { data: unreadCount = 0 } = trpc.notifications.getUnreadCount.useQuery();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, remove } = useNotifications(
+    filter === "nonlues",
+  );
+  const markAllAsReadMutation = markAllAsRead;
+  const deleteMutation = remove;
 
-  const markAsReadMutation = trpc.notifications.markAsRead.useMutation({
-    onSuccess: () => refetch(),
-  });
-  const markAllAsReadMutation = trpc.notifications.markAllAsRead.useMutation({
-    onSuccess: () => { refetch(); toast.success(t("toastAllRead")); },
-  });
-  const deleteMutation = trpc.notifications.delete.useMutation({
-    onSuccess: () => { refetch(); toast.success(t("toastDeleted")); },
-  });
-
-  const handleClick = (notif: any) => {
-    if (!notif.lu) markAsReadMutation.mutate({ id: notif.id });
+  const handleClick = (notif: Notification) => {
+    if (!notif.lu) markAsRead.mutate({ id: notif.id });
     if (notif.lien) setLocation(notif.lien);
   };
 
@@ -90,7 +80,7 @@ export default function NotificationsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => markAllAsReadMutation.mutate()}
+                onClick={() => markAllAsReadMutation.mutate(undefined, { onSuccess: () => toast.success(t("toastAllRead")) })}
                 disabled={markAllAsReadMutation.isPending}
               >
                 <CheckCheck className="h-4 w-4 mr-1" />
@@ -124,7 +114,7 @@ export default function NotificationsPage() {
               </div>
             ) : (
               <div>
-                {notifications.map((notif: any) => {
+                {notifications.map((notif: Notification) => {
                   const Icon = typeIcon[notif.type] || Info;
                   const color = typeColor[notif.type] || "text-muted-foreground";
                   return (
@@ -165,7 +155,7 @@ export default function NotificationsPage() {
                         variant="ghost"
                         size="icon"
                         className="shrink-0 h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); deleteMutation.mutate({ id: notif.id }); }}
+                        onClick={(e) => { e.stopPropagation(); deleteMutation.mutate({ id: notif.id }, { onSuccess: () => toast.success(t("toastDeleted")) }); }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
