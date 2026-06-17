@@ -361,8 +361,16 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   l'identique, **3 `any` legacy supprimés** ; sentinel `"none"` pour le select technicien — Radix interdit
   `value=""`). i18n namespace `vehicules`. Route + V2_ROUTES + sweep. **0 `any`**. tsc/eslint(0)/vitest **274**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Contrat propre sans carte/charts :
-`rapports`, `performances-fournisseurs`, `devis-ia`, `rapport-commande`, `nouvelle-depense`, `documentation`…
+- **Migration `rapport-commande` (articles en rupture à commander) ✅** (8e des ~24 pages feature) : audit
+  contrat OK (`stocks.getRapportCommande` + `artisan.getProfile`). Clean-archi : `domain` (types dérivés +
+  `formatCurrency`/`totalArticles`/`totalMontant`, **3 tests**) + `application/use-rapport-commande.ts` +
+  `ui/rapport-commande-page.tsx` (résumé + liste par fournisseur + tableau) + **`ui/pdf-export.ts`** (export
+  PDF bon de commande + rapport global). **jsPDF typé proprement** : forme FONCTION `autoTable(doc, opts)`
+  (au lieu de `(doc as any).autoTable`) + accesseur typé `lastFinalY` → **0 `any`** (les `as any` legacy
+  jspdf-autotable supprimés). i18n namespace `rapportCommande`. Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **277**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Sans carte/charts :
+`rapports`, `nouvelle-depense`, `documentation`, `tableau-bord-sync-comptable`, `devis-ia`…
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
