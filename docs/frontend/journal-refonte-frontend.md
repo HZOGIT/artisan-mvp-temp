@@ -378,8 +378,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   + dialog création + export CSV). i18n namespace `rapports`. Route + V2_ROUTES + sweep. **0 `any`**.
   tsc/eslint(0)/vitest **282**. **FINDING** : enrichir backend `executer` (colonnes explicites + totaux agrégés).
 
+- **Migration `documentation` (guide d'utilisation) ✅** (10e des ~24 pages feature) : page STATIQUE (0
+  endpoint). Le **catalogue de contenu** (10 sections × sous-sections) vit en `domain/documentation-content.ts`
+  (data, pas du libellé d'interface → reste en domain ; `iconKey` string au lieu d'un composant React pour
+  garder le domain pur) + `normalize`/`filterSections` (recherche tolérante, **5 tests**). `ui` : sommaire +
+  recherche + accordéons + `RenderLine` (tip/bullet/texte) + export PDF (`@/lib/generateGuidePDF` partagé) ;
+  chrome i18n (`documentation`). **0 `any`**. Petite dette legacy nettoyée : `gray` inutilisé retiré de
+  `@/lib/generateGuidePDF.ts` (bloquait le typecheck v2 via l'import ; 0 nouvelle erreur build). Route +
+  V2_ROUTES + sweep. tsc/eslint(0)/vitest **287**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Sans carte/charts :
-`nouvelle-depense`, `documentation`, `tableau-bord-sync-comptable`, `devis-ia`, `import`…
+`nouvelle-depense`, `ma-vitrine`, `tableau-bord-sync-comptable`, `devis-ia`, `import`…
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

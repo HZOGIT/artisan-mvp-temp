@@ -48,7 +48,6 @@ export async function generateGuidePDF() {
 
   const blue = [37, 99, 235];
   const dark = [30, 30, 30];
-  const gray = [100, 100, 100];
 
   function setColor(c: number[]) { doc.setTextColor(c[0], c[1], c[2]); }
   function addPage() { doc.addPage(); y = margin; }
