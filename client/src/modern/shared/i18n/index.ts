@@ -33,6 +33,7 @@ import devisOptionsFr from "@/modern/features/devis-options/i18n/fr.json";
 import parametresFr from "@/modern/features/parametres/i18n/fr.json";
 import dashboardFr from "@/modern/features/dashboard/i18n/fr.json";
 import abonnementFr from "@/modern/features/abonnement/i18n/fr.json";
+import notesFraisFr from "@/modern/features/notes-frais/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -75,6 +76,7 @@ const resources = {
     parametres: parametresFr,
     dashboard: dashboardFr,
     abonnement: abonnementFr,
+    notesFrais: notesFraisFr,
   },
 } as const;
 

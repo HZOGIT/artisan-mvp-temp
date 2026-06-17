@@ -103,6 +103,7 @@ const PARITE_PAGES = [
   { legacy: '/devis-options', v2: '/v2/devis-options', markers: ['Variantes de devis', 'Où trouver les variantes'] },
   { legacy: '/parametres', v2: '/v2/parametres', markers: ['Paramètres', 'Numérotation des documents', 'Ma page vitrine', 'Synchroniser mon agenda'] },
   { legacy: '/dashboard', v2: '/v2/dashboard', markers: ['CA du mois', 'Personnaliser le dashboard'] },
+  { legacy: '/notes-de-frais', v2: '/v2/notes-frais', markers: ['Notes de frais', 'Nouvelle note'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
