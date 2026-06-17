@@ -421,9 +421,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   calculer) + ui (4 KPIs + 3 onglets graphique/détails/historique). i18n namespace `previsions`. **0 `any`**
   (methode any legacy supprimé). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **306**.
 
+- **Migration `performances-fournisseurs` ✅** (15e des ~24 pages feature) : audit contrat — module
+  `commandes` keyé **`commandesFournisseurs`** (appRouter) ; 5 endpoints (getPerformances/list/create/
+  updateStatut + fournisseurs.list) présents, **0 gap** (legacy déjà 0 any). Clean-archi : domain
+  (`formatCurrency`/`formatDate`/`statutClass`/`statutVariant`/`fiabiliteColor`/`fiabiliteLevel`/`globalStats`,
+  **5 tests**) + application (perfs + commandes + fournisseurs + create/updateStatut) + ui (4 KPIs + tableau
+  perfs/fournisseur + dernières commandes + 2 dialogs). i18n namespace `performancesFournisseurs`. **0 `any`**.
+  Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **311**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
 `chantiers`/`calendrier-chantiers`, `planification`/`geolocalisation` (cartes), `devis-ia`, `analyses-photos`,
-`performances-fournisseurs`, `tableau-bord-depenses`/`-sync-comptable`, `integrations-comptables`, `import`(+releve), `nouvelle-depense`.
+`tableau-bord-depenses`/`-sync-comptable`, `integrations-comptables`, `import`(+releve), `nouvelle-depense`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
