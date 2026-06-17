@@ -107,6 +107,7 @@ const PARITE_PAGES = [
   { legacy: '/rapports', v2: '/v2/rapports', markers: ['Rapports Personnalisables', 'Mes rapports', 'Nouveau rapport'] },
   { legacy: '/documentation', v2: '/v2/documentation', markers: ["Guide d'utilisation", 'Sommaire'] },
   { legacy: '/ma-vitrine', v2: '/v2/ma-vitrine', markers: ['Ma Vitrine', 'Lien public', 'Personnalisation'] },
+  { legacy: '/rdv-en-ligne', v2: '/v2/rdv-en-ligne', markers: ['RDV en ligne', 'Gérez les demandes de rendez-vous'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

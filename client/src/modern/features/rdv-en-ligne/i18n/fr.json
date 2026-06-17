@@ -1,0 +1,50 @@
+{
+  "titre": "RDV en ligne",
+  "sousTitre": "Gérez les demandes de rendez-vous de vos clients",
+  "enAttenteBadge": "{{count}} en attente",
+  "confirmesBadge": "{{count}} confirmé(s)",
+  "aucun": "Aucune demande de RDV",
+  "aucunAstuce": "Les demandes de vos clients apparaîtront ici",
+  "clientInconnu": "Client inconnu",
+  "duree": "Durée : {{min}} min",
+  "motif": "Motif : ",
+  "confirmer": "Confirmer",
+  "refuser": "Refuser",
+  "autreCreneau": "Autre créneau",
+  "intervention": "Intervention #{{id}}",
+  "refuserTitre": "Refuser la demande de RDV",
+  "clientLabel": "Client : {{nom}}",
+  "inconnu": "Inconnu",
+  "motifRefus": "Motif du refus *",
+  "motifPlaceholder": "Expliquez au client pourquoi ce créneau n'est pas disponible...",
+  "annuler": "Annuler",
+  "envoi": "Envoi...",
+  "confirmerRefus": "Confirmer le refus",
+  "proposerTitre": "Proposer un autre créneau",
+  "creneauDemande": "Créneau demandé : {{date}}",
+  "nouveauCreneau": "Nouveau créneau proposé *",
+  "proposerCreneau": "Proposer ce créneau",
+  "toastConfirme": "RDV confirmé et intervention créée",
+  "errConfirm": "Erreur lors de la confirmation",
+  "toastRefuse": "RDV refusé, email envoyé au client",
+  "errRefuse": "Erreur lors du refus",
+  "toastPropose": "Nouveau créneau proposé, email envoyé au client",
+  "errPropose": "Erreur lors de la proposition",
+  "filtre": {
+    "tous": "Tous",
+    "en_attente": "En attente",
+    "confirme": "Confirmés",
+    "refuse": "Refusés"
+  },
+  "statut": {
+    "en_attente": "En attente",
+    "confirme": "Confirmé",
+    "refuse": "Refusé",
+    "annule": "Annulé"
+  },
+  "urgence": {
+    "normale": "Normale",
+    "urgente": "Urgente",
+    "tres_urgente": "Très urgente"
+  }
+}

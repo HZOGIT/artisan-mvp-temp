@@ -395,6 +395,14 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   moderer/envoyerDemande + clients) + ui (lien public + perso + liste d'avis + 2 dialogs). i18n namespace
   `maVitrine`. Route + V2_ROUTES + sweep. **0 `any`**. tsc/eslint(0)/vitest **291**.
 
+- **Migration `rdv-en-ligne` (demandes de RDV) ✅** (12e des ~24 pages feature) : audit contrat — le module
+  `rdv-en-ligne` est **monté sous la clé `rdv`** (appRouter ligne 156) → `trpc.rdv.{list,getStats,confirm,
+  refuse,proposeAutreCreneau}` présents. **Gap** : `rdv.list` new-stack ne prend **pas de filtre statut**
+  (renvoie tout) → **filtre client-side** (`filterByStatut`). Clean-archi : domain (`statutClass`/`urgenceClass`/
+  `clientName`/`filterByStatut`, **5 tests**) + application (list + stats + 3 transitions avec invalidations) +
+  ui (header/stats + filtres + liste + 2 dialogs refus/autre-créneau). i18n namespace `rdvEnLigne`. **0 `any`**
+  (selectedRdv/rdv any legacy supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **296**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Sans carte/charts :
 `nouvelle-depense`, `tableau-bord-sync-comptable`, `devis-ia`, `import`, `performances-fournisseurs`…
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
