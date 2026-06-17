@@ -164,7 +164,14 @@ const historiqueEmailsRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/historique-emails/ui/historique-emails-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute]);
+// Centre d'aide / Support — migration clean-archi de `pages/Support.tsx`.
+const supportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/support",
+  component: lazyRouteComponent(() => import("../../features/support/ui/support-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

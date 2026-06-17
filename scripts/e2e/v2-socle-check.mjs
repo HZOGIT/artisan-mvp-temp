@@ -85,6 +85,7 @@ const PARITE_PAGES = [
   { legacy: '/budgets-depenses', v2: '/v2/budgets-depenses', markers: ['Budgets', 'Totaux du mois', 'Par catégorie'] },
   { legacy: '/regles-depenses', v2: '/v2/regles-depenses', markers: ['Règles de catégorisation auto', 'Nouvelle règle'] },
   { legacy: '/historique-emails', v2: '/v2/historique-emails', markers: ['Historique des emails', 'Derniers envois'] },
+  { legacy: '/support', v2: '/v2/support', markers: ["Centre d'aide Operioz", 'Questions fréquentes', 'Nous contacter'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },

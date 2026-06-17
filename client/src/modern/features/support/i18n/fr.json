@@ -1,0 +1,53 @@
+{
+  "headerTitle": "Centre d'aide Operioz",
+  "headerSubtitle": "Notre équipe est là pour vous aider, 5j/7",
+  "channelEmailTitle": "Envoyer un email",
+  "channelEmailDesc": "support@operioz.com — Réponse sous 24h",
+  "channelEmailBtn": "Envoyer un email →",
+  "channelGuideTitle": "Guide d'utilisation",
+  "channelGuideDesc": "Toutes les fonctionnalités expliquées étape par étape",
+  "channelGuideBtn": "Consulter le guide →",
+  "channelAssistantTitle": "Demander à MonAssistant",
+  "channelAssistantDesc": "Votre IA disponible 24h/24, 7j/7",
+  "channelAssistantBtn": "Ouvrir MonAssistant →",
+  "faqTitle": "Questions fréquentes",
+  "faqDesc": "Les réponses aux questions les plus posées par nos utilisateurs",
+  "faq": [
+    {
+      "q": "Comment créer mon premier devis ?",
+      "r": "Allez dans Commercial → Devis, puis cliquez sur \"Nouveau devis\". Sélectionnez un client, ajoutez vos lignes (services ou articles depuis votre bibliothèque), MonAssistant peut même rédiger le devis pour vous depuis une description."
+    },
+    {
+      "q": "Comment envoyer une facture par email ?",
+      "r": "Ouvrez la facture, cliquez sur \"Envoyer par email\". Le PDF est généré automatiquement, l'email pré-rempli avec un modèle (modifiable dans Paramètres → Modèles d'emails). Vous pouvez aussi inclure un lien de paiement Stripe."
+    },
+    {
+      "q": "Comment configurer le paiement en ligne ?",
+      "r": "Le paiement en ligne par carte est disponible sur tous les plans. Stripe se charge du traitement, vous n'avez rien à configurer côté Operioz. Lors de l'envoi d'une facture, cochez \"Inclure un lien de paiement\"."
+    },
+    {
+      "q": "Comment importer mes anciens clients ?",
+      "r": "Dans Paramètres → Importer des données, vous pouvez téléverser un fichier Excel ou CSV. Vous mappez les colonnes (nom, email, téléphone…) et nous créons les clients en lot. Compatibilité avec EBP, Sage, Ciel et autres logiciels."
+    },
+    {
+      "q": "Comment changer mon mot de passe ?",
+      "r": "Mon profil → Sécurité → Mot de passe. Vous devrez saisir l'ancien mot de passe pour confirmer. En cas d'oubli, utilisez \"Mot de passe oublié\" sur la page de connexion."
+    }
+  ],
+  "contactTitle": "Nous contacter",
+  "contactDesc": "Décrivez votre besoin, nous vous répondons par email sous 24h ouvrées.",
+  "nomLabel": "Nom",
+  "emailLabel": "Email",
+  "sujetLabel": "Sujet",
+  "sujetTechnique": "Problème technique",
+  "sujetFacturation": "Question facturation",
+  "sujetSuggestion": "Suggestion",
+  "sujetAutre": "Autre",
+  "messageLabel": "Message",
+  "messagePlaceholder": "Décrivez votre demande...",
+  "sending": "Envoi...",
+  "send": "Envoyer",
+  "toastSent": "Votre message a été envoyé. Nous répondons sous 24h.",
+  "toastError": "Erreur lors de l'envoi",
+  "toastRequired": "Merci de remplir tous les champs"
+}

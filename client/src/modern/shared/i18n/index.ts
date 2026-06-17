@@ -19,6 +19,7 @@ import portailGestionFr from "@/modern/features/portail-gestion/i18n/fr.json";
 import budgetsDepensesFr from "@/modern/features/budgets-depenses/i18n/fr.json";
 import reglesDepensesFr from "@/modern/features/regles-depenses/i18n/fr.json";
 import historiqueEmailsFr from "@/modern/features/historique-emails/i18n/fr.json";
+import supportFr from "@/modern/features/support/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -47,6 +48,7 @@ const resources = {
     budgetsDepenses: budgetsDepensesFr,
     reglesDepenses: reglesDepensesFr,
     historiqueEmails: historiqueEmailsFr,
+    support: supportFr,
   },
 } as const;
 
