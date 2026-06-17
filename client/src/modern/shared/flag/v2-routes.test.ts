@@ -13,7 +13,7 @@ describe("resolveV2Path", () => {
   });
 
   it("renvoie null pour une route non migrée", () => {
-    expect(resolveV2Path("/parametres")).toBeNull();
+    expect(resolveV2Path("/dashboard")).toBeNull();
     expect(resolveV2Path("/")).toBeNull();
   });
 

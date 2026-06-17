@@ -241,7 +241,15 @@ const devisOptionsRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/devis-options/ui/devis-options-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute]);
+// Paramètres — migration clean-archi de `pages/Parametres.tsx` (onglet général + abonnement réutilisé).
+// La sous-section « réglages vitrine » est omise (pas d'endpoint backend — finding OPE-504).
+const parametresRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/parametres",
+  component: lazyRouteComponent(() => import("../../features/parametres/ui/parametres-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

@@ -209,7 +209,12 @@ fait **échouer** le gate ESLint v2. Désormais chaque nouvelle page naît clean
 seule couche tRPC + ui présentation, 0 `any`). Bilan : **5 bugs UI réels** trouvés via le typage strict
 (OPE-465→469), tous parqués dans « Refonte — findings & dette repérés ».
 
-## 🎯 PROCHAINE CIBLE : **`Parametres` → `/v2/parametres`** (DERNIÈRE page legacy non migrée, gros multi-domaine)
+- **Migration clean-archi — `parametres` ✅ (DERNIÈRE page, gros multi-domaine)** : migrée de `pages/Parametres.tsx` (onglets général + abonnement). `domain/parametres.ts` (types `RouterOutputs`/`Inputs` + mappers PURS `parametresToForm`/`formToUpdateInput` + `buildIcalUrl`/`demandeStatutClass` ; **6 tests**) + `application/use-parametres.ts` (SEULE couche tRPC : parametres.get + artisan.getProfile + calendrier.getIcalFeed + vitrine.getDemandesContact + mutations update/updateProfile/regenerateIcal/updateDemandeStatut/convertirDemande) + `ui/parametres-page.tsx` (présentation pure, **0 `any`** — supprime les 3 `any` legacy ; logo via `fetch('/api/upload-logo')` REST ; deep-link `?tab=abonnement` + toasts `?success`/`?canceled` via `window.location`+`history.replaceState`). **Réutilise `@/components/AbonnementSection`** (Stripe/devices, legacy trpc — fonctionne car le routeur neuf partage les providers legacy ; portage propre = slice futur). **⚠️ Sous-section « réglages vitrine » OMISE** (finding OPE-504 : aucun endpoint backend → pas d'UI morte ; décision « omettre » = défaut conventionnel, à rajouter quand OPE-504 livre `vitrine.updateSettings`). **Finding OPE-505** : `getDemandesContact` renvoie `unknown[]` → type `DemandeContact` local + assertion (sans `any`). Câblage route + V2_ROUTES + i18n + sweep e2e + maj `v2-routes.test` (non-migré → `/dashboard`). **Audit §3bis 6/6 ✅** (sauf section vitrine omise, documentée). tsc/eslint(0 err)/vitest **189**.
+
+## 🎯 PROCHAINE CIBLE : **TOUTES les pages de la longue traîne sont migrées (30/30).** Suites possibles : compléter `parametres` (section vitrine quand OPE-504 livré ; portage propre d'`AbonnementSection`), ou attaquer les GROS chantiers différés ci-dessous (Dashboard / Portail client / Home).
+
+### (archive) plan détaillé Parametres (FAIT — voir entrée ci-dessus) & gros chantiers différés
+Au choix selon priorité :
 
 `pages/Parametres.tsx` ~674 l. Tabs `general` + `abonnement`. **Plan de slice (1 itération dédiée) :**
 1. **Réutiliser `@/components/AbonnementSection`** pour l'onglet abonnement (composant Stripe/devices

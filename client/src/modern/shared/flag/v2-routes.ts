@@ -29,6 +29,7 @@ export const V2_ROUTES: Readonly<Record<string, string>> = {
   "/calendrier": "/v2/calendrier",
   "/utilisateurs": "/v2/utilisateurs",
   "/devis-options": "/v2/devis-options",
+  "/parametres": "/v2/parametres",
 };
 
 // Normalise un chemin pour la résolution : retire la query string et le slash final.
