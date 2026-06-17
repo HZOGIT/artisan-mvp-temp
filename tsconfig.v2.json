@@ -7,6 +7,11 @@
     "tsBuildInfoFile": null,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
     "target": "ESNext",
     "resolveJsonModule": true,
     "types": ["node", "vite/client", "@fastify/cookie"]

@@ -39,6 +39,23 @@ la règle est posée en `warn` puis passée en `error` quand tout est rétrofitt
 > (Runbook §3bis, les 6 cases) et en **consigner le résultat** (journal + Linear). Une itération qui ne
 > prouve pas la conformance est **incomplète**, on ne la close pas.
 
+## TypeScript le plus strict possible (imposé — demande humaine)
+Le front neuf vise **le TS le plus strict**. `tsconfig.v2.json` (gate) ajoute, au-delà du `strict:true`
+hérité : `noUnusedLocals/Parameters`, `noImplicitReturns`, `noFallthroughCasesInSwitch`,
+`noImplicitOverride`, `allowUnreachableCode:false`, `allowUnusedLabels:false`. **0 `any`** (règle de la
+clean-archi). Le neuf satisfait DÉJÀ `noUncheckedIndexedAccess` (0 erreur dans `client/src/modern`) —
+**écrire le code comme s'il était actif** : indexation défensive, pas de `!` non-null, pas d'accès
+d'index non gardé. Les 3 flags les plus durs (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+`noPropertyAccessFromIndexSignature`) ne sont pas encore **activés dans le gate** car la traversée
+transitive type-check aussi des fichiers **hors périmètre** (`client/src/lib/pdfGenerator.ts`,
+`csvExport.ts`, `src/modules/*`) qui portent leur propre dette → suivi : isoler `AppRouter` derrière un
+`.d.ts` généré + migrer les utils `lib/` dans `modern/`, puis les activer.
+
+## Query client (React Query) — staleTime par défaut (imposé)
+Le `QueryClient` partagé (`client/src/main.tsx`) utilise le **staleTime par défaut de React Query (0)**
+(plus de `staleTime: 5min`) → données considérées périmées immédiatement (refetch au remontage). Garder
+`refetchOnWindowFocus:false`.
+
 ## Convention de nommage des fichiers (imposée)
 **Tous les nouveaux fichiers du front neuf sont en `kebab-case`** (ex. `clients-list-page.tsx`,
 `modern-router-mount.tsx`, `ping-page.tsx`), y compris les fichiers de composants React (le composant

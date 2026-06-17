@@ -35,7 +35,8 @@ window.addEventListener('vite:preloadError', (e) => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,
+      // staleTime : valeur par défaut de React Query (0) — les données sont considérées
+      // périmées immédiatement (refetch au remontage/refocus selon les autres options).
       refetchOnWindowFocus: false,
     },
   },
