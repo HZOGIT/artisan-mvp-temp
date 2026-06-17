@@ -19,6 +19,17 @@ describe("factures — calcul des montants de ligne (pur)", () => {
     expect(calculerMontantsLigne("produit", "1", "100.00", "10")).toEqual({ montantHT: "100.00", montantTVA: "10.00", montantTTC: "110.00" });
     expect(calculerMontantsLigne("produit", "1", "100.00", "0")).toEqual({ montantHT: "100.00", montantTVA: "0.00", montantTTC: "100.00" });
   });
+
+  it("résilience : entrées vides/non numériques → 0 (garde `Number(x) || 0`)", () => {
+    expect(calculerMontantsLigne("produit", "", "100.00", "20")).toEqual({ montantHT: "0.00", montantTVA: "0.00", montantTTC: "0.00" });
+    expect(calculerMontantsLigne("produit", "2", "abc", "20")).toEqual({ montantHT: "0.00", montantTVA: "0.00", montantTTC: "0.00" });
+    expect(calculerMontantsLigne("produit", "2", "100.00", "xx")).toEqual({ montantHT: "200.00", montantTVA: "0.00", montantTTC: "200.00" }); // taux NaN → 0
+  });
+
+  it("arrondi au centime sur valeur non ronde (TVA 1.998 → 2.00)", () => {
+    // 3 × 3.33 = 9.99 HT ; TVA 20% = 1.998 → arrondi "2.00" ; TTC 11.988 → "11.99"
+    expect(calculerMontantsLigne("produit", "3", "3.33", "20")).toEqual({ montantHT: "9.99", montantTVA: "2.00", montantTTC: "11.99" });
+  });
 });
 
 describe("factures — calcul des totaux (pur)", () => {
