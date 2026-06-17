@@ -203,13 +203,13 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague R — feature `fournisseurs`** (rétrofit clean-archi). Extraire
-`domain/fournisseur.ts` (types `RouterOutputs` + règles pures : filtre/recherche, libellés) +
-`application/use-fournisseurs.ts` (SEULE couche tRPC : list + create/update/delete + articles/association
-+ invalidation), faire consommer `fournisseurs-page.tsx` (plus de `trpc` direct, **0 `any`**, warning
+## 🎯 PROCHAINE CIBLE : **Vague R — feature `articles`** (rétrofit clean-archi). Extraire
+`domain/article.ts` (types `RouterOutputs` + règles pures : filtre/recherche, catégories, calculs prix/TVA,
+import CSV preview) + `application/use-articles.ts` (SEULE couche tRPC : list + create/update/delete +
+import + invalidation), faire consommer `articles-page.tsx` (plus de `trpc` direct, **0 `any`**, warning
 `no-trpc-in-ui` disparaît). **Audit §3bis 6/6 obligatoire + consigné.** Garder parité e2e verte. Gabarit
-= `use-techniciens` / `use-interventions`. Reste après : articles, commandes, stocks, depenses,
-comptabilite, signature. Quand les 7 warnings tombent à 0 → `local/no-trpc-in-ui` en **`error`**.
+= `use-fournisseurs` / `use-techniciens`. Reste après : commandes, stocks, depenses, comptabilite,
+signature. Quand les 6 warnings tombent à 0 → `local/no-trpc-in-ui` en **`error`**.
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
 Rétrofitter 1 feature/itération (extraction `application/use-<feature>` + `domain` typés, `ui` sans tRPC,
@@ -248,6 +248,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Clean-archi — Vague R `fournisseurs` ✅** : `domain/fournisseur.ts` (types `RouterOutputs` (`Fournisseur`/`Article`/`FournisseurArticle`) + fonctions PURES `filterFournisseurs`/`filterArticles`/`fournisseurStats`/`indexArticlesById` ; **6 tests**) + `application/use-fournisseurs.ts` (SEULE couche tRPC : list + articles référentiel, create/update/delete) + `useFournisseurArticles` (articles associés d'1 fournisseur + associate/dissociate, query dépendante isolée). `fournisseurs-page.tsx` (682 l., 4 dialogs) consomme hook+domaine, **0 `any`**, plus aucun import tRPC. Warnings `no-trpc-in-ui` **7→6**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **72**. Prochaine : `articles`.
 - **Clean-archi — Vague R `techniciens` ✅** : `domain/technicien.ts` (types `RouterOutputs` (`Technicien`/`LinkableUser`/`TechnicienStats`/`Habilitation`) + fonctions PURES `toTechnicienStatut`/`habilExpiry`/`habilitationBadge` — descripteur de badge d'habilitation (no-expiry/expirée/expire-bientôt≤60j/valide), `now` injectable ; **6 tests**) + `application/use-techniciens.ts` (SEULE couche tRPC : getAll + linkableUsers, create/update/delete) + `useTechnicienDetail` (stats + habilitations + add/delete, queries dépendantes isolées). `techniciens-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC. Warnings `no-trpc-in-ui` **8→7**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **66**. Prochaine : `fournisseurs`.
 - **Clean-archi — Vague R `notifications` ✅** : `domain/notification.ts` (type `Notification` + `relativeDateDescriptor` PUR — descripteur de date relative déterministe `now` injectable, l'UI mappe vers i18n ; **7 tests**) + `application/use-notifications.ts` (SEULE couche tRPC : list filtrée + getUnreadCount, markAsRead/markAllAsRead/delete + invalidation). `notifications-page.tsx` consomme hook+domaine, **0 `any`** (`typeIcon` typé `LucideIcon`, plus de `Record<string,any>`), plus aucun import tRPC. Warnings `no-trpc-in-ui` **9→8**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **60**. Prochaine : `techniciens`.
 - **Clean-archi — Vague R `interventions` ✅** : `domain/intervention.ts` (types `RouterOutputs` + fonctions PURES `filterInterventions`/`groupEquipeByIntervention`/`availableTechniciens`/`buildAdresse`/`dureeDescriptor`/`membreName`/`toInterventionStatut` ; **8 tests**) + `application/use-interventions.ts` (SEULE couche tRPC : list+clients+techniciens+équipes agrégées, create/update/delete) + `useEquipe` (équipe d'1 intervention + add/remove, query dépendante isolée). `interventions-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC. **FINDING** : `dureeReelleMinutes` (durée réelle mobile) **absent du DTO `interventions.list`** new-stack (le legacy le lisait → toujours `undefined` → "-") → centralisé dans `domain.dureeReelleMinutes()` (renvoie `null`, parité "-" préservée ; 1 ligne à changer quand le DTO l'expose). Warnings `no-trpc-in-ui` **10→9**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **53**. Prochaine : `notifications`.

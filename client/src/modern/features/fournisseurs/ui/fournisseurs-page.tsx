@@ -7,17 +7,23 @@ import { Label } from "@/modern/shared/ui/label";
 import { Textarea } from "@/modern/shared/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/modern/shared/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/modern/shared/ui/table";
-import { trpc } from "@/modern/shared/trpc";
+import { useFournisseurs, useFournisseurArticles } from "../application/use-fournisseurs";
+import {
+  filterArticles,
+  filterFournisseurs,
+  fournisseurStats,
+  indexArticlesById,
+  type Article,
+  type Fournisseur,
+  type FournisseurArticle,
+} from "../domain/fournisseur";
 import { Loader2, Plus, Search, Building2, Edit, Trash2, Package, Link2, Unlink } from "lucide-react";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
 
-// Page Fournisseurs du FRONT NEUF (`/v2/fournisseurs`) — PORT CONFORME de `pages/Fournisseurs.tsx`.
-// JSX/Tailwind à l'identique ; plomberie repointée : primitives `@/modern/shared/ui`, tRPC partagé,
-// i18n (namespace `fournisseurs`). NB : on NE ré-enveloppe PAS dans `DashboardLayout` (le legacy le
-// faisait → double layout, alors que la page est déjà rendue dans le DashboardLayout d'AuthenticatedRoutes)
-// et on supprime la garde `useAuth` (le sous-arbre `/v2` est déjà sous auth). Comportement et rendu du
-// CONTENU inchangés ; seul le double-chrome accidentel du legacy disparaît.
+// Page Fournisseurs du FRONT NEUF (`/v2/fournisseurs`) — clean-archi : présentation pure. Données &
+// mutations via `useFournisseurs`/`useFournisseurArticles` (couche application, seule à importer tRPC) ;
+// recherche, stats et index articles via le domaine (`../domain/fournisseur`, fonctions pures testées).
+// Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (namespace `fournisseurs`).
 
 type FournisseurFormData = {
   nom: string;
@@ -44,7 +50,7 @@ export default function FournisseursPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isArticlesDialogOpen, setIsArticlesDialogOpen] = useState(false);
   const [isAssociateDialogOpen, setIsAssociateDialogOpen] = useState(false);
-  const [selectedFournisseur, setSelectedFournisseur] = useState<any>(null);
+  const [selectedFournisseur, setSelectedFournisseur] = useState<Fournisseur | null>(null);
   const [formData, setFormData] = useState<FournisseurFormData>({
     nom: "",
     contact: "",
@@ -64,59 +70,10 @@ export default function FournisseursPage() {
     delaiLivraison: 0
   });
 
-  const utils = trpc.useUtils();
-  const { data: fournisseurs, isLoading } = trpc.fournisseurs.list.useQuery();
-  const { data: articles } = trpc.articles.getArtisanArticles.useQuery();
-  const { data: fournisseurArticles, isLoading: loadingArticles } = trpc.fournisseurs.getFournisseurArticles.useQuery(
-    { fournisseurId: selectedFournisseur?.id || 0 },
-    { enabled: !!selectedFournisseur && isArticlesDialogOpen }
-  );
-
-  const createMutation = trpc.fournisseurs.create.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastCreated"));
-      setIsCreateDialogOpen(false);
-      resetForm();
-      utils.fournisseurs.list.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const updateMutation = trpc.fournisseurs.update.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastUpdated"));
-      setIsEditDialogOpen(false);
-      utils.fournisseurs.list.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const deleteMutation = trpc.fournisseurs.delete.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastDeleted"));
-      utils.fournisseurs.list.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const associateMutation = trpc.fournisseurs.associateArticle.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastAssociated"));
-      setIsAssociateDialogOpen(false);
-      setSelectedArticleId(null);
-      setAssociationData({ articleId: 0, referenceExterne: "", prixAchat: "", delaiLivraison: 0 });
-      utils.fournisseurs.getFournisseurArticles.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const dissociateMutation = trpc.fournisseurs.dissociateArticle.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastDissociated"));
-      utils.fournisseurs.getFournisseurArticles.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
+  const { fournisseurs, articles, isLoading, create: createMutation, update: updateMutation, remove: deleteMutation } =
+    useFournisseurs();
+  const { fournisseurArticles, isLoading: loadingArticles, associate: associateMutation, dissociate: dissociateMutation } =
+    useFournisseurArticles(selectedFournisseur?.id ?? 0, !!selectedFournisseur && isArticlesDialogOpen);
 
   const resetForm = () => {
     setFormData({
@@ -136,20 +93,39 @@ export default function FournisseursPage() {
       toast.error(t("toastNomRequired"));
       return;
     }
-    createMutation.mutate(formData);
+    createMutation.mutate(formData, {
+      onSuccess: () => {
+        toast.success(t("toastCreated"));
+        setIsCreateDialogOpen(false);
+        resetForm();
+      },
+      onError: (error) => toast.error(error.message),
+    });
   };
 
   const handleUpdate = () => {
     if (!selectedFournisseur) return;
-    updateMutation.mutate({
-      id: selectedFournisseur.id,
-      ...formData
-    });
+    updateMutation.mutate(
+      { id: selectedFournisseur.id, ...formData },
+      {
+        onSuccess: () => {
+          toast.success(t("toastUpdated"));
+          setIsEditDialogOpen(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   };
 
   const handleDelete = (id: number) => {
     if (confirm(t("confirmDelete"))) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate(
+        { id },
+        {
+          onSuccess: () => toast.success(t("toastDeleted")),
+          onError: (error) => toast.error(error.message),
+        },
+      );
     }
   };
 
@@ -158,16 +134,27 @@ export default function FournisseursPage() {
       toast.error(t("toastSelectArticle"));
       return;
     }
-    associateMutation.mutate({
-      fournisseurId: selectedFournisseur.id,
-      articleId: selectedArticleId,
-      referenceExterne: associationData.referenceExterne || undefined,
-      prixAchat: associationData.prixAchat || undefined,
-      delaiLivraison: associationData.delaiLivraison || undefined
-    });
+    associateMutation.mutate(
+      {
+        fournisseurId: selectedFournisseur.id,
+        articleId: selectedArticleId,
+        referenceExterne: associationData.referenceExterne || undefined,
+        prixAchat: associationData.prixAchat || undefined,
+        delaiLivraison: associationData.delaiLivraison || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("toastAssociated"));
+          setIsAssociateDialogOpen(false);
+          setSelectedArticleId(null);
+          setAssociationData({ articleId: 0, referenceExterne: "", prixAchat: "", delaiLivraison: 0 });
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   };
 
-  const openEditDialog = (fournisseur: any) => {
+  const openEditDialog = (fournisseur: Fournisseur) => {
     setSelectedFournisseur(fournisseur);
     setFormData({
       nom: fournisseur.nom,
@@ -182,25 +169,17 @@ export default function FournisseursPage() {
     setIsEditDialogOpen(true);
   };
 
-  const openArticlesDialog = (fournisseur: any) => {
+  const openArticlesDialog = (fournisseur: Fournisseur) => {
     setSelectedFournisseur(fournisseur);
     setIsArticlesDialogOpen(true);
   };
 
-  const filteredFournisseurs = fournisseurs?.filter((f: any) =>
-    matchSearch(f.nom, searchQuery) ||
-    matchSearch(f.contact, searchQuery) ||
-    matchSearch(f.ville, searchQuery)
-  );
-
-  const filteredArticles = articles?.filter((a: any) =>
-    matchSearch(a.designation, articleSearchQuery) ||
-    matchSearch(a.reference, articleSearchQuery)
-  );
-
-  const getArticleDetails = (articleId: number) => {
-    return articles?.find((a: any) => a.id === articleId);
-  };
+  // Sélections/index délégués au domaine (purs, testés).
+  const filteredFournisseurs = filterFournisseurs(fournisseurs, searchQuery);
+  const filteredArticles = filterArticles(articles, articleSearchQuery);
+  const stats = fournisseurStats(fournisseurs);
+  const articlesById = indexArticlesById(articles);
+  const getArticleDetails = (articleId: number): Article | undefined => articlesById.get(articleId);
 
   const formatCurrency = (value: string | number | null) => {
     if (!value) return "-";
@@ -335,7 +314,7 @@ export default function FournisseursPage() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{fournisseurs?.length || 0}</div>
+            <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
         <Card>
@@ -345,7 +324,7 @@ export default function FournisseursPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {fournisseurs?.filter((f: any) => f.email).length || 0}
+              {stats.withEmail}
             </div>
           </CardContent>
         </Card>
@@ -356,7 +335,7 @@ export default function FournisseursPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {fournisseurs?.filter((f: any) => f.telephone).length || 0}
+              {stats.withPhone}
             </div>
           </CardContent>
         </Card>
@@ -367,7 +346,7 @@ export default function FournisseursPage() {
         <CardHeader>
           <CardTitle>{t("listTitle")}</CardTitle>
           <CardDescription>
-            {t("listCount", { n: filteredFournisseurs?.length || 0 })}
+            {t("listCount", { n: filteredFournisseurs.length })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -375,7 +354,7 @@ export default function FournisseursPage() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : filteredFournisseurs && filteredFournisseurs.length > 0 ? (
+          ) : filteredFournisseurs.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -388,7 +367,7 @@ export default function FournisseursPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredFournisseurs.map((fournisseur: any) => (
+                {filteredFournisseurs.map((fournisseur: Fournisseur) => (
                   <TableRow key={fournisseur.id}>
                     <TableCell className="font-medium">{fournisseur.nom}</TableCell>
                     <TableCell>{fournisseur.contact || "-"}</TableCell>
@@ -545,7 +524,7 @@ export default function FournisseursPage() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : fournisseurArticles && fournisseurArticles.length > 0 ? (
+            ) : fournisseurArticles.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -557,7 +536,7 @@ export default function FournisseursPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {fournisseurArticles.map((assoc: any) => {
+                  {fournisseurArticles.map((assoc: FournisseurArticle) => {
                     const article = getArticleDetails(assoc.articleId);
                     return (
                       <TableRow key={assoc.id}>
@@ -574,7 +553,15 @@ export default function FournisseursPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => dissociateMutation.mutate({ id: assoc.id })}
+                            onClick={() =>
+                              dissociateMutation.mutate(
+                                { id: assoc.id },
+                                {
+                                  onSuccess: () => toast.success(t("toastDissociated")),
+                                  onError: (error) => toast.error(error.message),
+                                },
+                              )
+                            }
                             title={t("titleDissociate")}
                           >
                             <Unlink className="h-4 w-4 text-destructive" />
@@ -611,9 +598,9 @@ export default function FournisseursPage() {
                 onChange={(e) => setArticleSearchQuery(e.target.value)}
               />
             </div>
-            {articleSearchQuery && filteredArticles && filteredArticles.length > 0 && (
+            {articleSearchQuery && filteredArticles.length > 0 && (
               <div className="max-h-40 overflow-y-auto border rounded-md">
-                {filteredArticles.slice(0, 10).map((article: any) => (
+                {filteredArticles.slice(0, 10).map((article: Article) => (
                   <div
                     key={article.id}
                     className={`p-2 cursor-pointer hover:bg-accent ${selectedArticleId === article.id ? "bg-accent" : ""}`}
