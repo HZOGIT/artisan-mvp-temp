@@ -138,17 +138,24 @@ Devis · Factures · Interventions · Commandes · Stocks · Dépenses.
 ### Vague 3 — critique/public *(OPE-423)*
 - [x] **Comptabilité → `/v2/comptabilite`** (~673 l., lecture seule) — conformité FEC + filtres période + TVA/CA3 + 4 onglets + aperçu FEC. i18n, double-layout supprimé. Parité e2e `31|0`.
 - [x] **Socle `/v2` PUBLIC** (hors auth) + **Paiement** : `modern/shared/router/public-router.tsx` + `public-router-mount.tsx` (2ᵉ arbre TanStack basepath `/v2`, monté dans le `Router` public de `App.tsx` avant le catch-all authentifié). Pages `PaiementSucces`/`PaiementAnnule` portées (`paiement-{succes,annule}-page.tsx`, i18n namespace `paiement`). Routes `/v2/paiement/{succes,annule}`. 4 gates verts, parité e2e `33|0`, déployé.
-- [ ] Dashboard (~16 widgets legacy → stratégie à définir) · Signature · Portail (publics, socle prêt) · Abonnement.
+- [x] **Signature → `/v2/signature/:token`** (+ alias `/v2/devis-public/:token`) — port conforme `pages/SignatureDevis.tsx` (`signature-devis-page.tsx`, ~605 l., PUBLIC), i18n namespace `signature` (libellés legacy sans accents conservés). Canvas de signature, options/formules, refus, états (loading/erreur/déjà traité/confirmation). Primitives `checkbox`/`separator` ajoutées au barrel. Token via TanStack. **Finding** : le legacy lisait `devis.dateDevis` (inexistant → « Invalid Date ») → corrigé en `createdAt`. 4 gates verts, e2e `37|0` (montage déterministe ; flow signé = dette). Déployé.
+- [ ] Dashboard (~16 widgets legacy → stratégie à définir) · Portail (public, socle prêt) · Abonnement.
 
 ### Vague 4 — longue traîne + **suppression du legacy** *(OPE-424)*
 Reste des pages → bascule routeur racine sur TanStack Router → **suppression complète de l'ancien code**
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 3 — Signature `/v2/signature/:token`** (PUBLIC, par token, post-flow signature).
-Socle public en place (cf. `public-router`). Primitives manquantes : `checkbox`, `separator` → les ajouter
-au barrel. `SignatureDevis` ~605 l. Découper si lourd. *(OPE-423)*
+## 🎯 PROCHAINE CIBLE : **Vague 3 — Portail client `/v2/portail/:token`** (PUBLIC, par token, paiement Stripe).
+`PortailClient` ~1211 l. (la plus grosse) → **découper en slices**. Socle public prêt. Primitives `progress`
+à ajouter au barrel. *(OPE-423)*
 *(Dashboard reporté : ~16 widgets legacy `@/components/dashboard/**` → stratégie widgets à définir.)*
+
+### Dette e2e
+- **Signature — flow signé complet** : l'e2e actuel vérifie seulement le MONTAGE (requête tRPC déclenchée) ;
+  le flux signer/refuser/sélectionner option nécessite un **token valide** (générer un devis + lien signature)
+  → à ajouter dans une itération e2e dédiée. *(react-query retry sur token invalide → l'état d'erreur met
+  >1.5 s à s'afficher, d'où le check par requête plutôt que par texte.)*
 
 ### Vague 2 — listes + mutations *(OPE-422)* — ✅ TERMINÉE (6/6)
 - [x] **Devis → `/v2/devis`** — port conforme `pages/Devis.tsx` (`devis-page.tsx`), i18n (namespace `devis`, statuts + exports PDF/Excel), `StatutBadge` ré-exporté dans `modern/shared/ui`. Mutations delete + convertToFacture (pas de `update({statut})`). 4 gates verts, parité e2e `17|0`, déployé.
@@ -171,6 +178,7 @@ au barrel. `SignatureDevis` ~605 l. Découper si lourd. *(OPE-423)*
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Vague 3 — Signature ✅** port public `/v2/signature/:token` (canvas, options, refus, états ; i18n ; checkbox/separator au barrel ; fix « Invalid Date » legacy). e2e montage déterministe `37|0`, déployé. Prochaine : Portail.
 - **Socle public ✅ + Paiement** : 2ᵉ montage TanStack `/v2` PUBLIC (hors auth) dans le `Router` de App ; pages PaiementSucces/Annule portées (i18n). Débloque Signature/Portail. **Broadcast inclut désormais un % de progression** (demande humaine). 4 gates verts, parité e2e `33|0`, déployé. Prochaine : Signature.
 - **Vague 3 — Comptabilité ✅** port `/v2/comptabilite` (lecture seule : conformité FEC, TVA/CA3, 4 onglets, exports ; i18n ; double-layout supprimé). 4 gates verts, parité e2e `31|0`, déployé. Prochaine : socle public + pages Paiement.
 - **Vague 2 — Dépenses ✅** port `/v2/depenses` (KPIs + filtres + indemnités km, i18n). Finding : `depenses.list` ignore les filtres (pas d'`.input()`). 4 gates verts, parité e2e `29|0`, déployé. **🎉 VAGUE 2 TERMINÉE (6/6).** Prochaine : Vague 3 (Dashboard).

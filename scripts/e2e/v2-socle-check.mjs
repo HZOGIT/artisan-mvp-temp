@@ -41,6 +41,8 @@ page.on('pageerror', (e) => add({ route: current, type: 'pageerror', text: Strin
 // `/api/rest/clients` : tout 4xx/5xx est une vraie régression (la dette REST OPE-366 est supprimée).
 page.on('response', (r) => {
   if (r.status() < 400) return;
+  // 404 ATTENDU : token de signature de test invalide → `signature.getDevisForSignature` renvoie 404.
+  if (/signature\.getDevisForSignature/.test(r.url())) return;
   add({ route: current, type: 'http', status: r.status(), url: r.url().replace(BASE, '').slice(0, 160) });
 });
 
@@ -153,6 +155,23 @@ if (new URL(page.url()).pathname !== '/v2/clients') {
   add({ route: '/clients?v2=1', type: 'bascule', text: `flag ON mais pas de bascule, URL=${page.url()}` });
 }
 
+// --- Signature (publique, par token) : montage `/v2` hors auth ---
+// Sans token valide, l'état d'erreur n'apparaît qu'après les retries react-query (timing instable).
+// On vérifie de façon DÉTERMINISTE que la page MONTE et lit le token : elle déclenche la requête tRPC
+// `signature.getDevisForSignature` (preuve : routeur public + extraction du param + bonne procédure).
+let signCount = 0;
+for (const route of ['/signature/e2e-token', '/v2/signature/e2e-token']) {
+  signCount++;
+  current = `signature ${route}`;
+  let sigCalled = false;
+  const onReq = (r) => { if (r.url().includes('signature.getDevisForSignature')) sigCalled = true; };
+  page.on('request', onReq);
+  await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+  await page.waitForTimeout(1500);
+  page.off('request', onReq);
+  if (!sigCalled) add({ route, type: 'signature', text: 'la page n’a pas appelé signature.getDevisForSignature (montage/param KO)' });
+}
+
 // --- Sidebar → v2 : la nav redirige vers `/v2` quand la route est migrée (registre V2_ROUTES) ---
 // On cible la nav MOBILE (boutons directs `handleNavigate`, faciles à cliquer de façon fiable).
 let sidebarCount = 0;
@@ -180,7 +199,7 @@ if (new URL(page.url()).pathname !== '/dashboard') {
 }
 
 await browser.close();
-const total = cases.length + pariteCount + basculeCount + sidebarCount;
+const total = cases.length + pariteCount + basculeCount + sidebarCount + signCount;
 console.log(`cas testés: ${total} | issues: ${issues.length}`);
 if (issues.length) console.log(JSON.stringify(issues, null, 2));
 process.exit(issues.length ? 1 : 0);

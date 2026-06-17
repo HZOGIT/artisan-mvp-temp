@@ -14,6 +14,7 @@ import stocksFr from "@/modern/features/stocks/i18n/fr.json";
 import depensesFr from "@/modern/features/depenses/i18n/fr.json";
 import comptabiliteFr from "@/modern/features/comptabilite/i18n/fr.json";
 import paiementFr from "@/modern/features/paiement/i18n/fr.json";
+import signatureFr from "@/modern/features/signature/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -37,6 +38,7 @@ const resources = {
     depenses: depensesFr,
     comptabilite: comptabiliteFr,
     paiement: paiementFr,
+    signature: signatureFr,
   },
 } as const;
 

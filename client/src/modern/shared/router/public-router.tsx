@@ -48,7 +48,20 @@ const paiementAnnuleRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/paiement/ui/paiement-annule-page")),
 });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute]);
+// Signature de devis (publique, par token) — port conforme de `pages/SignatureDevis.tsx`.
+const signatureRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/signature/$token",
+  component: lazyRouteComponent(() => import("../../features/signature/ui/signature-devis-page")),
+});
+// Alias legacy `/devis-public/:token` → même page.
+const devisPublicRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/devis-public/$token",
+  component: lazyRouteComponent(() => import("../../features/signature/ui/signature-devis-page")),
+});
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,
