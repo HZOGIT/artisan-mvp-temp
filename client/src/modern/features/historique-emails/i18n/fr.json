@@ -1,0 +1,23 @@
+{
+  "title": "Historique des emails",
+  "subtitle": "Journal des emails envoyés depuis Operioz (devis, factures, relances, portail…). Lecture seule.",
+  "cardTitle": "Derniers envois",
+  "loading": "Chargement…",
+  "loadingFull": "Chargement de l'historique…",
+  "countDisplayed": "{{n}} email(s) affiché(s)",
+  "filterTous": "Tous",
+  "filterEnvoye": "Envoyés",
+  "filterEchec": "Échecs",
+  "filterSimule": "Simulés",
+  "refresh": "Rafraîchir",
+  "emptyFiltered": "Aucun email pour ce filtre.",
+  "emptyNone": "Aucun email envoyé pour le moment.",
+  "thDate": "Date",
+  "thDestinataire": "Destinataire",
+  "thSujet": "Sujet",
+  "thType": "Type",
+  "thStatut": "Statut",
+  "badgeEnvoye": "Envoyé",
+  "badgeEchec": "Échec",
+  "badgeSimule": "Simulé"
+}

@@ -157,7 +157,14 @@ const reglesDepensesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/regles-depenses/ui/regles-depenses-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute]);
+// Historique des emails — migration clean-archi de `pages/HistoriqueEmails.tsx`.
+const historiqueEmailsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/historique-emails",
+  component: lazyRouteComponent(() => import("../../features/historique-emails/ui/historique-emails-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
