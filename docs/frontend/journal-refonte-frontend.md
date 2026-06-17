@@ -315,7 +315,18 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   types dérivés/helpers). i18n namespace `badges`. Route `/v2/badges` + `V2_ROUTES["/badges"]` + sweep.
   **0 `any`**. tsc/eslint(0)/vitest **247**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~18 restantes). Ordre suggéré : `assistant`
+- **Migration `classement` (gamification : podium + tableau + badges/objectifs) ✅** (3e des ~20 pages
+  feature) : audit contrat — `badges.{getClassement,calculerClassement,getBadgesTechnicien,getObjectifsTechnicien}`
+  + `techniciens.getAll` présents. **Gap détecté & comblé SANS backend** : `getBadgesTechnicien` ne renvoie
+  que le lien brut (id/badgeId/dateObtention), PAS nom/couleur/points (que le legacy lisait via `any`) →
+  **jointure côté client** avec `badges.list` (`enrichBadgesTechnicien`, domain pur testé). Clean-archi :
+  `domain/classement.ts` (eur/initials/technicienName/buildRanking/splitPodium/objectifPct/enrichBadgesTechnicien,
+  **8 tests**) + `application/use-classement.ts` (2 hooks : classement + détail technicien via skipToken) +
+  `ui/classement-page.tsx` (podium framer-motion + tableau + badges + objectifs, markup à l'identique, **~7
+  `any` legacy supprimés**). i18n namespace `classement`. Route `/v2/classement` + V2_ROUTES + sweep. **0 `any`**.
+  tsc/eslint(0)/vitest **255**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~17 restantes). Ordre suggéré : `assistant`
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

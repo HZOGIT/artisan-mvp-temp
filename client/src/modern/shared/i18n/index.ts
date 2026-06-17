@@ -38,6 +38,7 @@ import portailFr from "@/modern/features/portail/i18n/fr.json";
 import homeFr from "@/modern/features/home/i18n/fr.json";
 import chatFr from "@/modern/features/chat/i18n/fr.json";
 import badgesFr from "@/modern/features/badges/i18n/fr.json";
+import classementFr from "@/modern/features/classement/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -85,6 +86,7 @@ const resources = {
     home: homeFr,
     chat: chatFr,
     badges: badgesFr,
+    classement: classementFr,
   },
 } as const;
 

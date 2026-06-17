@@ -1,0 +1,43 @@
+{
+  "titre": "Classement",
+  "sousTitre": "Gamification et performances des techniciens",
+  "recalculer": "Recalculer",
+  "lancerCalcul": "Lancer le calcul",
+  "chargement": "Chargement du classement…",
+  "aucunClassement": "Aucun classement pour {{periode}}.",
+  "podium": "Podium — {{periode}}",
+  "classementComplet": "Classement complet",
+  "classementCompletDesc": "Tous les techniciens classés pour {{periode}}",
+  "colRang": "Rang",
+  "colTechnicien": "Technicien",
+  "colInterventions": "Interventions",
+  "colNote": "Note moy.",
+  "colCa": "CA généré",
+  "colScore": "Score",
+  "ptsSuffix": "{{points}} pts",
+  "finPeriode": "C'est tout pour cette période.",
+  "badgesGagnes": "Badges gagnés",
+  "badgesTechnicien": "Technicien {{nom}}",
+  "badgesSelectionne": "Sélectionne un technicien dans le tableau",
+  "aucunBadge": "Aucun badge encore obtenu.",
+  "plusPts": "+{{points}} pts",
+  "objectifs": "Objectifs {{annee}}",
+  "objectifsDesc": "Progression mensuelle vers les objectifs fixés",
+  "aucunObjectif": "Aucun objectif défini cette année.",
+  "objInterventions": "Interventions : {{realise}} / {{objectif}}",
+  "objCa": "CA : {{realise}} / {{objectif}}",
+  "toastRecalcule": "Classement {{periode}} recalculé",
+  "errRecalcul": "Erreur lors du recalcul",
+  "periode": {
+    "semaine": "Semaine",
+    "mois": "Mois",
+    "trimestre": "Trimestre",
+    "annee": "Année"
+  },
+  "periodeLabel": {
+    "semaine": "Cette semaine",
+    "mois": "Ce mois",
+    "trimestre": "Ce trimestre",
+    "annee": "Cette année"
+  }
+}
