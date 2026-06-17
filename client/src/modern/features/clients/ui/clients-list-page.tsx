@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useClients } from "../application/use-clients";
+import { findDuplicateGroups, findCreateDuplicateMatch, type Client } from "../domain/client";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent } from "@/modern/shared/ui/card";
@@ -12,11 +13,10 @@ import { toast } from "sonner";
 import { matchSearch } from "@/lib/normalize";
 import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
 
-// Page Clients du FRONT NEUF (`/v2/clients`) — PORT CONFORME de `pages/Clients.tsx` (parité visuelle
-// stricte). Le JSX/Tailwind est copié à l'identique ; seule la plomberie change : primitives via
-// `@/modern/shared/ui`, tRPC via `@/modern/shared/trpc`, et **libellés via i18n** (`react-i18next`,
-// namespace `clients`, catalogue `fr` = textes actuels à l'identique). Données déjà servies par tRPC
-// côté legacy (list/update/delete/getEncoursMap), donc la migration n'altère ni le rendu ni le contrat.
+// Page Clients du FRONT NEUF (`/v2/clients`) — clean-archi : la couche UI (présentation) consomme le
+// hook `useClients()` (couche application, seule à parler à tRPC) et les fonctions PURES du domaine
+// (`findDuplicateGroups`/`findCreateDuplicateMatch`). Aucun import tRPC ici. i18n namespace `clients`,
+// primitives `@/modern/shared/ui`. Parité visuelle stricte vs `pages/Clients.tsx`.
 
 interface ClientFormData {
   nom: string;
@@ -60,7 +60,7 @@ export default function ClientsListPage() {
   const { t } = useTranslation("clients");
   const [, navigate] = useLocation();
   const search = useSearch();
-  const utils = trpc.useUtils();
+  const { clients, encoursMap, isLoading, update, remove } = useClients();
 
   // State pour le formulaire d'édition
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -76,85 +76,15 @@ export default function ClientsListPage() {
     if (f) setSearchQuery(f);
   }, [search]);
 
-  // Queries
-  const { data: clients = [], isLoading } = trpc.clients.list.useQuery();
-  // Encours impayé par client (badge « à risque » de la liste).
-  const { data: encoursMap = {} } = trpc.clients.getEncoursMap.useQuery();
-
-  // Détection de doublons potentiels (lecture seule, calculée depuis la liste déjà chargée) :
-  // même email OU même prénom+nom (normalisés). Purement informatif.
+  // Doublons potentiels (logique PURE du domaine) — descripteurs i18n formatés au rendu via `t()`.
   const [dupesDismissed, setDupesDismissed] = useState(false);
-  const duplicateGroups = useMemo(() => {
-    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
-    const push = (m: Map<string, any[]>, k: string, c: any) => {
-      const a = m.get(k); if (a) a.push(c); else m.set(k, [c]);
-    };
-    const byEmail = new Map<string, any[]>();
-    const byName = new Map<string, any[]>();
-    for (const c of clients as any[]) {
-      const email = norm(c.email);
-      if (email) push(byEmail, email, c);
-      const name = `${norm(c.prenom)} ${norm(c.nom)}`.trim();
-      if (name && name !== "") push(byName, name, c);
-    }
-    const groups: { reason: string; clients: any[] }[] = [];
-    const seen = new Set<string>(); // dédoublonne les groupes par ensemble d'ids
-    const addGroup = (reason: string, list: any[]) => {
-      if (list.length < 2) return;
-      const key = list.map((c) => c.id).sort((a, b) => a - b).join(",");
-      if (seen.has(key)) return;
-      seen.add(key);
-      groups.push({ reason, clients: list });
-    };
-    for (const [email, list] of byEmail) addGroup(t("dupesSameEmail", { email }), list);
-    for (const [, list] of byName) addGroup(t("dupesSameName"), list);
-    return groups;
-  }, [clients, t]);
+  const duplicateGroups = useMemo(() => findDuplicateGroups(clients), [clients]);
 
-  // Avertissement NON BLOQUANT à la création : si l'email, le téléphone ou le nom+prénom saisi
-  // correspond à un client existant, on le signale (sans empêcher l'enregistrement).
-  const createDuplicateMatch = useMemo(() => {
-    if (editingClientId) return null;
-    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
-    const digits = (s: any) => String(s || "").replace(/[\s.\-()+]/g, "");
-    const email = norm(formData.email);
-    const phone = digits(formData.telephone);
-    const name = `${norm(formData.prenom)} ${norm(formData.nom)}`.trim();
-    for (const c of clients as any[]) {
-      if (email && norm(c.email) === email) return { client: c, reason: t("dupeReasonEmail") };
-      if (phone && phone.length >= 6 && digits(c.telephone) === phone) return { client: c, reason: t("dupeReasonPhone") };
-    }
-    if (name) {
-      for (const c of clients as any[]) {
-        if (`${norm(c.prenom)} ${norm(c.nom)}`.trim() === name) return { client: c, reason: t("dupeReasonName") };
-      }
-    }
-    return null;
-  }, [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients, t]);
-
-  // Mutations
-  const updateMutation = trpc.clients.update.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastUpdated"));
-      setFormData(initialFormData);
-      setEditingClientId(null);
-      setIsEditModalOpen(false);
-      utils.clients.list.invalidate();
-    },
-    onError: (error) => {
-      toast.error(error.message || t("toastUpdateError"));
-    },
-  });
-
-  const deleteMutation = trpc.clients.delete.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastDeleted"));
-      utils.clients.list.invalidate();
-    },
-    onError: (error) => {
-      toast.error(error.message || t("toastDeleteError"));
-    },
-  });
+  // Avertissement NON BLOQUANT de doublon à la création (logique PURE du domaine).
+  const createDuplicateMatch = useMemo(
+    () => (editingClientId ? null : findCreateDuplicateMatch(formData, clients)),
+    [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients],
+  );
 
   // Handler pour les changements d'input
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -178,7 +108,7 @@ export default function ClientsListPage() {
   }, [resetForm]);
 
   // Handler pour ouvrir la modale d'édition
-  const handleOpenEditModal = useCallback((client: any) => {
+  const handleOpenEditModal = useCallback((client: Client) => {
     setFormData({
       nom: client.nom,
       prenom: client.prenom || "",
@@ -209,19 +139,33 @@ export default function ClientsListPage() {
       return;
     }
     if (editingClientId) {
-      await updateMutation.mutateAsync({
-        id: editingClientId,
-        ...formData,
-      });
+      update.mutate(
+        { id: editingClientId, ...formData },
+        {
+          onSuccess: () => {
+            toast.success(t("toastUpdated"));
+            setFormData(initialFormData);
+            setEditingClientId(null);
+            setIsEditModalOpen(false);
+          },
+          onError: (error) => toast.error(error.message || t("toastUpdateError")),
+        },
+      );
     }
-  }, [formData, editingClientId, updateMutation, t]);
+  }, [formData, editingClientId, update, t]);
 
   // Handler pour supprimer un client
   const handleDelete = useCallback((clientId: number) => {
     if (confirm(t("confirmDelete"))) {
-      deleteMutation.mutate({ id: clientId });
+      remove.mutate(
+        { id: clientId },
+        {
+          onSuccess: () => toast.success(t("toastDeleted")),
+          onError: (error) => toast.error(error.message || t("toastDeleteError")),
+        },
+      );
     }
-  }, [deleteMutation, t]);
+  }, [remove, t]);
 
   // Handler pour la recherche
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,7 +179,7 @@ export default function ClientsListPage() {
     matchSearch(client.email, searchQuery) ||
     matchSearch(client.ville, searchQuery) ||
     // Recherche/segmentation par étiquette.
-    matchSearch((client as any).etiquettes, searchQuery) ||
+    matchSearch(client.etiquettes, searchQuery) ||
     (client.telephone ? client.telephone.includes(searchQuery) : false)
   );
 
@@ -251,7 +195,7 @@ export default function ClientsListPage() {
       t("csvNom"), t("csvPrenom"), t("csvType"), t("csvRaisonSociale"), t("csvEmail"), t("csvTelephone"),
       t("csvAdresse"), t("csvCodePostal"), t("csvVille"), t("csvSiret"), t("csvNumeroTVA"), t("csvEtiquettes"), t("csvNotes"),
     ];
-    const rows = data.map((c: any) => [
+    const rows = data.map((c) => [
       c.nom, c.prenom, c.type, c.raisonSociale, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.numeroTVA, c.etiquettes, c.notes,
     ]);
     exportToCsv(`clients_${csvDateSuffix()}.csv`, headers, rows);
@@ -304,9 +248,9 @@ export default function ClientsListPage() {
                   <ul className="mt-1 space-y-1 text-amber-700">
                     {duplicateGroups.slice(0, 5).map((g, i) => (
                       <li key={i}>
-                        <span className="text-amber-600">{g.reason}</span>{" : "}
+                        <span className="text-amber-600">{t(g.reasonKey, g.reasonParams)}</span>{" : "}
                         {g.clients
-                          .map((c: any) => `${(c.prenom || "")} ${c.nom}`.trim() + (c.ville ? ` (${c.ville})` : ""))
+                          .map((c) => `${(c.prenom || "")} ${c.nom}`.trim() + (c.ville ? ` (${c.ville})` : ""))
                           .join(" · ")}
                       </li>
                     ))}
@@ -342,12 +286,12 @@ export default function ClientsListPage() {
                     <div className="flex items-center flex-wrap gap-2">
                       <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
                       {/* Badge « à risque » : impayés en cours */}
-                      {(encoursMap as any)[client.id] && parseFloat((encoursMap as any)[client.id].encoursTotal) > 0 && (
+                      {encoursMap[client.id] && parseFloat(encoursMap[client.id].encoursTotal) > 0 && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
-                          title={t("unpaidTitle", { echu: (encoursMap as any)[client.id].echu, count: (encoursMap as any)[client.id].nbFacturesImpayees })}
+                          title={t("unpaidTitle", { echu: encoursMap[client.id].echu, count: encoursMap[client.id].nbFacturesImpayees })}
                         >
-                          {t("unpaidBadge", { amount: (encoursMap as any)[client.id].encoursTotal })}
+                          {t("unpaidBadge", { amount: encoursMap[client.id].encoursTotal })}
                         </span>
                       )}
                     </div>
@@ -372,9 +316,9 @@ export default function ClientsListPage() {
                       )}
                     </div>
                     {/* Étiquettes de segmentation */}
-                    {(client as any).etiquettes && (
+                    {client.etiquettes && (
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {String((client as any).etiquettes).split(",").map((t2: string) => t2.trim()).filter(Boolean).map((tag: string, i: number) => (
+                        {String(client.etiquettes).split(",").map((t2: string) => t2.trim()).filter(Boolean).map((tag: string, i: number) => (
                           <span key={i} className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium">
                             {tag}
                           </span>
@@ -501,7 +445,7 @@ export default function ClientsListPage() {
                 {/* Avertissement doublon (non bloquant) à la création */}
                 {createDuplicateMatch && (
                   <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">
-                    {t("dupeWarnPrefix", { reason: createDuplicateMatch.reason })}{" "}
+                    {t("dupeWarnPrefix", { reason: t(createDuplicateMatch.reasonKey) })}{" "}
                     <strong>
                       {createDuplicateMatch.client.prenom} {createDuplicateMatch.client.nom}
                     </strong>
@@ -696,10 +640,10 @@ export default function ClientsListPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={updateMutation.isPending}
+                    disabled={update.isPending}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
                   >
-                    {updateMutation.isPending ? t("submitting") : t("submit")}
+                    {update.isPending ? t("submitting") : t("submit")}
                   </button>
                 </div>
               </form>

@@ -30,6 +30,28 @@ const kebabFilename = {
   },
 };
 
+// Règle custom (clean-archi) : la couche `features/<f>/ui/**` ne doit PAS importer tRPC directement —
+// elle passe par la couche application (`use-<feature>`). En `warn` tant que le rétrofit n'est pas fini
+// (les pages legacy-style restent vertes au gate) ; passera en `error` une fois tout rétrofitté.
+const noTrpcInUi = {
+  meta: {
+    type: "suggestion",
+    docs: { description: "L'UI ne doit pas importer tRPC ; encapsuler dans application/use-<feature>." },
+    schema: [],
+  },
+  create(context) {
+    const file = context.filename ?? context.getFilename();
+    if (!/\/features\/[^/]+\/ui\//.test(file)) return {};
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value === "@/modern/shared/trpc") {
+          context.report({ node, message: "Clean-archi : la couche ui/ n'importe pas tRPC. Passer par application/use-<feature>." });
+        }
+      },
+    };
+  },
+};
+
 export default tseslint.config({
   files: ["client/src/modern/**/*.{ts,tsx}"],
   languageOptions: {
@@ -37,11 +59,12 @@ export default tseslint.config({
     parserOptions: { ecmaFeatures: { jsx: true } },
   },
   plugins: {
-    local: { rules: { "kebab-filename": kebabFilename } },
+    local: { rules: { "kebab-filename": kebabFilename, "no-trpc-in-ui": noTrpcInUi } },
     i18next,
   },
   rules: {
     "local/kebab-filename": "error",
+    "local/no-trpc-in-ui": "warn",
     // Frontière strangler + pas de REST : le neuf passe par les coutures partagées.
     "no-restricted-imports": [
       "error",
