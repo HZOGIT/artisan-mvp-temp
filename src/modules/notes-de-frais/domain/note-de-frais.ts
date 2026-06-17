@@ -26,6 +26,23 @@ export interface NoteDeFrais {
   readonly createdAt: Date | null;
 }
 
+// Dépense liée affichée dans le détail d'une note (sous-ensemble des champs `depenses` utiles à l'UI).
+// OPE-490 : comble le gap (le détail/liste new-stack n'exposait ni `depenses[]` ni `nbDepenses`).
+export interface NoteFraisDepense {
+  readonly id: number;
+  readonly numero: string;
+  readonly fournisseur: string | null;
+  readonly dateDepense: string;
+  readonly categorie: string;
+  readonly montantTtc: string;
+}
+
+// Détail d'une note enrichi des dépenses liées (consommé par `getNoteFraisById`).
+export type NoteDeFraisDetail = NoteDeFrais & { readonly depenses: NoteFraisDepense[] };
+
+// Élément de liste enrichi du compteur de dépenses (consommé par `listNotesFrais`).
+export type NoteDeFraisListItem = NoteDeFrais & { readonly nbDepenses: number };
+
 export interface CreateNoteDeFraisInput {
   readonly userId: number;
   readonly numero: string;

@@ -4,7 +4,7 @@ import type { DbClient } from "../../../shared/db";
 import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch, DepenseLieeStatut } from "../application/note-de-frais-repository";
-import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
+import type { NoteDeFrais, NoteFraisDepense, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
 import { computeNextNoteFraisNumero } from "../application/numero";
 
 type NoteRow = typeof notesDeFrais.$inferSelect;
@@ -43,6 +43,50 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
         .orderBy(desc(notesDeFrais.id))
         .limit(1);
       return computeNextNoteFraisNumero(row?.numero ?? "");
+    });
+  }
+
+  // OPE-490 — dépenses liées à une note (détails), scopé tenant. Note du tenant requise (anti-IDOR :
+  // [] sinon). Join `notes_frais_depenses ⋈ depenses` (même pattern que le recalcul de montant).
+  getDepensesForNote(ctx: TenantContext, noteId: number): Promise<NoteFraisDepense[]> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const [note] = await tx.select({ id: notesDeFrais.id }).from(notesDeFrais).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId))).limit(1);
+      if (!note) return [];
+      const rows = await tx
+        .select({
+          id: depenses.id,
+          numero: depenses.numero,
+          fournisseur: depenses.fournisseur,
+          dateDepense: depenses.date_depense,
+          categorie: depenses.categorie,
+          montantTtc: depenses.montant_ttc,
+        })
+        .from(depenses)
+        .innerJoin(notesFraisDepenses, eq(notesFraisDepenses.depense_id, depenses.id))
+        .where(and(eq(notesFraisDepenses.note_id, noteId), eq(depenses.artisan_id, ctx.artisanId)))
+        .orderBy(desc(depenses.date_depense), desc(depenses.id));
+      return rows.map((r) => ({
+        id: r.id,
+        numero: r.numero,
+        fournisseur: r.fournisseur ?? null,
+        dateDepense: r.dateDepense,
+        categorie: r.categorie,
+        montantTtc: r.montantTtc ?? "0",
+      }));
+    });
+  }
+
+  // OPE-490 — compteur de dépenses liées par note (tenant) : Map noteId → count. Join via les notes
+  // du tenant (scope l'agrégat au tenant sans exposer les liens d'autrui).
+  countDepensesByNote(ctx: TenantContext): Promise<Map<number, number>> {
+    return withTenant(this.db, ctx, async (tx) => {
+      const rows = await tx
+        .select({ noteId: notesFraisDepenses.note_id, n: sql<number>`COUNT(*)::int` })
+        .from(notesFraisDepenses)
+        .innerJoin(notesDeFrais, eq(notesDeFrais.id, notesFraisDepenses.note_id))
+        .where(eq(notesDeFrais.artisan_id, ctx.artisanId))
+        .groupBy(notesFraisDepenses.note_id);
+      return new Map(rows.map((r) => [r.noteId, Number(r.n)]));
     });
   }
 

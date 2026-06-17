@@ -21,7 +21,7 @@ import { creerRegle, supprimerRegle } from "../../../regles-categorisation/appli
 // Composition : notes de frais via `trpc.depenses.listNotesFrais/...` (workflow anti self-approbation
 // porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
 import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
-import { listNotesDeFrais } from "../../../notes-de-frais/application/read-use-cases";
+import { listNotesDeFraisAvecCompte, getNoteFraisDetail } from "../../../notes-de-frais/application/read-use-cases";
 import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais, payerNoteDeFrais, ajouterDepenseANote, retirerDepenseDeNote } from "../../../notes-de-frais/application/write-use-cases";
 import type { ITransactionBancaireRepository } from "../../application/transaction-bancaire-repository";
 import { getTransactionsBancaires, ignorerTransaction, importReleve, convertirTransaction } from "../../application/transactions-use-cases";
@@ -274,13 +274,14 @@ export function createDepensesRouter(
     // ── Notes de frais (parité client : trpc.depenses.listNotesFrais/...) ──────────────
     // Read seul pour l'instant ; les mutations (create/soumettre/approuver/rejeter/payer) viendront
     // en slices dédiés en préservant l'anti self-approbation porté par le domaine notes-de-frais.
-    listNotesFrais: protectedProcedure.query(({ ctx }) => listNotesDeFrais(noteRepo, ctx.tenant)),
+    // OPE-490 : enrichi de `nbDepenses` (compteur de dépenses liées) par note.
+    listNotesFrais: protectedProcedure.query(({ ctx }) => listNotesDeFraisAvecCompte(noteRepo, ctx.tenant)),
 
     // Création d'une note de frais (parité client : trpc.depenses.createNoteFrais). ⚠️ `numero`
     // est généré CÔTÉ SERVEUR (noteRepo.nextNumero) — jamais fourni par le client — et `userId`
-    // est forcé au créateur dans le use-case (anti-IDOR demandeur). `depenseIds` est accepté mais
-    // ignoré pour l'instant : la cascade dépenses↔note (marquage des lignes) sort de ce slice et
-    // sera ajoutée avec addDepenseToNoteFrais/removeDepenseFromNoteFrais.
+    // est forcé au créateur dans le use-case (anti-IDOR demandeur). OPE-490 : `depenseIds` est
+    // désormais HONORÉ — cascade `addDepenseLink` (anti-IDOR : skip silencieux des dépenses hors
+    // tenant / non remboursables ; recalcul du `montant_total` porté par addDepenseLink).
     createNoteFrais: protectedProcedure
       .input(
         z.object({
@@ -292,12 +293,17 @@ export function createDepensesRouter(
       )
       .mutation(async ({ ctx, input }) => {
         const numero = await noteRepo.nextNumero(ctx.tenant);
-        return creerNoteDeFrais(noteRepo, ctx.tenant, {
+        const note = await creerNoteDeFrais(noteRepo, ctx.tenant, {
           numero,
           titre: input.titre,
           periodeDebut: input.periodeDebut,
           periodeFin: input.periodeFin,
         });
+        for (const depenseId of input.depenseIds ?? []) {
+          await noteRepo.addDepenseLink(ctx.tenant, note.id, depenseId);
+        }
+        // Relit pour renvoyer le `montant_total` à jour (recalculé par addDepenseLink).
+        return (await noteRepo.getById(ctx.tenant, note.id)) ?? note;
       }),
 
     // Soumission d'une note de frais (parité client : trpc.depenses.soumettreNoteFrais). ⚠️ Le
@@ -326,11 +332,10 @@ export function createDepensesRouter(
       .mutation(({ ctx, input }) => payerNoteDeFrais(noteRepo, ctx.tenant, input.id)),
 
     // ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
-    // On appelle donc directement le repo (getById → null) plutôt que le use-case `getNoteDeFrais`
-    // (qui lève NotFound → 404).
+    // OPE-490 : enrichi des `depenses[]` liées (détails) via `getNoteFraisDetail` (qui préserve le null).
     getNoteFraisById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(({ ctx, input }) => noteRepo.getById(ctx.tenant, input.id)),
+      .query(({ ctx, input }) => getNoteFraisDetail(noteRepo, ctx.tenant, input.id)),
 
     // ── Liens dépense ↔ note de frais (anti-IDOR via la note+dépense du tenant ; recalcul du total) ─
     addDepenseToNoteFrais: protectedProcedure

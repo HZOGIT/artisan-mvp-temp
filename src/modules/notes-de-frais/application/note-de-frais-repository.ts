@@ -2,6 +2,7 @@ import type { TenantContext } from "../../../shared/tenant";
 import type {
   NoteDeFrais,
   NoteDeFraisStatut,
+  NoteFraisDepense,
   CreateNoteDeFraisInput,
   UpdateNoteDeFraisInput,
 } from "../domain/note-de-frais";
@@ -41,6 +42,12 @@ export interface INoteDeFraisRepository {
   // REMBOURSABLE (une note ne regroupe que des avances salarié). Échec silencieux sinon (skip).
   // Idempotent (lien unique). Recalcule ensuite `montant_total` (= SUM des dépenses remboursables
   // liées). Parité legacy `addDepenseToNoteFrais` + `calculerTotalNoteFrais`.
+  // ── Lecture des liens (OPE-490) ───────────────────────────────────────────────────────────────
+  // Dépenses liées à une note (détails affichables), scopé tenant. [] si note hors tenant/sans lien.
+  getDepensesForNote(ctx: TenantContext, noteId: number): Promise<NoteFraisDepense[]>;
+  // Nombre de dépenses liées par note (pour la liste), scopé tenant : Map noteId → count.
+  countDepensesByNote(ctx: TenantContext): Promise<Map<number, number>>;
+
   addDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;
   // Retire le lien (note du tenant requise ; skip silencieux sinon) puis recalcule `montant_total`.
   removeDepenseLink(ctx: TenantContext, noteId: number, depenseId: number): Promise<void>;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FakeNoteDeFraisRepository } from "../infra/note-de-frais-repository-fake";
-import { listNotesDeFrais, getNoteDeFrais } from "./read-use-cases";
+import { listNotesDeFrais, getNoteDeFrais, listNotesDeFraisAvecCompte, getNoteFraisDetail } from "./read-use-cases";
 import { expectCrossTenantDenied } from "../../../shared/testing";
 import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
@@ -35,5 +35,31 @@ describe("notes-de-frais — use-cases de lecture", () => {
   it("getNoteDeFrais sur un id inexistant → NotFound", async () => {
     const repo = new FakeNoteDeFraisRepository();
     await expect(getNoteDeFrais(repo, A, 999999)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  // ── OPE-490 : enrichissement dépenses[] / nbDepenses ──────────────────────────────────────────
+  it("listNotesDeFraisAvecCompte : nbDepenses = nb de dépenses liées (0 si aucune)", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n1 = await repo.create(A, base({ titre: "Avec 2" }));
+    await repo.create(A, base({ titre: "Sans" }));
+    repo.registerDepense(A.artisanId, 501, { remboursable: true, montantTtc: "10.00" });
+    repo.registerDepense(A.artisanId, 502, { remboursable: true, montantTtc: "20.00" });
+    await repo.addDepenseLink(A, n1.id, 501);
+    await repo.addDepenseLink(A, n1.id, 502);
+    const list = await listNotesDeFraisAvecCompte(repo, A);
+    expect(list.find((n) => n.titre === "Avec 2")?.nbDepenses).toBe(2);
+    expect(list.find((n) => n.titre === "Sans")?.nbDepenses).toBe(0);
+  });
+
+  it("getNoteFraisDetail : note + dépenses liées (détails) ; null si hors tenant", async () => {
+    const repo = new FakeNoteDeFraisRepository();
+    const n = await repo.create(A, base());
+    repo.registerDepense(A.artisanId, 700, { remboursable: true, montantTtc: "33.00", numero: "DEP-700", fournisseur: "Castorama", categorie: "fournitures", dateDepense: "2026-06-10" });
+    await repo.addDepenseLink(A, n.id, 700);
+    const detail = await getNoteFraisDetail(repo, A, n.id);
+    expect(detail?.depenses).toHaveLength(1);
+    expect(detail?.depenses[0]).toMatchObject({ id: 700, numero: "DEP-700", fournisseur: "Castorama", montantTtc: "33.00", categorie: "fournitures" });
+    expect(detail?.montantTotal).toBe("33"); // recalculé par addDepenseLink
+    expect(await getNoteFraisDetail(repo, B, n.id)).toBeNull(); // parité : null hors tenant
   });
 });
