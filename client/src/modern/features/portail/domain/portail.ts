@@ -122,3 +122,23 @@ export function formatChatDate(date: Date | string, now: Date = new Date()): str
   if (days < 7) return d.toLocaleDateString("fr-FR", { weekday: "long" });
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
+
+// ── SLICE 6 : Demande IA + Mes infos (dernier onglet) ────────────────────────────────────────────────
+export type DemandeStructured = RouterOutputs["clientPortal"]["soumettreDemandeIA"]["structured"];
+export type PortailClientInfo = NonNullable<RouterOutputs["clientPortal"]["getClientInfo"]>;
+
+// Suggestions de projet (chips) du formulaire de demande IA — parité legacy. PUR.
+export const EXEMPLES_DEMANDE = [
+  "Rénover ma salle de bain",
+  "Refaire mon jardin",
+  "Problème de plomberie",
+  "Installation électrique",
+] as const;
+
+// Bornes legacy de la description de la demande IA (min 10 / max 2000 — alignées sur le zod backend). PUR.
+export const DEMANDE_MIN = 10;
+export const DEMANDE_MAX = 2000;
+export function demandeValide(description: string): boolean {
+  const len = description.trim().length;
+  return len >= DEMANDE_MIN && len <= DEMANDE_MAX;
+}

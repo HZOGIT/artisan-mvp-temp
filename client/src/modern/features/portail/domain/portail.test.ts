@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, type PortailIntervention, type PortailConversation } from "./portail";
+import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, demandeValide, EXEMPLES_DEMANDE, type PortailIntervention, type PortailConversation } from "./portail";
 
 describe("portail (socle, slice 1)", () => {
   it("expose les 8 onglets de l'espace client (parité legacy)", () => {
@@ -77,5 +77,18 @@ describe("portail slice 5 — chat", () => {
     const now = new Date("2026-06-10T12:00:00");
     expect(formatChatDate(new Date("2026-06-09T08:00:00"), now)).toBe("Hier");
     expect(formatChatDate(new Date("2026-06-01T08:00:00"), now)).toContain("juin");
+  });
+});
+
+describe("portail slice 6 — demande IA", () => {
+  it("demandeValide : min 10 / max 2000 caractères (trim)", () => {
+    expect(demandeValide("court")).toBe(false);
+    expect(demandeValide("  court  ")).toBe(false); // trim → 5
+    expect(demandeValide("description suffisamment longue")).toBe(true);
+    expect(demandeValide("x".repeat(10))).toBe(true); // borne basse
+    expect(demandeValide("x".repeat(2001))).toBe(false); // borne haute dépassée
+  });
+  it("EXEMPLES_DEMANDE : 4 suggestions de parité", () => {
+    expect(EXEMPLES_DEMANDE).toHaveLength(4);
   });
 });

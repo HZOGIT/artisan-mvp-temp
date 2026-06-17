@@ -19,7 +19,9 @@ import { usePortailDocuments } from "../application/use-portail-documents";
 import { usePortailActivity } from "../application/use-portail-activity";
 import { usePortailRdv } from "../application/use-portail-rdv";
 import { usePortailChat } from "../application/use-portail-chat";
-import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, type RdvUrgence } from "../domain/portail";
+import { usePortailInfos } from "../application/use-portail-infos";
+import { usePortailDemande } from "../application/use-portail-demande";
+import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, EXEMPLES_DEMANDE, demandeValide, type RdvUrgence, type DemandeStructured } from "../domain/portail";
 
 // SLICE 1 (socle) du portail client `/v2/portail/$token` : gate d'accès (chargement / lien invalide /
 // espace valide) + en-tête artisan + coquille d'onglets. Contenu des onglets = slices ultérieurs.
@@ -87,6 +89,28 @@ export default function PortailClientPage() {
     sendMessage.mutate(
       { token: token || "", conversationId: selectedChatConv, contenu: chatMessage.trim() },
       { onSuccess: () => setChatMessage(""), onError: () => toast.error(t("messageErreur")) },
+    );
+  };
+
+  // Demande IA + Mes infos (slice 6)
+  const { clientInfo } = usePortailInfos(token || "", !!access?.valid);
+  const { soumettreDemandeIA, demanderModification } = usePortailDemande();
+  const [demandeText, setDemandeText] = useState("");
+  const [demandeStructured, setDemandeStructured] = useState<DemandeStructured | null>(null);
+  const [modificationMessage, setModificationMessage] = useState("");
+  const [modificationSent, setModificationSent] = useState(false);
+
+  const submitDemande = () => {
+    soumettreDemandeIA.mutate(
+      { token: token || "", description: demandeText.trim() },
+      { onSuccess: (data) => setDemandeStructured(data.structured), onError: () => toast.error(t("demandeErreur")) },
+    );
+  };
+  const submitModification = () => {
+    if (!modificationMessage.trim()) return;
+    demanderModification.mutate(
+      { token: token || "", message: modificationMessage },
+      { onSuccess: () => { setModificationSent(true); setModificationMessage(""); }, onError: () => toast.error(t("infosModifErreur")) },
     );
   };
 
@@ -566,14 +590,112 @@ export default function PortailClientPage() {
             </div>
           </TabsContent>
 
-          {/* Onglets restants (slice 6) — coquille */}
-          {PORTAIL_TABS.filter((tab) => !["devis", "factures", "interventions", "chantier", "rdv", "messages"].includes(tab)).map((tab) => (
-            <TabsContent key={tab} value={tab}>
+          {/* SLICE 6 — Nouvelle demande IA */}
+          <TabsContent value="demande">
+            <Card className="border-violet-200 bg-gradient-to-br from-violet-50/50 to-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-violet-600" />{t("demandeTitre")}</CardTitle>
+                <CardDescription>{t("demandeDesc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {EXEMPLES_DEMANDE.map((ex) => (
+                    <button key={ex} type="button" onClick={() => setDemandeText(ex)} className="text-xs px-3 py-1.5 rounded-full border border-violet-200 bg-white hover:bg-violet-100 text-violet-700 transition-colors">{ex}</button>
+                  ))}
+                </div>
+                <Textarea value={demandeText} onChange={(e) => setDemandeText(e.target.value)} placeholder={t("demandePlaceholder")} rows={5} className="bg-white" />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{t("demandeCompteur", { count: demandeText.length })}</span>
+                  <Button onClick={submitDemande} disabled={!demandeValide(demandeText) || soumettreDemandeIA.isPending} className="bg-violet-600 hover:bg-violet-700">
+                    {soumettreDemandeIA.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("demandeEnvoi")}</> : <><Send className="h-4 w-4 mr-2" /> {t("demandeEnvoyer")}</>}
+                  </Button>
+                </div>
+
+                {demandeStructured && (
+                  <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-emerald-900">{t("demandeEnvoyeeTitre")}</p>
+                        <p className="text-xs text-emerald-700">{t("demandeEnvoyeeDesc")}</p>
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-md p-3 space-y-2 text-sm">
+                      <div><span className="font-semibold">{t("demandeLabelTitre")}</span> {demandeStructured.titre}</div>
+                      <div><span className="font-semibold">{t("demandeLabelType")}</span> {demandeStructured.typeTravaux}</div>
+                      <div><span className="font-semibold">{t("demandeLabelUrgence")}</span> <Badge variant={demandeStructured.urgence === "urgente" ? "destructive" : "secondary"}>{t(`urgence.${demandeStructured.urgence}`, demandeStructured.urgence)}</Badge></div>
+                      {demandeStructured.estimationMin !== null && demandeStructured.estimationMax !== null && (
+                        <div>
+                          <span className="font-semibold">{t("demandeLabelEstimation")}</span> <span className="text-violet-700 font-semibold">{demandeStructured.estimationMin}€ – {demandeStructured.estimationMax}€</span>
+                          <span className="text-xs text-muted-foreground ml-2">{t("demandeEstimationConfirmer")}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-semibold">{t("demandeLabelReformulee")}</span>
+                        <p className="mt-1 text-gray-700">{demandeStructured.descriptionReformulee}</p>
+                      </div>
+                      {demandeStructured.questions.length > 0 && (
+                        <div>
+                          <span className="font-semibold">{t("demandeLabelQuestions")}</span>
+                          <ul className="mt-1 list-disc list-inside text-gray-700">{demandeStructured.questions.map((q, i) => <li key={i}>{q}</li>)}</ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* SLICE 6 — Mes infos + demande de modification */}
+          <TabsContent value="infos">
+            <div className="grid gap-6 sm:grid-cols-2">
               <Card>
-                <CardContent className="py-10 text-center text-sm text-muted-foreground">{t("sectionAVenir")}</CardContent>
+                <CardHeader><CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-blue-600" />{t("infosCoordonnees")}</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  {clientInfo ? (
+                    <>
+                      <div><span className="text-sm text-gray-500">{t("infosNom")}</span><p className="font-medium">{clientInfo.prenom} {clientInfo.nom}</p></div>
+                      {clientInfo.email && <div><span className="text-sm text-gray-500">{t("infosEmail")}</span><p className="font-medium">{clientInfo.email}</p></div>}
+                      {clientInfo.telephone && <div><span className="text-sm text-gray-500">{t("infosTelephone")}</span><p className="font-medium">{clientInfo.telephone}</p></div>}
+                      {(clientInfo.adresse || clientInfo.ville) && (
+                        <div>
+                          <span className="text-sm text-gray-500">{t("infosAdresse")}</span>
+                          <p className="font-medium">{clientInfo.adresse}{(clientInfo.codePostal || clientInfo.ville) && <><br />{clientInfo.codePostal} {clientInfo.ville}</>}</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-gray-500">{t("chargement")}</p>
+                  )}
+                </CardContent>
               </Card>
-            </TabsContent>
-          ))}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2"><Send className="h-5 w-5 text-blue-600" />{t("infosModifTitre")}</CardTitle>
+                  <CardDescription>{t("infosModifDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {modificationSent ? (
+                    <div className="text-center py-4">
+                      <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                      <p className="text-green-700 font-medium">{t("infosModifEnvoye")}</p>
+                      <p className="text-sm text-gray-500 mt-1">{t("infosModifNotifie")}</p>
+                      <Button variant="outline" size="sm" className="mt-4" onClick={() => setModificationSent(false)}>{t("infosModifAutre")}</Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Textarea placeholder={t("infosModifPlaceholder")} value={modificationMessage} onChange={(e) => setModificationMessage(e.target.value)} rows={4} />
+                      <Button className="w-full" disabled={!modificationMessage.trim() || demanderModification.isPending} onClick={submitModification}>
+                        {demanderModification.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}{t("infosModifEnvoyer")}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
 
