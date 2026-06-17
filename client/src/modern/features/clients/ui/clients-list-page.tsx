@@ -1,0 +1,708 @@
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useLocation, useSearch } from "wouter";
+import { trpc } from "@/modern/shared/trpc";
+import { Button } from "@/modern/shared/ui/button";
+import { Input } from "@/modern/shared/ui/input";
+import { Card, CardContent } from "@/modern/shared/ui/card";
+import { Label } from "@/modern/shared/ui/label";
+import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download, AlertTriangle } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/modern/shared/ui/dropdown-menu";
+import { toast } from "sonner";
+import { matchSearch } from "@/lib/normalize";
+import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
+
+// Page Clients du FRONT NEUF (`/v2/clients`) — PORT CONFORME de `pages/Clients.tsx` (parité visuelle
+// stricte). Le JSX/Tailwind est copié à l'identique ; seule la plomberie change : primitives via
+// `@/modern/shared/ui` (copie conforme) et tRPC via le client partagé `@/modern/shared/trpc`. Les
+// données étaient DÉJÀ servies par tRPC côté legacy (list/update/delete/getEncoursMap), donc la
+// migration n'altère ni le rendu ni le contrat. Les utilitaires partagés (`@/lib/normalize`,
+// `@/lib/csvExport`) restent communs jusqu'à la suppression finale du legacy.
+
+interface ClientFormData {
+  nom: string;
+  prenom: string;
+  email: string;
+  telephone: string;
+  adresse: string;
+  codePostal: string;
+  ville: string;
+  adresseFacturation: string;
+  codePostalFacturation: string;
+  villeFacturation: string;
+  type: "particulier" | "professionnel";
+  raisonSociale: string;
+  siret: string;
+  numeroTVA: string;
+  notes: string;
+  etiquettes: string;
+}
+
+const initialFormData: ClientFormData = {
+  nom: "",
+  prenom: "",
+  email: "",
+  telephone: "",
+  adresse: "",
+  codePostal: "",
+  ville: "",
+  adresseFacturation: "",
+  codePostalFacturation: "",
+  villeFacturation: "",
+  type: "particulier",
+  raisonSociale: "",
+  siret: "",
+  numeroTVA: "",
+  notes: "",
+  etiquettes: "",
+};
+
+export default function ClientsListPage() {
+  const [, navigate] = useLocation();
+  const search = useSearch();
+  const utils = trpc.useUtils();
+
+  // State pour le formulaire d'édition
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [formData, setFormData] = useState<ClientFormData>(initialFormData);
+  const [editingClientId, setEditingClientId] = useState<number | null>(null);
+
+  // State pour la recherche. MonAssistant peut pré-remplir via ?filtre=
+  const [searchQuery, setSearchQuery] = useState("");
+  useEffect(() => {
+    const f = new URLSearchParams(search).get("filtre");
+    // Sur Clients il n'y a pas de filtre statut prédéfini : on utilise le filtre
+    // comme texte de recherche (ex: "particulier") si fourni.
+    if (f) setSearchQuery(f);
+  }, [search]);
+
+  // Queries
+  const { data: clients = [], isLoading } = trpc.clients.list.useQuery();
+  // Encours impayé par client (badge « à risque » de la liste).
+  const { data: encoursMap = {} } = trpc.clients.getEncoursMap.useQuery();
+
+  // Détection de doublons potentiels (lecture seule, calculée depuis la liste déjà chargée) :
+  // même email OU même prénom+nom (normalisés). Purement informatif.
+  const [dupesDismissed, setDupesDismissed] = useState(false);
+  const duplicateGroups = useMemo(() => {
+    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const push = (m: Map<string, any[]>, k: string, c: any) => {
+      const a = m.get(k); if (a) a.push(c); else m.set(k, [c]);
+    };
+    const byEmail = new Map<string, any[]>();
+    const byName = new Map<string, any[]>();
+    for (const c of clients as any[]) {
+      const email = norm(c.email);
+      if (email) push(byEmail, email, c);
+      const name = `${norm(c.prenom)} ${norm(c.nom)}`.trim();
+      if (name && name !== "") push(byName, name, c);
+    }
+    const groups: { reason: string; clients: any[] }[] = [];
+    const seen = new Set<string>(); // dédoublonne les groupes par ensemble d'ids
+    const addGroup = (reason: string, list: any[]) => {
+      if (list.length < 2) return;
+      const key = list.map((c) => c.id).sort((a, b) => a - b).join(",");
+      if (seen.has(key)) return;
+      seen.add(key);
+      groups.push({ reason, clients: list });
+    };
+    for (const [email, list] of byEmail) addGroup(`même email (${email})`, list);
+    for (const [, list] of byName) addGroup("même nom", list);
+    return groups;
+  }, [clients]);
+
+  // Avertissement NON BLOQUANT à la création : si l'email, le téléphone ou le nom+prénom saisi
+  // correspond à un client existant, on le signale (sans empêcher l'enregistrement).
+  const createDuplicateMatch = useMemo(() => {
+    if (editingClientId) return null;
+    const norm = (s: any) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const digits = (s: any) => String(s || "").replace(/[\s.\-()+]/g, "");
+    const email = norm(formData.email);
+    const phone = digits(formData.telephone);
+    const name = `${norm(formData.prenom)} ${norm(formData.nom)}`.trim();
+    for (const c of clients as any[]) {
+      if (email && norm(c.email) === email) return { client: c, reason: "le même email" };
+      if (phone && phone.length >= 6 && digits(c.telephone) === phone) return { client: c, reason: "le même téléphone" };
+    }
+    if (name) {
+      for (const c of clients as any[]) {
+        if (`${norm(c.prenom)} ${norm(c.nom)}`.trim() === name) return { client: c, reason: "le même nom" };
+      }
+    }
+    return null;
+  }, [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients]);
+
+  // Mutations
+  const updateMutation = trpc.clients.update.useMutation({
+    onSuccess: () => {
+      toast.success("Client mis à jour");
+      setFormData(initialFormData);
+      setEditingClientId(null);
+      setIsEditModalOpen(false);
+      utils.clients.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erreur lors de la mise à jour");
+    },
+  });
+
+  const deleteMutation = trpc.clients.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Client supprimé");
+      utils.clients.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Erreur lors de la suppression");
+    },
+  });
+
+  // Handler pour les changements d'input
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }, []);
+
+  // Handler pour réinitialiser le formulaire
+  const resetForm = useCallback(() => {
+    setFormData(initialFormData);
+  }, []);
+
+  // Handler pour fermer la modale d'édition
+  const handleCloseEditModal = useCallback(() => {
+    setIsEditModalOpen(false);
+    resetForm();
+    setEditingClientId(null);
+  }, [resetForm]);
+
+  // Handler pour ouvrir la modale d'édition
+  const handleOpenEditModal = useCallback((client: any) => {
+    setFormData({
+      nom: client.nom,
+      prenom: client.prenom || "",
+      email: client.email || "",
+      telephone: client.telephone || "",
+      adresse: client.adresse || "",
+      codePostal: client.codePostal || "",
+      ville: client.ville || "",
+      adresseFacturation: client.adresseFacturation || "",
+      codePostalFacturation: client.codePostalFacturation || "",
+      villeFacturation: client.villeFacturation || "",
+      type: (client.type === "professionnel" ? "professionnel" : "particulier"),
+      raisonSociale: client.raisonSociale || "",
+      siret: client.siret || "",
+      numeroTVA: client.numeroTVA || "",
+      notes: client.notes || "",
+      etiquettes: client.etiquettes || "",
+    });
+    setEditingClientId(client.id);
+    setIsEditModalOpen(true);
+  }, []);
+
+  // Handler pour soumettre le formulaire d'édition
+  const handleSubmitEdit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.nom.trim()) {
+      toast.error("Le nom est requis");
+      return;
+    }
+    if (editingClientId) {
+      await updateMutation.mutateAsync({
+        id: editingClientId,
+        ...formData,
+      });
+    }
+  }, [formData, editingClientId, updateMutation]);
+
+  // Handler pour supprimer un client
+  const handleDelete = useCallback((clientId: number) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
+      deleteMutation.mutate({ id: clientId });
+    }
+  }, [deleteMutation]);
+
+  // Handler pour la recherche
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  // Filtrer les clients (recherche insensible aux accents et a la casse).
+  const filteredClients = clients.filter(client =>
+    matchSearch(client.nom, searchQuery) ||
+    matchSearch(client.prenom, searchQuery) ||
+    matchSearch(client.email, searchQuery) ||
+    matchSearch(client.ville, searchQuery) ||
+    // Recherche/segmentation par étiquette.
+    matchSearch((client as any).etiquettes, searchQuery) ||
+    (client.telephone ? client.telephone.includes(searchQuery) : false)
+  );
+
+  // Export CSV des clients (portabilité RGPD). Exporte la sélection courante (après filtre de
+  // recherche), sinon l'ensemble.
+  const handleExportCSV = () => {
+    const data = filteredClients;
+    if (!data || data.length === 0) {
+      toast.error("Aucun client à exporter");
+      return;
+    }
+    const headers = ["Nom", "Prénom", "Type", "Raison sociale", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "N° TVA", "Étiquettes", "Notes"];
+    const rows = data.map((c: any) => [
+      c.nom, c.prenom, c.type, c.raisonSociale, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.numeroTVA, c.etiquettes, c.notes,
+    ]);
+    exportToCsv(`clients_${csvDateSuffix()}.csv`, headers, rows);
+    toast.success(`${data.length} client(s) exporté(s)`);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
+          <p className="text-muted-foreground mt-1">Gérez votre base de clients</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Exporter (CSV)
+          </Button>
+          <Button onClick={() => navigate('/clients/nouveau')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nouveau client
+          </Button>
+        </div>
+      </div>
+
+      {/* Barre de recherche */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Input
+          type="text"
+          placeholder="Rechercher un client..."
+          value={searchQuery}
+          onChange={handleSearchChange}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Bandeau doublons potentiels (informatif, dismissable) */}
+      {!isLoading && !dupesDismissed && duplicateGroups.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-amber-800">
+                    {duplicateGroups.length} doublon{duplicateGroups.length > 1 ? "s" : ""} potentiel{duplicateGroups.length > 1 ? "s" : ""} détecté{duplicateGroups.length > 1 ? "s" : ""}
+                  </p>
+                  <ul className="mt-1 space-y-1 text-amber-700">
+                    {duplicateGroups.slice(0, 5).map((g, i) => (
+                      <li key={i}>
+                        <span className="text-amber-600">{g.reason}</span>{" : "}
+                        {g.clients
+                          .map((c: any) => `${(c.prenom || "")} ${c.nom}`.trim() + (c.ville ? ` (${c.ville})` : ""))
+                          .join(" · ")}
+                      </li>
+                    ))}
+                    {duplicateGroups.length > 5 && (
+                      <li className="text-amber-600">+ {duplicateGroups.length - 5} autre(s)…</li>
+                    )}
+                  </ul>
+                  <p className="mt-1 text-xs text-amber-600">Vérifiez et nettoyez ces fiches en double pour garder un historique propre.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" className="text-amber-700 hover:text-amber-900" onClick={() => setDupesDismissed(true)}>
+                Masquer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Liste des clients */}
+      {isLoading ? (
+        <div className="text-center py-8">Chargement...</div>
+      ) : filteredClients.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          {searchQuery ? "Aucun client trouvé" : "Aucun client créé"}
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {filteredClients.map(client => (
+            <Card key={client.id}>
+              <CardContent className="pt-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h3 className="font-semibold text-lg">{client.nom} {client.prenom}</h3>
+                      {/* Badge « à risque » : impayés en cours */}
+                      {(encoursMap as any)[client.id] && parseFloat((encoursMap as any)[client.id].encoursTotal) > 0 && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                          title={`${(encoursMap as any)[client.id].echu} € échus sur ${(encoursMap as any)[client.id].nbFacturesImpayees} facture(s)`}
+                        >
+                          ⚠️ {(encoursMap as any)[client.id].encoursTotal} € impayés
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-sm text-gray-600 mt-2">
+                      {client.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4" />
+                          {client.email}
+                        </div>
+                      )}
+                      {client.telephone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4" />
+                          {client.telephone}
+                        </div>
+                      )}
+                      {client.adresse && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4" />
+                          {client.adresse}, {client.codePostal} {client.ville}
+                        </div>
+                      )}
+                    </div>
+                    {/* Étiquettes de segmentation */}
+                    {(client as any).etiquettes && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {String((client as any).etiquettes).split(",").map((t: string) => t.trim()).filter(Boolean).map((tag: string, i: number) => (
+                          <span key={i} className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleOpenEditModal(client)}>
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Éditer
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDelete(client.id)} className="text-red-600">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Modal Édition Client */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-40 bg-black/50" onClick={handleCloseEditModal} />
+          <div className="bg-background rounded-lg border shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto z-50">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold">Éditer le client</h2>
+              <button onClick={handleCloseEditModal} className="text-muted-foreground hover:text-foreground">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6">
+              <form onSubmit={handleSubmitEdit} className="space-y-4">
+                {/* Type de client */}
+                <div>
+                  <Label htmlFor="edit-type" className="block text-sm font-medium mb-1">
+                    Type de client
+                  </Label>
+                  <select
+                    id="edit-type"
+                    name="type"
+                    value={formData.type}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="particulier">Particulier</option>
+                    <option value="professionnel">Professionnel (entreprise, syndic…)</option>
+                  </select>
+                </div>
+
+                {/* Nom */}
+                <div>
+                  <Label htmlFor="edit-nom" className="block text-sm font-medium mb-1">
+                    Nom *
+                  </Label>
+                  <input
+                    id="edit-nom"
+                    type="text"
+                    name="nom"
+                    value={formData.nom}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Prénom */}
+                <div>
+                  <Label htmlFor="edit-prenom" className="block text-sm font-medium mb-1">
+                    Prénom
+                  </Label>
+                  <input
+                    id="edit-prenom"
+                    type="text"
+                    name="prenom"
+                    value={formData.prenom}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <Label htmlFor="edit-email" className="block text-sm font-medium mb-1">
+                    Email
+                  </Label>
+                  <input
+                    id="edit-email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Téléphone */}
+                <div>
+                  <Label htmlFor="edit-telephone" className="block text-sm font-medium mb-1">
+                    Téléphone
+                  </Label>
+                  <input
+                    id="edit-telephone"
+                    type="tel"
+                    name="telephone"
+                    value={formData.telephone}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Avertissement doublon (non bloquant) à la création */}
+                {createDuplicateMatch && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">
+                    ⚠️ Un client avec {createDuplicateMatch.reason} existe déjà :{" "}
+                    <strong>
+                      {createDuplicateMatch.client.prenom} {createDuplicateMatch.client.nom}
+                    </strong>
+                    . Vérifiez qu'il ne s'agit pas d'un doublon (vous pouvez tout de même enregistrer).
+                  </div>
+                )}
+
+                {/* Adresse */}
+                <div>
+                  <Label htmlFor="edit-adresse" className="block text-sm font-medium mb-1">
+                    Adresse
+                  </Label>
+                  <input
+                    id="edit-adresse"
+                    type="text"
+                    name="adresse"
+                    value={formData.adresse}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Code Postal et Ville */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-codePostal" className="block text-sm font-medium mb-1">
+                      Code Postal
+                    </Label>
+                    <input
+                      id="edit-codePostal"
+                      type="text"
+                      name="codePostal"
+                      value={formData.codePostal}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      maxLength={5}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-ville" className="block text-sm font-medium mb-1">
+                      Ville
+                    </Label>
+                    <input
+                      id="edit-ville"
+                      type="text"
+                      name="ville"
+                      value={formData.ville}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Adresse de facturation distincte */}
+                <div className="space-y-3 rounded-md border border-gray-200 p-3">
+                  <p className="text-sm font-medium text-gray-700">
+                    Adresse de facturation <span className="font-normal text-muted-foreground">(si différente — vide = adresse principale)</span>
+                  </p>
+                  <div>
+                    <Label htmlFor="edit-adresseFacturation" className="block text-sm font-medium mb-1">
+                      Adresse de facturation
+                    </Label>
+                    <input
+                      id="edit-adresseFacturation"
+                      type="text"
+                      name="adresseFacturation"
+                      value={formData.adresseFacturation}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="edit-codePostalFacturation" className="block text-sm font-medium mb-1">
+                        CP (facturation)
+                      </Label>
+                      <input
+                        id="edit-codePostalFacturation"
+                        type="text"
+                        name="codePostalFacturation"
+                        value={formData.codePostalFacturation}
+                        onChange={handleInputChange}
+                        maxLength={5}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-villeFacturation" className="block text-sm font-medium mb-1">
+                        Ville (facturation)
+                      </Label>
+                      <input
+                        id="edit-villeFacturation"
+                        type="text"
+                        name="villeFacturation"
+                        value={formData.villeFacturation}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Champs professionnels */}
+                {formData.type === "professionnel" && (
+                  <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-sm font-medium text-gray-700">Informations professionnelles</p>
+                    <div>
+                      <Label htmlFor="edit-raisonSociale" className="block text-sm font-medium mb-1">
+                        Raison sociale
+                      </Label>
+                      <input
+                        id="edit-raisonSociale"
+                        type="text"
+                        name="raisonSociale"
+                        value={formData.raisonSociale}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="edit-siret" className="block text-sm font-medium mb-1">
+                          SIRET
+                        </Label>
+                        <input
+                          id="edit-siret"
+                          type="text"
+                          name="siret"
+                          value={formData.siret}
+                          onChange={handleInputChange}
+                          maxLength={14}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-numeroTVA" className="block text-sm font-medium mb-1">
+                          N° TVA intracom.
+                        </Label>
+                        <input
+                          id="edit-numeroTVA"
+                          type="text"
+                          name="numeroTVA"
+                          value={formData.numeroTVA}
+                          onChange={handleInputChange}
+                          maxLength={20}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Étiquettes */}
+                <div>
+                  <Label htmlFor="edit-etiquettes" className="block text-sm font-medium mb-1">
+                    Étiquettes
+                  </Label>
+                  <input
+                    id="edit-etiquettes"
+                    name="etiquettes"
+                    type="text"
+                    value={formData.etiquettes}
+                    onChange={handleInputChange}
+                    placeholder="Ex : VIP, chantier neuf, syndic (séparées par des virgules)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <Label htmlFor="edit-notes" className="block text-sm font-medium mb-1">
+                    Notes
+                  </Label>
+                  <textarea
+                    id="edit-notes"
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Boutons */}
+                <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+                  <button
+                    type="button"
+                    onClick={handleCloseEditModal}
+                    className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateMutation.isPending}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
+                  >
+                    {updateMutation.isPending ? "Mise à jour..." : "Mettre à jour"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

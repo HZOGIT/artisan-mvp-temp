@@ -61,6 +61,27 @@ for (const c of cases) {
   await page.screenshot({ path: `/tmp/v2-socle-${c.route.replace(/\//g, '_')}.png`, fullPage: true });
 }
 
+// --- Parité Clients (Vague 1) : `/v2/clients` (port conforme) vs `/clients` (legacy) ---
+// On vérifie que les marqueurs structurants de l'UI sont présents des DEUX côtés (même page, même
+// markup copié à l'identique). Preuve de non-régression visuelle au niveau du contenu.
+let pariteCount = 0;
+const MARQUEURS_CLIENTS = ['Gérez votre base de clients', 'Exporter (CSV)', 'Nouveau client'];
+for (const route of ['/clients', '/v2/clients']) {
+  pariteCount++;
+  current = `parité ${route}`;
+  await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+  await page.waitForTimeout(1500);
+  const body = (await page.textContent('body')) || '';
+  for (const m of MARQUEURS_CLIENTS) {
+    if (!body.includes(m)) add({ route, type: 'parité', text: `marqueur absent: "${m}"` });
+  }
+  // Barre de recherche (placeholder = attribut, pas du textContent) + au moins une carte client.
+  if (await page.locator('input[placeholder="Rechercher un client..."]').count() === 0) {
+    add({ route, type: 'parité', text: 'barre de recherche absente' });
+  }
+  await page.screenshot({ path: `/tmp/parite-${route.replace(/\//g, '_')}.png`, fullPage: true });
+}
+
 // --- Bascule strangler-fig (OPE-420) : flag `?v2=1` + util de bascule par route ---
 // IMPORTANT : tester d'abord SANS flag (le flag est « collant » via localStorage une fois activé).
 let basculeCount = 0;
@@ -84,7 +105,7 @@ if (new URL(page.url()).pathname !== '/v2/clients') {
 }
 
 await browser.close();
-const total = cases.length + basculeCount;
+const total = cases.length + pariteCount + basculeCount;
 console.log(`cas testés: ${total} | issues: ${issues.length}`);
 if (issues.length) console.log(JSON.stringify(issues, null, 2));
 process.exit(issues.length ? 1 : 0);

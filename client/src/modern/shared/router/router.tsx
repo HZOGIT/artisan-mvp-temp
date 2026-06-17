@@ -38,14 +38,14 @@ const rootRoute = createRootRoute({
 const pingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ping",
-  component: lazyRouteComponent(() => import("../../features/_demo/PingPage")),
+  component: lazyRouteComponent(() => import("../../features/_demo/ping-page")),
 });
 
-// Reprise de l'ancien PoC `/v2/clients` (auparavant câblé en route wouter isolée) sous le socle.
+// Liste Clients du front neuf — port conforme de `pages/Clients.tsx` (parité visuelle).
 const clientsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/clients",
-  component: lazyRouteComponent(() => import("../../features/clients/ui/ClientsModernPage")),
+  component: lazyRouteComponent(() => import("../../features/clients/ui/clients-list-page")),
 });
 
 const routeTree = rootRoute.addChildren([pingRoute, clientsRoute]);

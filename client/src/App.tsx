@@ -104,7 +104,7 @@ const ReglesDepenses = lazy(() => import("./pages/ReglesDepenses"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 // PoC OPE-366 — page « stack cible » (clean archi + REST openapi-typescript), cohabite avec le legacy.
-const ModernRouterMount = lazy(() => import("./modern/shared/router/ModernRouterMount"));
+const ModernRouterMount = lazy(() => import("./modern/shared/router/modern-router-mount"));
 const CGV = lazy(() => import("./pages/legal/CGV"));
 const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
 

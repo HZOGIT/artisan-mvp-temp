@@ -16,6 +16,12 @@ clairement sens). Une migration de page = **on préserve le markup/JSX et les cl
 l'identique**, on ne change QUE la plomberie en dessous (routing, structure clean-archi, accès données).
 Toute itération doit prouver la **parité visuelle** (screenshots `/v2/<route>` vs `/<route>` legacy).
 
+## Convention de nommage des fichiers (imposée)
+**Tous les nouveaux fichiers du front neuf sont en `kebab-case`** (ex. `clients-list-page.tsx`,
+`modern-router-mount.tsx`, `ping-page.tsx`), y compris les fichiers de composants React (le composant
+exporté reste en `PascalCase`, seul le nom de fichier est kebab). Cohérent avec les primitives shadcn
+(`button.tsx`, `dropdown-menu.tsx`). Renommer au passage tout fichier neuf encore en PascalCase.
+
 ## Périmètre AUTONOME de la boucle (ne pas déborder)
 La boucle ne touche QUE :
 - `client/src/modern/**` (tout le code neuf `/v2`),
@@ -50,7 +56,13 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
    l'identique** ; ne réorganiser que la plomberie. **Flag `?v2=1`** câblé. **Legacy intact.**
 3. **GATES VERTS (barre obligatoire avant commit) :**
    - `pnpm exec tsc -p tsconfig.v2.json` → vert.
-   - `pnpm exec vitest run <tests touchés>` → vert (adapter les tests existants si besoin).
+   - `pnpm exec vitest run -c vitest.v2.config.ts` → vert (tests du front neuf).
+   - **`pnpm exec eslint -c eslint.v2.config.mjs client/src/modern`** → vert. **Gate ESLint dédié au code
+     neuf, enrichi À CHAQUE itération** : on y ajoute des règles (custom au besoin) pour faire respecter
+     les specs du neuf — frontière strangler (imports tRPC via `@/modern/shared/trpc`, primitives via
+     `@/modern/shared/ui`, jamais `@/lib/trpc`/`@/components/ui` en direct), **pas de REST**
+     (openapi-fetch interdit), **kebab-case** des noms de fichiers, etc. Ne lint QUE `client/src/modern/**`
+     (n'empiète pas sur l'ESLint global OPE-413).
    - **Parité visuelle** : via `scripts/pw-run.sh`, screenshot `/v2/<route>` ET `/<route>` legacy →
      comparer : **doivent être identiques** (mêmes éléments, même mise en page, 0 erreur console).
    - **e2e mutation** (si la page mute des données) : cas ajouté dans `scripts/staging-e2e-mutations.mjs`
@@ -86,7 +98,8 @@ groupe. Ne jamais batcher la **parité visuelle** ni le **typecheck** (à chaque
 - [x] **S4** Primitives `modern/shared/ui` = **copie conforme** des composants UI legacy utilisés par la Vague 1 (zéro changement visuel). *(OPE-416, périmètre réduit)* — `modern/shared/ui/{button,input,card,label,dropdown-menu}.ts` = **ré-export** des primitives legacy `@/components/ui/*` (composant identique → parité pixel garantie, zéro drift) + barrel `index.ts`. Surface = primitives utilisées par `pages/Clients.tsx` (Vague 1). Test garde-fou de surface (`index.test.ts`). tsc v2 ✅, vitest v2 17 ✅. **Pas de déploiement** (ré-export non encore consommé par le runtime → bundle inchangé). Relocalisation physique des primitives = à la suppression finale du legacy.
 
 ### Vague 1 — rodage (lecture, fort trafic, UI simple) *(OPE-421)*
-- [ ] **Clients → `/v2/clients`** (préserver l'UI de `pages/Clients.tsx`) — **à découper** : (1a) liste lecture-seule parité (header + recherche + cartes/tableau, données via `trpc.clients.list`, primitives `modern/shared/ui`) en **remplaçant** la page PoC ; (1b) actions/mutations (menu dropdown : éditer/supprimer, export CSV) + e2e mutation. Capturer screenshot legacy `/clients` vs `/v2/clients` à parité.
+- [x] **Clients → `/v2/clients`** (port conforme de `pages/Clients.tsx`) — **page complète** (header, recherche, bandeau doublons, cartes + badge encours + étiquettes, menu actions, modal édition) portée à l'identique (JSX/Tailwind copiés), plomberie repointée : primitives `@/modern/shared/ui` + tRPC `@/modern/shared/trpc` (data déjà tRPC côté legacy → contrat inchangé). PoC `ClientsModernPage` + `use-clients.ts` supprimés. Renommage kebab-case (`clients-list-page.tsx`, `modern-router-mount.tsx`, `ping-page.tsx`). tsc v2 ✅ (corrigé : `target ESNext` + handler `<select>`), vitest v2 17 ✅, **parité e2e `cas:6 | issues:0`** (marqueurs identiques legacy vs /v2 + barre de recherche + bascule), déployé.
+  - ⏳ **Dette batchée** : e2e **mutation** (modal édition : modifier Notes → save → persistance → revert) à ajouter dans une itération e2e dédiée (mutations byte-identiques au legacy, contrat tRPC `clients.update/delete` déjà couvert backend). Cf. « Dette de tests (batch autorisé) ».
 - [ ] ClientDetail → `/v2/clients/:id`
 - [ ] Articles → `/v2/articles`
 - [ ] Fournisseurs → `/v2/fournisseurs`
@@ -104,7 +117,7 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 1 — Clients slice 1a** (remplacer la page PoC `/v2/clients` par une **copie conforme en lecture seule** de `pages/Clients.tsx` : header + barre de recherche + liste/cartes, données `trpc.clients.list`, primitives `modern/shared/ui`). **Preuve = parité visuelle** screenshot `/v2/clients` vs `/clients` legacy. Mutations (éditer/supprimer/export) → slice 1b. *(OPE-421)*
+## 🎯 PROCHAINE CIBLE : **Gate ESLint du code neuf** (bootstrap). Installer `eslint` + parser TS, créer `eslint.v2.config.mjs` ne lintant QUE `client/src/modern/**`, avec : (1) `no-restricted-imports` → interdire `@/lib/trpc` (→ `@/modern/shared/trpc`), `@/components/ui/*` (→ `@/modern/shared/ui`), `openapi-fetch`/`openapi-react-query` (pas de REST) ; (2) **règle custom kebab-case** sur les noms de fichiers. Brancher le gate dans la recette. Puis l'enrichir itérativement. *(demande humaine — voir runbook gate ESLint)*
 
 > Note coordination boucle : pilotée par **CronCreate natif Claude** (job `834543d1`, toutes les 2 min, session-only → vit tant que le screen `ope-403-refonte-frontend` tourne). Le daemon bash `devtools/refonte-loop/*` est **désactivé** (ne pas le relancer).
 
@@ -113,6 +126,7 @@ l'ancien code entièrement quand la parité est validée partout.)*
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Vague 1 — Clients ✅** port conforme complet `pages/Clients.tsx` → `/v2/clients` (clients-list-page.tsx, kebab-case, primitives+tRPC partagés). Parité e2e `6|0`, déployé. PoC supprimé. Convention **kebab-case** + **gate ESLint v2** ajoutés à la recette (demandes humaines). Prochaine : bootstrap du gate ESLint v2.
 - **S4 ✅** primitives `modern/shared/ui` (ré-export copie conforme legacy : button/input/card/label/dropdown-menu + barrel) + test de surface. tsc v2 ✅, vitest v2 17 ✅. Pas de déploiement (bundle inchangé). **Vague 0 TERMINÉE.** Prochaine : Vague 1 Clients slice 1a (parité lecture).
 - **S3 ✅** client tRPC partagé `modern/shared/trpc` (réexpose l'instance legacy + types `RouterInputs/Outputs`). Feature `clients` migrée **REST→tRPC** (`clients.list`), REST/openapi supprimé du neuf → **dette OPE-366 résorbée**. `tsconfig.v2.json` types += `@fastify/cookie`. 16 tests vitest v2, e2e `4 | 0`, déployé. Incident « plus de devis/factures » = fausse alerte (mauvais compte) ; vérif navigateur OK même flag v2 ON. Prochaine : S4.
 - **S2 ✅** flag `?v2=1` + bascule par route (`modern/shared/flag/*`, hook `useV2Bascule` câblé dans App). Tests vitest dédiés (12) via `vitest.v2.config.ts` + e2e socle/bascule `cas testés:4 | issues:0`. Déployé. **Boucle basculée sur CronCreate natif Claude** (daemon bash retiré). Prochaine : S3.
