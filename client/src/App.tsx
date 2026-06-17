@@ -5,6 +5,7 @@ import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { trpc } from "./lib/trpc";
+import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 
 // ============================================================================
 // IMPORTS EAGER — pages critiques chargées dans le bundle initial
@@ -131,6 +132,9 @@ const ONBOARDING_BYPASS = new Set([
 
 function AuthenticatedRoutes() {
   const [location, setLocation] = useLocation();
+  // Bascule strangler-fig opt-in (OPE-420) : si `?v2=1` et route migrée → redirige vers `/v2/<route>`.
+  // No-op par défaut (flag inactif) → legacy strictement inchangé.
+  useV2Bascule();
   const { data: onboardingStatus, isLoading: onbLoading } =
     trpc.modules.getOnboardingStatus.useQuery();
 

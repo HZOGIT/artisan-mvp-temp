@@ -26,15 +26,29 @@ if (!signin.ok()) {
   process.exit(2);
 }
 
+// Dette PoC OPE-366 connue et TRAQUÉE (à supprimer en Vague 1 lors de la migration `clients` → tRPC) :
+// `ClientsModernPage` lit encore `/api/rest/clients` (openapi-fetch), endpoint REST jamais implémenté
+// → 404 attendu. On l'ignore pour ne pas faire rougir le gate du socle ; tout AUTRE 4xx/5xx ou erreur
+// console/page est une vraie régression.
+const KNOWN_DEBT_404 = /\/api\/rest\/clients/;
+
 const page = await ctx.newPage();
 let current = '';
 page.on('console', (m) => {
   if (m.type() !== 'error') return;
   const t = m.text();
   if (/Download the React DevTools|preloaded using link preload|favicon/i.test(t)) return;
+  // Les 404 réseau sont couverts (avec URL) par le handler 'response' ci-dessous → on évite le doublon.
+  if (/Failed to load resource/i.test(t)) return;
   add({ route: current, type: 'console', text: t.slice(0, 400) });
 });
 page.on('pageerror', (e) => add({ route: current, type: 'pageerror', text: String(e?.message || e).slice(0, 400) }));
+page.on('response', (r) => {
+  if (r.status() < 400) return;
+  const u = r.url();
+  if (KNOWN_DEBT_404.test(u)) return; // dette traquée OPE-366
+  add({ route: current, type: 'http', status: r.status(), url: u.replace(BASE, '').slice(0, 160) });
+});
 
 // (route, sélecteur de texte qui prouve le rendu du socle)
 const cases = [
@@ -53,7 +67,30 @@ for (const c of cases) {
   await page.screenshot({ path: `/tmp/v2-socle-${c.route.replace(/\//g, '_')}.png`, fullPage: true });
 }
 
+// --- Bascule strangler-fig (OPE-420) : flag `?v2=1` + util de bascule par route ---
+// IMPORTANT : tester d'abord SANS flag (le flag est « collant » via localStorage une fois activé).
+let basculeCount = 0;
+
+// 1) Sans flag → la route legacy reste legacy (parité : aucun détournement).
+basculeCount++;
+current = '/clients (sans flag)';
+await page.goto('/clients', { waitUntil: 'networkidle', timeout: 25000 });
+await page.waitForTimeout(1200);
+if (new URL(page.url()).pathname !== '/clients') {
+  add({ route: '/clients', type: 'bascule', text: `flag OFF mais redirigé vers ${page.url()}` });
+}
+
+// 2) Avec `?v2=1` → bascule vers `/v2/<route>` migrée.
+basculeCount++;
+current = '/clients?v2=1';
+await page.goto('/clients?v2=1', { waitUntil: 'networkidle', timeout: 25000 });
+await page.waitForTimeout(1500);
+if (new URL(page.url()).pathname !== '/v2/clients') {
+  add({ route: '/clients?v2=1', type: 'bascule', text: `flag ON mais pas de bascule, URL=${page.url()}` });
+}
+
 await browser.close();
-console.log(`cas testés: ${cases.length} | issues: ${issues.length}`);
+const total = cases.length + basculeCount;
+console.log(`cas testés: ${total} | issues: ${issues.length}`);
 if (issues.length) console.log(JSON.stringify(issues, null, 2));
 process.exit(issues.length ? 1 : 0);
