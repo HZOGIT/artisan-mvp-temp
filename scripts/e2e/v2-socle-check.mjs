@@ -94,6 +94,7 @@ const PARITE_PAGES = [
   { legacy: '/contrats', v2: '/v2/contrats', markers: ['Contrats de maintenance', 'Nouveau contrat'] },
   { legacy: '/relances', v2: '/v2/relances-devis', markers: ['Relances Devis', 'Configuration auto'] },
   { legacy: '/calendrier', v2: '/v2/calendrier', markers: ['Calendrier', 'glissez-déposez pour replanifier'] },
+  { legacy: '/devis-options', v2: '/v2/devis-options', markers: ['Variantes de devis', 'Où trouver les variantes'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },

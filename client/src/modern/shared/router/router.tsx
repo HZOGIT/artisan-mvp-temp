@@ -234,7 +234,14 @@ const utilisateursRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/utilisateurs/ui/utilisateurs-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute]);
+// Variantes de devis (placeholder explicatif) — migration clean-archi de `pages/DevisOptions.tsx`.
+const devisOptionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/devis-options",
+  component: lazyRouteComponent(() => import("../../features/devis-options/ui/devis-options-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

@@ -1,0 +1,13 @@
+{
+  "title": "Variantes de devis",
+  "subtitle": "Proposez plusieurs options (Standard, Premium, Éco…) sur un même devis.",
+  "cardTitle": "Où trouver les variantes ?",
+  "cardDescription": "Les variantes sont attachées à un devis existant et se gèrent depuis sa page de détail.",
+  "step1": "Ouvrez la liste de vos devis ou créez-en un nouveau.",
+  "step2": "Cliquez sur un devis pour entrer dans son détail.",
+  "step3": "Utilisez l'onglet <strong>Variantes</strong> pour ajouter plusieurs options chiffrées (ex : <em>Standard</em>, <em>Premium</em>, <em>Éco</em>).",
+  "step4": "Le client peut choisir une variante depuis le portail ; vous la convertissez ensuite en devis officiel avec un seul bouton.",
+  "ouvrirDevis": "Ouvrir mes devis",
+  "creerDevis": "Créer un nouveau devis",
+  "astuce": "Astuce : depuis un devis ouvert, vous pouvez aussi accéder directement aux variantes via l'URL <code>/devis-options/&lt;id-du-devis&gt;</code>."
+}

@@ -29,6 +29,7 @@ import contratsFr from "@/modern/features/contrats/i18n/fr.json";
 import relancesDevisFr from "@/modern/features/relances-devis/i18n/fr.json";
 import calendrierFr from "@/modern/features/calendrier/i18n/fr.json";
 import utilisateursFr from "@/modern/features/utilisateurs/i18n/fr.json";
+import devisOptionsFr from "@/modern/features/devis-options/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -67,6 +68,7 @@ const resources = {
     relancesDevis: relancesDevisFr,
     calendrier: calendrierFr,
     utilisateurs: utilisateursFr,
+    devisOptions: devisOptionsFr,
   },
 } as const;
 
