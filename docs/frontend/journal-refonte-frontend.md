@@ -105,6 +105,11 @@ Ne jamais committer/stash un fichier non suivi d'un autre agent. **Après push, 
 
 ---
 
+## ETA mesuré (demande humaine 2026-06-17)
+À CHAQUE itération, (re)lancer `/tmp/eta.sh <itérations_restantes>` (script throwaway, le recréer s'il
+manque : médiane des intervalles entre commits `front-v2`/OPE-403 × restantes → ETA daté). Inclure l'ETA
+dans le rapport + ntfy. Mesuré : ~6-7 min/itération (sweep par route).
+
 ## Runbook d'une itération (idempotent)
 ```bash
 cd /home/developer/artisan-mvp-temp
