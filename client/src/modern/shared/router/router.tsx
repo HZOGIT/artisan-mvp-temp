@@ -213,7 +213,14 @@ const contratsRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/contrats/ui/contrats-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute]);
+// Relances de devis — migration clean-archi de `pages/RelancesDevis.tsx`.
+const relancesDevisRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/relances-devis",
+  component: lazyRouteComponent(() => import("../../features/relances-devis/ui/relances-devis-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
