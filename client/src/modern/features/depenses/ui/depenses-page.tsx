@@ -1,7 +1,19 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useDepenses, useIndemniteKm } from "../application/use-depenses";
+import {
+  budgetTotal,
+  buildTrajetMotif,
+  indexCategoriesByNom,
+  montantIndemniteKm,
+  monthRange,
+  STATUT_KEYS,
+  TARIF_KM_DEFAULT,
+  type Categorie,
+  type Depense,
+  type KmClient,
+} from "../domain/depense";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
@@ -18,12 +30,10 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Page Dépenses du FRONT NEUF (`/v2/depenses`) — PORT CONFORME de `pages/Depenses.tsx`. JSX à
-// l'identique (KPIs + filtres + liste + dialog indemnités km). Plomberie repointée : primitives
-// `@/modern/shared/ui`, tRPC partagé, i18n (namespace `depenses`). Navigation via `<Link>` wouter
-// (les pages cibles /depenses/nouvelle, /budgets-depenses, /import-releve, /notes-de-frais restent legacy).
-
-const TARIF_KM_DEFAULT = 0.529; // Barème fiscal voiture <= 5 CV, <= 5000 km/an
+// Page Dépenses du FRONT NEUF (`/v2/depenses`) — clean-archi : présentation pure. Données & mutations
+// via `useDepenses`/`useIndemniteKm` (couche application, seule à importer tRPC) ; totaux, plage de mois,
+// indemnité km, index catégories via le domaine (`../domain/depense`, fonctions pures testées). Parité
+// visuelle stricte : JSX/Tailwind à l'identique (KPIs + filtres + liste + dialog indemnités km).
 
 function eur2(n: number) {
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -47,8 +57,6 @@ const STATUT_STYLES: Record<string, string> = {
   remboursee: "bg-purple-100 text-purple-700",
 };
 
-const STATUT_KEYS = ["brouillon", "soumise", "approuvee", "rejetee", "remboursee"];
-
 export default function DepensesPage() {
   const { t } = useTranslation("depenses");
   const [mois, setMois] = useState<string>(() => new Date().toISOString().slice(0, 7));
@@ -57,40 +65,15 @@ export default function DepensesPage() {
   const [search, setSearch] = useState("");
   const [isKmOpen, setIsKmOpen] = useState(false);
 
-  // FINDING legacy : `depenses.list` n'a PAS d'`.input()` (cf. depenses.router.ts) → les filtres
-  // (catégorie/statut/mois/recherche) que le legacy passait à `useQuery(filters)` étaient IGNORÉS côté
-  // serveur (et aucun filtrage client). On appelle donc `useQuery()` sans argument (même résultat,
-  // contrat respecté). Les contrôles de filtre restent affichés (parité). À corriger en backend.
-  const { data: depenses, refetch } = trpc.depenses.list.useQuery();
-  const { data: stats } = trpc.depenses.stats.useQuery({ mois });
-  const { data: categories } = trpc.depenses.getCategories.useQuery();
-  const { data: budgets } = trpc.depenses.getBudgets.useQuery({ mois });
+  // FINDING legacy : `depenses.list` n'a PAS d'`.input()` → filtres ignorés côté serveur (cf. couche
+  // application). Les contrôles de filtre restent affichés (parité). À corriger en backend.
+  const { depenses, stats, categories, budgets, remove: deleteMut, exportFec: exportFecMut } = useDepenses(mois);
 
-  const deleteMut = trpc.depenses.delete.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastDeleted"));
-      refetch();
-    },
-  });
+  // Index catégorie → couleur (résolution déléguée au domaine).
+  const categoriesByNom = indexCategoriesByNom(categories);
 
-  const exportFecMut = trpc.depenses.exportFecAchats.useMutation({
-    onSuccess: (res) => {
-      const blob = new Blob([res.contenu], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `FEC-achats-${mois}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(t("toastFecDownloaded"));
-    },
-  });
-
-  const budgetTotal = useMemo(
-    () => (budgets || []).reduce((s: number, b: any) => s + Number(b.budget || 0), 0),
-    [budgets]
-  );
-  const ecart = budgetTotal - (stats?.totalMois || 0);
+  const totalBudget = budgetTotal(budgets);
+  const ecart = totalBudget - (stats?.totalMois || 0);
 
   return (
     <div className="space-y-6">
@@ -157,7 +140,7 @@ export default function DepensesPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>{t("kpiBudget")}</CardDescription>
-              <CardTitle className="text-2xl">{eur(budgetTotal)}</CardTitle>
+              <CardTitle className="text-2xl">{eur(totalBudget)}</CardTitle>
             </CardHeader>
             <CardContent className="pt-0 text-xs text-muted-foreground">
               <Link to="/budgets-depenses" className="hover:underline">{t("configure")}</Link>
@@ -196,7 +179,7 @@ export default function DepensesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="toutes">{t("allCategories")}</SelectItem>
-              {(categories || []).map((c: any) => (
+              {categories.map((c: Categorie) => (
                 <SelectItem key={c.id} value={c.nom}>
                   {c.nom}
                 </SelectItem>
@@ -227,10 +210,22 @@ export default function DepensesPage() {
           <Button
             variant="outline"
             onClick={() => {
-              const [y, m] = mois.split("-").map(Number);
-              const debut = `${mois}-01`;
-              const fin = new Date(y, m, 0).toISOString().slice(0, 10);
-              exportFecMut.mutate({ dateDebut: debut, dateFin: fin });
+              const { debut, fin } = monthRange(mois);
+              exportFecMut.mutate(
+                { dateDebut: debut, dateFin: fin },
+                {
+                  onSuccess: (res) => {
+                    const blob = new Blob([res.contenu], { type: "text/plain;charset=utf-8" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `FEC-achats-${mois}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success(t("toastFecDownloaded"));
+                  },
+                },
+              );
             }}
             disabled={exportFecMut.isPending}
           >
@@ -248,8 +243,8 @@ export default function DepensesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {(stats?.parCategorie || []).slice(0, 6).map((c: any) => {
-              const cat = (categories || []).find((x: any) => x.nom === c.categorie);
+            {(stats?.parCategorie || []).slice(0, 6).map((c) => {
+              const cat = categoriesByNom.get(c.categorie);
               return (
                 <div key={c.categorie} className="flex items-center gap-2">
                   <div
@@ -296,12 +291,13 @@ export default function DepensesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {depenses.map((d: any) => {
-                      const cat = (categories || []).find((x: any) => x.nom === d.categorie);
+                    {depenses.map((d: Depense) => {
+                      const cat = categoriesByNom.get(d.categorie);
                       return (
                         <tr key={d.id} className="border-b last:border-b-0 hover:bg-muted/40">
                           <td className="py-2 px-2 whitespace-nowrap">
-                            {d.date_depense ? format(new Date(d.date_depense), "dd MMM", { locale: fr }) : "—"}
+                            {/* DTO en camelCase ; le legacy lisait `date_depense` (snake) via any → "—" toujours. Corrigé. */}
+                            {d.dateDepense ? format(new Date(d.dateDepense), "dd MMM", { locale: fr }) : "—"}
                           </td>
                           <td className="py-2 px-2">
                             <div className="font-medium truncate max-w-[200px]">
@@ -321,11 +317,11 @@ export default function DepensesPage() {
                             </div>
                           </td>
                           <td className="py-2 px-2 text-right font-medium whitespace-nowrap">
-                            {eur(d.montant_ttc)}
+                            {eur(d.montantTtc)}
                           </td>
                           <td className="py-2 px-2 hidden sm:table-cell">
                             <Badge className={STATUT_STYLES[d.statut] || ""}>{d.statut}</Badge>
-                            {d.justificatif_url && (
+                            {d.justificatifUrl && (
                               <Paperclip className="h-3 w-3 inline ml-1 text-muted-foreground" />
                             )}
                           </td>
@@ -341,7 +337,10 @@ export default function DepensesPage() {
                               className="h-8 w-8 text-destructive"
                               onClick={() => {
                                 if (confirm(t("confirmDelete", { numero: d.numero }))) {
-                                  deleteMut.mutate({ id: d.id });
+                                  deleteMut.mutate(
+                                    { id: d.id },
+                                    { onSuccess: () => toast.success(t("toastDeleted")) },
+                                  );
                                 }
                               }}
                             >
@@ -371,10 +370,7 @@ export default function DepensesPage() {
       <IndemniteKmDialog
         open={isKmOpen}
         onOpenChange={setIsKmOpen}
-        onSuccess={() => {
-          refetch();
-          setIsKmOpen(false);
-        }}
+        onSuccess={() => setIsKmOpen(false)}
       />
     </div>
   );
@@ -399,31 +395,16 @@ function IndemniteKmDialog({
     clientId: undefined as number | undefined,
   });
 
-  const { data: clients } = trpc.clients.list.useQuery();
+  const { clients, creer: creerMut } = useIndemniteKm();
 
   const km = parseFloat(form.kilometres || "0");
   const tarif = parseFloat(form.tarifKm || String(TARIF_KM_DEFAULT));
-  const montant = +(km * tarif).toFixed(2);
+  const montant = montantIndemniteKm(km, tarif);
 
-  const creerMut = trpc.depenses.creerIndemniteKm.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastKmCreated", { montant: eur2(montant) }));
-      setForm({
-        dateDepense: new Date().toISOString().slice(0, 10),
-        depart: "", arrivee: "", kilometres: "",
-        tarifKm: String(TARIF_KM_DEFAULT), motif: "", clientId: undefined,
-      });
-      onSuccess();
-    },
-    onError: (e) => toast.error(e.message || t("error")),
-  });
-
-  const trajetMotif = useMemo(() => {
-    const parts: string[] = [];
-    if (form.depart || form.arrivee) parts.push(`${form.depart || "?"} → ${form.arrivee || "?"}`);
-    if (form.motif) parts.push(form.motif);
-    return parts.join(" — ") || t("defaultMotif");
-  }, [form.depart, form.arrivee, form.motif, t]);
+  const trajetMotif = useMemo(
+    () => buildTrajetMotif(form.depart, form.arrivee, form.motif) || t("defaultMotif"),
+    [form.depart, form.arrivee, form.motif, t],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -507,7 +488,7 @@ function IndemniteKmDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t("aucun")}</SelectItem>
-                {(clients || []).map((c: any) => (
+                {clients.map((c: KmClient) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     {c.prenom ? `${c.prenom} ` : ""}{c.nom}
                   </SelectItem>
@@ -539,13 +520,27 @@ function IndemniteKmDialog({
                 toast.error(t("toastEnterKm"));
                 return;
               }
-              creerMut.mutate({
-                dateDepense: form.dateDepense,
-                kilometres: km,
-                tarifKm: tarif,
-                motif: trajetMotif,
-                clientId: form.clientId,
-              });
+              creerMut.mutate(
+                {
+                  dateDepense: form.dateDepense,
+                  kilometres: km,
+                  tarifKm: tarif,
+                  motif: trajetMotif,
+                  clientId: form.clientId,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(t("toastKmCreated", { montant: eur2(montant) }));
+                    setForm({
+                      dateDepense: new Date().toISOString().slice(0, 10),
+                      depart: "", arrivee: "", kilometres: "",
+                      tarifKm: String(TARIF_KM_DEFAULT), motif: "", clientId: undefined,
+                    });
+                    onSuccess();
+                  },
+                  onError: (e) => toast.error(e.message || t("error")),
+                },
+              );
             }}
             disabled={creerMut.isPending || !km}
           >
