@@ -183,7 +183,20 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 
 - [x] **durcissement relance facture** → `envoyer-relance-facture.test.ts` +1 cas : `artisan introuvable → NotFound` AVANT l'envoi (email.sent=0) ✅ it.81. (joursDeRetard futur déjà couvert L56.)
 
-**Prochaine cible : DURCISSEMENT (a) — DERNIÈRES branches.** Reste à vérifier `envoyer-facture-email` (branches d'envoi/erreur) et gardes rares restantes. ⚠️ **Saturation atteinte** : après ~3 itérations de branches résiduelles (it.78-81), le gisement L1/L2/L3 est épuisé. **Au prochain réveil sans gap significatif → STOP recommandé** : signaler clôture à l'humain et proposer (b) L4 navigateur OU redirection vers la dette frontend (208 erreurs TS, OPE-253). Ne pas créer de tests cosmétiques sans garantie réelle.
+- [x] **signature domain emails** → `signature.test.ts` +3 cas : buildSignedDevisArtisanEmail (sujet + échappement signataire), buildRefusedDevisArtisanEmail (motif présent/échappé ; clientName vide → « Le client », pas de bloc motif si null) ✅ it.82.
+
+### 🔄 SATURATION LEVÉE (it.82) — nouveaux modules activés par un autre agent
+Le scan it.82 (≠ it.77 qui était vide) révèle **des modules récemment activés** avec des fonctions SANS test. La boucle reprend → NE PAS clôturer. **Backlog L1 réamorcé** (`export (async) function` sans réf dans un test, vérifié it.82) :
+- [x] `signature/domain` buildSigned/RefusedDevisArtisanEmail ✅ it.82
+- [ ] `factures/application/read-use-cases` : getFactureDetail · getAvoirsFacture · getAuditLogFacture (CRITIQUE — prochaine cible)
+- [ ] `subscription/domain` subscriptionEmail · `subscription/domain/subscription` extraPriceId
+- [ ] `rdv-en-ligne/application/read-use-cases` : listRdvsAvecClient · getRdvStats · getRdvPendingCount
+- [ ] `commandes/application/performances-use-cases` getPerformancesFournisseurs
+- [ ] `comptabilite/domain/fec` fecFileName · `stocks/application/read` listStockEntrant
+- [ ] modules RH activés : `badges` listObjectifsDuTechnicien · `techniciens` getStatsTechnicien · `conges` listCongesEnAttente · `vehicules` enregistrerReleveKilometrage
+⚠️ Coordination : un autre agent (`ope-366-spike-frontend`) traite la dette TS frontend en parallèle — je reste sur `src/`, lui sur `client/`.
+
+**Prochaine cible : `factures/application/read-use-cases.ts`** — getFactureDetail / getAvoirsFacture / getAuditLogFacture (L1 fakes ; vérifier si pur ou délégation repo → tester la logique d'agrégation/garde anti-IDOR). 1 fichier.
 
 **Décision humaine (2026-06-17) : CONTINUER EN AUTONOMIE.** Plus de sollicitation. La boucle :
 1. it.75 → garde-fou meta-test de couverture L2 ✅ FAIT.
@@ -280,3 +293,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-17 06:04:58Z` **[test]** durcissement calcul montants TVA/arrondis — it.79 — montants.test +2 cas : résilience entrées vides/non-numériques -> 0 (garde Number||0), arrondi centime sur valeur non ronde (3x3.33@20% -> HT 9.99/TVA 1.998->2.00/TTC 11.99). Intégrité financière du calcul de ligne. Couverture structurelle saturée -> valeur marginale décroissante.
 - `2026-06-17 06:34:29Z` **[test]** durcissement calcul montants DEVIS — it.80 — devis/montants.test +2 cas (parité factures it.79) : résilience Number||0 sur entrées vides/non-numériques, arrondi centime non rond (3x3.33@20% -> 9.99/2.00/11.99). Intégrité financière côté devis. Saturation structurelle persistante.
 - `2026-06-17 07:04:29Z` **[test]** durcissement relance facture (artisan introuvable) — it.81 — envoyer-relance-facture +1 cas : artisan introuvable -> NotFound AVANT l'envoi (email.sent=0). Dernière branche non couverte du use-case. Saturation L1/L2/L3 atteinte -> au prochain réveil sans gap significatif, STOP recommandé (clôture/redirection frontend OPE-253).
+- `2026-06-17 07:36:38Z` **[test]** signature domain emails + SATURATION LEVÉE — it.82 — signature.test +3 cas (buildSigned/RefusedDevisArtisanEmail : sujet, motif, fallback clientName, échappement HTML). IMPORTANT: scan révèle ~16 fonctions SANS test dans des modules RÉCEMMENT ACTIVÉS (factures read, rdv read, subscription domain, badges/techniciens/conges/vehicules) -> boucle NON saturée, REPREND. Autre agent (ope-366) traite le front TS en //.

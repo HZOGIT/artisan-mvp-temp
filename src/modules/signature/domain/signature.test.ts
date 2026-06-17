@@ -5,6 +5,8 @@ import {
   escapeHtml,
   formatEuro,
   buildSignatureLinkEmail,
+  buildSignedDevisArtisanEmail,
+  buildRefusedDevisArtisanEmail,
 } from "./signature";
 
 describe("signature domain", () => {
@@ -47,5 +49,30 @@ describe("signature domain", () => {
     expect(body).toContain("Toiture &amp; Co");
     expect(body).toContain("&lt;script&gt;");
     expect(body).not.toContain("<script>");
+  });
+
+  // Emails de notification artisan (parité legacy signDevis/refuseDevis) — purs, échappés HTML.
+  it("buildSignedDevisArtisanEmail : sujet accepté/signé + signataire échappé", () => {
+    const { subject, body } = buildSignedDevisArtisanEmail({ devisNumero: "DEV-42", signataireName: "Jean <b>D</b>", signataireEmail: "jean@cli.fr" });
+    expect(subject).toBe("Devis DEV-42 accepté et signé");
+    expect(body).toContain("DEV-42");
+    expect(body).toContain("jean@cli.fr");
+    expect(body).toContain("Jean &lt;b&gt;D&lt;/b&gt;");
+    expect(body).not.toContain("<b>D</b>");
+  });
+
+  it("buildRefusedDevisArtisanEmail : motif présent si fourni + échappé", () => {
+    const { subject, body } = buildRefusedDevisArtisanEmail({ devisNumero: "DEV-7", clientName: "Léa", motifRefus: "Trop <cher>" });
+    expect(subject).toBe("Devis DEV-7 refusé par Léa");
+    expect(body).toContain("Motif :");
+    expect(body).toContain("Trop &lt;cher&gt;");
+    expect(body).not.toContain("<cher>");
+  });
+
+  it("buildRefusedDevisArtisanEmail : clientName vide → « Le client », pas de bloc motif si null", () => {
+    const { subject, body } = buildRefusedDevisArtisanEmail({ devisNumero: "DEV-9", clientName: "", motifRefus: null });
+    expect(subject).toBe("Devis DEV-9 refusé par Le client");
+    expect(body).toContain("Le client");
+    expect(body).not.toContain("Motif :");
   });
 });
