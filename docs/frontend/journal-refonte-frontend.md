@@ -33,6 +33,12 @@ la règle est posée en `warn` puis passée en `error` quand tout est rétrofitt
 **Rétrofit total** : les 15 pages déjà migrées sont à refactorer (extraction hook + typage strict),
 **1 feature/itération**, en gardant la parité e2e verte. Cf. backlog « Vague R ».
 
+> **🔒 NON NÉGOCIABLE (exigence humaine répétée) — vérifier la conformance à CHAQUE itération.** On veut
+> de la **vraie clean-archi**, de la **testabilité unitaire réelle**, du **code propre et modulaire** —
+> pas un port qui mélange tout dans l'UI. Chaque itération DOIT exécuter l'**audit de conformance**
+> (Runbook §3bis, les 6 cases) et en **consigner le résultat** (journal + Linear). Une itération qui ne
+> prouve pas la conformance est **incomplète**, on ne la close pas.
+
 ## Convention de nommage des fichiers (imposée)
 **Tous les nouveaux fichiers du front neuf sont en `kebab-case`** (ex. `clients-list-page.tsx`,
 `modern-router-mount.tsx`, `ping-page.tsx`), y compris les fichiers de composants React (le composant
@@ -104,7 +110,25 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
      (actions UI réelles → tRPC + assertion de persistance via API, **non destructif** : modifie puis
      REVERT). **rouge avant / vert après**. *(Tests lourds : peuvent être batchés sur un groupe
      d'itérations — voir « Dette de tests » plus bas.)*
-4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante, noter tout split/blocage.
+3bis. **🔒 AUDIT DE CONFORMANCE CLEAN-ARCHI — OBLIGATOIRE À CHAQUE ITÉRATION (exigence humaine, non
+   négociable : « je ne tolérerai plus cette erreur »).** Avant de clore, **vérifier explicitement** et
+   **écrire le résultat** (dans le log d'itération + le commentaire Linear) que la cible respecte la
+   recette. Checklist à cocher une par une (un seul ❌ = itération NON close, on corrige) :
+   - [ ] **3 couches réelles** : `domain/<entity>.ts` (types + règles **pures**) · `application/use-<feature>.ts`
+     (hook, **seule** couche tRPC) · `ui/*-page.tsx` (**présentation pure**). Dépendance `ui → application → domain`.
+   - [ ] **0 `any`** dans les 3 couches (`grep -nE ': any|as any' <fichiers>` → vide). Types dérivés de `RouterOutputs`/`RouterInputs`.
+   - [ ] **`ui/` n'importe PAS `@/modern/shared/trpc`** → le warning `local/no-trpc-in-ui` du fichier **DISPARAÎT**
+     (compteur global décroît : noter `N→N-1`).
+   - [ ] **Testabilité unitaire RÉELLE** : la logique métier (filtres, calculs, synthèses, règles) vit dans `domain/`
+     en fonctions **pures** (sans réseau ni i18n) et est **couverte par des tests vitest** (`<entity>.test.ts`,
+     rouge-avant/vert-après pour les règles non triviales). Pas de logique métier non testée laissée dans l'UI.
+   - [ ] **Modularité** : pas de fonction fourre-tout ; effets UI (toast/clipboard/navigation/reset) attachés via le
+     `onSuccess`/`onError` **par appel** de `.mutate()`, l'invalidation/persistance vit dans le hook.
+   - [ ] **Parité visuelle** stricte conservée (JSX/Tailwind inchangés).
+   Commande d'auto-contrôle : `grep -rnE ': any|as any' client/src/modern/features/<f>` (vide) +
+   `pnpm exec eslint -c eslint.v2.config.mjs client/src/modern | grep -c no-trpc-in-ui` (doit décroître).
+4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante, noter tout split/blocage **+ consigner
+   le résultat de l'audit 3bis** (les 6 cases).
 5. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (journal+ntfy+bus).
    **Le message DOIT inclure un % de progression** (demande humaine) — format `📊 X% (N/M pages)` où
    `N` = pages migrées, `M` = total legacy. Calcul :
@@ -163,12 +187,13 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague R — feature `factures`** (rétrofit clean-archi). Extraire
-`domain/facture.ts` (types `RouterOutputs` + règles pures : calcul totaux/statuts, filtres) +
-`application/use-factures.ts` (SEULE couche tRPC : list + transitions/mutations + invalidation), faire
-consommer `factures-page.tsx` (plus de `trpc` direct, **0 `any`**, le warning `no-trpc-in-ui` doit
-disparaître pour ce fichier). Garder parité e2e verte. Gabarit = `use-clients` / `use-client-detail`.
-Après factures : devis, interventions, puis le reste. Quand les 12 warnings tombent à 0 → passer
+## 🎯 PROCHAINE CIBLE : **Vague R — feature `devis`** (rétrofit clean-archi). Extraire
+`domain/devis.ts` (types `RouterOutputs` + règles pures : filtres statut/recherche, synthèses) +
+`application/use-devis.ts` (SEULE couche tRPC : list + create/delete/transitions + invalidation), faire
+consommer `devis-page.tsx` (plus de `trpc` direct, **0 `any`**, le warning `no-trpc-in-ui` doit
+disparaître pour ce fichier). Garder parité e2e verte. Gabarit = `use-factures` / `use-clients`.
+Après devis : interventions, puis le reste (notifications, techniciens, fournisseurs, articles,
+commandes, stocks, depenses, comptabilite, signature). Quand les 11 warnings tombent à 0 → passer
 `local/no-trpc-in-ui` en **`error`**.
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
@@ -208,6 +233,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Clean-archi — Vague R `factures` ✅** : `domain/facture.ts` (types `RouterOutputs` + fonctions PURES `clientLabel`/`isBrouillon`/`filterFactures`/`computeEncoursSummary` — filtrage type+statut+recherche & synthèse d'encours avoirs déduits ; **9 tests**) + `application/use-factures.ts` (SEULE couche tRPC : list factures+clients, create/delete, invalidation) + `useClientEncours` (query dépendante isolée). `factures-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC (toasts/navigation via `onSuccess` par appel). Warnings `no-trpc-in-ui` **12→11**. tsc/eslint(0 err)/vitest **38**, parité `37|0` + mutation `1|0`, déployé `f1f3fab9`. **Audit §3bis : 6/6 ✅** (3 couches · 0 any · ui sans tRPC · warning 12→11 · 9 tests purs · parité OK). Prochaine : `devis`.
 - **Clean-archi — ClientDetail ✅** (feature `clients` 100 % rétrofittée) : `application/use-client-detail.ts` (hook : `clients.getById` + `devis/factures/interventions.list` + `clientPortal.*` + `activites.*`, invalidation centralisée) + domaine pur étendu (`ofClient`, `activitesOfClient`, `sortActivitesByEcheance`, `computeClientStats` + types `ClientDetail/DevisRow/FactureRow/InterventionRow/ActiviteRow/PortalStatus/ActiviteType`). `client-detail-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC (toasts/clipboard/reset via `onSuccess` par appel). Warnings `no-trpc-in-ui` **13→12**. tsc/eslint(0 err)/vitest **29** (clients domain 16), parité `37|0` + mutation `1|0`, déployé `c3dd4e9f`. Prochaine : Vague R `factures`.
 - **Clean-archi — Clients (liste) ✅ GABARIT** : `application/use-clients.ts` (hook encapsulant tRPC : list/getEncoursMap/update/delete) + `domain/client.ts` (types `RouterOutputs` + fonctions PURES `findDuplicateGroups`/`findCreateDuplicateMatch` renvoyant des clés i18n, **7 tests**). `clients-list-page.tsx` consomme le hook, **0 `any`**, plus aucun import tRPC. Règle eslint **custom `no-trpc-in-ui` (warn)** posée → flague les 13 ui non rétrofittées (clients-list exempte). tsc/vitest(24)/eslint verts, parité `37|0` + mutation `1|0`. Prochaine : ClientDetail.
 - **Vague 3 — Signature ✅** port public `/v2/signature/:token` (canvas, options, refus, états ; i18n ; checkbox/separator au barrel ; fix « Invalid Date » legacy). e2e montage déterministe `37|0`, déployé. Prochaine : Portail.

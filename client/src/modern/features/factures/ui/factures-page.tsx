@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useFactures, useClientEncours } from "../application/use-factures";
+import {
+  clientLabel,
+  computeEncoursSummary,
+  filterFactures,
+  isBrouillon,
+  type Facture,
+  type FactureClient,
+  type TypeFilter,
+} from "../domain/facture";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent } from "@/modern/shared/ui/card";
@@ -14,20 +23,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/modern/shared/ui/badge";
 import { StatutBadge } from "@/modern/shared/ui/statut-badge";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
 
-// Page Factures du FRONT NEUF (`/v2/factures`) — PORT CONFORME de `pages/Factures.tsx`. JSX à
-// l'identique (table native + StatutBadge) ; plomberie repointée : primitives `@/modern/shared/ui`,
-// tRPC partagé, i18n (namespace `factures`). Libellés via i18n ; couleurs = classes Tailwind.
+// Page Factures du FRONT NEUF (`/v2/factures`) — clean-archi : présentation pure. Les données/mutations
+// viennent de `useFactures`/`useClientEncours` (couche application, seule à importer tRPC) ; le filtrage
+// et la synthèse d'encours viennent du domaine (`../domain/facture`, fonctions pures testées). Parité
+// visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge). Libellés via i18n (namespace
+// `factures`) ; couleurs = classes Tailwind.
 
 export default function FacturesPage() {
   const { t } = useTranslation("factures");
   const [, setLocation] = useLocation();
   const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"tous" | "facture" | "avoir">("tous");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("tous");
   // Filtre par statut piloté par l'URL ?filtre= (set par MonAssistant via naviguer_vers).
   const [statusFilter, setStatusFilter] = useState<string>("all");
   useEffect(() => {
@@ -49,36 +59,10 @@ export default function FacturesPage() {
     dateEcheance: "",
   });
 
-  const utils = trpc.useUtils();
-  const { data: facturesList, isLoading } = trpc.factures.list.useQuery();
-  const { data: clients } = trpc.clients.list.useQuery();
+  const { factures: facturesList, clients, isLoading, create: createMutation, remove: deleteMutation } = useFactures();
   // Encours impayé du client sélectionné dans le dialogue de création (alerte non bloquante).
-  const { data: encoursClient } = trpc.clients.getEncours.useQuery(
-    { clientId: parseInt(selectedClientId) },
-    { enabled: !!selectedClientId && !isNaN(parseInt(selectedClientId)) }
-  );
-
-  const createMutation = trpc.factures.create.useMutation({
-    onSuccess: (data) => {
-      utils.factures.list.invalidate();
-      setIsCreateDialogOpen(false);
-      toast.success(t("toastCreated"));
-      setLocation(`/factures/${data.id}`);
-    },
-    onError: () => {
-      toast.error(t("toastCreateError"));
-    },
-  });
-
-  const deleteMutation = trpc.factures.delete.useMutation({
-    onSuccess: () => {
-      utils.factures.list.invalidate();
-      toast.success(t("toastDeleted"));
-    },
-    onError: (error) => {
-      toast.error(error.message || t("toastDeleteError"));
-    },
-  });
+  const selectedClientIdNum = selectedClientId ? parseInt(selectedClientId) : null;
+  const encoursClient = useClientEncours(selectedClientIdNum);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,19 +70,32 @@ export default function FacturesPage() {
       toast.error(t("toastSelectClient"));
       return;
     }
-    createMutation.mutate({
-      clientId: parseInt(selectedClientId),
-      ...formData,
-    });
+    createMutation.mutate(
+      { clientId: parseInt(selectedClientId), ...formData },
+      {
+        onSuccess: (data) => {
+          setIsCreateDialogOpen(false);
+          toast.success(t("toastCreated"));
+          setLocation(`/factures/${data.id}`);
+        },
+        onError: () => toast.error(t("toastCreateError")),
+      },
+    );
   };
 
   const handleDelete = (id: number, statut: string) => {
-    if (statut !== "brouillon") {
+    if (!isBrouillon(statut)) {
       toast.error(t("toastOnlyDraft"));
       return;
     }
     if (confirm(t("confirmDelete"))) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate(
+        { id },
+        {
+          onSuccess: () => toast.success(t("toastDeleted")),
+          onError: (error) => toast.error(error.message || t("toastDeleteError")),
+        },
+      );
     }
   };
 
@@ -107,30 +104,14 @@ export default function FacturesPage() {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
   };
 
-  const clientsMap = new Map((clients || []).map((c: any) => [c.id, c]));
+  const clientsMap = new Map<number, FactureClient>(clients.map((c) => [c.id, c]));
 
-  const filteredFactures = facturesList?.filter((facture: any) => {
-    if (typeFilter !== "tous") {
-      const docType = facture.typeDocument || "facture";
-      if (docType !== typeFilter) return false;
-    }
-    if (statusFilter === "impayees") {
-      if (facture.statut === "payee" || facture.statut === "annulee" || facture.statut === "brouillon") {
-        return false;
-      }
-    } else if (statusFilter === "en_retard") {
-      if (facture.statut !== "en_retard") return false;
-    } else if (statusFilter === "brouillon") {
-      if (facture.statut !== "brouillon") return false;
-    }
-    if (!searchQuery) return true;
-    const client = clientsMap.get(facture.clientId);
-    const clientName = client ? `${client.nom} ${client.prenom}` : "";
-    return (
-      matchSearch(facture.numero, searchQuery) ||
-      matchSearch(facture.objet, searchQuery) ||
-      matchSearch(clientName, searchQuery)
-    );
+  // Filtrage délégué au domaine (pur, testé) — le résolveur de nom client garde le domaine sans Map.
+  const filteredFactures = filterFactures(facturesList, {
+    typeFilter,
+    statusFilter,
+    searchQuery,
+    resolveClientName: (clientId) => clientLabel(clientId == null ? undefined : clientsMap.get(clientId)),
   });
 
   const activeStatusLabel = statusFilter !== "all" ? t(`statusFilter_${statusFilter}`, { defaultValue: statusFilter }) : null;
@@ -146,12 +127,12 @@ export default function FacturesPage() {
       t("csvNumero"), t("csvType"), t("csvClient"), t("csvObjet"), t("csvReference"),
       t("csvDate"), t("csvEcheance"), t("csvMontantHT"), t("csvTVA"), t("csvMontantTTC"), t("csvMontantPaye"), t("csvStatut"),
     ];
-    const rows = data.map((f: any) => {
-      const client: any = clientsMap.get(f.clientId);
+    const rows = data.map((f: Facture) => {
+      const client = f.clientId == null ? undefined : clientsMap.get(f.clientId);
       return [
         f.numero,
         f.typeDocument === "avoir" ? t("csvAvoir") : t("csvFacture"),
-        client ? `${client.nom || ""} ${client.prenom || ""}`.trim() : "",
+        clientLabel(client),
         f.objet,
         f.referenceClient,
         f.dateFacture ? format(new Date(f.dateFacture), "dd/MM/yyyy") : "",
@@ -205,7 +186,7 @@ export default function FacturesPage() {
                       <SelectValue placeholder={t("clientPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      {clients?.map((client: any) => (
+                      {clients.map((client) => (
                         <SelectItem key={client.id} value={String(client.id)}>
                           {client.nom} {client.prenom}
                         </SelectItem>
@@ -293,38 +274,28 @@ export default function FacturesPage() {
         </div>
       )}
 
-      {/* Visibilité de l'encours : total à encaisser (impayé) calculé à la volée. */}
+      {/* Visibilité de l'encours : total à encaisser (impayé), calcul délégué au domaine (pur, testé). */}
       {(() => {
-        const reelles = (facturesList || []).filter((f: any) => f.typeDocument !== "avoir");
-        if (reelles.length === 0) return null;
-        const reste = (f: any) => Math.max(0, (parseFloat(f.totalTTC || "0") || 0) - (parseFloat(f.montantPaye || "0") || 0));
-        const impayees = reelles.filter((f: any) => f.statut === "envoyee" || f.statut === "en_retard" || f.statut === "validee");
-        const creditAvoirs = (facturesList || [])
-          .filter((f: any) => f.typeDocument === "avoir" && f.statut !== "annulee" && f.statut !== "brouillon")
-          .reduce((s: number, f: any) => s + Math.abs(parseFloat(f.totalTTC || "0") || 0), 0);
-        const totalImpaye = Math.max(0, impayees.reduce((s: number, f: any) => s + reste(f), 0) - creditAvoirs);
-        const totalEnRetard = Math.min(
-          reelles.filter((f: any) => f.statut === "en_retard").reduce((s: number, f: any) => s + reste(f), 0),
-          totalImpaye,
-        );
+        const enc = computeEncoursSummary(facturesList);
+        if (!enc.hasReelles) return null;
         return (
           <div className="grid gap-4 sm:grid-cols-3">
             <Card>
               <CardContent className="pt-4">
                 <p className="text-sm text-muted-foreground">{t("statToCollect")}</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalImpaye)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(enc.totalImpaye)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4">
                 <p className="text-sm text-muted-foreground">{t("statOverdue")}</p>
-                <p className="text-2xl font-bold text-orange-600">{formatCurrency(totalEnRetard)}</p>
+                <p className="text-2xl font-bold text-orange-600">{formatCurrency(enc.totalEnRetard)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4">
                 <p className="text-sm text-muted-foreground">{t("statUnpaidCount")}</p>
-                <p className="text-2xl font-bold">{impayees.length}</p>
+                <p className="text-2xl font-bold">{enc.impayeesCount}</p>
               </CardContent>
             </Card>
           </div>
@@ -342,7 +313,7 @@ export default function FacturesPage() {
             className="pl-10"
           />
         </div>
-        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as any)}>
+        <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
           <SelectTrigger className="w-44">
             <SelectValue />
           </SelectTrigger>
@@ -375,7 +346,7 @@ export default function FacturesPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredFactures.map((facture: any) => {
+              {filteredFactures.map((facture) => {
                 const client = clientsMap.get(facture.clientId);
                 const isAvoir = facture.typeDocument === "avoir";
                 const isBrouillon = facture.statut === "brouillon";
