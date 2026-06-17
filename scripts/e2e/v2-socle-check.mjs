@@ -105,8 +105,8 @@ const PARITE_PAGES = [
   { legacy: '/dashboard', v2: '/v2/dashboard', markers: ['CA du mois', 'Personnaliser le dashboard'] },
   { legacy: '/notes-de-frais', v2: '/v2/notes-frais', markers: ['Notes de frais', 'Nouvelle note'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
-  // Portail client (socle, slice 1) : token bidon → état « lien invalide » des 2 côtés (parité du gate d'accès).
-  { legacy: '/portail/e2e-invalid-token', v2: '/v2/portail/e2e-invalid-token', markers: ['Lien expiré ou invalide'] },
+  // NB : le PORTAIL (token) n'est PAS testé par marqueurs ici (le gate verifyAccess est timing-dépendant,
+  // comme la signature) → test déterministe « montage déclenche verifyAccess » dans la section signature/portail.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
 ];
@@ -200,6 +200,21 @@ for (const route of ['/signature/e2e-token', '/v2/signature/e2e-token']) {
   await page.waitForTimeout(1500);
   page.off('request', onReq);
   if (!sigCalled) add({ route, type: 'signature', text: 'la page n’a pas appelé signature.getDevisForSignature (montage/param KO)' });
+}
+
+// --- Portail client (publique, par token) : montage `/v2` hors auth — DÉTERMINISTE (verifyAccess) ---
+// Le gate d'accès (lien valide/invalide) dépend du retour réseau (timing) → on vérifie que le montage
+// LIT le token et déclenche `clientPortal.verifyAccess` (preuve : route publique + param + bonne proc).
+for (const route of ['/portail/e2e-token', '/v2/portail/e2e-token']) {
+  signCount++;
+  current = `portail ${route}`;
+  let called = false;
+  const onReq = (r) => { if (r.url().includes('clientPortal.verifyAccess')) called = true; };
+  page.on('request', onReq);
+  await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+  await page.waitForTimeout(1500);
+  page.off('request', onReq);
+  if (!called) add({ route, type: 'portail', text: 'la page n’a pas appelé clientPortal.verifyAccess (montage/param KO)' });
 }
 
 // --- Sidebar → v2 : la nav redirige vers `/v2` quand la route est migrée (registre V2_ROUTES) ---
