@@ -61,7 +61,14 @@ const devisPublicRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/signature/ui/signature-devis-page")),
 });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute]);
+// Espace client public par token — migration clean-archi de `pages/PortailClient.tsx` (slice 1 : socle).
+const portailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/portail/$token",
+  component: lazyRouteComponent(() => import("../../features/portail/ui/portail-client-page")),
+});
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,

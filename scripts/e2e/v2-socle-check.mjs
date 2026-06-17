@@ -105,6 +105,8 @@ const PARITE_PAGES = [
   { legacy: '/dashboard', v2: '/v2/dashboard', markers: ['CA du mois', 'Personnaliser le dashboard'] },
   { legacy: '/notes-de-frais', v2: '/v2/notes-frais', markers: ['Notes de frais', 'Nouvelle note'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
+  // Portail client (socle, slice 1) : token bidon → état « lien invalide » des 2 côtés (parité du gate d'accès).
+  { legacy: '/portail/e2e-invalid-token', v2: '/v2/portail/e2e-invalid-token', markers: ['Lien expiré ou invalide'] },
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
 ];

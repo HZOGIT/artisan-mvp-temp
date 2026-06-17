@@ -1,0 +1,23 @@
+{
+  "chargement": "Chargement de votre espace client...",
+  "lienInvalideTitre": "Lien expiré ou invalide",
+  "lienInvalideDesc": "Ce lien d'accès n'est plus valide. Veuillez contacter votre artisan pour obtenir un nouveau lien d'accès à votre espace client.",
+  "espaceClient": "Espace Client",
+  "bienvenue": "Bienvenue, {{prenom}} {{nom}}",
+  "tabDemande": "Demande",
+  "tabDemandePrefix": "Nouvelle ",
+  "tabDevis": "Devis",
+  "tabDevisPrefix": "Mes ",
+  "tabFactures": "Factures",
+  "tabFacturesPrefix": "Mes ",
+  "tabInterventions": "Interventions",
+  "tabInterventionsPrefix": "Mes ",
+  "tabMessages": "Messages",
+  "tabRdv": "RDV",
+  "tabRdvPrefix": "Prendre ",
+  "tabChantier": "Chantier",
+  "tabChantierPrefix": "Mon ",
+  "tabInfos": "Infos",
+  "tabInfosPrefix": "Mes ",
+  "sectionAVenir": "Cette section est en cours de migration vers le nouvel espace."
+}
