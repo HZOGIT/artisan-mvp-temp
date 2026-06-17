@@ -1,4 +1,4 @@
-import type { RouterOutputs } from "@/modern/shared/trpc";
+import type { RouterInputs, RouterOutputs } from "@/modern/shared/trpc";
 
 // Couche DOMAINE de la feature `clients` (clean-archi) : types dérivés des sorties du routeur tRPC
 // (source de vérité serveur — zod → AppRouter) + règles PURES testables sans réseau ni i18n.
@@ -6,6 +6,62 @@ import type { RouterOutputs } from "@/modern/shared/trpc";
 
 export type Client = RouterOutputs["clients"]["list"][number];
 export type EncoursMap = RouterOutputs["clients"]["getEncoursMap"];
+
+// Types de la vue DÉTAIL (`/v2/clients/:id`) — dérivés des sorties serveur (0 `any`).
+export type ClientDetail = NonNullable<RouterOutputs["clients"]["getById"]>;
+export type DevisRow = RouterOutputs["devis"]["list"][number];
+export type FactureRow = RouterOutputs["factures"]["list"][number];
+export type InterventionRow = RouterOutputs["interventions"]["list"][number];
+export type ActiviteRow = RouterOutputs["activites"]["list"][number];
+export type PortalStatus = RouterOutputs["clientPortal"]["getStatus"];
+export type ActiviteType = NonNullable<RouterInputs["activites"]["create"]["type"]>;
+
+const toNumber = (v: unknown): number => {
+  const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : 0;
+  return Number.isFinite(n) ? n : 0;
+};
+
+// Filtre PUR : lignes rattachées à un client (devis/factures/interventions ont toutes `clientId`).
+export function ofClient<T extends { clientId: number | null }>(
+  rows: readonly T[],
+  clientId: number,
+): T[] {
+  return rows.filter((r) => r.clientId === clientId);
+}
+
+// Activités/rappels CRM rattachés à CE client (entité polymorphe → filtrer type + id).
+export function activitesOfClient(rows: readonly ActiviteRow[], clientId: number): ActiviteRow[] {
+  return rows.filter((a) => a.entiteType === "client" && a.entiteId === clientId);
+}
+
+// Tri PUR par échéance croissante (copie, ne mute pas l'entrée).
+export function sortActivitesByEcheance(rows: readonly ActiviteRow[]): ActiviteRow[] {
+  return rows.slice().sort((a, b) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime());
+}
+
+export interface ClientStats {
+  totalFacture: number;
+  facturesImpayees: number;
+  devisEnAttente: number;
+  interventionsTerminees: number;
+}
+
+// Statistiques PURES affichées en tête de la fiche client (mêmes règles que le legacy).
+export function computeClientStats(
+  devis: readonly DevisRow[],
+  factures: readonly FactureRow[],
+  interventions: readonly InterventionRow[],
+): ClientStats {
+  const totalFacture = factures
+    .filter((f) => f.statut === "payee")
+    .reduce((s, f) => s + toNumber(f.totalTTC), 0);
+  const facturesImpayees = factures
+    .filter((f) => f.statut !== "payee" && f.statut !== "annulee")
+    .reduce((s, f) => s + toNumber(f.totalTTC), 0);
+  const devisEnAttente = devis.filter((d) => d.statut === "envoye").length;
+  const interventionsTerminees = interventions.filter((i) => i.statut === "terminee").length;
+  return { totalFacture, facturesImpayees, devisEnAttente, interventionsTerminees };
+}
 
 // Libellé d'affichage d'un client.
 export function nomComplet(c: Pick<Client, "nom" | "prenom" | "raisonSociale">): string {

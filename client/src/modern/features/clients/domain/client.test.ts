@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { nomComplet, findDuplicateGroups, findCreateDuplicateMatch, type Client } from "./client";
+import {
+  nomComplet,
+  findDuplicateGroups,
+  findCreateDuplicateMatch,
+  ofClient,
+  activitesOfClient,
+  sortActivitesByEcheance,
+  computeClientStats,
+  type Client,
+  type DevisRow,
+  type FactureRow,
+  type InterventionRow,
+  type ActiviteRow,
+} from "./client";
 
 // Fabrique de Client minimal pour les tests purs (les champs non utilisés sont remplis loosely).
 const mk = (p: Partial<Client> & { id: number }): Client => ({
@@ -70,5 +83,67 @@ describe("findCreateDuplicateMatch", () => {
   });
   it("renvoie null si aucun match", () => {
     expect(findCreateDuplicateMatch({ email: "x@y.fr", telephone: "", prenom: "", nom: "" }, base)).toBeNull();
+  });
+});
+
+// Fabriques minimales pour les fonctions de la vue détail (champs non testés remplis loosely).
+const mkDevis = (p: Partial<DevisRow> & { id: number }): DevisRow =>
+  ({ clientId: null, statut: "brouillon", totalTTC: "0", ...p } as unknown as DevisRow);
+const mkFacture = (p: Partial<FactureRow> & { id: number }): FactureRow =>
+  ({ clientId: null, statut: "brouillon", totalTTC: "0", ...p } as unknown as FactureRow);
+const mkInterv = (p: Partial<InterventionRow> & { id: number }): InterventionRow =>
+  ({ clientId: null, statut: "planifiee", ...p } as unknown as InterventionRow);
+const mkActivite = (p: Partial<ActiviteRow> & { id: number }): ActiviteRow =>
+  ({ entiteType: "client", entiteId: 0, fait: false, echeance: "2026-01-01", type: "appel", ...p } as unknown as ActiviteRow);
+
+describe("ofClient", () => {
+  it("ne garde que les lignes du client demandé", () => {
+    const rows = [mkDevis({ id: 1, clientId: 7 }), mkDevis({ id: 2, clientId: 9 }), mkDevis({ id: 3, clientId: 7 })];
+    expect(ofClient(rows, 7).map((r) => r.id)).toEqual([1, 3]);
+  });
+});
+
+describe("activitesOfClient", () => {
+  it("filtre par entiteType=client ET entiteId", () => {
+    const rows = [
+      mkActivite({ id: 1, entiteId: 5 }),
+      mkActivite({ id: 2, entiteId: 5, entiteType: "devis" }),
+      mkActivite({ id: 3, entiteId: 8 }),
+    ];
+    expect(activitesOfClient(rows, 5).map((r) => r.id)).toEqual([1]);
+  });
+});
+
+describe("sortActivitesByEcheance", () => {
+  it("trie par échéance croissante sans muter l'entrée", () => {
+    const rows = [
+      mkActivite({ id: 1, echeance: "2026-03-01" }),
+      mkActivite({ id: 2, echeance: "2026-01-01" }),
+      mkActivite({ id: 3, echeance: "2026-02-01" }),
+    ];
+    expect(sortActivitesByEcheance(rows).map((r) => r.id)).toEqual([2, 3, 1]);
+    expect(rows.map((r) => r.id)).toEqual([1, 2, 3]); // entrée intacte
+  });
+});
+
+describe("computeClientStats", () => {
+  it("agrège payées / impayées / devis envoyés / interventions terminées", () => {
+    const devis = [mkDevis({ id: 1, statut: "envoye" }), mkDevis({ id: 2, statut: "brouillon" })];
+    const factures = [
+      mkFacture({ id: 1, statut: "payee", totalTTC: "100.50" }),
+      mkFacture({ id: 2, statut: "envoyee", totalTTC: "40" }),
+      mkFacture({ id: 3, statut: "annulee", totalTTC: "999" }),
+    ];
+    const interventions = [mkInterv({ id: 1, statut: "terminee" }), mkInterv({ id: 2, statut: "planifiee" })];
+    const stats = computeClientStats(devis, factures, interventions);
+    expect(stats.totalFacture).toBeCloseTo(100.5);
+    expect(stats.facturesImpayees).toBeCloseTo(40); // annulée exclue
+    expect(stats.devisEnAttente).toBe(1);
+    expect(stats.interventionsTerminees).toBe(1);
+  });
+
+  it("tolère des montants non numériques (résilience)", () => {
+    const factures = [mkFacture({ id: 1, statut: "payee", totalTTC: "abc" as unknown as string })];
+    expect(computeClientStats([], factures, []).totalFacture).toBe(0);
   });
 });

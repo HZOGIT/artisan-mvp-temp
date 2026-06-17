@@ -2,7 +2,15 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useClientDetail, type ClientDetailVM } from "../application/use-client-detail";
+import {
+  activitesOfClient,
+  computeClientStats,
+  ofClient,
+  sortActivitesByEcheance,
+  type ActiviteType,
+  type ClientDetail,
+} from "../domain/client";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
@@ -14,12 +22,12 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Détail client du FRONT NEUF (`/v2/clients/:id`) — PORT CONFORME de `pages/ClientDetail.tsx` (parité
-// visuelle stricte). JSX/Tailwind copiés à l'identique ; plomberie repointée (primitives
-// `@/modern/shared/ui`, tRPC `@/modern/shared/trpc`, libellés i18n namespace `clients`, param de route
-// via TanStack Router). Correction au passage : tous les hooks sont remontés AVANT les early-returns
-// (le legacy appelait des hooks après `if (!client) return` — antipattern). Les couleurs de statut
-// restent des classes Tailwind (pas des libellés) ; seuls les LABELS passent par i18n.
+// Détail client du FRONT NEUF (`/v2/clients/:id`) — clean-archi : la PRÉSENTATION ne connaît plus le
+// transport. Les données/mutations viennent du hook `useClientDetail` (couche application, seule à
+// importer tRPC) ; les calculs (stats, filtrage par client, tri) viennent du domaine (`../domain/client`,
+// fonctions pures testées). Parité visuelle stricte : JSX/Tailwind copiés à l'identique. Les couleurs de
+// statut restent des classes Tailwind ; seuls les LABELS passent par i18n (namespace `clients`).
+// Hooks remontés AVANT les early-returns (le legacy appelait des hooks après `if (!client) return`).
 
 const devisStatusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -54,12 +62,10 @@ export default function ClientDetailPage() {
   const [, setLocation] = useLocation();
   const clientIdNum = parseInt(id || "0");
 
-  const { data: client, isLoading } = trpc.clients.getById.useQuery(
-    { id: clientIdNum },
-    { enabled: !!id }
-  );
+  // Tous les hooks (via la couche application) AVANT les early-returns → ordre de hooks stable.
+  const vm = useClientDetail(clientIdNum);
 
-  if (isLoading) {
+  if (vm.isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -67,7 +73,7 @@ export default function ClientDetailPage() {
     );
   }
 
-  if (!client) {
+  if (!vm.client) {
     return (
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold text-foreground">{t("notFoundTitle")}</h2>
@@ -78,89 +84,68 @@ export default function ClientDetailPage() {
     );
   }
 
-  return <ClientDetailContent client={client} clientIdNum={clientIdNum} />;
+  return <ClientDetailContent vm={vm} client={vm.client} clientIdNum={clientIdNum} />;
 }
 
-function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum: number }) {
+function ClientDetailContent({
+  vm,
+  client,
+  clientIdNum,
+}: {
+  vm: ClientDetailVM;
+  client: ClientDetail;
+  clientIdNum: number;
+}) {
   const { t } = useTranslation("clients");
   const [, setLocation] = useLocation();
 
-  const { data: clientDevis } = trpc.devis.list.useQuery();
-  const { data: clientFactures } = trpc.factures.list.useQuery();
-  const { data: clientInterventions } = trpc.interventions.list.useQuery();
+  const {
+    devis,
+    factures,
+    interventions,
+    activites,
+    portalStatus,
+    generateAccess,
+    deactivateAccess,
+    createActivite,
+    toggleActivite,
+    deleteActivite,
+  } = vm;
 
-  // Portal access
-  const { data: portalStatus, refetch: refetchPortal } = trpc.clientPortal.getStatus.useQuery(
-    { clientId: clientIdNum },
-    { enabled: !!clientIdNum }
-  );
-
-  const generateAccess = trpc.clientPortal.generateAccess.useMutation({
-    onSuccess: (data) => {
-      toast.success(t("toastPortalSent"));
-      navigator.clipboard.writeText(data.url).catch(() => {});
-      refetchPortal();
-    },
-    onError: (err) => {
-      toast.error(err.message || t("toastPortalGenError"));
-    },
-  });
-
-  const deactivateAccess = trpc.clientPortal.deactivate.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastPortalDeactivated"));
-      refetchPortal();
-    },
-  });
-
-  // Activités / rappels CRM rattachés à ce client.
-  const { data: allActivites, refetch: refetchActivites } = trpc.activites.list.useQuery();
   const [activiteTitre, setActiviteTitre] = useState("");
   const [activiteEcheance, setActiviteEcheance] = useState("");
-  const [activiteType, setActiviteType] = useState("appel");
-  const createActivite = trpc.activites.create.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastRappelAdded"));
-      setActiviteTitre("");
-      setActiviteEcheance("");
-      setActiviteType("appel");
-      refetchActivites();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const toggleActivite = trpc.activites.toggleFait.useMutation({
-    onSuccess: () => refetchActivites(),
-    onError: (e) => toast.error(e.message),
-  });
-  const deleteActivite = trpc.activites.delete.useMutation({
-    onSuccess: () => refetchActivites(),
-    onError: (e) => toast.error(e.message),
-  });
+  const [activiteType, setActiviteType] = useState<ActiviteType>("appel");
 
   const formatCurrency = (amount: string | number | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount || 0;
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
   };
 
-  // Filtrer les données pour ce client
-  const devisClient = (clientDevis || []).filter((d: any) => d.clientId === clientIdNum);
-  const facturesClient = (clientFactures || []).filter((f: any) => f.clientId === clientIdNum);
-  const interventionsClient = (clientInterventions || []).filter((i: any) => i.clientId === clientIdNum);
-  const activitesClient = (allActivites || []).filter(
-    (a: any) => a.entiteType === "client" && a.entiteId === clientIdNum,
-  );
+  // Sélections/calculs délégués au domaine (fonctions pures, testées).
+  const devisClient = ofClient(devis, clientIdNum);
+  const facturesClient = ofClient(factures, clientIdNum);
+  const interventionsClient = ofClient(interventions, clientIdNum);
+  const activitesClient = activitesOfClient(activites, clientIdNum);
+  const { totalFacture, facturesImpayees, devisEnAttente, interventionsTerminees } =
+    computeClientStats(devisClient, facturesClient, interventionsClient);
 
-  // Calculs des statistiques
-  const totalFacture = facturesClient
-    .filter((f: any) => f.statut === "payee")
-    .reduce((sum: number, f: any) => sum + (parseFloat(f.totalTTC) || 0), 0);
-
-  const facturesImpayees = facturesClient
-    .filter((f: any) => f.statut !== "payee" && f.statut !== "annulee")
-    .reduce((sum: number, f: any) => sum + (parseFloat(f.totalTTC) || 0), 0);
-
-  const devisEnAttente = devisClient.filter((d: any) => d.statut === "envoye").length;
-  const interventionsTerminees = interventionsClient.filter((i: any) => i.statut === "terminee").length;
+  // Effets UI (toasts/clipboard/reset) attachés par appel — la persistance/invalidation vit dans le hook.
+  const handleGenerateAccess = () =>
+    generateAccess.mutate(
+      { clientId: clientIdNum },
+      {
+        onSuccess: (data) => {
+          toast.success(t("toastPortalSent"));
+          navigator.clipboard.writeText(data.url).catch(() => {});
+        },
+        onError: (err) => toast.error(err.message || t("toastPortalGenError")),
+      },
+    );
+  const handleDeactivateAccess = () =>
+    deactivateAccess.mutate(
+      { clientId: clientIdNum },
+      { onSuccess: () => toast.success(t("toastPortalDeactivated")) },
+    );
 
   return (
     <div className="space-y-6">
@@ -340,7 +325,7 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
                       variant="outline"
                       size="sm"
                       className="text-xs"
-                      onClick={() => generateAccess.mutate({ clientId: clientIdNum })}
+                      onClick={() => handleGenerateAccess()}
                       disabled={generateAccess.isPending}
                     >
                       <RefreshCw className="h-3 w-3 mr-1" />
@@ -351,7 +336,7 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
                     variant="ghost"
                     size="sm"
                     className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => deactivateAccess.mutate({ clientId: clientIdNum })}
+                    onClick={() => handleDeactivateAccess()}
                     disabled={deactivateAccess.isPending}
                   >
                     <ShieldOff className="h-3 w-3 mr-1" />
@@ -363,7 +348,7 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
                   variant="outline"
                   size="sm"
                   className="w-full justify-start"
-                  onClick={() => generateAccess.mutate({ clientId: clientIdNum })}
+                  onClick={() => handleGenerateAccess()}
                   disabled={generateAccess.isPending || !client?.email}
                 >
                   {generateAccess.isPending ? (
@@ -396,14 +381,14 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
                   {t("tabInterventions", { n: interventionsClient.length })}
                 </TabsTrigger>
                 <TabsTrigger value="activites">
-                  {t("tabActivites", { n: activitesClient.filter((a: any) => !a.fait).length })}
+                  {t("tabActivites", { n: activitesClient.filter((a) => !a.fait).length })}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="devis" className="mt-4">
                 {devisClient.length > 0 ? (
                   <div className="space-y-3">
-                    {devisClient.map((devis: any) => (
+                    {devisClient.map((devis) => (
                       <button
                         key={devis.id}
                         onClick={() => setLocation(`/devis/${devis.id}`)}
@@ -442,7 +427,7 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
               <TabsContent value="factures" className="mt-4">
                 {facturesClient.length > 0 ? (
                   <div className="space-y-3">
-                    {facturesClient.map((facture: any) => (
+                    {facturesClient.map((facture) => (
                       <button
                         key={facture.id}
                         onClick={() => setLocation(`/factures/${facture.id}`)}
@@ -481,7 +466,7 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
               <TabsContent value="interventions" className="mt-4">
                 {interventionsClient.length > 0 ? (
                   <div className="space-y-3">
-                    {interventionsClient.map((intervention: any) => (
+                    {interventionsClient.map((intervention) => (
                       <div
                         key={intervention.id}
                         className="p-4 rounded-lg border"
@@ -522,13 +507,24 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
                     e.preventDefault();
                     if (!activiteTitre.trim()) { toast.error(t("toastTitreRequired")); return; }
                     if (!activiteEcheance) { toast.error(t("toastEcheanceRequired")); return; }
-                    createActivite.mutate({
-                      titre: activiteTitre.trim(),
-                      echeance: activiteEcheance,
-                      type: activiteType as any,
-                      entiteType: "client",
-                      entiteId: clientIdNum,
-                    });
+                    createActivite.mutate(
+                      {
+                        titre: activiteTitre.trim(),
+                        echeance: activiteEcheance,
+                        type: activiteType,
+                        entiteType: "client",
+                        entiteId: clientIdNum,
+                      },
+                      {
+                        onSuccess: () => {
+                          toast.success(t("toastRappelAdded"));
+                          setActiviteTitre("");
+                          setActiviteEcheance("");
+                          setActiviteType("appel");
+                        },
+                        onError: (e) => toast.error(e.message),
+                      },
+                    );
                   }}
                 >
                   <Input
@@ -543,7 +539,7 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
                     onChange={(e) => setActiviteEcheance(e.target.value)}
                     className="sm:w-40"
                   />
-                  <Select value={activiteType} onValueChange={setActiviteType}>
+                  <Select value={activiteType} onValueChange={(v) => setActiviteType(v as ActiviteType)}>
                     <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="appel">{t("activiteType_appel")}</SelectItem>
@@ -560,15 +556,13 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
 
                 {activitesClient.length > 0 ? (
                   <div className="space-y-2">
-                    {activitesClient
-                      .slice()
-                      .sort((a: any, b: any) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime())
-                      .map((a: any) => (
+                    {sortActivitesByEcheance(activitesClient)
+                      .map((a) => (
                         <div key={a.id} className="flex items-start gap-2 p-3 rounded-lg border">
                           <button
                             type="button"
                             title={a.fait ? t("markTodo") : t("markDone")}
-                            onClick={() => toggleActivite.mutate({ id: a.id, fait: !a.fait })}
+                            onClick={() => toggleActivite.mutate({ id: a.id, fait: !a.fait }, { onError: (e) => toast.error(e.message) })}
                             className="mt-0.5 shrink-0"
                           >
                             {a.fait
@@ -592,7 +586,7 @@ function ClientDetailContent({ client, clientIdNum }: { client: any; clientIdNum
                           <button
                             type="button"
                             title={t("deleteTitle")}
-                            onClick={() => deleteActivite.mutate({ id: a.id })}
+                            onClick={() => deleteActivite.mutate({ id: a.id }, { onError: (e) => toast.error(e.message) })}
                             className="mt-0.5 shrink-0 text-muted-foreground hover:text-rose-500"
                           >
                             <Trash2 className="h-3.5 w-3.5" />

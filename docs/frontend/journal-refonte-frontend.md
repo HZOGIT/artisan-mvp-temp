@@ -163,11 +163,13 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Clean-archi — ClientDetail** (finir la feature `clients`). Extraire
-`application/use-client-detail.ts` (hook : `clients.getById` + `devis/factures/interventions.list` +
-`activites.*`, typés via `RouterOutputs`) + helpers domaine (stats/filtrage par client), faire consommer
-`client-detail-page.tsx`, **retirer les `any`** (warning `no-trpc-in-ui` doit disparaître pour ce fichier).
-Parité e2e verte. Puis **Vague R** sur les autres features (gabarit = `use-clients`).
+## 🎯 PROCHAINE CIBLE : **Vague R — feature `factures`** (rétrofit clean-archi). Extraire
+`domain/facture.ts` (types `RouterOutputs` + règles pures : calcul totaux/statuts, filtres) +
+`application/use-factures.ts` (SEULE couche tRPC : list + transitions/mutations + invalidation), faire
+consommer `factures-page.tsx` (plus de `trpc` direct, **0 `any`**, le warning `no-trpc-in-ui` doit
+disparaître pour ce fichier). Garder parité e2e verte. Gabarit = `use-clients` / `use-client-detail`.
+Après factures : devis, interventions, puis le reste. Quand les 12 warnings tombent à 0 → passer
+`local/no-trpc-in-ui` en **`error`**.
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
 Rétrofitter 1 feature/itération (extraction `application/use-<feature>` + `domain` typés, `ui` sans tRPC,
@@ -206,6 +208,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Clean-archi — ClientDetail ✅** (feature `clients` 100 % rétrofittée) : `application/use-client-detail.ts` (hook : `clients.getById` + `devis/factures/interventions.list` + `clientPortal.*` + `activites.*`, invalidation centralisée) + domaine pur étendu (`ofClient`, `activitesOfClient`, `sortActivitesByEcheance`, `computeClientStats` + types `ClientDetail/DevisRow/FactureRow/InterventionRow/ActiviteRow/PortalStatus/ActiviteType`). `client-detail-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC (toasts/clipboard/reset via `onSuccess` par appel). Warnings `no-trpc-in-ui` **13→12**. tsc/eslint(0 err)/vitest **29** (clients domain 16), parité `37|0` + mutation `1|0`, déployé `c3dd4e9f`. Prochaine : Vague R `factures`.
 - **Clean-archi — Clients (liste) ✅ GABARIT** : `application/use-clients.ts` (hook encapsulant tRPC : list/getEncoursMap/update/delete) + `domain/client.ts` (types `RouterOutputs` + fonctions PURES `findDuplicateGroups`/`findCreateDuplicateMatch` renvoyant des clés i18n, **7 tests**). `clients-list-page.tsx` consomme le hook, **0 `any`**, plus aucun import tRPC. Règle eslint **custom `no-trpc-in-ui` (warn)** posée → flague les 13 ui non rétrofittées (clients-list exempte). tsc/vitest(24)/eslint verts, parité `37|0` + mutation `1|0`. Prochaine : ClientDetail.
 - **Vague 3 — Signature ✅** port public `/v2/signature/:token` (canvas, options, refus, états ; i18n ; checkbox/separator au barrel ; fix « Invalid Date » legacy). e2e montage déterministe `37|0`, déployé. Prochaine : Portail.
 - **Socle public ✅ + Paiement** : 2ᵉ montage TanStack `/v2` PUBLIC (hors auth) dans le `Router` de App ; pages PaiementSucces/Annule portées (i18n). Débloque Signature/Portail. **Broadcast inclut désormais un % de progression** (demande humaine). 4 gates verts, parité e2e `33|0`, déployé. Prochaine : Signature.
