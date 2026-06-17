@@ -206,7 +206,14 @@ const congesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/conges/ui/conges-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute]);
+// Contrats de maintenance — migration clean-archi de `pages/Contrats.tsx`.
+const contratsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/contrats",
+  component: lazyRouteComponent(() => import("../../features/contrats/ui/contrats-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
