@@ -369,8 +369,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   (au lieu de `(doc as any).autoTable`) + accesseur typé `lastFinalY` → **0 `any`** (les `as any` legacy
   jspdf-autotable supprimés). i18n namespace `rapportCommande`. Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **277**.
 
+- **Migration `rapports` (rapports personnalisables) ✅** (9e des ~24 pages feature) : audit contrat — 5
+  endpoints `rapports.*` présents. **Gap backend détecté** : `executer` new-stack renvoie `{ resultats,
+  nombreLignes, tempsExecution }` (pas `{colonnes, lignes, totaux}` comme le legacy) → **colonnes dérivées
+  côté client** (`deriveColonnes`), **totaux retirés** (calcul backend legacy non porté → FINDING à combler).
+  Clean-archi : domain (`humanizeColumn`/`favoris`/`formatCell`/`deriveColonnes` + types, **5 tests**) +
+  application (list + executer via skipToken + CRUD/favori) + ui (3 onglets : mes-rapports/exécuter/modèles
+  + dialog création + export CSV). i18n namespace `rapports`. Route + V2_ROUTES + sweep. **0 `any`**.
+  tsc/eslint(0)/vitest **282**. **FINDING** : enrichir backend `executer` (colonnes explicites + totaux agrégés).
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Sans carte/charts :
-`rapports`, `nouvelle-depense`, `documentation`, `tableau-bord-sync-comptable`, `devis-ia`…
+`nouvelle-depense`, `documentation`, `tableau-bord-sync-comptable`, `devis-ia`, `import`…
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

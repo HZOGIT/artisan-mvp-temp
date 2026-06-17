@@ -104,6 +104,7 @@ const PARITE_PAGES = [
   { legacy: '/assistant/conversations', v2: '/v2/assistant/conversations', markers: ['Mes conversations'] },
   { legacy: '/vehicules', v2: '/v2/vehicules', markers: ['Gestion des Véhicules', 'Total véhicules', 'Ajouter un véhicule'] },
   { legacy: '/rapport-commande', v2: '/v2/rapport-commande', markers: ['Rapport de Commande', 'Articles à commander'] },
+  { legacy: '/rapports', v2: '/v2/rapports', markers: ['Rapports Personnalisables', 'Mes rapports', 'Nouveau rapport'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

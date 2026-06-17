@@ -44,6 +44,7 @@ import modelesTransactionnelsFr from "@/modern/features/modeles-email-transactio
 import assistantConversationsFr from "@/modern/features/assistant-conversations/i18n/fr.json";
 import vehiculesFr from "@/modern/features/vehicules/i18n/fr.json";
 import rapportCommandeFr from "@/modern/features/rapport-commande/i18n/fr.json";
+import rapportsFr from "@/modern/features/rapports/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -97,6 +98,7 @@ const resources = {
     assistantConversations: assistantConversationsFr,
     vehicules: vehiculesFr,
     rapportCommande: rapportCommandeFr,
+    rapports: rapportsFr,
   },
 } as const;
 
