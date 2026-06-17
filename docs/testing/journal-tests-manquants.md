@@ -166,9 +166,12 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `subscription/infra/subscription-event-notifier-drizzle.ts` → test (3 cas : notifyArtisan RLS+isolation, emailArtisanOwner via userId→email, artisan inexistant no-op) ✅ it.74
 - ✅ **FRONT L2 DRIZZLE ÉPUISÉ (it.74)** : scan final → chaque `*-drizzle.ts` a un test sibling OU combiné (avis flow it.58 ; factures contact-readers it.56 ; assistant threads it.68). 0 adapter sans test.
 
-**Prochaine cible : garde-fou meta-test de couverture L2** — `src/interface/trpc/` ou `src/` : un test qui scanne tous les `*-drizzle.ts` et vérifie que chacun a un test sibling OU est listé dans une allow-list de tests combinés (avis-flow, contact-readers, assistant-threads). Rend ROUGE l'ajout futur d'un adapter Drizzle sans test (anti-régression de couverture, comme `router-coverage.test.ts` pour L3).
+- [x] **garde-fou meta-test L2** → `src/shared/testing/drizzle-l2-coverage.test.ts` (3 cas : sanity scan, chaque `*-drizzle.ts` a sibling OU allow-list combinée, allow-list non périmée) ✅ it.75
+
+**Prochaine cible : DURCISSEMENT colonnes critiques (a)** — choisir UN use-case critique et couvrir ses cas limites/branches non testés. Pistes à scanner : transitions de statut devis/facture (gardes refus), calculs TVA/totaux (arrondis, taux multiples), validations d'entrée tRPC (zod 400), erreurs de paiement. Méthode : lire le use-case + son test existant, ajouter les branches manquantes (L1 fakes ou L3 router). 1 fichier/itération.
+
 **Décision humaine (2026-06-17) : CONTINUER EN AUTONOMIE.** Plus de sollicitation. La boucle :
-1. it.75 → garde-fou meta-test de couverture L2 (ci-dessus).
+1. it.75 → garde-fou meta-test de couverture L2 ✅ FAIT.
 2. Ensuite, à CHAQUE réveil, choisir soi-même la cible la plus utile, dans cet ordre de valeur :
    (a) **durcir les colonnes existantes** — cas limites/branches non couverts des use-cases critiques (validation, erreurs, transitions de statut, calculs TVA/totaux) en L1/L3 ;
    (b) **L4 navigateur** — nouveaux parcours critiques jouables sans secret externe (le parcours abonnement Stripe reste bloqué tant que les price IDs staging ne sont pas fournis → le tenter seulement si dispo) ;
@@ -255,3 +258,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-17 00:05:01Z` **[test]** interventions-mobile repo L2 (RLS) — it.72 — InterventionMobileRepositoryDrizzle 4 cas verts : createArrivee+getByIntervention round-trip + anti-IDOR (B->null), getManyByInterventions map (vide->vide, B->vide), updateArrivee coords, updateDepart+signature + anti-IDOR (B no-op). Réel restant : 2 adapters (logo-writer, event-notifier).
 - `2026-06-17 00:34:38Z` **[test]** artisan logo-writer L2 — it.73 — ArtisanLogoWriterDrizzle 2 cas verts : setLogo met à jour SEULEMENT l'artisan ciblé (B intact), setLogo(null) efface le logo. Réel restant : 1 SEUL adapter (subscription/event-notifier) -> fin du front L2 drizzle en vue.
 - `2026-06-17 01:04:59Z` **[test]** subscription event-notifier L2 — FRONT L2 DRIZZLE ÉPUISÉ — it.74 — SubscriptionEventNotifierDrizzle 3 cas verts : notifyArtisan insert scopé + isolation RLS, emailArtisanOwner via userId->users.email, artisan inexistant no-op. JALON: dernier adapter Drizzle -> FRONT L2 ÉPUISÉ (scan final: 0 sans test, sibling ou combiné). Suite = garde-fou meta-test L2 puis arbitrage humain (L4 navigateur / mutation / clore).
+- `2026-06-17 04:18:16Z` **[test]** garde-fou couverture L2 drizzle — it.75 — meta-test drizzle-l2-coverage 3 cas verts : scan de tous les *-drizzle.ts, chacun a un sibling OU une entrée allow-list combinée (avis-flow/contact-readers/assistant-threads), allow-list non périmée. Devient ROUGE si un adapter Drizzle est ajouté sans test (anti-régression couverture, comme router-coverage pour L3). Suite: durcissement colonnes critiques.
