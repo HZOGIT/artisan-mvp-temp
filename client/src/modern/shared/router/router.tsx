@@ -115,7 +115,14 @@ const commandesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/commandes/ui/commandes-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute]);
+// Stocks du front neuf — port conforme de `pages/Stocks.tsx`.
+const stocksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/stocks",
+  component: lazyRouteComponent(() => import("../../features/stocks/ui/stocks-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

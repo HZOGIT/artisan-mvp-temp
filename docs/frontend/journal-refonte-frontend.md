@@ -139,15 +139,16 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 2 — Stocks `/v2/stocks`** (port conforme de `pages/Stocks.tsx`).
-Primitives prêtes. Découper si lourd. *(OPE-422)*
+## 🎯 PROCHAINE CIBLE : **Vague 2 — Dépenses `/v2/depenses`** (port conforme de `pages/Depenses.tsx`).
+**DERNIÈRE page de la Vague 2.** Primitives prêtes. Découper si lourd. *(OPE-422)*
 
 ### Vague 2 — listes + mutations *(OPE-422)*
 - [x] **Devis → `/v2/devis`** — port conforme `pages/Devis.tsx` (`devis-page.tsx`), i18n (namespace `devis`, statuts + exports PDF/Excel), `StatutBadge` ré-exporté dans `modern/shared/ui`. Mutations delete + convertToFacture (pas de `update({statut})`). 4 gates verts, parité e2e `17|0`, déployé.
 - [x] **Factures → `/v2/factures`** — port conforme `pages/Factures.tsx` (`factures-page.tsx`), i18n (namespace `factures`), `StatutBadge` partagé, dialog création + alerte encours client + cartes stats + filtres type/statut + export CSV. Mutations create + delete. 4 gates verts, parité e2e `19|0`, déployé.
 - [x] **Interventions → `/v2/interventions`** — port conforme `pages/Interventions.tsx` (`interventions-page.tsx`), i18n (namespace `interventions`), `StatutBadge` partagé, dialogs création/édition + **gestion d'équipe** (ajout/retrait membres) + filtres + durée réelle. Mutations create/update/delete + équipe. 4 gates verts, parité e2e `21|0`, déployé.
 - [x] **Commandes → `/v2/commandes`** — port conforme `pages/CommandesFournisseurs.tsx` (`commandes-page.tsx`), i18n (namespace `commandes`), filtres statut/fournisseur + table + actions (PDF/email/suppression). Mutations delete + sendEmail. 4 gates verts, parité e2e `25|0`, déployé.
-- [ ] Stocks · Dépenses (primitives prêtes ; pages lourdes → slices). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau.
+- [x] **Stocks → `/v2/stocks`** — port conforme `pages/Stocks.tsx` (`stocks-page.tsx`, ~812 l.), i18n (namespace `stocks`), Tabs (tous/bas) + KPIs + alertes + 4 dialogs (créer/éditer/mouvement/historique). Mutations create/update/delete/adjustQuantity/generateAlerts. Double-DashboardLayout legacy supprimé. Fix tsc : `quantite` envoyé en `String`. 4 gates verts, parité e2e `27|0`, déployé.
+- [ ] Dépenses (primitives prêtes). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau.
 - **Sidebar → v2** câblée (`DashboardLayout` via `resolveV2Path`) : tous les liens de routes migrées pointent sur `/v2`.
 
 ### Cibles suivantes (file)
@@ -162,6 +163,7 @@ Primitives prêtes. Découper si lourd. *(OPE-422)*
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Vague 2 — Stocks ✅** port `/v2/stocks` (Tabs + KPIs + 4 dialogs + mouvements/historique, i18n). Supprime double-layout legacy. 4 gates verts, parité e2e `27|0`, déployé. Prochaine : Dépenses (dernière Vague 2).
 - **Vague 2 — Commandes ✅** port `/v2/commandes` (filtres statut/fournisseur, actions PDF/email/suppr, i18n namespace `commandes`). 4 gates verts, parité e2e `25|0`, déployé. Prochaine : Stocks.
 - **Sidebar → v2 e2e ✅** durci : `scripts/e2e/v2-socle-check.mjs` clique la nav MOBILE (boutons directs) — « Clients » → `/v2/clients`, « Accueil » (non migré) → reste `/dashboard`. `cas:23 | issues:0`. Dette de test sidebar levée. (Test pur, pas de déploiement.)
 - **Sidebar → v2 ✅** (demande humaine + recette) : `DashboardLayout` résout sa navigation via `resolveV2Path` → tout lien de route migrée mène à `/v2`, item actif surligné sur `/v2`. Liens profonds tapés à la main restent legacy sauf `?v2=1`.
