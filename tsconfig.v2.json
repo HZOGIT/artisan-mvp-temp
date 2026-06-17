@@ -1,0 +1,13 @@
+{
+  "//": "OPE-403 — gate typecheck du FRONT NEUF de la refonte (client/src/modern/** = code `/v2`). Pendant la migration strangler, le legacy (client/src/pages, etc.) garde sa dette tsc (tsconfig.json non gaté). Le code neuf, lui, DOIT rester vert : `pnpm exec tsc -p tsconfig.v2.json`. tsc suit les imports transitifs (AppRouter, primitives) même hors `include`.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "tsBuildInfoFile": null,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["client/src/modern/**/*"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "**/*.test.tsx"]
+}
