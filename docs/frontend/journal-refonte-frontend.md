@@ -27,7 +27,11 @@ exporté reste en `PascalCase`, seul le nom de fichier est kebab). Cohérent ave
 - **Aucune chaîne utilisateur en dur** dans le JSX du neuf → passer par `t("clef")` (hook `useTranslation`).
 - Init + provider partagés dans `client/src/modern/shared/i18n/` ; locale par défaut **`fr`** (catalogue
   `fr` = les libellés actuels, à l'identique → parité). `en` ajouté plus tard sans refonte.
-- **Catalogues par feature/namespace** (ex. `clients`), clés stables et descriptives.
+- **Un `fr.json` par module/domaine**, **co-localisé** avec la feature : `features/<feature>/i18n/fr.json`
+  (le commun = `shared/i18n/common/fr.json`). 1 fichier JSON = 1 **namespace** i18next. On les agrège
+  dans `shared/i18n/index.ts` (ajouter l'import + le namespace quand une feature est migrée). `en` plus
+  tard = déposer les `en.json` à côté. Clés stables et descriptives ; pluriel via `clef_one`/`clef_other`.
+  (tsconfig.v2 : `resolveJsonModule`.)
 - Le **gate ESLint v2** fera respecter ceci via `eslint-plugin-i18next` (`no-literal-string`).
 - Pages déjà portées avant l'i18n (ex. Clients) → **rétro-i18n** lors du setup i18n (puis le lint passe).
 
@@ -126,18 +130,16 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Setup i18n (`react-i18next`)** puis rétro-i18n de la page Clients.
-Installer `react-i18next` + `i18next`, créer `client/src/modern/shared/i18n/` (init, provider, catalogue `fr`
-= libellés actuels à l'identique), monter le provider au-dessus du sous-arbre `/v2`. Puis **rétro-i18n
-`clients-list-page.tsx`** (remplacer les chaînes en dur par `t("…")`, namespace `clients`, **parité e2e
-inchangée `6|0`**). *(demande humaine — voir section « i18n »)*
+## 🎯 PROCHAINE CIBLE : **Gate ESLint du code neuf** (bootstrap). `eslint` + parser TS +
+`eslint.v2.config.mjs` ne lintant QUE `client/src/modern/**` : `no-restricted-imports` (interdire
+`@/lib/trpc`→`@/modern/shared/trpc`, `@/components/ui/*`→`@/modern/shared/ui`,
+`openapi-fetch`/`openapi-react-query`), **règle custom kebab-case** (noms de fichiers), et
+`eslint-plugin-i18next` `no-literal-string` (Clients est déjà i18n → devrait passer). Brancher dans la
+recette (gate), puis enrichir itérativement. *(demande humaine)*
 
 ### Cibles suivantes (file)
-1. **Gate ESLint du code neuf** : `eslint` + parser TS + `eslint.v2.config.mjs` ne lintant QUE
-   `client/src/modern/**` : `no-restricted-imports` (interdire `@/lib/trpc`→`@/modern/shared/trpc`,
-   `@/components/ui/*`→`@/modern/shared/ui`, `openapi-fetch`/`openapi-react-query`), **règle custom
-   kebab-case**, et `eslint-plugin-i18next` `no-literal-string`. Brancher dans la recette, enrichir itér.
-2. Vague 1 — ClientDetail `/v2/clients/:id`, Articles, Fournisseurs, Techniciens, Notifications (i18n d'emblée).
+1. Vague 1 — ClientDetail `/v2/clients/:id`, Articles, Fournisseurs, Techniciens, Notifications (i18n + kebab d'emblée).
+2. Dette batchée : e2e mutation (modal édition Clients).
 
 > Note coordination boucle : pilotée par **CronCreate natif Claude** (job `834543d1`, toutes les 2 min, session-only → vit tant que le screen `ope-403-refonte-frontend` tourne). Le daemon bash `devtools/refonte-loop/*` est **désactivé** (ne pas le relancer).
 
@@ -146,6 +148,7 @@ inchangée `6|0`**). *(demande humaine — voir section « i18n »)*
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **i18n ✅** `react-i18next` + `i18next` installés ; `shared/i18n` (init idempotent, importé par modern-router-mount) ; **un `fr.json` par module** (`features/clients/i18n/fr.json` + `shared/i18n/common/fr.json`) agrégés en namespaces ; `clients-list-page.tsx` **entièrement rétro-i18n** (libellés, toasts, modal, CSV, pluriels). Valeurs `fr` identiques → **parité e2e `6|0`** inchangée. tsconfig.v2 += `resolveJsonModule`. Déployé. Prochaine : gate ESLint v2.
 - **Vague 1 — Clients ✅** port conforme complet `pages/Clients.tsx` → `/v2/clients` (clients-list-page.tsx, kebab-case, primitives+tRPC partagés). Parité e2e `6|0`, déployé. PoC supprimé. Convention **kebab-case** + **gate ESLint v2** ajoutés à la recette (demandes humaines). Prochaine : bootstrap du gate ESLint v2.
 - **S4 ✅** primitives `modern/shared/ui` (ré-export copie conforme legacy : button/input/card/label/dropdown-menu + barrel) + test de surface. tsc v2 ✅, vitest v2 17 ✅. Pas de déploiement (bundle inchangé). **Vague 0 TERMINÉE.** Prochaine : Vague 1 Clients slice 1a (parité lecture).
 - **S3 ✅** client tRPC partagé `modern/shared/trpc` (réexpose l'instance legacy + types `RouterInputs/Outputs`). Feature `clients` migrée **REST→tRPC** (`clients.list`), REST/openapi supprimé du neuf → **dette OPE-366 résorbée**. `tsconfig.v2.json` types += `@fastify/cookie`. 16 tests vitest v2, e2e `4 | 0`, déployé. Incident « plus de devis/factures » = fausse alerte (mauvais compte) ; vérif navigateur OK même flag v2 ON. Prochaine : S4.

@@ -8,6 +8,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "target": "ESNext",
+    "resolveJsonModule": true,
     "types": ["node", "vite/client", "@fastify/cookie"]
   },
   "include": ["client/src/modern/**/*"],

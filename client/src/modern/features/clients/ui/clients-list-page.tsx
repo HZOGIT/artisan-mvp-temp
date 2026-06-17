@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
+import { useTranslation } from "react-i18next";
 import { trpc } from "@/modern/shared/trpc";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
@@ -13,10 +14,9 @@ import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
 
 // Page Clients du FRONT NEUF (`/v2/clients`) — PORT CONFORME de `pages/Clients.tsx` (parité visuelle
 // stricte). Le JSX/Tailwind est copié à l'identique ; seule la plomberie change : primitives via
-// `@/modern/shared/ui` (copie conforme) et tRPC via le client partagé `@/modern/shared/trpc`. Les
-// données étaient DÉJÀ servies par tRPC côté legacy (list/update/delete/getEncoursMap), donc la
-// migration n'altère ni le rendu ni le contrat. Les utilitaires partagés (`@/lib/normalize`,
-// `@/lib/csvExport`) restent communs jusqu'à la suppression finale du legacy.
+// `@/modern/shared/ui`, tRPC via `@/modern/shared/trpc`, et **libellés via i18n** (`react-i18next`,
+// namespace `clients`, catalogue `fr` = textes actuels à l'identique). Données déjà servies par tRPC
+// côté legacy (list/update/delete/getEncoursMap), donc la migration n'altère ni le rendu ni le contrat.
 
 interface ClientFormData {
   nom: string;
@@ -57,6 +57,7 @@ const initialFormData: ClientFormData = {
 };
 
 export default function ClientsListPage() {
+  const { t } = useTranslation("clients");
   const [, navigate] = useLocation();
   const search = useSearch();
   const utils = trpc.useUtils();
@@ -105,10 +106,10 @@ export default function ClientsListPage() {
       seen.add(key);
       groups.push({ reason, clients: list });
     };
-    for (const [email, list] of byEmail) addGroup(`même email (${email})`, list);
-    for (const [, list] of byName) addGroup("même nom", list);
+    for (const [email, list] of byEmail) addGroup(t("dupesSameEmail", { email }), list);
+    for (const [, list] of byName) addGroup(t("dupesSameName"), list);
     return groups;
-  }, [clients]);
+  }, [clients, t]);
 
   // Avertissement NON BLOQUANT à la création : si l'email, le téléphone ou le nom+prénom saisi
   // correspond à un client existant, on le signale (sans empêcher l'enregistrement).
@@ -120,38 +121,38 @@ export default function ClientsListPage() {
     const phone = digits(formData.telephone);
     const name = `${norm(formData.prenom)} ${norm(formData.nom)}`.trim();
     for (const c of clients as any[]) {
-      if (email && norm(c.email) === email) return { client: c, reason: "le même email" };
-      if (phone && phone.length >= 6 && digits(c.telephone) === phone) return { client: c, reason: "le même téléphone" };
+      if (email && norm(c.email) === email) return { client: c, reason: t("dupeReasonEmail") };
+      if (phone && phone.length >= 6 && digits(c.telephone) === phone) return { client: c, reason: t("dupeReasonPhone") };
     }
     if (name) {
       for (const c of clients as any[]) {
-        if (`${norm(c.prenom)} ${norm(c.nom)}`.trim() === name) return { client: c, reason: "le même nom" };
+        if (`${norm(c.prenom)} ${norm(c.nom)}`.trim() === name) return { client: c, reason: t("dupeReasonName") };
       }
     }
     return null;
-  }, [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients]);
+  }, [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients, t]);
 
   // Mutations
   const updateMutation = trpc.clients.update.useMutation({
     onSuccess: () => {
-      toast.success("Client mis à jour");
+      toast.success(t("toastUpdated"));
       setFormData(initialFormData);
       setEditingClientId(null);
       setIsEditModalOpen(false);
       utils.clients.list.invalidate();
     },
     onError: (error) => {
-      toast.error(error.message || "Erreur lors de la mise à jour");
+      toast.error(error.message || t("toastUpdateError"));
     },
   });
 
   const deleteMutation = trpc.clients.delete.useMutation({
     onSuccess: () => {
-      toast.success("Client supprimé");
+      toast.success(t("toastDeleted"));
       utils.clients.list.invalidate();
     },
     onError: (error) => {
-      toast.error(error.message || "Erreur lors de la suppression");
+      toast.error(error.message || t("toastDeleteError"));
     },
   });
 
@@ -204,7 +205,7 @@ export default function ClientsListPage() {
   const handleSubmitEdit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nom.trim()) {
-      toast.error("Le nom est requis");
+      toast.error(t("toastNameRequired"));
       return;
     }
     if (editingClientId) {
@@ -213,14 +214,14 @@ export default function ClientsListPage() {
         ...formData,
       });
     }
-  }, [formData, editingClientId, updateMutation]);
+  }, [formData, editingClientId, updateMutation, t]);
 
   // Handler pour supprimer un client
   const handleDelete = useCallback((clientId: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
+    if (confirm(t("confirmDelete"))) {
       deleteMutation.mutate({ id: clientId });
     }
-  }, [deleteMutation]);
+  }, [deleteMutation, t]);
 
   // Handler pour la recherche
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -243,15 +244,18 @@ export default function ClientsListPage() {
   const handleExportCSV = () => {
     const data = filteredClients;
     if (!data || data.length === 0) {
-      toast.error("Aucun client à exporter");
+      toast.error(t("toastNothingToExport"));
       return;
     }
-    const headers = ["Nom", "Prénom", "Type", "Raison sociale", "Email", "Téléphone", "Adresse", "Code postal", "Ville", "SIRET", "N° TVA", "Étiquettes", "Notes"];
+    const headers = [
+      t("csvNom"), t("csvPrenom"), t("csvType"), t("csvRaisonSociale"), t("csvEmail"), t("csvTelephone"),
+      t("csvAdresse"), t("csvCodePostal"), t("csvVille"), t("csvSiret"), t("csvNumeroTVA"), t("csvEtiquettes"), t("csvNotes"),
+    ];
     const rows = data.map((c: any) => [
       c.nom, c.prenom, c.type, c.raisonSociale, c.email, c.telephone, c.adresse, c.codePostal, c.ville, c.siret, c.numeroTVA, c.etiquettes, c.notes,
     ]);
     exportToCsv(`clients_${csvDateSuffix()}.csv`, headers, rows);
-    toast.success(`${data.length} client(s) exporté(s)`);
+    toast.success(t("toastExported", { count: data.length }));
   };
 
   return (
@@ -259,17 +263,17 @@ export default function ClientsListPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Clients</h1>
-          <p className="text-muted-foreground mt-1">Gérez votre base de clients</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-2" />
-            Exporter (CSV)
+            {t("exportCsv")}
           </Button>
           <Button onClick={() => navigate('/clients/nouveau')}>
             <Plus className="h-4 w-4 mr-2" />
-            Nouveau client
+            {t("newClient")}
           </Button>
         </div>
       </div>
@@ -279,7 +283,7 @@ export default function ClientsListPage() {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
         <Input
           type="text"
-          placeholder="Rechercher un client..."
+          placeholder={t("searchPlaceholder")}
           value={searchQuery}
           onChange={handleSearchChange}
           className="pl-10"
@@ -295,7 +299,7 @@ export default function ClientsListPage() {
                 <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
                 <div className="text-sm">
                   <p className="font-semibold text-amber-800">
-                    {duplicateGroups.length} doublon{duplicateGroups.length > 1 ? "s" : ""} potentiel{duplicateGroups.length > 1 ? "s" : ""} détecté{duplicateGroups.length > 1 ? "s" : ""}
+                    {t("dupes", { count: duplicateGroups.length })}
                   </p>
                   <ul className="mt-1 space-y-1 text-amber-700">
                     {duplicateGroups.slice(0, 5).map((g, i) => (
@@ -307,14 +311,14 @@ export default function ClientsListPage() {
                       </li>
                     ))}
                     {duplicateGroups.length > 5 && (
-                      <li className="text-amber-600">+ {duplicateGroups.length - 5} autre(s)…</li>
+                      <li className="text-amber-600">{t("dupesMore", { count: duplicateGroups.length - 5 })}</li>
                     )}
                   </ul>
-                  <p className="mt-1 text-xs text-amber-600">Vérifiez et nettoyez ces fiches en double pour garder un historique propre.</p>
+                  <p className="mt-1 text-xs text-amber-600">{t("dupesHint")}</p>
                 </div>
               </div>
               <Button variant="ghost" size="sm" className="text-amber-700 hover:text-amber-900" onClick={() => setDupesDismissed(true)}>
-                Masquer
+                {t("hide")}
               </Button>
             </div>
           </CardContent>
@@ -323,10 +327,10 @@ export default function ClientsListPage() {
 
       {/* Liste des clients */}
       {isLoading ? (
-        <div className="text-center py-8">Chargement...</div>
+        <div className="text-center py-8">{t("loading")}</div>
       ) : filteredClients.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          {searchQuery ? "Aucun client trouvé" : "Aucun client créé"}
+          {searchQuery ? t("emptyFiltered") : t("emptyNone")}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -341,9 +345,9 @@ export default function ClientsListPage() {
                       {(encoursMap as any)[client.id] && parseFloat((encoursMap as any)[client.id].encoursTotal) > 0 && (
                         <span
                           className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
-                          title={`${(encoursMap as any)[client.id].echu} € échus sur ${(encoursMap as any)[client.id].nbFacturesImpayees} facture(s)`}
+                          title={t("unpaidTitle", { echu: (encoursMap as any)[client.id].echu, count: (encoursMap as any)[client.id].nbFacturesImpayees })}
                         >
-                          ⚠️ {(encoursMap as any)[client.id].encoursTotal} € impayés
+                          {t("unpaidBadge", { amount: (encoursMap as any)[client.id].encoursTotal })}
                         </span>
                       )}
                     </div>
@@ -370,7 +374,7 @@ export default function ClientsListPage() {
                     {/* Étiquettes de segmentation */}
                     {(client as any).etiquettes && (
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {String((client as any).etiquettes).split(",").map((t: string) => t.trim()).filter(Boolean).map((tag: string, i: number) => (
+                        {String((client as any).etiquettes).split(",").map((t2: string) => t2.trim()).filter(Boolean).map((tag: string, i: number) => (
                           <span key={i} className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-2 py-0.5 text-xs font-medium">
                             {tag}
                           </span>
@@ -387,11 +391,11 @@ export default function ClientsListPage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => handleOpenEditModal(client)}>
                         <Pencil className="w-4 h-4 mr-2" />
-                        Éditer
+                        {t("edit")}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleDelete(client.id)} className="text-red-600">
                         <Trash2 className="w-4 h-4 mr-2" />
-                        Supprimer
+                        {t("delete")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -408,7 +412,7 @@ export default function ClientsListPage() {
           <div className="fixed inset-0 z-40 bg-black/50" onClick={handleCloseEditModal} />
           <div className="bg-background rounded-lg border shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto z-50">
             <div className="flex items-center justify-between p-6 border-b">
-              <h2 className="text-lg font-semibold">Éditer le client</h2>
+              <h2 className="text-lg font-semibold">{t("editTitle")}</h2>
               <button onClick={handleCloseEditModal} className="text-muted-foreground hover:text-foreground">
                 ✕
               </button>
@@ -419,7 +423,7 @@ export default function ClientsListPage() {
                 {/* Type de client */}
                 <div>
                   <Label htmlFor="edit-type" className="block text-sm font-medium mb-1">
-                    Type de client
+                    {t("typeLabel")}
                   </Label>
                   <select
                     id="edit-type"
@@ -428,15 +432,15 @@ export default function ClientsListPage() {
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="particulier">Particulier</option>
-                    <option value="professionnel">Professionnel (entreprise, syndic…)</option>
+                    <option value="particulier">{t("typeParticulier")}</option>
+                    <option value="professionnel">{t("typeProfessionnel")}</option>
                   </select>
                 </div>
 
                 {/* Nom */}
                 <div>
                   <Label htmlFor="edit-nom" className="block text-sm font-medium mb-1">
-                    Nom *
+                    {t("nomLabel")}
                   </Label>
                   <input
                     id="edit-nom"
@@ -452,7 +456,7 @@ export default function ClientsListPage() {
                 {/* Prénom */}
                 <div>
                   <Label htmlFor="edit-prenom" className="block text-sm font-medium mb-1">
-                    Prénom
+                    {t("prenomLabel")}
                   </Label>
                   <input
                     id="edit-prenom"
@@ -467,7 +471,7 @@ export default function ClientsListPage() {
                 {/* Email */}
                 <div>
                   <Label htmlFor="edit-email" className="block text-sm font-medium mb-1">
-                    Email
+                    {t("emailLabel")}
                   </Label>
                   <input
                     id="edit-email"
@@ -482,7 +486,7 @@ export default function ClientsListPage() {
                 {/* Téléphone */}
                 <div>
                   <Label htmlFor="edit-telephone" className="block text-sm font-medium mb-1">
-                    Téléphone
+                    {t("telephoneLabel")}
                   </Label>
                   <input
                     id="edit-telephone"
@@ -497,18 +501,18 @@ export default function ClientsListPage() {
                 {/* Avertissement doublon (non bloquant) à la création */}
                 {createDuplicateMatch && (
                   <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800">
-                    ⚠️ Un client avec {createDuplicateMatch.reason} existe déjà :{" "}
+                    {t("dupeWarnPrefix", { reason: createDuplicateMatch.reason })}{" "}
                     <strong>
                       {createDuplicateMatch.client.prenom} {createDuplicateMatch.client.nom}
                     </strong>
-                    . Vérifiez qu'il ne s'agit pas d'un doublon (vous pouvez tout de même enregistrer).
+                    {t("dupeWarnSuffix")}
                   </div>
                 )}
 
                 {/* Adresse */}
                 <div>
                   <Label htmlFor="edit-adresse" className="block text-sm font-medium mb-1">
-                    Adresse
+                    {t("adresseLabel")}
                   </Label>
                   <input
                     id="edit-adresse"
@@ -524,7 +528,7 @@ export default function ClientsListPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="edit-codePostal" className="block text-sm font-medium mb-1">
-                      Code Postal
+                      {t("codePostalLabel")}
                     </Label>
                     <input
                       id="edit-codePostal"
@@ -538,7 +542,7 @@ export default function ClientsListPage() {
                   </div>
                   <div>
                     <Label htmlFor="edit-ville" className="block text-sm font-medium mb-1">
-                      Ville
+                      {t("villeLabel")}
                     </Label>
                     <input
                       id="edit-ville"
@@ -554,11 +558,11 @@ export default function ClientsListPage() {
                 {/* Adresse de facturation distincte */}
                 <div className="space-y-3 rounded-md border border-gray-200 p-3">
                   <p className="text-sm font-medium text-gray-700">
-                    Adresse de facturation <span className="font-normal text-muted-foreground">(si différente — vide = adresse principale)</span>
+                    {t("billingSectionTitle")} <span className="font-normal text-muted-foreground">{t("billingSectionHint")}</span>
                   </p>
                   <div>
                     <Label htmlFor="edit-adresseFacturation" className="block text-sm font-medium mb-1">
-                      Adresse de facturation
+                      {t("adresseFacturationLabel")}
                     </Label>
                     <input
                       id="edit-adresseFacturation"
@@ -572,7 +576,7 @@ export default function ClientsListPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <Label htmlFor="edit-codePostalFacturation" className="block text-sm font-medium mb-1">
-                        CP (facturation)
+                        {t("cpFacturationLabel")}
                       </Label>
                       <input
                         id="edit-codePostalFacturation"
@@ -586,7 +590,7 @@ export default function ClientsListPage() {
                     </div>
                     <div>
                       <Label htmlFor="edit-villeFacturation" className="block text-sm font-medium mb-1">
-                        Ville (facturation)
+                        {t("villeFacturationLabel")}
                       </Label>
                       <input
                         id="edit-villeFacturation"
@@ -603,10 +607,10 @@ export default function ClientsListPage() {
                 {/* Champs professionnels */}
                 {formData.type === "professionnel" && (
                   <div className="space-y-3 rounded-md border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-sm font-medium text-gray-700">Informations professionnelles</p>
+                    <p className="text-sm font-medium text-gray-700">{t("proSectionTitle")}</p>
                     <div>
                       <Label htmlFor="edit-raisonSociale" className="block text-sm font-medium mb-1">
-                        Raison sociale
+                        {t("raisonSocialeLabel")}
                       </Label>
                       <input
                         id="edit-raisonSociale"
@@ -620,7 +624,7 @@ export default function ClientsListPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <Label htmlFor="edit-siret" className="block text-sm font-medium mb-1">
-                          SIRET
+                          {t("siretLabel")}
                         </Label>
                         <input
                           id="edit-siret"
@@ -634,7 +638,7 @@ export default function ClientsListPage() {
                       </div>
                       <div>
                         <Label htmlFor="edit-numeroTVA" className="block text-sm font-medium mb-1">
-                          N° TVA intracom.
+                          {t("numeroTVALabel")}
                         </Label>
                         <input
                           id="edit-numeroTVA"
@@ -653,7 +657,7 @@ export default function ClientsListPage() {
                 {/* Étiquettes */}
                 <div>
                   <Label htmlFor="edit-etiquettes" className="block text-sm font-medium mb-1">
-                    Étiquettes
+                    {t("etiquettesLabel")}
                   </Label>
                   <input
                     id="edit-etiquettes"
@@ -661,7 +665,7 @@ export default function ClientsListPage() {
                     type="text"
                     value={formData.etiquettes}
                     onChange={handleInputChange}
-                    placeholder="Ex : VIP, chantier neuf, syndic (séparées par des virgules)"
+                    placeholder={t("etiquettesPlaceholder")}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -669,7 +673,7 @@ export default function ClientsListPage() {
                 {/* Notes */}
                 <div>
                   <Label htmlFor="edit-notes" className="block text-sm font-medium mb-1">
-                    Notes
+                    {t("notesLabel")}
                   </Label>
                   <textarea
                     id="edit-notes"
@@ -688,14 +692,14 @@ export default function ClientsListPage() {
                     onClick={handleCloseEditModal}
                     className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
                   >
-                    Annuler
+                    {t("cancel", { ns: "common" })}
                   </button>
                   <button
                     type="submit"
                     disabled={updateMutation.isPending}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
                   >
-                    {updateMutation.isPending ? "Mise à jour..." : "Mettre à jour"}
+                    {updateMutation.isPending ? t("submitting") : t("submit")}
                   </button>
                 </div>
               </form>
