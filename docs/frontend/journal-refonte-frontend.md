@@ -78,9 +78,10 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
      (n'empiète pas sur l'ESLint global OPE-413).
    - **Parité visuelle** : via `scripts/pw-run.sh`, screenshot `/v2/<route>` ET `/<route>` legacy →
      comparer : **doivent être identiques** (mêmes éléments, même mise en page, 0 erreur console).
-   - **e2e mutation** (si la page mute des données) : cas ajouté dans `scripts/staging-e2e-mutations.mjs`
-     (**rouge avant / vert après**) + sweep route `issues:0`. *(Tests lourds : peuvent être batchés sur
-     un groupe d'itérations — voir « Dette de tests » plus bas.)*
+   - **e2e mutation** (si la page mute des données) : cas ajouté dans **`scripts/e2e/v2-mutations.mjs`**
+     (actions UI réelles → tRPC + assertion de persistance via API, **non destructif** : modifie puis
+     REVERT). **rouge avant / vert après**. *(Tests lourds : peuvent être batchés sur un groupe
+     d'itérations — voir « Dette de tests » plus bas.)*
 4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante, noter tout split/blocage.
 5. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (journal+ntfy+bus).
 6. **Commit UNIQUE chirurgical** (`git add <mes chemins>`) → `git push origin staging` → **re-vérifier
@@ -133,15 +134,14 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **e2e mutations Vague 1** (itération dédiée, dette batchée). Ajouter à
-`scripts/e2e/v2-socle-check.mjs` (ou un nouveau `scripts/e2e/v2-mutations.mjs`) des cas de **mutation
-réels non destructifs** sur les pages migrées (ex. Clients : éditer Notes → save → persistance → revert ;
-Articles : créer puis supprimer un article de test ; Techniciens : idem). **Rouge avant / vert après**,
-refetch serveur. Clôt la dette batchée avant la Vague 2. *(OPE-421/422)*
+## 🎯 PROCHAINE CIBLE : **Vague 2 — Devis `/v2/devis`** (port conforme de `pages/Devis.tsx`). Liste +
+mutations (création/transitions de statut). **Attention contrat** : transitions de statut = mutations
+DÉDIÉES (pas `update({statut})` — cf. P1 2026-06-16) ; ajouter le cas dans `scripts/e2e/v2-mutations.mjs`.
+Découper si lourd ; pattern « gate de chargement externe » si early-returns. *(OPE-422)*
 
-### Vague 2 (après) — listes + mutations *(OPE-422)*
-Devis · Factures · Interventions · Commandes · Stocks · Dépenses (primitives prêtes ; certaines pages
-lourdes → slices ; appliquer le pattern « gate de chargement externe » si early-returns).
+### Vague 2 — listes + mutations *(OPE-422)*
+Devis · Factures · Interventions · Commandes · Stocks · Dépenses (primitives prêtes ; pages lourdes →
+slices). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau (Articles create/delete, Techniciens, etc.).
 
 ### Cibles suivantes (file)
 1. Vague 1 — Articles, Fournisseurs, Techniciens (i18n + kebab d'emblée ; chacune ~600-700 l. → prévoir slices + primitives dialog/table/textarea).
@@ -155,6 +155,7 @@ lourdes → slices ; appliquer le pattern « gate de chargement externe » si ea
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **e2e mutations v2 ✅** `scripts/e2e/v2-mutations.mjs` : cas Clients update (édite Notes via modale → persistance API → REVERT, non destructif), `cas:1 | issues:0`. Sélecteur scopé `.grid.gap-4` (évite les menus sidebar) + rôles Radix (`menuitem`/`button`). Clôt la dette batchée. Test pur (pas de déploiement). Prochaine : Vague 2 (Devis).
 - **Vague 1 — Articles ✅** port `/v2/articles` (3 dialogs + import CSV, ~90 clés i18n). 4 gates verts, parité e2e `15|0`, déployé. **🎉 VAGUE 1 TERMINÉE (6/6).** Prochaine : e2e mutations (dette batchée), puis Vague 2.
 - **Vague 1 — Fournisseurs ✅** port `/v2/fournisseurs` (4 dialogs, dialog/table/textarea, i18n namespace `fournisseurs`). Supprime le double-DashboardLayout du legacy (finding). 4 gates verts, parité e2e `13|0`, déployé. Prochaine : Articles (dernière Vague 1).
 - **Vague 1 — Techniciens ✅** port `/v2/techniciens` (dialog/select/table, i18n namespace `techniciens`, registre bascule). 4 gates verts, parité e2e `11|0`, déployé. Prochaine : Fournisseurs.
