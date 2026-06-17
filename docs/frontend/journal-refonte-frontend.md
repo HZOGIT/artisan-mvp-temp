@@ -306,7 +306,16 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   markup à l'identique). i18n namespace `chat`. Primitive `avatar` ajoutée au barrel. Route `/v2/chat`
   (router.tsx) + `V2_ROUTES["/chat"]` + entrée sweep. **0 `any`**. tsc/eslint(0)/vitest **241**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~19 restantes). Ordre suggéré : `assistant`
+- **Migration `badges` (gamification techniciens) ✅** (2e des ~20 pages feature) : audit contrat OK
+  (`badges.{list,create,getClassement,calculerClassement}` + `techniciens.getAll` déjà câblés dans
+  `src/interface/trpc/router.ts`, 0 gap). Clean-archi : `domain/badges.ts` (types dérivés + `categorieClass`/
+  `rankMedal`/`progressPct`/`maxPoints`/`technicienLabel`, **6 tests**) + `application/use-badges.ts` (list +
+  classement[periode] + techniciens + create + calculerClassement) + `ui/badges-page.tsx` (3 onglets
+  Badges/Classement/Objectifs + dialog création, markup à l'identique, **3 `any` legacy supprimés** via
+  types dérivés/helpers). i18n namespace `badges`. Route `/v2/badges` + `V2_ROUTES["/badges"]` + sweep.
+  **0 `any`**. tsc/eslint(0)/vitest **247**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~18 restantes). Ordre suggéré : `assistant`
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

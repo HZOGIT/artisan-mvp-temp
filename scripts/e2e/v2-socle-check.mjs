@@ -97,6 +97,7 @@ const PARITE_PAGES = [
   { legacy: '/support', v2: '/v2/support', markers: ["Centre d'aide Operioz", 'Questions fréquentes', 'Nous contacter'] },
   { legacy: '/avis', v2: '/v2/avis', markers: ['Avis clients', 'Note moyenne', 'Distribution'] },
   { legacy: '/chat', v2: '/v2/chat', markers: ['Conversations', 'Nouveau'] },
+  { legacy: '/badges', v2: '/v2/badges', markers: ['Badges & Gamification', 'Classement', 'Objectifs'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },
