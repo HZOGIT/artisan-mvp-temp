@@ -285,7 +285,25 @@ La boucle vise l'état final **strangler-fig terminé** : v2 par défaut + **leg
 
 - **Suppression legacy — 1ère coupe : pages publiques par token ✅** (phase 3b) : supprimé `client/src/pages/SignatureDevis.tsx` + `client/src/pages/PortailClient.tsx` (entièrement migrées : signature + portail 6/6 ; sweep-validées). Redirections publiques rendues **inconditionnelles** dans `App.tsx` (plus de fallback `?v2=0` pour ces 3 routes) + imports lazy + import `isV2Enabled` retirés. **Méthode de sécurité (build partagé)** : ces pages n'étaient importées QUE par `App.tsx` (grep) ; après coupe, `tsc -p tsconfig.json` **211** (← 213, **−2**, aucune nouvelle erreur) + 0 import résiduel. tsc.v2 0 / vitest **235**.
 
-## 🎯 PROCHAINE CIBLE : **suppression legacy — coupes suivantes** (« ne reste que le code propre »). Méthode éprouvée : (1) cibler une page migrée importée UNIQUEMENT par App.tsx/AuthenticatedRoutes ; (2) la bascule couvre déjà la route → retirer route legacy + import + `git rm` le fichier ; (3) garde-fou : `tsc -p tsconfig.json` ne DOIT pas augmenter (baseline 211) + 0 import résiduel ; (4) sweep vert. Cibles : pages auth migrées (clients/devis/factures/…). En bout : wouter + `@/lib/trpc`. Conserver les composants partagés consommés par v2.
+## ⚠️ CORRECTION D'ÉTAT (2026-06-17) — « toutes les pages migrées » était FAUX
+Audit réel (App.tsx vs V2_ROUTES vs features modernes) : **89 fichiers `pages/` legacy restent** (2 supprimés :
+PortailClient, SignatureDevis). **30 domaines cœur migrés** (V2_ROUTES). MAIS **~20 pages FEATURE n'ont
+AUCUN équivalent moderne** (vrai legacy non migré) : `assistant`, `assistant/conversations`, `chat`,
+`geolocalisation`, `planification`, `rapports`, `previsions`, `vehicules`, `badges`, `alertes-previsions`,
+`chantiers`, `calendrier-chantiers`, `devis-ia`, `analyses-photos`, `classement`, `ma-vitrine`,
+`rdv-en-ligne`, `modeles-email(-transactionnels)`, `performances-fournisseurs`, `tableau-bord-depenses`,
+`tableau-bord-sync-comptable`, `integrations-comptables`, `documentation`, `import`, `import-releve`,
+`rapport-commande`, `devis-ia`. + pages **auth/légal** (sign-in/up, forgot/reset, mentions/cgu/cgv/confid/
+contact/aide/guide). + sous-routes détail/création (certaines migrées dans le routeur v2, à vérifier).
+La **sidebar est le `DashboardLayout` legacy** → ses liens pointent legacy ; pour les 30 migrés la bascule
+redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
+
+## 🎯 PROCHAINE CIBLE : **reprendre la MIGRATION des ~20 pages feature non migrées** (priorité avant toute
+suppression). Reprendre le process standard (audit contrat → clean-archi domain/application/ui → i18n →
+gates → sweep par route). Ordre suggéré par usage : `assistant`/`chat` (cœur quotidien), puis
+`chantiers`/`planification`/`rapports`/`previsions`, puis le reste. **Ensuite seulement** : suppression
+legacy (méthode éprouvée : page importée uniquement par App.tsx → retirer route+import → `git rm` →
+garde-fou `tsc -p tsconfig.json` ≤ baseline 211 + 0 import résiduel → sweep vert), puis wouter + `@/lib/trpc`.
 
 ### Plan Portail (slices) — audit contrat GREEN (14 endpoints clientPortal OK) :
 Page la + grosse/risquée (1211 l., PUBLIC par token, **paiement Stripe**). **Audit contrat ✅** : les **14 endpoints `clientPortal.*` existent tous** en new-stack (verifyAccess, getClientInfo, getDevis, getFactures, getInterventions, getSuiviChantiers, getCreneauxDisponibles, getMesRdv, getConversations, getConversationMessages, demanderRdv, demanderModification, sendClientMessage, soumettreDemandeIA). **Montage** : route PUBLIQUE additive dans `public-router.tsx` (`/portail/$token`, comme signature) + `App.tsx` `<Route path="/v2/portail/:token" component={PublicModernRouterMount} />`. **Non lié au trafic réel** (les liens emailés pointent vers le legacy `/portail/:token` jusqu'au cutover backend des liens) → **constructible en slices sans risque**. **Paiement = REST** `fetch('/api/paiement/create-checkout-session', {factureId, token})` → redirect Stripe (⚠️ cf. CLAUDE.md : `x-forwarded-host`/`success_url`, retour `?paiement=succes|annule`). **5 `any` legacy** à supprimer.
