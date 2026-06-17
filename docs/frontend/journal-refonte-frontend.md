@@ -16,6 +16,23 @@ clairement sens). Une migration de page = **on préserve le markup/JSX et les cl
 l'identique**, on ne change QUE la plomberie en dessous (routing, structure clean-archi, accès données).
 Toute itération doit prouver la **parité visuelle** (screenshots `/v2/<route>` vs `/<route>` legacy).
 
+## Clean-archi par feature (IMPOSÉE — audit 2026-06-17)
+**Décision humaine : « clean-archi + rétrofit total ».** Les ports « fidèles » actuels mélangent
+fetch tRPC + logique + présentation dans un seul composant `ui/` (comme le legacy) → NON conforme à la
+stack cible. Désormais, **chaque feature** doit avoir :
+- `domain/<entity>.ts` : **types dérivés de `RouterOutputs`** (`type Devis = RouterOutputs["devis"]["list"][number]`)
+  + règles pures testables. **Bannir `any`** (utiliser les types inférés tRPC).
+- `application/use-<feature>.ts` : hook(s) qui **encapsulent tRPC** (queries+mutations), exposent des
+  données typées + des actions. **C'est la SEULE couche qui importe `@/modern/shared/trpc`.**
+- `ui/*-page.tsx` : **présentation pure** — consomme le hook `use-<feature>`, **n'importe JAMAIS tRPC**.
+
+**Enforcement eslint v2** (à activer au fil du rétrofit) : interdire `@/modern/shared/trpc` dans
+`features/**/ui/**` (autorisé seulement dans `application/**`). Tant que des pages legacy-style restent,
+la règle est posée en `warn` puis passée en `error` quand tout est rétrofitté.
+
+**Rétrofit total** : les 15 pages déjà migrées sont à refactorer (extraction hook + typage strict),
+**1 feature/itération**, en gardant la parité e2e verte. Cf. backlog « Vague R ».
+
 ## Convention de nommage des fichiers (imposée)
 **Tous les nouveaux fichiers du front neuf sont en `kebab-case`** (ex. `clients-list-page.tsx`,
 `modern-router-mount.tsx`, `ping-page.tsx`), y compris les fichiers de composants React (le composant
@@ -146,7 +163,19 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 3 — Portail client `/v2/portail/:token`** (PUBLIC, par token, paiement Stripe).
+## 🎯 PROCHAINE CIBLE : **Clean-archi — pattern de référence (Clients)**. Établir la couche
+`application/use-clients.ts` (hook encapsulant `clients.list/getById/update/delete/getEncoursMap` typés
+via `RouterOutputs`) + `domain/client.ts` (types stricts), faire consommer `clients-list-page.tsx` et
+`client-detail-page.tsx` par le hook (plus de `trpc` direct dans `ui/`), retirer les `any`. Garder parité
+e2e verte. Puis poser la règle eslint `no-restricted-imports` de `@/modern/shared/trpc` dans `ui/**` en
+**warn**. Sert de gabarit pour le rétrofit des autres features. *(décision « clean-archi + rétrofit total »)*
+
+### Vague R — rétrofit clean-archi (après le pattern de référence)
+Rétrofitter 1 feature/itération (extraction `application/use-<feature>` + `domain` typés, `ui` sans tRPC,
+0 `any`) : notifications · techniciens · fournisseurs · articles · devis · factures · interventions ·
+commandes · stocks · depenses · comptabilite · signature · paiement. Puis **eslint trpc-interdit-dans-ui = error**.
+
+## (reporté) Vague 3 — Portail client `/v2/portail/:token` (PUBLIC, par token, paiement Stripe).
 `PortailClient` ~1211 l. (la plus grosse) → **découper en slices**. Socle public prêt. Primitives `progress`
 à ajouter au barrel. *(OPE-423)*
 *(Dashboard reporté : ~16 widgets legacy `@/components/dashboard/**` → stratégie widgets à définir.)*
