@@ -1,0 +1,22 @@
+{
+  "titre": "Géolocalisation",
+  "sousTitre": "Suivez vos techniciens en temps réel sur la carte",
+  "actualiser": "Actualiser",
+  "techniciens": "Techniciens",
+  "chargement": "Chargement...",
+  "aucunePosition": "Aucune position reçue",
+  "aucunePositionAstuce": "Les techniciens doivent activer le mode mobile",
+  "aucunTechnicien": "Aucun technicien configuré",
+  "enDeplacement": "En déplacement",
+  "stationnaire": "Stationnaire",
+  "statistiques": "Statistiques",
+  "actifs": "Actifs",
+  "legende": "Légende",
+  "positionTechnicien": "Position du technicien",
+  "carteTempsReel": "Carte en temps réel",
+  "nbTechniciens": "{{n}} technicien(s)",
+  "popupMaj": "Dernière mise à jour",
+  "popupBatterie": "Batterie",
+  "popupVitesse": "Vitesse",
+  "kmh": "{{n}} km/h"
+}

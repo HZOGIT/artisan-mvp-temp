@@ -114,6 +114,7 @@ const PARITE_PAGES = [
   { legacy: '/tableau-bord-depenses', v2: '/v2/tableau-bord-depenses', markers: ['Tableau de bord dépenses', 'Total du mois', 'Budget consommé'] },
   { legacy: '/import-releve', v2: '/v2/import-releve', markers: ['Import relevé bancaire', 'Choisir le fichier CSV'] },
   { legacy: '/tableau-bord-sync-comptable', v2: '/v2/tableau-bord-sync-comptable', markers: ['Tableau de Bord Synchronisations', 'Taux de Réussite'] },
+  { legacy: '/geolocalisation', v2: '/v2/geolocalisation', markers: ['Géolocalisation', 'Carte en temps réel', 'Légende'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

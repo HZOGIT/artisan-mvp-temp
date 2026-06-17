@@ -39,6 +39,7 @@ export const V2_ROUTES: Readonly<Record<string, string>> = {
   "/tableau-bord-depenses": "/v2/tableau-bord-depenses",
   "/import-releve": "/v2/import-releve",
   "/tableau-bord-sync-comptable": "/v2/tableau-bord-sync-comptable",
+  "/geolocalisation": "/v2/geolocalisation",
   "/flotte": "/v2/flotte",
   "/statistiques": "/v2/statistiques",
   "/modules": "/v2/modules",

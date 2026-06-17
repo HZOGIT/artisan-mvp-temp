@@ -16,6 +16,6 @@
     "resolveJsonModule": true,
     "types": ["node", "vite/client", "@fastify/cookie"]
   },
-  "include": ["client/src/modern/**/*"],
+  "include": ["client/src/modern/**/*", "client/src/leaflet.d.ts"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "**/*.test.tsx"]
 }

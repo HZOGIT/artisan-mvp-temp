@@ -458,8 +458,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   répartition + historique + perf). i18n namespace `syncComptable`. **0 `any`** (18 supprimés). Route +
   V2_ROUTES + sweep. tsc/eslint(0)/vitest **324**.
 
+- **Migration `geolocalisation` ✅** (19e des ~24 pages feature) — **1re page CARTE Leaflet**. Déblocage
+  typage : **`client/src/leaflet.d.ts` ajouté à l'`include` de `tsconfig.v2.json`** → le global `L` (déclaré
+  hors `client/src/modern/**`) est désormais en portée pour le code neuf (réutilisable par `planification`).
+  Audit contrat — 2 endpoints (geolocalisation.getPositions + techniciens.getAll) présents. Clean-archi :
+  domain (`withPosition`/`techId`/`latLng`/`batterieColor` + **constructeurs HTML PURS** `markerIconHtml`/
+  `popupContentHtml` (labels i18n injectés) — **4 tests**) + application (auto-refresh 30 s via
+  `refetchInterval`) + ui (MapView partagé + gestion impérative des marqueurs + liste + stats + légende).
+  i18n namespace `geolocalisation`. **0 `any`**. Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **328**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
-`chantiers`/`calendrier-chantiers`, `planification`/`geolocalisation` (cartes), `devis-ia`, `analyses-photos`,
+`chantiers`/`calendrier-chantiers`, `planification` (carte — L débloqué), `devis-ia`, `analyses-photos`,
 `integrations-comptables`, `import`, `nouvelle-depense`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
