@@ -49,6 +49,7 @@ import documentationFr from "@/modern/features/documentation/i18n/fr.json";
 import maVitrineFr from "@/modern/features/ma-vitrine/i18n/fr.json";
 import rdvEnLigneFr from "@/modern/features/rdv-en-ligne/i18n/fr.json";
 import alertesPrevisionsFr from "@/modern/features/alertes-previsions/i18n/fr.json";
+import previsionsFr from "@/modern/features/previsions/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -107,6 +108,7 @@ const resources = {
     maVitrine: maVitrineFr,
     rdvEnLigne: rdvEnLigneFr,
     alertesPrevisions: alertesPrevisionsFr,
+    previsions: previsionsFr,
   },
 } as const;
 

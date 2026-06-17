@@ -412,8 +412,18 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   historique + save + verifier) + ui (formulaire seuils/canaux/fréquence + historique). i18n namespace
   `alertesPrevisions`. **0 `any`** (2 legacy supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **301**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Sans carte/charts :
-`nouvelle-depense`, `tableau-bord-sync-comptable`, `devis-ia`, `import`, `performances-fournisseurs`…
+- **Migration `previsions` (prévisions de CA) ✅** (14e des ~24 pages feature) : audit contrat — module
+  `previsions-ca` keyé **`previsions`** (appRouter ligne 163) ; 4 endpoints (getHistorique/getPrevisions/
+  getComparaison/calculer) présents. **Gap** : `ComparaisonMois` expose `caPrevisionnel`/`caRealise`
+  (≠`previsionnel`/`realise` lus par le legacy) → remap via `num()`. **Chart.js conservé** (dep ; graphique
+  barres prévisionnel vs réalisé). Clean-archi : domain (`num`/`totalPrevisionnel`/`totalRealise`/
+  `confianceMoyenne`/`ecartPct`/`confianceClass` + MOIS/METHODES, **5 tests**) + application (3 queries +
+  calculer) + ui (4 KPIs + 3 onglets graphique/détails/historique). i18n namespace `previsions`. **0 `any`**
+  (methode any legacy supprimé). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **306**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
+`chantiers`/`calendrier-chantiers`, `planification`/`geolocalisation` (cartes), `devis-ia`, `analyses-photos`,
+`performances-fournisseurs`, `tableau-bord-depenses`/`-sync-comptable`, `integrations-comptables`, `import`(+releve), `nouvelle-depense`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
