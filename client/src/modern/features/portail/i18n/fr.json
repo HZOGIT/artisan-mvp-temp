@@ -19,5 +19,29 @@
   "tabChantierPrefix": "Mon ",
   "tabInfos": "Infos",
   "tabInfosPrefix": "Mes ",
-  "sectionAVenir": "Cette section est en cours de migration vers le nouvel espace."
+  "sectionAVenir": "Cette section est en cours de migration vers le nouvel espace.",
+  "aucunDevis": "Aucun devis pour le moment",
+  "aucuneFacture": "Aucune facture pour le moment",
+  "pdf": "PDF",
+  "signer": "Signer",
+  "payerEnLigne": "Payer en ligne",
+  "echeance": "Échéance : {{date}}",
+  "paiementSucces": "Paiement effectué avec succès ! Merci.",
+  "paiementAnnule": "Paiement annulé.",
+  "paiementErreur": "Erreur lors de la création du paiement",
+  "paiementConnexion": "Erreur de connexion au service de paiement",
+  "devisStatut": {
+    "brouillon": "Brouillon",
+    "envoye": "Envoyé",
+    "accepte": "Accepté",
+    "refuse": "Refusé",
+    "expire": "Expiré"
+  },
+  "factureStatut": {
+    "brouillon": "Brouillon",
+    "validee": "Validée",
+    "envoyee": "En attente",
+    "payee": "Payée",
+    "en_retard": "En retard"
+  }
 }

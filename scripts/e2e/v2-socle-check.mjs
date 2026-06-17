@@ -49,6 +49,9 @@ page.on('response', (r) => {
   if (r.status() < 400) return;
   // 404 ATTENDU : token de signature de test invalide → `signature.getDevisForSignature` renvoie 404.
   if (/signature\.getDevisForSignature/.test(r.url())) return;
+  // 401 ATTENDU : token portail de test invalide → les procédures `clientPortal.*` (gated par token)
+  // renvoient Unauthorized (sécurité par design). Le legacy les déclenche même token invalide.
+  if (r.status() === 401 && /clientPortal\./.test(r.url())) return;
   add({ route: current, type: 'http', status: r.status(), url: r.url().replace(BASE, '').slice(0, 160) });
 });
 
