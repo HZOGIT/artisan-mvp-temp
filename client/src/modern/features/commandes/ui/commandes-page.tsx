@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useCommandes } from "../application/use-commandes";
+import {
+  filterCommandes,
+  isCommandeStatut,
+  STATUT_KEYS,
+  type Commande,
+} from "../domain/commande";
 import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent } from "@/modern/shared/ui/card";
 import { Input } from "@/modern/shared/ui/input";
@@ -10,12 +16,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useLocation, useSearch } from "wouter";
 import { Plus, Search, ShoppingCart, MoreHorizontal, Eye, Pencil, Trash2, Download, Mail } from "lucide-react";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 
-// Page Bons de commande fournisseurs du FRONT NEUF (`/v2/commandes`) — PORT CONFORME de
-// `pages/CommandesFournisseurs.tsx`. JSX à l'identique (table native + Badge statut) ; plomberie
-// repointée : primitives `@/modern/shared/ui`, tRPC partagé, i18n (namespace `commandes`).
+// Page Bons de commande fournisseurs du FRONT NEUF (`/v2/commandes`) — clean-archi : présentation pure.
+// Données & mutations via `useCommandes` (couche application, seule à importer tRPC) ; filtrage via le
+// domaine (`../domain/commande`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à
+// l'identique (table native + Badge statut). Libellés via i18n (namespace `commandes`).
 
 const statusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -25,11 +31,9 @@ const statusColors: Record<string, string> = {
   annulee: "bg-red-100 text-red-700",
 };
 
-const STATUT_KEYS = ["brouillon", "envoyee", "confirmee", "livree", "annulee"];
-
-function formatCurrency(value: any): string {
-  const num = parseFloat(value) || 0;
-  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(num);
+function formatCurrency(value: string | number | null | undefined): string {
+  const num = typeof value === "string" ? parseFloat(value) : value || 0;
+  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number.isFinite(num) ? num : 0);
 }
 
 export default function CommandesPage() {
@@ -41,57 +45,45 @@ export default function CommandesPage() {
   const [filterFournisseur, setFilterFournisseur] = useState("tous");
   useEffect(() => {
     const f = new URLSearchParams(search).get("filtre");
-    if (f && STATUT_KEYS.includes(f)) {
+    if (f && isCommandeStatut(f)) {
       setFilterStatut(f);
     } else if (!f) {
       setFilterStatut("tous");
     }
   }, [search]);
 
-  const { data: commandes, isLoading } = trpc.commandesFournisseurs.list.useQuery();
-  const { data: fournisseurs } = trpc.fournisseurs.list.useQuery();
-  const utils = trpc.useUtils();
-
-  const deleteMutation = trpc.commandesFournisseurs.delete.useMutation({
-    onSuccess: () => {
-      utils.commandesFournisseurs.list.invalidate();
-      toast.success(t("toastDeleted"));
-    },
-    onError: () => toast.error(t("toastDeleteError")),
-  });
-
-  const sendEmailMutation = trpc.commandesFournisseurs.sendEmail.useMutation({
-    onSuccess: () => {
-      utils.commandesFournisseurs.list.invalidate();
-      toast.success(t("toastEmailSent"));
-    },
-    onError: (err) => toast.error(err.message || t("toastEmailError")),
-  });
+  const { commandes, fournisseurs, isLoading, remove: deleteMutation, sendEmail: sendEmailMutation } = useCommandes();
 
   const handleDelete = (id: number) => {
     if (confirm(t("confirmDelete"))) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate(
+        { id },
+        {
+          onSuccess: () => toast.success(t("toastDeleted")),
+          onError: () => toast.error(t("toastDeleteError")),
+        },
+      );
     }
   };
 
   const handleSendEmail = (id: number) => {
     if (confirm(t("confirmEmail"))) {
-      sendEmailMutation.mutate({ id });
+      sendEmailMutation.mutate(
+        { id },
+        {
+          onSuccess: () => toast.success(t("toastEmailSent")),
+          onError: (err) => toast.error(err.message || t("toastEmailError")),
+        },
+      );
     }
   };
 
-  const filtered = (commandes || []).filter((c: any) => {
-    if (filterStatut !== "tous" && c.statut !== filterStatut) return false;
-    if (filterFournisseur !== "tous" && c.fournisseurId.toString() !== filterFournisseur) return false;
-    if (searchQuery) {
-      return (
-        matchSearch(c.numero, searchQuery) ||
-        matchSearch(c.fournisseurNom, searchQuery) ||
-        matchSearch(c.reference, searchQuery)
-      );
-    }
-    return true;
-  });
+  // Le nom fournisseur n'est pas dans le DTO des commandes → résolu via la liste des fournisseurs.
+  const fournisseurNomById = new Map<number, string>(fournisseurs.map((f) => [f.id, f.nom]));
+  const resolveFournisseurNom = (id: number | null) => (id == null ? "" : fournisseurNomById.get(id) ?? "");
+
+  // Filtrage délégué au domaine (pur, testé).
+  const filtered = filterCommandes(commandes, { filterStatut, filterFournisseur, searchQuery, resolveFournisseurNom });
 
   return (
     <div className="space-y-6">
@@ -135,7 +127,7 @@ export default function CommandesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="tous">{t("allFournisseurs")}</SelectItem>
-            {(fournisseurs || []).map((f: any) => (
+            {fournisseurs.map((f) => (
               <SelectItem key={f.id} value={f.id.toString()}>{f.nom}</SelectItem>
             ))}
           </SelectContent>
@@ -161,10 +153,10 @@ export default function CommandesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((cmd: any) => (
+              {filtered.map((cmd: Commande) => (
                 <tr key={cmd.id} className="cursor-pointer" onClick={() => setLocation(`/commandes/${cmd.id}`)}>
                   <td className="font-medium whitespace-nowrap">{cmd.numero || '-'}</td>
-                  <td className="whitespace-nowrap">{cmd.fournisseurNom || '-'}</td>
+                  <td className="whitespace-nowrap">{resolveFournisseurNom(cmd.fournisseurId) || '-'}</td>
                   <td className="whitespace-nowrap text-muted-foreground">
                     {cmd.dateCommande ? format(new Date(cmd.dateCommande), "dd/MM/yyyy") : "-"}
                   </td>

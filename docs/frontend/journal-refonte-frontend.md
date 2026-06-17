@@ -203,13 +203,15 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague R — feature `commandes`** (rétrofit clean-archi). Extraire
-`domain/commande.ts` (types `RouterOutputs` + règles pures : filtres statut/fournisseur, libellés/totaux)
-+ `application/use-commandes.ts` (SEULE couche tRPC : list + delete/sendEmail + invalidation), faire
-consommer `commandes-page.tsx` (plus de `trpc` direct, **0 `any`**, warning `no-trpc-in-ui` disparaît).
-**Audit §3bis 6/6 obligatoire + consigné.** Garder parité e2e verte. Gabarit = `use-articles` /
-`use-fournisseurs`. Reste après : stocks, depenses, comptabilite, signature. Quand les 5 warnings
-tombent à 0 → `local/no-trpc-in-ui` en **`error`**.
+## 🎯 PROCHAINE CIBLE : **Vague R — feature `stocks`** (rétrofit clean-archi). Page riche (~812 l., Tabs +
+KPIs + alertes + 4 dialogs : créer/éditer/mouvement/historique). Extraire `domain/stock.ts` (types
+`RouterOutputs` + règles pures : filtres, KPIs, seuils d'alerte bas, calcul valeur stock) +
+`application/use-stocks.ts` (SEULE couche tRPC : list + create/update/delete/adjustQuantity/generateAlerts
++ mouvements/historique + invalidation), faire consommer `stocks-page.tsx` (plus de `trpc` direct,
+**0 `any`**, warning `no-trpc-in-ui` disparaît). **Audit §3bis 6/6 obligatoire + consigné.** Attention au
+fix legacy connu : `adjustQuantity` quantite envoyée en `String`. Garder parité e2e verte. Gabarit =
+`use-commandes` / `use-fournisseurs`. Reste après : depenses, comptabilite, signature. Quand les 4
+warnings tombent à 0 → `local/no-trpc-in-ui` en **`error`**.
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
 Rétrofitter 1 feature/itération (extraction `application/use-<feature>` + `domain` typés, `ui` sans tRPC,
@@ -248,6 +250,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Clean-archi — Vague R `commandes` ✅ (+ 1 finding)** : `domain/commande.ts` (types `RouterOutputs` (`Commande`/`CommandeFournisseur`) + fonctions PURES `filterCommandes`/`isCommandeStatut` + `STATUT_KEYS` ; **5 tests**) + `application/use-commandes.ts` (SEULE couche tRPC : list commandes+fournisseurs, delete/sendEmail). `commandes-page.tsx` consomme hook+domaine, **0 `any`** (dont `formatCurrency(value:any)` typé), plus aucun import tRPC. **🔴 FINDING** : le DTO `commandesFournisseurs.list` n'expose **pas** `fournisseurNom` (seulement `fournisseurId`) ; le legacy lisait `cmd.fournisseurNom` via `any` → undefined → **colonne fournisseur vide ("-") + recherche par fournisseur cassée**. Corrigé : nom résolu via la liste des fournisseurs (résolveur injecté au domaine). Warnings `no-trpc-in-ui` **5→4**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **85**. Prochaine : `stocks`.
 - **Clean-archi — Vague R `articles` ✅ (+ 2 bugs corrigés via le typage strict)** : `domain/article.ts` (types `RouterOutputs`/`RouterInputs` (`BiblioArticle`/`ImportRow`) + fonctions PURES `filterArticles`/`distinctCategories`/`distinctMetiers`/`computeMarge`/`parseImportCsv`+`splitCsvLine` ; **8 tests** dont parsing CSV) + `application/use-articles.ts` (SEULE couche tRPC : getBibliotheque, create/update/delete/import). `articles-page.tsx` (630 l., 3 dialogs) consomme hook+domaine, **0 `any`**. **🔴 FINDING 1** : le DTO `getBibliotheque` renvoie du **camelCase** (`prixBase`/`sousCategorie`) mais le legacy lisait `prix_base`/`sous_categorie` (snake) via `any` → **undefined → prix affiché 0 €, marge "—", recherche sous-cat cassée**. Corrigé : lectures en camelCase (les écritures restent snake = schéma d'entrée des mutations). **🔴 FINDING 2** : le parsing CSV d'import du legacy désalignait indices valeurs (regex `match` à vides intercalés) vs en-tête (`split`) → colonnes mal mappées à l'import. Corrigé via `splitCsvLine` (découpe quote-aware identique en-tête/valeurs) + détection accent-safe (`métier`). Warnings `no-trpc-in-ui` **6→5**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **80**. Prochaine : `commandes`.
 - **Clean-archi — Vague R `fournisseurs` ✅** : `domain/fournisseur.ts` (types `RouterOutputs` (`Fournisseur`/`Article`/`FournisseurArticle`) + fonctions PURES `filterFournisseurs`/`filterArticles`/`fournisseurStats`/`indexArticlesById` ; **6 tests**) + `application/use-fournisseurs.ts` (SEULE couche tRPC : list + articles référentiel, create/update/delete) + `useFournisseurArticles` (articles associés d'1 fournisseur + associate/dissociate, query dépendante isolée). `fournisseurs-page.tsx` (682 l., 4 dialogs) consomme hook+domaine, **0 `any`**, plus aucun import tRPC. Warnings `no-trpc-in-ui` **7→6**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **72**. Prochaine : `articles`.
 - **Clean-archi — Vague R `techniciens` ✅** : `domain/technicien.ts` (types `RouterOutputs` (`Technicien`/`LinkableUser`/`TechnicienStats`/`Habilitation`) + fonctions PURES `toTechnicienStatut`/`habilExpiry`/`habilitationBadge` — descripteur de badge d'habilitation (no-expiry/expirée/expire-bientôt≤60j/valide), `now` injectable ; **6 tests**) + `application/use-techniciens.ts` (SEULE couche tRPC : getAll + linkableUsers, create/update/delete) + `useTechnicienDetail` (stats + habilitations + add/delete, queries dépendantes isolées). `techniciens-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC. Warnings `no-trpc-in-ui` **8→7**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **66**. Prochaine : `fournisseurs`.
