@@ -99,6 +99,7 @@ const PARITE_PAGES = [
   { legacy: '/chat', v2: '/v2/chat', markers: ['Conversations', 'Nouveau'] },
   { legacy: '/badges', v2: '/v2/badges', markers: ['Badges & Gamification', 'Classement', 'Objectifs'] },
   { legacy: '/classement', v2: '/v2/classement', markers: ['Classement', 'Gamification et performances des techniciens'] },
+  { legacy: '/modeles-email', v2: '/v2/modeles-email', markers: ["Modèles d'emails", 'Variables disponibles', 'Nouveau modèle'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

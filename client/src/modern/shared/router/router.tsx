@@ -196,6 +196,12 @@ const classementRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/classement/ui/classement-page")),
 });
 
+const modelesEmailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/modeles-email",
+  component: lazyRouteComponent(() => import("../../features/modeles-email/ui/modeles-email-page")),
+});
+
 // Flotte (vue d'ensemble du parc) — migration clean-archi de `pages/Flotte.tsx`.
 const flotteRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -281,7 +287,7 @@ const notesFraisRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/notes-frais/ui/notes-frais-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute]);
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
