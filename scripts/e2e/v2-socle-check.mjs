@@ -88,6 +88,7 @@ const PARITE_PAGES = [
   { legacy: '/support', v2: '/v2/support', markers: ["Centre d'aide Operioz", 'Questions fréquentes', 'Nous contacter'] },
   { legacy: '/avis', v2: '/v2/avis', markers: ['Avis clients', 'Note moyenne', 'Distribution'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
+  { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
