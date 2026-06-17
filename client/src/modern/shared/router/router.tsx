@@ -73,7 +73,14 @@ const techniciensRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/techniciens/ui/techniciens-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute]);
+// Fournisseurs du front neuf — port conforme de `pages/Fournisseurs.tsx`.
+const fournisseursRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/fournisseurs",
+  component: lazyRouteComponent(() => import("../../features/fournisseurs/ui/fournisseurs-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

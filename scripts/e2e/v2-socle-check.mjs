@@ -70,6 +70,7 @@ const PARITE_PAGES = [
   { legacy: '/clients', v2: '/v2/clients', markers: ['Gérez votre base de clients', 'Exporter (CSV)', 'Nouveau client'] },
   { legacy: '/notifications', v2: '/v2/notifications', markers: ['Toutes', 'Non lues'] },
   { legacy: '/techniciens', v2: '/v2/techniciens', markers: ["Gestion de l'équipe", 'Nouveau technicien', 'Statistiques'] },
+  { legacy: '/fournisseurs', v2: '/v2/fournisseurs', markers: ['Gérez vos fournisseurs et leurs articles associés', 'Nouveau fournisseur', 'Liste des fournisseurs'] },
 ];
 for (const p of PARITE_PAGES) {
   for (const route of [p.legacy, p.v2]) {

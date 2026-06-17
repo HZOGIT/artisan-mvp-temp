@@ -117,7 +117,8 @@ groupe. Ne jamais batcher la **parité visuelle** ni le **typecheck** (à chaque
   - 🐞 **Fix socle** : wouter catch-all `/v2/:rest*` ne matchait PAS les routes imbriquées (`/v2/clients/4` → 404 legacy) → corrigé en **`/v2/*`** (App.tsx). Toutes les routes `/v2/<a>/<b>` fonctionnent désormais.
   - 🐞 **Finding legacy** : `pages/ClientDetail.tsx` est CASSÉ en prod (hooks après early-return → #310, plante via ErrorBoundary). Le port v2 corrige. À remonter (legacy sera supprimé, mais bug actif d'ici là).
 - [ ] Articles → `/v2/articles`
-- [ ] Fournisseurs → `/v2/fournisseurs`
+- [x] Fournisseurs → `/v2/fournisseurs` — port conforme de `pages/Fournisseurs.tsx` (`fournisseurs-page.tsx`), i18n (namespace `fournisseurs`) + kebab + primitives partagées (dialog/table/textarea/badge). 4 dialogs (création/édition/articles/association). Route TanStack + registre bascule. 4 gates verts, **parité e2e `13|0`**, déployé.
+  - 🐞 **Finding legacy** : `pages/Fournisseurs.tsx` se ré-enveloppe dans `<DashboardLayout>` alors qu'il est DÉJÀ rendu dans le DashboardLayout d'AuthenticatedRoutes → **double chrome** (DashboardLayout n'a pas de garde anti-imbrication). Le port v2 **supprime** ce double layout (rendu propre). À remonter.
 - [x] Techniciens → `/v2/techniciens` — port conforme de `pages/Techniciens.tsx` (`techniciens-page.tsx`), i18n (namespace `techniciens`) + kebab + primitives partagées (dialog/select/table/badge). Route TanStack + registre bascule. 4 gates verts, **parité e2e `11|0`**, déployé.
 - [x] Notifications → `/v2/notifications` — port conforme de `pages/Notifications.tsx` (`notifications-page.tsx`), i18n (namespace `notifications`) + kebab + primitives partagées. Primitives `badge`/`scroll-area` ajoutées au barrel. Bascule registre + route TanStack. 4 gates verts, **parité e2e `8|0`**, déployé.
 
@@ -132,9 +133,9 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 1 — Fournisseurs `/v2/fournisseurs`** (port conforme de `pages/Fournisseurs.tsx`,
-~700 l., primitives dialog/table/badge/textarea prêtes, i18n + kebab). Domaines tRPC : fournisseurs.* +
-articles.getArtisanArticles. Découper si besoin (liste + association d'articles). *(OPE-421)*
+## 🎯 PROCHAINE CIBLE : **Vague 1 — Articles `/v2/articles`** (port conforme de `pages/Articles.tsx`, ~648 l.,
+primitives dialog/select/dropdown-menu/textarea/badge prêtes, i18n + kebab). Domaine tRPC : articles.* (bibliothèque).
+**DERNIÈRE page de la Vague 1.** *(OPE-421)*
 
 ### Cibles suivantes (file)
 1. Vague 1 — Articles, Fournisseurs, Techniciens (i18n + kebab d'emblée ; chacune ~600-700 l. → prévoir slices + primitives dialog/table/textarea).
@@ -148,6 +149,7 @@ articles.getArtisanArticles. Découper si besoin (liste + association d'articles
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Vague 1 — Fournisseurs ✅** port `/v2/fournisseurs` (4 dialogs, dialog/table/textarea, i18n namespace `fournisseurs`). Supprime le double-DashboardLayout du legacy (finding). 4 gates verts, parité e2e `13|0`, déployé. Prochaine : Articles (dernière Vague 1).
 - **Vague 1 — Techniciens ✅** port `/v2/techniciens` (dialog/select/table, i18n namespace `techniciens`, registre bascule). 4 gates verts, parité e2e `11|0`, déployé. Prochaine : Fournisseurs.
 - **Vague 1 — ClientDetail ✅** port `/v2/clients/:id` (split gate/contenu → corrige l'antipattern hooks #310 du legacy). **Fix socle `/v2/*`** (le catch-all `/v2/:rest*` cassait les routes imbriquées → 404). Finding : legacy ClientDetail planté. 4 gates verts, e2e `9|0`, déployé.
 - **Primitives barrel ✅ (prep slice)** ajout copie conforme `select`/`tabs`/`dialog`/`table`/`textarea` à `modern/shared/ui` (+ test de surface étendu) → débloque ClientDetail, Articles, Fournisseurs, Techniciens. tsc/vitest/eslint verts. Pas de déploiement (ré-exports non consommés par le runtime). Prochaine : port ClientDetail.
