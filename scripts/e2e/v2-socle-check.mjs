@@ -13,6 +13,12 @@ const PASS = process.env.E2E_PASS || '';
 const issues = [];
 const add = (o) => issues.push(o);
 
+// MODE PAR ROUTE (OPE-403, accélération post-deploy) : si `ROUTE=/<chemin>` est fourni (legacy OU v2,
+// ex. `ROUTE=/v2/dashboard`), on ne valide QUE l'entrée PARITE_PAGES correspondante (les 2 côtés) et on
+// SAUTE tout le reste (démo socle, recherche clients, ClientDetail, bascule, signature, sidebar mobile).
+// → check ciblé ~10-15 s au lieu de ~3 min. Sweep GLOBAL = `ROUTE` non défini (cron + recette finale).
+const ONLY = process.env.ROUTE || '';
+
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
 
@@ -52,7 +58,7 @@ const cases = [
   { route: '/v2/clients', expect: 'Clients' },
 ];
 
-for (const c of cases) {
+if (!ONLY) for (const c of cases) {
   current = c.route;
   await page.goto(c.route, { waitUntil: 'networkidle', timeout: 25000 });
   await page.waitForTimeout(1500);
@@ -100,7 +106,11 @@ const PARITE_PAGES = [
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
 ];
-for (const p of PARITE_PAGES) {
+const paritePages = ONLY ? PARITE_PAGES.filter((p) => p.legacy === ONLY || p.v2 === ONLY) : PARITE_PAGES;
+if (ONLY && paritePages.length === 0) {
+  add({ route: ONLY, type: 'config', text: `ROUTE="${ONLY}" ne correspond à aucune entrée PARITE_PAGES (ajouter l'entrée d'abord)` });
+}
+for (const p of paritePages) {
   for (const route of [p.legacy, p.v2]) {
     pariteCount++;
     current = `parité ${route}`;
@@ -114,7 +124,7 @@ for (const p of PARITE_PAGES) {
   }
 }
 // Barre de recherche Clients (placeholder = attribut, hors textContent).
-for (const route of ['/clients', '/v2/clients']) {
+if (!ONLY) for (const route of ['/clients', '/v2/clients']) {
   await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
   await page.waitForTimeout(800);
   if (await page.locator('input[placeholder="Rechercher un client..."]').count() === 0) {
@@ -126,7 +136,7 @@ for (const route of ['/clients', '/v2/clients']) {
 // NB : on n'exige PAS la parité avec le legacy `/clients/:id` — la page legacy est CASSÉE (elle appelle
 // des hooks après des early-returns → React #310, elle plante via l'ErrorBoundary). Le port `/v2` CORRIGE
 // ce bug (gate de chargement externe). On valide donc le rendu côté v2 (marqueurs structurants présents).
-try {
+if (!ONLY) try {
   const listRes = await ctx.request.get('/api/trpc/clients.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%7D%7D');
   const listJson = await listRes.json();
   const first = listJson?.[0]?.result?.data?.json?.[0];
@@ -148,9 +158,11 @@ try {
   add({ route: 'detail', type: 'detail', text: `échec récup id client: ${String(e).slice(0, 120)}` });
 }
 
+// Sections GLOBALES (bascule + signature + sidebar mobile) — SAUTÉES en mode ROUTE ciblé (gain de temps).
+let basculeCount = 0, signCount = 0, sidebarCount = 0;
+if (!ONLY) {
 // --- Bascule strangler-fig (OPE-420) : flag `?v2=1` + util de bascule par route ---
 // IMPORTANT : tester d'abord SANS flag (le flag est « collant » via localStorage une fois activé).
-let basculeCount = 0;
 
 // 1) Sans flag → la route legacy reste legacy (parité : aucun détournement).
 basculeCount++;
@@ -174,7 +186,6 @@ if (new URL(page.url()).pathname !== '/v2/clients') {
 // Sans token valide, l'état d'erreur n'apparaît qu'après les retries react-query (timing instable).
 // On vérifie de façon DÉTERMINISTE que la page MONTE et lit le token : elle déclenche la requête tRPC
 // `signature.getDevisForSignature` (preuve : routeur public + extraction du param + bonne procédure).
-let signCount = 0;
 for (const route of ['/signature/e2e-token', '/v2/signature/e2e-token']) {
   signCount++;
   current = `signature ${route}`;
@@ -189,7 +200,6 @@ for (const route of ['/signature/e2e-token', '/v2/signature/e2e-token']) {
 
 // --- Sidebar → v2 : la nav redirige vers `/v2` quand la route est migrée (registre V2_ROUTES) ---
 // On cible la nav MOBILE (boutons directs `handleNavigate`, faciles à cliquer de façon fiable).
-let sidebarCount = 0;
 await page.setViewportSize({ width: 390, height: 844 });
 const navBtn = (label) => page.locator('nav[aria-label="Navigation mobile"] button', { hasText: label }).first();
 
@@ -212,9 +222,10 @@ await page.waitForTimeout(1000);
 if (new URL(page.url()).pathname !== '/dashboard') {
   add({ route: 'sidebar/dashboard', type: 'sidebar', text: `attendu /dashboard (non migré), obtenu ${page.url()}` });
 }
+} // fin sections globales (if !ONLY)
 
 await browser.close();
-const total = cases.length + pariteCount + basculeCount + sidebarCount + signCount;
-console.log(`cas testés: ${total} | issues: ${issues.length}`);
+const total = (ONLY ? 0 : cases.length) + pariteCount + basculeCount + sidebarCount + signCount;
+console.log(`${ONLY ? `[ROUTE ${ONLY}] ` : ''}cas testés: ${total} | issues: ${issues.length}`);
 if (issues.length) console.log(JSON.stringify(issues, null, 2));
 process.exit(issues.length ? 1 : 0);

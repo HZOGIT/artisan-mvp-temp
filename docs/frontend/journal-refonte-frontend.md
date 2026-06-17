@@ -74,16 +74,28 @@ exporté reste en `PascalCase`, seul le nom de fichier est kebab). Cohérent ave
 - Le **gate ESLint v2** fera respecter ceci via `eslint-plugin-i18next` (`no-literal-string`).
 - Pages déjà portées avant l'i18n (ex. Clients) → **rétro-i18n** lors du setup i18n (puis le lint passe).
 
-## Périmètre AUTONOME de la boucle (ne pas déborder)
-La boucle ne touche QUE :
+## Périmètre AUTONOME de la boucle (ÉLARGI — demande humaine 2026-06-17)
+La boucle touche :
 - `client/src/modern/**` (tout le code neuf `/v2`),
 - `client/src/main.tsx` / `App.tsx` **uniquement** pour câbler le montage `/v2/*` et le flag (ajouts, jamais de suppression de route legacy),
-- `scripts/staging-e2e-mutations.mjs` / `scripts/e2e/**` (cas e2e des routes `/v2`),
-- `tsconfig.v2.json`, ce journal.
+- `scripts/staging-e2e-mutations.mjs` / `scripts/e2e/**` (cas e2e des routes `/v2` + tooling sweep),
+- `tsconfig.v2.json`, ce journal,
+- **`src/modules/**` (BACKEND) — NOUVEAU : autorisé pour COMBLER LES GAPS de contrat nécessaires à la
+  refonte** (porter/compléter un endpoint, typer un DTO `unknown`, ajouter un champ). Demande humaine :
+  « porter TOUS les endpoints backend vers la nouvelle approche ; si gap → itération intermédiaire ».
+  Ces itérations backend portent leurs propres **tests vitest backend** (`vitest run src`) + restent
+  chirurgicales (mes chemins). On ne « contourne » plus un gap, on le **comble**.
 
-**HORS boucle (traités séparément, NE PAS faire en autonome — ils touchent du code partagé/backend) :**
-monorepo OPE-404, garde-fous backend (bodyLimit/errorFormatter/tenant OPE-406/409/410), ESLint global
-OPE-413. Si une page en dépend, la marquer **bloquée** et passer à la suivante.
+**Toujours HORS boucle (code partagé d'autres agents) :** monorepo OPE-404, garde-fous transverses
+(bodyLimit/errorFormatter/tenant OPE-406/409/410), ESLint global OPE-413. En cas de conflit, garder leurs versions.
+
+## Dette à solder (NOUVELLE APPROCHE, humain 2026-06-17)
+- **`AbonnementSection`** (Stripe/devices) : actuellement réutilisé tel quel (legacy `@/lib/trpc`). **À PORTER**
+  vers l'approche moderne (`feature abonnement` clean-archi via `@/modern/shared/trpc`), **en implémentant
+  les gaps backend si besoin** (subscription/devices existent côté new-stack — vérifier la complétude).
+- **Réintégrer section vitrine** dans `/v2/parametres` après création des endpoints `vitrine.getSettings/updateSettings` (OPE-504).
+- **Findings backend = à combler** (plus seulement filer) : OPE-490 (notes de frais `depenses[]`/`nbDepenses`),
+  OPE-504 (vitrine settings), OPE-505 (leads `unknown[]`) → chacun = une itération intermédiaire backend.
 
 ## Coordination multi-agents (règle d'or CLAUDE.md)
 D'autres agents travaillent sur `staging` (sujets non-front). **Commits chirurgicaux** : `git add`
@@ -103,6 +115,18 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
 1. **Choisir la cible** = en tête du backlog ci-dessous (vague courante). Le périmètre d'une itération
    est **à ta main** : 1 page simple, ou 1 slice d'une page complexe (liste → détail → formulaire).
    Si tu découbres une complexité, **split** dans le backlog et ne fais qu'un morceau.
+1ter. **🔍 AUDIT DE CONTRAT — AVANT TOUT BUILD (imposé, demande humaine 2026-06-17).** Avant d'écrire la
+   moindre ligne de la feature, **auditer que le contrat backend new-stack porte TOUT ce que le legacy
+   lit/écrit** : pour chaque champ lu (`RouterOutputs[...]`) et chaque mutation (`RouterInputs[...]`),
+   vérifier qu'il existe et n'est pas masqué par un `any` legacy. Méthode : lister les `trpc.*` de la page
+   legacy, ouvrir les `src/modules/<domaine>/{domain,interface/trpc}`, confronter les champs.
+   - **Gap trouvé** (champ/endpoint manquant, type `unknown[]`, écriture droppée…) → **ON LE TRAITE** :
+     **NOUVELLE APPROCHE (humain 2026-06-17) — porter TOUS les endpoints backend vers la nouvelle
+     approche fait partie de la refonte. Si gap → ITÉRATION INTERMÉDIAIRE qui crée/complète l'endpoint
+     backend** (`src/modules/**` — périmètre élargi pour ces itérations), avec ses tests vitest backend,
+     PUIS on reprend le build front. Filer quand même un finding Linear pour la trace. Ne PLUS « omettre »
+     une section faute de backend : on **comble le gap**.
+   - **Pas de gap** → build direct.
 2bis. **Sidebar → v2 (imposé)** : ajouter la route au **registre `V2_ROUTES`** (`modern/shared/flag/v2-routes.ts`).
    La sidebar (`DashboardLayout`) résout désormais ses liens via `resolveV2Path()` (câblage unique fait) :
    **dès qu'une route est dans le registre, la navigation de la sidebar pointe automatiquement sur `/v2/<route>`**
@@ -120,8 +144,12 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
      `@/modern/shared/ui`, jamais `@/lib/trpc`/`@/components/ui` en direct), **pas de REST**
      (openapi-fetch interdit), **kebab-case** des noms de fichiers, etc. Ne lint QUE `client/src/modern/**`
      (n'empiète pas sur l'ESLint global OPE-413).
-   - **Parité visuelle** : via `scripts/pw-run.sh`, screenshot `/v2/<route>` ET `/<route>` legacy →
-     comparer : **doivent être identiques** (mêmes éléments, même mise en page, 0 erreur console).
+   - **Parité visuelle — SWEEP PAR ROUTE (imposé, humain 2026-06-17, accélération)** : après deploy, lancer
+     **uniquement la route concernée** :
+     `./scripts/pw-run.sh scripts/e2e/v2-socle-check.mjs ROUTE=/v2/<route>` (~10-15 s vs ~3 min pour le sweep
+     complet ; ne teste que l'entrée `PARITE_PAGES` correspondante, legacy+v2). **Le sweep GLOBAL (sans
+     `ROUTE`) ne se relance qu'À LA FIN (recette)** + via le cron 5 min. NB : ajouter l'entrée `PARITE_PAGES`
+     AVANT (sinon `ROUTE=` ne matche rien). Au besoin, screenshot `/v2/<route>` ET `/<route>` pour comparer.
    - **e2e mutation** (si la page mute des données) : cas ajouté dans **`scripts/e2e/v2-mutations.mjs`**
      (actions UI réelles → tRPC + assertion de persistance via API, **non destructif** : modifie puis
      REVERT). **rouge avant / vert après**. *(Tests lourds : peuvent être batchés sur un groupe
