@@ -103,7 +103,7 @@ const ReglesDepenses = lazy(() => import("./pages/ReglesDepenses"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 // PoC OPE-366 — page « stack cible » (clean archi + REST openapi-typescript), cohabite avec le legacy.
-const ClientsModernPage = lazy(() => import("./modern/features/clients/ui/ClientsModernPage"));
+const ModernRouterMount = lazy(() => import("./modern/shared/router/ModernRouterMount"));
 const CGV = lazy(() => import("./pages/legal/CGV"));
 const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
 
@@ -155,8 +155,9 @@ function AuthenticatedRoutes() {
         <Switch location={location}>
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/clients" component={Clients} />
-          {/* PoC OPE-366 : version moderne (REST + clean archi) montée en parallèle du legacy. */}
-          <Route path="/v2/clients" component={ClientsModernPage} />
+          {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
+              providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
+          <Route path="/v2/:rest*" component={ModernRouterMount} />
           <Route path="/clients/nouveau" component={ClientsNouveauPage} />
           <Route path="/clients/import" component={ImportClients} />
           <Route path="/clients/:id" component={ClientDetail} />

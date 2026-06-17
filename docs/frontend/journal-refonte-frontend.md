@@ -80,7 +80,7 @@ groupe. Ne jamais batcher la **parité visuelle** ni le **typecheck** (à chaque
 ## Backlog (ordre = priorité). ✅ fait · 🚧 bloqué · ⬜ à faire
 
 ### Vague 0 — Socle (front-additif, visuellement neutre) — EN COURS
-- [ ] **S1** TanStack Router monté sur `/v2/*` cohabitant avec wouter (QueryClient + auth partagés ; error/pending par route ; lazy). Une route `/v2/ping` de démonstration. *(OPE-415)*
+- [x] **S1** TanStack Router monté sur `/v2/*` cohabitant avec wouter (QueryClient + auth partagés ; error/pending par route ; lazy). Une route `/v2/ping` de démonstration. *(OPE-415)* — `@tanstack/react-router@1.170.16` ajouté ; socle dans `modern/shared/router/{router.tsx,ModernRouterMount.tsx}` (routage par code, `basepath:/v2`, pending+error+notFound par défaut) ; câblé via catch-all wouter `/v2/:rest*` dans `App.tsx` (DANS `AuthenticatedRoutes` → providers+auth partagés). L'ancien PoC `/v2/clients` repris sous le socle ; démo `/v2/ping`. tsc v2 ✅, `vite build` ✅.
 - [ ] **S2** Helper de flag `?v2=1` + util de bascule par route (ouvre `/v2/<route>`, sinon legacy). *(OPE-420)*
 - [ ] **S3** Squelette clean-archi `modern/features/<domaine>/{domain,application,ui}` + `modern/shared/{ui,router,lib,trpc}` ; client tRPC partagé (`modern/shared/trpc`). *(OPE-419)*
 - [ ] **S4** Primitives `modern/shared/ui` = **copie conforme** des composants UI legacy utilisés par la Vague 1 (zéro changement visuel). *(OPE-416, périmètre réduit)*
@@ -104,10 +104,11 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **S1** (monter TanStack Router sur `/v2/*` + route `/v2/ping`).
+## 🎯 PROCHAINE CIBLE : **S2** (helper de flag `?v2=1` + util de bascule par route : ouvre `/v2/<route>` si activé, sinon legacy). *(OPE-420)*
 
 ---
 
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **S1 ✅** socle TanStack Router sur `/v2/*` (cohabite wouter, providers+auth partagés, lazy, pending/error/notFound par route) + démo `/v2/ping` ; PoC `/v2/clients` repris sous le socle. tsc v2 + `vite build` verts. Reste à déployer le SPA + parité visuelle staging. Prochaine cible : S2 (flag `?v2=1`).
