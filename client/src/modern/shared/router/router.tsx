@@ -150,7 +150,14 @@ const budgetsDepensesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/budgets-depenses/ui/budgets-depenses-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute]);
+// Règles de catégorisation des dépenses — migration clean-archi de `pages/ReglesDepenses.tsx`.
+const reglesDepensesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/regles-depenses",
+  component: lazyRouteComponent(() => import("../../features/regles-depenses/ui/regles-depenses-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

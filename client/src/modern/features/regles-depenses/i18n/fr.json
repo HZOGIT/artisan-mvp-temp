@@ -1,0 +1,20 @@
+{
+  "title": "Règles de catégorisation auto",
+  "subtitle": "Ces règles s'appliquent automatiquement lors de l'import de relevé bancaire.",
+  "howTitle": "Comment ça marche",
+  "howDesc": "Lors d'un import CSV bancaire, chaque transaction est confrontée à vos règles. Si le libellé contient l'un des mots-clés, la catégorie correspondante est suggérée automatiquement dans l'étape de tri.",
+  "newTitle": "Nouvelle règle",
+  "newDesc": "Exemple : « TOTAL » → Carburant, « BRICO DEPOT » → Matériaux",
+  "ifContains": "Si le libellé contient",
+  "ifContainsPlaceholder": "TOTAL, BRICO, AUCHAN…",
+  "categorieLabel": "Catégorie",
+  "categoriePlaceholder": "Choisir…",
+  "addBtn": "Ajouter",
+  "activeRules": "Règles actives ({{n}})",
+  "empty": "Aucune règle. Ajoute ta première règle ci-dessus.",
+  "siContient": "Si contient",
+  "toastRequired": "Renseigne le libellé et la catégorie",
+  "toastAdded": "Règle ajoutée",
+  "toastDeleted": "Règle supprimée",
+  "toastError": "Erreur"
+}
