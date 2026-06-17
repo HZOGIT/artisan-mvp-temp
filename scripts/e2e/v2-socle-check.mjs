@@ -92,7 +92,7 @@ const PARITE_PAGES = [
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },
   { legacy: '/conges', v2: '/v2/conges', markers: ['Gestion des Congés', 'Nouvelle demande'] },
   { legacy: '/contrats', v2: '/v2/contrats', markers: ['Contrats de maintenance', 'Nouveau contrat'] },
-  { legacy: '/relances-devis', v2: '/v2/relances-devis', markers: ['Relances Devis', 'Configuration auto'] },
+  { legacy: '/relances', v2: '/v2/relances-devis', markers: ['Relances Devis', 'Configuration auto'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
