@@ -1,6 +1,15 @@
 import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useArticles } from "../application/use-articles";
+import {
+  computeMarge,
+  distinctCategories,
+  distinctMetiers,
+  filterArticles,
+  parseImportCsv,
+  type BiblioArticle,
+  type ImportRow,
+} from "../domain/article";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent } from "@/modern/shared/ui/card";
@@ -12,12 +21,12 @@ import { Search, Package, Filter, Plus, Pencil, Trash2, Upload, Download, MoreHo
 import { Badge } from "@/modern/shared/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/modern/shared/ui/dropdown-menu";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
 
-// Page Bibliothèque d'articles du FRONT NEUF (`/v2/articles`) — PORT CONFORME de `pages/Articles.tsx`.
-// JSX/Tailwind à l'identique (table native `data-table` conservée) ; plomberie repointée : primitives
-// `@/modern/shared/ui`, tRPC partagé, i18n (namespace `articles`). Les libellés métier/catégorie/
-// sous-catégorie/unité/TVA passent par i18n ; les couleurs restent des classes Tailwind.
+// Page Bibliothèque d'articles du FRONT NEUF (`/v2/articles`) — clean-archi : présentation pure. Données
+// & mutations via `useArticles` (couche application, seule à importer tRPC) ; recherche, filtres,
+// valeurs distinctes, marge et parsing CSV d'import via le domaine (`../domain/article`, fonctions pures
+// testées). Parité visuelle stricte : JSX/Tailwind à l'identique (table native `data-table`). Libellés
+// métier/catégorie/sous-catégorie/unité/TVA via i18n ; couleurs = classes Tailwind.
 
 // Couleurs (classes Tailwind, pas des libellés).
 const categorieColors: Record<string, string> = {
@@ -97,52 +106,15 @@ export default function ArticlesPage() {
   const [metierFilter, setMetierFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [editingArticle, setEditingArticle] = useState<any>(null);
-  const [articleToDelete, setArticleToDelete] = useState<any>(null);
+  const [editingArticle, setEditingArticle] = useState<BiblioArticle | null>(null);
+  const [articleToDelete, setArticleToDelete] = useState<BiblioArticle | null>(null);
   const [form, setForm] = useState<ArticleForm>(defaultForm);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: articles, isLoading, refetch } = trpc.articles.getBibliotheque.useQuery({});
-
-  const createMutation = trpc.articles.createBibliothequeArticle.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastCreated"));
-      refetch();
-      closeDialog();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const updateMutation = trpc.articles.updateBibliothequeArticle.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastUpdated"));
-      refetch();
-      closeDialog();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const deleteMutation = trpc.articles.deleteBibliothequeArticle.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastDeleted"));
-      refetch();
-      setIsDeleteDialogOpen(false);
-      setArticleToDelete(null);
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const importMutation = trpc.articles.importBibliothequeArticles.useMutation({
-    onSuccess: (result) => {
-      toast.success(t("toastImported", { n: result.imported }));
-      refetch();
-      setIsImportDialogOpen(false);
-      setImportPreview([]);
-    },
-    onError: (error) => toast.error(error.message),
-  });
+  const { articles, isLoading, create: createMutation, update: updateMutation, remove: deleteMutation, importArticles: importMutation } =
+    useArticles();
 
   const formatCurrency = (amount: string | number | null) => {
     const num = typeof amount === "string" ? parseFloat(amount) : amount || 0;
@@ -155,17 +127,20 @@ export default function ArticlesPage() {
     setIsDialogOpen(true);
   };
 
-  const openEditDialog = (article: any) => {
+  const openEditDialog = (article: BiblioArticle) => {
     setEditingArticle(article);
     setForm({
       nom: article.nom || "",
       description: article.description || "",
       unite: article.unite || "unité",
-      prix_base: article.prix_base?.toString() || "",
+      // Lecture = sortie getBibliotheque (camelCase) ; écriture = champs de form en snake_case
+      // (= schéma d'entrée des mutations). Le legacy lisait `prix_base`/`sous_categorie` (snake) sur
+      // la sortie camelCase → undefined (prix affiché 0 €, marge "—", recherche cassée). Corrigé ici.
+      prix_base: article.prixBase?.toString() || "",
       prixRevient: article.prixRevient?.toString() || "",
       tauxTVA: article.tauxTVA?.toString() || "20",
       categorie: article.categorie || "fourniture",
-      sous_categorie: article.sous_categorie || "",
+      sous_categorie: article.sousCategorie || "",
       metier: article.metier || "plombier",
     });
     setIsDialogOpen(true);
@@ -182,21 +157,38 @@ export default function ArticlesPage() {
       toast.error(t("toastRequiredFields"));
       return;
     }
+    const onSettled = {
+      onSuccess: () => {
+        toast.success(editingArticle ? t("toastUpdated") : t("toastCreated"));
+        closeDialog();
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    };
     if (editingArticle) {
-      updateMutation.mutate({ id: editingArticle.id, ...form });
+      updateMutation.mutate({ id: editingArticle.id, ...form }, onSettled);
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(form, onSettled);
     }
   };
 
-  const handleDelete = (article: any) => {
+  const handleDelete = (article: BiblioArticle) => {
     setArticleToDelete(article);
     setIsDeleteDialogOpen(true);
   };
 
   const confirmDelete = () => {
     if (articleToDelete) {
-      deleteMutation.mutate({ id: articleToDelete.id });
+      deleteMutation.mutate(
+        { id: articleToDelete.id },
+        {
+          onSuccess: () => {
+            toast.success(t("toastDeleted"));
+            setIsDeleteDialogOpen(false);
+            setArticleToDelete(null);
+          },
+          onError: (error) => toast.error(error.message),
+        },
+      );
     }
   };
 
@@ -206,9 +198,9 @@ export default function ArticlesPage() {
       return;
     }
     const headers = [t("csvNom"), t("csvDescription"), t("csvUnite"), t("csvPrixHT"), t("csvCategorie"), t("csvSousCategorie"), t("csvMetier")];
-    const rows = filteredArticles.map((a: any) => [
+    const rows = filteredArticles.map((a: BiblioArticle) => [
       a.nom || "", a.description || "", a.unite || "",
-      a.prix_base || "", a.categorie || "", a.sous_categorie || "", a.metier || "",
+      a.prixBase || "", a.categorie || "", a.sousCategorie || "", a.metier || "",
     ]);
     const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" });
@@ -226,29 +218,10 @@ export default function ArticlesPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split("\n").filter(line => line.trim());
-      if (lines.length < 2) { toast.error(t("toastCsvNoData")); return; }
-      const headers = lines[0].split(",").map(h => h.replace(/"/g, "").trim().toLowerCase());
-      const parsed = lines.slice(1).map(line => {
-        const values = line.match(/("([^"]|"")*"|[^,]*)/g)?.map(v => v.replace(/^"|"$/g, "").replace(/""/g, '"').trim()) || [];
-        const nomIdx = headers.findIndex(h => h.includes("nom") || h.includes("design"));
-        const descIdx = headers.findIndex(h => h.includes("desc"));
-        const uniteIdx = headers.findIndex(h => h.includes("unit"));
-        const prixIdx = headers.findIndex(h => h.includes("prix") || h.includes("ht"));
-        const catIdx = headers.findIndex(h => h.includes("cat"));
-        const sousIdx = headers.findIndex(h => h.includes("sous"));
-        const metierIdx = headers.findIndex(h => h.includes("met"));
-        return {
-          nom: values[nomIdx] || values[0] || "",
-          description: values[descIdx] || "",
-          unite: values[uniteIdx] || "unité",
-          prix_base: values[prixIdx]?.replace(",", ".") || "0",
-          categorie: values[catIdx] || "fourniture",
-          sous_categorie: values[sousIdx] || "",
-          metier: values[metierIdx] || "plombier",
-        };
-      }).filter(a => a.nom);
+      const text = typeof event.target?.result === "string" ? event.target.result : "";
+      // Parsing délégué au domaine (pur, testé).
+      const parsed = parseImportCsv(text);
+      if (parsed.length === 0) { toast.error(t("toastCsvNoData")); return; }
       setImportPreview(parsed);
       setIsImportDialogOpen(true);
     };
@@ -258,25 +231,20 @@ export default function ArticlesPage() {
 
   const handleImport = () => {
     if (importPreview.length === 0) return;
-    importMutation.mutate(importPreview);
+    importMutation.mutate(importPreview, {
+      onSuccess: (result) => {
+        toast.success(t("toastImported", { n: result.imported }));
+        setIsImportDialogOpen(false);
+        setImportPreview([]);
+      },
+      onError: (error) => toast.error(error.message),
+    });
   };
 
-  const filteredArticles = articles?.filter((article: any) => {
-    const matchesSearch = !searchQuery ||
-      matchSearch(article.nom, searchQuery) ||
-      matchSearch(article.description, searchQuery) ||
-      matchSearch(article.sous_categorie, searchQuery);
-    const matchesCategory = categoryFilter === "all" || article.categorie === categoryFilter;
-    const matchesMetier = metierFilter === "all" || article.metier === metierFilter;
-    return matchesSearch && matchesCategory && matchesMetier;
-  });
-
-  const categories = articles
-    ? Array.from(new Set(articles.map((a: any) => a.categorie).filter(Boolean)))
-    : [];
-  const metiers = articles
-    ? Array.from(new Set(articles.map((a: any) => a.metier).filter(Boolean)))
-    : [];
+  // Sélections/agrégations déléguées au domaine (pures, testées).
+  const filteredArticles = filterArticles(articles, { searchQuery, categoryFilter, metierFilter });
+  const categories = distinctCategories(articles);
+  const metiers = distinctMetiers(articles);
 
   return (
     <div className="space-y-6">
@@ -285,7 +253,7 @@ export default function ArticlesPage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">{t("libTitle")}</h1>
           <p className="text-muted-foreground mt-1">
-            {t("countLine", { filtered: filteredArticles?.length || 0, total: articles?.length || 0 })}
+            {t("countLine", { filtered: filteredArticles.length, total: articles.length })}
           </p>
         </div>
         <div className="flex gap-2">
@@ -320,7 +288,7 @@ export default function ArticlesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("allMetiers")}</SelectItem>
-            {metiers.map((m: any) => (
+            {metiers.map((m: string) => (
               <SelectItem key={m} value={m}>{t(`metier_${m}`, { defaultValue: m })}</SelectItem>
             ))}
           </SelectContent>
@@ -332,7 +300,7 @@ export default function ArticlesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("allCategories")}</SelectItem>
-            {categories.map((cat: any) => (
+            {categories.map((cat: string) => (
               <SelectItem key={cat} value={cat}>{t(`categorie_${cat}`, { defaultValue: cat })}</SelectItem>
             ))}
           </SelectContent>
@@ -360,7 +328,7 @@ export default function ArticlesPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredArticles.map((article: any) => (
+              {filteredArticles.map((article: BiblioArticle) => (
                 <tr key={article.id}>
                   <td>
                     <p className="font-medium">{article.nom}</p>
@@ -379,19 +347,15 @@ export default function ArticlesPage() {
                     </Badge>
                   </td>
                   <td className="whitespace-nowrap text-sm">
-                    {t(`sous_${article.sous_categorie}`, { defaultValue: article.sous_categorie })}
+                    {t(`sous_${article.sousCategorie}`, { defaultValue: article.sousCategorie })}
                   </td>
                   <td className="whitespace-nowrap">{article.unite}</td>
-                  <td className="text-right font-medium whitespace-nowrap">{formatCurrency(article.prix_base)}</td>
+                  <td className="text-right font-medium whitespace-nowrap">{formatCurrency(article.prixBase)}</td>
                   <td className="text-right whitespace-nowrap text-sm">
                     {(() => {
-                      const pv = parseFloat(article.prix_base);
-                      const pr = article.prixRevient != null ? parseFloat(article.prixRevient) : NaN;
-                      if (!isNaN(pv) && !isNaN(pr) && pv > 0) {
-                        const pct = Math.round(((pv - pr) / pv) * 100);
-                        return <span className={pv - pr >= 0 ? "text-green-600" : "text-red-600"}>{pct}&nbsp;%</span>;
-                      }
-                      return <span className="text-muted-foreground">—</span>;
+                      const m = computeMarge(article.prixBase, article.prixRevient);
+                      if (!m) return <span className="text-muted-foreground">—</span>;
+                      return <span className={m.positive ? "text-green-600" : "text-red-600"}>{m.pct}&nbsp;%</span>;
                     })()}
                   </td>
                   <td className="whitespace-nowrap">
@@ -494,14 +458,11 @@ export default function ArticlesPage() {
               </div>
               <div className="flex items-end">
                 {(() => {
-                  const pv = parseFloat(form.prix_base);
-                  const pr = parseFloat(form.prixRevient);
-                  if (!isNaN(pv) && !isNaN(pr) && pv > 0 && form.prixRevient !== "") {
-                    const marge = pv - pr;
-                    const pct = Math.round((marge / pv) * 100);
+                  const m = computeMarge(form.prix_base, form.prixRevient);
+                  if (m) {
                     return (
-                      <p className={`text-sm ${marge >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {t("margeLabel")} <strong>{formatCurrency(marge)}</strong> ({pct}&nbsp;%)
+                      <p className={`text-sm ${m.positive ? "text-green-600" : "text-red-600"}`}>
+                        {t("margeLabel")} <strong>{formatCurrency(m.montant)}</strong> ({m.pct}&nbsp;%)
                       </p>
                     );
                   }
