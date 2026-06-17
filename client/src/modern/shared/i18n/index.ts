@@ -41,6 +41,7 @@ import badgesFr from "@/modern/features/badges/i18n/fr.json";
 import classementFr from "@/modern/features/classement/i18n/fr.json";
 import modelesEmailFr from "@/modern/features/modeles-email/i18n/fr.json";
 import modelesTransactionnelsFr from "@/modern/features/modeles-email-transactionnels/i18n/fr.json";
+import assistantConversationsFr from "@/modern/features/assistant-conversations/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -91,6 +92,7 @@ const resources = {
     classement: classementFr,
     modelesEmail: modelesEmailFr,
     modelesTransactionnels: modelesTransactionnelsFr,
+    assistantConversations: assistantConversationsFr,
   },
 } as const;
 

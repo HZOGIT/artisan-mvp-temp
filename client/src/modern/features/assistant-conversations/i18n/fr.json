@@ -1,0 +1,12 @@
+{
+  "titre": "Mes conversations",
+  "nouvelle": "Nouvelle conversation",
+  "aucune": "Aucune conversation pour le moment",
+  "demarrezEchange": "Démarrez un échange avec MonAssistant.",
+  "demarrer": "Démarrer",
+  "conversation": "Conversation",
+  "instant": "à l'instant",
+  "minAgo": "il y a {{n}} min",
+  "hAgo": "il y a {{n}} h",
+  "jAgo": "il y a {{n}} j"
+}

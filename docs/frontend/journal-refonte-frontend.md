@@ -344,7 +344,15 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
 - **ETA script `/tmp/eta.sh` rendu AUTO-AUDIT** : dérive `REMAINING` de l'état réel (dossiers
   `modern/features/<x>` manquants + forfaits auth/légal 3 + suppression 6) → ne peut plus surestimer.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~19 restantes, cf. `/tmp/eta.sh`). Ordre : `assistant`
+- **Migration `assistant-conversations` (historique MonAssistant) ✅** (6e des ~24 pages feature) : audit
+  contrat OK (`assistant.getThreads` présent). Clean-archi : `domain` (`AiThread` dérivé + `relativeTime`
+  STRUCTURÉ i18n-friendly `{kind:instant|min|h|j|date}`, **5 tests**) + `application/use-assistant-threads.ts`
+  + `ui` (liste de fils, navigation pleine page vers `/assistant` legacy → la bascule la redirigera une fois
+  `/assistant` migré). i18n namespace `assistantConversations`. Route `/v2/assistant/conversations` +
+  V2_ROUTES + sweep. **0 `any`** (le cast `as AiThread[]` legacy supprimé). tsc/eslint(0)/vitest **270**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). `assistant` (gros, streaming) ou
+au choix un contrat propre sans carte/charts (vehicules, rapports, performances-fournisseurs, devis-ia…).
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
