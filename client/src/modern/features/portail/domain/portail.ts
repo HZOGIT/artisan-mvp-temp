@@ -103,3 +103,22 @@ export function rdvStatutClass(statut: string): string {
     default: return "bg-yellow-100 text-yellow-700"; // en_attente
   }
 }
+
+// ── SLICE 5 : Messages / Chat ──────────────────────────────────────────────────────────────────────
+export type PortailConversation = RouterOutputs["clientPortal"]["getConversations"][number];
+export type PortailMessage = RouterOutputs["clientPortal"]["getConversationMessages"][number];
+
+// Total des messages non lus côté client (badge de l'onglet). PUR.
+export function totalUnread(conversations: readonly PortailConversation[]): number {
+  return conversations.reduce((sum, c) => sum + (c.nonLuClient || 0), 0);
+}
+
+// Date courte d'un message (parité legacy : heure du jour / "Hier" / jour de semaine / date). PUR.
+export function formatChatDate(date: Date | string, now: Date = new Date()): string {
+  const d = new Date(date);
+  const days = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days === 0) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  if (days === 1) return "Hier";
+  if (days < 7) return d.toLocaleDateString("fr-FR", { weekday: "long" });
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+}

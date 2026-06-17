@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, type PortailIntervention } from "./portail";
+import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, type PortailIntervention, type PortailConversation } from "./portail";
 
 describe("portail (socle, slice 1)", () => {
   it("expose les 8 onglets de l'espace client (parité legacy)", () => {
@@ -64,5 +64,18 @@ describe("portail slice 4 — RDV", () => {
     expect(rdvStatutClass("refuse")).toContain("red");
     expect(rdvStatutClass("annule")).toContain("gray");
     expect(rdvStatutClass("en_attente")).toContain("yellow");
+  });
+});
+
+describe("portail slice 5 — chat", () => {
+  it("totalUnread somme les nonLuClient", () => {
+    const convs = [{ nonLuClient: 2 }, { nonLuClient: 0 }, { nonLuClient: 3 }] as unknown as PortailConversation[];
+    expect(totalUnread(convs)).toBe(5);
+    expect(totalUnread([])).toBe(0);
+  });
+  it("formatChatDate : heure aujourd'hui, 'Hier', jour <7j, date au-delà", () => {
+    const now = new Date("2026-06-10T12:00:00");
+    expect(formatChatDate(new Date("2026-06-09T08:00:00"), now)).toBe("Hier");
+    expect(formatChatDate(new Date("2026-06-01T08:00:00"), now)).toContain("juin");
   });
 });

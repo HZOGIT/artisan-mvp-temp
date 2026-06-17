@@ -96,5 +96,11 @@
     "confirme": "Confirmé",
     "refuse": "Refusé",
     "annule": "Annulé"
-  }
+  },
+  "conversations": "Conversations",
+  "aucuneConversation": "Aucune conversation",
+  "conversation": "Conversation",
+  "selectionnezConversation": "Sélectionnez une conversation",
+  "votreMessage": "Votre message...",
+  "messageErreur": "Erreur lors de l'envoi du message"
 }

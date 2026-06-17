@@ -13,9 +13,21 @@ export interface PortalChatMessage {
   readonly conversationId: number;
   readonly auteur: string;
   readonly contenu: string;
+  // OPE-403 : exposé pour l'UI portail (`createdAt` du message ; déjà présent au runtime, type élargi).
+  readonly createdAt: Date;
+}
+// Vue « liste » d'une conversation côté portail (sujet + aperçu + non-lus) — déjà fourni par le repo
+// chat migré (ConversationWithClient), type ici élargi pour que l'UI portail le consomme (OPE-403).
+export interface PortalChatConversationSummary {
+  readonly id: number;
+  readonly clientId: number;
+  readonly sujet: string | null;
+  readonly nonLuClient: number;
+  readonly dernierMessage: string | null;
+  readonly dernierMessageDate: Date | null;
 }
 export interface ChatRepoForPortal {
-  listConversations(ctx: TenantContext): Promise<Array<{ id: number; clientId: number }>>;
+  listConversations(ctx: TenantContext): Promise<PortalChatConversationSummary[]>;
   getConversationOwned(ctx: TenantContext, conversationId: number): Promise<PortalChatConversation | null>;
   listMessages(ctx: TenantContext, conversationId: number): Promise<PortalChatMessage[]>;
   markMessagesAsRead(ctx: TenantContext, conversationId: number, lecteur: "client" | "artisan"): Promise<void>;
@@ -45,7 +57,7 @@ async function conversationDuClient(deps: PortalChatDeps, ctx: TenantContext, cl
 }
 
 // Conversations du client connecté (filtrées sur SON clientId parmi celles du tenant).
-export async function getConversations(deps: Pick<PortalChatDeps, "access" | "chat">, token: string, now: Date = new Date()): Promise<Array<{ id: number; clientId: number }>> {
+export async function getConversations(deps: Pick<PortalChatDeps, "access" | "chat">, token: string, now: Date = new Date()): Promise<PortalChatConversationSummary[]> {
   const { ctx, clientId } = await resolve(deps, token, now);
   const all = await deps.chat.listConversations(ctx);
   return all.filter((c) => c.clientId === clientId);

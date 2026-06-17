@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard, MapPin, CheckCircle2, CheckCircle, Send, ArrowRight, ArrowLeft } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard, MapPin, CheckCircle2, CheckCircle, Send, ArrowRight, ArrowLeft, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { Badge } from "@/modern/shared/ui/badge";
 import { Button } from "@/modern/shared/ui/button";
@@ -12,12 +12,14 @@ import { Input } from "@/modern/shared/ui/input";
 import { Textarea } from "@/modern/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
 import { Progress } from "@/modern/shared/ui/progress";
+import { ScrollArea } from "@/modern/shared/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/modern/shared/ui/tabs";
 import { usePortailAccess } from "../application/use-portail-access";
 import { usePortailDocuments } from "../application/use-portail-documents";
 import { usePortailActivity } from "../application/use-portail-activity";
 import { usePortailRdv } from "../application/use-portail-rdv";
-import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, type RdvUrgence } from "../domain/portail";
+import { usePortailChat } from "../application/use-portail-chat";
+import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, type RdvUrgence } from "../domain/portail";
 
 // SLICE 1 (socle) du portail client `/v2/portail/$token` : gate d'accès (chargement / lien invalide /
 // espace valide) + en-tête artisan + coquille d'onglets. Contenu des onglets = slices ultérieurs.
@@ -62,6 +64,29 @@ export default function PortailClientPage() {
         onSuccess: () => { setRdvStep(1); setRdvForm({ titre: "", description: "", urgence: "normale" }); setRdvSelectedSlot(null); setRdvSuccess(true); setTimeout(() => setRdvSuccess(false), 5000); },
         onError: () => toast.error(t("rdvErreur")),
       },
+    );
+  };
+
+  // Chat (slice 5)
+  const [selectedChatConv, setSelectedChatConv] = useState<number | null>(null);
+  const [chatMessage, setChatMessage] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const { conversations, messages, sendMessage, refetchMessages, refetchConvs } = usePortailChat(token || "", !!access?.valid, selectedChatConv);
+  const totalUnreadChat = totalUnread(conversations);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => {
+    if (!selectedChatConv) return;
+    const id = setInterval(() => { refetchMessages(); refetchConvs(); }, 10000);
+    return () => clearInterval(id);
+  }, [selectedChatConv, refetchMessages, refetchConvs]);
+
+  const submitChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatMessage.trim() || !selectedChatConv) return;
+    sendMessage.mutate(
+      { token: token || "", conversationId: selectedChatConv, contenu: chatMessage.trim() },
+      { onSuccess: () => setChatMessage(""), onError: () => toast.error(t("messageErreur")) },
     );
   };
 
@@ -154,10 +179,13 @@ export default function PortailClientPage() {
             {PORTAIL_TABS.map((tab) => {
               const Icon = TAB_ICON[tab];
               const meta = TAB_LABEL[tab];
+              const count = tab === "devis" ? devis.length : tab === "factures" ? factures.length : 0;
               return (
                 <TabsTrigger key={tab} value={tab} className="flex items-center gap-1.5 text-xs sm:text-sm">
                   <Icon className={`h-4 w-4 ${tab === "demande" ? "text-violet-600" : ""}`} />
                   {meta.prefix && <span className="hidden sm:inline">{t(meta.prefix)}</span>}{t(meta.label)}
+                  {count > 0 && <span className="ml-1 bg-gray-200 text-gray-700 text-xs rounded-full px-1.5">{count}</span>}
+                  {tab === "messages" && totalUnreadChat > 0 && <span className="ml-1 bg-blue-600 text-white text-xs rounded-full px-1.5">{totalUnreadChat}</span>}
                 </TabsTrigger>
               );
             })}
@@ -469,8 +497,77 @@ export default function PortailClientPage() {
             </div>
           </TabsContent>
 
-          {/* Onglets restants (slices 5-6) — coquille */}
-          {PORTAIL_TABS.filter((tab) => !["devis", "factures", "interventions", "chantier", "rdv"].includes(tab)).map((tab) => (
+          {/* SLICE 5 — Messages / Chat */}
+          <TabsContent value="messages">
+            <div className="grid gap-4 sm:grid-cols-3" style={{ minHeight: "500px" }}>
+              <Card className={`${selectedChatConv ? "hidden sm:flex" : "flex"} flex-col`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2"><MessageCircle className="h-5 w-5 text-blue-600" />{t("conversations")}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 p-0 overflow-hidden">
+                  <ScrollArea className="h-full">
+                    {conversations.length === 0 ? (
+                      <div className="p-6 text-center text-gray-500"><MessageCircle className="h-10 w-10 mx-auto mb-3 opacity-30" /><p className="text-sm">{t("aucuneConversation")}</p></div>
+                    ) : (
+                      <div className="space-y-1 p-2">
+                        {conversations.map((conv) => (
+                          <button key={conv.id} onClick={() => setSelectedChatConv(conv.id)} className={`w-full p-3 rounded-lg text-left transition-colors ${selectedChatConv === conv.id ? "bg-blue-50 border border-blue-200" : "hover:bg-gray-50"}`}>
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-sm truncate">{conv.sujet || t("conversation")}</span>
+                              {(conv.nonLuClient || 0) > 0 && <Badge className="ml-2 shrink-0 bg-blue-600">{conv.nonLuClient}</Badge>}
+                            </div>
+                            {conv.dernierMessage && <p className="text-xs text-gray-500 truncate mt-1">{conv.dernierMessage}</p>}
+                            {conv.dernierMessageDate && <p className="text-xs text-gray-400 mt-1 flex items-center gap-1"><Clock className="h-3 w-3" />{formatChatDate(conv.dernierMessageDate)}</p>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+
+              <Card className={`sm:col-span-2 ${selectedChatConv ? "flex" : "hidden sm:flex"} flex-col`}>
+                {selectedChatConv ? (
+                  <>
+                    <CardHeader className="pb-2 border-b">
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => setSelectedChatConv(null)}><ArrowLeft className="h-5 w-5" /></Button>
+                        <CardTitle className="text-lg">{conversations.find((c) => c.id === selectedChatConv)?.sujet || t("conversation")}</CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="flex-1 p-0 flex flex-col overflow-hidden">
+                      <ScrollArea className="flex-1 p-4" style={{ maxHeight: "400px" }}>
+                        <div className="space-y-3">
+                          {messages.map((msg) => (
+                            <div key={msg.id} className={`flex ${msg.auteur === "client" ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-[75%] rounded-lg p-3 ${msg.auteur === "client" ? "bg-blue-600 text-white" : "bg-gray-100"}`}>
+                                <p className="text-sm whitespace-pre-wrap">{msg.contenu}</p>
+                                <p className={`text-xs mt-1 ${msg.auteur === "client" ? "text-blue-200" : "text-gray-400"}`}>{formatChatDate(msg.createdAt)}</p>
+                              </div>
+                            </div>
+                          ))}
+                          <div ref={chatEndRef} />
+                        </div>
+                      </ScrollArea>
+                      <div className="p-3 border-t">
+                        <form onSubmit={submitChat} className="flex gap-2">
+                          <Input value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder={t("votreMessage")} className="flex-1" />
+                          <Button type="submit" disabled={!chatMessage.trim() || sendMessage.isPending}><Send className="h-4 w-4" /></Button>
+                        </form>
+                      </div>
+                    </CardContent>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-gray-500 py-16">
+                    <div className="text-center"><MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-30" /><p>{t("selectionnezConversation")}</p></div>
+                  </div>
+                )}
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Onglets restants (slice 6) — coquille */}
+          {PORTAIL_TABS.filter((tab) => !["devis", "factures", "interventions", "chantier", "rdv", "messages"].includes(tab)).map((tab) => (
             <TabsContent key={tab} value={tab}>
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">{t("sectionAVenir")}</CardContent>
