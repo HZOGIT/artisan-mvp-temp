@@ -2,6 +2,7 @@
 // tant qu'une route legacy n'est PAS listée ici, la bascule la laisse au legacy (intact). À chaque page
 // migrée (Vague 1+), on ajoute son entrée `'<chemin legacy>': '<chemin /v2>'`.
 export const V2_ROUTES: Readonly<Record<string, string>> = {
+  "/": "/v2/home",
   "/clients": "/v2/clients",
   "/notifications": "/v2/notifications",
   "/techniciens": "/v2/techniciens",

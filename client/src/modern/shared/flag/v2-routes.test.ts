@@ -4,6 +4,7 @@ import { isV2Path, resolveV2Path, V2_ROUTES } from "./v2-routes";
 describe("resolveV2Path", () => {
   it("renvoie le chemin /v2 pour une route migrée", () => {
     expect(resolveV2Path("/clients")).toBe("/v2/clients");
+    expect(resolveV2Path("/")).toBe("/v2/home"); // vitrine migrée
   });
 
   it("ignore le slash final et la query/hash", () => {
@@ -14,7 +15,6 @@ describe("resolveV2Path", () => {
 
   it("renvoie null pour une route non migrée", () => {
     expect(resolveV2Path("/profil")).toBeNull();
-    expect(resolveV2Path("/")).toBeNull();
   });
 
   it("ne re-bascule pas un chemin déjà sous /v2 (absent du registre)", () => {

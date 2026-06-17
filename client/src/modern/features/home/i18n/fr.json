@@ -1,0 +1,236 @@
+{
+  "brand": "Operioz",
+  "nav": {
+    "fonctionnalites": "Fonctionnalités",
+    "tarifs": "Tarifs",
+    "temoignages": "Témoignages",
+    "faq": "FAQ"
+  },
+  "menu": "Menu",
+  "seConnecter": "Se connecter",
+  "essaiGratuit": "Essai gratuit",
+  "hero": {
+    "badge": "Nouveau — Conformité facturation 2026 incluse",
+    "title1": "Gérez votre activité,",
+    "title2": "quel que soit votre métier",
+    "subtitle": "Devis, factures, clients, planning, paiements en ligne et assistant IA — tout en un. Pour les artisans, indépendants et professionnels du terrain.",
+    "ctaPrimary": "Commencer gratuitement",
+    "ctaDemo": "Voir une démo",
+    "trustSatisfaction": "satisfaction",
+    "trustSecure": "Données sécurisées",
+    "trustNoCommit": "Sans engagement",
+    "trustMobile": "100% mobile"
+  },
+  "mockup": {
+    "url": "app.operioz.com/dashboard",
+    "hello": "Bonjour, Marc 👋",
+    "activity": "Voici votre activité",
+    "online": "En ligne",
+    "sidebar": ["Tableau de bord", "Clients", "Devis", "Factures", "Planning", "Assistant IA", "Paramètres"],
+    "statCaLabel": "CA du mois",
+    "statCaValue": "12 450 €",
+    "statCaTrend": "+18%",
+    "statDevisLabel": "Devis en cours",
+    "statDevisValue": "8",
+    "statDevisTrend": "3 en attente",
+    "statEncaissLabel": "Taux d'encaissement",
+    "statEncaissValue": "95%",
+    "statEncaissTrend": "+4 pts",
+    "devisRecents": "Devis récents",
+    "voirTout": "Voir tout →",
+    "rows": [
+      { "ref": "2026-042", "client": "SCI Les Terrasses", "city": "Lyon", "amount": "3 200 €", "status": "Envoyé" },
+      { "ref": "2026-041", "client": "Restaurant Le Bouchon", "city": "Paris", "amount": "1 850 €", "status": "Accepté" },
+      { "ref": "2026-040", "client": "Cabinet Médical Presqu'île", "city": "Lyon", "amount": "5 400 €", "status": "Signé" }
+    ]
+  },
+  "reassurance": {
+    "trust": "Ils font confiance à Operioz",
+    "logos": ["Plomberie Martin", "Élec Pro Lyon", "Chauffage Durand", "Rénov Bâti", "Multi Services Karim"],
+    "counterArtisans": "artisans actifs",
+    "counterDevis": "devis générés",
+    "counterEncaisse": "encaissés via Operioz"
+  },
+  "features": {
+    "eyebrow": "Fonctionnalités",
+    "title1": "Tout ce dont vous avez besoin,",
+    "title2": "rien de superflu",
+    "primary": [
+      {
+        "eyebrow": "Devis & facturation",
+        "title": "Des devis pro en 2 minutes,\ndes factures conformes en 1 clic",
+        "description": "Composez vos devis avec votre bibliothèque d'articles métier (500+ références), transformez-les en factures, suivez les paiements et restez conforme à la facturation électronique 2026.",
+        "bullets": ["Bibliothèque articles métier", "Numérotation automatique", "Export FEC pour le comptable"],
+        "plan": "Inclus dans tous les plans"
+      },
+      {
+        "eyebrow": "Portail client & paiement",
+        "title": "Vos clients consultent et règlent\nleurs factures en ligne",
+        "description": "Un portail dédié pour chaque client avec ses devis, factures et l'historique des interventions. Paiement direct par carte bancaire via Stripe, sans frais cachés.",
+        "bullets": ["Portail client personnalisé", "Paiement Stripe intégré", "Relances automatiques"],
+        "plan": "Inclus à partir du plan Pro"
+      },
+      {
+        "eyebrow": "Assistant IA",
+        "title": "Un assistant qui comprend\nvotre activité, jour après jour",
+        "description": "Analyses, prévisions de trésorerie, génération de devis assistée, suggestions de relances — l'IA Operioz lit votre activité en temps réel et vous fait gagner des heures chaque semaine.",
+        "bullets": ["Analyse photo + suggestion de devis", "Prévisions de trésorerie", "Relances intelligentes"],
+        "plan": "Inclus à partir du plan Pro"
+      }
+    ],
+    "secondaryTitle": "Et bien plus encore",
+    "secondary": [
+      { "title": "Gestion clients (CRM)", "description": "Fichier complet avec historique, documents, notes.", "plan": "Inclus" },
+      { "title": "Calendrier & planning", "description": "Vue jour/semaine/mois, drag & drop des interventions.", "plan": "Inclus" },
+      { "title": "Chat client", "description": "Messagerie intégrée pour échanger sans quitter l'app.", "plan": "Pro+" },
+      { "title": "Géolocalisation équipes", "description": "Carte temps réel, affectation par proximité.", "plan": "Entreprise" },
+      { "title": "Contrats de maintenance", "description": "Récurrence automatique, facturation périodique.", "plan": "Pro+" },
+      { "title": "Conformité 2026", "description": "Facturation électronique, export FEC, RGPD.", "plan": "Inclus" }
+    ]
+  },
+  "illustrations": {
+    "devisTitle": "Devis #2026-042",
+    "devisBadge": "Brouillon",
+    "devisClient": "SCI Les Terrasses du Rhône",
+    "devisCity": "Lyon · 69002",
+    "devisLines": [
+      { "label": "Pose chaudière gaz Frisquet 25kW", "qty": "1", "price": "2 400 €" },
+      { "label": "Tube cuivre Ø22, raccords", "qty": "12", "price": "480 €" },
+      { "label": "Main d'œuvre — Installation", "qty": "8 h", "price": "320 €" }
+    ],
+    "devisTotalLabel": "Total TTC",
+    "devisTotal": "3 200 €",
+    "clientTitle": "Portail client",
+    "clientInitials": "SM",
+    "clientName": "Sophie Martin",
+    "clientEmail": "sophie.martin@email.fr",
+    "clientAPayer": "À payer",
+    "clientAPayerValue": "1 240 €",
+    "clientStatut": "Statut",
+    "clientStatutValue": "En cours",
+    "clientRegler": "Régler en ligne · 1 240 €",
+    "iaTitle": "Assistant Operioz",
+    "iaQuestion": "Comment va ma trésorerie ce mois-ci ?",
+    "iaAnswer1Pre": "Bonne semaine : ",
+    "iaAnswer1Strong": "12 450 €",
+    "iaAnswer1Post": " encaissés, dont 3 factures réglées via Stripe.",
+    "iaAnswer2Strong": "2 factures",
+    "iaAnswer2Post": " en retard (Cabinet Médical, 1 850 €). Je peux envoyer une relance ?",
+    "iaRelancer": "Relancer",
+    "iaPlusTard": "Plus tard"
+  },
+  "sectors": {
+    "eyebrow": "Secteurs",
+    "title": "Adapté à votre secteur d'activité",
+    "subtitle": "Operioz s'adapte à tous les professionnels indépendants, quel que soit votre métier.",
+    "items": [
+      { "title": "Bâtiment & Rénovation", "examples": "(plombier, électricien, maçon, carreleur, couvreur...)" },
+      { "title": "Espaces verts & Extérieur", "examples": "(jardinier, paysagiste, pisciniste, arboriste...)" },
+      { "title": "Aménagement intérieur", "examples": "(cuisiniste, menuisier, peintre, décorateur, poseur...)" },
+      { "title": "Travaux publics & VRD", "examples": "(terrassier, enrobeur, canalisateur, paveur...)" },
+      { "title": "Commerce & Services", "examples": "(vendeur, prestataire, artisan commerçant, installateur...)" },
+      { "title": "Maintenance & Dépannage", "examples": "(technicien, réparateur, dépanneur, maintenancier...)" }
+    ]
+  },
+  "how": {
+    "eyebrow": "Démarrage",
+    "title": "Opérationnel en 3 étapes",
+    "steps": [
+      { "title": "Créez votre compte", "description": "Inscription en 2 minutes, sans carte bancaire. Aucune installation." },
+      { "title": "Configurez votre activité", "description": "Importez vos clients, choisissez votre bibliothèque métier, personnalisez vos documents." },
+      { "title": "Développez votre business", "description": "Envoyez devis, facturez, encaissez en ligne, pilotez avec l'assistant IA." }
+    ]
+  },
+  "pricing": {
+    "eyebrow": "Tarifs",
+    "title": "Des tarifs simples et transparents",
+    "subtitle": "30 jours d'essai gratuit sur toutes les offres — Sans engagement.",
+    "monthly": "Mensuel",
+    "annual": "Annuel",
+    "discount": "−20%",
+    "recommended": "Recommandé",
+    "perMonth": "/mois",
+    "billedAnnually": "Facturé annuellement · {{total}}€/an",
+    "billedMonthly": "Facturation mensuelle, sans engagement",
+    "footerFree": "30 jours gratuits",
+    "footerNoCard": "Sans carte bancaire",
+    "footerCancel": "Résiliation en 1 clic",
+    "plans": [
+      {
+        "name": "Essentiel",
+        "tagline": "Parfait pour démarrer",
+        "cta": "Essayer Essentiel",
+        "features": ["Devis & factures illimités", "Gestion clients (jusqu'à 100)", "Calendrier & planification", "Bibliothèque articles métier", "Tableau de bord", "Export comptable FEC", "Support email"]
+      },
+      {
+        "name": "Pro",
+        "tagline": "Le choix des artisans qui développent",
+        "cta": "Démarrer avec Pro",
+        "features": ["Tout Essentiel +", "Clients illimités", "Assistant IA", "Portail client", "Paiement en ligne Stripe", "Chat client intégré", "Contrats de maintenance", "Notifications temps réel", "Support prioritaire"]
+      },
+      {
+        "name": "Entreprise",
+        "tagline": "Pour les équipes et multi-métiers",
+        "cta": "Choisir Entreprise",
+        "features": ["Tout Pro +", "Multi-utilisateurs (jusqu'à 10)", "Gestion techniciens", "Géolocalisation équipes", "Bons de commande fournisseurs", "Rapports avancés", "API & intégrations", "Support téléphonique dédié"]
+      }
+    ]
+  },
+  "testimonials": {
+    "eyebrow": "Témoignages",
+    "title": "Ils nous font confiance",
+    "subtitle": "Des artisans qui ont digitalisé leur activité avec Operioz.",
+    "reviewsSuffix": "avis",
+    "items": [
+      { "name": "Marc Dubois", "role": "Plombier — Lyon", "text": "Depuis Operioz, je génère mes devis en 3 minutes au lieu de 30. J'ai réduit mes impayés de 60% grâce aux relances automatiques. L'app paie largement son abonnement chaque mois." },
+      { "name": "Sophie Martin", "role": "Paysagiste — Bordeaux", "text": "Depuis Operioz, j'envoie mes devis d'aménagement depuis mon téléphone sur le chantier. Mes clients reçoivent tout en temps réel et paient en ligne. Un gain de temps énorme." },
+      { "name": "Karim Benali", "role": "Cuisiniste — Lyon", "text": "Je gère mes commandes fournisseurs, mes clients et mon planning depuis une seule app. J'ai gagné 5 h par semaine sur l'administratif." }
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions fréquentes",
+    "more": "Une autre question ?",
+    "email": "contact@operioz.com",
+    "items": [
+      { "question": "Est-ce adapté à mon métier ?", "answer": "Operioz est conçu pour les plombiers, électriciens, chauffagistes, climaticiens et artisans multi-métiers. Chaque métier dispose de sa propre bibliothèque d'articles avec plus de 300 références prêtes à l'emploi." },
+      { "question": "Puis-je importer mes clients existants ?", "answer": "Oui, vous pouvez importer votre fichier clients au format CSV en quelques clics. Toutes les données sont conservées : coordonnées, historique, notes." },
+      { "question": "Comment fonctionne l'essai gratuit ?", "answer": "L'essai gratuit dure 30 jours avec accès complet à toutes les fonctionnalités. Aucune carte bancaire n'est requise. À la fin de l'essai, vous choisissez l'offre qui vous convient — ou rien du tout." },
+      { "question": "Mes données sont-elles sécurisées ?", "answer": "Vos données sont hébergées sur des serveurs européens avec chiffrement SSL, sauvegardes quotidiennes et conformité RGPD. Vous restez propriétaire de vos données et pouvez les exporter à tout moment." },
+      { "question": "Puis-je annuler à tout moment ?", "answer": "Oui, sans engagement. Vous pouvez annuler votre abonnement à tout moment depuis votre espace. Vos données restent accessibles pendant 30 jours après résiliation pour vous laisser le temps d'exporter ce qui vous est utile." },
+      { "question": "La facturation électronique 2026, c'est quoi ?", "answer": "À partir de 2026, toutes les entreprises françaises devront émettre et recevoir des factures au format électronique. Operioz est déjà conforme avec la génération de factures aux normes et l'export FEC pour votre comptable." },
+      { "question": "L'application fonctionne-t-elle hors ligne ?", "answer": "Operioz est une application web PWA : les pages déjà visitées restent accessibles sans connexion, et toute modification est synchronisée automatiquement dès que le réseau revient." },
+      { "question": "Y a-t-il une application mobile ?", "answer": "Operioz est une PWA installable depuis votre navigateur sur iOS et Android — vous obtenez une icône sur votre écran d'accueil et l'expérience d'une vraie app, sans passer par les stores. Aucune installation lourde." },
+      { "question": "Puis-je utiliser l'application sur mon téléphone ?", "answer": "Oui, Operioz est entièrement responsive et fonctionne parfaitement sur smartphone et tablette. La majorité des artisans utilisent l'app autant sur le chantier que depuis leur bureau." }
+    ]
+  },
+  "cta": {
+    "title1": "Rejoignez ",
+    "title2": "500+ professionnels",
+    "title3": " qui ont digitalisé leur activité",
+    "subtitle": "30 jours gratuits · sans engagement · sans carte bancaire.",
+    "button": "Créer mon compte gratuitement",
+    "reassurance": [
+      { "label": "Données sécurisées", "sub": "Hébergement EU, RGPD" },
+      { "label": "Opérationnel en 5 min", "sub": "Aucune installation" },
+      { "label": "Support réactif", "sub": "Réponse sous 24 h" }
+    ]
+  },
+  "footer": {
+    "tagline": "Le logiciel de gestion tout-en-un pour les artisans, indépendants et professionnels du terrain.",
+    "produit": "Produit",
+    "ressources": "Ressources",
+    "legal": "Légal",
+    "guide": "Guide d'utilisation",
+    "blog": "Blog",
+    "blogSoon": "(bientôt)",
+    "aide": "Centre d'aide",
+    "mentions": "Mentions légales",
+    "cgu": "CGU",
+    "cgv": "CGV",
+    "confidentialite": "Politique de confidentialité",
+    "email": "contact@operioz.com",
+    "copyright": "© {{year}} Operioz. Tous droits réservés.",
+    "madeIn": "Fait avec ❤ en France · Pour tous les professionnels 🇫🇷"
+  }
+}

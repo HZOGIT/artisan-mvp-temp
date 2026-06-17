@@ -273,6 +273,7 @@ function Router() {
         <Route path="/v2/signature/:token" component={PublicModernRouterMount} />
         <Route path="/v2/devis-public/:token" component={PublicModernRouterMount} />
         <Route path="/v2/portail/:token" component={PublicModernRouterMount} />
+        <Route path="/v2/home" component={PublicModernRouterMount} />
         <Route path="/portail/:token" component={PortailClient} />
         <Route path="/avis/:token" component={SoumettreAvis} />
         <Route path="/vitrine/:slug" component={Vitrine} />

@@ -68,7 +68,14 @@ const portailRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/portail/ui/portail-client-page")),
 });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute]);
+// Page vitrine publique (`pages/Home.tsx`, legacy `/`) — port routing/chemins (vitrine statique).
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/home",
+  component: lazyRouteComponent(() => import("../../features/home/ui/home-page")),
+});
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,
