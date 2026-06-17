@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useTechniciens, useTechnicienDetail } from "../application/use-techniciens";
+import {
+  habilExpiry,
+  habilitationBadge,
+  toTechnicienStatut,
+  type Habilitation,
+  type LinkableUser,
+  type Technicien,
+  type TechnicienStatut,
+} from "../domain/technicien";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Label } from "@/modern/shared/ui/label";
@@ -31,9 +40,10 @@ import {
 import { Users, Plus, Pencil, Trash2, Phone, Mail, Wrench, Calendar, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Techniciens du FRONT NEUF (`/v2/techniciens`) — PORT CONFORME de `pages/Techniciens.tsx`
-// (parité visuelle stricte). JSX/Tailwind à l'identique ; plomberie repointée : primitives
-// `@/modern/shared/ui`, tRPC `@/modern/shared/trpc`, libellés i18n (namespace `techniciens`).
+// Page Techniciens du FRONT NEUF (`/v2/techniciens`) — clean-archi : présentation pure. Données &
+// mutations via `useTechniciens`/`useTechnicienDetail` (couche application, seule à importer tRPC) ;
+// le calcul du badge d'habilitation (échéance/expiration) vient du domaine (`../domain/technicien`,
+// pur & testé). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`techniciens`).
 
 interface TechnicienForm {
   nom: string;
@@ -43,7 +53,7 @@ interface TechnicienForm {
   specialite: string;
   couleur: string;
   coutHoraire: string;
-  statut: "actif" | "inactif" | "conge";
+  statut: TechnicienStatut;
   userId: number | null;
 }
 
@@ -79,77 +89,32 @@ export default function TechniciensPage() {
   const [selectedTechnicien, setSelectedTechnicien] = useState<number | null>(null);
   const [habilForm, setHabilForm] = useState({ type: "", numero: "", organisme: "", dateObtention: "", dateExpiration: "" });
 
-  const { data: techniciens, refetch } = trpc.techniciens.getAll.useQuery();
-  // Comptes utilisateurs du tenant liables à une fiche technicien.
-  const { data: linkableUsers } = trpc.techniciens.getLinkableUsers.useQuery();
-  const { data: stats } = trpc.techniciens.getStats.useQuery(
-    { technicienId: selectedTechnicien! },
-    { enabled: !!selectedTechnicien }
-  );
-  const { data: habilitations, refetch: refetchHabil } = trpc.techniciens.getHabilitations.useQuery(
-    { technicienId: selectedTechnicien! },
-    { enabled: !!selectedTechnicien }
-  );
-
-  const addHabilMutation = trpc.techniciens.addHabilitation.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastHabilAdded"));
-      setHabilForm({ type: "", numero: "", organisme: "", dateObtention: "", dateExpiration: "" });
-      refetchHabil();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const deleteHabilMutation = trpc.techniciens.deleteHabilitation.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastHabilDeleted"));
-      refetchHabil();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const createMutation = trpc.techniciens.create.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastCreated"));
-      setIsDialogOpen(false);
-      setForm(initialForm);
-      refetch();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const updateMutation = trpc.techniciens.update.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastUpdated"));
-      setIsDialogOpen(false);
-      setEditingId(null);
-      setForm(initialForm);
-      refetch();
-    },
-    onError: (error) => toast.error(error.message),
-  });
-
-  const deleteMutation = trpc.techniciens.delete.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastDeleted"));
-      refetch();
-    },
-    onError: (error) => toast.error(error.message),
-  });
+  const { techniciens, linkableUsers, create: createMutation, update: updateMutation, remove: deleteMutation } =
+    useTechniciens();
+  const { stats, habilitations, addHabilitation: addHabilMutation, deleteHabilitation: deleteHabilMutation } =
+    useTechnicienDetail(selectedTechnicien);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // `coutHoraire` vide -> undefined : l'input serveur est un decimal validé (rejette "").
     const payload = { ...form, coutHoraire: form.coutHoraire || undefined };
+    const onSettled = {
+      onSuccess: () => {
+        toast.success(editingId ? t("toastUpdated") : t("toastCreated"));
+        setIsDialogOpen(false);
+        setEditingId(null);
+        setForm(initialForm);
+      },
+      onError: (error: { message: string }) => toast.error(error.message),
+    };
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...payload });
+      updateMutation.mutate({ id: editingId, ...payload }, onSettled);
     } else {
-      createMutation.mutate(payload);
+      createMutation.mutate(payload, onSettled);
     }
   };
 
-  const handleEdit = (technicien: any) => {
-    if (!technicien) return;
+  const handleEdit = (technicien: Technicien) => {
     setEditingId(technicien.id);
     setForm({
       nom: technicien.nom,
@@ -159,7 +124,7 @@ export default function TechniciensPage() {
       specialite: technicien.specialite || "",
       couleur: technicien.couleur || "#3b82f6",
       coutHoraire: technicien.coutHoraire != null ? String(technicien.coutHoraire) : "",
-      statut: technicien.statut as "actif" | "inactif" | "conge",
+      statut: toTechnicienStatut(technicien.statut),
       userId: technicien.userId ?? null,
     });
     setIsDialogOpen(true);
@@ -282,7 +247,7 @@ export default function TechniciensPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">{t("noUserLinked")}</SelectItem>
-                    {(linkableUsers || []).map((u: any) => (
+                    {linkableUsers.map((u: LinkableUser) => (
                       <SelectItem key={u.id} value={String(u.id)}>
                         {u.nom}{u.role ? ` — ${u.role}` : ""}
                       </SelectItem>
@@ -354,10 +319,10 @@ export default function TechniciensPage() {
         {/* Liste des techniciens */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>{t("teamCount", { n: techniciens?.length || 0 })}</CardTitle>
+            <CardTitle>{t("teamCount", { n: techniciens.length })}</CardTitle>
           </CardHeader>
           <CardContent>
-            {techniciens?.length === 0 ? (
+            {techniciens.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {t("emptyTeam")}
               </div>
@@ -373,7 +338,7 @@ export default function TechniciensPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {techniciens?.map((tech: any) => (
+                  {techniciens.map((tech: Technicien) => (
                     <TableRow
                       key={tech.id}
                       className={`cursor-pointer ${selectedTechnicien === tech.id ? "bg-muted" : ""}`}
@@ -440,7 +405,13 @@ export default function TechniciensPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               if (confirm(t("confirmDeleteTech"))) {
-                                deleteMutation.mutate({ id: tech.id });
+                                deleteMutation.mutate(
+                                  { id: tech.id },
+                                  {
+                                    onSuccess: () => toast.success(t("toastDeleted")),
+                                    onError: (error) => toast.error(error.message),
+                                  },
+                                );
                               }
                             }}
                           >
@@ -510,37 +481,39 @@ export default function TechniciensPage() {
             ) : (
               <div className="space-y-4">
                 {/* Liste */}
-                {habilitations && habilitations.length > 0 ? (
+                {habilitations.length > 0 ? (
                   <div className="space-y-2">
-                    {habilitations.map((h: any) => {
-                      const exp = h.dateExpiration ? new Date(h.dateExpiration) : null;
-                      const valid = exp && !isNaN(exp.getTime());
-                      const joursRestants = valid ? Math.ceil((exp!.getTime() - Date.now()) / 86400000) : null;
-                      let badge: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } = { label: t("habilNoExpiry"), variant: "outline" };
-                      if (joursRestants != null) {
-                        if (joursRestants < 0) badge = { label: t("habilExpired"), variant: "destructive" };
-                        else if (joursRestants <= 60) badge = { label: t("habilExpiresIn", { n: joursRestants }), variant: "secondary" };
-                        else badge = { label: t("habilValid"), variant: "default" };
-                      }
+                    {habilitations.map((h: Habilitation) => {
+                      // Badge & échéance délégués au domaine (pur, testé).
+                      const badge = habilitationBadge(h);
+                      const badgeLabel =
+                        badge.key === "habilExpiresIn" ? t("habilExpiresIn", { n: badge.params.n }) : t(badge.key);
+                      const exp = habilExpiry(h);
                       return (
                         <div key={h.id} className="flex items-start justify-between gap-2 p-3 border rounded-lg">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium">{h.type}</span>
-                              <Badge variant={badge.variant}>{badge.label}</Badge>
+                              <Badge variant={badge.variant}>{badgeLabel}</Badge>
                             </div>
                             <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
                               {h.numero && <p>{t("habilNumero")} {h.numero}</p>}
                               {h.organisme && <p>{t("habilOrganisme")} {h.organisme}</p>}
-                              {valid && <p>{t("habilEcheance")} {exp!.toLocaleDateString("fr-FR")}</p>}
+                              {exp && <p>{t("habilEcheance")} {exp.toLocaleDateString("fr-FR")}</p>}
                             </div>
                           </div>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => {
-                              if (confirm(t("confirmDeleteHabil"))) {
-                                deleteHabilMutation.mutate({ technicienId: selectedTechnicien, id: h.id });
+                              if (selectedTechnicien != null && confirm(t("confirmDeleteHabil"))) {
+                                deleteHabilMutation.mutate(
+                                  { technicienId: selectedTechnicien, id: h.id },
+                                  {
+                                    onSuccess: () => toast.success(t("toastHabilDeleted")),
+                                    onError: (error) => toast.error(error.message),
+                                  },
+                                );
                               }
                             }}
                           >
@@ -559,18 +532,28 @@ export default function TechniciensPage() {
                   className="space-y-2 border-t pt-4"
                   onSubmit={(e) => {
                     e.preventDefault();
+                    if (selectedTechnicien == null) return;
                     if (!habilForm.type.trim()) {
                       toast.error(t("toastHabilTypeRequired"));
                       return;
                     }
-                    addHabilMutation.mutate({
-                      technicienId: selectedTechnicien,
-                      type: habilForm.type.trim(),
-                      numero: habilForm.numero.trim() || undefined,
-                      organisme: habilForm.organisme.trim() || undefined,
-                      dateObtention: habilForm.dateObtention || undefined,
-                      dateExpiration: habilForm.dateExpiration || undefined,
-                    });
+                    addHabilMutation.mutate(
+                      {
+                        technicienId: selectedTechnicien,
+                        type: habilForm.type.trim(),
+                        numero: habilForm.numero.trim() || undefined,
+                        organisme: habilForm.organisme.trim() || undefined,
+                        dateObtention: habilForm.dateObtention || undefined,
+                        dateExpiration: habilForm.dateExpiration || undefined,
+                      },
+                      {
+                        onSuccess: () => {
+                          toast.success(t("toastHabilAdded"));
+                          setHabilForm({ type: "", numero: "", organisme: "", dateObtention: "", dateExpiration: "" });
+                        },
+                        onError: (error) => toast.error(error.message),
+                      },
+                    );
                   }}
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
