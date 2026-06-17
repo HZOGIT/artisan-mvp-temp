@@ -9,15 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/modern/shared/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/modern/shared/ui/tabs";
 import { Badge } from "@/modern/shared/ui/badge";
-import { trpc } from "@/modern/shared/trpc";
+import { useStocks, useMouvements } from "../application/use-stocks";
+import {
+  filterStocks,
+  indexEntrantByStock,
+  isLowStock,
+  previsionnel,
+  totalStockValue,
+  type Mouvement,
+  type Stock,
+} from "../domain/stock";
 import { Loader2, Plus, Search, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, History, Bell } from "lucide-react";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
 
-// Page Gestion des Stocks du FRONT NEUF (`/v2/stocks`) — PORT CONFORME de `pages/Stocks.tsx`. JSX à
-// l'identique (tabs + 4 dialogs : créer/éditer/mouvement/historique + KPIs + alertes). Plomberie
-// repointée : primitives `@/modern/shared/ui`, tRPC partagé, i18n (namespace `stocks`). NB : on NE
-// ré-enveloppe PAS dans `DashboardLayout` (déjà fourni par AuthenticatedRoutes) et on retire `useAuth`.
+// Page Gestion des Stocks du FRONT NEUF (`/v2/stocks`) — clean-archi : présentation pure. Données &
+// mutations via `useStocks`/`useMouvements` (couche application, seule à importer tRPC) ; recherche,
+// seuil d'alerte, valeur de stock et index entrant via le domaine (`../domain/stock`, fonctions pures
+// testées). Parité visuelle stricte : JSX/Tailwind à l'identique (tabs + 4 dialogs + KPIs + alertes).
 
 const UNITE_KEYS: { value: string; key: string }[] = [
   { value: "unité", key: "unite_unite" },
@@ -65,7 +73,7 @@ export default function StocksPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isMouvementDialogOpen, setIsMouvementDialogOpen] = useState(false);
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
-  const [selectedStock, setSelectedStock] = useState<any>(null);
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [formData, setFormData] = useState<StockFormData>({
     reference: "",
     designation: "",
@@ -84,68 +92,24 @@ export default function StocksPage() {
     reference: ""
   });
 
-  const utils = trpc.useUtils();
-  const { data: stocks, isLoading } = trpc.stocks.list.useQuery();
-  const { data: lowStockItems } = trpc.stocks.getLowStock.useQuery();
+  const {
+    stocks,
+    lowStockItems,
+    stockEntrant,
+    isLoading,
+    create: createMutation,
+    update: updateMutation,
+    remove: deleteMutation,
+    adjust: adjustMutation,
+    generateAlerts: generateAlertsMutation,
+  } = useStocks();
   // Quantité entrante (commandes fournisseurs en cours) par fiche stock → stock prévisionnel.
-  const { data: stockEntrant } = trpc.stocks.getEntrant.useQuery();
-  const entrantByStock: Record<number, number> = {};
-  (stockEntrant || []).forEach((e: any) => { entrantByStock[e.stockId] = e.entrant; });
-  const { data: mouvements, isLoading: loadingMouvements } = trpc.stocks.getMouvements.useQuery(
-    { stockId: selectedStock?.id || 0 },
-    { enabled: !!selectedStock && isHistoryDialogOpen }
+  const entrantByStock = indexEntrantByStock(stockEntrant);
+  const entrantOf = (stockId: number) => entrantByStock.get(stockId) ?? 0;
+  const { mouvements, isLoading: loadingMouvements } = useMouvements(
+    selectedStock?.id ?? 0,
+    !!selectedStock && isHistoryDialogOpen,
   );
-
-  const createMutation = trpc.stocks.create.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastCreated"));
-      setIsCreateDialogOpen(false);
-      resetForm();
-      utils.stocks.list.invalidate();
-      utils.stocks.getLowStock.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const updateMutation = trpc.stocks.update.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastUpdated"));
-      setIsEditDialogOpen(false);
-      utils.stocks.list.invalidate();
-      utils.stocks.getLowStock.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const deleteMutation = trpc.stocks.delete.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastDeleted"));
-      utils.stocks.list.invalidate();
-      utils.stocks.getLowStock.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const adjustMutation = trpc.stocks.adjustQuantity.useMutation({
-    onSuccess: () => {
-      toast.success(t("toastMvt"));
-      setIsMouvementDialogOpen(false);
-      resetMouvementForm();
-      utils.stocks.list.invalidate();
-      utils.stocks.getLowStock.invalidate();
-      utils.stocks.getMouvements.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
-
-  const generateAlertsMutation = trpc.stocks.generateAlerts.useMutation({
-    onSuccess: (data) => {
-      toast.success(t("toastAlerts", { count: data.alertsCreated }));
-      utils.notifications.list.invalidate();
-      utils.notifications.getUnreadCount.invalidate();
-    },
-    onError: (error) => toast.error(error.message)
-  });
 
   const resetForm = () => {
     setFormData({
@@ -175,20 +139,39 @@ export default function StocksPage() {
       toast.error(t("toastRequiredFields"));
       return;
     }
-    createMutation.mutate(formData);
+    createMutation.mutate(formData, {
+      onSuccess: () => {
+        toast.success(t("toastCreated"));
+        setIsCreateDialogOpen(false);
+        resetForm();
+      },
+      onError: (error) => toast.error(error.message),
+    });
   };
 
   const handleUpdate = () => {
     if (!selectedStock) return;
-    updateMutation.mutate({
-      id: selectedStock.id,
-      ...formData
-    });
+    updateMutation.mutate(
+      { id: selectedStock.id, ...formData },
+      {
+        onSuccess: () => {
+          toast.success(t("toastUpdated"));
+          setIsEditDialogOpen(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   };
 
   const handleDelete = (id: number) => {
     if (confirm(t("confirmDelete"))) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate(
+        { id },
+        {
+          onSuccess: () => toast.success(t("toastDeleted")),
+          onError: (error) => toast.error(error.message),
+        },
+      );
     }
   };
 
@@ -197,15 +180,31 @@ export default function StocksPage() {
       toast.error(t("toastInvalidQty"));
       return;
     }
-    adjustMutation.mutate({
-      ...mouvementData,
-      stockId: selectedStock.id,
-      // L'input tRPC attend `quantite` en string (le legacy envoyait un number, toléré car non gaté).
-      quantite: String(mouvementData.quantite),
-    });
+    adjustMutation.mutate(
+      {
+        ...mouvementData,
+        stockId: selectedStock.id,
+        // L'input tRPC attend `quantite` en string (le legacy envoyait un number, toléré car non gaté).
+        quantite: String(mouvementData.quantite),
+      },
+      {
+        onSuccess: () => {
+          toast.success(t("toastMvt"));
+          setIsMouvementDialogOpen(false);
+          resetMouvementForm();
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   };
 
-  const openEditDialog = (stock: any) => {
+  const handleGenerateAlerts = () =>
+    generateAlertsMutation.mutate(undefined, {
+      onSuccess: (data) => toast.success(t("toastAlerts", { count: data.alertsCreated })),
+      onError: (error) => toast.error(error.message),
+    });
+
+  const openEditDialog = (stock: Stock) => {
     setSelectedStock(stock);
     setFormData({
       reference: stock.reference,
@@ -220,7 +219,7 @@ export default function StocksPage() {
     setIsEditDialogOpen(true);
   };
 
-  const openMouvementDialog = (stock: any) => {
+  const openMouvementDialog = (stock: Stock) => {
     setSelectedStock(stock);
     setMouvementData({
       stockId: stock.id,
@@ -232,7 +231,7 @@ export default function StocksPage() {
     setIsMouvementDialogOpen(true);
   };
 
-  const openHistoryDialog = (stock: any) => {
+  const openHistoryDialog = (stock: Stock) => {
     setSelectedStock(stock);
     setIsHistoryDialogOpen(true);
   };
@@ -247,17 +246,8 @@ export default function StocksPage() {
     });
   };
 
-  const filteredStocks = stocks?.filter((stock: any) =>
-    matchSearch(stock.reference, searchQuery) ||
-    matchSearch(stock.designation, searchQuery) ||
-    matchSearch(stock.fournisseur, searchQuery)
-  );
-
-  const isLowStock = (stock: any) => {
-    const qty = parseFloat(stock.quantiteEnStock || "0");
-    const seuil = parseFloat(stock.seuilAlerte || "0");
-    return qty <= seuil;
-  };
+  // Recherche déléguée au domaine (pure, testée). `isLowStock` vient aussi du domaine.
+  const filteredStocks = filterStocks(stocks, searchQuery);
 
   const uniteSelect = (value: string, onChange: (v: string) => void) => (
     <Select value={value} onValueChange={onChange}>
@@ -280,7 +270,7 @@ export default function StocksPage() {
           <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => generateAlertsMutation.mutate()}>
+          <Button variant="outline" onClick={handleGenerateAlerts}>
             <Bell className="h-4 w-4 mr-2" />
             {t("generateAlerts")}
           </Button>
@@ -383,24 +373,21 @@ export default function StocksPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("kpiArticles")}</CardDescription>
-            <CardTitle className="text-2xl">{stocks?.length ?? 0}</CardTitle>
+            <CardTitle className="text-2xl">{stocks.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("kpiValue")}</CardDescription>
             <CardTitle className="text-2xl">
-              {(stocks || []).reduce(
-                (sum: number, s: any) => sum + (parseFloat(s.quantiteEnStock || "0") || 0) * (parseFloat(s.prixAchat || "0") || 0),
-                0,
-              ).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+              {totalStockValue(stocks).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
             </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>{t("kpiLow")}</CardDescription>
-            <CardTitle className="text-2xl text-orange-600">{lowStockItems?.length ?? 0}</CardTitle>
+            <CardTitle className="text-2xl text-orange-600">{lowStockItems.length}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -419,7 +406,7 @@ export default function StocksPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {lowStockItems.map((item: any) => (
+              {lowStockItems.map((item: Stock) => (
                 <Badge key={item.id} variant="outline" className="bg-white border-orange-300">
                   {item.designation} ({item.quantiteEnStock} {item.unite})
                 </Badge>
@@ -463,7 +450,7 @@ export default function StocksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStocks.map((stock: any) => (
+                  {filteredStocks.map((stock: Stock) => (
                     <tr key={stock.id} className={`border-t ${isLowStock(stock) ? 'bg-orange-50' : ''}`}>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
@@ -477,13 +464,13 @@ export default function StocksPage() {
                         <span className={isLowStock(stock) ? 'text-orange-600 font-bold' : ''}>
                           {stock.quantiteEnStock} {stock.unite}
                         </span>
-                        {entrantByStock[stock.id] > 0 && (
+                        {entrantOf(stock.id) > 0 && (
                           <Badge
                             variant="outline"
                             className="ml-2 border-blue-300 text-blue-700 bg-blue-50"
-                            title={t("previsionnelTitle", { qty: (parseFloat(stock.quantiteEnStock || '0') + entrantByStock[stock.id]).toFixed(2), unite: stock.unite })}
+                            title={t("previsionnelTitle", { qty: previsionnel(stock, entrantOf(stock.id)).toFixed(2), unite: stock.unite })}
                           >
-                            {t("entrantBadge", { n: entrantByStock[stock.id] })}
+                            {t("entrantBadge", { n: entrantOf(stock.id) })}
                           </Badge>
                         )}
                       </td>
@@ -536,7 +523,7 @@ export default function StocksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {lowStockItems.map((stock: any) => (
+                  {lowStockItems.map((stock: Stock) => (
                     <tr key={stock.id} className="border-t bg-orange-50">
                       <td className="p-2">
                         <div className="flex items-center gap-2">
@@ -751,7 +738,7 @@ export default function StocksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mouvements.map((mvt: any) => (
+                  {mouvements.map((mvt: Mouvement) => (
                     <tr key={mvt.id} className="border-t">
                       <td className="p-2 text-sm">{formatDate(mvt.createdAt)}</td>
                       <td className="p-2">
