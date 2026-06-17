@@ -26,12 +26,6 @@ if (!signin.ok()) {
   process.exit(2);
 }
 
-// Dette PoC OPE-366 connue et TRAQUÉE (à supprimer en Vague 1 lors de la migration `clients` → tRPC) :
-// `ClientsModernPage` lit encore `/api/rest/clients` (openapi-fetch), endpoint REST jamais implémenté
-// → 404 attendu. On l'ignore pour ne pas faire rougir le gate du socle ; tout AUTRE 4xx/5xx ou erreur
-// console/page est une vraie régression.
-const KNOWN_DEBT_404 = /\/api\/rest\/clients/;
-
 const page = await ctx.newPage();
 let current = '';
 page.on('console', (m) => {
@@ -43,11 +37,11 @@ page.on('console', (m) => {
   add({ route: current, type: 'console', text: t.slice(0, 400) });
 });
 page.on('pageerror', (e) => add({ route: current, type: 'pageerror', text: String(e?.message || e).slice(0, 400) }));
+// `/v2/clients` est désormais alimenté par tRPC (`clients.list`, client partagé) — plus aucun
+// `/api/rest/clients` : tout 4xx/5xx est une vraie régression (la dette REST OPE-366 est supprimée).
 page.on('response', (r) => {
   if (r.status() < 400) return;
-  const u = r.url();
-  if (KNOWN_DEBT_404.test(u)) return; // dette traquée OPE-366
-  add({ route: current, type: 'http', status: r.status(), url: u.replace(BASE, '').slice(0, 160) });
+  add({ route: current, type: 'http', status: r.status(), url: r.url().replace(BASE, '').slice(0, 160) });
 });
 
 // (route, sélecteur de texte qui prouve le rendu du socle)

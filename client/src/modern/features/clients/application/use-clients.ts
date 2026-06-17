@@ -1,11 +1,11 @@
-import { $api } from "@/modern/shared/api/query";
+import { trpc } from "@/modern/shared/trpc";
 import type { Client } from "../domain/client";
 
-// Use-case de lecture (couche application) : expose la liste des clients du tenant via le hook Query
-// généré. L'UI ne connaît ni l'URL ni le transport — elle consomme `useClients()`. Le type de retour
-// `Client[]` vient du contrat OpenAPI (type-safe end-to-end : serveur zod → OpenAPI → openapi-typescript).
+// Use-case de lecture (couche application) : expose la liste des clients du tenant via le client tRPC
+// PARTAGÉ (`modern/shared/trpc` → `clients.list`, protégé + scopé tenant). L'UI ne connaît ni l'URL ni
+// le transport : elle consomme `useClients()`. Type-safe end-to-end (serveur zod → AppRouter → front).
 export function useClients() {
-  const query = $api.useQuery("get", "/api/rest/clients");
+  const query = trpc.clients.list.useQuery();
   return {
     clients: (query.data ?? []) as Client[],
     isLoading: query.isLoading,

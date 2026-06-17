@@ -1,12 +1,13 @@
 {
-  "//": "OPE-403 — gate typecheck du FRONT NEUF de la refonte (client/src/modern/** = code `/v2`). Pendant la migration strangler, le legacy (client/src/pages, etc.) garde sa dette tsc (tsconfig.json non gaté). Le code neuf, lui, DOIT rester vert : `pnpm exec tsc -p tsconfig.v2.json`. tsc suit les imports transitifs (AppRouter, primitives) même hors `include`.",
+  "//": "OPE-403 — gate typecheck du FRONT NEUF de la refonte (client/src/modern/** = code `/v2`). Pendant la migration strangler, le legacy (client/src/pages, etc.) garde sa dette tsc (tsconfig.json non gaté). Le code neuf, lui, DOIT rester vert : `pnpm exec tsc -p tsconfig.v2.json`. tsc suit les imports transitifs (AppRouter, primitives) même hors `include`. `types` ajoute `@fastify/cookie` : le front neuf consomme tRPC via `AppRouter` (modern/shared/trpc) donc tsc traverse la source backend qui s'appuie sur l'augmentation globale `declare module 'fastify'` (setCookie/cookies) — la base tsconfig.json limite `types` à node+vite/client. N'affecte que ce gate, pas le bundle.",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
     "incremental": false,
     "tsBuildInfoFile": null,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "types": ["node", "vite/client", "@fastify/cookie"]
   },
   "include": ["client/src/modern/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "**/*.test.tsx"]

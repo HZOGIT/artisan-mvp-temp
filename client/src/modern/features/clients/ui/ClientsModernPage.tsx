@@ -1,9 +1,9 @@
 import { useClients } from "../application/use-clients";
 import { nomComplet } from "../domain/client";
 
-// Page PoC OPE-366 — réécriture de la liste clients sur la stack cible (clean archi + REST typé).
-// Cohabite avec le legacy : montée sur `/v2/clients` dans le routeur wouter actuel (DashboardLayout
-// conservé). Aucune dépendance à tRPC : data via `useClients()` → openapi-react-query → /api/rest/clients.
+// Liste clients du front neuf (clean archi) — montée sur `/v2/clients` via le socle TanStack Router,
+// dans le DashboardLayout legacy. Données via le client tRPC PARTAGÉ (`useClients()` → `clients.list`,
+// cf. `modern/shared/trpc`) — tRPC conservé, plus de REST.
 export default function ClientsModernPage() {
   const { clients, isLoading, isError, refetch } = useClients();
 
@@ -13,7 +13,7 @@ export default function ClientsModernPage() {
         <div>
           <h1 className="text-2xl font-semibold">Clients</h1>
           <p className="text-sm text-muted-foreground">
-            Stack cible (PoC) — REST <code>/api/rest/clients</code> via client openapi-typescript.
+            Stack cible — données via tRPC <code>clients.list</code> (client partagé).
           </p>
         </div>
         <button
