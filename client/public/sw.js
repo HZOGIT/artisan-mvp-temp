@@ -1,7 +1,10 @@
 // Bump à chaque changement de stratégie/cassure de contrat : l'`activate` ci-dessous purge tout
 // cache dont le nom diffère → force la suppression de l'ancien cache (ex. bundle pré-superjson)
 // chez les clients ayant un SW périmé. Stratégie network-first (cf. fetch) → en ligne, toujours frais.
-const CACHE_NAME = 'operioz-v2';
+// Bump → `operioz-v3` : purge à l'`activate` les caches périmés, dont d'éventuelles entrées EMPOISONNÉES
+// (un `/assets/*.js` mis en cache alors que le SPA-fallback avait répondu index.html en 200 → text/html
+// servi comme module). Voir aussi le garde-fou anti-poison dans le handler `fetch` des assets ci-dessous.
+const CACHE_NAME = 'operioz-v3';
 const STATIC_ASSETS = [
   '/',
   '/dashboard',
@@ -62,7 +65,14 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok) {
+          // ANTI-POISON : ne JAMAIS mettre en cache une réponse text/html pour un script/style (= chunk
+          // hashé périmé tombé sur le SPA-fallback). Sinon on servirait du HTML comme module (MIME error)
+          // et on l'empoisonnerait durablement. On laisse la réponse remonter telle quelle (404 ou html)
+          // → l'import dynamique échoue → `vite:preloadError` → rechargement unique (cf. main.tsx).
+          const isCode = request.destination === 'script' || request.destination === 'style';
+          const ct = response.headers.get('content-type') || '';
+          const poisoned = isCode && ct.includes('text/html');
+          if (response.ok && !poisoned) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }

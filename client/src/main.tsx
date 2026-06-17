@@ -18,9 +18,14 @@ import superjson from 'superjson'
 // infinie ("charge en boucle"). On a retire le filet 'unhandledrejection' (trop
 // large) et le handler 'load' qui effacait le flag (re-autorisait la boucle).
 const RELOAD_FLAG = 'operioz:chunk-reloaded'
+// Anti-boucle FENÊTRÉ (pas « une seule fois pour toujours ») : on recharge si le dernier rechargement
+// pour chunk périmé date de PLUS de 30 s. Ça récupère les déploiements SUCCESSIFS dans une même session
+// (un onglet resté ouvert pendant plusieurs deploys) tout en bloquant une vraie boucle (< 30 s).
+const RELOAD_COOLDOWN_MS = 30_000
 function reloadOnceForStaleChunk() {
   try {
-    if (sessionStorage.getItem(RELOAD_FLAG)) return
+    const last = Number(sessionStorage.getItem(RELOAD_FLAG) || 0)
+    if (Date.now() - last < RELOAD_COOLDOWN_MS) return // déjà rechargé très récemment -> anti-boucle
     sessionStorage.setItem(RELOAD_FLAG, String(Date.now()))
   } catch {
     return // pas de storage fiable -> on ne recharge pas (anti-boucle)
@@ -46,15 +51,27 @@ const queryClient = new QueryClient({
 const fetchWithCreds: typeof fetch = (url, options) =>
   fetch(url, { ...options, credentials: 'include' })
 
-// Le Dashboard tire plusieurs blocs depuis des endpoints `dashboard.*` (stats, conversion, alertes,
-// objectifs). Avec un `httpBatchLink` unique, ces requetes sont REGROUPEES dans UN seul appel HTTP qui
-// ne resout que lorsque la PLUS LENTE est prete -> tous les blocs attendent le plus lent (rendu fige).
-// On de-batche donc les `dashboard.*` via un `httpLink` dedie : chaque bloc fait sa propre requete et
-// s'affiche des que SA donnee arrive (rendu progressif). Le reste de l'app garde le batching (1 requete).
+// Le Dashboard tire ses blocs depuis de nombreux endpoints. Avec un `httpBatchLink` unique, ces requetes
+// sont REGROUPEES dans UN seul appel HTTP qui ne resout que lorsque la PLUS LENTE est prete -> TOUS les
+// blocs attendent le plus lent (rendu fige). On de-batche donc les endpoints des widgets du dashboard via
+// un `httpLink` dedie (1 requete par bloc -> chaque bloc s'affiche des que SA donnee arrive = rendu
+// progressif). Le reste de l'app garde le batching (1 requete groupee).
+// NB : ces procedures peuvent aussi etre appelees ailleurs (ex. `stocks.getLowStock`, `activites.list`) ;
+// elles y feront alors une requete individuelle (cout negligeable). Ajouter ici tout nouvel endpoint de
+// widget dashboard pour le garder hors batch.
+const DASHBOARD_UNBATCHED = new Set([
+  'conseilsIA',
+  'statistiques.getDevisStats',
+  'activites.list',
+  'previsions.getTresoreriePrevisionnelle',
+  'commandesFournisseurs.getEnRetard',
+  'contrats.getAFacturer',
+  'stocks.getLowStock',
+])
 const trpcClient = trpc.createClient({
   links: [
     splitLink({
-      condition: (op) => op.path.startsWith('dashboard.'),
+      condition: (op) => op.path.startsWith('dashboard.') || DASHBOARD_UNBATCHED.has(op.path),
       true: httpLink({ url: '/api/trpc', transformer: superjson, fetch: fetchWithCreds }),
       false: httpBatchLink({ url: '/api/trpc', transformer: superjson, fetch: fetchWithCreds }),
     }),
