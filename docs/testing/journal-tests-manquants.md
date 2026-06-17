@@ -196,7 +196,12 @@ Le scan it.82 (≠ it.77 qui était vide) révèle **des modules récemment acti
 - [ ] modules RH activés : `badges` listObjectifsDuTechnicien · `techniciens` getStatsTechnicien · `conges` listCongesEnAttente · `vehicules` enregistrerReleveKilometrage
 ⚠️ Coordination : un autre agent (`ope-366-spike-frontend`) traite la dette TS frontend en parallèle — je reste sur `src/`, lui sur `client/`.
 
-**Prochaine cible : `factures/application/read-use-cases.ts`** — getFactureDetail / getAvoirsFacture / getAuditLogFacture (L1 fakes ; vérifier si pur ou délégation repo → tester la logique d'agrégation/garde anti-IDOR). 1 fichier.
+- [x] `factures/application/read-use-cases` (detail) → `read-detail-use-cases.test.ts` (7 cas : getFactureDetail agrégation/404/client null, getAvoirsFacture & getAuditLogFacture gardes behavior-preserving []) ✅ it.83.
+
+## ⏸️ BOUCLE EN PAUSE (2026-06-17, demande humaine — refonte frontend)
+L'humain a **stoppé la boucle** (refonte du frontend en cours). **Cron supprimé.** **Backlog L1 restant non traité** (à reprendre si redémarrage) :
+subscription/domain (subscriptionEmail, extraPriceId) · rdv-en-ligne/read (listRdvsAvecClient, getRdvStats, getRdvPendingCount) · commandes (getPerformancesFournisseurs) · comptabilite/fec (fecFileName) · stocks/read (listStockEntrant) · badges (listObjectifsDuTechnicien) · techniciens (getStatsTechnicien) · conges (listCongesEnAttente) · vehicules (enregistrerReleveKilometrage).
+**Pour relancer** : re-créer un cron `/loop 30m …` et reprendre ce backlog (prochaine cible = subscription/domain).
 
 **Décision humaine (2026-06-17) : CONTINUER EN AUTONOMIE.** Plus de sollicitation. La boucle :
 1. it.75 → garde-fou meta-test de couverture L2 ✅ FAIT.
@@ -294,3 +299,4 @@ Le scan it.82 (≠ it.77 qui était vide) révèle **des modules récemment acti
 - `2026-06-17 06:34:29Z` **[test]** durcissement calcul montants DEVIS — it.80 — devis/montants.test +2 cas (parité factures it.79) : résilience Number||0 sur entrées vides/non-numériques, arrondi centime non rond (3x3.33@20% -> 9.99/2.00/11.99). Intégrité financière côté devis. Saturation structurelle persistante.
 - `2026-06-17 07:04:29Z` **[test]** durcissement relance facture (artisan introuvable) — it.81 — envoyer-relance-facture +1 cas : artisan introuvable -> NotFound AVANT l'envoi (email.sent=0). Dernière branche non couverte du use-case. Saturation L1/L2/L3 atteinte -> au prochain réveil sans gap significatif, STOP recommandé (clôture/redirection frontend OPE-253).
 - `2026-06-17 07:36:38Z` **[test]** signature domain emails + SATURATION LEVÉE — it.82 — signature.test +3 cas (buildSigned/RefusedDevisArtisanEmail : sujet, motif, fallback clientName, échappement HTML). IMPORTANT: scan révèle ~16 fonctions SANS test dans des modules RÉCEMMENT ACTIVÉS (factures read, rdv read, subscription domain, badges/techniciens/conges/vehicules) -> boucle NON saturée, REPREND. Autre agent (ope-366) traite le front TS en //.
+- `2026-06-17 07:45:44Z` **[front-v2]** S1 ✅ socle TanStack Router /v2/* — Socle refonte monté: TanStack Router sur /v2/* (cohabite wouter, providers+auth partagés, lazy, pending/error/notFound). Démo /v2/ping rend pong, 0 erreur. PoC /v2/clients repris sous le socle (404 REST hérité OPE-366 → migrer tRPC en Vague1). Déployé+vérifié staging. Prochaine: S2 (flag ?v2=1).
