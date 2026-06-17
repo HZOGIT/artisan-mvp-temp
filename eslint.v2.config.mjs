@@ -31,8 +31,9 @@ const kebabFilename = {
 };
 
 // Règle custom (clean-archi) : la couche `features/<f>/ui/**` ne doit PAS importer tRPC directement —
-// elle passe par la couche application (`use-<feature>`). En `warn` tant que le rétrofit n'est pas fini
-// (les pages legacy-style restent vertes au gate) ; passera en `error` une fois tout rétrofitté.
+// elle passe par la couche application (`use-<feature>`). Rétrofit terminé (Vague R : 14/14 features) →
+// règle en **`error`** : verrou définitif de la frontière (ui = présentation pure, application = seule
+// couche tRPC). Toute nouvelle page doit naître clean-archi.
 const noTrpcInUi = {
   meta: {
     type: "suggestion",
@@ -64,7 +65,7 @@ export default tseslint.config({
   },
   rules: {
     "local/kebab-filename": "error",
-    "local/no-trpc-in-ui": "warn",
+    "local/no-trpc-in-ui": "error",
     // Frontière strangler + pas de REST : le neuf passe par les coutures partagées.
     "no-restricted-imports": [
       "error",

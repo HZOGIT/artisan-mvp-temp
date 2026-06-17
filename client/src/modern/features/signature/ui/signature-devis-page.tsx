@@ -8,15 +8,23 @@ import { Label } from "@/modern/shared/ui/label";
 import { Separator } from "@/modern/shared/ui/separator";
 import { Textarea } from "@/modern/shared/ui/textarea";
 import { Checkbox } from "@/modern/shared/ui/checkbox";
-import { trpc } from "@/modern/shared/trpc";
+import { useSignature } from "../application/use-signature";
+import {
+  buildPdfLignes,
+  canSubmitSignature,
+  isSignatureProcessed,
+  type SignatureLigne,
+  type SignatureOption,
+} from "../domain/signature";
 import { Loader2, Check, Building2, User, Pen, AlertCircle, Download, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { generateDevisPDF } from "@/lib/pdfGenerator";
 
-// Page PUBLIQUE de signature de devis du FRONT NEUF (`/v2/signature/:token`) — PORT CONFORME de
-// `pages/SignatureDevis.tsx`. Montée hors auth (cf. public-router). JSX/canvas copiés à l'identique ;
-// plomberie repointée : primitives `@/modern/shared/ui`, tRPC partagé, i18n (namespace `signature`),
-// token de route via TanStack. Libellés legacy (sans accents) conservés à l'identique pour la parité.
+// Page PUBLIQUE de signature de devis du FRONT NEUF (`/v2/signature/:token`) — clean-archi : présentation
+// pure. Données & mutations via `useSignature` (couche application, seule à importer tRPC) ; validation du
+// formulaire, état traité, construction des lignes PDF via le domaine (`../domain/signature`, fonctions
+// pures testées). Montée hors auth (cf. public-router). JSX/canvas copiés à l'identique ; libellés legacy
+// (sans accents) conservés pour la parité ; token de route via TanStack.
 
 export default function SignatureDevisPage() {
   const { t } = useTranslation("signature");
@@ -33,10 +41,8 @@ export default function SignatureDevisPage() {
   const [motifRefus, setMotifRefus] = useState("");
   const [actionComplete, setActionComplete] = useState<"accepte" | "refuse" | null>(null);
 
-  const { data, isLoading, error } = trpc.signature.getDevisForSignature.useQuery(
-    { token: token || "" },
-    { enabled: !!token }
-  );
+  const { data, isLoading, error, sign: signMutation, refuse: refuseMutation, selectOption: selectOptionMutation } =
+    useSignature(token || "");
 
   // Pré-remplit l'email depuis les données client au chargement.
   useEffect(() => {
@@ -44,39 +50,6 @@ export default function SignatureDevisPage() {
       setSignataireEmail(data.client.email);
     }
   }, [data]);
-
-  const signMutation = trpc.signature.signDevis.useMutation({
-    onSuccess: () => {
-      setActionComplete("accepte");
-      toast.success(t("toastSigned"));
-    },
-    onError: (err) => {
-      toast.error(err.message);
-      setIsSigning(false);
-    }
-  });
-
-  const refuseMutation = trpc.signature.refuseDevis.useMutation({
-    onSuccess: () => {
-      setActionComplete("refuse");
-      toast.success(t("toastRefused"));
-    },
-    onError: (err) => {
-      toast.error(err.message);
-      setIsRefusing(false);
-    }
-  });
-
-  const utils = trpc.useUtils();
-  const selectOptionMutation = trpc.signature.selectDevisOption.useMutation({
-    onSuccess: () => {
-      utils.signature.getDevisForSignature.invalidate({ token: token || "" });
-      toast.success(t("toastOptionSelected"));
-    },
-    onError: (err) => {
-      toast.error(err.message);
-    }
-  });
 
   // Canvas setup
   useEffect(() => {
@@ -156,45 +129,63 @@ export default function SignatureDevisPage() {
   };
 
   const handleSign = () => {
-    if (!hasSignature || !signataireName || !signataireEmail || !token || !accepted) {
+    if (!canSubmitSignature({ hasSignature, signataireName, signataireEmail, accepted, token })) {
       toast.error(t("toastFillAll"));
       return;
     }
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !token) return;
     setIsSigning(true);
     const signatureData = canvas.toDataURL("image/png");
-    signMutation.mutate({ token, signatureData, signataireName, signataireEmail });
+    signMutation.mutate(
+      { token, signatureData, signataireName, signataireEmail },
+      {
+        onSuccess: () => {
+          setActionComplete("accepte");
+          toast.success(t("toastSigned"));
+        },
+        onError: (err) => {
+          toast.error(err.message);
+          setIsSigning(false);
+        },
+      },
+    );
   };
 
   const handleRefuse = () => {
     if (!token) return;
     setIsRefusing(true);
-    refuseMutation.mutate({ token, motifRefus: motifRefus || undefined });
+    refuseMutation.mutate(
+      { token, motifRefus: motifRefus || undefined },
+      {
+        onSuccess: () => {
+          setActionComplete("refuse");
+          toast.success(t("toastRefused"));
+        },
+        onError: (err) => {
+          toast.error(err.message);
+          setIsRefusing(false);
+        },
+      },
+    );
   };
 
   const handleDownloadPDF = () => {
     if (!data) return;
     const { devis: d, artisan: a, client: c, lignes: l } = data;
-    const lignesPDF = (l || []).map((ligne: any) => ({
-      designation: ligne.designation,
-      description: ligne.description,
-      quantite: parseFloat(ligne.quantite) || 1,
-      unite: ligne.unite,
-      prixUnitaire: parseFloat(ligne.prixUnitaireHT) || 0,
-      tauxTva: parseFloat(ligne.tauxTVA) || 20,
-    }));
-    generateDevisPDF((a || {}) as any, (c || {}) as any, {
+    // Lignes PDF construites par le domaine (pur, typé). `nom` garanti string (requis par le type PDF
+    // Client) ; artisan absent → objet vide (tous ses champs PDF sont optionnels).
+    generateDevisPDF(a ?? {}, { ...(c ?? {}), nom: c?.nom ?? "" }, {
       numero: d.numero,
       dateCreation: d.createdAt,
       dateValidite: d.dateValidite,
       statut: d.statut || "brouillon",
       objet: d.objet,
-      lignes: lignesPDF,
-      totalHT: parseFloat(d.totalHT as any) || 0,
-      totalTVA: parseFloat(d.totalTVA as any) || 0,
-      totalTTC: parseFloat(d.totalTTC as any) || 0,
-      conditions: (d as any).conditionsPaiement || null,
+      lignes: buildPdfLignes(l),
+      totalHT: parseFloat(d.totalHT ?? "0") || 0,
+      totalTVA: parseFloat(d.totalTVA ?? "0") || 0,
+      totalTTC: parseFloat(d.totalTTC ?? "0") || 0,
+      conditions: d.conditionsPaiement || null,
     });
   };
 
@@ -256,9 +247,8 @@ export default function SignatureDevisPage() {
 
   if (!data) return null;
 
-  const { devis, artisan, client, lignes, signature } = data;
-  const options = (data as any).options || [];
-  const isAlreadyProcessed = signature.statut === "accepte" || signature.statut === "refuse";
+  const { devis, artisan, client, lignes, signature, options } = data;
+  const isAlreadyProcessed = isSignatureProcessed(signature.statut);
 
   return (
     <div className="min-h-screen bg-gray-50 py-6 px-4">
@@ -357,7 +347,7 @@ export default function SignatureDevisPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {lignes.map((ligne: any, index: number) => (
+                  {lignes.map((ligne: SignatureLigne, index: number) => (
                     <tr key={index} className="border-t">
                       <td className="p-3">
                         <p className="font-medium text-sm">{ligne.designation}</p>
@@ -409,7 +399,7 @@ export default function SignatureDevisPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {options.map((option: any) => (
+              {options.map((option: SignatureOption) => (
                 <div
                   key={option.id}
                   className={`border rounded-lg p-4 ${option.selectionnee ? "border-primary bg-primary/5" : "border-muted"}`}
@@ -441,7 +431,7 @@ export default function SignatureDevisPage() {
                         variant={option.selectionnee ? "secondary" : "outline"}
                         size="sm"
                         disabled={option.selectionnee || selectOptionMutation.isPending}
-                        onClick={() => selectOptionMutation.mutate({ token: token || "", optionId: option.id })}
+                        onClick={() => selectOptionMutation.mutate({ token: token || "", optionId: option.id }, { onSuccess: () => toast.success(t("toastOptionSelected")), onError: (err) => toast.error(err.message) })}
                       >
                         {option.selectionnee ? t("choisie") : t("choisir")}
                       </Button>

@@ -203,16 +203,20 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague R — feature `signature` (LA DERNIÈRE)** — page PUBLIQUE `/v2/signature/:token`
-(`signature-devis-page.tsx`, ~605 l.). Extraire `domain/signature.ts` (types `RouterOutputs` + règles pures :
-calculs montants/options/formules, états) + `application/use-signature.ts` (SEULE couche tRPC :
-`signature.getDevisForSignature` + `signer`/`refuser` + invalidation), faire consommer la page (plus de
-`trpc` direct, **0 `any`**, dernier warning `no-trpc-in-ui` disparaît). **Audit §3bis 6/6 obligatoire +
-consigné.** Garder parité e2e verte (montage déterministe `signature.getDevisForSignature`). Attention :
-le legacy lisait `devis.dateDevis` (inexistant → corrigé en `createdAt`) ; vérifier les autres champs.
-Gabarit = `use-comptabilite` / `use-depenses`. **🏁 QUAND le warning tombe à 0 → passer
-`local/no-trpc-in-ui` en `error` dans `eslint.v2.config.mjs` (verrou définitif) + documenter. FIN DE LA
-VAGUE R.** NB : `paiement` est déjà propre (pages succès/annule sans tRPC).
+## 🏁 VAGUE R TERMINÉE (14/14 features clean-archi) — `local/no-trpc-in-ui` est passé en **`error`**
+La frontière clean-archi est **verrouillée** : toute page `features/<f>/ui/**` qui importe `@/modern/shared/trpc`
+fait **échouer** le gate ESLint v2. Désormais chaque nouvelle page naît clean-archi (domain pur + application =
+seule couche tRPC + ui présentation, 0 `any`). Bilan : **5 bugs UI réels** trouvés via le typage strict
+(OPE-465→469), tous parqués dans « Refonte — findings & dette repérés ».
+
+## 🎯 PROCHAINE CIBLE : **pages restantes hors Vague R** (gros morceaux différés). Au choix selon priorité :
+- **Dashboard** (`/v2` racine, ~16 widgets) — stratégie : découper en sous-composants/feature `dashboard`
+  (domain agrégats + application hooks par widget). Le plus gros chantier restant.
+- **Portail client** (`/v2/portail/:token`, PUBLIC, ~1211 l., paiement Stripe) — bien tester le flux Stripe
+  (cf. CLAUDE.md : `x-forwarded-host`, success_url).
+- **Abonnement** (`/v2/abonnement`).
+Appliquer le **même gabarit clean-archi + audit §3bis** (désormais `no-trpc-in-ui` = error dès le départ).
+Commencer par celui à plus forte valeur / plus simple à dérisquer (proposer Dashboard en sous-tranches).
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
 Rétrofitter 1 feature/itération (extraction `application/use-<feature>` + `domain` typés, `ui` sans tRPC,
@@ -251,6 +255,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Clean-archi — Vague R `signature` ✅ (LA DERNIÈRE 14/14) + verrou `error`** : `domain/signature.ts` (types `RouterOutputs` (`SignatureData`/`SignatureDevis`/`SignatureLigne`/`SignatureOption`) + fonctions PURES `isSignatureProcessed`/`canSubmitSignature`/`buildPdfLignes` ; **4 tests**) + `application/use-signature.ts` (SEULE couche tRPC : getDevisForSignature public + signDevis/refuseDevis/selectDevisOption). `signature-devis-page.tsx` (PUBLIC, ~600 l., canvas signature) consomme hook+domaine, **0 `any`** (dont les casts PDF `(a||{}) as any` retirés ; `options`/`conditionsPaiement`/`dateValidite` étaient déjà sur le type → casts inutiles). **🏁 `no-trpc-in-ui` passé en `error`** (verrou clean-archi). Warnings **1→0**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **105**. **FIN VAGUE R.**
 - **Clean-archi — Vague R `comptabilite` ✅ (+ findings champs)** : `domain/comptabilite.ts` (types `RouterOutputs` (Balance/GrandLivre/JournalVentes/FecPreview/TvaDetail + sous-types) + fonctions PURES `balanceTotals`/`ligneSoldeNet`/`toCsv` ; **6 tests**) + `application/use-comptabilite.ts` (SEULE couche tRPC : 6 rapports lecture seule sur une période ; exports FEC/CSV-serveur/PDF/Factur-X = endpoints REST de téléchargement, hors tRPC). `comptabilite-page.tsx` (672 l., bandeau conformité + CA3 + 4 onglets) consomme hook+domaine, **0 `any`**, plus aucun import tRPC. **🔴 FINDING** : le legacy lisait sur `getBalance`/`getGrandLivre` des champs **inexistants** (`compte`/`libelle`/`solde`/`soldeDebit`/`soldeCredit`) via `any` ; les DTO exposent `numeroCompte`/`libelleCompte`/`soldeDebiteur`/`soldeCrediteur`/`totalDebit`/`totalCredit` → **colonnes Compte/Libellé vides + Solde 0 € (balance) et en-têtes de compte vides/0 € (grand livre)**. Corrigé (+ solde net = débiteur−créditeur via `ligneSoldeNet`). Warnings `no-trpc-in-ui` **2→1**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **101**. Prochaine : `signature` (DERNIÈRE).
 - **Clean-archi — Vague R `depenses` ✅ (+ 1 bug corrigé via le typage)** : `domain/depense.ts` (types `RouterOutputs` (`Depense`/`DepenseStats`/`Categorie`/`Budget`/`KmClient`) + fonctions PURES `budgetTotal`/`indexCategoriesByNom`/`montantIndemniteKm`/`monthRange`/`buildTrajetMotif` + constantes `TARIF_KM_DEFAULT`/`STATUT_KEYS` ; **5 tests**) + `application/use-depenses.ts` (SEULE couche tRPC : list+stats+categories+budgets, delete/exportFecAchats) + `useIndemniteKm` (clients + creerIndemniteKm). `depenses-page.tsx` (2 composants : page + dialog km) consomme hook+domaine, **0 `any`**, plus aucun import tRPC ; blob FEC + toasts via `onSuccess` par appel. **🔴 FINDING** (même pattern qu'articles) : le DTO `depenses.list` est en **camelCase** (`dateDepense`/`montantTtc`/`justificatifUrl`) mais le legacy lisait du snake_case via `any` → **date "—", montant 0 €, trombone justificatif jamais affiché**. Corrigé (lectures camelCase). Warnings `no-trpc-in-ui` **3→2**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **95**. Prochaine : `comptabilite`.
 - **Clean-archi — Vague R `stocks` ✅** (la plus grosse page, ~782 l.) : `domain/stock.ts` (types `RouterOutputs` (`Stock`/`Mouvement`/`StockEntrant`) + fonctions PURES `filterStocks`/`isLowStock`/`totalStockValue`/`indexEntrantByStock`/`previsionnel` ; **5 tests**) + `application/use-stocks.ts` (SEULE couche tRPC : list+lowStock+entrant, create/update/delete/adjustQuantity/generateAlerts) + `useMouvements` (historique d'1 fiche, query dépendante isolée). `stocks-page.tsx` (Tabs + KPIs + alertes + 4 dialogs) consomme hook+domaine, **0 `any`**, plus aucun import tRPC ; fix `adjustQuantity` quantite en `String` conservé. Warnings `no-trpc-in-ui` **4→3**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **90**. Prochaine : `depenses`.
