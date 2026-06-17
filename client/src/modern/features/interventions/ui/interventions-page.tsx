@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useInterventions, useEquipe } from "../application/use-interventions";
+import {
+  availableTechniciens,
+  buildAdresse,
+  dureeDescriptor,
+  dureeReelleMinutes,
+  filterInterventions,
+  groupEquipeByIntervention,
+  membreName,
+  toInterventionStatut,
+  type EquipeByArtisanRow,
+  type EquipeMembre,
+  type Intervention,
+  type InterventionStatut,
+  type Technicien,
+} from "../domain/intervention";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent } from "@/modern/shared/ui/card";
@@ -14,13 +29,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/modern/shared/ui/badge";
 import { StatutBadge } from "@/modern/shared/ui/statut-badge";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Page Interventions du FRONT NEUF (`/v2/interventions`) — PORT CONFORME de `pages/Interventions.tsx`.
-// JSX à l'identique (table native + StatutBadge + dialogs création/édition + gestion d'équipe) ;
-// plomberie repointée : primitives `@/modern/shared/ui`, tRPC partagé, i18n (namespace `interventions`).
+// Page Interventions du FRONT NEUF (`/v2/interventions`) — clean-archi : présentation pure. Données &
+// mutations via `useInterventions`/`useEquipe` (couche application, seule à importer tRPC) ; filtrage,
+// indexation d'équipe, durée, adresse, statuts via le domaine (`../domain/intervention`, fonctions pures
+// testées). Parité visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge + dialogs +
+// gestion d'équipe). Libellés via i18n (namespace `interventions`).
 
 export default function InterventionsPage() {
   const { t } = useTranslation("interventions");
@@ -39,7 +55,7 @@ export default function InterventionsPage() {
   }, [search]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedIntervention, setSelectedIntervention] = useState<any>(null);
+  const [selectedIntervention, setSelectedIntervention] = useState<Intervention | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [formData, setFormData] = useState<{
     titre: string;
@@ -47,7 +63,7 @@ export default function InterventionsPage() {
     dateDebut: string;
     dateFin: string;
     adresse: string;
-    statut: "planifiee" | "en_cours" | "terminee" | "annulee";
+    statut: InterventionStatut;
   }>({
     titre: "",
     description: "",
@@ -57,73 +73,25 @@ export default function InterventionsPage() {
     statut: "planifiee",
   });
 
-  const utils = trpc.useUtils();
-  const { data: interventionsList, isLoading } = trpc.interventions.list.useQuery();
-  const { data: clients } = trpc.clients.list.useQuery();
+  const {
+    interventions: interventionsList,
+    clients,
+    techniciens: techniciensList,
+    equipesByArtisan,
+    isLoading,
+    create: createMutation,
+    update: updateMutation,
+    remove: deleteMutation,
+  } = useInterventions();
 
-  const createMutation = trpc.interventions.create.useMutation({
-    onSuccess: () => {
-      utils.interventions.list.invalidate();
-      setIsCreateDialogOpen(false);
-      resetForm();
-      toast.success(t("toastCreated"));
-    },
-    onError: () => {
-      toast.error(t("toastCreateError"));
-    },
-  });
+  // Index PUR interventionId → membres (évite le N+1).
+  const equipeParIntervention = groupEquipeByIntervention(equipesByArtisan);
 
-  const updateMutation = trpc.interventions.update.useMutation({
-    onSuccess: () => {
-      utils.interventions.list.invalidate();
-      setIsEditDialogOpen(false);
-      toast.success(t("toastUpdated"));
-    },
-    onError: () => {
-      toast.error(t("toastUpdateError"));
-    },
-  });
-
-  const deleteMutation = trpc.interventions.delete.useMutation({
-    onSuccess: () => {
-      utils.interventions.list.invalidate();
-      toast.success(t("toastDeleted"));
-    },
-    onError: () => {
-      toast.error(t("toastDeleteError"));
-    },
-  });
-
-  // Équipe d'intervention (plusieurs intervenants additionnels).
-  const { data: techniciensList } = trpc.techniciens.getAll.useQuery();
-  // Toutes les équipes (1 requête) → map interventionId → membres (évite le N+1).
-  const { data: equipesByArtisan } = trpc.interventions.getEquipesByArtisan.useQuery();
-  const equipeParIntervention = new Map<number, any[]>();
-  for (const m of equipesByArtisan || []) {
-    const arr = equipeParIntervention.get(m.interventionId) || [];
-    arr.push(m);
-    equipeParIntervention.set(m.interventionId, arr);
-  }
   const [membreToAdd, setMembreToAdd] = useState<string>("");
-  const { data: equipe } = trpc.interventions.getEquipe.useQuery(
-    { interventionId: selectedIntervention?.id ?? 0 },
-    { enabled: isEditDialogOpen && !!selectedIntervention?.id },
+  const { equipe, addMembre: addMembreMutation, removeMembre: removeMembreMutation } = useEquipe(
+    selectedIntervention?.id ?? 0,
+    isEditDialogOpen && !!selectedIntervention?.id,
   );
-  const addMembreMutation = trpc.interventions.ajouterMembreEquipe.useMutation({
-    onSuccess: () => {
-      utils.interventions.getEquipe.invalidate();
-      setMembreToAdd("");
-      toast.success(t("toastMemberAdded"));
-    },
-    onError: (e) => toast.error(e.message),
-  });
-  const removeMembreMutation = trpc.interventions.retirerMembreEquipe.useMutation({
-    onSuccess: () => {
-      utils.interventions.getEquipe.invalidate();
-      toast.success(t("toastMemberRemoved"));
-    },
-    onError: (e) => toast.error(e.message),
-  });
 
   const resetForm = () => {
     setFormData({
@@ -139,9 +107,9 @@ export default function InterventionsPage() {
 
   const handleClientChange = (clientId: string) => {
     setSelectedClientId(clientId);
-    const client = clients?.find((c: any) => c.id === parseInt(clientId));
-    if (client?.adresse) {
-      const adresse = `${client.adresse}, ${client.codePostal || ""} ${client.ville || ""}`.trim().replace(/,\s*$/, "");
+    const client = clients.find((c) => c.id === parseInt(clientId));
+    const adresse = buildAdresse(client);
+    if (adresse) {
       setFormData((prev) => ({ ...prev, adresse }));
     }
   };
@@ -152,22 +120,35 @@ export default function InterventionsPage() {
       toast.error(t("toastRequiredFields"));
       return;
     }
-    createMutation.mutate({
-      clientId: parseInt(selectedClientId),
-      ...formData,
-    });
+    createMutation.mutate(
+      { clientId: parseInt(selectedClientId), ...formData },
+      {
+        onSuccess: () => {
+          setIsCreateDialogOpen(false);
+          resetForm();
+          toast.success(t("toastCreated"));
+        },
+        onError: () => toast.error(t("toastCreateError")),
+      },
+    );
   };
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedIntervention) return;
-    updateMutation.mutate({
-      id: selectedIntervention.id,
-      ...formData,
-    });
+    updateMutation.mutate(
+      { id: selectedIntervention.id, ...formData },
+      {
+        onSuccess: () => {
+          setIsEditDialogOpen(false);
+          toast.success(t("toastUpdated"));
+        },
+        onError: () => toast.error(t("toastUpdateError")),
+      },
+    );
   };
 
-  const handleEdit = (intervention: any) => {
+  const handleEdit = (intervention: Intervention) => {
     setSelectedIntervention(intervention);
     setFormData({
       titre: intervention.titre || "",
@@ -175,36 +156,37 @@ export default function InterventionsPage() {
       dateDebut: intervention.dateDebut ? format(new Date(intervention.dateDebut), "yyyy-MM-dd'T'HH:mm") : "",
       dateFin: intervention.dateFin ? format(new Date(intervention.dateFin), "yyyy-MM-dd'T'HH:mm") : "",
       adresse: intervention.adresse || "",
-      statut: intervention.statut || "planifiee",
+      statut: toInterventionStatut(intervention.statut),
     });
     setIsEditDialogOpen(true);
   };
 
   const handleDelete = (id: number) => {
     if (confirm(t("confirmDelete"))) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate(
+        { id },
+        {
+          onSuccess: () => toast.success(t("toastDeleted")),
+          onError: () => toast.error(t("toastDeleteError")),
+        },
+      );
     }
   };
 
-  const filteredInterventions = interventionsList?.filter((intervention: any) => {
-    if (statusFilter !== "all" && intervention.statut !== statusFilter) return false;
-    if (!searchQuery) return true;
-    return (
-      matchSearch(intervention.titre, searchQuery) ||
-      matchSearch(intervention.description, searchQuery) ||
-      matchSearch(intervention.adresse, searchQuery)
-    );
-  });
+  const filteredInterventions = filterInterventions(interventionsList, { statusFilter, searchQuery });
 
   const activeStatusLabel =
     statusFilter !== "all" ? t(`statut_${statusFilter}`, { defaultValue: statusFilter }) : null;
 
-  const nomMembre = (m: any) => [m.prenom, m.nom].filter(Boolean).join(" ") || t("techNum", { id: m.technicienId });
+  // Nom du membre via le domaine + fallback i18n côté présentation.
+  const nomMembre = (m: { prenom?: string | null; nom?: string | null; technicienId: number }) =>
+    membreName(m) || t("techNum", { id: m.technicienId });
 
   const dureeLabel = (min: number | null | undefined) => {
-    if (min == null) return "-";
-    if (min >= 60) return t("durationHM", { h: Math.floor(min / 60), mm: String(min % 60).padStart(2, "0") });
-    return t("durationMin", { m: min });
+    const d = dureeDescriptor(min);
+    if (d.kind === "none") return "-";
+    if (d.kind === "hm") return t("durationHM", { h: d.h, mm: d.mm });
+    return t("durationMin", { m: d.m });
   };
 
   return (
@@ -240,7 +222,7 @@ export default function InterventionsPage() {
                       <SelectValue placeholder={t("clientPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      {clients?.map((client: any) => (
+                      {clients.map((client) => (
                         <SelectItem key={client.id} value={String(client.id)}>
                           {client.nom} {client.prenom}
                         </SelectItem>
@@ -357,7 +339,7 @@ export default function InterventionsPage() {
               </div>
               <div className="space-y-2">
                 <Label>{t("statutLabel")}</Label>
-                <Select value={formData.statut} onValueChange={(v) => setFormData({ ...formData, statut: v as "planifiee" | "en_cours" | "terminee" | "annulee" })}>
+                <Select value={formData.statut} onValueChange={(v) => setFormData({ ...formData, statut: toInterventionStatut(v) })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -381,9 +363,9 @@ export default function InterventionsPage() {
               {/* Équipe : intervenants supplémentaires (binôme, aide…) */}
               <div className="space-y-2">
                 <Label>{t("equipeLabel")}</Label>
-                {equipe && equipe.length > 0 ? (
+                {equipe.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {equipe.map((m: any) => (
+                    {equipe.map((m: EquipeMembre) => (
                       <Badge key={m.id} variant="secondary" className="gap-1 pr-1">
                         {nomMembre(m)}
                         {m.role ? <span className="text-[10px] opacity-70">({m.role})</span> : null}
@@ -391,7 +373,15 @@ export default function InterventionsPage() {
                           type="button"
                           aria-label={t("removeAria")}
                           className="ml-0.5 rounded hover:bg-muted-foreground/20"
-                          onClick={() => removeMembreMutation.mutate({ id: m.id })}
+                          onClick={() =>
+                            removeMembreMutation.mutate(
+                              { id: m.id },
+                              {
+                                onSuccess: () => toast.success(t("toastMemberRemoved")),
+                                onError: (e) => toast.error(e.message),
+                              },
+                            )
+                          }
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -407,13 +397,11 @@ export default function InterventionsPage() {
                       <SelectValue placeholder={t("addTechPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      {(techniciensList || [])
-                        .filter((tech: any) => !equipe?.some((m: any) => m.technicienId === tech.id))
-                        .map((tech: any) => (
-                          <SelectItem key={tech.id} value={String(tech.id)}>
-                            {[tech.prenom, tech.nom].filter(Boolean).join(" ") || t("techNum", { id: tech.id })}
-                          </SelectItem>
-                        ))}
+                      {availableTechniciens(techniciensList, equipe).map((tech: Technicien) => (
+                        <SelectItem key={tech.id} value={String(tech.id)}>
+                          {membreName(tech) || t("techNum", { id: tech.id })}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button
@@ -423,10 +411,19 @@ export default function InterventionsPage() {
                     onClick={() =>
                       selectedIntervention?.id &&
                       membreToAdd &&
-                      addMembreMutation.mutate({
-                        interventionId: selectedIntervention.id,
-                        technicienId: parseInt(membreToAdd),
-                      })
+                      addMembreMutation.mutate(
+                        {
+                          interventionId: selectedIntervention.id,
+                          technicienId: parseInt(membreToAdd),
+                        },
+                        {
+                          onSuccess: () => {
+                            setMembreToAdd("");
+                            toast.success(t("toastMemberAdded"));
+                          },
+                          onError: (e) => toast.error(e.message),
+                        },
+                      )
                     }
                   >
                     {t("add")}
@@ -491,17 +488,17 @@ export default function InterventionsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredInterventions.map((intervention: any) => (
+              {filteredInterventions.map((intervention: Intervention) => (
                 <tr key={intervention.id}>
                   <td className="font-medium">
                     {intervention.titre}
                     {/* équipe (intervenants additionnels) */}
                     {(equipeParIntervention.get(intervention.id)?.length ?? 0) > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {equipeParIntervention.get(intervention.id)!.map((m: any) => (
+                        {(equipeParIntervention.get(intervention.id) ?? []).map((m: EquipeByArtisanRow) => (
                           <Badge key={m.technicienId} variant="secondary" className="text-[10px] font-normal gap-1">
                             <Users className="h-2.5 w-2.5" />
-                            {[m.prenom, m.nom].filter(Boolean).join(" ") || t("techShort", { id: m.technicienId })}
+                            {membreName(m) || t("techShort", { id: m.technicienId })}
                           </Badge>
                         ))}
                       </div>
@@ -517,7 +514,7 @@ export default function InterventionsPage() {
                   </td>
                   {/* durée réelle sur site captée par l'app mobile (arrivée→départ) */}
                   <td className="whitespace-nowrap text-muted-foreground">
-                    {dureeLabel(intervention.dureeReelleMinutes)}
+                    {dureeLabel(dureeReelleMinutes(intervention))}
                   </td>
                   <td className="whitespace-nowrap">
                     <DropdownMenu>
