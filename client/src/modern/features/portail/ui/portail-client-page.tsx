@@ -4,16 +4,20 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard, MapPin, CheckCircle2 } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard, MapPin, CheckCircle2, CheckCircle, Send, ArrowRight, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { Badge } from "@/modern/shared/ui/badge";
 import { Button } from "@/modern/shared/ui/button";
+import { Input } from "@/modern/shared/ui/input";
+import { Textarea } from "@/modern/shared/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
 import { Progress } from "@/modern/shared/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/modern/shared/ui/tabs";
 import { usePortailAccess } from "../application/use-portail-access";
 import { usePortailDocuments } from "../application/use-portail-documents";
 import { usePortailActivity } from "../application/use-portail-activity";
-import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention } from "../domain/portail";
+import { usePortailRdv } from "../application/use-portail-rdv";
+import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, type RdvUrgence } from "../domain/portail";
 
 // SLICE 1 (socle) du portail client `/v2/portail/$token` : gate d'accès (chargement / lien invalide /
 // espace valide) + en-tête artisan + coquille d'onglets. Contenu des onglets = slices ultérieurs.
@@ -42,6 +46,24 @@ export default function PortailClientPage() {
   const { devis, factures } = usePortailDocuments(token || "", !!access?.valid);
   const { interventions, chantiers } = usePortailActivity(token || "", !!access?.valid);
   const prochaine = prochaineIntervention(interventions);
+  const { creneaux, mesRdv, demanderRdv } = usePortailRdv(token || "", !!access?.valid);
+
+  // Wizard RDV (état local UI).
+  const [rdvStep, setRdvStep] = useState(1);
+  const [rdvForm, setRdvForm] = useState<{ titre: string; description: string; urgence: RdvUrgence }>({ titre: "", description: "", urgence: "normale" });
+  const [rdvSelectedSlot, setRdvSelectedSlot] = useState<string | null>(null);
+  const [rdvSuccess, setRdvSuccess] = useState(false);
+
+  const submitRdv = () => {
+    if (!rdvSelectedSlot) return;
+    demanderRdv.mutate(
+      { token: token || "", titre: rdvForm.titre, description: rdvForm.description || undefined, urgence: rdvForm.urgence, dateProposee: rdvSelectedSlot },
+      {
+        onSuccess: () => { setRdvStep(1); setRdvForm({ titre: "", description: "", urgence: "normale" }); setRdvSelectedSlot(null); setRdvSuccess(true); setTimeout(() => setRdvSuccess(false), 5000); },
+        onError: () => toast.error(t("rdvErreur")),
+      },
+    );
+  };
 
   // Retour de paiement Stripe (?paiement=succes|annule) → toast + onglet factures, puis nettoyage URL.
   useEffect(() => {
@@ -325,8 +347,130 @@ export default function PortailClientPage() {
             </div>
           </TabsContent>
 
-          {/* Onglets restants (slices 4-6) — coquille */}
-          {PORTAIL_TABS.filter((tab) => !["devis", "factures", "interventions", "chantier"].includes(tab)).map((tab) => (
+          {/* SLICE 4 — Prise de RDV (wizard 3 étapes + mes RDV) */}
+          <TabsContent value="rdv">
+            <div className="space-y-6">
+              {rdvSuccess && (
+                <Card className="border-green-200 bg-green-50">
+                  <CardContent className="py-6 text-center">
+                    <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-600" />
+                    <p className="font-medium text-green-800">{t("rdvEnvoyeeTitre")}</p>
+                    <p className="text-sm text-green-600 mt-1">{t("rdvEnvoyeeDesc")}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="flex items-center justify-center gap-2 mb-4">
+                {[1, 2, 3].map((step) => (
+                  <div key={step} className="flex items-center gap-1.5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${rdvStep >= step ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-400"}`}>{step}</div>
+                    <span className={`text-xs hidden sm:inline ${rdvStep >= step ? "text-blue-600 font-medium" : "text-gray-400"}`}>{step === 1 ? t("rdvStep1") : step === 2 ? t("rdvStep2") : t("rdvStep3")}</span>
+                    {step < 3 && <ArrowRight className="h-3.5 w-3.5 text-gray-300 mx-1" />}
+                  </div>
+                ))}
+              </div>
+
+              {rdvStep === 1 && (
+                <Card>
+                  <CardHeader><CardTitle>{t("rdvDecrivez")}</CardTitle><CardDescription>{t("rdvDecrivezDesc")}</CardDescription></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">{t("rdvTitre")}</label>
+                      <Input value={rdvForm.titre} onChange={(e) => setRdvForm((f) => ({ ...f, titre: e.target.value }))} placeholder={t("rdvTitrePlaceholder")} className="mt-1" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">{t("rdvDescription")}</label>
+                      <Textarea value={rdvForm.description} onChange={(e) => setRdvForm((f) => ({ ...f, description: e.target.value }))} placeholder={t("rdvDescriptionPlaceholder")} rows={3} className="mt-1" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">{t("rdvUrgence")}</label>
+                      <Select value={rdvForm.urgence} onValueChange={(v) => setRdvForm((f) => ({ ...f, urgence: v as RdvUrgence }))}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="normale">{t("urgence.normale")}</SelectItem>
+                          <SelectItem value="urgente">{t("urgence.urgente")}</SelectItem>
+                          <SelectItem value="tres_urgente">{t("urgence.tres_urgente")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={() => setRdvStep(2)} disabled={!rdvForm.titre.trim()} className="w-full">{t("rdvChoisirCreneau")} <ArrowRight className="h-4 w-4 ml-2" /></Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {rdvStep === 2 && (
+                <Card>
+                  <CardHeader><CardTitle>{t("rdvChoisissez")}</CardTitle><CardDescription>{t("rdvChoisissezDesc")}</CardDescription></CardHeader>
+                  <CardContent>
+                    {creneaux.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500"><CalendarDays className="h-10 w-10 mx-auto mb-3 opacity-40" /><p>{t("rdvAucunCreneau")}</p></div>
+                    ) : (
+                      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                        {Object.entries(groupSlotsByDay(creneaux)).map(([day, daySlots]) => (
+                          <div key={day}>
+                            <h4 className="font-medium text-sm mb-2 capitalize">{new Date(day + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {daySlots.map((slot) => (
+                                <Button key={slot} size="sm" variant={rdvSelectedSlot === slot ? "default" : "outline"} onClick={() => setRdvSelectedSlot(slot)} className="min-w-[70px]">
+                                  {new Date(slot).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2 mt-6">
+                      <Button variant="outline" onClick={() => setRdvStep(1)}><ArrowLeft className="h-4 w-4 mr-1" /> {t("rdvRetour")}</Button>
+                      <Button onClick={() => setRdvStep(3)} disabled={!rdvSelectedSlot} className="flex-1">{t("rdvContinuer")} <ArrowRight className="h-4 w-4 ml-2" /></Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {rdvStep === 3 && (
+                <Card>
+                  <CardHeader><CardTitle>{t("rdvConfirmez")}</CardTitle><CardDescription>{t("rdvConfirmezDesc")}</CardDescription></CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                      <p><strong>{t("rdvLabelTitre")}</strong> {rdvForm.titre}</p>
+                      {rdvForm.description && <p><strong>{t("rdvLabelDescription")}</strong> {rdvForm.description}</p>}
+                      <p><strong>{t("rdvLabelUrgence")}</strong> {t(`urgence.${rdvForm.urgence}`)}</p>
+                      <p><strong>{t("rdvLabelCreneau")}</strong> {rdvSelectedSlot && new Date(rdvSelectedSlot).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setRdvStep(2)}><ArrowLeft className="h-4 w-4 mr-1" /> {t("rdvRetour")}</Button>
+                      <Button className="flex-1" onClick={submitRdv} disabled={demanderRdv.isPending}>
+                        {demanderRdv.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> {t("rdvEnvoi")}</> : <><Send className="h-4 w-4 mr-2" /> {t("rdvEnvoyer")}</>}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {mesRdv.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle>{t("rdvMesRdv")}</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {mesRdv.map((rdv) => (
+                        <div key={rdv.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{rdv.titre}</p>
+                            <p className="text-sm text-gray-500">{new Date(rdv.dateProposee).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}</p>
+                          </div>
+                          <Badge className={rdvStatutClass(rdv.statut || "en_attente")}>{t(`rdvStatut.${rdv.statut || "en_attente"}`, rdv.statut || "")}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Onglets restants (slices 5-6) — coquille */}
+          {PORTAIL_TABS.filter((tab) => !["devis", "factures", "interventions", "chantier", "rdv"].includes(tab)).map((tab) => (
             <TabsContent key={tab} value={tab}>
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">{t("sectionAVenir")}</CardContent>

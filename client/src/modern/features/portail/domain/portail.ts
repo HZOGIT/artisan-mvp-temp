@@ -1,4 +1,4 @@
-import type { RouterOutputs } from "@/modern/shared/trpc";
+import type { RouterInputs, RouterOutputs } from "@/modern/shared/trpc";
 
 // Couche DOMAIN de la feature `portail` (clean-archi) — espace client PUBLIC par token (`/v2/portail/$token`).
 // SLICE 1 (socle) : vérification d'accès. Les onglets (devis/factures/paiement/interventions/chantiers/
@@ -78,4 +78,28 @@ export function prochaineIntervention(interventions: readonly PortailInterventio
     .filter((i) => new Date(i.dateIntervention) >= now && i.statut === "planifiee")
     .sort((a, b) => new Date(a.dateIntervention).getTime() - new Date(b.dateIntervention).getTime());
   return futures[0] ?? null;
+}
+
+// ── SLICE 4 : Prise de RDV ─────────────────────────────────────────────────────────────────────────
+export type PortailRdv = RouterOutputs["clientPortal"]["getMesRdv"][number];
+export type RdvUrgence = RouterInputs["clientPortal"]["demanderRdv"]["urgence"];
+
+// Groupe les créneaux ISO par jour (YYYY-MM-DD), ordre des jours préservé (insertion). PUR.
+export function groupSlotsByDay(slots: readonly string[]): Record<string, string[]> {
+  const grouped: Record<string, string[]> = {};
+  for (const slot of slots) {
+    const day = new Date(slot).toISOString().split("T")[0];
+    (grouped[day] ??= []).push(slot);
+  }
+  return grouped;
+}
+
+// Classe de pastille d'un statut de RDV (libellé i18n `rdvStatut.<statut>`). PUR.
+export function rdvStatutClass(statut: string): string {
+  switch (statut) {
+    case "confirme": return "bg-green-100 text-green-700";
+    case "refuse": return "bg-red-100 text-red-700";
+    case "annule": return "bg-gray-100 text-gray-500";
+    default: return "bg-yellow-100 text-yellow-700"; // en_attente
+  }
 }

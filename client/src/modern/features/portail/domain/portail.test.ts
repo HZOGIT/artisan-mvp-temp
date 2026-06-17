@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, type PortailIntervention } from "./portail";
+import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, type PortailIntervention } from "./portail";
 
 describe("portail (socle, slice 1)", () => {
   it("expose les 8 onglets de l'espace client (parité legacy)", () => {
@@ -50,5 +50,19 @@ describe("portail slice 3 — interventions/chantiers", () => {
     ];
     expect(prochaineIntervention(list, now)?.id).toBe(3);
     expect(prochaineIntervention([i(1, "2026-06-05T10:00:00Z", "planifiee")], now)).toBeNull();
+  });
+});
+
+describe("portail slice 4 — RDV", () => {
+  it("groupSlotsByDay groupe par jour ISO", () => {
+    const g = groupSlotsByDay(["2026-06-10T08:00:00Z", "2026-06-10T10:00:00Z", "2026-06-11T09:00:00Z"]);
+    expect(Object.keys(g)).toEqual(["2026-06-10", "2026-06-11"]);
+    expect(g["2026-06-10"]).toHaveLength(2);
+  });
+  it("rdvStatutClass mappe le statut", () => {
+    expect(rdvStatutClass("confirme")).toContain("green");
+    expect(rdvStatutClass("refuse")).toContain("red");
+    expect(rdvStatutClass("annule")).toContain("gray");
+    expect(rdvStatutClass("en_attente")).toContain("yellow");
   });
 });
