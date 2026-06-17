@@ -403,6 +403,15 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   ui (header/stats + filtres + liste + 2 dialogs refus/autre-créneau). i18n namespace `rdvEnLigne`. **0 `any`**
   (selectedRdv/rdv any legacy supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **296**.
 
+- **Migration `alertes-previsions` (alertes écarts de CA) ✅** (13e des ~24 pages feature) : audit contrat —
+  module `alertes-previsions` keyé `alertesPrevisions`, 4 endpoints (getConfig/getHistorique/saveConfig/
+  verifierEtEnvoyer) présents. **Gaps de DTO comblés** (masqués par `any` legacy) : l'historique a `dateEnvoi`
+  (≠`createdAt`), `caRealise` (≠`caReel`), et un **canal unique** `canalEnvoi` (`email`/`sms`/`les_deux`) au
+  lieu des 2 booléens legacy → helpers purs `canalHasEmail`/`canalHasSms`. Clean-archi : domain
+  (`isAlertePositive`/`formatMontant`/`formatDateHeure`/`canalHas*`, **5 tests**) + application (config +
+  historique + save + verifier) + ui (formulaire seuils/canaux/fréquence + historique). i18n namespace
+  `alertesPrevisions`. **0 `any`** (2 legacy supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **301**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Sans carte/charts :
 `nouvelle-depense`, `tableau-bord-sync-comptable`, `devis-ia`, `import`, `performances-fournisseurs`…
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/

@@ -33,6 +33,7 @@ export const V2_ROUTES: Readonly<Record<string, string>> = {
   "/documentation": "/v2/documentation",
   "/ma-vitrine": "/v2/ma-vitrine",
   "/rdv-en-ligne": "/v2/rdv-en-ligne",
+  "/alertes-previsions": "/v2/alertes-previsions",
   "/flotte": "/v2/flotte",
   "/statistiques": "/v2/statistiques",
   "/modules": "/v2/modules",
