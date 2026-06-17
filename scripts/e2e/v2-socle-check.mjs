@@ -102,6 +102,7 @@ const PARITE_PAGES = [
   { legacy: '/calendrier', v2: '/v2/calendrier', markers: ['Calendrier', 'glissez-déposez pour replanifier'] },
   { legacy: '/devis-options', v2: '/v2/devis-options', markers: ['Variantes de devis', 'Où trouver les variantes'] },
   { legacy: '/parametres', v2: '/v2/parametres', markers: ['Paramètres', 'Numérotation des documents', 'Synchroniser mon agenda'] },
+  { legacy: '/dashboard', v2: '/v2/dashboard', markers: ['CA du mois', 'Personnaliser le dashboard'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
@@ -214,13 +215,13 @@ if (new URL(page.url()).pathname !== '/v2/clients') {
   add({ route: 'sidebar/clients', type: 'sidebar', text: `attendu /v2/clients, obtenu ${page.url()}` });
 }
 
-// « Accueil » (route NON migrée) → reste /dashboard (legacy).
+// « Accueil » (route MIGRÉE = dashboard) → bascule vers /v2/dashboard.
 sidebarCount++;
 current = 'sidebar Accueil';
 await navBtn('Accueil').click();
 await page.waitForTimeout(1000);
-if (new URL(page.url()).pathname !== '/dashboard') {
-  add({ route: 'sidebar/dashboard', type: 'sidebar', text: `attendu /dashboard (non migré), obtenu ${page.url()}` });
+if (new URL(page.url()).pathname !== '/v2/dashboard') {
+  add({ route: 'sidebar/dashboard', type: 'sidebar', text: `attendu /v2/dashboard (migré), obtenu ${page.url()}` });
 }
 } // fin sections globales (if !ONLY)
 
