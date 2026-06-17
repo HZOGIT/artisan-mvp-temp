@@ -43,5 +43,19 @@
     "envoyee": "En attente",
     "payee": "Payée",
     "en_retard": "En retard"
+  },
+  "aucuneIntervention": "Aucune intervention pour le moment",
+  "prochaineIntervention": "Prochaine intervention",
+  "aucunChantier": "Aucun chantier en cours pour le moment.",
+  "avancementGlobal": "Avancement global",
+  "etapesChantier": "Etapes du chantier",
+  "etapesBientot": "Les etapes de suivi seront bientot disponibles.",
+  "portailSecurise": "Portail client sécurisé",
+  "siret": "SIRET : {{siret}}",
+  "interventionStatut": {
+    "planifiee": "Planifiée",
+    "en_cours": "En cours",
+    "terminee": "Terminée",
+    "annulee": "Annulée"
   }
 }

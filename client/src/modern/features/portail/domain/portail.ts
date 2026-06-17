@@ -46,3 +46,36 @@ export function factureStatutClass(statut: string): string {
 export function isFacturePayable(statut: string): boolean {
   return statut === "envoyee" || statut === "en_retard";
 }
+
+// ── SLICE 3 : Interventions + Suivi chantiers ─────────────────────────────────────────────────────
+export type PortailIntervention = RouterOutputs["clientPortal"]["getInterventions"][number];
+export type PortailChantier = RouterOutputs["clientPortal"]["getSuiviChantiers"][number];
+
+// Classe de badge d'un statut d'intervention (libellé i18n `interventionStatut.<statut>`). PUR.
+export function interventionStatutClass(statut: string): string {
+  switch (statut) {
+    case "planifiee": return "bg-blue-100 text-blue-700 border-blue-200";
+    case "en_cours": return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    case "terminee": return "bg-green-100 text-green-700 border-green-200";
+    case "annulee": return "bg-red-100 text-red-700 border-red-200";
+    default: return "bg-gray-100 text-gray-700";
+  }
+}
+
+// Classe de badge d'un statut de chantier (couleur uniquement ; le libellé = statut « humanisé »). PUR.
+export function chantierStatutClass(statut: string): string {
+  switch (statut) {
+    case "termine": return "bg-green-100 text-green-800";
+    case "en_cours": return "bg-blue-100 text-blue-800";
+    case "en_pause": return "bg-yellow-100 text-yellow-800";
+    default: return "bg-gray-100 text-gray-800";
+  }
+}
+
+// Prochaine intervention « planifiée » à venir (la + proche par date), `null` sinon. PUR.
+export function prochaineIntervention(interventions: readonly PortailIntervention[], now: Date = new Date()): PortailIntervention | null {
+  const futures = interventions
+    .filter((i) => new Date(i.dateIntervention) >= now && i.statut === "planifiee")
+    .sort((a, b) => new Date(a.dateIntervention).getTime() - new Date(b.dateIntervention).getTime());
+  return futures[0] ?? null;
+}

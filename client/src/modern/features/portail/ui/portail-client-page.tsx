@@ -4,14 +4,16 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard } from "lucide-react";
+import { FileText, Receipt, Calendar, User, Loader2, Phone, Mail, MessageCircle, CalendarDays, HardHat, Sparkles, Download, ExternalLink, CreditCard, MapPin, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { Badge } from "@/modern/shared/ui/badge";
 import { Button } from "@/modern/shared/ui/button";
+import { Progress } from "@/modern/shared/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/modern/shared/ui/tabs";
 import { usePortailAccess } from "../application/use-portail-access";
 import { usePortailDocuments } from "../application/use-portail-documents";
-import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable } from "../domain/portail";
+import { usePortailActivity } from "../application/use-portail-activity";
+import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention } from "../domain/portail";
 
 // SLICE 1 (socle) du portail client `/v2/portail/$token` : gate d'accès (chargement / lien invalide /
 // espace valide) + en-tête artisan + coquille d'onglets. Contenu des onglets = slices ultérieurs.
@@ -38,6 +40,8 @@ export default function PortailClientPage() {
   const [payingFactureId, setPayingFactureId] = useState<number | null>(null);
   const { access, isLoading } = usePortailAccess(token || "");
   const { devis, factures } = usePortailDocuments(token || "", !!access?.valid);
+  const { interventions, chantiers } = usePortailActivity(token || "", !!access?.valid);
+  const prochaine = prochaineIntervention(interventions);
 
   // Retour de paiement Stripe (?paiement=succes|annule) → toast + onglet factures, puis nettoyage URL.
   useEffect(() => {
@@ -219,8 +223,110 @@ export default function PortailClientPage() {
             </div>
           </TabsContent>
 
-          {/* Onglets restants (slices 3-6) — coquille */}
-          {PORTAIL_TABS.filter((tab) => tab !== "devis" && tab !== "factures").map((tab) => (
+          {/* SLICE 3 — Interventions */}
+          <TabsContent value="interventions">
+            <div className="space-y-3">
+              {prochaine && (
+                <Card className="border-blue-200 bg-blue-50/50">
+                  <CardHeader className="pb-2">
+                    <CardDescription className="text-blue-600 font-medium text-xs uppercase tracking-wider">{t("prochaineIntervention")}</CardDescription>
+                    <CardTitle className="text-lg text-blue-900">{prochaine.titre}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-blue-700"><Calendar className="h-4 w-4" />{format(new Date(prochaine.dateIntervention), "EEEE dd MMMM yyyy 'à' HH:mm", { locale: fr })}</div>
+                      {prochaine.adresse && <div className="flex items-center gap-2 text-blue-600"><MapPin className="h-4 w-4" />{prochaine.adresse}</div>}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {interventions.length === 0 ? (
+                <Card><CardContent className="py-12 text-center text-gray-500"><Calendar className="h-12 w-12 mx-auto mb-4 opacity-40" /><p>{t("aucuneIntervention")}</p></CardContent></Card>
+              ) : (
+                interventions.filter((i) => i.id !== prochaine?.id).map((i) => (
+                  <Card key={i.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 sm:p-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <span className="font-semibold text-gray-900">{i.titre}</span>
+                            <Badge variant="outline" className={interventionStatutClass(i.statut || "planifiee")}>{t(`interventionStatut.${i.statut || "planifiee"}`, i.statut || "")}</Badge>
+                          </div>
+                          {i.description && <p className="text-sm text-gray-500 truncate">{i.description}</p>}
+                        </div>
+                        <div className="text-sm text-gray-500 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{i.dateIntervention && format(new Date(i.dateIntervention), "dd MMM yyyy 'à' HH:mm", { locale: fr })}</div>
+                          {i.adresse && <div className="flex items-center gap-1.5 mt-1"><MapPin className="h-3.5 w-3.5" />{i.adresse}</div>}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* SLICE 3 — Suivi chantiers */}
+          <TabsContent value="chantier">
+            <div className="space-y-6">
+              {chantiers.length === 0 ? (
+                <Card><CardContent className="py-12 text-center"><HardHat className="h-12 w-12 mx-auto text-gray-300 mb-4" /><p className="text-gray-500">{t("aucunChantier")}</p></CardContent></Card>
+              ) : (
+                chantiers.map((chantier) => (
+                  <Card key={chantier.id}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">{chantier.nom}</CardTitle>
+                          {chantier.description && <CardDescription>{chantier.description}</CardDescription>}
+                        </div>
+                        <Badge className={chantierStatutClass(chantier.statut || "planifie")}>{(chantier.statut || "planifie").replace("_", " ")}</Badge>
+                      </div>
+                      <div className="mt-3">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-500">{t("avancementGlobal")}</span>
+                          <span className="font-semibold">{chantier.avancement || 0}%</span>
+                        </div>
+                        <Progress value={chantier.avancement || 0} className="h-3" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {chantier.etapes && chantier.etapes.length > 0 ? (
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-sm text-gray-700">{t("etapesChantier")}</h4>
+                          <div className="relative">
+                            {chantier.etapes.map((etape, idx) => (
+                              <div key={etape.id} className="flex gap-4 pb-6 last:pb-0">
+                                <div className="flex flex-col items-center">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${etape.statut === "termine" ? "bg-green-500 text-white" : etape.statut === "en_cours" ? "bg-blue-500 text-white animate-pulse" : "bg-gray-200 text-gray-500"}`}>
+                                    {etape.statut === "termine" ? <CheckCircle2 className="h-4 w-4" /> : etape.ordre}
+                                  </div>
+                                  {idx < chantier.etapes.length - 1 && <div className={`w-0.5 flex-1 mt-1 ${etape.statut === "termine" ? "bg-green-300" : "bg-gray-200"}`} />}
+                                </div>
+                                <div className="flex-1 pt-1">
+                                  <div className="flex items-center justify-between">
+                                    <h5 className={`font-medium ${etape.statut === "termine" ? "text-green-700" : etape.statut === "en_cours" ? "text-blue-700" : "text-gray-600"}`}>{etape.titre}</h5>
+                                    <span className="text-sm font-semibold">{etape.pourcentage}%</span>
+                                  </div>
+                                  {etape.description && <p className="text-sm text-gray-500 mt-0.5">{etape.description}</p>}
+                                  <Progress value={etape.pourcentage || 0} className="h-1.5 mt-2" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-sm text-center py-4">{t("etapesBientot")}</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Onglets restants (slices 4-6) — coquille */}
+          {PORTAIL_TABS.filter((tab) => !["devis", "factures", "interventions", "chantier"].includes(tab)).map((tab) => (
             <TabsContent key={tab} value={tab}>
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">{t("sectionAVenir")}</CardContent>
@@ -229,6 +335,23 @@ export default function PortailClientPage() {
           ))}
         </Tabs>
       </main>
+
+      <footer className="bg-white border-t mt-auto">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-500">
+            <div className="text-center sm:text-left">
+              <p className="font-medium text-gray-700">{access.artisan?.nomEntreprise}</p>
+              {access.artisan?.adresse && <p>{access.artisan.adresse}, {access.artisan?.codePostal} {access.artisan?.ville}</p>}
+              {access.artisan?.siret && <p>{t("siret", { siret: access.artisan.siret })}</p>}
+            </div>
+            <div className="text-center sm:text-right">
+              {access.artisan?.telephone && <p>{access.artisan.telephone}</p>}
+              {access.artisan?.email && <p>{access.artisan.email}</p>}
+              <p className="text-xs text-gray-400 mt-1">{t("portailSecurise")}</p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
