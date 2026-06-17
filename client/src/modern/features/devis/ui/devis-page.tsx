@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { trpc } from "@/modern/shared/trpc";
+import { useDevis } from "../application/use-devis";
+import {
+  clientLabel,
+  countByStatut,
+  filterDevis,
+  isDevisStatut,
+  STATUT_KEYS,
+  type Devis,
+  type DevisClient,
+} from "../domain/devis";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent } from "@/modern/shared/ui/card";
@@ -11,16 +20,13 @@ import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/modern/shared/ui/dropdown-menu";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Page Devis du FRONT NEUF (`/v2/devis`) — PORT CONFORME de `pages/Devis.tsx`. JSX/Tailwind à
-// l'identique (table native `data-table` conservée) ; plomberie repointée : primitives
-// `@/modern/shared/ui` (dont StatutBadge), tRPC partagé, i18n (namespace `devis`). Couleurs de filtres
-// par statut conservées (classes Tailwind) ; libellés via i18n.
-
-const STATUT_KEYS = ["brouillon", "envoye", "accepte", "refuse", "expire"];
+// Page Devis du FRONT NEUF (`/v2/devis`) — clean-archi : présentation pure. Données/mutations via
+// `useDevis` (couche application, seule à importer tRPC) ; filtrage/décompte via le domaine
+// (`../domain/devis`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à l'identique
+// (table native `data-table`). Couleurs de filtres conservées (classes Tailwind) ; libellés via i18n.
 
 const statusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -40,48 +46,39 @@ export default function DevisPage() {
   useEffect(() => {
     const params = new URLSearchParams(search);
     const f = params.get("filtre");
-    if (f && STATUT_KEYS.includes(f)) {
+    if (f && isDevisStatut(f)) {
       setStatusFilter(f);
     }
   }, [search]);
-  const utils = trpc.useUtils();
-  const { data: devisList, isLoading } = trpc.devis.list.useQuery();
-  const { data: clients } = trpc.clients.list.useQuery();
+  const { devis: devisList, clients, isLoading, remove: deleteMutation, convertToFacture: convertToFactureMutation } = useDevis();
 
   const statutLabelOf = (statut: string) => t(`statut_${statut}`, { defaultValue: statut });
 
-  const deleteMutation = trpc.devis.delete.useMutation({
-    onSuccess: () => {
-      utils.devis.list.invalidate();
-      toast.success(t("toastDeleted"));
-    },
-    onError: () => {
-      toast.error(t("toastDeleteError"));
-    },
-  });
-
-  const convertToFactureMutation = trpc.devis.convertToFacture.useMutation({
-    onSuccess: (data) => {
-      utils.devis.list.invalidate();
-      utils.factures.list.invalidate();
-      toast.success(t("toastConverted"));
-      setLocation(`/factures/${data.id}`);
-    },
-    onError: (error) => {
-      toast.error(error.message || t("toastConvertError"));
-    },
-  });
-
   const handleDelete = (id: number) => {
     if (confirm(t("confirmDelete"))) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate(
+        { id },
+        {
+          onSuccess: () => toast.success(t("toastDeleted")),
+          onError: () => toast.error(t("toastDeleteError")),
+        },
+      );
     }
   };
 
   const handleConvertToFacture = (devisId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm(t("confirmConvert"))) {
-      convertToFactureMutation.mutate({ devisId });
+      convertToFactureMutation.mutate(
+        { devisId },
+        {
+          onSuccess: (data) => {
+            toast.success(t("toastConverted"));
+            setLocation(`/factures/${data.id}`);
+          },
+          onError: (error) => toast.error(error.message || t("toastConvertError")),
+        },
+      );
     }
   };
 
@@ -123,13 +120,12 @@ export default function DevisPage() {
     y += 5;
 
     doc.setFont("helvetica", "normal");
-    filteredDevis.forEach((devis: any) => {
+    filteredDevis.forEach((devis: Devis) => {
       if (y > 280) {
         doc.addPage();
         y = 20;
       }
-      const client = clientsMap.get(devis.clientId);
-      const clientName = client ? `${client.nom} ${client.prenom}`.substring(0, 20) : "-";
+      const clientName = (resolveClientName(devis.clientId) || "-").substring(0, 20);
       const objet = (devis.objet || "-").substring(0, 25);
 
       doc.text(devis.numero || "-", 14, y);
@@ -152,11 +148,10 @@ export default function DevisPage() {
       return;
     }
 
-    const data = filteredDevis.map((devis: any) => {
-      const client = clientsMap.get(devis.clientId);
+    const data = filteredDevis.map((devis: Devis) => {
       return {
         [t("thNumero")]: devis.numero || "-",
-        [t("thClient")]: client ? `${client.nom} ${client.prenom}` : "-",
+        [t("thClient")]: resolveClientName(devis.clientId) || "-",
         [t("thDate")]: devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-",
         [t("thObjet")]: devis.objet || "-",
         [t("excelMontantHT")]: parseFloat(devis.totalHT || "0"),
@@ -185,32 +180,13 @@ export default function DevisPage() {
     toast.success(t("toastExcelDownloaded"));
   };
 
-  // Créer un mapping client pour la recherche par nom
-  const clientsMap = new Map<number, { nom: string; prenom: string }>();
-  clients?.forEach((client: any) => {
-    clientsMap.set(client.id, { nom: client.nom, prenom: client.prenom || "" });
-  });
+  // Index client pour la résolution de nom (l'index vit côté UI ; le filtrage est délégué au domaine).
+  const clientsMap = new Map<number, DevisClient>(clients.map((c) => [c.id, c]));
+  const resolveClientName = (clientId: number | null) =>
+    clientLabel(clientId == null ? undefined : clientsMap.get(clientId));
 
-  const filteredDevis = devisList?.filter((devis: any) => {
-    if (statusFilter !== "all" && devis.statut !== statusFilter) {
-      return false;
-    }
-    if (searchQuery) {
-      const client = clientsMap.get(devis.clientId);
-      const clientName = client ? `${client.nom} ${client.prenom}` : "";
-      return (
-        matchSearch(devis.numero, searchQuery) ||
-        matchSearch(devis.objet, searchQuery) ||
-        matchSearch(clientName, searchQuery)
-      );
-    }
-    return true;
-  });
-
-  const statusCounts = devisList?.reduce((acc: Record<string, number>, devis: any) => {
-    acc[devis.statut] = (acc[devis.statut] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>) || {};
+  const filteredDevis = filterDevis(devisList, { statusFilter, searchQuery, resolveClientName });
+  const statusCounts = countByStatut(devisList);
 
   return (
     <div className="space-y-6">
@@ -293,13 +269,13 @@ export default function DevisPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredDevis.map((devis: any) => {
-                const client = clientsMap.get(devis.clientId);
+              {filteredDevis.map((devis: Devis) => {
+                const clientName = resolveClientName(devis.clientId);
                 return (
                   <tr key={devis.id} className="cursor-pointer" onClick={() => setLocation(`/devis/${devis.id}`)}>
                     <td className="font-medium whitespace-nowrap">{devis.numero}</td>
                     <td className="whitespace-nowrap text-muted-foreground">{devis.dateDevis ? format(new Date(devis.dateDevis), "dd/MM/yyyy") : "-"}</td>
-                    <td className="whitespace-nowrap">{client ? `${client.nom} ${client.prenom}` : "-"}</td>
+                    <td className="whitespace-nowrap">{clientName || "-"}</td>
                     <td className="max-w-[200px] truncate">{devis.objet || "-"}</td>
                     <td className="font-medium text-right whitespace-nowrap">{formatCurrency(devis.totalTTC)}</td>
                     <td className="whitespace-nowrap">

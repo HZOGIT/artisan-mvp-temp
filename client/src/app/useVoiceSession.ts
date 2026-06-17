@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { VoiceState } from '@/domain/voice/VoiceSession';
 import { GeminiLiveVoiceSession } from '@/infra-web/GeminiLiveVoiceSession';
 import { vlog } from '@/infra-web/voiceDebug';
@@ -30,6 +31,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
   const sessionRef = useRef<GeminiLiveVoiceSession | null>(null);
   // The thread voice turns are persisted to (created by /voice/token if absent).
   const threadIdRef = useRef<number | undefined>(options.threadId);
+  const queryClient = useQueryClient();
 
   const stopVoice = useCallback(async () => {
     if (sessionRef.current) {
@@ -107,6 +109,11 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
             vlog(`❌ session error: ${err.message}`);
             setError(err.message);
             setVoiceState('error');
+          },
+          onToolCallDone: () => {
+            for (const key of ['devis', 'factures', 'clients', 'stocks', 'commandes', 'notifications']) {
+              queryClient.invalidateQueries({ queryKey: [key] });
+            }
           },
         },
       });

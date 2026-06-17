@@ -11,6 +11,8 @@ export interface VoiceSessionEvents {
   onTurnComplete: (userTranscript: string, assistantTranscript: string, metadata?: any) => void;
   onInterrupted: () => void;
   onError: (error: Error) => void;
+  /** Fired after each batch of voice tool calls completes — use to invalidate queries. */
+  onToolCallDone?: () => void;
 }
 
 export interface VoiceSessionConfig {

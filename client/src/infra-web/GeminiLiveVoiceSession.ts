@@ -278,6 +278,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
     if (this._ws?.readyState === WebSocket.OPEN) {
       this._ws.send(JSON.stringify({ toolResponse: { functionResponses } }));
       vlog(`🔧 sent ${functionResponses.length} toolResponse(s)`);
+      this._events?.onToolCallDone?.();
     } else {
       vlog(`🔧 toolResponse NOT sent — WS closed (state=${this._ws?.readyState})`);
     }

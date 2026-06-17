@@ -859,6 +859,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       setLocation(target);
     },
     onInvalidate: (keys) => {
+      // QueryClient est partagé avec le modern — cette invalidation couvre aussi les pages modern/.
       for (const key of keys) {
         queryClient.invalidateQueries({
           predicate: (query) => queryKeyContains(query.queryKey, key),

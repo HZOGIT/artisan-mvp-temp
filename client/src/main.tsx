@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
     queries: {
       // staleTime : valeur par défaut de React Query (0) — les données sont considérées
       // périmées immédiatement (refetch au remontage/refocus selon les autres options).
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
     },
   },
 })

@@ -53,8 +53,7 @@ transitive type-check aussi des fichiers **hors périmètre** (`client/src/lib/p
 
 ## Query client (React Query) — staleTime par défaut (imposé)
 Le `QueryClient` partagé (`client/src/main.tsx`) utilise le **staleTime par défaut de React Query (0)**
-(plus de `staleTime: 5min`) → données considérées périmées immédiatement (refetch au remontage). Garder
-`refetchOnWindowFocus:false`.
+(plus de `staleTime: 5min`) → données considérées périmées immédiatement (refetch au remontage/refocus).
 
 ## Convention de nommage des fichiers (imposée)
 **Tous les nouveaux fichiers du front neuf sont en `kebab-case`** (ex. `clients-list-page.tsx`,
@@ -204,13 +203,13 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague R — feature `devis`** (rétrofit clean-archi). Extraire
-`domain/devis.ts` (types `RouterOutputs` + règles pures : filtres statut/recherche, synthèses) +
-`application/use-devis.ts` (SEULE couche tRPC : list + create/delete/transitions + invalidation), faire
-consommer `devis-page.tsx` (plus de `trpc` direct, **0 `any`**, le warning `no-trpc-in-ui` doit
-disparaître pour ce fichier). Garder parité e2e verte. Gabarit = `use-factures` / `use-clients`.
-Après devis : interventions, puis le reste (notifications, techniciens, fournisseurs, articles,
-commandes, stocks, depenses, comptabilite, signature). Quand les 11 warnings tombent à 0 → passer
+## 🎯 PROCHAINE CIBLE : **Vague R — feature `interventions`** (rétrofit clean-archi). Extraire
+`domain/intervention.ts` (types `RouterOutputs` + règles pures : filtres statut/recherche, équipe,
+durée) + `application/use-interventions.ts` (SEULE couche tRPC : list + create/update/delete + équipe +
+invalidation), faire consommer `interventions-page.tsx` (plus de `trpc` direct, **0 `any`**, warning
+`no-trpc-in-ui` disparaît). **Audit §3bis 6/6 obligatoire + consigné.** Garder parité e2e verte. Gabarit
+= `use-devis` / `use-factures`. Reste après : notifications, techniciens, fournisseurs, articles,
+commandes, stocks, depenses, comptabilite, signature. Quand les 10 warnings tombent à 0 → passer
 `local/no-trpc-in-ui` en **`error`**.
 
 ### Vague R — rétrofit clean-archi (après le pattern de référence)
@@ -250,6 +249,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Clean-archi — Vague R `devis` ✅** : `domain/devis.ts` (types `RouterOutputs` + fonctions PURES `clientLabel`/`filterDevis`/`countByStatut`/`isDevisStatut` + `STATUT_KEYS` ; **7 tests**) + `application/use-devis.ts` (SEULE couche tRPC : list devis+clients, delete/convertToFacture + invalidation). `devis-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC (toasts/navigation via `onSuccess` par appel) ; exports PDF/Excel typés `Devis`, nom client via résolveur. Warnings `no-trpc-in-ui` **11→10**. **Audit §3bis 6/6 ✅**. tsc/eslint(0 err)/vitest **45**. Prochaine : `interventions`.
 - **Clean-archi — Vague R `factures` ✅** : `domain/facture.ts` (types `RouterOutputs` + fonctions PURES `clientLabel`/`isBrouillon`/`filterFactures`/`computeEncoursSummary` — filtrage type+statut+recherche & synthèse d'encours avoirs déduits ; **9 tests**) + `application/use-factures.ts` (SEULE couche tRPC : list factures+clients, create/delete, invalidation) + `useClientEncours` (query dépendante isolée). `factures-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC (toasts/navigation via `onSuccess` par appel). Warnings `no-trpc-in-ui` **12→11**. tsc/eslint(0 err)/vitest **38**, parité `37|0` + mutation `1|0`, déployé `f1f3fab9`. **Audit §3bis : 6/6 ✅** (3 couches · 0 any · ui sans tRPC · warning 12→11 · 9 tests purs · parité OK). Prochaine : `devis`.
 - **Clean-archi — ClientDetail ✅** (feature `clients` 100 % rétrofittée) : `application/use-client-detail.ts` (hook : `clients.getById` + `devis/factures/interventions.list` + `clientPortal.*` + `activites.*`, invalidation centralisée) + domaine pur étendu (`ofClient`, `activitesOfClient`, `sortActivitesByEcheance`, `computeClientStats` + types `ClientDetail/DevisRow/FactureRow/InterventionRow/ActiviteRow/PortalStatus/ActiviteType`). `client-detail-page.tsx` consomme hook+domaine, **0 `any`**, plus aucun import tRPC (toasts/clipboard/reset via `onSuccess` par appel). Warnings `no-trpc-in-ui` **13→12**. tsc/eslint(0 err)/vitest **29** (clients domain 16), parité `37|0` + mutation `1|0`, déployé `c3dd4e9f`. Prochaine : Vague R `factures`.
 - **Clean-archi — Clients (liste) ✅ GABARIT** : `application/use-clients.ts` (hook encapsulant tRPC : list/getEncoursMap/update/delete) + `domain/client.ts` (types `RouterOutputs` + fonctions PURES `findDuplicateGroups`/`findCreateDuplicateMatch` renvoyant des clés i18n, **7 tests**). `clients-list-page.tsx` consomme le hook, **0 `any`**, plus aucun import tRPC. Règle eslint **custom `no-trpc-in-ui` (warn)** posée → flague les 13 ui non rétrofittées (clients-list exempte). tsc/vitest(24)/eslint verts, parité `37|0` + mutation `1|0`. Prochaine : ClientDetail.
