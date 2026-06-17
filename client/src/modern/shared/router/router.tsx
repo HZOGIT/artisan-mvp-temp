@@ -66,7 +66,14 @@ const notificationsRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/notifications/ui/notifications-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute]);
+// Techniciens du front neuf — port conforme de `pages/Techniciens.tsx`.
+const techniciensRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/techniciens",
+  component: lazyRouteComponent(() => import("../../features/techniciens/ui/techniciens-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
