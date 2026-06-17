@@ -199,7 +199,14 @@ const modulesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/modules/ui/modules-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute]);
+// Gestion des congés — migration clean-archi de `pages/Conges.tsx`.
+const congesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/conges",
+  component: lazyRouteComponent(() => import("../../features/conges/ui/conges-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

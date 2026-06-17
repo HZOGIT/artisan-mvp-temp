@@ -90,6 +90,7 @@ const PARITE_PAGES = [
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },
+  { legacy: '/conges', v2: '/v2/conges', markers: ['Gestion des Congés', 'Nouvelle demande'] },
   // Pages PUBLIQUES (montage `/v2` hors auth) — vérifie que le socle public rend la page.
   { legacy: '/paiement/succes', v2: '/v2/paiement/succes', markers: ['Paiement réussi', "Retour à l'accueil"] },
   { legacy: '/paiement/annule', v2: '/v2/paiement/annule', markers: ['Paiement annulé', 'Réessayer le paiement'] },
