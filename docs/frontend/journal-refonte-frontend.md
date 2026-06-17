@@ -209,7 +209,32 @@ fait **échouer** le gate ESLint v2. Désormais chaque nouvelle page naît clean
 seule couche tRPC + ui présentation, 0 `any`). Bilan : **5 bugs UI réels** trouvés via le typage strict
 (OPE-465→469), tous parqués dans « Refonte — findings & dette repérés ».
 
-## 🎯 PROCHAINE CIBLE : **pages restantes hors Vague R** (gros morceaux différés). Au choix selon priorité :
+## 🎯 PROCHAINE CIBLE : **`Parametres` → `/v2/parametres`** (DERNIÈRE page legacy non migrée, gros multi-domaine)
+
+`pages/Parametres.tsx` ~674 l. Tabs `general` + `abonnement`. **Plan de slice (1 itération dédiée) :**
+1. **Réutiliser `@/components/AbonnementSection`** pour l'onglet abonnement (composant Stripe/devices
+   auto-suffisant via `@/lib/trpc` legacy — même stratégie que `@/components/Calendar` ; portage propre
+   d'AbonnementSection = slice futur séparé, gros : checkout/portal/devices = 8 endpoints).
+2. **Onglet `general`** = feature clean-archi `parametres` :
+   - `domain/` : `parametresToForm(parametres, artisan)` + `formToUpdateInput(formData)` (mappers PURS,
+     incl. `parseVitrineServices` JSON) + `buildIcalUrl(path, origin)` + `demandeStatutClass` ; **types**
+     `RouterOutputs["parametres"/"artisan"/"vitrine"/"calendrier"]`. Tests sur les 2 mappers.
+   - `application/` : `parametres.get` + `artisan.getProfile` + `calendrier.getIcalFeed` +
+     `vitrine.getDemandesContact` + mutations `parametres.update`/`artisan.updateProfile`/`regenerateIcalFeed`/
+     `updateDemandeContactStatut`/`convertirDemandeEnClient`. Logo = `fetch('/api/upload-logo')` (REST, garder en ui).
+   - `ui/` : sections numérotation, mentions/CGV, paiement, notifications, personnalisation (logo+couleurs),
+     slug, iCal, demandes contact (leads). **Deep-link `?tab=abonnement`** + toasts `?success=1`/`?canceled=1`.
+   - **⚠️ BLOQUÉ (finding OPE-504)** : la **section « Ma page vitrine » (réglages** `vitrineActive`/`Description`/
+     `Zone`/`Services`/`Experience`**)** n'a **AUCUN endpoint d'écriture/lecture** en new-stack
+     (`parametres.get/update` les excluent, pas de `vitrine.updateSettings`, `artisan.updateProfile` ne les
+     porte pas). Sur new-stack elle est **déjà non fonctionnelle** (champs vides + non sauvegardés). **Décision
+     à confirmer (humain)** : OMETTRE cette sous-section dans `/v2` (recommandé : pas de backend → pas de UI
+     morte) **ou** la répliquer telle quelle (non fonctionnelle). Démarrer la migration **sans** cette
+     sous-section et la rajouter quand OPE-504 livre le endpoint. Le reste de la page est 100% migrable.
+3. **Câblage** route + `V2_ROUTES` `/parametres` + i18n + sweep e2e (`?tab=` deep-link + marqueurs « Paramètres »,
+   « Numérotation des documents »). NB : page **non admin-gated** → marker-testable au sweep.
+
+### (archive) pages déjà traitées / différées hors Vague R
 - **Dashboard** (`/dashboard`, ~711 l., ~16 widgets) — stratégie : feature `dashboard` (domain agrégats +
   application hooks par widget). Le plus gros chantier restant. **⚠️ DEMANDE HUMAINE (2026-06-17) : DÉ-BATCHER
   les requêtes** — actuellement trop lent à afficher les différents blocs (le batch tRPC fait attendre TOUS
