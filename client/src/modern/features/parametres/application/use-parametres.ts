@@ -26,9 +26,8 @@ export function useParametres() {
   const parametres: Parametres | undefined = parametresQ.data;
   const artisan: ArtisanProfile | undefined = artisanQ.data;
   const icalFeed: IcalFeed | undefined = icalQ.data;
-  // `getDemandesContact` est typé `unknown[]` côté backend (finding OPE-505) → assertion vers la forme
-  // consommée par l'UI (champs id/nom/email/telephone/message/statut), sans `any`.
-  const demandes = (demandesQ.data ?? []) as DemandeContact[];
+  // OPE-505 résolu : `getDemandesContact` renvoie un DTO typé → type dérivé, plus d'assertion.
+  const demandes: DemandeContact[] = demandesQ.data ?? [];
   const vitrineSettings: VitrineSettings | undefined = vitrineQ.data;
 
   return {

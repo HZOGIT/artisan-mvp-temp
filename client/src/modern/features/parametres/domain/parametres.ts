@@ -16,16 +16,9 @@ export type DelaiPaiementType = NonNullable<UpdateParametresInput["delaiPaiement
 export type VitrineSettings = RouterOutputs["vitrine"]["getSettings"];
 export type UpdateVitrineSettingsInput = RouterInputs["vitrine"]["updateSettings"];
 
-// `vitrine.getDemandesContact` renvoie `unknown[]` côté backend (DTO lead non typé — finding OPE-505) ;
-// on déclare ici la forme consommée par l'UI (champs lus par la liste des leads).
-export interface DemandeContact {
-  readonly id: number;
-  readonly nom: string;
-  readonly email: string | null;
-  readonly telephone: string | null;
-  readonly message: string | null;
-  readonly statut: string;
-}
+// OPE-505 RÉSOLU : `vitrine.getDemandesContact` est désormais typé `DemandeContact[]` côté backend →
+// on dérive directement le type du routeur (plus d'interface locale ni d'assertion).
+export type DemandeContact = RouterOutputs["vitrine"]["getDemandesContact"][number];
 
 export interface ParametresForm {
   prefixeDevis: string;

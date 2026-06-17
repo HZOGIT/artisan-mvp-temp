@@ -2,6 +2,7 @@ import { ConflictError, NotFoundError, TooManyRequestsError } from "../../../sha
 import type { TenantContext } from "../../../shared/tenant";
 import type { IVitrinePublicReader } from "./vitrine-public-reader";
 import { computeAvisStats, resoudreServices, safeHtml } from "../domain/vitrine";
+import type { DemandeContact } from "../../demandes-contact/domain/demande-contact";
 
 // ── getBySlug (public) ────────────────────────────────────────────────────────
 // Assemble la page vitrine publique d'un artisan résolu par slug (404 si inconnu ou vitrine inactive).
@@ -119,7 +120,9 @@ export async function submitContact(deps: SubmitContactDeps, input: SubmitContac
 export type LeadStatut = "nouveau" | "contacte" | "converti" | "perdu";
 
 export interface LeadRepo {
-  list(ctx: TenantContext): Promise<unknown[]>;
+  // OPE-505 : typé `DemandeContact[]` (le repo `demandes-contact` renvoie déjà ce DTO) — le front
+  // dérive donc `RouterOutputs["vitrine"]["getDemandesContact"]` sans assertion.
+  list(ctx: TenantContext): Promise<DemandeContact[]>;
   getById(ctx: TenantContext, id: number): Promise<{ id: number; clientId: number | null; nom: string; email: string | null; telephone: string | null } | null>;
   setStatut(ctx: TenantContext, id: number, statut: LeadStatut, clientId?: number | null): Promise<unknown>;
   create(ctx: TenantContext, input: { nom: string; email?: string | null; telephone?: string | null; message?: string | null; source?: string }): Promise<unknown>;
@@ -132,7 +135,7 @@ export interface LeadsAdminDeps {
   readonly clients: ClientCreator;
 }
 
-export function getDemandesContact(deps: LeadsAdminDeps, ctx: TenantContext): Promise<unknown[]> {
+export function getDemandesContact(deps: LeadsAdminDeps, ctx: TenantContext): Promise<DemandeContact[]> {
   return deps.leads.list(ctx);
 }
 
