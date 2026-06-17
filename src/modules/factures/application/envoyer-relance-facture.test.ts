@@ -94,4 +94,13 @@ describe("envoyerRelanceFacture", () => {
     const repo = new FakeFactureRepository();
     await expect(envoyerRelanceFacture(repo, makeDeps(), A, { factureId: 999 })).rejects.toBeInstanceOf(NotFoundError);
   });
+
+  it("artisan introuvable → NotFound (avant l'envoi)", async () => {
+    const repo = new FakeFactureRepository();
+    const f = await seedFacture(repo, A);
+    const email = new FakeEmailPort();
+    const deps = makeDeps({ email, artisanReader: { getArtisan: async () => null } });
+    await expect(envoyerRelanceFacture(repo, deps, A, { factureId: f.id })).rejects.toBeInstanceOf(NotFoundError);
+    expect(email.sent).toHaveLength(0); // garde AVANT l'envoi
+  });
 });
