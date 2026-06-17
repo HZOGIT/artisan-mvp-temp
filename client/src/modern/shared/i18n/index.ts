@@ -27,6 +27,10 @@ if (!i18n.isInitialized) {
     // React échappe déjà le HTML → pas de double échappement par i18next.
     interpolation: { escapeValue: false },
     returnNull: false,
+    // Ressources bundlées (sync) → pas besoin de Suspense ; le désactiver évite que `useTranslation`
+    // suspende pendant l'init asynchrone (course → erreur React #310 « more hooks » sur les pages à
+    // hooks nombreux + early-returns, ex. ClientDetail).
+    react: { useSuspense: false },
   });
 }
 

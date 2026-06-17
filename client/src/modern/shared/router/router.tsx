@@ -52,6 +52,13 @@ const clientsRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/clients/ui/clients-list-page")),
 });
 
+// Détail client — port conforme de `pages/ClientDetail.tsx` (param de route typé `$id`).
+const clientDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/clients/$id",
+  component: lazyRouteComponent(() => import("../../features/clients/ui/client-detail-page")),
+});
+
 // Notifications du front neuf — port conforme de `pages/Notifications.tsx`.
 const notificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -59,7 +66,7 @@ const notificationsRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/notifications/ui/notifications-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, notificationsRoute]);
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

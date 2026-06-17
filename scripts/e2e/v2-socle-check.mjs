@@ -92,6 +92,32 @@ for (const route of ['/clients', '/v2/clients']) {
   }
 }
 
+// ClientDetail : on récupère un id de client réel via tRPC puis on vérifie le rendu de `/v2/clients/:id`.
+// NB : on n'exige PAS la parité avec le legacy `/clients/:id` — la page legacy est CASSÉE (elle appelle
+// des hooks après des early-returns → React #310, elle plante via l'ErrorBoundary). Le port `/v2` CORRIGE
+// ce bug (gate de chargement externe). On valide donc le rendu côté v2 (marqueurs structurants présents).
+try {
+  const listRes = await ctx.request.get('/api/trpc/clients.list?batch=1&input=%7B%220%22%3A%7B%22json%22%3Anull%7D%7D');
+  const listJson = await listRes.json();
+  const first = listJson?.[0]?.result?.data?.json?.[0];
+  if (first?.id) {
+    const MARQUEURS_DETAIL = ['Fiche client complète', 'Total facturé', 'Informations', 'Historique'];
+    const route = `/v2/clients/${first.id}`;
+    pariteCount++;
+    current = `rendu ${route}`;
+    await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+    await page.waitForTimeout(1500);
+    const body = (await page.textContent('body')) || '';
+    for (const m of MARQUEURS_DETAIL) {
+      if (!body.includes(m)) add({ route, type: 'detail', text: `marqueur absent: "${m}"` });
+    }
+  } else {
+    add({ route: 'detail', type: 'detail', text: 'aucun client pour tester ClientDetail' });
+  }
+} catch (e) {
+  add({ route: 'detail', type: 'detail', text: `échec récup id client: ${String(e).slice(0, 120)}` });
+}
+
 // --- Bascule strangler-fig (OPE-420) : flag `?v2=1` + util de bascule par route ---
 // IMPORTANT : tester d'abord SANS flag (le flag est « collant » via localStorage une fois activé).
 let basculeCount = 0;

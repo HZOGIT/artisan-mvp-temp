@@ -161,7 +161,7 @@ function AuthenticatedRoutes() {
           <Route path="/clients" component={Clients} />
           {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
-          <Route path="/v2/:rest*" component={ModernRouterMount} />
+          <Route path="/v2/*" component={ModernRouterMount} />
           <Route path="/clients/nouveau" component={ClientsNouveauPage} />
           <Route path="/clients/import" component={ImportClients} />
           <Route path="/clients/:id" component={ClientDetail} />
