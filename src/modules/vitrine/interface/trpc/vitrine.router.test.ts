@@ -19,14 +19,18 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
   let app: ReturnType<typeof buildApp>;
 
   const cleanup = async () => {
+    await admin.query('delete from parametres_artisan where "artisanId" in (select id from artisans where "userId"=$1)', [UID]);
     await admin.query('delete from artisans where "userId"=$1', [UID]);
     await admin.query("delete from users where id=$1", [UID]);
   };
 
+  const SLUG = "vitrine-sarl-9964351";
+
   beforeAll(async () => {
     await cleanup();
     await admin.query("insert into users (id, email, password, role) values ($1,$2,'x','artisan')", [UID, EMAIL]);
-    await admin.query('insert into artisans ("userId","nomEntreprise") values ($1,$2)', [UID, "Vitrine SARL"]);
+    const artisanId = (await admin.query('insert into artisans ("userId","nomEntreprise",slug) values ($1,$2,$3) returning id', [UID, "Vitrine SARL", SLUG])).rows[0].id;
+    await admin.query('insert into parametres_artisan ("artisanId","vitrineActive","vitrineDescription") values ($1,true,$2)', [artisanId, "Artisan vitrine"]);
     app = buildApp({ jwtSecret: SECRET });
   });
 
@@ -55,5 +59,22 @@ describe.skipIf(!URL)("vitrine.router e2e (public + admin leads)", () => {
   it("ADMIN updateDemandeContactStatut : sans cookie → 401 ; statut hors enum → 400", async () => {
     expect((await injectTrpc(app, "POST", "vitrine.updateDemandeContactStatut", { id: 1, statut: "nouveau" })).statusCode).toBe(401);
     expect((await injectTrpc(app, "POST", "vitrine.updateDemandeContactStatut", { id: 1, statut: "archive" }, await jwt(UID))).statusCode).toBe(400);
+  });
+
+  // getBySlug — endpoint PUBLIC (sans cookie), contrat consommé par la page Vitrine du SPA.
+  it("PUBLIC getBySlug : vitrine active → 200 + payload agrégé (artisan/vitrine/avis/stats)", async () => {
+    const res = await injectTrpc(app, "GET", "vitrine.getBySlug", { slug: SLUG }); // pas de cookie
+    expect(res.statusCode).toBe(200);
+    const data = res.json().result.data as { artisan: { nomEntreprise: string }; vitrine: unknown; avis: unknown[]; avisStats: unknown; publicStats: unknown };
+    expect(data.artisan.nomEntreprise).toBe("Vitrine SARL");
+    expect(data.vitrine).toBeTruthy();
+    expect(Array.isArray(data.avis)).toBe(true);
+    expect(data).toHaveProperty("avisStats");
+    expect(data).toHaveProperty("publicStats");
+  });
+
+  it("PUBLIC getBySlug : slug inconnu → 404 (NOT_FOUND)", async () => {
+    const res = await injectTrpc(app, "GET", "vitrine.getBySlug", { slug: "slug-inexistant-zzz" });
+    expect(res.statusCode).toBe(404);
   });
 });
