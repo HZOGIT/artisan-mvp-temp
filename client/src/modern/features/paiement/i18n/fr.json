@@ -1,0 +1,11 @@
+{
+  "titleSucces": "Paiement réussi !",
+  "descSucces": "Votre paiement a été traité avec succès. Un reçu vous sera envoyé par email.",
+  "infoSucces": "Merci pour votre confiance. La facture a été marquée comme payée et l'artisan en a été notifié.",
+  "closeWindow": "Fermer cette fenêtre",
+  "backHome": "Retour à l'accueil",
+  "titleAnnule": "Paiement annulé",
+  "descAnnule": "Le paiement a été annulé. Aucun montant n'a été débité de votre compte.",
+  "infoAnnule": "Si vous avez rencontré un problème lors du paiement, n'hésitez pas à contacter l'artisan pour obtenir de l'aide.",
+  "retry": "Réessayer le paiement"
+}

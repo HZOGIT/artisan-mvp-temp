@@ -89,6 +89,10 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
      d'itérations — voir « Dette de tests » plus bas.)*
 4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante, noter tout split/blocage.
 5. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (journal+ntfy+bus).
+   **Le message DOIT inclure un % de progression** (demande humaine) — format `📊 X% (N/M pages)` où
+   `N` = pages migrées, `M` = total legacy. Calcul :
+   `N=$(ls client/src/modern/features/*/ui/*-page.tsx | grep -v _demo | wc -l)`,
+   `M=$(ls client/src/pages/*.tsx | wc -l)`, `X=$((N*100/M))`.
 6. **Commit UNIQUE chirurgical** (`git add <mes chemins>`) → `git push origin staging` → **re-vérifier
    `origin/staging`**. Message `feat(front-v2): <quoi>` + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 7. **Déployer le SPA** si le bundle a changé (page migrée) : `./devtools/deploy-staging-pages.sh`.
@@ -133,19 +137,18 @@ Devis · Factures · Interventions · Commandes · Stocks · Dépenses.
 
 ### Vague 3 — critique/public *(OPE-423)*
 - [x] **Comptabilité → `/v2/comptabilite`** (~673 l., lecture seule) — conformité FEC + filtres période + TVA/CA3 + 4 onglets + aperçu FEC. i18n, double-layout supprimé. Parité e2e `31|0`.
-- [ ] Dashboard (~16 widgets legacy → stratégie à définir) · Signature · Portail · Paiement (publics → socle public d'abord) · Abonnement.
+- [x] **Socle `/v2` PUBLIC** (hors auth) + **Paiement** : `modern/shared/router/public-router.tsx` + `public-router-mount.tsx` (2ᵉ arbre TanStack basepath `/v2`, monté dans le `Router` public de `App.tsx` avant le catch-all authentifié). Pages `PaiementSucces`/`PaiementAnnule` portées (`paiement-{succes,annule}-page.tsx`, i18n namespace `paiement`). Routes `/v2/paiement/{succes,annule}`. 4 gates verts, parité e2e `33|0`, déployé.
+- [ ] Dashboard (~16 widgets legacy → stratégie à définir) · Signature · Portail (publics, socle prêt) · Abonnement.
 
 ### Vague 4 — longue traîne + **suppression du legacy** *(OPE-424)*
 Reste des pages → bascule routeur racine sur TanStack Router → **suppression complète de l'ancien code**
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Socle — montage `/v2` PUBLIC (hors auth)** + **pages Paiement**
-(`PaiementSucces` 60 l. / `PaiementAnnule` 53 l., publiques, post-Stripe). Le routeur neuf est monté
-SEULEMENT dans `AuthenticatedRoutes` ; pour les pages publiques (Signature/Portail/Paiement), il faut
-monter un second arbre `/v2/*` dans le `Router` public de `App.tsx` (hors DashboardLayout/auth). Établir
-ce socle avec les 2 petites pages Paiement, puis enchaîner Signature/Portail.
-*(Dashboard reporté : compose ~16 widgets legacy `@/components/dashboard/**` → stratégie widgets à définir.)*
+## 🎯 PROCHAINE CIBLE : **Vague 3 — Signature `/v2/signature/:token`** (PUBLIC, par token, post-flow signature).
+Socle public en place (cf. `public-router`). Primitives manquantes : `checkbox`, `separator` → les ajouter
+au barrel. `SignatureDevis` ~605 l. Découper si lourd. *(OPE-423)*
+*(Dashboard reporté : ~16 widgets legacy `@/components/dashboard/**` → stratégie widgets à définir.)*
 
 ### Vague 2 — listes + mutations *(OPE-422)* — ✅ TERMINÉE (6/6)
 - [x] **Devis → `/v2/devis`** — port conforme `pages/Devis.tsx` (`devis-page.tsx`), i18n (namespace `devis`, statuts + exports PDF/Excel), `StatutBadge` ré-exporté dans `modern/shared/ui`. Mutations delete + convertToFacture (pas de `update({statut})`). 4 gates verts, parité e2e `17|0`, déployé.
@@ -168,6 +171,7 @@ ce socle avec les 2 petites pages Paiement, puis enchaîner Signature/Portail.
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Socle public ✅ + Paiement** : 2ᵉ montage TanStack `/v2` PUBLIC (hors auth) dans le `Router` de App ; pages PaiementSucces/Annule portées (i18n). Débloque Signature/Portail. **Broadcast inclut désormais un % de progression** (demande humaine). 4 gates verts, parité e2e `33|0`, déployé. Prochaine : Signature.
 - **Vague 3 — Comptabilité ✅** port `/v2/comptabilite` (lecture seule : conformité FEC, TVA/CA3, 4 onglets, exports ; i18n ; double-layout supprimé). 4 gates verts, parité e2e `31|0`, déployé. Prochaine : socle public + pages Paiement.
 - **Vague 2 — Dépenses ✅** port `/v2/depenses` (KPIs + filtres + indemnités km, i18n). Finding : `depenses.list` ignore les filtres (pas d'`.input()`). 4 gates verts, parité e2e `29|0`, déployé. **🎉 VAGUE 2 TERMINÉE (6/6).** Prochaine : Vague 3 (Dashboard).
 - **Vague 2 — Stocks ✅** port `/v2/stocks` (Tabs + KPIs + 4 dialogs + mouvements/historique, i18n). Supprime double-layout legacy. 4 gates verts, parité e2e `27|0`, déployé. Prochaine : Dépenses (dernière Vague 2).

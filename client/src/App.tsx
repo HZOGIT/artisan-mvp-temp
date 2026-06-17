@@ -105,6 +105,8 @@ const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 // PoC OPE-366 — page « stack cible » (clean archi + REST openapi-typescript), cohabite avec le legacy.
 const ModernRouterMount = lazy(() => import("./modern/shared/router/modern-router-mount"));
+// Montage du front neuf pour les pages PUBLIQUES (hors auth) : paiement (et à venir signature/portail).
+const PublicModernRouterMount = lazy(() => import("./modern/shared/router/public-router-mount"));
 const CGV = lazy(() => import("./pages/legal/CGV"));
 const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
 
@@ -265,6 +267,9 @@ function Router() {
         <Route path="/devis-public/:token" component={SignatureDevis} />
         <Route path="/paiement/succes" component={PaiementSucces} />
         <Route path="/paiement/annule" component={PaiementAnnule} />
+        {/* Front neuf PUBLIC (hors auth) — pages paiement `/v2/*` montées avant le catch-all authentifié. */}
+        <Route path="/v2/paiement/succes" component={PublicModernRouterMount} />
+        <Route path="/v2/paiement/annule" component={PublicModernRouterMount} />
         <Route path="/portail/:token" component={PortailClient} />
         <Route path="/avis/:token" component={SoumettreAvis} />
         <Route path="/vitrine/:slug" component={Vitrine} />
