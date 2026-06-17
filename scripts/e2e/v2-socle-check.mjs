@@ -168,19 +168,30 @@ if (!ONLY) try {
 // Sections GLOBALES (bascule + signature + sidebar mobile) — SAUTÉES en mode ROUTE ciblé (gain de temps).
 let basculeCount = 0, signCount = 0, sidebarCount = 0;
 if (!ONLY) {
-// --- Bascule strangler-fig (OPE-420) : flag `?v2=1` + util de bascule par route ---
-// IMPORTANT : tester d'abord SANS flag (le flag est « collant » via localStorage une fois activé).
+// --- Bascule strangler-fig (OPE-403) : défaut ACTIVÉ + escape hatch `?v2=0` + util de bascule par route ---
+// IMPORTANT : le flag est « collant » via localStorage. On teste donc dans l'ordre défaut → opt-out → opt-in,
+// le storage étant vierge à ce stade (aucune route ?v2 visitée avant). Toutes les pages étant migrées,
+// le DÉFAUT (sans paramètre) bascule désormais vers `/v2`.
 
-// 1) Sans flag → la route legacy reste legacy (parité : aucun détournement).
+// 1) Sans flag (défaut) → bascule vers `/v2/<route>` migrée (storage vierge).
 basculeCount++;
-current = '/clients (sans flag)';
+current = '/clients (défaut)';
 await page.goto('/clients', { waitUntil: 'networkidle', timeout: 25000 });
-await page.waitForTimeout(1200);
-if (new URL(page.url()).pathname !== '/clients') {
-  add({ route: '/clients', type: 'bascule', text: `flag OFF mais redirigé vers ${page.url()}` });
+await page.waitForTimeout(1500);
+if (new URL(page.url()).pathname !== '/v2/clients') {
+  add({ route: '/clients', type: 'bascule', text: `défaut ON mais pas de bascule, URL=${page.url()}` });
 }
 
-// 2) Avec `?v2=1` → bascule vers `/v2/<route>` migrée.
+// 2) Opt-out explicite `?v2=0` → la route legacy reste legacy (escape hatch / rollback).
+basculeCount++;
+current = '/clients?v2=0';
+await page.goto('/clients?v2=0', { waitUntil: 'networkidle', timeout: 25000 });
+await page.waitForTimeout(1200);
+if (new URL(page.url()).pathname !== '/clients') {
+  add({ route: '/clients?v2=0', type: 'bascule', text: `opt-out ?v2=0 mais redirigé vers ${page.url()}` });
+}
+
+// 3) Avec `?v2=1` → bascule vers `/v2/<route>` migrée (et réécrit la préférence).
 basculeCount++;
 current = '/clients?v2=1';
 await page.goto('/clients?v2=1', { waitUntil: 'networkidle', timeout: 25000 });
