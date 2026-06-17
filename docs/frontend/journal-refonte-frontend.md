@@ -132,17 +132,20 @@ groupe. Ne jamais batcher la **parité visuelle** ni le **typecheck** (à chaque
 Devis · Factures · Interventions · Commandes · Stocks · Dépenses.
 
 ### Vague 3 — critique/public *(OPE-423)*
-Dashboard · Signature · Portail · Paiement · Comptabilité · Abonnement.
+- [x] **Comptabilité → `/v2/comptabilite`** (~673 l., lecture seule) — conformité FEC + filtres période + TVA/CA3 + 4 onglets + aperçu FEC. i18n, double-layout supprimé. Parité e2e `31|0`.
+- [ ] Dashboard (~16 widgets legacy → stratégie à définir) · Signature · Portail · Paiement (publics → socle public d'abord) · Abonnement.
 
 ### Vague 4 — longue traîne + **suppression du legacy** *(OPE-424)*
 Reste des pages → bascule routeur racine sur TanStack Router → **suppression complète de l'ancien code**
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 3 — critique/public** *(OPE-423)*. Dashboard · Signature · Portail ·
-Paiement · Comptabilité · Abonnement. **Pages critiques** → parité + e2e renforcés ; Signature/Portail/
-Paiement sont publics (hors layout auth) → vérifier le montage `/v2` hors `AuthenticatedRoutes`. Commencer
-par **Dashboard `/v2/dashboard`** (lecture, fort trafic).
+## 🎯 PROCHAINE CIBLE : **Socle — montage `/v2` PUBLIC (hors auth)** + **pages Paiement**
+(`PaiementSucces` 60 l. / `PaiementAnnule` 53 l., publiques, post-Stripe). Le routeur neuf est monté
+SEULEMENT dans `AuthenticatedRoutes` ; pour les pages publiques (Signature/Portail/Paiement), il faut
+monter un second arbre `/v2/*` dans le `Router` public de `App.tsx` (hors DashboardLayout/auth). Établir
+ce socle avec les 2 petites pages Paiement, puis enchaîner Signature/Portail.
+*(Dashboard reporté : compose ~16 widgets legacy `@/components/dashboard/**` → stratégie widgets à définir.)*
 
 ### Vague 2 — listes + mutations *(OPE-422)* — ✅ TERMINÉE (6/6)
 - [x] **Devis → `/v2/devis`** — port conforme `pages/Devis.tsx` (`devis-page.tsx`), i18n (namespace `devis`, statuts + exports PDF/Excel), `StatutBadge` ré-exporté dans `modern/shared/ui`. Mutations delete + convertToFacture (pas de `update({statut})`). 4 gates verts, parité e2e `17|0`, déployé.
@@ -165,6 +168,7 @@ par **Dashboard `/v2/dashboard`** (lecture, fort trafic).
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Vague 3 — Comptabilité ✅** port `/v2/comptabilite` (lecture seule : conformité FEC, TVA/CA3, 4 onglets, exports ; i18n ; double-layout supprimé). 4 gates verts, parité e2e `31|0`, déployé. Prochaine : socle public + pages Paiement.
 - **Vague 2 — Dépenses ✅** port `/v2/depenses` (KPIs + filtres + indemnités km, i18n). Finding : `depenses.list` ignore les filtres (pas d'`.input()`). 4 gates verts, parité e2e `29|0`, déployé. **🎉 VAGUE 2 TERMINÉE (6/6).** Prochaine : Vague 3 (Dashboard).
 - **Vague 2 — Stocks ✅** port `/v2/stocks` (Tabs + KPIs + 4 dialogs + mouvements/historique, i18n). Supprime double-layout legacy. 4 gates verts, parité e2e `27|0`, déployé. Prochaine : Dépenses (dernière Vague 2).
 - **Vague 2 — Commandes ✅** port `/v2/commandes` (filtres statut/fournisseur, actions PDF/email/suppr, i18n namespace `commandes`). 4 gates verts, parité e2e `25|0`, déployé. Prochaine : Stocks.

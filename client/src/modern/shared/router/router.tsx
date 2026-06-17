@@ -129,7 +129,14 @@ const depensesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/depenses/ui/depenses-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute]);
+// Comptabilité du front neuf — port conforme de `pages/Comptabilite.tsx`.
+const comptabiliteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/comptabilite",
+  component: lazyRouteComponent(() => import("../../features/comptabilite/ui/comptabilite-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
