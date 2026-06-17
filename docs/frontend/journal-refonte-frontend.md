@@ -110,13 +110,13 @@ groupe. Ne jamais batcher la **parité visuelle** ni le **typecheck** (à chaque
 - [x] **S3** Squelette clean-archi + **client tRPC partagé** (`modern/shared/trpc`). *(OPE-419)* — `modern/shared/trpc/index.ts` réexpose l'instance `trpc` legacy unique (provider/QueryClient/auth/superjson partagés) + types `RouterInputs`/`RouterOutputs` inférés de `AppRouter`. Feature `clients` **migrée REST→tRPC** : domaine `Client = RouterOutputs["clients"]["list"][number]`, application `trpc.clients.list.useQuery()`, UI inchangée. **REST supprimé** (`modern/shared/api/*` + openapi-fetch retirés du neuf) → **dette OPE-366 résorbée**. `tsconfig.v2.json` : `types` += `@fastify/cookie` (augmentation chargée car tsc traverse la source backend via AppRouter). Test domaine `nomComplet` ajouté. tsc v2 ✅, vitest v2 16 ✅, e2e `cas testés:4 | issues:0` ✅, déployé.
 - [x] **S4** Primitives `modern/shared/ui` = **copie conforme** des composants UI legacy utilisés par la Vague 1 (zéro changement visuel). *(OPE-416, périmètre réduit)* — `modern/shared/ui/{button,input,card,label,dropdown-menu}.ts` = **ré-export** des primitives legacy `@/components/ui/*` (composant identique → parité pixel garantie, zéro drift) + barrel `index.ts`. Surface = primitives utilisées par `pages/Clients.tsx` (Vague 1). Test garde-fou de surface (`index.test.ts`). tsc v2 ✅, vitest v2 17 ✅. **Pas de déploiement** (ré-export non encore consommé par le runtime → bundle inchangé). Relocalisation physique des primitives = à la suppression finale du legacy.
 
-### Vague 1 — rodage (lecture, fort trafic, UI simple) *(OPE-421)*
+### Vague 1 — rodage (lecture, fort trafic, UI simple) *(OPE-421)* — ✅ TERMINÉE (6/6)
 - [x] **Clients → `/v2/clients`** (port conforme de `pages/Clients.tsx`) — **page complète** (header, recherche, bandeau doublons, cartes + badge encours + étiquettes, menu actions, modal édition) portée à l'identique (JSX/Tailwind copiés), plomberie repointée : primitives `@/modern/shared/ui` + tRPC `@/modern/shared/trpc` (data déjà tRPC côté legacy → contrat inchangé). PoC `ClientsModernPage` + `use-clients.ts` supprimés. Renommage kebab-case (`clients-list-page.tsx`, `modern-router-mount.tsx`, `ping-page.tsx`). tsc v2 ✅ (corrigé : `target ESNext` + handler `<select>`), vitest v2 17 ✅, **parité e2e `cas:6 | issues:0`** (marqueurs identiques legacy vs /v2 + barre de recherche + bascule), déployé.
   - ⏳ **Dette batchée** : e2e **mutation** (modal édition : modifier Notes → save → persistance → revert) à ajouter dans une itération e2e dédiée (mutations byte-identiques au legacy, contrat tRPC `clients.update/delete` déjà couvert backend). Cf. « Dette de tests (batch autorisé) ».
 - [x] ClientDetail → `/v2/clients/:id` — port conforme de `pages/ClientDetail.tsx` (`client-detail-page.tsx`), i18n (namespace `clients` étendu) + kebab + primitives partagées (select/tabs/badge…), route enfant TanStack `/clients/$id`. **Refactor correctif** : split gate de chargement externe + contenu interne (le legacy appelait des hooks après early-returns → React #310 ; le legacy `/clients/:id` PLANTE — corrigé côté v2). 4 gates verts, e2e `9|0` (rendu /v2 OK). Déployé.
   - 🐞 **Fix socle** : wouter catch-all `/v2/:rest*` ne matchait PAS les routes imbriquées (`/v2/clients/4` → 404 legacy) → corrigé en **`/v2/*`** (App.tsx). Toutes les routes `/v2/<a>/<b>` fonctionnent désormais.
   - 🐞 **Finding legacy** : `pages/ClientDetail.tsx` est CASSÉ en prod (hooks après early-return → #310, plante via ErrorBoundary). Le port v2 corrige. À remonter (legacy sera supprimé, mais bug actif d'ici là).
-- [ ] Articles → `/v2/articles`
+- [x] Articles → `/v2/articles` — port conforme de `pages/Articles.tsx` (`articles-page.tsx`), i18n (namespace `articles`, ~90 clés : métiers/catégories/sous-catégories/unités/TVA) + kebab + primitives partagées (dialog/select/dropdown-menu/textarea/badge). 3 dialogs (créer/éditer, suppression, import CSV preview) + table native. 4 gates verts, **parité e2e `15|0`**, déployé.
 - [x] Fournisseurs → `/v2/fournisseurs` — port conforme de `pages/Fournisseurs.tsx` (`fournisseurs-page.tsx`), i18n (namespace `fournisseurs`) + kebab + primitives partagées (dialog/table/textarea/badge). 4 dialogs (création/édition/articles/association). Route TanStack + registre bascule. 4 gates verts, **parité e2e `13|0`**, déployé.
   - 🐞 **Finding legacy** : `pages/Fournisseurs.tsx` se ré-enveloppe dans `<DashboardLayout>` alors qu'il est DÉJÀ rendu dans le DashboardLayout d'AuthenticatedRoutes → **double chrome** (DashboardLayout n'a pas de garde anti-imbrication). Le port v2 **supprime** ce double layout (rendu propre). À remonter.
 - [x] Techniciens → `/v2/techniciens` — port conforme de `pages/Techniciens.tsx` (`techniciens-page.tsx`), i18n (namespace `techniciens`) + kebab + primitives partagées (dialog/select/table/badge). Route TanStack + registre bascule. 4 gates verts, **parité e2e `11|0`**, déployé.
@@ -133,9 +133,15 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 1 — Articles `/v2/articles`** (port conforme de `pages/Articles.tsx`, ~648 l.,
-primitives dialog/select/dropdown-menu/textarea/badge prêtes, i18n + kebab). Domaine tRPC : articles.* (bibliothèque).
-**DERNIÈRE page de la Vague 1.** *(OPE-421)*
+## 🎯 PROCHAINE CIBLE : **e2e mutations Vague 1** (itération dédiée, dette batchée). Ajouter à
+`scripts/e2e/v2-socle-check.mjs` (ou un nouveau `scripts/e2e/v2-mutations.mjs`) des cas de **mutation
+réels non destructifs** sur les pages migrées (ex. Clients : éditer Notes → save → persistance → revert ;
+Articles : créer puis supprimer un article de test ; Techniciens : idem). **Rouge avant / vert après**,
+refetch serveur. Clôt la dette batchée avant la Vague 2. *(OPE-421/422)*
+
+### Vague 2 (après) — listes + mutations *(OPE-422)*
+Devis · Factures · Interventions · Commandes · Stocks · Dépenses (primitives prêtes ; certaines pages
+lourdes → slices ; appliquer le pattern « gate de chargement externe » si early-returns).
 
 ### Cibles suivantes (file)
 1. Vague 1 — Articles, Fournisseurs, Techniciens (i18n + kebab d'emblée ; chacune ~600-700 l. → prévoir slices + primitives dialog/table/textarea).
@@ -149,6 +155,7 @@ primitives dialog/select/dropdown-menu/textarea/badge prêtes, i18n + kebab). Do
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Vague 1 — Articles ✅** port `/v2/articles` (3 dialogs + import CSV, ~90 clés i18n). 4 gates verts, parité e2e `15|0`, déployé. **🎉 VAGUE 1 TERMINÉE (6/6).** Prochaine : e2e mutations (dette batchée), puis Vague 2.
 - **Vague 1 — Fournisseurs ✅** port `/v2/fournisseurs` (4 dialogs, dialog/table/textarea, i18n namespace `fournisseurs`). Supprime le double-DashboardLayout du legacy (finding). 4 gates verts, parité e2e `13|0`, déployé. Prochaine : Articles (dernière Vague 1).
 - **Vague 1 — Techniciens ✅** port `/v2/techniciens` (dialog/select/table, i18n namespace `techniciens`, registre bascule). 4 gates verts, parité e2e `11|0`, déployé. Prochaine : Fournisseurs.
 - **Vague 1 — ClientDetail ✅** port `/v2/clients/:id` (split gate/contenu → corrige l'antipattern hooks #310 du legacy). **Fix socle `/v2/*`** (le catch-all `/v2/:rest*` cassait les routes imbriquées → 404). Finding : legacy ClientDetail planté. 4 gates verts, e2e `9|0`, déployé.
