@@ -53,6 +53,7 @@ import previsionsFr from "@/modern/features/previsions/i18n/fr.json";
 import performancesFournisseursFr from "@/modern/features/performances-fournisseurs/i18n/fr.json";
 import tableauBordDepensesFr from "@/modern/features/tableau-bord-depenses/i18n/fr.json";
 import importReleveFr from "@/modern/features/import-releve/i18n/fr.json";
+import syncComptableFr from "@/modern/features/tableau-bord-sync-comptable/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -115,6 +116,7 @@ const resources = {
     performancesFournisseurs: performancesFournisseursFr,
     tableauBordDepenses: tableauBordDepensesFr,
     importReleve: importReleveFr,
+    syncComptable: syncComptableFr,
   },
 } as const;
 

@@ -446,9 +446,21 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   convertir/ignorer) + ui (upload drag-zone + aperçu + import + liste transactions catégorisables). i18n
   namespace `importReleve`. **0 `any`** (5 legacy supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **319**.
 
+- **Migration `tableau-bord-sync-comptable` ✅** (18e des ~24 pages feature) : dashboard sync comptable
+  (634 l, **18 `any` legacy** = la plus dense en logique). Audit contrat — 5 endpoints
+  `integrationsComptables.*` (getSyncStatus/getSyncLogs/getPendingItems/getExports/lancerSync) présents.
+  **Découverte** : `getSyncLogs` ET `getExports` renvoient le MÊME type (`ExportComptableRow`, **sans champ
+  `type`**) → le `log.type` lu par le legacy était toujours `undefined` (masqué par `any`) ; `lancerSync`
+  renvoie `{success,nbItems,message}` (≠ `facturesSyncees`/`paiementsSynces` legacy) → toast sur `message`.
+  **Toute l'agrégation extraite en domain PUR** : `computeStats` (filtres période/statut/type + totaux +
+  taux + écritures + évolution vs période précédente + 10 dernières) + `computeChartData` (série jour/jour) +
+  `statutVariant`/`typeLabelKey` (**6 tests**). application + ui (filtres + 4 KPIs + barres CSS + statut +
+  répartition + historique + perf). i18n namespace `syncComptable`. **0 `any`** (18 supprimés). Route +
+  V2_ROUTES + sweep. tsc/eslint(0)/vitest **324**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
 `chantiers`/`calendrier-chantiers`, `planification`/`geolocalisation` (cartes), `devis-ia`, `analyses-photos`,
-`tableau-bord-sync-comptable`, `integrations-comptables`, `import`, `nouvelle-depense`.
+`integrations-comptables`, `import`, `nouvelle-depense`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
