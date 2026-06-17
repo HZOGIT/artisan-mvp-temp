@@ -351,8 +351,18 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   `/assistant` migré). i18n namespace `assistantConversations`. Route `/v2/assistant/conversations` +
   V2_ROUTES + sweep. **0 `any`** (le cast `as AiThread[]` legacy supprimé). tsc/eslint(0)/vitest **270**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). `assistant` (gros, streaming) ou
-au choix un contrat propre sans carte/charts (vehicules, rapports, performances-fournisseurs, devis-ia…).
+- **Migration `vehicules` (gestion de flotte) ✅** (7e des ~24 pages feature) : audit contrat — 7 endpoints
+  `vehicules.*` + `techniciens.getAll` présents. **Gaps de DTO comblés SANS backend** (masqués par `any`
+  legacy) : `getStatistiquesFlotte` renvoie `nbVehicules`/`kmTotalFlotte`/`assurancesAExpirer` (≠ noms legacy)
+  → champs remappés + « entretiens à venir » = `entretiensAVenir.length` ; assurances/entretiens ne portent
+  que `vehiculeId` (pas d'objet véhicule imbriqué) → **jointure client** `vehiculeImmat`. Clean-archi : domain
+  (`statutClass`/`statutVariant`/`technicienPrenom`/`vehiculeImmat` + `TypeCarburant` non-null, **4 tests**) +
+  application (5 queries + create/delete) + ui (stats + alertes + 3 onglets + dialog création, markup à
+  l'identique, **3 `any` legacy supprimés** ; sentinel `"none"` pour le select technicien — Radix interdit
+  `value=""`). i18n namespace `vehicules`. Route + V2_ROUTES + sweep. **0 `any`**. tsc/eslint(0)/vitest **274**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Contrat propre sans carte/charts :
+`rapports`, `performances-fournisseurs`, `devis-ia`, `rapport-commande`, `nouvelle-depense`, `documentation`…
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

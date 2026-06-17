@@ -27,6 +27,7 @@ export const V2_ROUTES: Readonly<Record<string, string>> = {
   "/modeles-email": "/v2/modeles-email",
   "/modeles-email-transactionnels": "/v2/modeles-email-transactionnels",
   "/assistant/conversations": "/v2/assistant/conversations",
+  "/vehicules": "/v2/vehicules",
   "/flotte": "/v2/flotte",
   "/statistiques": "/v2/statistiques",
   "/modules": "/v2/modules",
