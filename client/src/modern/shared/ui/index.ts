@@ -6,3 +6,5 @@ export * from "./input";
 export * from "./card";
 export * from "./label";
 export * from "./dropdown-menu";
+export * from "./badge";
+export * from "./scroll-area";

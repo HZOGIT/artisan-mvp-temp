@@ -2,9 +2,8 @@
 // tant qu'une route legacy n'est PAS listée ici, la bascule la laisse au legacy (intact). À chaque page
 // migrée (Vague 1+), on ajoute son entrée `'<chemin legacy>': '<chemin /v2>'`.
 export const V2_ROUTES: Readonly<Record<string, string>> = {
-  // `/clients` est repris sous le socle TanStack Router (cf. ModernRouterMount). La feature sera
-  // migrée sur tRPC en Vague 1 ; le mapping de bascule, lui, est déjà valide.
   "/clients": "/v2/clients",
+  "/notifications": "/v2/notifications",
 };
 
 // Normalise un chemin pour la résolution : retire la query string et le slash final.

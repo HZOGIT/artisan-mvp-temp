@@ -61,25 +61,35 @@ for (const c of cases) {
   await page.screenshot({ path: `/tmp/v2-socle-${c.route.replace(/\//g, '_')}.png`, fullPage: true });
 }
 
-// --- Parité Clients (Vague 1) : `/v2/clients` (port conforme) vs `/clients` (legacy) ---
+// --- Parité Vague 1 : `/v2/<page>` (port conforme) vs `/<page>` (legacy) ---
 // On vérifie que les marqueurs structurants de l'UI sont présents des DEUX côtés (même page, même
 // markup copié à l'identique). Preuve de non-régression visuelle au niveau du contenu.
 let pariteCount = 0;
-const MARQUEURS_CLIENTS = ['Gérez votre base de clients', 'Exporter (CSV)', 'Nouveau client'];
-for (const route of ['/clients', '/v2/clients']) {
-  pariteCount++;
-  current = `parité ${route}`;
-  await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
-  await page.waitForTimeout(1500);
-  const body = (await page.textContent('body')) || '';
-  for (const m of MARQUEURS_CLIENTS) {
-    if (!body.includes(m)) add({ route, type: 'parité', text: `marqueur absent: "${m}"` });
+// { legacy, v2, markers: [textes attendus des deux côtés] }
+const PARITE_PAGES = [
+  { legacy: '/clients', v2: '/v2/clients', markers: ['Gérez votre base de clients', 'Exporter (CSV)', 'Nouveau client'] },
+  { legacy: '/notifications', v2: '/v2/notifications', markers: ['Toutes', 'Non lues'] },
+];
+for (const p of PARITE_PAGES) {
+  for (const route of [p.legacy, p.v2]) {
+    pariteCount++;
+    current = `parité ${route}`;
+    await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+    await page.waitForTimeout(1500);
+    const body = (await page.textContent('body')) || '';
+    for (const m of p.markers) {
+      if (!body.includes(m)) add({ route, type: 'parité', text: `marqueur absent: "${m}"` });
+    }
+    await page.screenshot({ path: `/tmp/parite-${route.replace(/\//g, '_')}.png`, fullPage: true });
   }
-  // Barre de recherche (placeholder = attribut, pas du textContent) + au moins une carte client.
+}
+// Barre de recherche Clients (placeholder = attribut, hors textContent).
+for (const route of ['/clients', '/v2/clients']) {
+  await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+  await page.waitForTimeout(800);
   if (await page.locator('input[placeholder="Rechercher un client..."]').count() === 0) {
     add({ route, type: 'parité', text: 'barre de recherche absente' });
   }
-  await page.screenshot({ path: `/tmp/parite-${route.replace(/\//g, '_')}.png`, fullPage: true });
 }
 
 // --- Bascule strangler-fig (OPE-420) : flag `?v2=1` + util de bascule par route ---

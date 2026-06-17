@@ -2,6 +2,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import commonFr from "./common/fr.json";
 import clientsFr from "@/modern/features/clients/i18n/fr.json";
+import notificationsFr from "@/modern/features/notifications/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -13,6 +14,7 @@ const resources = {
   fr: {
     common: commonFr,
     clients: clientsFr,
+    notifications: notificationsFr,
   },
 } as const;
 

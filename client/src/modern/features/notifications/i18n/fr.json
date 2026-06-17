@@ -1,0 +1,22 @@
+{
+  "title": "Notifications",
+  "unread_one": "{{count}} non lue",
+  "unread_other": "{{count}} non lues",
+  "markAllRead": "Tout marquer comme lu",
+  "filterAll": "Toutes",
+  "filterUnread": "Non lues",
+  "empty": "Aucune notification",
+  "emptyUnread": "Aucune notification non lue",
+  "type_succes": "Succes",
+  "type_alerte": "Alerte",
+  "type_rappel": "Rappel",
+  "type_info": "Info",
+  "type_erreur": "Erreur",
+  "relInstant": "A l'instant",
+  "relMinutes": "Il y a {{n}} min",
+  "relHours": "Il y a {{n}}h",
+  "relYesterday": "Hier",
+  "relDays": "Il y a {{n}} jours",
+  "toastAllRead": "Toutes les notifications marquees comme lues",
+  "toastDeleted": "Notification supprimee"
+}
