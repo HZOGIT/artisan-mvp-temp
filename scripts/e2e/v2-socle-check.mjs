@@ -77,6 +77,7 @@ const PARITE_PAGES = [
   { legacy: '/interventions', v2: '/v2/interventions', markers: ['Planifiez et suivez vos interventions', 'Nouvelle intervention'] },
   { legacy: '/commandes', v2: '/v2/commandes', markers: ['Bons de commande fournisseurs', 'Nouvelle commande'] },
   { legacy: '/stocks', v2: '/v2/stocks', markers: ['Gestion des Stocks', 'Ajouter un article', 'Stock bas'] },
+  { legacy: '/depenses', v2: '/v2/depenses', markers: ['Total du mois', 'À rembourser', 'Export FEC'] },
 ];
 for (const p of PARITE_PAGES) {
   for (const route of [p.legacy, p.v2]) {
