@@ -8,3 +8,8 @@ export * from "./label";
 export * from "./dropdown-menu";
 export * from "./badge";
 export * from "./scroll-area";
+export * from "./select";
+export * from "./tabs";
+export * from "./dialog";
+export * from "./table";
+export * from "./textarea";

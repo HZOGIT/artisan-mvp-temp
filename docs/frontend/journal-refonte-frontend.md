@@ -130,11 +130,12 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 1 — ClientDetail `/v2/clients/:id`** (port conforme de `pages/ClientDetail.tsx`,
-i18n + kebab, route enfant TanStack à param typé). **GROS (~623 l., Tabs/Select/Badge, plusieurs domaines
-tRPC : clientPortal, activites, devis/factures/interventions) → SPLIT en slices** : (a) ajouter primitives
-manquantes au barrel (`select`, `tabs`) ; (b) carte infos + en-tête ; (c) onglets (devis/factures/interv.) ;
-(d) portail + activités. Parité visuelle vs legacy à chaque slice montrable. *(OPE-421)*
+## 🎯 PROCHAINE CIBLE : **Vague 1 — ClientDetail `/v2/clients/:id`** (port conforme **complet** de
+`pages/ClientDetail.tsx`, i18n namespace `clients` étendu + kebab, route enfant TanStack `/clients/$id`).
+Primitives prêtes (barrel complété). **Attention** : le legacy appelle des hooks APRÈS des `return`
+anticipés (`if (!client) return`) — au port, **remonter tous les hooks avant les early-returns** (corrige
+l'antipattern sans changer le visuel). Domaines tRPC : clients.getById, devis/factures/interventions.list,
+clientPortal.*, activites.*. Parité visuelle vs legacy (charger un id existant). *(OPE-421)*
 
 ### Cibles suivantes (file)
 1. Vague 1 — Articles, Fournisseurs, Techniciens (i18n + kebab d'emblée ; chacune ~600-700 l. → prévoir slices + primitives dialog/table/textarea).
@@ -148,6 +149,7 @@ manquantes au barrel (`select`, `tabs`) ; (b) carte infos + en-tête ; (c) ongle
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Primitives barrel ✅ (prep slice)** ajout copie conforme `select`/`tabs`/`dialog`/`table`/`textarea` à `modern/shared/ui` (+ test de surface étendu) → débloque ClientDetail, Articles, Fournisseurs, Techniciens. tsc/vitest/eslint verts. Pas de déploiement (ré-exports non consommés par le runtime). Prochaine : port ClientDetail.
 - **Vague 1 — Notifications ✅** port conforme `pages/Notifications.tsx` → `/v2/notifications` (`notifications-page.tsx`, kebab+i18n+primitives partagées ; barrel += badge/scroll-area ; registre bascule + route). 4 gates verts, parité e2e `8|0`, déployé. Prochaine : ClientDetail (à splitter).
 - **Gate ESLint v2 ✅** `eslint.v2.config.mjs` (scope `client/src/modern/**`) : `no-restricted-imports` (frontière strangler : `@/lib/trpc`/`@/components/ui/*`/openapi interdits ; coutures `shared/{ui,trpc}` exemptées), **règle custom `kebab-filename`**, `i18next/no-literal-string` (jsx-text-only, exclut les glyphes). Strings socle router rétro-i18n (namespace `common`), `_demo` exempté. **eslint v2 vert** + tsc/vitest/parité `6|0`, déployé. Prochaine : ClientDetail.
 - **i18n ✅** `react-i18next` + `i18next` installés ; `shared/i18n` (init idempotent, importé par modern-router-mount) ; **un `fr.json` par module** (`features/clients/i18n/fr.json` + `shared/i18n/common/fr.json`) agrégés en namespaces ; `clients-list-page.tsx` **entièrement rétro-i18n** (libellés, toasts, modal, CSV, pluriels). Valeurs `fr` identiques → **parité e2e `6|0`** inchangée. tsconfig.v2 += `resolveJsonModule`. Déployé. Prochaine : gate ESLint v2.
