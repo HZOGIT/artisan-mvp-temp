@@ -64,6 +64,11 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
 1. **Choisir la cible** = en tête du backlog ci-dessous (vague courante). Le périmètre d'une itération
    est **à ta main** : 1 page simple, ou 1 slice d'une page complexe (liste → détail → formulaire).
    Si tu découbres une complexité, **split** dans le backlog et ne fais qu'un morceau.
+2bis. **Sidebar → v2 (imposé)** : ajouter la route au **registre `V2_ROUTES`** (`modern/shared/flag/v2-routes.ts`).
+   La sidebar (`DashboardLayout`) résout désormais ses liens via `resolveV2Path()` (câblage unique fait) :
+   **dès qu'une route est dans le registre, la navigation de la sidebar pointe automatiquement sur `/v2/<route>`**
+   (et l'item reste surligné actif sur `/v2`). Les liens profonds (`/clients` tapé à la main) restent legacy
+   sauf flag `?v2=1`. Donc : **inscrire chaque page migrée dans `V2_ROUTES`** (déjà nécessaire pour la bascule).
 2. **Implémenter sous `/v2/<route>`** en clean-archi (`modern/features/<domaine>/{domain,application,ui}`,
    data via `@trpc/react-query`, primitives `modern/shared/ui`). **Copier le JSX/Tailwind du legacy à
    l'identique** ; ne réorganiser que la plomberie. **Flag `?v2=1`** câblé. **Legacy intact.**
@@ -134,14 +139,15 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Vague 2 — Interventions `/v2/interventions`** (port conforme de
-`pages/Interventions.tsx`). Primitives prêtes ; `StatutBadge` partagé. Découper si lourd ; pattern
-« gate de chargement externe » si early-returns. *(OPE-422)*
+## 🎯 PROCHAINE CIBLE : **Vague 2 — Commandes `/v2/commandes`** (port conforme de
+`pages/CommandesFournisseurs.tsx`). Primitives prêtes. Découper si lourd. *(OPE-422)*
 
 ### Vague 2 — listes + mutations *(OPE-422)*
 - [x] **Devis → `/v2/devis`** — port conforme `pages/Devis.tsx` (`devis-page.tsx`), i18n (namespace `devis`, statuts + exports PDF/Excel), `StatutBadge` ré-exporté dans `modern/shared/ui`. Mutations delete + convertToFacture (pas de `update({statut})`). 4 gates verts, parité e2e `17|0`, déployé.
 - [x] **Factures → `/v2/factures`** — port conforme `pages/Factures.tsx` (`factures-page.tsx`), i18n (namespace `factures`), `StatutBadge` partagé, dialog création + alerte encours client + cartes stats + filtres type/statut + export CSV. Mutations create + delete. 4 gates verts, parité e2e `19|0`, déployé.
-- [ ] Interventions · Commandes · Stocks · Dépenses (primitives prêtes ; pages lourdes → slices). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau.
+- [x] **Interventions → `/v2/interventions`** — port conforme `pages/Interventions.tsx` (`interventions-page.tsx`), i18n (namespace `interventions`), `StatutBadge` partagé, dialogs création/édition + **gestion d'équipe** (ajout/retrait membres) + filtres + durée réelle. Mutations create/update/delete + équipe. 4 gates verts, parité e2e `21|0`, déployé.
+- [ ] Commandes · Stocks · Dépenses (primitives prêtes ; pages lourdes → slices). Étendre `scripts/e2e/v2-mutations.mjs` au fil de l'eau.
+- **Sidebar → v2** câblée (`DashboardLayout` via `resolveV2Path`) : tous les liens de routes migrées pointent sur `/v2`.
 
 ### Cibles suivantes (file)
 1. Vague 1 — Articles, Fournisseurs, Techniciens (i18n + kebab d'emblée ; chacune ~600-700 l. → prévoir slices + primitives dialog/table/textarea).
@@ -155,6 +161,8 @@ l'ancien code entièrement quand la parité est validée partout.)*
 ## Log d'itérations
 <!-- broadcast.sh append ici ; ajouter aussi un résumé manuel par itération si utile -->
 - `init` boucle créée (journal + prompt + gate tsconfig.v2 + cron 2 min). Prochaine cible : S1.
+- **Sidebar → v2 ✅** (demande humaine + recette) : `DashboardLayout` résout sa navigation via `resolveV2Path` → tout lien de route migrée mène à `/v2`, item actif surligné sur `/v2`. Liens profonds tapés à la main restent legacy sauf `?v2=1`.
+- **Vague 2 — Interventions ✅** port `/v2/interventions` (dialogs + gestion d'équipe, i18n, StatutBadge partagé). 4 gates verts, parité e2e `21|0`, déployé. Prochaine : Commandes.
 - **Vague 2 — Factures ✅** port `/v2/factures` (i18n, StatutBadge partagé, alerte encours + stats + filtres + export CSV, create+delete). 4 gates verts, parité e2e `19|0`, déployé. Prochaine : Interventions.
 - **Vague 2 — Devis ✅** port `/v2/devis` (i18n statuts + exports PDF/Excel, `StatutBadge` partagé, delete+convertToFacture). 4 gates verts, parité e2e `17|0`, déployé. Prochaine : Factures. *(Rappel : rejouer l'e2e APRÈS propagation du déploiement — un run trop tôt voit des chunks périmés.)*
 - **e2e mutations v2 ✅** `scripts/e2e/v2-mutations.mjs` : cas Clients update (édite Notes via modale → persistance API → REVERT, non destructif), `cas:1 | issues:0`. Sélecteur scopé `.grid.gap-4` (évite les menus sidebar) + rôles Radix (`menuitem`/`button`). Clôt la dette batchée. Test pur (pas de déploiement). Prochaine : Vague 2 (Devis).

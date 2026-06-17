@@ -82,6 +82,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+// Refonte (strangler) : quand une route a une version `/v2` migrée (registre `V2_ROUTES`), la
+// navigation de la sidebar pointe dessus. `resolveV2Path(p)` renvoie `/v2/<route>` si migrée, sinon null.
+import { resolveV2Path } from "@/modern/shared/flag/v2-routes";
 
 // ============================================================================
 // MonAssistant — contextes par route
@@ -769,9 +772,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     () => filteredGroups.flatMap((g) => g.items),
     [filteredGroups]
   );
-  const activeItem = flatItems.find((i) => i.path === location);
+  // Actif si l'URL courante = le chemin de l'item OU sa version `/v2` migrée (sidebar redirigée v2).
+  const isPathActive = (p: string) => location === p || location === resolveV2Path(p);
+  const activeItem = flatItems.find((i) => isPathActive(i.path));
   const activeGroup = filteredGroups.find((g) =>
-    g.items.some((i) => i.path === location)
+    g.items.some((i) => isPathActive(i.path))
   );
 
   // Panneau de navigation (overlay) déployé pour un groupe donné
@@ -957,7 +962,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const handleRailGroupClick = (group: NavGroup) => {
     // Groupe à 1 item → on navigue direct.
     if (group.items.length === 1) {
-      setLocation(group.items[0].path);
+      const p = group.items[0].path;
+      setLocation(resolveV2Path(p) ?? p);
       setOpenGroupId(null);
       return;
     }
@@ -965,7 +971,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   };
 
   const handleNavigate = (path: string) => {
-    setLocation(path);
+    // Sidebar redirigée vers la v2 quand elle existe (sinon legacy).
+    setLocation(resolveV2Path(path) ?? path);
     setOpenGroupId(null);
     setMobileMoreOpen(false);
   };
@@ -1107,7 +1114,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                     <ul className="p-2 space-y-0.5">
                       {group.items.map((item) => {
                         const ItemIcon = item.icon;
-                        const isItemActive = location === item.path;
+                        const isItemActive = isPathActive(item.path);
                         return (
                           <li key={item.path}>
                             <button
@@ -1226,7 +1233,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           {MOBILE_PRIMARY.map((p) => {
             const groupAvailable = filteredGroups.find((g) => g.id === p.id);
             if (!groupAvailable) return null;
-            const isActive = location === p.path || activeGroup?.id === p.id;
+            const isActive = isPathActive(p.path) || activeGroup?.id === p.id;
             const Icon = p.icon;
             return (
               <button
@@ -1339,7 +1346,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                               <li className="pt-1 pb-1.5 space-y-0.5">
                                 {group.items.map((item) => {
                                   const ItemIcon = item.icon;
-                                  const isItemActive = location === item.path;
+                                  const isItemActive = isPathActive(item.path);
                                   return (
                                     <button
                                       key={item.path}

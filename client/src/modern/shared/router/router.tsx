@@ -101,7 +101,14 @@ const facturesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/factures/ui/factures-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute]);
+// Interventions du front neuf — port conforme de `pages/Interventions.tsx`.
+const interventionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/interventions",
+  component: lazyRouteComponent(() => import("../../features/interventions/ui/interventions-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
