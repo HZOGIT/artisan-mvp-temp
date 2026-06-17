@@ -333,7 +333,18 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   dialog création/édition + dialog aperçu + carte variables, markup à l'identique). i18n namespace
   `modelesEmail`. Route `/v2/modeles-email` + V2_ROUTES + sweep. **0 `any`**. tsc/eslint(0)/vitest **260**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~16 restantes). Ordre suggéré : `assistant`
+- **Migration `modeles-email-transactionnels` ✅** (5e des ~24 pages feature) : sibling de `modeles-email`
+  (même endpoints `modelesEmail.*`, UI distincte avec modèles prédéfinis). **Correctif de parité** : le
+  `<select>` legacy envoyait des valeurs HORS enum ("relance"/"confirmation"/"rappel") → 400 backend ;
+  v2 mappe les libellés sur des valeurs VALIDES (`relance_devis`/`envoi_facture`/`rappel_paiement`/`autre`).
+  Champ `variables` legacy supprimé (absent du schéma new-stack). Clean-archi : domain (TYPE_OPTIONS/varCode/
+  MODELES_PAR_DEFAUT/defautToCreateInput, **5 tests**) + application (CRUD) + ui (réutilise `BulletproofModal`
+  partagé, markup à l'identique). i18n namespace `modelesTransactionnels`. Route + V2_ROUTES + sweep. **0 `any`**
+  (2 `as any` legacy supprimés). tsc/eslint(0)/vitest **265**.
+- **ETA script `/tmp/eta.sh` rendu AUTO-AUDIT** : dérive `REMAINING` de l'état réel (dossiers
+  `modern/features/<x>` manquants + forfaits auth/légal 3 + suppression 6) → ne peut plus surestimer.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (~19 restantes, cf. `/tmp/eta.sh`). Ordre : `assistant`
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
