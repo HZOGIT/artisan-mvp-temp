@@ -126,6 +126,7 @@ import { createInterventionsMobileModule } from "./modules/interventions-mobile/
 import { InterventionMobileRepositoryDrizzle } from "./modules/interventions-mobile/infra/intervention-mobile-repository-drizzle";
 import { createVitrineModule } from "./modules/vitrine/vitrine.module";
 import { VitrinePublicReaderDrizzle } from "./modules/vitrine/infra/vitrine-public-reader-drizzle";
+import { VitrineSettingsRepositoryDrizzle } from "./modules/vitrine/infra/vitrine-settings-repository-drizzle";
 import { createClientPortalModule } from "./modules/client-portal/client-portal.module";
 import { PortalAccessRepositoryDrizzle } from "./modules/client-portal/infra/portal-access-repository-drizzle";
 import { PortalDocsReaderDrizzle } from "./modules/client-portal/infra/portal-docs-reader-drizzle";
@@ -469,6 +470,8 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       pdf: new JsPdfAdapter(),
       email: deps.emailPort ?? new LegacyEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
+      signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
+      appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     },
     // convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
     // `factureRepo` (hoisté) + lecteur devis vu factures.
@@ -710,6 +713,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // (délégation `demandesContact` + `clients` pour la conversion).
   const vitrine = createVitrineModule({
     reader: new VitrinePublicReaderDrizzle(getDbHandle().db),
+    settings: new VitrineSettingsRepositoryDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     email: deps.emailPort ?? new LegacyEmailAdapter(),
     notifications: notificationRepo,

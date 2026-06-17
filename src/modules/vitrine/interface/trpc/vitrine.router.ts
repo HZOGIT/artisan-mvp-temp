@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IVitrinePublicReader } from "../../application/vitrine-public-reader";
+import type { IVitrineSettingsRepository } from "../../application/vitrine-settings-repository";
+import { getVitrineSettings, updateVitrineSettings } from "../../application/settings-use-cases";
 import {
   getBySlug,
   submitContact,
@@ -21,8 +23,17 @@ const submitSchema = z.object({
 
 const statutEnum = z.enum(["nouveau", "contacte", "converti", "perdu"]);
 
+const settingsSchema = z.object({
+  vitrineActive: z.boolean().optional(),
+  vitrineDescription: z.string().max(5000).nullish(),
+  vitrineZone: z.string().max(500).nullish(),
+  vitrineServices: z.string().max(10000).nullish(),
+  vitrineExperience: z.number().int().min(0).max(100).nullish(),
+});
+
 export interface VitrineRouterDeps extends SubmitContactDeps, LeadsAdminDeps {
   readonly reader: IVitrinePublicReader;
+  readonly settings: IVitrineSettingsRepository;
 }
 
 // Routeur tRPC `vitrine`. Surface PUBLIQUE (par slug, sans cookie) : `getBySlug` (page agrégée) +
@@ -40,5 +51,11 @@ export function createVitrineRouter(deps: VitrineRouterDeps) {
     convertirDemandeEnClient: protectedProcedure
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(({ ctx, input }) => convertirDemandeEnClient(deps, ctx.tenant, input.id)),
+    // Réglages vitrine (ADMIN, scopé tenant — OPE-504). Lecture + mise à jour partielle des colonnes
+    // `vitrine*` de `parametres_artisan`. Consommé par la section « Ma page vitrine » de `/v2/parametres`.
+    getSettings: protectedProcedure.query(({ ctx }) => getVitrineSettings(deps.settings, ctx.tenant)),
+    updateSettings: protectedProcedure
+      .input(settingsSchema)
+      .mutation(({ ctx, input }) => updateVitrineSettings(deps.settings, ctx.tenant, input)),
   });
 }
