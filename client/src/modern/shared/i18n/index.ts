@@ -21,6 +21,7 @@ import reglesDepensesFr from "@/modern/features/regles-depenses/i18n/fr.json";
 import historiqueEmailsFr from "@/modern/features/historique-emails/i18n/fr.json";
 import supportFr from "@/modern/features/support/i18n/fr.json";
 import avisFr from "@/modern/features/avis/i18n/fr.json";
+import flotteFr from "@/modern/features/flotte/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -51,6 +52,7 @@ const resources = {
     historiqueEmails: historiqueEmailsFr,
     support: supportFr,
     avis: avisFr,
+    flotte: flotteFr,
   },
 } as const;
 

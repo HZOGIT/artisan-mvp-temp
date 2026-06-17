@@ -178,7 +178,14 @@ const avisRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/avis/ui/avis-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute]);
+// Flotte (vue d'ensemble du parc) — migration clean-archi de `pages/Flotte.tsx`.
+const flotteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/flotte",
+  component: lazyRouteComponent(() => import("../../features/flotte/ui/flotte-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
