@@ -22,6 +22,15 @@ Toute itération doit prouver la **parité visuelle** (screenshots `/v2/<route>`
 exporté reste en `PascalCase`, seul le nom de fichier est kebab). Cohérent avec les primitives shadcn
 (`button.tsx`, `dropdown-menu.tsx`). Renommer au passage tout fichier neuf encore en PascalCase.
 
+## i18n (imposé) — `react-i18next`
+**Le front neuf doit être i18n-friendly.** Lib retenue : **`react-i18next`** (i18next). Conventions :
+- **Aucune chaîne utilisateur en dur** dans le JSX du neuf → passer par `t("clef")` (hook `useTranslation`).
+- Init + provider partagés dans `client/src/modern/shared/i18n/` ; locale par défaut **`fr`** (catalogue
+  `fr` = les libellés actuels, à l'identique → parité). `en` ajouté plus tard sans refonte.
+- **Catalogues par feature/namespace** (ex. `clients`), clés stables et descriptives.
+- Le **gate ESLint v2** fera respecter ceci via `eslint-plugin-i18next` (`no-literal-string`).
+- Pages déjà portées avant l'i18n (ex. Clients) → **rétro-i18n** lors du setup i18n (puis le lint passe).
+
 ## Périmètre AUTONOME de la boucle (ne pas déborder)
 La boucle ne touche QUE :
 - `client/src/modern/**` (tout le code neuf `/v2`),
@@ -117,7 +126,18 @@ Reste des pages → bascule routeur racine sur TanStack Router → **suppression
 (wouter + pages legacy migrées) une fois TOUT confirmé. *(C'est l'objectif final : on supprimera
 l'ancien code entièrement quand la parité est validée partout.)*
 
-## 🎯 PROCHAINE CIBLE : **Gate ESLint du code neuf** (bootstrap). Installer `eslint` + parser TS, créer `eslint.v2.config.mjs` ne lintant QUE `client/src/modern/**`, avec : (1) `no-restricted-imports` → interdire `@/lib/trpc` (→ `@/modern/shared/trpc`), `@/components/ui/*` (→ `@/modern/shared/ui`), `openapi-fetch`/`openapi-react-query` (pas de REST) ; (2) **règle custom kebab-case** sur les noms de fichiers. Brancher le gate dans la recette. Puis l'enrichir itérativement. *(demande humaine — voir runbook gate ESLint)*
+## 🎯 PROCHAINE CIBLE : **Setup i18n (`react-i18next`)** puis rétro-i18n de la page Clients.
+Installer `react-i18next` + `i18next`, créer `client/src/modern/shared/i18n/` (init, provider, catalogue `fr`
+= libellés actuels à l'identique), monter le provider au-dessus du sous-arbre `/v2`. Puis **rétro-i18n
+`clients-list-page.tsx`** (remplacer les chaînes en dur par `t("…")`, namespace `clients`, **parité e2e
+inchangée `6|0`**). *(demande humaine — voir section « i18n »)*
+
+### Cibles suivantes (file)
+1. **Gate ESLint du code neuf** : `eslint` + parser TS + `eslint.v2.config.mjs` ne lintant QUE
+   `client/src/modern/**` : `no-restricted-imports` (interdire `@/lib/trpc`→`@/modern/shared/trpc`,
+   `@/components/ui/*`→`@/modern/shared/ui`, `openapi-fetch`/`openapi-react-query`), **règle custom
+   kebab-case**, et `eslint-plugin-i18next` `no-literal-string`. Brancher dans la recette, enrichir itér.
+2. Vague 1 — ClientDetail `/v2/clients/:id`, Articles, Fournisseurs, Techniciens, Notifications (i18n d'emblée).
 
 > Note coordination boucle : pilotée par **CronCreate natif Claude** (job `834543d1`, toutes les 2 min, session-only → vit tant que le screen `ope-403-refonte-frontend` tourne). Le daemon bash `devtools/refonte-loop/*` est **désactivé** (ne pas le relancer).
 
