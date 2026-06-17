@@ -227,7 +227,14 @@ const calendrierRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/calendrier/ui/calendrier-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute]);
+// Gestion des utilisateurs — migration clean-archi de `pages/Utilisateurs.tsx`.
+const utilisateursRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/utilisateurs",
+  component: lazyRouteComponent(() => import("../../features/utilisateurs/ui/utilisateurs-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
