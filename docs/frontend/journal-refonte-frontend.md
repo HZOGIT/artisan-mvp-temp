@@ -438,9 +438,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   `tableauBordDepenses`. CTA cross-nav via `<a href>` (bascule redirige vers /v2). Route + V2_ROUTES + sweep.
   **0 `any`**. tsc/eslint(0)/vitest **315**.
 
+- **Migration `import-releve` (import CSV relevé bancaire) ✅** (17e des ~24 pages feature) : audit contrat —
+  5 endpoints `depenses.*` (getCategories/getTransactionsBancaires/importReleve/convertirTransaction/
+  ignorerTransaction) présents. **Gap** : `TransactionBancaire` en camelCase (`categorieSuggeree`/`dateTransaction`/
+  `typeTransaction` ≠ snake_case legacy) → remap. Clean-archi : domain (`eur` + **`parsePreview`/`detectSeparator`**
+  — parsing CSV d'aperçu pur, **4 tests**) + application (catégories + transactions[skipToken] + import +
+  convertir/ignorer) + ui (upload drag-zone + aperçu + import + liste transactions catégorisables). i18n
+  namespace `importReleve`. **0 `any`** (5 legacy supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **319**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
 `chantiers`/`calendrier-chantiers`, `planification`/`geolocalisation` (cartes), `devis-ia`, `analyses-photos`,
-`tableau-bord-sync-comptable`, `integrations-comptables`, `import`(+releve), `nouvelle-depense`.
+`tableau-bord-sync-comptable`, `integrations-comptables`, `import`, `nouvelle-depense`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

@@ -274,6 +274,12 @@ const tableauBordDepensesRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/tableau-bord-depenses/ui/tableau-bord-depenses-page")),
 });
 
+const importReleveRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/import-releve",
+  component: lazyRouteComponent(() => import("../../features/import-releve/ui/import-releve-page")),
+});
+
 // Flotte (vue d'ensemble du parc) — migration clean-archi de `pages/Flotte.tsx`.
 const flotteRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -359,7 +365,7 @@ const notesFraisRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/notes-frais/ui/notes-frais-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute]);
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
