@@ -171,7 +171,14 @@ const supportRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/support/ui/support-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute]);
+// Avis clients — migration clean-archi de `pages/Avis.tsx`.
+const avisRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/avis",
+  component: lazyRouteComponent(() => import("../../features/avis/ui/avis-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
