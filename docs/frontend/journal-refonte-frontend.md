@@ -429,9 +429,18 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   perfs/fournisseur + dernières commandes + 2 dialogs). i18n namespace `performancesFournisseurs`. **0 `any`**.
   Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **311**.
 
+- **Migration `tableau-bord-depenses` ✅** (16e des ~24 pages feature) : dashboard avec **recharts** (donut
+  par catégorie + barres 6 mois) + export PDF (`@/lib/generateRapportDepensesPDF` partagé). Audit contrat —
+  4 endpoints (depenses.stats/getBudgets/getCategories + artisan.getProfile) présents. Clean-archi : domain
+  (`eur`/`donutData`/`barData`/`alertesBudget`/`totalBudget`/`pctBudget`/`projection`, **4 tests**) +
+  application + ui (6 KPIs + 2 graphiques + alertes budget + top dépenses/fournisseurs + CTA). **Les 14 `any`
+  legacy supprimés** (types dérivés ; mapping typé string→number pour l'appel PDF). i18n namespace
+  `tableauBordDepenses`. CTA cross-nav via `<a href>` (bascule redirige vers /v2). Route + V2_ROUTES + sweep.
+  **0 `any`**. tsc/eslint(0)/vitest **315**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
 `chantiers`/`calendrier-chantiers`, `planification`/`geolocalisation` (cartes), `devis-ia`, `analyses-photos`,
-`tableau-bord-depenses`/`-sync-comptable`, `integrations-comptables`, `import`(+releve), `nouvelle-depense`.
+`tableau-bord-sync-comptable`, `integrations-comptables`, `import`(+releve), `nouvelle-depense`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

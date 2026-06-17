@@ -111,6 +111,7 @@ const PARITE_PAGES = [
   { legacy: '/alertes-previsions', v2: '/v2/alertes-previsions', markers: ['Alertes Prévisions CA', 'Configuration', 'Historique des alertes'] },
   { legacy: '/previsions', v2: '/v2/previsions', markers: ['Prévisions de CA', 'CA Prévisionnel', 'Confiance'] },
   { legacy: '/performances-fournisseurs', v2: '/v2/performances-fournisseurs', markers: ['Performances Fournisseurs', 'Taux de Fiabilité', 'Performance par Fournisseur'] },
+  { legacy: '/tableau-bord-depenses', v2: '/v2/tableau-bord-depenses', markers: ['Tableau de bord dépenses', 'Total du mois', 'Budget consommé'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },
