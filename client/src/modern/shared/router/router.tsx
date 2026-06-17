@@ -143,7 +143,14 @@ const portailGestionRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/portail-gestion/ui/portail-gestion-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute]);
+// Budgets de dépenses du front neuf — migration clean-archi de `pages/BudgetsDepenses.tsx`.
+const budgetsDepensesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/budgets-depenses",
+  component: lazyRouteComponent(() => import("../../features/budgets-depenses/ui/budgets-depenses-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

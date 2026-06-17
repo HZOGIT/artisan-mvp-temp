@@ -1,0 +1,16 @@
+{
+  "title": "Budgets",
+  "subtitle": "{{mois}} — par catégorie",
+  "copyPrevMonth": "Copier mois précédent",
+  "totalsTitle": "Totaux du mois",
+  "consomme": "{{pct}}% consommé",
+  "budgetLabel": "Budget",
+  "realiseLabel": "Réalisé",
+  "restantLabel": "Restant",
+  "byCategoryTitle": "Par catégorie",
+  "byCategoryDesc": "Edite le budget directement dans la grille.",
+  "emptyCategories": "Aucune catégorie configurée. Les catégories par défaut sont seedées au boot.",
+  "tip": "Astuce : édite un montant et clique ailleurs, le budget se sauvegarde automatiquement.",
+  "toastBudgetUpdated": "Budget mis à jour",
+  "toastBudgetsCopied": "Budgets copiés depuis le mois précédent"
+}
