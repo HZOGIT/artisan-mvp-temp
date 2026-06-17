@@ -94,7 +94,14 @@ const devisRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/devis/ui/devis-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute]);
+// Factures du front neuf — port conforme de `pages/Factures.tsx`.
+const facturesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/factures",
+  component: lazyRouteComponent(() => import("../../features/factures/ui/factures-page")),
+});
+
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

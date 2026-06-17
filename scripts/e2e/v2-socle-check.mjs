@@ -73,6 +73,7 @@ const PARITE_PAGES = [
   { legacy: '/fournisseurs', v2: '/v2/fournisseurs', markers: ['Gérez vos fournisseurs et leurs articles associés', 'Nouveau fournisseur', 'Liste des fournisseurs'] },
   { legacy: '/articles', v2: '/v2/articles', markers: ["Bibliothèque d'articles", 'Nouvel article', 'Importer CSV'] },
   { legacy: '/devis', v2: '/v2/devis', markers: ['Gérez vos devis clients', 'Nouveau devis'] },
+  { legacy: '/factures', v2: '/v2/factures', markers: ['Gérez vos factures et avoirs clients', 'Nouvelle facture'] },
 ];
 for (const p of PARITE_PAGES) {
   for (const route of [p.legacy, p.v2]) {
