@@ -162,12 +162,13 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - [x] `devis/infra/devis-signature-reader-drizzle.ts` → test (2 cas : round-trip signature par devisId, null si absent) ✅ it.70
 - [x] `devis-ia/infra/devis-ia-repository-drizzle.ts` → test (4 cas : analyse CRUD+anti-IDOR, photos ownership, détail enrichi, updateSuggestionOwned chaîne anti-IDOR) ✅ it.71
 - [x] `interventions-mobile/infra/intervention-mobile-repository-drizzle.ts` → test (4 cas : createArrivee+getByIntervention anti-IDOR, getMany map, updateArrivee, updateDepart+signature anti-IDOR) ✅ it.72
-- [ ] **Réel restant (vérifié it.72) :** artisan/logo-writer, subscription/event-notifier.
+- [x] `artisan/infra/artisan-logo-writer-drizzle.ts` → test (2 cas : setLogo ciblé uniquement, setLogo(null) efface) ✅ it.73
+- [ ] **Réel restant (vérifié it.73) :** subscription/event-notifier (DERNIER adapter Drizzle).
   (avis public-reader/writer = it.58 ; factures readers = it.56 ; assistant thread-writer = it.68 — couverts en tests combinés, pas en sibling.)
   ⚠️ Beaucoup sont des **readers RLS scopés tenant** → test L2 = round-trip + **anti-IDOR cross-tenant** (`expectCrossTenantDenied`).
   Quelques-uns sont hors-RLS (signature, ical public, contact public) → test = persistance/round-trip simple.
 
-**Prochaine cible : `artisan/infra/artisan-logo-writer-drizzle.ts`** (L2 ; writer du logo artisan — RLS, persistance scopée tenant + anti-IDOR). Puis subscription/event-notifier (2 adapters réels restants → fin du front L2 drizzle).
+**Prochaine cible : `subscription/infra/subscription-event-notifier-drizzle.ts`** (L2 ; DERNIER adapter Drizzle du front — RLS, persistance/notification scopée tenant). Après → **front L2 drizzle ÉPUISÉ** : ajouter un garde-fou meta-test (chaque `*-drizzle.ts` a un test sibling OU combiné) puis réévaluer les fronts (L4 navigateur / mutation testing) avec l'humain.
 
 ---
 
@@ -247,3 +248,4 @@ repos des features critiques d'abord. Liste (recalculable : `for f in $(find src
 - `2026-06-16 23:04:22Z` **[test]** devis signature-reader L2 — it.70 — DevisSignatureReaderDrizzle 2 cas verts : getByDevisId round-trip (id/token/createdAt) du devis signé, null si devis sans signature ou inexistant. Réel restant : 4 adapters (devis-ia, interventions-mobile, logo-writer, event-notifier).
 - `2026-06-16 23:35:05Z` **[test]** devis-ia repo L2 (RLS+chaîne anti-IDOR) — it.71 — DevisIARepositoryDrizzle 4 cas verts : analyse CRUD+anti-IDOR (B->null/[]), addPhoto/listPhotoUrls ownership analyse parente, getAnalyseDetail enrichi (résultats->suggestions), updateSuggestionOwned anti-IDOR via chaîne suggestion->résultat->analyse(tenant). Réel restant : 3 adapters.
 - `2026-06-17 00:05:01Z` **[test]** interventions-mobile repo L2 (RLS) — it.72 — InterventionMobileRepositoryDrizzle 4 cas verts : createArrivee+getByIntervention round-trip + anti-IDOR (B->null), getManyByInterventions map (vide->vide, B->vide), updateArrivee coords, updateDepart+signature + anti-IDOR (B no-op). Réel restant : 2 adapters (logo-writer, event-notifier).
+- `2026-06-17 00:34:38Z` **[test]** artisan logo-writer L2 — it.73 — ArtisanLogoWriterDrizzle 2 cas verts : setLogo met à jour SEULEMENT l'artisan ciblé (B intact), setLogo(null) efface le logo. Réel restant : 1 SEUL adapter (subscription/event-notifier) -> fin du front L2 drizzle en vue.
