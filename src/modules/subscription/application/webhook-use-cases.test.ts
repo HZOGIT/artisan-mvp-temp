@@ -54,6 +54,17 @@ describe("processStripeWebhook (fail-closed + sync abonnement)", () => {
     expect(writer.upserts[0].fields.plan).toBe("pro");
   });
 
+  // Fail-SAFE (≠ fail-closed des branches signature) : un handler qui throw (ex. DB down) APRÈS une
+  // signature valide → 500, pour que Stripe RÉ-ESSAIE l'event (un 200 le perdrait définitivement).
+  it("handler en échec (signé) → 500 {Webhook handler failed} → Stripe retentera", async () => {
+    const { deps, writer } = build();
+    writer.applyUpsert = async () => { throw new Error("db down"); };
+    const event = { id: "evt_boom", type: "customer.subscription.updated", data: { object: { id: "sub_1", customer: "cus_1", status: "active", metadata: { plan: "pro", artisanId: "7" }, items: { data: [{ price: { id: "price_pro" } }] } } } };
+    const r = await processStripeWebhook(deps, { rawBody: raw(event), signature: SIG });
+    expect(r.http).toBe(500);
+    expect(r.body).toEqual({ error: "Webhook handler failed" });
+  });
+
   it("subscription.updated : artisanId résolu par customerId si pas de metadata", async () => {
     const { deps, writer } = build();
     writer.seedCustomer("cus_9", 99);
