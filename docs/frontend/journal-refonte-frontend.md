@@ -602,8 +602,18 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   `clientsImport`. **0 `any`** (le `row: any` legacy → `Record<string, unknown>` + coercions). Route + V2_ROUTES
   + sweep. vitest **388**.
 
-## 🎯 PROCHAINE CIBLE : **continuer les sous-pages détail/création** (devis/factures editors = gros morceaux ;
-commandes (form/detail), contrat detail, profil, mobile) puis **suppression du legacy**. Toutes les pages applicatives + auth + légal
+- **Migration `interventions-mobile` (/mobile) ✅** : vue terrain du jour (418 l) — interventions du jour +
+  démarrer (géoloc `navigator.geolocation`) / terminer (signature canvas + notes) + itinéraire/appel. 4
+  endpoints (interventionsMobile.getTodayInterventions/start/end + interventions.getEquipesByArtisan).
+  **`getTodayInterventions` typé `unknown[]` backend** (legacy `any`) → **type `MobileIntervention` déclaré
+  explicitement** + cast à la frontière (application). `DashboardLayout` retiré (fourni par le mount /v2).
+  Clean-archi : domain (`statutVariant`/`equipeParIntervention`/`membreName`/`dureeSurSite`/`mapsUrl` — **5
+  tests**) + application (4 endpoints) + ui (cartes + canvas signature tactile + dialog). i18n. **0 `any`** (2
+  supprimés). Route /v2/mobile + V2_ROUTES + sweep. vitest **393**.
+
+## 🎯 PROCHAINE CIBLE : **sous-pages détail/création restantes** : `profil` (727), `commandes` (form 622/detail
+466), `contrats/:id` (539), éditeurs `devis/:id`(1116)/`factures/:id`(1197)/`devis/nouveau`(873) ; puis stubs
+`/contact /aide /guide` + landing `/` ; puis **suppression du legacy**. Toutes les pages applicatives + auth + légal
 sont migrées et basculées via `V2_ROUTES`. Étapes : (1) **audit `comm -23`** des routes App.tsx vs `V2_ROUTES`
 pour lister le résiduel non migré (PageEnConstruction, /contact /aide /guide, /calendrier ≠ calendrier-chantiers,
 Home `/`…) ; (2) **valider la parité au navigateur** (sweep complet + manuel sur login) ; (3) **supprimer**

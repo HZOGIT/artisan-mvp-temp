@@ -1,0 +1,29 @@
+{
+  "titre": "Interventions du jour",
+  "aucuneIntervention": "Aucune intervention prévue aujourd'hui",
+  "itineraire": "Itinéraire",
+  "appeler": "Appeler",
+  "demarrer": "Démarrer",
+  "terminer": "Terminer",
+  "terminee": "Terminée",
+  "arrivee": "Arrivée: {{heure}}",
+  "depart": "Départ: {{heure}}",
+  "dureeSurSite": "Durée sur site : {{duree}}",
+  "terminerTitre": "Terminer l'intervention",
+  "terminerDesc": "Ajoutez des notes et faites signer le client",
+  "notesIntervention": "Notes d'intervention",
+  "notesPlaceholder": "Travaux effectués, observations...",
+  "signatureClient": "Signature du client",
+  "effacer": "Effacer",
+  "signezCadre": "Signez dans le cadre ci-dessus",
+  "annuler": "Annuler",
+  "valider": "Valider",
+  "toastDemarree": "Intervention démarrée",
+  "toastTerminee": "Intervention terminée",
+  "statut": {
+    "planifiee": "Planifiée",
+    "en_cours": "En cours",
+    "terminee": "Terminée",
+    "annulee": "Annulée"
+  }
+}
