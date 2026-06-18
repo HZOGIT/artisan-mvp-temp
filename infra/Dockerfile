@@ -14,7 +14,7 @@ COPY package.json pnpm-lock.yaml .npmrc ./
 RUN pnpm install --frozen-lockfile
 # Sources nécessaires au bundle (src + schéma Drizzle importé en relatif).
 COPY tsconfig*.json ./
-COPY src ./src
+COPY apps/api ./apps/api
 COPY drizzle ./drizzle
 # `shared/` (racine) = constantes pures partagées legacy↔new-stack (ex. `shared/permissions.ts` :
 # ROLE_TEMPLATES/ALL_PERMISSIONS), importé en relatif depuis src/** → requis au bundle esbuild.
