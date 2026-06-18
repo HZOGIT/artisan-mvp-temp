@@ -625,13 +625,44 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   /v2 existent et fonctionnent mais ne sont pas servies via la bascule sur un chemin paramétré. À traiter à la
   refonte bascule (préfixe + extraction de param) en même temps que le finding default-on.
 
-## 🎯 PROCHAINE CIBLE : **sous-pages restantes** : `profil` (727), `commandes/nouvelle`+`:id/modifier`
-(CommandeFournisseurForm 622), `contrats/:id` (539), éditeurs `devis`/`factures` (gros) ; stubs ; puis **legacy**. Toutes les pages applicatives + auth + légal
-sont migrées et basculées via `V2_ROUTES`. Étapes : (1) **audit `comm -23`** des routes App.tsx vs `V2_ROUTES`
-pour lister le résiduel non migré (PageEnConstruction, /contact /aide /guide, /calendrier ≠ calendrier-chantiers,
-Home `/`…) ; (2) **valider la parité au navigateur** (sweep complet + manuel sur login) ; (3) **supprimer**
-`client/src/pages/**`, wouter et `@/lib/trpc` une fois la couverture /v2 confirmée à 100%. ⚠️ login = critique :
-valider manuellement AVANT toute suppression auth.
+## 📊 POINT D'ÉTAPE (2026-06-18) — ANALYSE PRÉCISE DU RESTANT (audit `comm -23` App.tsx vs router /v2)
+
+**Avancement : ~72 pages /v2 migrées / 81 → 88,9 %.** Toutes les pages principales (28 feature + ~30
+domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile, commandes/:id sont faites.
+
+**IL RESTE EXACTEMENT (9 pages réelles) :**
+| Page | Route legacy | Lignes | any | Note |
+|------|-------------|-------:|----:|------|
+| FactureDetail | /factures/:id | 1197 | 27 | éditeur lourd |
+| DevisDetail | /devis/:id | 1116 | 16 | éditeur lourd |
+| DevisNouveauPage | /devis/nouveau | 873 | 11 | créateur devis |
+| Vitrine (public) | /vitrine/:slug | 749 | 3 | vitrine publique artisan |
+| Profil | /profil | 727 | 11 | paramètres compte (email/mdp/delete) |
+| DevisLigneEdit | /devis/:id/ligne/nouvelle | 654 | 11 | édition ligne devis |
+| CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
+| ContratDetail | /contrats/:id | 539 | 2 | détail contrat |
+| SoumettreAvis (public) | /avis/:token | 187 | 0 | dépôt d'avis public |
+≈ **6664 lignes, ~93 `any`**. Le **cluster devis/factures** (DevisDetail+DevisLigneEdit+DevisNouveau+
+FactureDetail ≈ 3840 l) est le gros morceau.
+
+**FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
+/v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
+par redirections** : portail/signature/devis-public/paiement.
+
+**STUBS triviaux (3)** : /contact /aide /guide (PageEnConstruction) — à faire en 1 itération ou laisser.
+
+**STRUCTUREL avant suppression legacy (findings ouverts)** :
+1. **Bascule pas default-on sur chargement plein** (vérifié navigateur : legacy /cgv ne bascule pas) → un
+   accès direct à une URL migrée sert encore le legacy. À corriger (default-on ou redirections explicites).
+2. **Bascule routes à paramètre KO** (`resolveV2Path` = lookup clé EXACTE) → /clients/:id, /devis/:id,
+   /factures/:id, /contrats/:id, /commandes/:id, /avis/:token, /vitrine/:slug ne basculent pas (pages /v2
+   pourtant fonctionnelles). À refondre (préfixe + extraction param).
+3. **Suppression du legacy** (`client/src/pages/**`, wouter, `@/lib/trpc`) une fois 1+2 traités + parité
+   validée. ⚠️ login critique → valider manuellement avant suppression auth.
+
+🎯 **PROCHAINES CIBLES (ordre)** : (a) finir les sous-pages — d'abord les petites (ContratDetail 2 any,
+SoumettreAvis public 0 any, Profil), puis le cluster devis/factures ; (b) stubs ; (c) findings bascule 1+2 ;
+(d) suppression legacy. **Reporting : ntfy à CHAQUE itération avec % + ETA actualisé** (cf. `/tmp/eta.sh`).
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
