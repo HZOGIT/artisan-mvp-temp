@@ -523,8 +523,19 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   Setters d'édition **génériques typés** (`<K extends keyof SuggestionEditable>`) → plus de `value: any`. i18n.
   **0 `any`** (7 supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **357**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes (les 3 plus
-grosses, à parité délicate) : `assistant` (chat streaming SSE), `chantiers` (1035 l CRUD), `calendrier-chantiers` (1635 l vue calendrier).
+- **Migration `chantiers` ✅** (26e des pages feature) : gestion de projets multi-interventions (1035 l, **la
+  plus grosse CRUD**, 21 endpoints, 6 onglets + rappels CRM). 12 `any` legacy. **2 BUGS LEGACY révélés** :
+  (1) stats = `nombreInterventions` (≠ `totalInterventions` lu → toujours 0) ; (2) `getInterventions` renvoie
+  le **lien de jointure** (`ChantierInterventionLien` : id/chantierId/interventionId/ordre, **sans
+  titre/dateDebut/statut**) → l'onglet interventions affichait titre vide + « Date non définie » + badge vide
+  → remap sur `interventionId`/`createdAt` (finding : endpoint à enrichir). Clean-archi : domain (types +
+  `statutVariant`/`prioriteColor`/`techNom`/`mainOeuvreSynthese`/`activitesForChantier`/`activitesParEcheance`/
+  `rappelsActifs`/`suiviPourcentage` + form defaults — **6 tests**) + application (10 queries gated + 11
+  mutations) + ui (liste + création + 6 onglets aperçu/phases/main-d'œuvre/interventions/documents/suivi +
+  rappels). i18n. **0 `any`** (12 supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **362**. → findings.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes (les 2 dernières,
+à parité délicate) : `assistant` (chat streaming SSE + voix + speech), `calendrier-chantiers` (1635 l vue calendrier).
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
