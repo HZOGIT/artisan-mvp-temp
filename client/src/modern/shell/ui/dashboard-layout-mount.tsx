@@ -56,6 +56,7 @@ export function DashboardLayoutMount() {
         location={location} permissions={permissions} modulesActifs={modulesActifs} user={user}
         resolveV2Path={resolveV2Path} onNavigate={setLocation} onLogout={logout}
         assistantOpen={assistantOpen}
+        mainExtraClass="md:mr-[520px]"
         topBarActions={topBarActions}
         banners={<TrialBanner />}
         assistant={
