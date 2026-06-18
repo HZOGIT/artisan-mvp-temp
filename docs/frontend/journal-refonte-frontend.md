@@ -641,8 +641,8 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | DevisLigneEdit | /devis/:id/ligne/nouvelle | 654 | 11 | édition ligne devis |
 | CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
 | ContratDetail | /contrats/:id | 539 | 2 | détail contrat |
-| SoumettreAvis (public) | /avis/:token | 187 | 0 | dépôt d'avis public |
-≈ **6664 lignes, ~93 `any`**. Le **cluster devis/factures** (DevisDetail+DevisLigneEdit+DevisNouveau+
+| ~~SoumettreAvis (public)~~ ✅ | ~~/avis/:token~~ → /v2/avis/:token | 187 | 0 | **FAIT** (avis-public ; redirect explicite + public-router) |
+≈ **6664 lignes, ~93 `any`** (− avis-public fait → 8 pages réelles restantes). Le **cluster devis/factures** (DevisDetail+DevisLigneEdit+DevisNouveau+
 FactureDetail ≈ 3840 l) est le gros morceau.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→

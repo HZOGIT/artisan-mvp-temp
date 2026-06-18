@@ -57,7 +57,6 @@ const InterventionsMobile = lazy(() => import("./pages/InterventionsMobile"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Techniciens = lazy(() => import("./pages/Techniciens"));
 const Avis = lazy(() => import("./pages/Avis"));
-const SoumettreAvis = lazy(() => import("./pages/SoumettreAvis"));
 const Geolocalisation = lazy(() => import("./pages/Geolocalisation"));
 const Comptabilite = lazy(() => import("./pages/Comptabilite"));
 const Planification = lazy(() => import("./pages/Planification"));
@@ -275,8 +274,9 @@ function Router() {
         <Route path="/v2/devis-public/:token" component={PublicModernRouterMount} />
         <Route path="/v2/portail/:token" component={PublicModernRouterMount} />
         <Route path="/v2/home" component={PublicModernRouterMount} />
+        <Route path="/v2/avis/:token" component={PublicModernRouterMount} />
         <Route path="/portail/:token">{(p) => <Redirect to={`/v2/portail/${p.token}${window.location.search}`} />}</Route>
-        <Route path="/avis/:token" component={SoumettreAvis} />
+        <Route path="/avis/:token">{(p) => <Redirect to={`/v2/avis/${p.token}${window.location.search}`} />}</Route>
         <Route path="/vitrine/:slug" component={Vitrine} />
         {/*
           Toutes les routes authentifiées passent par UN SEUL catch-all

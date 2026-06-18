@@ -1,0 +1,22 @@
+{
+  "chargement": "Chargement...",
+  "lienInvalide": "Lien invalide",
+  "lienInvalideDesc": "Ce lien de demande d'avis n'existe pas ou a expiré.",
+  "lienExpire": "Lien expiré",
+  "lienExpireDesc": "Ce lien de demande d'avis a expiré. Contactez votre artisan pour en recevoir un nouveau.",
+  "merciTitre": "Merci pour votre avis !",
+  "merciDesc": "Votre retour a bien été enregistré. Il nous aide à améliorer nos services.",
+  "donnezAvis": "Donnez votre avis",
+  "souhaiteSatisfaction": "{{artisan}} souhaite connaître votre satisfaction",
+  "votreArtisan": "Votre artisan",
+  "commentEvaluez": "Comment évaluez-vous notre prestation ?",
+  "commentairePlaceholder": "Partagez votre expérience (optionnel)...",
+  "envoiEnCours": "Envoi en cours...",
+  "envoyerAvis": "Envoyer mon avis",
+  "toastMerci": "Merci pour votre avis !",
+  "note1": "Très insatisfait",
+  "note2": "Insatisfait",
+  "note3": "Correct",
+  "note4": "Satisfait",
+  "note5": "Très satisfait"
+}

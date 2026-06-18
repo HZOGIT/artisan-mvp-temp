@@ -75,7 +75,14 @@ const homeRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/home/ui/home-page")),
 });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute]);
+// Dépôt d'avis client public par token — port de `pages/SoumettreAvis.tsx`.
+const avisPublicRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/avis/$token",
+  component: lazyRouteComponent(() => import("../../features/avis-public/ui/soumettre-avis-page")),
+});
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,
