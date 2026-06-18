@@ -12,7 +12,7 @@ import {
   Bell, CheckCircle, AlertTriangle, Clock, Info, XCircle, Trash2, CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 
 // Page Notifications du FRONT NEUF (`/v2/notifications`) — clean-archi : présentation pure. Données &
 // mutations via `useNotifications` (couche application, seule à importer tRPC) ; le calcul de date
