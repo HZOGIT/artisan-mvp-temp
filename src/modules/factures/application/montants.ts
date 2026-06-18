@@ -1,10 +1,11 @@
 import type { LigneType } from "../domain/facture";
+import { round2 } from "../../../shared/money";
 
 // Calcul des montants d'une ligne de facture — PUR, testable. ⚠️ Parité legacy :
 //  - une ligne `section`/`note` est une ligne d'affichage (titre de lot / texte libre) SANS
 //    prix → montants forcés à 0, **exclue des totaux** ;
-//  - sinon montantHT = quantité × prixUnitaireHT ; montantTVA = montantHT × tauxTVA/100 ;
-//    montantTTC = montantHT + montantTVA. Arrondi au centime.
+//  - sinon montantHT = round2(quantité × prixUnitaireHT) ; montantTVA = round2(montantHT × tauxTVA/100) ;
+//    montantTTC = round2(montantHT + montantTVA). round2 corrige les erreurs IEEE-754.
 // NB : copie volontaire du helper devis (isolation des modules — pas de couplage inter-domaine).
 export interface MontantsLigne {
   readonly montantHT: string;
@@ -22,9 +23,9 @@ export function calculerMontantsLigne(
   const q = isDisplay ? 0 : Number(quantite) || 0;
   const pu = isDisplay ? 0 : Number(prixUnitaireHT) || 0;
   const taux = isDisplay ? 0 : Number(tauxTVA) || 0;
-  const ht = q * pu;
-  const tva = ht * (taux / 100);
-  return { montantHT: ht.toFixed(2), montantTVA: tva.toFixed(2), montantTTC: (ht + tva).toFixed(2) };
+  const ht = round2(q * pu);
+  const tva = round2(ht * (taux / 100));
+  return { montantHT: ht.toFixed(2), montantTVA: tva.toFixed(2), montantTTC: round2(ht + tva).toFixed(2) };
 }
 
 // Totaux d'une facture = somme des montants de ses lignes (les lignes d'affichage valent 0 →
@@ -46,13 +47,13 @@ export function calculerMontantsAvoirLigne(quantite: string, prixUnitaireHT: str
   const q = Math.abs(Number(quantite) || 0);
   const pu = Math.abs(Number(prixUnitaireHT) || 0);
   const taux = Number(tauxTVA) || 0;
-  const ht = -(q * pu);
-  const tva = ht * (taux / 100);
+  const ht = -round2(q * pu);
+  const tva = round2(ht * (taux / 100));
   return {
     prixUnitaireHT: (-pu).toFixed(2),
     montantHT: ht.toFixed(2),
     montantTVA: tva.toFixed(2),
-    montantTTC: (ht + tva).toFixed(2),
+    montantTTC: round2(ht + tva).toFixed(2),
   };
 }
 
@@ -67,5 +68,5 @@ export function calculerTotaux(
     tva += Number(l.montantTVA) || 0;
     ttc += Number(l.montantTTC) || 0;
   }
-  return { totalHT: ht.toFixed(2), totalTVA: tva.toFixed(2), totalTTC: ttc.toFixed(2) };
+  return { totalHT: round2(ht).toFixed(2), totalTVA: round2(tva).toFixed(2), totalTTC: round2(ttc).toFixed(2) };
 }
