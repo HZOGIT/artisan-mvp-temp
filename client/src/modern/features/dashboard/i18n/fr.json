@@ -110,5 +110,15 @@
   "wb_btnFacture": "Facture",
   "wb_btnIntervention": "Intervention",
   "wb_rechercher": "Rechercher",
-  "wb_rechercheGlobale": "Recherche globale"
+  "wb_rechercheGlobale": "Recherche globale",
+  "caf_aucun": "Aucun contrat à facturer.",
+  "caf_aFacturer": "{{count}} à facturer",
+  "caf_echueDepuis": "échue depuis {{n}} j",
+  "caf_echeanceAuj": "échéance aujourd'hui",
+  "ler_aucun": "Aucune livraison en retard.",
+  "ler_enRetard": "{{count}} en retard",
+  "ler_joursRetard": "{{n}} j de retard",
+  "ler_prevueLe": "prévue le {{date}}",
+  "ler_commandeNum": "Commande #{{id}}",
+  "caf_ttc": "{{m}} € TTC"
 }

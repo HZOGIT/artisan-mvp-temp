@@ -18,8 +18,8 @@ import { UpcomingInterventionsWidget } from "@/components/dashboard/widgets/Upco
 import { ObjectifsWidget } from "@/components/dashboard/widgets/Objectifs";
 import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesAFaire";
 import { TresoreriePrevisionnelleWidget } from "@/components/dashboard/widgets/TresoreriePrevisionnelle";
-import { LivraisonsEnRetardWidget } from "@/components/dashboard/widgets/LivraisonsEnRetard";
-import { ContratsAFacturerWidget } from "@/components/dashboard/widgets/ContratsAFacturer";
+import { LivraisonsEnRetardWidget } from "./widgets/livraisons-en-retard";
+import { ContratsAFacturerWidget } from "./widgets/contrats-a-facturer";
 import { StockBasWidget } from "@/components/dashboard/widgets/StockBas";
 import { useDashboard } from "../application/use-dashboard";
 import {
