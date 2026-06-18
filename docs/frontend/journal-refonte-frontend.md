@@ -778,10 +778,20 @@ au navigateur après déploiement.
 contre une régression du fix « auth v2 public » (re-dead-end si une route auth repassait dans le routeur
 authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test-only (pas de déploiement).
 
-## 🎯 PROCHAINE CIBLE : **suppression legacy** — SEUL item restant, IRRÉVERSIBLE, touche auth → **go/no-go +
-ordre humain requis**. Tous les prérequis sont levés : default-on actif, login validé (legacy ET /v2), auth v2
-publique + garde-fou e2e, 89 routes /v2, parité éditeurs vérifiée. Ordre sûr proposé : (1) cutover login → /v2 +
-retrait pages auth legacy ; (2) retrait `pages/**` par lots (sweep+login à chaque) ; (3) retrait wouter + `@/lib/trpc`.
+## 🚧 SUPPRESSION LEGACY — démarrée par LOTS (build-vérifiés). Mécanique validée :
+- **Gate de suppression = `npx vite build`** (esbuild, ce que le deploy exécute), PAS `tsc --noEmit` (le legacy
+  a **159 erreurs de type pré-existantes** non bloquantes pour le bundle). + vitest.v2 + tsc.v2 (périmètre neuf).
+- **Procédure par lot** : retirer fichiers `pages/<X>.tsx` + leurs import/Route dans `App.tsx` → `vite build` OK →
+  deploy → revalider bascule (default-on) + login navigateur → commit chirurgical.
+
+**LOT 1 ✅** : retrait de 4 pages détail/sous-pages migrées+validées (leaf, réf. uniquement dans App.tsx) :
+`ImportClients`, `ContratDetail`, `InterventionsMobile`, `CommandeFournisseurDetail`. Routes legacy `/clients/import`,
+`/contrats/:id`, `/mobile`, `/commandes/:id` retirées → servies par bascule default-on vers `/v2`. `vite build` OK,
+vitest.v2 450, tsc.v2 0. **Note** : retire le filet `?v2=0` pour ces 4 routes (migrées+validées en /v2).
+
+### 🎯 PROCHAINS LOTS : continuer le retrait des `pages/**` migrées (devis/factures editors, sous-pages, puis pages
+domaine), **lot par lot avec `vite build` + bascule + login revalidés**. Auth (`pages/SignIn`…) + landing/dashboard
+en DERNIER (extra-validation login). Puis wouter + `@/lib/trpc`.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré

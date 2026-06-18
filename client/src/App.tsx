@@ -29,7 +29,6 @@ const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
 const Clients = lazy(() => import("./pages/Clients").then((m) => ({ default: m.Clients })));
 const ClientsNouveauPage = lazy(() => import("./pages/ClientsNouveauPage").then((m) => ({ default: m.ClientsNouveauPage })));
 const ClientDetail = lazy(() => import("./pages/ClientDetail"));
-const ImportClients = lazy(() => import("./pages/ImportClients"));
 const Devis = lazy(() => import("./pages/Devis"));
 const DevisNouveauPage = lazy(() => import("./pages/DevisNouveauPage"));
 const DevisDetail = lazy(() => import("./pages/DevisDetail"));
@@ -52,8 +51,6 @@ const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFourniss
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
 const Contrats = lazy(() => import("./pages/Contrats"));
-const ContratDetail = lazy(() => import("./pages/ContratDetail"));
-const InterventionsMobile = lazy(() => import("./pages/InterventionsMobile"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Techniciens = lazy(() => import("./pages/Techniciens"));
 const Avis = lazy(() => import("./pages/Avis"));
@@ -78,7 +75,6 @@ const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
 const CalendrierChantiers = lazy(() => import("./pages/CalendrierChantiers"));
 const CommandesFournisseurs = lazy(() => import("./pages/CommandesFournisseurs"));
 const CommandeFournisseurForm = lazy(() => import("./pages/CommandeFournisseurForm"));
-const CommandeFournisseurDetail = lazy(() => import("./pages/CommandeFournisseurDetail"));
 const TableauBordSyncComptable = lazy(() => import("./pages/TableauBordSyncComptable"));
 const StatistiquesDevis = lazy(() => import("./pages/StatistiquesDevis"));
 const PortailGestion = lazy(() => import("./pages/PortailGestion"));
@@ -161,7 +157,6 @@ function AuthenticatedRoutes() {
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
           <Route path="/v2/*" component={ModernRouterMount} />
           <Route path="/clients/nouveau" component={ClientsNouveauPage} />
-          <Route path="/clients/import" component={ImportClients} />
           <Route path="/clients/:id" component={ClientDetail} />
           <Route path="/devis" component={Devis} />
           <Route path="/devis/nouveau" component={DevisNouveauPage} />
@@ -178,8 +173,6 @@ function AuthenticatedRoutes() {
           <Route path="/profil" component={Profil} />
           <Route path="/parametres" component={Parametres} />
           <Route path="/contrats" component={Contrats} />
-          <Route path="/contrats/:id" component={ContratDetail} />
-          <Route path="/mobile" component={InterventionsMobile} />
           <Route path="/chat" component={Chat} />
           <Route path="/techniciens" component={Techniciens} />
           <Route path="/avis" component={Avis} />
@@ -214,7 +207,6 @@ function AuthenticatedRoutes() {
           <Route path="/historique-emails" component={HistoriqueEmails} />
           <Route path="/commandes/nouvelle" component={CommandeFournisseurForm} />
           <Route path="/commandes/:id/modifier" component={CommandeFournisseurForm} />
-          <Route path="/commandes/:id" component={CommandeFournisseurDetail} />
           <Route path="/commandes" component={CommandesFournisseurs} />
           <Route path="/rapport-commande" component={RapportCommande} />
           <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
