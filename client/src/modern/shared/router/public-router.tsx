@@ -82,7 +82,14 @@ const avisPublicRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/avis-public/ui/soumettre-avis-page")),
 });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute]);
+// Vitrine artisan publique par slug — port de `pages/Vitrine.tsx`.
+const vitrineRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/vitrine/$slug",
+  component: lazyRouteComponent(() => import("../../features/vitrine-public/ui/vitrine-page")),
+});
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute, vitrineRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,

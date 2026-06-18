@@ -73,7 +73,6 @@ const Assistant = lazy(() => import("./pages/Assistant"));
 const AssistantConversations = lazy(() => import("./pages/AssistantConversations"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const RdvEnLigne = lazy(() => import("./pages/RdvEnLigne"));
-const Vitrine = lazy(() => import("./pages/Vitrine"));
 const MaVitrine = lazy(() => import("./pages/MaVitrine"));
 const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
 const CalendrierChantiers = lazy(() => import("./pages/CalendrierChantiers"));
@@ -275,9 +274,10 @@ function Router() {
         <Route path="/v2/portail/:token" component={PublicModernRouterMount} />
         <Route path="/v2/home" component={PublicModernRouterMount} />
         <Route path="/v2/avis/:token" component={PublicModernRouterMount} />
+        <Route path="/v2/vitrine/:slug" component={PublicModernRouterMount} />
         <Route path="/portail/:token">{(p) => <Redirect to={`/v2/portail/${p.token}${window.location.search}`} />}</Route>
         <Route path="/avis/:token">{(p) => <Redirect to={`/v2/avis/${p.token}${window.location.search}`} />}</Route>
-        <Route path="/vitrine/:slug" component={Vitrine} />
+        <Route path="/vitrine/:slug">{(p) => <Redirect to={`/v2/vitrine/${p.slug}${window.location.search}`} />}</Route>
         {/*
           Toutes les routes authentifiées passent par UN SEUL catch-all
           AuthenticatedRoutes pour que DashboardLayout (et MonAssistant

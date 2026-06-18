@@ -636,7 +636,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | FactureDetail | /factures/:id | 1197 | 27 | éditeur lourd |
 | DevisDetail | /devis/:id | 1116 | 16 | éditeur lourd |
 | DevisNouveauPage | /devis/nouveau | 873 | 11 | créateur devis |
-| Vitrine (public) | /vitrine/:slug | 749 | 3 | vitrine publique artisan |
+| ~~Vitrine (public)~~ ✅ | ~~/vitrine/:slug~~ → /v2/vitrine/:slug | 749 | 3 | **FAIT** (vitrine-public ; payload getBySlug unknown→typé) |
 | ~~Profil~~ ✅ | ~~/profil~~ → /v2/profil | 727 | 11 | **FAIT** (profil ; 11 `as any` étaient inutiles, champs typés) |
 | DevisLigneEdit | /devis/:id/ligne/nouvelle | 654 | 11 | édition ligne devis |
 | CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
@@ -664,6 +664,15 @@ domain (`formFromArtisan`/`buildUpdatePayload`/`passwordStrength`/`validateEmail
 + catalogues SPECIALITES/FORME_OPTIONS/METIERS_IA — **5 tests**) + application (2 hooks) + ui (form + 3 cartes
 compte). Route `/v2/profil` (exact-key → **bascule OK** + V2_ROUTES + sweep). Test `v2-routes` mis à jour
 (`/profil` n'est plus l'exemple « non migré » → `/contact`). vitest **410**.
+
+**Itération `vitrine-public` (`/vitrine/:slug`) ✅** : vitrine artisan publique (749 l) — nav/hero/stats/à-propos/
+services/avis (+ JSON-LD SEO)/contact/footer + barre mobile. `vitrine.getBySlug` + `submitContact`. **FINDING** :
+`getBySlug` typé **`Promise<unknown>`** backend (payload agrégé artisan/vitrine/avis/stats) → **type `VitrineData`
+déclaré explicitement** + cast en application. Clean-archi domain (`getTheme`/`computeInitials`/`clientNameShort`/
+`anneeCreation`/`buildJsonLd` (rich-snippet schema.org)/`buildContactMessage` + catalogue `SPEC_THEME` — **6 tests**)
++ application (skipToken) + ui (framer-motion conservé ; icône thème résolue en UI). **64 clés i18n**. **0 `any`**
+(3 supprimés). Route publique `/v2/vitrine/$slug` (public-router) + **redirect explicite** App.tsx + legacy retiré.
+vitest **416**.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
