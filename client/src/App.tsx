@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { trpc } from "./modern/shared/trpc";
 import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
+import { resolveEntryRoute } from "./modern/shared/router/entry-routes";
 
 // ============================================================================
 // IMPORTS EAGER — pages critiques chargées dans le bundle initial
@@ -89,49 +90,17 @@ function AuthenticatedRoutes() {
   );
 }
 
-// Routeur d'ENTRÉE (sans wouter) — dispatch impératif sur la location (shim History API). Ordre = ancien Switch :
-// (1) redirections legacy→/v2 exactes, (2) redirections à paramètre, (3) montages PUBLICS /v2 (hors auth),
-// (4) catch-all authentifié. Query string préservée (retour Stripe).
-const ENTRY_REDIRECTS: Record<string, string> = {
-  "/": "/v2/home", "/signin": "/v2/signin", "/sign-in": "/v2/sign-in", "/signup": "/v2/signup",
-  "/forgot-password": "/v2/forgot-password", "/reset-password": "/v2/reset-password",
-  "/contact": "/v2/contact", "/aide": "/v2/aide", "/guide": "/v2/guide",
-  "/paiement/succes": "/v2/paiement/succes", "/paiement/annule": "/v2/paiement/annule",
-  "/mentions-legales": "/v2/mentions-legales", "/cgu": "/v2/cgu", "/cgv": "/v2/cgv", "/confidentialite": "/v2/confidentialite",
-};
-// /legacy/:param → /v2/legacy/:param (signature, devis-public, portail, avis, vitrine).
-const PARAM_REDIRECTS: { re: RegExp; to: string }[] = [
-  { re: /^\/(signature|devis-public|portail|avis)\/(.+)$/, to: "/v2/$1/$2" },
-  { re: /^\/vitrine\/(.+)$/, to: "/v2/vitrine/$1" },
-];
-// Pages /v2 PUBLIQUES (hors auth) montées via PublicModernRouterMount.
-const PUBLIC_V2_EXACT = new Set([
-  "/v2/contact", "/v2/aide", "/v2/guide", "/v2/paiement/succes", "/v2/paiement/annule", "/v2/home",
-  "/v2/signin", "/v2/sign-in", "/v2/signup", "/v2/forgot-password", "/v2/reset-password",
-  "/v2/mentions-legales", "/v2/cgu", "/v2/cgv", "/v2/confidentialite",
-]);
-const PUBLIC_V2_PARAM_PREFIXES = ["/v2/signature/", "/v2/devis-public/", "/v2/portail/", "/v2/avis/", "/v2/vitrine/"];
-
+// Routeur d'ENTRÉE (sans wouter) — dispatch impératif sur la location (shim History API). La classification
+// (redirection legacy→/v2 / montage public /v2 / authentifié) est PURE et testée dans `resolveEntryRoute`.
 function Router() {
   const [location] = useLocation();
   const search = typeof window !== "undefined" ? window.location.search : "";
+  const route = resolveEntryRoute(location, search);
 
-  const exact = ENTRY_REDIRECTS[location];
-  if (exact) return <Redirect to={`${exact}${search}`} />;
-  for (const { re, to } of PARAM_REDIRECTS) {
-    if (re.test(location)) return <Redirect to={`${location.replace(re, to)}${search}`} />;
-  }
-  if (PUBLIC_V2_EXACT.has(location) || PUBLIC_V2_PARAM_PREFIXES.some((p) => location.startsWith(p))) {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <PublicModernRouterMount />
-      </Suspense>
-    );
-  }
-  // Tout le reste = authentifié (un seul catch-all pour que le shell modern persiste entre navigations).
+  if (route.kind === "redirect") return <Redirect to={route.to} />;
   return (
     <Suspense fallback={<PageLoader />}>
-      <AuthenticatedRoutes />
+      {route.kind === "public" ? <PublicModernRouterMount /> : <AuthenticatedRoutes />}
     </Suspense>
   );
 }
