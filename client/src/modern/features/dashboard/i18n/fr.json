@@ -83,5 +83,13 @@
   "qa_nouveauDevis": "Nouveau devis",
   "qa_nouvelleFacture": "Nouvelle facture",
   "qa_nouveauClient": "Nouveau client",
-  "qa_nouvelleIntervention": "Nouvelle intervention"
+  "qa_nouvelleIntervention": "Nouvelle intervention",
+  "statVoirDetail": "{{title}} — cliquer pour voir le détail",
+  "alertVoir": "Voir",
+  "alertFermer": "Fermer cette alerte",
+  "personnaliserDashboard": "Personnaliser le dashboard",
+  "personnaliserDesc": "Activez ou masquez les widgets affichés. Glissez-déposez pour réordonner.",
+  "fermer": "Fermer",
+  "afficherWidget": "Afficher {{label}}",
+  "reinitialiser": "Réinitialiser"
 }

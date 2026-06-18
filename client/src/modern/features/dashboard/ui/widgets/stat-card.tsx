@@ -1,6 +1,7 @@
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export type StatCardColor = "blue" | "green" | "orange" | "red" | "violet" | "cyan";
 
@@ -92,6 +93,7 @@ export function StatCard({
   footer,
   onClick,
 }: StatCardProps) {
+  const { t } = useTranslation("dashboard");
   const styles = COLOR_STYLES[color];
   const isNumeric = typeof value === "number";
 
@@ -108,7 +110,7 @@ export function StatCard({
       className={`relative text-left bg-card text-card-foreground rounded-xl border border-border p-4 shadow-sm overflow-hidden ${
         onClick ? "cursor-pointer hover:shadow-md transition-shadow" : "cursor-default"
       } ${pulse ? `ring-2 ring-offset-2 ${styles.ring}` : ""} disabled:cursor-default`}
-      aria-label={onClick ? `${title} — cliquer pour voir le détail` : title}
+      aria-label={onClick ? t("statVoirDetail", { title }) : title}
     >
       {badge !== undefined && badge > 0 && (
         <span className="absolute top-2 right-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow">

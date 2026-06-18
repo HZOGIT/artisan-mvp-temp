@@ -1,8 +1,9 @@
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
+import { Switch } from "@/modern/shared/ui/switch";
+import { Button } from "@/modern/shared/ui/button";
 import { AnimatePresence, motion } from "framer-motion";
 import { RotateCcw, X } from "lucide-react";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface CustomizableWidget {
   id: string;
@@ -33,6 +34,7 @@ export function CustomizePanel({
   onToggle,
   onReset,
 }: CustomizePanelProps) {
+  const { t } = useTranslation("dashboard");
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -60,17 +62,17 @@ export function CustomizePanel({
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 240, damping: 28 }}
             role="dialog"
-            aria-label="Personnaliser le dashboard"
+            aria-label={t("personnaliserDashboard")}
             className="fixed inset-y-0 right-0 z-50 w-full sm:w-[380px] bg-background shadow-2xl border-l flex flex-col"
           >
             <div className="flex items-center justify-between p-4 border-b shrink-0">
               <div>
-                <h2 className="text-base font-semibold">Personnaliser le dashboard</h2>
+                <h2 className="text-base font-semibold">{t("personnaliserDashboard")}</h2>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Activez ou masquez les widgets affichés. Glissez-déposez pour réordonner.
+                  {t("personnaliserDesc")}
                 </p>
               </div>
-              <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fermer">
+              <Button variant="ghost" size="icon" onClick={onClose} aria-label={t("fermer")}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -92,7 +94,7 @@ export function CustomizePanel({
                     <Switch
                       checked={visible}
                       onCheckedChange={(checked) => onToggle(w.id, checked)}
-                      aria-label={`Afficher ${w.label}`}
+                      aria-label={t("afficherWidget", { label: w.label })}
                     />
                   </label>
                 );
@@ -107,7 +109,7 @@ export function CustomizePanel({
                 onClick={onReset}
               >
                 <RotateCcw className="h-3.5 w-3.5 mr-2" />
-                Réinitialiser
+                {t("reinitialiser")}
               </Button>
             </div>
           </motion.aside>

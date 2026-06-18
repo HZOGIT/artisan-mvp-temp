@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, AlertTriangle, ArrowRight, Info, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface DashboardAlert {
   type: "danger" | "warning" | "info";
@@ -71,7 +72,7 @@ function alertKey(a: DashboardAlert): string {
  * - Chaque alerte peut être fermée individuellement, mémorisé en localStorage.
  * - Bouton "Voir" cliquable si `lien` fourni.
  */
-export function AlertsBar({ alerts, onNavigate }: AlertsBarProps) {
+export function AlertsBar({ alerts, onNavigate }: AlertsBarProps) { const { t } = useTranslation("dashboard");
   const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed());
 
   useEffect(() => {
@@ -111,7 +112,7 @@ export function AlertsBar({ alerts, onNavigate }: AlertsBarProps) {
                   onClick={() => onNavigate(alert.lien!)}
                   className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${style.text} hover:bg-white/40 dark:hover:bg-white/5 transition-colors`}
                 >
-                  Voir <ArrowRight className="h-3 w-3" />
+                  {t("alertVoir")} <ArrowRight className="h-3 w-3" />
                 </button>
               )}
               <button
@@ -123,7 +124,7 @@ export function AlertsBar({ alerts, onNavigate }: AlertsBarProps) {
                     return next;
                   })
                 }
-                aria-label="Fermer cette alerte"
+                aria-label={t("alertFermer")}
                 className="shrink-0 h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/40 dark:hover:bg-white/5 transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
