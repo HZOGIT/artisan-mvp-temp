@@ -784,6 +784,8 @@ authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test
 - **Procédure par lot** : retirer fichiers `pages/<X>.tsx` + leurs import/Route dans `App.tsx` → `vite build` OK →
   deploy → revalider bascule (default-on) + login navigateur → commit chirurgical.
 
+**LOT 2 ✅** : retrait 8 pages migrées+validées (ClientDetail, ClientsNouveauPage, DevisDetail, DevisNouveauPage, DevisLigneEdit, FactureDetail, CommandeFournisseurForm, Profil) → routes /clients/:id, /clients/nouveau, /devis/:id(+/nouveau,+/ligne), /factures/:id, /commandes/nouvelle(+/:id/modifier), /profil servies par bascule. vite build OK, vitest.v2 450, tsc.v2 0.
+
 **LOT 1 ✅** : retrait de 4 pages détail/sous-pages migrées+validées (leaf, réf. uniquement dans App.tsx) :
 `ImportClients`, `ContratDetail`, `InterventionsMobile`, `CommandeFournisseurDetail`. Routes legacy `/clients/import`,
 `/contrats/:id`, `/mobile`, `/commandes/:id` retirées → servies par bascule default-on vers `/v2`. `vite build` OK,

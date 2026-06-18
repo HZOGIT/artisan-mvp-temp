@@ -27,17 +27,10 @@ import DashboardLayout from "./components/DashboardLayout";
 // ============================================================================
 const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
 const Clients = lazy(() => import("./pages/Clients").then((m) => ({ default: m.Clients })));
-const ClientsNouveauPage = lazy(() => import("./pages/ClientsNouveauPage").then((m) => ({ default: m.ClientsNouveauPage })));
-const ClientDetail = lazy(() => import("./pages/ClientDetail"));
 const Devis = lazy(() => import("./pages/Devis"));
-const DevisNouveauPage = lazy(() => import("./pages/DevisNouveauPage"));
-const DevisDetail = lazy(() => import("./pages/DevisDetail"));
-const DevisLigneEdit = lazy(() => import("./pages/DevisLigneEdit"));
 const Factures = lazy(() => import("./pages/Factures"));
-const FactureDetail = lazy(() => import("./pages/FactureDetail"));
 const Interventions = lazy(() => import("./pages/Interventions"));
 const Articles = lazy(() => import("./pages/Articles"));
-const Profil = lazy(() => import("./pages/Profil"));
 const Parametres = lazy(() => import("./pages/Parametres"));
 const Calendrier = lazy(() => import("./pages/Calendrier"));
 const Stocks = lazy(() => import("./pages/Stocks"));
@@ -74,7 +67,6 @@ const MaVitrine = lazy(() => import("./pages/MaVitrine"));
 const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
 const CalendrierChantiers = lazy(() => import("./pages/CalendrierChantiers"));
 const CommandesFournisseurs = lazy(() => import("./pages/CommandesFournisseurs"));
-const CommandeFournisseurForm = lazy(() => import("./pages/CommandeFournisseurForm"));
 const TableauBordSyncComptable = lazy(() => import("./pages/TableauBordSyncComptable"));
 const StatistiquesDevis = lazy(() => import("./pages/StatistiquesDevis"));
 const PortailGestion = lazy(() => import("./pages/PortailGestion"));
@@ -156,21 +148,14 @@ function AuthenticatedRoutes() {
           {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
           <Route path="/v2/*" component={ModernRouterMount} />
-          <Route path="/clients/nouveau" component={ClientsNouveauPage} />
-          <Route path="/clients/:id" component={ClientDetail} />
           <Route path="/devis" component={Devis} />
-          <Route path="/devis/nouveau" component={DevisNouveauPage} />
-          <Route path="/devis/:id" component={DevisDetail} />
-          <Route path="/devis/:id/ligne/nouvelle" component={DevisLigneEdit} />
           <Route path="/factures" component={Factures} />
-          <Route path="/factures/:id" component={FactureDetail} />
           <Route path="/interventions" component={Interventions} />
           <Route path="/articles" component={Articles} />
           <Route path="/calendrier" component={Calendrier} />
           <Route path="/statistiques" component={StatistiquesDevis} />
           <Route path="/stocks" component={Stocks} />
           <Route path="/fournisseurs" component={Fournisseurs} />
-          <Route path="/profil" component={Profil} />
           <Route path="/parametres" component={Parametres} />
           <Route path="/contrats" component={Contrats} />
           <Route path="/chat" component={Chat} />
@@ -205,8 +190,6 @@ function AuthenticatedRoutes() {
           <Route path="/modeles-email" component={ModelesEmail} />
           <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
           <Route path="/historique-emails" component={HistoriqueEmails} />
-          <Route path="/commandes/nouvelle" component={CommandeFournisseurForm} />
-          <Route path="/commandes/:id/modifier" component={CommandeFournisseurForm} />
           <Route path="/commandes" component={CommandesFournisseurs} />
           <Route path="/rapport-commande" component={RapportCommande} />
           <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
