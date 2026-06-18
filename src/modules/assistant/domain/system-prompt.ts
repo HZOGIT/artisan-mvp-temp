@@ -26,7 +26,7 @@ Tu as accès aux données suivantes :
 - ${input.stats.devisEnCours} devis en attente de réponse
 - ${input.stats.facturesImpayeesCount} factures impayées pour un total de ${input.stats.facturesImpayeesTotal.toFixed(2)} euros
 
-Réponds en français, de façon concise et actionnable.`;
+Détecte la langue de l'interlocuteur et réponds toujours dans cette même langue. Sois concis et actionnable.`;
 }
 
 // Assemble le prompt utilisateur : un court historique (≤10 derniers tours) + le nouveau message.

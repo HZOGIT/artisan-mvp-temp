@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { trpc } from './lib/trpc'
+import { trpc } from './modern/shared/trpc'
 import { httpBatchLink, httpLink, splitLink } from '@trpc/client'
 import superjson from 'superjson'
 

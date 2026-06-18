@@ -5,6 +5,7 @@ import type { PdfPort } from "../../../shared/ports/pdf";
 import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader, ClientReader } from "../../../shared/readers/contact-readers";
 import type { IDevisRepository } from "./devis-repository";
+import type { DevisSignatureReader } from "./devis-signature-reader";
 
 // Dépendances de l'envoi d'un devis par email (composition : artisan + client + PDF + email +
 // rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
@@ -14,6 +15,8 @@ export interface DevisMailingDeps {
   readonly pdf: PdfPort;
   readonly email: EmailPort;
   readonly rateLimiter: RateLimiterPort;
+  readonly signatureReader: DevisSignatureReader;
+  readonly appUrl: string;
 }
 
 export interface EnvoyerDevisEmailInput {
@@ -42,6 +45,7 @@ function escapeHtml(s: string): string {
 
 // Sujet + corps HTML de l'email devis (pur, testable) — parité fonctionnelle du template legacy
 // `generateDevisEmailContent`. `customMessage` éventuel ajouté en bas (échappé).
+// `portalUrl` : lien de signature en ligne (`/portail/<token>`), ajouté si disponible.
 export function buildDevisEmail(params: {
   artisanName: string;
   clientName: string;
@@ -50,14 +54,20 @@ export function buildDevisEmail(params: {
   totalTTC: string;
   dateValidite?: string | null;
   customMessage?: string | null;
+  portalUrl?: string | null;
 }): { subject: string; body: string } {
-  const { artisanName, clientName, numero, objet, totalTTC, dateValidite, customMessage } = params;
+  const { artisanName, clientName, numero, objet, totalTTC, dateValidite, customMessage, portalUrl } = params;
   const subject = `Devis ${numero}${objet ? ` - ${objet}` : ""} de ${artisanName}`;
   const validite = dateValidite
     ? `<tr><td style="padding:6px 0;font-size:14px;color:#6b7280;border-top:1px solid #dbeafe;">Validité</td><td style="padding:6px 0;font-size:14px;color:#111827;font-weight:600;text-align:right;border-top:1px solid #dbeafe;">${escapeHtml(dateValidite)}</td></tr>`
     : "";
   const note = customMessage
     ? `<tr><td colspan="2" style="padding:16px 0 0 0;font-size:14px;color:#6b7280;font-style:italic;border-top:1px solid #e5e7eb;">${escapeHtml(customMessage)}</td></tr>`
+    : "";
+  const signatureButton = portalUrl
+    ? `<tr><td style="padding:28px 40px 0 40px;text-align:center;">
+          <a href="${portalUrl}" style="display:inline-block;background-color:#1e40af;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:6px;">Consulter et signer en ligne</a>
+       </td></tr>`
     : "";
   const body = `<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8"></head>
@@ -84,6 +94,8 @@ export function buildDevisEmail(params: {
             </td></tr>
           </table>
         </td></tr>
+        ${signatureButton}
+        <tr><td style="padding:${portalUrl ? "16px" : "0"} 40px 36px 40px;"></td></tr>
       </table>
     </td></tr>
   </table>
@@ -119,6 +131,9 @@ export async function envoyerDevisParEmail(
   const totalTTC = `${(parseFloat(devis.totalTTC || "0") || 0).toFixed(2)} €`;
   const dateValidite = devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : null;
 
+  const signature = await deps.signatureReader.getByDevisId(ctx, devis.id);
+  const portalUrl = signature ? `${deps.appUrl}/portail/${signature.token}` : null;
+
   const { subject, body } = buildDevisEmail({
     artisanName,
     clientName,
@@ -127,6 +142,7 @@ export async function envoyerDevisParEmail(
     totalTTC,
     dateValidite,
     customMessage: input.customMessage ?? null,
+    portalUrl,
   });
 
   const attachments = input.attachPdf
