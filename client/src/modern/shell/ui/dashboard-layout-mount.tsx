@@ -15,14 +15,24 @@ import { AssistantFAB } from "./assistant-fab";
 import { AssistantDrawer } from "./assistant-drawer";
 import { readPanelSize, writePanelSize, initialAssistantOpen, PANEL_MARGIN_CLASS, type AssistantPanelSize } from "../domain/assistant-panel";
 
-// MOUNT du SHELL modern — composant RACINE du routeur modern (remplace le shell legacy components/DashboardLayout).
-// Branche données (useShell + subscription) + navigation wouter + remplit TOUS les slots de la chrome
-// (recherche Ctrl+K, notifs, bannière essai, blocage expiré, FAB+drawer assistant). Enveloppe l'<Outlet/> TanStack.
+// Routes authentifiées accessibles MEME quand l'onboarding n'est pas terminé (gate ci-dessous).
+const ONBOARDING_BYPASS = new Set(["/onboarding", "/profil", "/parametres", "/assistant", "/assistant/conversations", "/notifications"]);
+
+// MOUNT du SHELL modern — composant du layout `app-shell` (routeur unifié). Branche données (useShell +
+// subscription) + remplit TOUS les slots de la chrome (recherche Ctrl+K, notifs, bannière essai, blocage
+// expiré, FAB+drawer assistant) + porte le GATE onboarding. Enveloppe l'<Outlet/> TanStack des pages auth.
 export function DashboardLayoutMount() {
   const { t } = useTranslation("shell");
   const [location, setLocation] = useLocation();
   const { user, permissions, modulesActifs, logout } = useShell();
   const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });
+  // Gate onboarding (relocalisé d'App.tsx au shell, OPE-403/F1) : un artisan dont l'onboarding n'est pas
+  // terminé est redirigé vers /onboarding (sauf routes bypass). /onboarding est hors shell (route dédiée).
+  const { data: onboardingStatus, isLoading: onbLoading } = trpc.modules.getOnboardingStatus.useQuery();
+  useEffect(() => {
+    if (onbLoading || !onboardingStatus) return;
+    if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) setLocation("/onboarding");
+  }, [onboardingStatus, onbLoading, location, setLocation]);
   const [searchOpen, setSearchOpen] = useState(false);
   // Auto-open du panneau assistant sur desktop large (port du comportement legacy).
   const [assistantOpen, setAssistantOpen] = useState(initialAssistantOpen);
