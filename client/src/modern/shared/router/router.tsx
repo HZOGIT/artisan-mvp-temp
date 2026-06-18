@@ -352,6 +352,11 @@ const signupRoute = createRoute({ getParentRoute: () => rootRoute, path: "/signu
 const forgotPasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: "/forgot-password", component: lazyRouteComponent(() => import("../../features/auth/ui/forgot-password-page")) });
 const resetPasswordRoute = createRoute({ getParentRoute: () => rootRoute, path: "/reset-password", component: lazyRouteComponent(() => import("../../features/auth/ui/reset-password-page")) });
 
+const mentionsLegalesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/mentions-legales", component: lazyRouteComponent(() => import("../../features/legal/ui/mentions-legales-page")) });
+const cguRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cgu", component: lazyRouteComponent(() => import("../../features/legal/ui/cgu-page")) });
+const cgvRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cgv", component: lazyRouteComponent(() => import("../../features/legal/ui/cgv-page")) });
+const confidentialiteRoute = createRoute({ getParentRoute: () => rootRoute, path: "/confidentialite", component: lazyRouteComponent(() => import("../../features/legal/ui/confidentialite-page")) });
+
 // Flotte (vue d'ensemble du parc) — migration clean-archi de `pages/Flotte.tsx`.
 const flotteRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -437,7 +442,7 @@ const notesFraisRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/notes-frais/ui/notes-frais-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute, syncComptableRoute, geolocalisationRoute, planificationRoute, nouvelleDepenseRoute, integrationsComptablesRoute, analysesPhotosRoute, importRoute, devisIaRoute, chantiersRoute, assistantRoute, calendrierChantiersRoute, signinRoute, signInAliasRoute, signupRoute, forgotPasswordRoute, resetPasswordRoute]);
+const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute, syncComptableRoute, geolocalisationRoute, planificationRoute, nouvelleDepenseRoute, integrationsComptablesRoute, analysesPhotosRoute, importRoute, devisIaRoute, chantiersRoute, assistantRoute, calendrierChantiersRoute, signinRoute, signInAliasRoute, signupRoute, forgotPasswordRoute, resetPasswordRoute, mentionsLegalesRoute, cguRoute, cgvRoute, confidentialiteRoute]);
 
 export const modernRouter = createRouter({
   routeTree,

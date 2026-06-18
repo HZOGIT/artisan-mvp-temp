@@ -564,9 +564,19 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   routes publiques) → ajouter les 5 entrées à `V2_ROUTES` suffit, le legacy reste fallback `?v2=0` (faible
   risque, pas de suppression). Routes /v2/{signin,sign-in,signup,forgot-password,reset-password}. vitest **379**.
 
-## 🎯 PROCHAINE CIBLE : **pages légales** (mentions-legales, cgu, cgv, confidentialite — `pages/legal/`) puis
-**suppression du legacy** (pages/**, wouter, @/lib/trpc) une fois la parité confirmée. ⚠️ NE PAS supprimer les
-pages auth legacy tant que /v2 n'est pas validé manuellement au navigateur (login = critique).
+- **Migration `legal` ✅ (4 pages statiques)** : `mentions-legales`, `cgu`, `cgv`, `confidentialite`. **0
+  endpoint** (contenu statique). Le HTML légal (de confiance, aucune entrée utilisateur) est stocké en
+  **consts domain** (`legal-content.ts`, 4 `LegalDoc`) → rendu via `dangerouslySetInnerHTML` (hors règle
+  i18next sur les littéraux JSX), markup à l'identique. ui : coque `LegalPage` partagée (port de LegalLayout,
+  Link→`<a href>`) + 4 pages fines. i18n namespace `legal` (chrome uniquement). **2 tests** (intégrité +
+  marqueurs). **0 `any`**. Bascule auto via `V2_ROUTES` (legacy = fallback ?v2=0). vitest **381**.
+
+## 🎯 PROCHAINE CIBLE : **suppression progressive du legacy**. Toutes les pages applicatives + auth + légal
+sont migrées et basculées via `V2_ROUTES`. Étapes : (1) **audit `comm -23`** des routes App.tsx vs `V2_ROUTES`
+pour lister le résiduel non migré (PageEnConstruction, /contact /aide /guide, /calendrier ≠ calendrier-chantiers,
+Home `/`…) ; (2) **valider la parité au navigateur** (sweep complet + manuel sur login) ; (3) **supprimer**
+`client/src/pages/**`, wouter et `@/lib/trpc` une fois la couverture /v2 confirmée à 100%. ⚠️ login = critique :
+valider manuellement AVANT toute suppression auth.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
