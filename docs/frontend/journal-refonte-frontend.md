@@ -475,9 +475,18 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   destination/techniciens + assignation). i18n namespace `planification`. **0 `any`** (1 supprimé). Route +
   V2_ROUTES + sweep. tsc/eslint(0)/vitest **332**.
 
+- **Migration `nouvelle-depense` ✅** (21e des ~24 pages feature) : saisie dépense + **scan IA OCR**
+  (photo→`analyserJustificatif`→pré-remplissage). Audit contrat — 5 endpoints depenses/clients présents.
+  **2 BUGS LEGACY révélés par le typage** (masqués par cast non typé) : (1) la fréquence « hebdomadaire »
+  du Select n'existe pas dans l'enum backend (`{mensuelle,trimestrielle,annuelle}`) → 400 silencieux →
+  **retirée du Select** ; (2) `statut` n'est pas un champ d'entrée de `depenses.create` (forcé serveur) →
+  les boutons Brouillon/Soumettre étaient déjà identiques → `statut` retiré du payload. Clean-archi : domain
+  (`montants`/`prochaineOccurrence`/`applyOcr` (OCR→form)/`buildPayload` + consts — **4 tests**) + application
+  (skipToken doublons debouncés) + ui (scan + form + montants live + doublons + récurrence). i18n. **0 `any`**
+  (7 supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **336**. → **findings Linear** à logger.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
-`chantiers`/`calendrier-chantiers`, `devis-ia`, `analyses-photos`, `integrations-comptables`, `import`,
-`nouvelle-depense`.
+`chantiers`/`calendrier-chantiers`, `devis-ia`, `analyses-photos`, `integrations-comptables`, `import`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +

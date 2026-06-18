@@ -116,6 +116,7 @@ const PARITE_PAGES = [
   { legacy: '/tableau-bord-sync-comptable', v2: '/v2/tableau-bord-sync-comptable', markers: ['Tableau de Bord Synchronisations', 'Taux de Réussite'] },
   { legacy: '/geolocalisation', v2: '/v2/geolocalisation', markers: ['Géolocalisation', 'Carte en temps réel', 'Légende'] },
   { legacy: '/planification', v2: '/v2/planification', markers: ['Planification Intelligente', 'Techniciens suggérés', 'Carte des techniciens'] },
+  { legacy: '/nouvelle-depense', v2: '/v2/nouvelle-depense', markers: ['Nouvelle dépense', 'Scanner un justificatif', 'Total TTC'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },
