@@ -19,8 +19,6 @@ COPY drizzle ./drizzle
 # `shared/` (racine) = constantes pures partagées legacy↔new-stack (ex. `shared/permissions.ts` :
 # ROLE_TEMPLATES/ALL_PERMISSIONS), importé en relatif depuis src/** → requis au bundle esbuild.
 COPY shared ./shared
-# `src/shared/legacy/emailService` est bundlé en sidecar (legacy-email.mjs) — la dernière dette (PDF internalisé)
-# consommés par les adapters du new-stack (PDF facture/devis, envoi email). Sous src/ → déjà copiés ci-dessus.
 RUN pnpm build:newstack
 
 # ── Runtime : deps de prod + bundle, utilisateur non-root ────────────────────

@@ -247,7 +247,7 @@ import { TresorerieReaderDrizzle } from "./modules/previsions-ca/infra/tresoreri
 import type { TresorerieReader } from "./modules/previsions-ca/application/tresorerie-reader";
 import type { IPrevisionCARepository } from "./modules/previsions-ca/application/prevision-ca-repository";
 import type { EmailPort, RateLimiterPort, LlmPort, VisionPort } from "./shared/ports";
-import { LegacyEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
+import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiVisionAdapter } from "./shared/ports";
 import { JsPdfAdapter } from "./shared/pdf/js-pdf-adapter";
 
 export interface AppDeps extends ContextDeps {
@@ -339,7 +339,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     avisRepo: deps.avisRepo ?? new AvisRepositoryDrizzle(getDbHandle().db),
     demande: {
       repo: deps.demandeAvisRepo ?? new DemandeAvisRepositoryDrizzle(getDbHandle().db),
-      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      email: deps.emailPort ?? new ResendEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
       lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     },
@@ -400,7 +400,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       fournisseurRepo,
       artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db),
       pdf: new JsPdfAdapter(),
-      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      email: deps.emailPort ?? new ResendEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
     // Proposition IA de lignes de commande depuis un devis accepté (lecture seule) : devis + stock +
@@ -468,7 +468,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new SharedClientReaderDrizzle(getDbHandle().db),
       pdf: new JsPdfAdapter(),
-      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      email: deps.emailPort ?? new ResendEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
@@ -500,7 +500,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       artisanReader: new ArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new ClientReaderDrizzle(getDbHandle().db),
       pdf: new JsPdfAdapter(),
-      email: deps.emailPort ?? new LegacyEmailAdapter(),
+      email: deps.emailPort ?? new ResendEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
   });
@@ -605,7 +605,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const utilisateurs = createUtilisateursModule({
     repository: deps.utilisateurRepo ?? new UtilisateurRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
-    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    email: deps.emailPort ?? new ResendEmailAdapter(),
   });
   // Comptabilité (SENSIBLE, gate `comptabilite.voir`) — LECTURES (grand-livre/balance/journal/TVA).
   // ⚠️ Montée mais PAS encore activée (DEFAULT_ENABLED) : il manque `getFecPreview` (générateur FEC) →
@@ -618,7 +618,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: deps.authRepo ?? new AuthRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
-    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    email: deps.emailPort ?? new ResendEmailAdapter(),
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
@@ -636,7 +636,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // l'anti-IDOR passe par l'appartenance du devis parent (lue sous RLS). Immutabilité post-signature
   // garantie par la garde SQL `statut='en_attente'` dans les writers.
   const signatureDb = getDbHandle().db;
-  const signatureEmail = deps.emailPort ?? new LegacyEmailAdapter();
+  const signatureEmail = deps.emailPort ?? new ResendEmailAdapter();
   const signatureNotifications = new SignatureNotificationWriterDrizzle(signatureDb);
   const signature = createSignatureModule({
     protectedDeps: {
@@ -682,7 +682,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repo: chatRepo,
     notifier: new ChatClientNotifierDrizzle(
       chatDb,
-      deps.emailPort ?? new LegacyEmailAdapter(),
+      deps.emailPort ?? new ResendEmailAdapter(),
       new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
       deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     ),
@@ -690,7 +690,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // Module `support` (formulaire de contact → email à la boîte support). Sans table : EmailPort legacy
   // + rate-limiter anti-flood (5 / 15 min, parité legacy) + boîte support (env SUPPORT_EMAIL).
   const support = createSupportModule({
-    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    email: deps.emailPort ?? new ResendEmailAdapter(),
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     destinataire: process.env.SUPPORT_EMAIL ?? "support@operioz.com",
   });
@@ -715,7 +715,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     reader: new VitrinePublicReaderDrizzle(getDbHandle().db),
     settings: new VitrineSettingsRepositoryDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
-    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    email: deps.emailPort ?? new ResendEmailAdapter(),
     notifications: notificationRepo,
     leads: demandeContactRepo,
     clients: clientRepo,
@@ -734,7 +734,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     notifications: notificationRepo,
     artisanReader: portalAccessRepo,
     artisanInfoReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
-    email: deps.emailPort ?? new LegacyEmailAdapter(),
+    email: deps.emailPort ?? new ResendEmailAdapter(),
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     llm: deps.llm ?? new GeminiLlmAdapter(),
   });
@@ -788,7 +788,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
     paymentWriter: new WebhookPaymentWriterDrizzle(getDbHandle().db),
-    notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, deps.emailPort ?? new LegacyEmailAdapter()),
+    notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, deps.emailPort ?? new ResendEmailAdapter()),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
@@ -836,7 +836,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   // §4 HORS-tRPC : chat assistant en STREAMING SSE — mode AGENTIQUE (function-calling, 12 lectures +
   // 11 écritures mappées aux use-cases migrés). MONTÉ mais PAS routé (absent de MIGRATED_ROUTES) : le
   // legacy sert encore l'agentique tant que la parité n'est pas validée → AUCUNE régression.
-  const agentEmail = deps.emailPort ?? new LegacyEmailAdapter();
+  const agentEmail = deps.emailPort ?? new ResendEmailAdapter();
   const agentRegistry = buildAssistantAgentRegistry(
     {
       clients: clientRepo,

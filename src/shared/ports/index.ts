@@ -11,3 +11,4 @@ export * from "./stripe";
 export * from "./stripe-adapter";
 export * from "./fakes";
 export * from "./adapters";
+export * from "../email/resend-email-adapter";

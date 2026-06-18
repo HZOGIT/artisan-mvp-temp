@@ -1,40 +1,8 @@
 // Adapters branchant les ports sur l'implémentation existante (legacy). L'import est
 // résolu via une variable (type `string`, non littéral) → TypeScript ne tire PAS le
 // graphe legacy dans le typecheck de src/** (gate propre), tout en câblant au runtime.
-import type { EmailPort, EmailMessage } from "./email";
 import type { LlmPort, LlmCompleteOptions } from "./llm";
 import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
-
-type LegacyEmailModule = {
-  sendEmail: (p: {
-    to: string;
-    subject: string;
-    body: string;
-    attachmentName?: string;
-    attachmentContent?: string; // base64
-  }) => Promise<{ success: boolean; message: string }>;
-};
-
-// ⚠️ Résolu relativement au module COURANT (`import.meta.url`) → fonctionne depuis le bundle déployé
-// `dist-newstack/server.mjs` (sibling `legacy-email.mjs`). L'ancien chemin relatif `../../../server/…`
-// se cassait après bundling (résolu en `/server/…`, absent du conteneur). Bundle produit au build.
-const LEGACY_EMAIL_MODULE: string = new URL("./legacy-email.mjs", import.meta.url).href;
-
-export class LegacyEmailAdapter implements EmailPort {
-  async send(message: EmailMessage): Promise<void> {
-    const mod = (await import(LEGACY_EMAIL_MODULE)) as LegacyEmailModule;
-    // Le helper legacy `sendEmail` accepte UNE pièce jointe (attachmentName/attachmentContent
-    // base64). On y mappe la 1re pièce jointe (les use-cases n'en envoient qu'une — le PDF du doc).
-    const att = message.attachments?.[0];
-    const res = await mod.sendEmail({
-      to: message.to,
-      subject: message.subject,
-      body: message.body,
-      ...(att ? { attachmentName: att.filename, attachmentContent: att.content.toString("base64") } : {}),
-    });
-    if (!res.success) throw new Error(`Échec envoi email : ${res.message}`);
-  }
-}
 
 // Adapter LLM sur Google GenAI (Gemini). Import via variable-de-chemin (string non-littéral) → le
 // SDK n'est PAS tiré dans le typecheck de src/** ; on type structurellement ce qu'on utilise. La clé
