@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/server.ts",
     "build": "vite build",
-    "build:newstack": "esbuild src/server.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/server.mjs && esbuild src/shared/legacy/pdfGenerator.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/legacy-pdf.mjs && esbuild src/shared/legacy/emailService.ts --platform=node --packages=external --bundle --format=esm --external:../db --outfile=dist-newstack/legacy-email.mjs",
+    "build:newstack": "esbuild src/server.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/server.mjs && esbuild src/shared/legacy/emailService.ts --platform=node --packages=external --bundle --format=esm --external:../db --outfile=dist-newstack/legacy-email.mjs",
     "start:newstack": "node dist-newstack/server.mjs",
     "check": "tsc --noEmit",
     "format": "prettier --write .",

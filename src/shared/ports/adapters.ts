@@ -2,7 +2,6 @@
 // résolu via une variable (type `string`, non littéral) → TypeScript ne tire PAS le
 // graphe legacy dans le typecheck de src/** (gate propre), tout en câblant au runtime.
 import type { EmailPort, EmailMessage } from "./email";
-import type { PdfPort } from "./pdf";
 import type { LlmPort, LlmCompleteOptions } from "./llm";
 import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 
@@ -34,33 +33,6 @@ export class LegacyEmailAdapter implements EmailPort {
       ...(att ? { attachmentName: att.filename, attachmentContent: att.content.toString("base64") } : {}),
     });
     if (!res.success) throw new Error(`Échec envoi email : ${res.message}`);
-  }
-}
-
-// Adapter PDF : route `render(template, data)` vers les générateurs legacy (facture/devis/bon de
-// commande). Import via variable-de-chemin (le graphe legacy n'est PAS tiré dans le gate tsc src/**).
-type LegacyPdfModule = {
-  generateFacturePDF: (data: unknown) => Buffer;
-  generateDevisPDF: (data: unknown) => Buffer;
-  generateBonCommandePDF: (data: unknown) => Buffer;
-};
-
-// Idem : sibling `legacy-pdf.mjs` du bundle déployé (cf. note LEGACY_EMAIL_MODULE).
-const LEGACY_PDF_MODULE: string = new URL("./legacy-pdf.mjs", import.meta.url).href;
-
-export class LegacyPdfAdapter implements PdfPort {
-  async render(template: string, data: Record<string, unknown>): Promise<Buffer> {
-    const mod = (await import(LEGACY_PDF_MODULE)) as LegacyPdfModule;
-    switch (template) {
-      case "facture":
-        return mod.generateFacturePDF(data);
-      case "devis":
-        return mod.generateDevisPDF(data);
-      case "bon-commande":
-        return mod.generateBonCommandePDF(data);
-      default:
-        throw new Error(`Template PDF inconnu : ${template}`);
-    }
   }
 }
 
