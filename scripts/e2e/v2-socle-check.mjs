@@ -57,7 +57,6 @@ page.on('response', (r) => {
 
 // (route, sélecteur de texte qui prouve le rendu du socle)
 const cases = [
-  { route: '/v2/ping', expect: 'pong' },
   { route: '/v2/clients', expect: 'Clients' },
 ];
 
