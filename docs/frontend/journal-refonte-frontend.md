@@ -778,7 +778,16 @@ au navigateur après déploiement.
 contre une régression du fix « auth v2 public » (re-dead-end si une route auth repassait dans le routeur
 authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test-only (pas de déploiement).
 
-## ⛔ BLOQUÉ (2026-06-18) — phase PAGES finie, phase SHELL hors périmètre → arbitrage humain demandé
+## 🔨 PHASE SHELL DÉMARRÉE (2026-06-18) — build modern/shell EN PÉRIMÈTRE (non câblé = 0 risque runtime)
+Levée du blocage partiel : construire le shell modern dans `client/src/modern/**` EST dans le périmètre (seul le
+retrait des fichiers `components/**` ne l'est pas → on les laissera orphelins). Stratégie : bâtir le shell modern
+brique par brique, NON CÂBLÉ (0 impact runtime, pas de deploy), testé ; le câblage App.tsx + suppression legacy =
+étape finale validée/cadrée. **Brique 1 ✅ `modern/shell/domain/nav.ts`** : port FIDÈLE de NAV_GROUPS (8 groupes) +
+pathPermissionMap + filterGroupByPermissions + MODULE_TO_LABELS + filterGroupByModules + getAssistantContextForPath +
+formatRelativeDate (5 tests, 0 any). Prochaines briques : RAIL_COLORS/notif domain → sidebar UI → layout → drawer →
+câblage final.
+
+## ⛔ (archive) BLOQUÉ (2026-06-18) — phase PAGES finie, phase SHELL hors périmètre → arbitrage humain demandé
 **App.tsx = 100% /v2** (0 import de page legacy), **88/89 pages migrées**, **87/89 fichiers legacy retirés**, cutover
 complet validé (auth/landing/dashboard/onboarding/404/légales/paiement/assistant), **0 régression** (~15 lots).
 Le **résiduel** = `pages/Assistant` (réf. `components/AssistantDrawer.tsx`) + shell `components/DashboardLayout` +
