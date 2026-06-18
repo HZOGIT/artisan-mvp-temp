@@ -778,7 +778,18 @@ au navigateur après déploiement.
 contre une régression du fix « auth v2 public » (re-dead-end si une route auth repassait dans le routeur
 authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test-only (pas de déploiement).
 
-## ✅ REFONTE UI COMPLÈTE (2026-06-18) — shell modern câblé + validé ; reste = dette hors périmètre
+## 🏁 REFONTE + NETTOYAGE DETTE TERMINÉS (2026-06-18)
+**100% des étapes substantielles faites** : 89 pages migrées → `/v2`, **shell modern câblé**, **TOUS les composants
+legacy re-portés** (18 widgets dashboard + 6 standalone : Map/Calendar/CookieBanner/BulletproofModal/ConseillerIA/
+StatutBadge), `@/lib/trpc` consolidé dans `modern/shared/trpc`, **wouter ÉLIMINÉ** (0 import + dépendance désinstallée
++ patch retiré ; routeur d'entrée App.tsx = dispatch impératif sur le shim `modern/shared/router/navigation`).
+Validé : login→/v2/dashboard, redirections, nav, **sweep 153 cas / 0 issue**, 0 erreur, 470 tests vitest.v2.
+
+**Résiduel `client/src/` legacy = FONDATION CONSERVÉE (pas de la dette)** : `components/ui/**` (shadcn, conservé sur
+demande utilisateur) + `lib/utils.ts` (cn shadcn) + `components/ErrorBoundary` + `contexts/ThemeContext` + `main.tsx`
+(point d'entrée). Plus aucune page ni composant feature legacy ; plus de routeur legacy.
+
+## (archive) ✅ REFONTE UI COMPLÈTE (2026-06-18) — shell modern câblé + validé ; reste = dette hors périmètre
 **État final** : 89 pages migrées + cutover auth/landing/dashboard/onboarding/404/légales/paiement/assistant +
 **SHELL modern câblé** (bricks 1-12 : sidebar/topbar/recherche Ctrl+K/notif/bannières/blocker/assistant). Validé
 navigateur : login→/v2/dashboard, nav unique (pas de double shell), parité drawer assistant, **sweep 152 cas / 0 issue**.
