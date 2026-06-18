@@ -784,6 +784,8 @@ authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test
 - **Procédure par lot** : retirer fichiers `pages/<X>.tsx` + leurs import/Route dans `App.tsx` → `vite build` OK →
   deploy → revalider bascule (default-on) + login navigateur → commit chirurgical.
 
+**LOT 7 ✅** : retrait des 8 DERNIÈRES pages domaine non-sensibles (Parametres, ReglesDepenses, RelancesDevis, StatistiquesDevis, Support, TableauBordDepenses, TableauBordSyncComptable, Utilisateurs). vite build OK, vitest.v2 450. Cumul lots 1-7 = 68 pages. Reste UNIQUEMENT le bloc sensible (auth/Home/Dashboard/légales/spéciales/Assistant) + wouter + @/lib/trpc.
+
 **LOT 6 ✅** : retrait 12 pages (Import, ImportReleve, Modules, NotesFrais, NouvelleDepense, PerformancesFournisseurs, Planification, PortailGestion, Previsions, RapportCommande, Rapports, RdvEnLigne). vite build OK, vitest.v2 450. Cumul lots 1-6 = 60 pages.
 
 **LOT 5 ✅** : retrait 12 pages (AnalysesPhotos, AssistantConversations, Avis, Calendrier, CalendrierChantiers, Chantiers, DevisIA, DevisOptions, Flotte, IntegrationsComptables, MaVitrine, Vehicules). Assistant gardé (réf. par AssistantDrawer). vite build OK, vitest.v2 450. Cumul lots 1-5 = 48 pages.

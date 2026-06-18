@@ -26,17 +26,9 @@ import DashboardLayout from "./components/DashboardLayout";
 // Chaque page devient un chunk webpack/Vite separe → bundle initial reduit.
 // ============================================================================
 const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
-const Parametres = lazy(() => import("./pages/Parametres"));
-const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
 const Assistant = lazy(() => import("./pages/Assistant"));
-const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
-const TableauBordSyncComptable = lazy(() => import("./pages/TableauBordSyncComptable"));
-const StatistiquesDevis = lazy(() => import("./pages/StatistiquesDevis"));
-const Support = lazy(() => import("./pages/Support"));
-const TableauBordDepenses = lazy(() => import("./pages/TableauBordDepenses"));
-const ReglesDepenses = lazy(() => import("./pages/ReglesDepenses"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
 // PoC OPE-366 — page « stack cible » (clean archi + REST openapi-typescript), cohabite avec le legacy.
@@ -99,15 +91,7 @@ function AuthenticatedRoutes() {
           {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
           <Route path="/v2/*" component={ModernRouterMount} />
-          <Route path="/statistiques" component={StatistiquesDevis} />
-          <Route path="/parametres" component={Parametres} />
-          <Route path="/tableau-bord-depenses" component={TableauBordDepenses} />
-          <Route path="/regles-depenses" component={ReglesDepenses} />
-          <Route path="/tableau-bord-sync-comptable" component={TableauBordSyncComptable} />
-          <Route path="/relances" component={RelancesDevis} />
           <Route path="/assistant" component={Assistant} />
-          <Route path="/utilisateurs" component={Utilisateurs} />
-          <Route path="/support" component={Support} />
           {/* Pages legales — publiques, pas d'auth requise */}
           <Route path="/mentions-legales" component={MentionsLegales} />
           <Route path="/cgu" component={CGU} />
