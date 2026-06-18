@@ -785,8 +785,7 @@ couplées au **SHELL legacy** :
 - **`App.tsx → AuthenticatedRoutes`** enveloppe TOUT dans **`<DashboardLayout>` (legacy)** et monte **toutes** les
   pages /v2 via `<Route path="/v2/*" component={ModernRouterMount} />` **À L'INTÉRIEUR** de ce DashboardLayout.
   ⇒ le **shell legacy (sidebar + `AssistantDrawer`, ~1400 l) reste la chrome de TOUTES les pages /v2.**
-- **`Assistant`** : rendu dans `components/AssistantDrawer.tsx` (`import Assistant from "@/pages/Assistant"`), dans
-  `DashboardLayout`. **`NotFound`** : catch-all wouter. **`Onboarding`** : 366 l, non migré, gate plein écran post-signup.
+- **`NotFound`** : ✅ MIGRÉ (features/not-found) — App.tsx pointe le composant v2. **`Onboarding`** : ✅ MIGRÉ. **`Assistant`** : reste — réf. par `components/AssistantDrawer.tsx` (legacy, HORS périmètre modern/+App).
 
 ### 🎯 PHASE FINALE (architecturale, à cadrer — plus risquée que les lots de pages) :
 1. **Migrer le SHELL** (`DashboardLayout` + `AssistantDrawer` → `client/src/modern/**`) pour que les pages /v2 ne

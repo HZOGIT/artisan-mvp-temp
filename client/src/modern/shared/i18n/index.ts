@@ -80,6 +80,7 @@ import factureDetailFr from "@/modern/features/facture-detail/i18n/fr.json";
 import commandeFormFr from "@/modern/features/commande-form/i18n/fr.json";
 import pageConstructionFr from "@/modern/features/page-construction/i18n/fr.json";
 import onboardingFr from "@/modern/features/onboarding/i18n/fr.json";
+import notFoundFr from "@/modern/features/not-found/i18n/fr.json";
 import vitrinePublicFr from "@/modern/features/vitrine-public/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
@@ -170,6 +171,7 @@ const resources = {
     commandeForm: commandeFormFr,
     pageConstruction: pageConstructionFr,
     onboarding: onboardingFr,
+    notFound: notFoundFr,
     vitrinePublic: vitrinePublicFr,
   },
 } as const;

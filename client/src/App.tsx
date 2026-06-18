@@ -12,7 +12,7 @@ import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 // (route racine + auth + dashboard immediatement disponible apres login)
 // ============================================================================
 import Onboarding from "./modern/features/onboarding/ui/onboarding-page";
-import NotFound from "./pages/NotFound";
+import NotFound from "./modern/features/not-found/ui/not-found-page";
 import DashboardLayout from "./components/DashboardLayout";
 
 // ============================================================================
