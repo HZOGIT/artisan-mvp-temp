@@ -6,6 +6,9 @@ vars:
   DB_USER: '{{.MYSQL_USER | default "artisan_user"}}'
   DB_PASS: '{{.MYSQL_PASSWORD | default "artisan_password"}}'
   DB_NAME: artisan_mvp
+  # DB de dev/test locale (PG sur 5432). Les tâches drizzle/seed tournent depuis le HOST (plus de
+  # conteneur dev `app` bind-mount après l'unification du compose) → DATABASE_URL + DB_DIALECT injectés.
+  DEV_DATABASE_URL: postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp
   # Consolidé : on développe directement sur la branche `staging` dans ce dépôt
   # (plus de worktree séparé). Le déploiement rebuild le conteneur depuis ce checkout.
   STAGING_DIR: /home/developer/artisan-mvp-temp
@@ -38,7 +41,7 @@ tasks:
   dev:logs:app:
     desc: Follow app container logs only
     cmds:
-      - '{{.COMPOSE}} logs -f app'
+      - '{{.COMPOSE}} logs -f new-stack'
 
   dev:restart:
     desc: Restart all dev containers
@@ -48,12 +51,12 @@ tasks:
   db:generate:
     desc: Generate a new migration from schema.ts changes (does NOT touch the DB)
     cmds:
-      - '{{.COMPOSE}} exec app sh -c "cd /app && pnpm exec drizzle-kit generate"'
+      - 'DB_DIALECT=postgresql pnpm exec drizzle-kit generate'
 
   db:migrate:
     desc: Apply pending migrations + verify no drift (the ONLY safe way to change the schema)
     cmds:
-      - '{{.COMPOSE}} exec app sh -c "cd /app && pnpm exec drizzle-kit generate && pnpm exec drizzle-kit migrate"'
+      - 'DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate && DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit migrate'
 
   # Deprecated alias — kept so old muscle memory still works. Use db:migrate.
   dev:migrate:
@@ -64,7 +67,7 @@ tasks:
   dev:seed:
     desc: Seed dev user dev@operioz.com / Operioz (PostgreSQL, bcrypt)
     cmds:
-      - '{{.COMPOSE}} exec app sh -c "cd /app && USER_EMAIL=dev@operioz.com USER_PASSWORD=Operioz USER_NAME=''Dev Operioz'' pnpm exec tsx scripts/create-user.ts"'
+      - 'DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql USER_EMAIL=dev@operioz.com USER_PASSWORD=Operioz USER_NAME="Dev Operioz" pnpm exec tsx scripts/create-user.ts'
 
   dev:seed:show:
     desc: Show seeded dev users
@@ -141,7 +144,7 @@ tasks:
     desc: Deploy the local `staging` branch to staging.operioz.com (rebuild + restart app)
     dir: '{{.STAGING_DIR}}'
     cmds:
-      - '{{.STAGING_COMPOSE}} up -d --build --force-recreate app'
+      - '{{.STAGING_COMPOSE}} up -d --build --force-recreate new-stack'
       - '{{.STAGING_COMPOSE}} ps'
 
   staging:down:
@@ -154,7 +157,7 @@ tasks:
     desc: Follow staging app logs
     dir: '{{.STAGING_DIR}}'
     cmds:
-      - '{{.STAGING_COMPOSE}} logs -f app'
+      - '{{.STAGING_COMPOSE}} logs -f new-stack'
 
   staging:status:
     desc: Show staging container status
