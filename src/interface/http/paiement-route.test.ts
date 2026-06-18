@@ -81,7 +81,7 @@ describe.skipIf(!URL)("GET /api/paiement/status/:factureId (public par token por
       url: "/api/paiement/create-checkout-session",
       headers: {
         "content-type": "application/json",
-        host: "staging-newstack.operioz.com", // hôte interne (posé par fetch côté dispatcher)
+        host: "staging-backend.operioz.com", // hôte interne (posé par fetch côté dispatcher)
         "x-forwarded-host": "staging.operioz.com", // hôte public (posé par le dispatcher)
         "x-forwarded-proto": "https",
       },

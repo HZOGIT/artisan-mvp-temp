@@ -51,7 +51,7 @@ export function registerPaiementRoute(app: FastifyInstance, deps: PaiementRouteD
     const factureId = typeof body.factureId === "number" ? body.factureId : parseInt(String(body.factureId ?? ""), 10);
     const token = typeof body.token === "string" ? body.token : undefined;
     // Origin PUBLIC reconstruit derrière le proxy. ⚠️ Derrière le dispatcher Pages, l'en-tête `host`
-    // vaut l'hôte INTERNE du new-stack (staging-newstack.operioz.com) → une redirection Stripe bâtie
+    // vaut l'hôte INTERNE du new-stack (staging-backend.operioz.com) → une redirection Stripe bâtie
     // dessus renverrait l'utilisateur vers le BACKEND (404 sur /portail/*). On privilégie donc
     // `x-forwarded-host` (hôte public d'origine, posé par le dispatcher) puis `host`, sinon APP_URL.
     const headers = (req.headers ?? {}) as Record<string, string | undefined>;

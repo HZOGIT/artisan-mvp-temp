@@ -7,7 +7,7 @@
 // on forwarde les en-têtes (dont Cookie) tels quels. STREAMING-SAFE : on retourne la Response de fetch
 // telle quelle (body en flux préservé → SSE de l'assistant/chat OK).
 
-const NEWSTACK = "https://staging-newstack.operioz.com";
+const NEWSTACK = "https://staging-backend.operioz.com";
 
 export async function onRequest(context) {
   const { request } = context;
@@ -17,7 +17,7 @@ export async function onRequest(context) {
   const headers = new Headers(request.headers);
   // On supprime `host` pour laisser fetch poser le bon Host (routage tunnel vers le new-stack).
   // MAIS le backend reconstruit certaines URLs publiques (redirections Stripe success/cancel, liens
-  // portail) à partir de l'hôte de la requête : sans rien, il verrait `staging-newstack.operioz.com`
+  // portail) à partir de l'hôte de la requête : sans rien, il verrait `staging-backend.operioz.com`
   // (l'hôte interne) et renverrait l'utilisateur vers le BACKEND (→ 404 sur /portail/*). On préserve
   // donc l'hôte/proto PUBLIC d'origine via x-forwarded-host / x-forwarded-proto (front même origine).
   headers.set("x-forwarded-host", url.host);

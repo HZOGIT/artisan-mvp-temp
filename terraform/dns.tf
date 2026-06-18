@@ -5,7 +5,7 @@
 # Architecture staging (split front/back) :
 #   staging.operioz.com          -> Cloudflare Pages (projet "artisan-staging",
 #                                   gere via wrangler / API, hors Terraform)
-#   staging-backend.operioz.com  -> tunnel artisan-staging -> app:3000 (API)
+#   staging-backend.operioz.com  -> tunnel artisan-staging -> new-stack:3001 (API Fastify)
 
 # Front : staging.operioz.com -> Cloudflare Pages (CNAME proxie vers le projet).
 resource "cloudflare_dns_record" "staging_tunnel" {
@@ -21,17 +21,6 @@ resource "cloudflare_dns_record" "staging_tunnel" {
 resource "cloudflare_dns_record" "staging_backend" {
   zone_id = cloudflare_zone.operioz.id
   name    = "staging-backend"
-  type    = "CNAME"
-  content = "${cloudflare_zero_trust_tunnel_cloudflared.staging.id}.cfargotunnel.com"
-  proxied = true
-  ttl     = 1
-}
-
-# Nouveau stack clean-archi : staging-newstack.operioz.com -> tunnel artisan-staging
-# (ingress -> new-stack:3001). Additif, n'affecte pas staging/-backend.
-resource "cloudflare_dns_record" "staging_newstack" {
-  zone_id = cloudflare_zone.operioz.id
-  name    = "staging-newstack"
   type    = "CNAME"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.staging.id}.cfargotunnel.com"
   proxied = true
