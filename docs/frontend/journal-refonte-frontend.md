@@ -1194,3 +1194,16 @@ Supprimé: legacy/pdfGenerator.ts (1215l) + fonts.ts + LegacyPdfAdapter/LEGACY_P
 esbuild legacy-pdf.mjs (build:newstack). Gates: tsc.src 0, build:newstack OK, tests 276/276, backend redéployé + smoke OK.
 RESTE Étape B: internaliser email (legacy/emailService.ts Resend 544l + env.ts + sidecar legacy-email.mjs + LegacyEmailAdapter
 10× dans app.ts → src/shared/email/ impl directe EmailPort) → src/shared/legacy/ entièrement supprimable. + #6 F1 routeur (attend go).
+
+## ✅ F1.1 — ROUTEUR UNIFIÉ (2026-06-18, 3afa187) — déployé + testé
+Fusion des 2 routeurs (modernRouter auth + publicModernRouter) en UN arbre TanStack : racine nue <Outlet/> →
+layout pathless `app-shell` (DashboardLayoutMount) parent des ~70 routes auth + routes publiques directes +
+/onboarding + redirection /→/home. App.tsx = un seul <RouterProvider> (plus de dispatch resolveEntryRoute ni
+double mount). Gate onboarding relocalisé au shell. Supprimé: public-router(.tsx/-mount.tsx), entry-routes(.ts/test).
+Le shim navigation RESTE (F1.2 = son retrait = migrer ~30 fichiers vers hooks TanStack natifs). tsc.v2 0, vitest.v2 457,
+build OK. TESTÉ STAGING: /→/home, public no-shell, login→dashboard+shell, nav+shell, 404, portail/signature/paiement
+(Stripe) publics, 0 erreur.
+⚠️ BUG GIT RENCONTRÉ ×2 (decad56, de256b5): `git add <fichier-déjà-git-rm> <fichiers-modifiés>` AVORTE tout l'add
+sur le pathspec manquant → seules les suppressions sont committées, pas les modifs → origin cassé. FIX: ne PAS lister
+les chemins déjà git-rm dans git add (ils sont déjà stagés). Toujours re-vérifier origin après push (grep marqueur).
+RESTE: F1.2 (retrait shim, ~30 fichiers) + legacy Étape B (email).
