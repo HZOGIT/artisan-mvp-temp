@@ -633,7 +633,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 **IL RESTE EXACTEMENT (9 pages réelles) :**
 | Page | Route legacy | Lignes | any | Note |
 |------|-------------|-------:|----:|------|
-| FactureDetail | /factures/:id | 1197 | 27 | éditeur lourd |
+| ~~FactureDetail~~ ✅ | ~~/factures/:id~~ → /v2/factures/:id | 1197 | 27 | **FAIT** (facture-detail ; avoirs/paiement/audit ; getById riche) |
 | ~~DevisDetail~~ ✅ | ~~/devis/:id~~ → /v2/devis/:id | 1116 | 16 | **FAIT** (devis-detail ; getById riche, dead-code retiré) |
 | ~~DevisNouveauPage~~ ✅ | ~~/devis/nouveau~~ → /v2/devis/nouveau | 873 | 11 | **FAIT** (devis-nouveau ; IA + modèles + REST search) |
 | ~~Vitrine (public)~~ ✅ | ~~/vitrine/:slug~~ → /v2/vitrine/:slug | 749 | 3 | **FAIT** (vitrine-public ; payload getBySlug unknown→typé) |
@@ -642,7 +642,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
 | ~~ContratDetail~~ ✅ | ~~/contrats/:id~~ → /v2/contrats/:id | 539 | 2 | **FAIT** (contrat-detail ; findings client+factures) |
 | ~~SoumettreAvis (public)~~ ✅ | ~~/avis/:token~~ → /v2/avis/:token | 187 | 0 | **FAIT** (avis-public ; redirect explicite + public-router) |
-≈ **5938 lignes restantes, ~91 `any`** (avis-public + contrat-detail faits → **7 pages réelles restantes**).
+≈ **5938 lignes restantes, ~91 `any`** (cluster devis/factures terminé → **1 page réelle restante : commande-form, bloquée contrat**).
 Le **cluster devis/factures** (DevisDetail+DevisLigneEdit+DevisNouveau+FactureDetail ≈ 3840 l) est le gros morceau.
 
 **Itération `contrat-detail` (`/contrats/:id`) ✅** : page 3 onglets (détails/interventions/factures), 7 endpoints
@@ -705,6 +705,17 @@ JAMAIS déclenché (bouton → page ligne) → supprimé. 7 modules d'endpoints 
 artisan/parametres). Clean-archi domain (`formatCurrency`/`activitesForDevis`/`pendingCount`/`pdfLignes`/
 `statutTransition` + catalogues — **5 tests**) + application (1 hook, ~20 endpoints) + ui. i18n **110 clés**. **0
 `any`** (16 supprimés). Route `/v2/devis/$id`. vitest **433**.
+
+**Itération `facture-detail` (`/factures/:id`) ✅** (4e du cluster — **FIN du cluster devis/factures**, 1197 l, la
+plus grosse) : éditeur de facture/avoir — statut (machine à états `allowedNext`), **paiement** (markAsPaid),
+**avoirs** (total/partiel avec builder de lignes + calculs de solde), **journal d'audit**, **verrouillage fiscal**
+(art. 286 CGI), lignes (table + ajout via autocomplete REST), avoirs liés, **rappels CRM**, email (envoi/renvoi),
+PDF. `getById` renvoie une **`FactureDetail` riche** (lignes+client+totaux+typeDocument+factureOrigineId+
+montantPaye+conditionsPaiement tous typés → les 27 `as any` legacy étaient inutiles). **Dead code retiré**
+(`handleSelectArticle`+`getBibliotheque`). Clean-archi domain (`avoirSolde`/`avoirLignesMontantTTC`/
+`buildAvoirTotalLignes`/`allowedNext`/`statutAction`/`pdfLignes`/`activitesForFacture` — **7 tests**) + application
+(~14 endpoints + REST search) + ui. i18n **119 clés**. **0 `any`** (27 supprimés). Route `/v2/factures/$id`.
+vitest **440**. → **CLUSTER DEVIS/FACTURES TERMINÉ.** Reste seulement `commande-form` (bloquée contrat).
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
