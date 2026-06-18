@@ -40,7 +40,7 @@ la règle est posée en `warn` puis passée en `error` quand tout est rétrofitt
 > prouve pas la conformance est **incomplète**, on ne la close pas.
 
 ## TypeScript le plus strict possible (imposé — demande humaine)
-Le front neuf vise **le TS le plus strict**. `tsconfig.v2.json` (gate) ajoute, au-delà du `strict:true`
+Le front neuf vise **le TS le plus strict**. `tsconfig.client.json` (gate) ajoute, au-delà du `strict:true`
 hérité : `noUnusedLocals/Parameters`, `noImplicitReturns`, `noFallthroughCasesInSwitch`,
 `noImplicitOverride`, `allowUnreachableCode:false`, `allowUnusedLabels:false`. **0 `any`** (règle de la
 clean-archi). Le neuf satisfait DÉJÀ `noUncheckedIndexedAccess` (0 erreur dans `client/src/modern`) —
@@ -79,7 +79,7 @@ La boucle touche :
 - `client/src/modern/**` (tout le code neuf `/v2`),
 - `client/src/main.tsx` / `App.tsx` **uniquement** pour câbler le montage `/v2/*` et le flag (ajouts, jamais de suppression de route legacy),
 - `scripts/staging-e2e-mutations.mjs` / `scripts/e2e/**` (cas e2e des routes `/v2` + tooling sweep),
-- `tsconfig.v2.json`, ce journal,
+- `tsconfig.client.json`, ce journal,
 - **`src/modules/**` (BACKEND) — NOUVEAU : autorisé pour COMBLER LES GAPS de contrat nécessaires à la
   refonte** (porter/compléter un endpoint, typer un DTO `unknown`, ajouter un champ). Demande humaine :
   « porter TOUS les endpoints backend vers la nouvelle approche ; si gap → itération intermédiaire ».
@@ -141,9 +141,9 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
    data via `@trpc/react-query`, primitives `modern/shared/ui`). **Copier le JSX/Tailwind du legacy à
    l'identique** ; ne réorganiser que la plomberie. **Flag `?v2=1`** câblé. **Legacy intact.**
 3. **GATES VERTS (barre obligatoire avant commit) :**
-   - `pnpm exec tsc -p tsconfig.v2.json` → vert.
-   - `pnpm exec vitest run -c vitest.v2.config.ts` → vert (tests du front neuf).
-   - **`pnpm exec eslint -c eslint.v2.config.mjs client/src/modern`** → vert. **Gate ESLint dédié au code
+   - `pnpm exec tsc -p tsconfig.client.json` → vert.
+   - `pnpm exec vitest run -c vitest.client.config.ts` → vert (tests du front neuf).
+   - **`pnpm exec eslint -c eslint.client.config.mjs client/src/modern`** → vert. **Gate ESLint dédié au code
      neuf, enrichi À CHAQUE itération** : on y ajoute des règles (custom au besoin) pour faire respecter
      les specs du neuf — frontière strangler (imports tRPC via `@/modern/shared/trpc`, primitives via
      `@/modern/shared/ui`, jamais `@/lib/trpc`/`@/components/ui` en direct), **pas de REST**
@@ -175,7 +175,7 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
      `onSuccess`/`onError` **par appel** de `.mutate()`, l'invalidation/persistance vit dans le hook.
    - [ ] **Parité visuelle** stricte conservée (JSX/Tailwind inchangés).
    Commande d'auto-contrôle : `grep -rnE ': any|as any' client/src/modern/features/<f>` (vide) +
-   `pnpm exec eslint -c eslint.v2.config.mjs client/src/modern | grep -c no-trpc-in-ui` (doit décroître).
+   `pnpm exec eslint -c eslint.client.config.mjs client/src/modern | grep -c no-trpc-in-ui` (doit décroître).
 4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante, noter tout split/blocage **+ consigner
    le résultat de l'audit 3bis** (les 6 cases).
 5. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (journal+ntfy+bus).
@@ -206,8 +206,8 @@ groupe. Ne jamais batcher la **parité visuelle** ni le **typecheck** (à chaque
 
 ### Vague 0 — Socle (front-additif, visuellement neutre) — ✅ TERMINÉE (S1→S4)
 - [x] **S1** TanStack Router monté sur `/v2/*` cohabitant avec wouter (QueryClient + auth partagés ; error/pending par route ; lazy). Une route `/v2/ping` de démonstration. *(OPE-415)* — `@tanstack/react-router@1.170.16` ajouté ; socle dans `modern/shared/router/{router.tsx,ModernRouterMount.tsx}` (routage par code, `basepath:/v2`, pending+error+notFound par défaut) ; câblé via catch-all wouter `/v2/:rest*` dans `App.tsx` (DANS `AuthenticatedRoutes` → providers+auth partagés). L'ancien PoC `/v2/clients` repris sous le socle ; démo `/v2/ping`. tsc v2 ✅, `vite build` ✅.
-- [x] **S2** Helper de flag `?v2=1` + util de bascule par route (ouvre `/v2/<route>`, sinon legacy). *(OPE-420)* — `modern/shared/flag/` : `v2-flag.ts` (lecture `?v2=1`/`=0`, persistance localStorage « collante », cœur pur `readV2FlagFromSearch`), `v2-routes.ts` (registre `V2_ROUTES` legacy→/v2 + `resolveV2Path`/`isV2Path`), `use-v2-bascule.ts` (hook wouter sans rendu : redirige si flag actif ET route migrée, sinon no-op). Câblé via `useV2Bascule()` dans `AuthenticatedRoutes` (App.tsx). Tests vitest dédiés (`vitest.v2.config.ts`, 12 cas) + e2e `scripts/e2e/v2-socle-check.mjs` étendu (legacy reste legacy / `?v2=1` bascule). tsc v2 ✅, vitest v2 ✅, e2e 0 issue, déployé.
-- [x] **S3** Squelette clean-archi + **client tRPC partagé** (`modern/shared/trpc`). *(OPE-419)* — `modern/shared/trpc/index.ts` réexpose l'instance `trpc` legacy unique (provider/QueryClient/auth/superjson partagés) + types `RouterInputs`/`RouterOutputs` inférés de `AppRouter`. Feature `clients` **migrée REST→tRPC** : domaine `Client = RouterOutputs["clients"]["list"][number]`, application `trpc.clients.list.useQuery()`, UI inchangée. **REST supprimé** (`modern/shared/api/*` + openapi-fetch retirés du neuf) → **dette OPE-366 résorbée**. `tsconfig.v2.json` : `types` += `@fastify/cookie` (augmentation chargée car tsc traverse la source backend via AppRouter). Test domaine `nomComplet` ajouté. tsc v2 ✅, vitest v2 16 ✅, e2e `cas testés:4 | issues:0` ✅, déployé.
+- [x] **S2** Helper de flag `?v2=1` + util de bascule par route (ouvre `/v2/<route>`, sinon legacy). *(OPE-420)* — `modern/shared/flag/` : `v2-flag.ts` (lecture `?v2=1`/`=0`, persistance localStorage « collante », cœur pur `readV2FlagFromSearch`), `v2-routes.ts` (registre `V2_ROUTES` legacy→/v2 + `resolveV2Path`/`isV2Path`), `use-v2-bascule.ts` (hook wouter sans rendu : redirige si flag actif ET route migrée, sinon no-op). Câblé via `useV2Bascule()` dans `AuthenticatedRoutes` (App.tsx). Tests vitest dédiés (`vitest.client.config.ts`, 12 cas) + e2e `scripts/e2e/v2-socle-check.mjs` étendu (legacy reste legacy / `?v2=1` bascule). tsc v2 ✅, vitest v2 ✅, e2e 0 issue, déployé.
+- [x] **S3** Squelette clean-archi + **client tRPC partagé** (`modern/shared/trpc`). *(OPE-419)* — `modern/shared/trpc/index.ts` réexpose l'instance `trpc` legacy unique (provider/QueryClient/auth/superjson partagés) + types `RouterInputs`/`RouterOutputs` inférés de `AppRouter`. Feature `clients` **migrée REST→tRPC** : domaine `Client = RouterOutputs["clients"]["list"][number]`, application `trpc.clients.list.useQuery()`, UI inchangée. **REST supprimé** (`modern/shared/api/*` + openapi-fetch retirés du neuf) → **dette OPE-366 résorbée**. `tsconfig.client.json` : `types` += `@fastify/cookie` (augmentation chargée car tsc traverse la source backend via AppRouter). Test domaine `nomComplet` ajouté. tsc v2 ✅, vitest v2 16 ✅, e2e `cas testés:4 | issues:0` ✅, déployé.
 - [x] **S4** Primitives `modern/shared/ui` = **copie conforme** des composants UI legacy utilisés par la Vague 1 (zéro changement visuel). *(OPE-416, périmètre réduit)* — `modern/shared/ui/{button,input,card,label,dropdown-menu}.ts` = **ré-export** des primitives legacy `@/components/ui/*` (composant identique → parité pixel garantie, zéro drift) + barrel `index.ts`. Surface = primitives utilisées par `pages/Clients.tsx` (Vague 1). Test garde-fou de surface (`index.test.ts`). tsc v2 ✅, vitest v2 17 ✅. **Pas de déploiement** (ré-export non encore consommé par le runtime → bundle inchangé). Relocalisation physique des primitives = à la suppression finale du legacy.
 
 ### Vague 1 — rodage (lecture, fort trafic, UI simple) *(OPE-421)* — ✅ TERMINÉE (6/6)
@@ -459,7 +459,7 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   V2_ROUTES + sweep. tsc/eslint(0)/vitest **324**.
 
 - **Migration `geolocalisation` ✅** (19e des ~24 pages feature) — **1re page CARTE Leaflet**. Déblocage
-  typage : **`client/src/leaflet.d.ts` ajouté à l'`include` de `tsconfig.v2.json`** → le global `L` (déclaré
+  typage : **`client/src/leaflet.d.ts` ajouté à l'`include` de `tsconfig.client.json`** → le global `L` (déclaré
   hors `client/src/modern/**`) est désormais en portée pour le code neuf (réutilisable par `planification`).
   Audit contrat — 2 endpoints (geolocalisation.getPositions + techniciens.getAll) présents. Clean-archi :
   domain (`withPosition`/`techId`/`latLng`/`batterieColor` + **constructeurs HTML PURS** `markerIconHtml`/
@@ -1107,12 +1107,12 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 - **Vague 1 — ClientDetail ✅** port `/v2/clients/:id` (split gate/contenu → corrige l'antipattern hooks #310 du legacy). **Fix socle `/v2/*`** (le catch-all `/v2/:rest*` cassait les routes imbriquées → 404). Finding : legacy ClientDetail planté. 4 gates verts, e2e `9|0`, déployé.
 - **Primitives barrel ✅ (prep slice)** ajout copie conforme `select`/`tabs`/`dialog`/`table`/`textarea` à `modern/shared/ui` (+ test de surface étendu) → débloque ClientDetail, Articles, Fournisseurs, Techniciens. tsc/vitest/eslint verts. Pas de déploiement (ré-exports non consommés par le runtime). Prochaine : port ClientDetail.
 - **Vague 1 — Notifications ✅** port conforme `pages/Notifications.tsx` → `/v2/notifications` (`notifications-page.tsx`, kebab+i18n+primitives partagées ; barrel += badge/scroll-area ; registre bascule + route). 4 gates verts, parité e2e `8|0`, déployé. Prochaine : ClientDetail (à splitter).
-- **Gate ESLint v2 ✅** `eslint.v2.config.mjs` (scope `client/src/modern/**`) : `no-restricted-imports` (frontière strangler : `@/lib/trpc`/`@/components/ui/*`/openapi interdits ; coutures `shared/{ui,trpc}` exemptées), **règle custom `kebab-filename`**, `i18next/no-literal-string` (jsx-text-only, exclut les glyphes). Strings socle router rétro-i18n (namespace `common`), `_demo` exempté. **eslint v2 vert** + tsc/vitest/parité `6|0`, déployé. Prochaine : ClientDetail.
+- **Gate ESLint v2 ✅** `eslint.client.config.mjs` (scope `client/src/modern/**`) : `no-restricted-imports` (frontière strangler : `@/lib/trpc`/`@/components/ui/*`/openapi interdits ; coutures `shared/{ui,trpc}` exemptées), **règle custom `kebab-filename`**, `i18next/no-literal-string` (jsx-text-only, exclut les glyphes). Strings socle router rétro-i18n (namespace `common`), `_demo` exempté. **eslint v2 vert** + tsc/vitest/parité `6|0`, déployé. Prochaine : ClientDetail.
 - **i18n ✅** `react-i18next` + `i18next` installés ; `shared/i18n` (init idempotent, importé par modern-router-mount) ; **un `fr.json` par module** (`features/clients/i18n/fr.json` + `shared/i18n/common/fr.json`) agrégés en namespaces ; `clients-list-page.tsx` **entièrement rétro-i18n** (libellés, toasts, modal, CSV, pluriels). Valeurs `fr` identiques → **parité e2e `6|0`** inchangée. tsconfig.v2 += `resolveJsonModule`. Déployé. Prochaine : gate ESLint v2.
 - **Vague 1 — Clients ✅** port conforme complet `pages/Clients.tsx` → `/v2/clients` (clients-list-page.tsx, kebab-case, primitives+tRPC partagés). Parité e2e `6|0`, déployé. PoC supprimé. Convention **kebab-case** + **gate ESLint v2** ajoutés à la recette (demandes humaines). Prochaine : bootstrap du gate ESLint v2.
 - **S4 ✅** primitives `modern/shared/ui` (ré-export copie conforme legacy : button/input/card/label/dropdown-menu + barrel) + test de surface. tsc v2 ✅, vitest v2 17 ✅. Pas de déploiement (bundle inchangé). **Vague 0 TERMINÉE.** Prochaine : Vague 1 Clients slice 1a (parité lecture).
-- **S3 ✅** client tRPC partagé `modern/shared/trpc` (réexpose l'instance legacy + types `RouterInputs/Outputs`). Feature `clients` migrée **REST→tRPC** (`clients.list`), REST/openapi supprimé du neuf → **dette OPE-366 résorbée**. `tsconfig.v2.json` types += `@fastify/cookie`. 16 tests vitest v2, e2e `4 | 0`, déployé. Incident « plus de devis/factures » = fausse alerte (mauvais compte) ; vérif navigateur OK même flag v2 ON. Prochaine : S4.
-- **S2 ✅** flag `?v2=1` + bascule par route (`modern/shared/flag/*`, hook `useV2Bascule` câblé dans App). Tests vitest dédiés (12) via `vitest.v2.config.ts` + e2e socle/bascule `cas testés:4 | issues:0`. Déployé. **Boucle basculée sur CronCreate natif Claude** (daemon bash retiré). Prochaine : S3.
+- **S3 ✅** client tRPC partagé `modern/shared/trpc` (réexpose l'instance legacy + types `RouterInputs/Outputs`). Feature `clients` migrée **REST→tRPC** (`clients.list`), REST/openapi supprimé du neuf → **dette OPE-366 résorbée**. `tsconfig.client.json` types += `@fastify/cookie`. 16 tests vitest v2, e2e `4 | 0`, déployé. Incident « plus de devis/factures » = fausse alerte (mauvais compte) ; vérif navigateur OK même flag v2 ON. Prochaine : S4.
+- **S2 ✅** flag `?v2=1` + bascule par route (`modern/shared/flag/*`, hook `useV2Bascule` câblé dans App). Tests vitest dédiés (12) via `vitest.client.config.ts` + e2e socle/bascule `cas testés:4 | issues:0`. Déployé. **Boucle basculée sur CronCreate natif Claude** (daemon bash retiré). Prochaine : S3.
 - **S1 ✅** socle TanStack Router sur `/v2/*` (cohabite wouter, providers+auth partagés, lazy, pending/error/notFound par route) + démo `/v2/ping` ; PoC `/v2/clients` repris sous le socle. tsc v2 + `vite build` verts. **Déployé** (Pages) + **vérif navigateur staging** (`scripts/e2e/v2-socle-check.mjs`) : `/v2/ping` rend « pong » **0 erreur** → routing+lazy+providers OK ; `/v2/clients` rend (contenu « Clients » présent) **via le socle**. Prochaine cible : S2 (flag `?v2=1`).
   - ⚠️ **Finding (dette PoC OPE-366, hérité de `09de4d4`, PAS une régression S1)** : `/v2/clients` appelle `GET /api/rest/clients` (openapi-fetch) → **404** (endpoint REST jamais implémenté). À **résorber en Vague 1** en migrant la feature `clients` sur **tRPC** (`@trpc/react-query`) conformément à la mission (« tRPC conservé, pas de REST ») et en supprimant `modern/shared/api/*` (openapi-fetch). Le socle lui-même est OK.
 
@@ -1216,3 +1216,15 @@ RESTE: F1.2 (retrait shim, ~30 fichiers) + legacy Étape B (email).
   boundary EmailPort sans artisanId).
 - Gates: tsc.src 0, suite backend 2766 (533 fichiers), build:newstack OK, backend redéployé + smoke OK, staging sain.
 RESTE: F1.2 (retrait shim navigation ~30 fichiers → hooks TanStack natifs) — dernier chantier.
+
+## 🧱 RESTRUCTURATION DOSSIERS « screamingly clear » — PLAN PAR BRIQUES (cron 3 min, 2026-06-18)
+Autonome = FRONTEND uniquement (mon périmètre, déployable Pages + vérif navigateur). Backend/infra (apps/api,
+packages/contract, infra/edge, top-level apps/) = coordination séparée APRÈS (risque imports backend/Dockerfile/dispatcher).
+Une brique = un sous-arbre : move + maj imports + gates (tsc.client/vitest.client/vite build) + commit chirurgical +
+deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
+- [ ] B1 voice : client/src/{domain/voice, infra-web, app/useVoiceSession} → client/src/modern/shared/voice/
+- [ ] B2 ui-kit : client/src/components/ui → client/src/modern/shared/ui-kit/ (primitives shadcn)
+- [ ] B3 bootstrap : App.tsx/main.tsx/ErrorBoundary/ThemeContext/index.css/const/leaflet.d → client/src/bootstrap/ ;
+      lib/utils + hooks → modern/shared/lib + modern/shared/hooks
+- [ ] B4 drop préfixe `modern/` : client/src/modern/* → client/src/* (mass @/modern/ → @/, tsconfig paths, vite) — LE GROS
+→ PROCHAINE BRIQUE : B1 (voice).
