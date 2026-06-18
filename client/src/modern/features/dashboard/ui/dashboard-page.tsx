@@ -16,7 +16,7 @@ import { TopClientsWidget } from "./widgets/top-clients";
 import { RecentActivityWidget } from "./widgets/recent-activity";
 import { UpcomingInterventionsWidget } from "./widgets/upcoming-interventions";
 import { ObjectifsWidget } from "./widgets/objectifs";
-import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesAFaire";
+import { ActivitesAFaireWidget } from "./widgets/activites-a-faire";
 import { TresoreriePrevisionnelleWidget } from "./widgets/tresorerie-previsionnelle";
 import { LivraisonsEnRetardWidget } from "./widgets/livraisons-en-retard";
 import { ContratsAFacturerWidget } from "./widgets/contrats-a-facturer";
