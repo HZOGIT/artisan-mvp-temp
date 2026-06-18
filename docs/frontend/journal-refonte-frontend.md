@@ -640,10 +640,19 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | Profil | /profil | 727 | 11 | paramètres compte (email/mdp/delete) |
 | DevisLigneEdit | /devis/:id/ligne/nouvelle | 654 | 11 | édition ligne devis |
 | CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
-| ContratDetail | /contrats/:id | 539 | 2 | détail contrat |
+| ~~ContratDetail~~ ✅ | ~~/contrats/:id~~ → /v2/contrats/:id | 539 | 2 | **FAIT** (contrat-detail ; findings client+factures) |
 | ~~SoumettreAvis (public)~~ ✅ | ~~/avis/:token~~ → /v2/avis/:token | 187 | 0 | **FAIT** (avis-public ; redirect explicite + public-router) |
-≈ **6664 lignes, ~93 `any`** (− avis-public fait → 8 pages réelles restantes). Le **cluster devis/factures** (DevisDetail+DevisLigneEdit+DevisNouveau+
-FactureDetail ≈ 3840 l) est le gros morceau.
+≈ **5938 lignes restantes, ~91 `any`** (avis-public + contrat-detail faits → **7 pages réelles restantes**).
+Le **cluster devis/factures** (DevisDetail+DevisLigneEdit+DevisNouveau+FactureDetail ≈ 3840 l) est le gros morceau.
+
+**Itération `contrat-detail` (`/contrats/:id`) ✅** : page 3 onglets (détails/interventions/factures), 7 endpoints
+(getById/getInterventions/generateFacture/suspendre/reactiver/createIntervention/updateIntervention).
+**2 findings contrat** (legacy `any`) : (1) `getById` renvoie le contrat SEUL (**sans `client`** — que `clientId`)
+→ client chargé via `clients.getById` ; (2) **pas d'endpoint « factures récurrentes »** → l'onglet Factures était
+TOUJOURS vide en legacy (`contrat.facturesRecurrentes` undefined) → parité = onglet vide (génération de facture
+OK). Clean-archi domain (`montantsContrat`/`statutContratVariant`/`buildCreateInterventionPayload` + catalogues
+— **5 tests**) + application (skipToken + client) + ui (3 onglets + dialog planif). useParams TanStack. i18n. **0 `any`**.
+Route `/v2/contrats/$id`. vitest **405**.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
