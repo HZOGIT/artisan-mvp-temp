@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/modern/shared/ui-kit/sonner";
+import { TooltipProvider } from "@/modern/shared/ui-kit/tooltip";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
