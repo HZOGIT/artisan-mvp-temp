@@ -9,7 +9,7 @@ import { AlertsBar, type DashboardAlert } from "./widgets/alerts-bar";
 import { QuickActions } from "./widgets/quick-actions";
 import { DashboardWidget } from "./widgets/dashboard-widget";
 import { CustomizePanel } from "./widgets/customize-panel";
-import { ConseillerIAWidget } from "@/components/ConseillerIAWidget";
+import { ConseillerIAWidget } from "./widgets/conseiller-ia";
 import { RevenueChartWidget } from "./widgets/revenue-chart";
 import { DevisRepartitionWidget } from "./widgets/devis-repartition";
 import { TopClientsWidget } from "./widgets/top-clients";

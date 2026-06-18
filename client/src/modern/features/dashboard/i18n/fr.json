@@ -170,5 +170,10 @@
   "aaf_typeAutre": "À faire",
   "aaf_ajoutee": "Activité ajoutée",
   "aaf_titreRequis": "Le titre est requis",
-  "aaf_echeanceRequise": "L'échéance est requise"
+  "aaf_echeanceRequise": "L'échéance est requise",
+  "cia_titre": "Conseiller IA",
+  "cia_analyse": "Analyse de votre activité en cours…",
+  "cia_priorites": "Conseiller IA — vos priorités du jour",
+  "cia_regenerer": "Régénérer les conseils",
+  "cia_actualiser": "Actualiser"
 }
