@@ -766,10 +766,16 @@ console. `?v2=0` (legacy forcé) marche aussi. **La bascule ne redirige PAS `/si
 déconnecté** (415 car., 0 champ — pas montés en public). → **NE PAS supprimer `pages/SignIn` / routes `/signin`**
 tant que les pages auth v2 ne sont pas montées PUBLIQUEMENT. Mémoire : [[v2-auth-login-state]].
 
-## 🎯 PROCHAINE CIBLE : **suppression legacy** — SEUL item restant, à cadrer avec l'humain. Pré-requis identifié :
-**monter les pages auth v2 en PUBLIC** (comme le public-router) + revalider login, AVANT de supprimer `pages/SignIn`.
-Le reste (`client/src/pages/**` hors auth, wouter, `@/lib/trpc`) = gros refactor App.tsx. État : default-on actif,
-login validé, 89 routes /v2, parité éditeurs vérifiée. **Décision/ordre de suppression = go/no-go humain.**
+**Pages auth v2 montées en PUBLIC ✅** (étape de-risquée vers la suppression legacy) : les 5 routes auth
+(signin/sign-in/signup/forgot-password/reset-password) **déplacées** du routeur AUTHENTIFIÉ (`router.tsx`) vers le
+**public-router** + montées explicitement dans `App.tsx` (`/v2/signin`… → `PublicModernRouterMount`, AVANT le
+catch-all authentifié). → un visiteur **déconnecté** peut désormais afficher `/v2/sign-in` (corrige le dead-end 415
+car. / 0 champ). Le login legacy `/signin` reste intact (non touché). Gates verts (tsc 0 / vitest 450). À revalider
+au navigateur après déploiement.
+
+## 🎯 PROCHAINE CIBLE : **suppression legacy** — SEUL item restant. Pré-requis « monter auth v2 en public » = FAIT
+(reste à revalider login sur /v2 déconnecté). Ensuite : retirer `client/src/pages/**` + wouter + `@/lib/trpc` (gros
+refactor App.tsx). État : default-on actif, login validé (legacy), auth v2 public. **Ordre de suppression = go/no-go humain.**
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré

@@ -278,6 +278,12 @@ function Router() {
         <Route path="/v2/home" component={PublicModernRouterMount} />
         <Route path="/v2/avis/:token" component={PublicModernRouterMount} />
         <Route path="/v2/vitrine/:slug" component={PublicModernRouterMount} />
+        {/* Pages d'auth v2 montées en PUBLIC (visiteur déconnecté) — AVANT le catch-all authentifié. */}
+        <Route path="/v2/signin" component={PublicModernRouterMount} />
+        <Route path="/v2/sign-in" component={PublicModernRouterMount} />
+        <Route path="/v2/signup" component={PublicModernRouterMount} />
+        <Route path="/v2/forgot-password" component={PublicModernRouterMount} />
+        <Route path="/v2/reset-password" component={PublicModernRouterMount} />
         <Route path="/portail/:token">{(p) => <Redirect to={`/v2/portail/${p.token}${window.location.search}`} />}</Route>
         <Route path="/avis/:token">{(p) => <Redirect to={`/v2/avis/${p.token}${window.location.search}`} />}</Route>
         <Route path="/vitrine/:slug">{(p) => <Redirect to={`/v2/vitrine/${p.slug}${window.location.search}`} />}</Route>

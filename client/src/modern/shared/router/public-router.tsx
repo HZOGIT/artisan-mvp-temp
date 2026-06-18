@@ -95,7 +95,15 @@ const contactRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cont
 const aideRoute = createRoute({ getParentRoute: () => rootRoute, path: "/aide", component: lazyRouteComponent(pageConstruction) });
 const guideRoute = createRoute({ getParentRoute: () => rootRoute, path: "/guide", component: lazyRouteComponent(pageConstruction) });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute, vitrineRoute, contactRoute, aideRoute, guideRoute]);
+// Pages d'AUTHENTIFICATION (signin/signup/forgot/reset) — montées en PUBLIC : un visiteur DÉCONNECTÉ doit
+// pouvoir les afficher (le routeur authentifié ne les rend pas hors session → dead-end). Voir mémoire login.
+const authSignInRoute = createRoute({ getParentRoute: () => rootRoute, path: "/signin", component: lazyRouteComponent(() => import("../../features/auth/ui/sign-in-page")) });
+const authSignInAliasRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sign-in", component: lazyRouteComponent(() => import("../../features/auth/ui/sign-in-page")) });
+const authSignUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/signup", component: lazyRouteComponent(() => import("../../features/auth/ui/sign-up-page")) });
+const authForgotRoute = createRoute({ getParentRoute: () => rootRoute, path: "/forgot-password", component: lazyRouteComponent(() => import("../../features/auth/ui/forgot-password-page")) });
+const authResetRoute = createRoute({ getParentRoute: () => rootRoute, path: "/reset-password", component: lazyRouteComponent(() => import("../../features/auth/ui/reset-password-page")) });
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute, vitrineRoute, contactRoute, aideRoute, guideRoute, authSignInRoute, authSignInAliasRoute, authSignUpRoute, authForgotRoute, authResetRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,
