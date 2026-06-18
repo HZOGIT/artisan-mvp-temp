@@ -108,3 +108,13 @@ describe("shell/nav — userInitial (pur)", () => {
     expect(userInitial(undefined, undefined)).toBe("?");
   });
 });
+
+import { notifTypeMeta } from "./notif-style";
+describe("shell/notif-style (pur)", () => {
+  it("type connu → icône+couleur ; inconnu → Info + muted", () => {
+    expect(notifTypeMeta("succes").color).toBe("text-green-500");
+    expect(notifTypeMeta("erreur").color).toBe("text-red-500");
+    expect(notifTypeMeta("zzz").color).toBe("text-muted-foreground");
+    expect(notifTypeMeta("zzz").Icon).toBeTruthy();
+  });
+});
