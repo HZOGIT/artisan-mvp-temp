@@ -6,10 +6,11 @@ import { useAssistantThreads } from "../application/use-assistant-threads";
 import { relativeTime, type RelativeTime } from "../domain/assistant-conversations";
 
 // Page `assistant-conversations` (historique MonAssistant) — migration clean-archi de
-// `pages/AssistantConversations.tsx`. Markup à l'identique. Navigation vers `/assistant` (encore legacy ;
-// la bascule la redirigera vers `/v2/assistant` une fois cette page migrée) → navigation pleine page.
+// `pages/AssistantConversations.tsx`. Navigation DIRECTE vers `/v2/assistant` (et non `/assistant`) : le
+// round-trip legacy `/assistant` → redirect `/v2/assistant` PERDAIT la query `?thread=X` → on ouvrait une
+// NOUVELLE conversation au lieu de celle cliquée. En ciblant `/v2/assistant` directement, `?thread=X` est conservé.
 function goAssistant(query = "") {
-  window.location.href = `/assistant${query}`;
+  window.location.href = `/v2/assistant${query}`;
 }
 
 function Relative({ value }: { value: RelativeTime }) {
