@@ -57,6 +57,7 @@ import syncComptableFr from "@/modern/features/tableau-bord-sync-comptable/i18n/
 import geolocalisationFr from "@/modern/features/geolocalisation/i18n/fr.json";
 import planificationFr from "@/modern/features/planification/i18n/fr.json";
 import nouvelleDepenseFr from "@/modern/features/nouvelle-depense/i18n/fr.json";
+import integrationsComptablesFr from "@/modern/features/integrations-comptables/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -123,6 +124,7 @@ const resources = {
     geolocalisation: geolocalisationFr,
     planification: planificationFr,
     nouvelleDepense: nouvelleDepenseFr,
+    integrationsComptables: integrationsComptablesFr,
   },
 } as const;
 

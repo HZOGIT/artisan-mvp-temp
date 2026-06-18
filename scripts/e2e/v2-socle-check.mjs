@@ -117,6 +117,7 @@ const PARITE_PAGES = [
   { legacy: '/geolocalisation', v2: '/v2/geolocalisation', markers: ['Géolocalisation', 'Carte en temps réel', 'Légende'] },
   { legacy: '/planification', v2: '/v2/planification', markers: ['Planification Intelligente', 'Techniciens suggérés', 'Carte des techniciens'] },
   { legacy: '/nouvelle-depense', v2: '/v2/nouvelle-depense', markers: ['Nouvelle dépense', 'Scanner un justificatif', 'Total TTC'] },
+  { legacy: '/integrations-comptables', v2: '/v2/integrations-comptables', markers: ['Intégrations Comptables', 'Export Manuel', 'Configuration'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },
