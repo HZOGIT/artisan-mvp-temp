@@ -40,13 +40,6 @@ const rootRoute = createRootRoute({
   notFoundComponent: RouterNotFound,
 });
 
-// Route de démonstration du socle (OPE-415) — prouve montage + lazy + providers partagés.
-const pingRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/ping",
-  component: lazyRouteComponent(() => import("../../features/_demo/ping-page")),
-});
-
 // Liste Clients du front neuf — port conforme de `pages/Clients.tsx` (parité visuelle).
 const clientsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -448,7 +441,7 @@ const notesFraisRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/notes-frais/ui/notes-frais-page")),
 });
 
-const routeTree = rootRoute.addChildren([pingRoute, clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute, syncComptableRoute, geolocalisationRoute, planificationRoute, nouvelleDepenseRoute, integrationsComptablesRoute, analysesPhotosRoute, importRoute, devisIaRoute, chantiersRoute, assistantRoute, calendrierChantiersRoute, clientsNouveauRoute, clientsImportRoute, mobileRoute, commandeDetailRoute, contratDetailRoute, profilRoute, devisLigneRoute, devisNouveauRoute, devisDetailRoute, factureDetailRoute, commandeNouvelleRoute, commandeModifierRoute]);
+const routeTree = rootRoute.addChildren([clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute, syncComptableRoute, geolocalisationRoute, planificationRoute, nouvelleDepenseRoute, integrationsComptablesRoute, analysesPhotosRoute, importRoute, devisIaRoute, chantiersRoute, assistantRoute, calendrierChantiersRoute, clientsNouveauRoute, clientsImportRoute, mobileRoute, commandeDetailRoute, contratDetailRoute, profilRoute, devisLigneRoute, devisNouveauRoute, devisDetailRoute, factureDetailRoute, commandeNouvelleRoute, commandeModifierRoute]);
 
 export const modernRouter = createRouter({
   routeTree,
