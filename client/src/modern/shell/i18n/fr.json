@@ -26,5 +26,12 @@
   "trialTomorrow": "Votre essai gratuit se termine demain.",
   "trialDays": "Votre essai gratuit se termine dans {{n}} jours.",
   "trialCtaSuffix": "Choisissez votre plan pour continuer sans interruption.",
-  "choisirPlan": "Choisir mon plan →"
+  "choisirPlan": "Choisir mon plan →",
+  "aboExpire": "Votre abonnement a expiré",
+  "renouvelezAcces": "Renouvelez pour retrouver l'accès à toutes vos données.",
+  "donneesConservees": "Vos données sont conservées pendant 30 jours.",
+  "renouvelerAbo": "Renouveler mon abonnement",
+  "gererAboStripe": "Gérer mon abonnement (portail Stripe)",
+  "exporterDonnees": "Exporter mes données",
+  "contacterSupport": "Contacter le support"
 }
