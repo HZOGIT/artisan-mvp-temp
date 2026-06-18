@@ -10,6 +10,7 @@ import { Badge } from "@/modern/shared/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/modern/shared/ui/dialog";
 import { Textarea } from "@/modern/shared/ui/textarea";
 import { Input } from "@/modern/shared/ui/input";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { useRdvEnLigne } from "../application/use-rdv-en-ligne";
 import { STATUT_FILTERS, statutClass, urgenceClass, clientName, filterByStatut, type RdvItem } from "../domain/rdv-en-ligne";
 
@@ -17,6 +18,7 @@ import { STATUT_FILTERS, statutClass, urgenceClass, clientName, filterByStatut, 
 // l'identique. tRPC encapsulé dans `use-rdv-en-ligne`, classes/règles en domain.
 export default function RdvEnLignePage() {
   const { t } = useTranslation("rdvEnLigne");
+  const [, setLocation] = useLocation();
   const [filterStatut, setFilterStatut] = useState("tous");
   const [refuseDialogOpen, setRefuseDialogOpen] = useState(false);
   const [proposeDialogOpen, setProposeDialogOpen] = useState(false);
@@ -127,7 +129,7 @@ export default function RdvEnLignePage() {
                   )}
 
                   {rdv.statut === "confirme" && rdv.interventionId && (
-                    <Button size="sm" variant="outline">
+                    <Button size="sm" variant="outline" onClick={() => setLocation("/interventions")}>
                       <ArrowRight className="h-4 w-4 mr-1" />{t("intervention", { id: rdv.interventionId })}
                     </Button>
                   )}

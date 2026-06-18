@@ -421,7 +421,7 @@ const contratsRoute = createRoute({
 // Relances de devis — migration clean-archi de `pages/RelancesDevis.tsx`.
 const relancesDevisRoute = createRoute({
   getParentRoute: () => appShellRoute,
-  path: "/relances-devis",
+  path: "/relances",
   component: lazyRouteComponent(() => import("../../features/relances-devis/ui/relances-devis-page")),
 });
 
@@ -464,7 +464,7 @@ const dashboardRoute = createRoute({
 // Notes de frais — migration clean-archi de `pages/NotesFrais.tsx` (débloquée par OPE-490 backend).
 const notesFraisRoute = createRoute({
   getParentRoute: () => appShellRoute,
-  path: "/notes-frais",
+  path: "/notes-de-frais",
   component: lazyRouteComponent(() => import("../../features/notes-frais/ui/notes-frais-page")),
 });
 
