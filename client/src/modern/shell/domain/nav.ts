@@ -183,6 +183,35 @@ export function getAssistantContextForPath(path: string): { context: string; pro
   return ASSISTANT_FALLBACK;
 }
 
+// Nav mobile primaire (barre du bas). PORT FIDÈLE.
+export const MOBILE_PRIMARY: { id: GroupId; path: string; label: string; icon: LucideIcon }[] = [
+  { id: "dashboard", path: "/dashboard", label: "Accueil", icon: LayoutDashboard },
+  { id: "commercial", path: "/devis", label: "Commercial", icon: Briefcase },
+  { id: "clients", path: "/clients", label: "Clients", icon: Users },
+  { id: "terrain", path: "/interventions", label: "Terrain", icon: Wrench },
+];
+
+// Composition de la sidebar : permissions → modules actifs → drop des groupes vides. PUR (port lignes 763-767).
+export function buildSidebarGroups(permissions: string[], modulesActifs: string[] | null): NavGroup[] {
+  return NAV_GROUPS
+    .map((g) => filterGroupByPermissions(g, permissions))
+    .map((g) => filterGroupByModules(g, modulesActifs))
+    .filter((g) => g.items.length > 0);
+}
+
+// Un item est actif si l'URL = son path OU sa version /v2 migrée. `resolveV2Path` injecté → PUR/testable.
+export function isPathActive(location: string, path: string, resolveV2Path: (p: string) => string | null): boolean {
+  return location === path || location === resolveV2Path(path);
+}
+
+// Groupe/item actif pour l'URL courante. PUR (resolveV2Path injecté).
+export function resolveActiveItem(groups: NavGroup[], location: string, resolveV2Path: (p: string) => string | null): MenuItem | undefined {
+  return groups.flatMap((g) => g.items).find((i) => isPathActive(location, i.path, resolveV2Path));
+}
+export function resolveActiveGroup(groups: NavGroup[], location: string, resolveV2Path: (p: string) => string | null): NavGroup | undefined {
+  return groups.find((g) => g.items.some((i) => isPathActive(location, i.path, resolveV2Path)));
+}
+
 // Date relative FR pour la cloche de notifications. PUR.
 export function formatRelativeDate(date: string | Date): string {
   const d = new Date(date);

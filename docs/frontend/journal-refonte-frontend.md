@@ -784,8 +784,7 @@ retrait des fichiers `components/**` ne l'est pas → on les laissera orphelins)
 brique par brique, NON CÂBLÉ (0 impact runtime, pas de deploy), testé ; le câblage App.tsx + suppression legacy =
 étape finale validée/cadrée. **Brique 1 ✅ `modern/shell/domain/nav.ts`** : port FIDÈLE de NAV_GROUPS (8 groupes) +
 pathPermissionMap + filterGroupByPermissions + MODULE_TO_LABELS + filterGroupByModules + getAssistantContextForPath +
-formatRelativeDate (5 tests, 0 any). Prochaines briques : RAIL_COLORS/notif domain → sidebar UI → layout → drawer →
-câblage final.
+formatRelativeDate (5 tests, 0 any). **Brique 2 ✅** : `buildSidebarGroups` (compose perms+modules+drop vides) + `isPathActive`/`resolveActiveGroup`/`resolveActiveItem` (resolveV2Path injecté = pur) + `MOBILE_PRIMARY` + `rail-colors.ts` (RAIL_COLORS 8 couleurs dont purple). 4 tests. La couche DOMAIN du shell est complète + testée (vitest.v2 464). Prochaines briques : sidebar UI → layout UI → drawer modern → câblage final.
 
 ## ⛔ (archive) BLOQUÉ (2026-06-18) — phase PAGES finie, phase SHELL hors périmètre → arbitrage humain demandé
 **App.tsx = 100% /v2** (0 import de page legacy), **88/89 pages migrées**, **87/89 fichiers legacy retirés**, cutover

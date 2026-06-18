@@ -62,3 +62,39 @@ describe("shell/nav — domain pur (port fidèle DashboardLayout)", () => {
     expect(formatRelativeDate(new Date(now - 3 * 24 * 3600000))).toBe("Il y a 3 jours");
   });
 });
+
+import { buildSidebarGroups, isPathActive, resolveActiveGroup, resolveActiveItem, MOBILE_PRIMARY } from "./nav";
+import { RAIL_COLORS } from "./rail-colors";
+
+const idV2 = (p: string) => (p === "/clients" ? "/v2/clients" : p === "/devis" ? "/v2/devis" : null);
+
+describe("shell/nav — composition sidebar + actif (pur)", () => {
+  it("buildSidebarGroups : compose permissions + modules + drop vides", () => {
+    const all = buildSidebarGroups([], null); // show-all
+    expect(all.map((g) => g.id)).toContain("commercial");
+    // un seul module actif (clients) + ALWAYS_VISIBLE → les groupes sans item visible disparaissent
+    const onlyClients = buildSidebarGroups([], ["clients"]);
+    for (const g of onlyClients) expect(g.items.length).toBeGreaterThan(0);
+    expect(onlyClients.find((g) => g.id === "clients")?.items.map((i) => i.label)).toContain("Clients");
+  });
+
+  it("isPathActive : match direct ou via /v2 migrée", () => {
+    expect(isPathActive("/clients", "/clients", idV2)).toBe(true);
+    expect(isPathActive("/v2/clients", "/clients", idV2)).toBe(true); // URL déjà sur /v2
+    expect(isPathActive("/v2/clients", "/devis", idV2)).toBe(false);
+  });
+
+  it("resolveActiveGroup/Item : trouve le groupe+item de l'URL (y compris /v2)", () => {
+    const groups = buildSidebarGroups([], null);
+    expect(resolveActiveItem(groups, "/v2/clients", idV2)?.path).toBe("/clients");
+    expect(resolveActiveGroup(groups, "/v2/clients", idV2)?.id).toBe("clients");
+    expect(resolveActiveGroup(groups, "/route-x", idV2)).toBeUndefined();
+  });
+
+  it("MOBILE_PRIMARY : 4 entrées ; RAIL_COLORS couvre les 8 couleurs (dont purple)", () => {
+    expect(MOBILE_PRIMARY.map((m) => m.id)).toEqual(["dashboard", "commercial", "clients", "terrain"]);
+    for (const c of ["violet", "blue", "emerald", "orange", "rose", "cyan", "slate", "purple"] as const) {
+      expect(RAIL_COLORS[c]?.iconActive).toBeTruthy();
+    }
+  });
+});
