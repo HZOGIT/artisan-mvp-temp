@@ -1166,3 +1166,12 @@ supprimer (cloudflared rogue à arrêter puis re-apply ; dev.operioz.com déjà 
   GARDER volume postgres_staging_data = data-safe) + cleanup .env (.env.save + .env.production).
 - I2 dispatcher : [[path]].js forwarde déjà tout (dispatch.mjs a des ramifications runtime src/interface/gateway →
   refacto backend, pas juste code mort). F1 (unification routeur TanStack natif) : approuvé, prêt, NON lancé pendant la bascule infra.
+
+## ✅ PROGRAMME SIMPLIFICATION — 6/7 FAITS + VÉRIFIÉS (2026-06-18)
+#1 tunnel dev: terraform "No changes" (appliqué). #2 mysql legacy: conteneur supprimé (0 ref src, staging sain).
+#3 doublon cloudflared host: tué (docker garde le tunnel staging). #4 compose: docker-compose.staging.yml →
+docker-compose.yml (project artisan-staging + volume postgres_staging_data préservés = data-safe), base legacy
+supprimée, Taskfile MAJ (drizzle/seed en host-run via DEV_DATABASE_URL, db:generate vérifié). #5 .env: .env.save +
+.env.production supprimés. #7 (B1) server/_core → src/shared/legacy/ : build:newstack + tsconfig MAJ, backend
+redéployé + SMOKE AUTH OK. Au passage: 2 fix Dockerfile (COPY patches + COPY server obsolètes cassaient le deploy backend).
+RESTE #6 (F1) unification routeur — recommandé déprioriser mais demandé ("lance tout 1 à 7").
