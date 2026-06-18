@@ -120,6 +120,7 @@ const PARITE_PAGES = [
   { legacy: '/integrations-comptables', v2: '/v2/integrations-comptables', markers: ['Intégrations Comptables', 'Export Manuel', 'Configuration'] },
   { legacy: '/analyses-photos', v2: '/v2/analyses-photos', markers: ['Analyse photos IA', 'Nouvelle analyse', 'Historique des analyses'] },
   { legacy: '/import', v2: '/v2/import', markers: ['Migrez vos données', 'Source', 'Assistance incluse'] },
+  { legacy: '/devis-ia', v2: '/v2/devis-ia', markers: ['Devis Automatique IA', 'Mes analyses'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

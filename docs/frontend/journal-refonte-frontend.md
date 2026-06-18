@@ -514,8 +514,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   variables → hors règle i18next). **0 `any`** (2 supprimés). Finding mineur : `autoMap` retire les accents
   (« Téléphone » non matché). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **351**.
 
+- **Migration `devis-ia` ✅** (25e des ~24+ pages feature) : éditeur de devis IA (867 l, le plus gros éditeur
+  stateful) — photos → travaux détectés → **articles éditables** (qté/prix/sélection + ajout manuel) → devis.
+  Module `devisIA` (mêmes 6 endpoints + `updateSuggestion`). Clean-archi : domain (`SuggestionEditable` +
+  `suggestionToEditable`/`buildEditedMap`/`lineTotal`/`calculateTotal`/`selectedCount`/`newSuggestion`/
+  `buildUpdatePayload` + `urgenceColor`/`statutVariant` + `TVA_RATE` — **6 tests**) + application (skipToken +
+  6 mutations) + ui (liste analyses + photos + tableau éditable + prévisualisation HT/TVA/TTC + génération).
+  Setters d'édition **génériques typés** (`<K extends keyof SuggestionEditable>`) → plus de `value: any`. i18n.
+  **0 `any`** (7 supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **357**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes (les 3 plus
-grosses) : `assistant` (chat streaming), `chantiers` (1035 l), `calendrier-chantiers` (1635 l), `devis-ia` (867 l).
+grosses, à parité délicate) : `assistant` (chat streaming SSE), `chantiers` (1035 l CRUD), `calendrier-chantiers` (1635 l vue calendrier).
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
