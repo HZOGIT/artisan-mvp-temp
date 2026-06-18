@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
+import { Link } from "@/modern/shared/router/navigation";
 import { PackageCheck, TruckIcon, AlertTriangle } from "lucide-react";
 import { useLivraisonsEnRetard } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";

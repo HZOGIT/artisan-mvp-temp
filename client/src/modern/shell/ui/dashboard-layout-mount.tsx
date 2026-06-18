@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { Outlet } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { resolveV2Path } from "@/modern/shared/flag/v2-routes";

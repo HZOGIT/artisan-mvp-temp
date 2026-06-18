@@ -13,7 +13,7 @@ import { Input } from "@/modern/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
 import { Badge } from "@/modern/shared/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/modern/shared/ui/dropdown-menu";
-import { useLocation, useSearch } from "wouter";
+import { useLocation, useSearch } from "@/modern/shared/router/navigation";
 import { Plus, Search, ShoppingCart, MoreHorizontal, Eye, Pencil, Trash2, Download, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";

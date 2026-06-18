@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { useTranslation } from "react-i18next";
 import { Euro, FileText, Receipt, Target, TrendingUp, Users, Settings2, LayoutGrid, Check, CircleDashed, CreditCard, Sparkles, UserPlus } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";

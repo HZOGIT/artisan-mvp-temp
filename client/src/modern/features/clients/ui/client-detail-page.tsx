@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useClientDetail, type ClientDetailVM } from "../application/use-client-detail";

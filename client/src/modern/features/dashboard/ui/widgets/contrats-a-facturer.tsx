@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
+import { Link } from "@/modern/shared/router/navigation";
 import { FileText, CalendarClock, CheckCircle2 } from "lucide-react";
 import { useContratsAFacturer } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";

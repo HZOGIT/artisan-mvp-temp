@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sparkles, X, Maximize2 } from "lucide-react";
 import AssistantPage from "@/modern/features/assistant/ui/assistant-page";

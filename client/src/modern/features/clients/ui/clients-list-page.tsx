@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useLocation, useSearch } from "wouter";
+import { useLocation, useSearch } from "@/modern/shared/router/navigation";
 import { useTranslation } from "react-i18next";
 import { useClients } from "../application/use-clients";
 import { findDuplicateGroups, findCreateDuplicateMatch, type Client } from "../domain/client";

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
+import { Link } from "@/modern/shared/router/navigation";
 import { Cookie, X } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 

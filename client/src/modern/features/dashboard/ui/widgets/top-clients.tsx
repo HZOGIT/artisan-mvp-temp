@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
 import { Users } from "lucide-react";
 import { useTopClients } from "../../application/use-dashboard-widgets";

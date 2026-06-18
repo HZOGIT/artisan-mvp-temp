@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/modern/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
 import { Textarea } from "@/modern/shared/ui/textarea";
-import { useLocation, useSearch } from "wouter";
+import { useLocation, useSearch } from "@/modern/shared/router/navigation";
 import { Plus, Search, Calendar, MoreHorizontal, Pencil, Trash2, FileDown, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/modern/shared/ui/dropdown-menu";
 import { Badge } from "@/modern/shared/ui/badge";

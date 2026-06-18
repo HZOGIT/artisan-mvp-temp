@@ -10,7 +10,7 @@ import { Textarea } from "@/modern/shared/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/modern/shared/ui/accordion";
 import { Mail, BookOpen, Sparkles, Send, MessageCircle, Loader2 } from "lucide-react";
-import { Link } from "wouter";
+import { Link } from "@/modern/shared/router/navigation";
 import { toast } from "sonner";
 
 // Page Centre d'aide / Support du FRONT NEUF (`/v2/support`) — MIGRATION clean-archi de `pages/Support.tsx`

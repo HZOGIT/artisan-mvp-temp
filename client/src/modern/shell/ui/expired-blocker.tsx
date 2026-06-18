@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { XCircle, RefreshCw, Download, MessageCircle } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent } from "@/modern/shared/ui/card";

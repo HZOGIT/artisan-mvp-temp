@@ -14,7 +14,7 @@ import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent } from "@/modern/shared/ui/card";
 import { StatutBadge } from "@/modern/shared/ui/statut-badge";
-import { useLocation, useSearch } from "wouter";
+import { useLocation, useSearch } from "@/modern/shared/router/navigation";
 import { Plus, Search, FileText, MoreHorizontal, Eye, Pencil, Trash2, Receipt, Download, FileSpreadsheet } from "lucide-react";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";

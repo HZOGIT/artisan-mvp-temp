@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Building2, FileText, Loader2, Receipt, Search, Users, Wrench, type LucideIcon } from "lucide-react";
 import { trpc } from "@/modern/shared/trpc";

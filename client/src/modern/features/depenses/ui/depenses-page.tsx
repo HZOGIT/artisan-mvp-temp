@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { Link } from "@/modern/shared/router/navigation";
 import { useTranslation } from "react-i18next";
 import { useDepenses, useIndemniteKm } from "../application/use-depenses";
 import {

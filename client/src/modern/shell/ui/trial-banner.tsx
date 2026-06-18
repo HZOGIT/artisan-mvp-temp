@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "wouter";
+import { Link } from "@/modern/shared/router/navigation";
 import { AlertTriangle, Clock } from "lucide-react";
 import { trpc } from "@/modern/shared/trpc";
 import { trialBannerSeverity } from "../domain/subscription";

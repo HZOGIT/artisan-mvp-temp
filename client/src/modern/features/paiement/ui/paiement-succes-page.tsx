@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";

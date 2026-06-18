@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { motion } from "framer-motion";
 import { ArrowRight, Calendar, Clock, MapPin } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
