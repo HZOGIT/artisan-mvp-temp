@@ -496,8 +496,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   **4 tests**) + application (10 endpoints) + ui (KPIs + 4 onglets). i18n. **0 `any`** (4 supprimés). Route +
   V2_ROUTES + sweep. tsc/eslint(0)/vitest **340**. → **findings Linear**.
 
+- **Migration `analyses-photos` ✅** (23e des ~24 pages feature) : diagnostic IA de photos → devis (520 l,
+  10 `any`). Audit contrat — module `devisIA` (6 endpoints addPhoto/analyserPhotos/createAnalyse/genererDevis/
+  getById/list) + clients/interventions/artisan présents. Workflow multi-étapes (createAnalyse → addPhoto
+  par fichier → analyserPhotos → getById → genererDevis). Clean-archi : domain (`eur`/`urgenceColor`/
+  `suggestionMontant`/`totalEstime` (somme des suggestions sélectionnées) + **`safeErrorMsg`** (strip base64,
+  sécurité) + `isAccepted` — **5 tests**) + application (skipToken détail + 4 mutations) + ui (dropzone
+  multi-photos + diagnostic + historique + FilePreview). i18n namespace `analysesPhotos`. **0 `any`** (10
+  supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **345**.
+
 ## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
-`chantiers`/`calendrier-chantiers`, `devis-ia`, `analyses-photos`, `import`.
+`chantiers`/`calendrier-chantiers`, `devis-ia`, `import`.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
