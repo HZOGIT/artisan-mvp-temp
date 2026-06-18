@@ -332,6 +332,18 @@ await page.waitForTimeout(1500);
   const body404 = (await page.textContent('body')) || '';
   if (!body404.includes('Page introuvable')) add({ route: '/route-inconnue-zzz-404', type: '404', text: 'page 404 v2 « Page introuvable » absente' });
 }
+
+// SHELL modern (OPE-403, câblage final) : sur une page /v2 authentifiée, la chrome modern doit être présente
+// et UNIQUE (rail nav `aria-label="Navigation principale"`). count===0 → shell absent ; count>1 → double shell
+// (régression du cutover : le DashboardLayout legacy ré-enveloppe /v2). Garde-fou du shell modern.
+sidebarCount++;
+current = 'shell modern unique';
+await page.goto('/v2/dashboard', { waitUntil: 'networkidle', timeout: 25000 });
+await page.waitForTimeout(1500);
+{
+  const navCount = await page.locator('nav[aria-label="Navigation principale"]').count();
+  if (navCount !== 1) add({ route: '/v2/dashboard', type: 'shell', text: `shell modern attendu UNIQUE (1 nav principale), obtenu ${navCount} (0=absent, >1=double shell)` });
+}
 } // fin sections globales (if !ONLY)
 
 // Pages d'AUTH v2 montées en PUBLIC (OPE-403) : un visiteur DÉCONNECTÉ doit pouvoir afficher le FORMULAIRE
