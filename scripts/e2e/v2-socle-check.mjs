@@ -125,7 +125,7 @@ const PARITE_PAGES = [
   { legacy: '/assistant', v2: '/v2/assistant', markers: ['MonAssistant', 'Actions rapides'] },
   { legacy: '/calendrier-chantiers', v2: '/v2/calendrier-chantiers', markers: ['Calendrier des Chantiers', 'Aujourd'] },
   { legacy: '/signin', v2: '/v2/signin', markers: ['Connexion', 'Se connecter'] },
-  { legacy: '/cgv', v2: '/v2/cgv', markers: ['Conditions générales de vente', 'Période d'] },
+  { legacy: '/v2/cgv', v2: '/v2/cgv', markers: ['Conditions générales de vente', 'Période d'] }, // legacy /cgv (auth-wrapped, footer-only) rend vide → on valide la page /v2 réelle (la seule servie aux users)
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

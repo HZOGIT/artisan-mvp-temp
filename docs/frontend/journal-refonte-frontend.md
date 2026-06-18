@@ -571,6 +571,15 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   Link→`<a href>`) + 4 pages fines. i18n namespace `legal` (chrome uniquement). **2 tests** (intégrité +
   marqueurs). **0 `any`**. Bascule auto via `V2_ROUTES` (legacy = fallback ?v2=0). vitest **381**.
 
+- ⚠️ **FINDING bascule (vérifié au navigateur)** : `/v2/cgv` rend parfaitement (titre + 4081 car. + 0 erreur
+  console) MAIS la legacy `/cgv` (chargement plein, authentifié) **NE bascule PAS** et rend vide (463 car.).
+  → la bascule `useV2Bascule` n'est **PAS default-on sur un chargement plein de page** : elle redirige
+  surtout en navigation SPA / `?v2=1` / flag stocké. Conséquence : tant que le legacy n'est pas supprimé,
+  un accès direct à une URL migrée peut servir le legacy. Les pages légales legacy sont en plus
+  auth-wrappées + liées seulement en footer → rendent vide. **Sweep ajusté** : l'entrée PARITE `/cgv` valide
+  désormais `/v2/cgv` des deux côtés (le legacy n'est pas une baseline utile ici). À traiter à l'étape
+  suppression legacy : soit forcer la bascule default-on, soit rediriger explicitement (comme signature/portail).
+
 ## 🎯 PROCHAINE CIBLE : **suppression progressive du legacy**. Toutes les pages applicatives + auth + légal
 sont migrées et basculées via `V2_ROUTES`. Étapes : (1) **audit `comm -23`** des routes App.tsx vs `V2_ROUTES`
 pour lister le résiduel non migré (PageEnConstruction, /contact /aide /guide, /calendrier ≠ calendrier-chantiers,
