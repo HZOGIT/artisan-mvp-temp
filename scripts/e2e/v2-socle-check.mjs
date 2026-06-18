@@ -130,6 +130,7 @@ const PARITE_PAGES = [
   { legacy: '/mobile', v2: '/v2/mobile', markers: ['Interventions du jour'] },
   { legacy: '/profil', v2: '/v2/profil', markers: ['Mon profil', 'Informations entreprise', 'Zone de danger'] },
   { legacy: '/devis/nouveau', v2: '/v2/devis/nouveau', markers: ['Nouveau devis', 'Lignes du devis', 'Générer avec'] },
+  { legacy: '/commandes/nouvelle', v2: '/v2/commandes/nouvelle', markers: ['Nouveau bon de commande', 'Lignes de commande'] },
   { legacy: '/v2/cgv', v2: '/v2/cgv', markers: ['Conditions générales de vente', 'Période d'] }, // legacy /cgv (auth-wrapped, footer-only) rend vide → on valide la page /v2 réelle (la seule servie aux users)
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },

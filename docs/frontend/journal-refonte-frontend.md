@@ -639,7 +639,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | ~~Vitrine (public)~~ ✅ | ~~/vitrine/:slug~~ → /v2/vitrine/:slug | 749 | 3 | **FAIT** (vitrine-public ; payload getBySlug unknown→typé) |
 | ~~Profil~~ ✅ | ~~/profil~~ → /v2/profil | 727 | 11 | **FAIT** (profil ; 11 `as any` étaient inutiles, champs typés) |
 | ~~DevisLigneEdit~~ ✅ | ~~/devis/:id/ligne/nouvelle~~ → /v2/... | 654 | 11 | **FAIT** (devis-ligne ; bug prix/réf snake_case corrigé) |
-| CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
+| ~~CommandeFournisseurForm~~ ✅ | ~~/commandes/nouvelle + /:id/modifier~~ → /v2 | 622 | 12 | **FAIT** (commande-form ; create plein, edit métadonnées) |
 | ~~ContratDetail~~ ✅ | ~~/contrats/:id~~ → /v2/contrats/:id | 539 | 2 | **FAIT** (contrat-detail ; findings client+factures) |
 | ~~SoumettreAvis (public)~~ ✅ | ~~/avis/:token~~ → /v2/avis/:token | 187 | 0 | **FAIT** (avis-public ; redirect explicite + public-router) |
 ≈ **5938 lignes restantes, ~91 `any`** (cluster devis/factures terminé → **1 page réelle restante : commande-form, bloquée contrat**).
@@ -716,6 +716,26 @@ montantPaye+conditionsPaiement tous typés → les 27 `as any` legacy étaient i
 `buildAvoirTotalLignes`/`allowedNext`/`statutAction`/`pdfLignes`/`activitesForFacture` — **7 tests**) + application
 (~14 endpoints + REST search) + ui. i18n **119 clés**. **0 `any`** (27 supprimés). Route `/v2/factures/$id`.
 vitest **440**. → **CLUSTER DEVIS/FACTURES TERMINÉ.** Reste seulement `commande-form` (bloquée contrat).
+
+**Itération `commande-form` (`/commandes/nouvelle` + `/commandes/:id/modifier`) ✅** — **🎉 DERNIÈRE PAGE RÉELLE**
+(622 l, 2 routes, 1 composant) : création/édition de bon de commande fournisseur — fournisseur, date de
+livraison, adresse, notes, lignes (autocomplete article **artisan local + bibliothèque REST**), **génération IA**
+depuis devis accepté, totaux, enregistrer (brouillon / + envoi email). **Décision face au gap contrat** : pas de
+mutation de ligne backend + `update` métadonnées seules → **CREATE plein** (endpoint create accepte tout) ;
+**EDIT = métadonnées uniquement** (fournisseur + lignes affichés mais désactivés, bandeau d'avertissement,
+chargement des lignes via `getLignes` — corrige le bug de chargement legacy). **Findings corrigés** : le free-text
+`delaiLivraison` (jamais persisté) → remplacé par un vrai champ date `dateLivraisonPrevue` ; `dateCommande`
+(ignoré) supprimé ; les articles artisan n'ont **pas de `prixAchat`** (toujours undefined) → quirk préservé.
+Clean-archi domain (`totals`/`mapArtisanArticles`/`mapBiblioResults`/`ligneFromSearchResult`/`mapIaLignes`/
+`validateForm`/`buildCreatePayload`/`buildUpdatePayload` — **7 tests**) + application (REST biblio + IA) + ui. i18n.
+**0 `any`** (12 supprimés). Routes `/v2/commandes/nouvelle` (exact-key → **bascule** + sweep) + `/v2/commandes/$id/modifier`.
+vitest **447**.
+
+## 🎉 TOUTES LES PAGES RÉELLES MIGRÉES (88/88 — 100 %)
+Les 9 dernières sous-pages (avis/contrat/profil/vitrine + cluster devis/factures 4 pages + commande-form) sont
+faites. **Reste UNIQUEMENT** : (1) 3 stubs triviaux `/contact /aide /guide` (PageEnConstruction) ; (2) findings
+bascule (default-on sur chargement plein + routes à paramètre) ; (3) **suppression du legacy** (`client/src/pages/**`,
+wouter, `@/lib/trpc`) après validation de parité (login critique → valider manuellement avant suppression auth).
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
