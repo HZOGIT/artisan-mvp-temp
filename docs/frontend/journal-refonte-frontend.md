@@ -790,6 +790,16 @@ générer d'itérations marginales ni toucher hors périmètre. Si réponse = A 
 (DashboardLayout + drawer en `client/src/modern/**`) puis rebrancher `App.tsx` dessus (câblage), sans supprimer les
 fichiers legacy `components/**` tant que le périmètre ne l'autorise pas explicitement.
 
+### 📐 SCOPE PRÉCIS de la phase shell (audit 2026-06-18) — pour décision éclairée
+Le shell legacy = **`components/DashboardLayout.tsx` (1432 lignes)** + dépend de **5 autres composants legacy** à
+porter aussi : `AssistantFAB`, `GlobalSearch`, `TrialBanner`, `ExpiredBlocker`, `DashboardLayoutSkeleton` (+
+`AssistantDrawer`). Contenu : `NAV_GROUPS` (~200 l), sidebar adaptative selon modules actifs, notifications,
+recherche globale, bannière essai, blocage expiré, nav mobile, menu user, FAB+drawer assistant. Le **routeur modern
+root = `<Outlet/>` nu** → les pages /v2 dépendent à 100% du DashboardLayout legacy. **Conclusion** : reconstruire
+fidèlement ce shell en `modern/**` = **multi-itérations + RISQUE ÉLEVÉ** (chrome cœur, câblage tout-ou-rien) pour
+**0 bénéfice utilisateur** (l'app tourne déjà 100% /v2 ; on ne supprimerait que des fichiers legacy orphelins).
+→ Recommandation : **(C) clore**, ou **(A)/(B) seulement si cadré explicitement** (ratio risque/bénéfice défavorable).
+
 ### (archive) 🏁 ÉTAT — page-migration + suppression TERMINÉES ; reste la PHASE SHELL
 **86/89 pages legacy supprimées** (lots 1-11), **cutover auth/landing/dashboard validé**, **0 régression**. Les
 **3 pages legacy restantes** (`Assistant`, `NotFound`, `Onboarding`) ne sont PAS de simples retraits — elles sont
