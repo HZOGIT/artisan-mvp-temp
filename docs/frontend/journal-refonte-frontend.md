@@ -1223,8 +1223,8 @@ packages/contract, infra/edge, top-level apps/) = coordination séparée APRÈS 
 Une brique = un sous-arbre : move + maj imports + gates (tsc.client/vitest.client/vite build) + commit chirurgical +
 deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
 - [x] B1 voice (389b9e7) : client/src/{domain/voice, infra-web, app/useVoiceSession} → client/src/modern/shared/voice/
-- [ ] B2 ui-kit : client/src/components/ui → client/src/modern/shared/ui-kit/ (primitives shadcn)
+- [x] B2 ui-kit (600f023) : client/src/components/ui → client/src/modern/shared/ui-kit/ (primitives shadcn)
 - [ ] B3 bootstrap : App.tsx/main.tsx/ErrorBoundary/ThemeContext/index.css/const/leaflet.d → client/src/bootstrap/ ;
       lib/utils + hooks → modern/shared/lib + modern/shared/hooks
 - [ ] B4 drop préfixe `modern/` : client/src/modern/* → client/src/* (mass @/modern/ → @/, tsconfig paths, vite) — LE GROS
-→ PROCHAINE BRIQUE : B2 (ui-kit : client/src/components/ui → client/src/modern/shared/ui-kit/).
+→ PROCHAINE BRIQUE : B3 (bootstrap : App.tsx/main.tsx/ErrorBoundary/ThemeContext/index.css/const/leaflet.d → client/src/bootstrap/ ; lib/utils + hooks → modern/shared).
