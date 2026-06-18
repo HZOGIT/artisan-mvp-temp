@@ -75,7 +75,7 @@ export class StripeAdapter implements StripePort {
           price_data: {
             currency: "eur",
             product_data: { name: `Facture ${p.numeroFacture}`, description: `Paiement de facture pour ${p.clientName} - ${p.artisanName}` },
-            unit_amount: Math.round(p.montantTTC * 100),
+            unit_amount: Math.round(parseFloat(p.montantTTC.toFixed(2)) * 100),
           },
           quantity: 1,
         },
