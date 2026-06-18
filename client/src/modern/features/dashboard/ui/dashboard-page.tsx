@@ -15,12 +15,12 @@ import { DevisRepartitionWidget } from "@/components/dashboard/widgets/DevisRepa
 import { TopClientsWidget } from "@/components/dashboard/widgets/TopClients";
 import { RecentActivityWidget } from "./widgets/recent-activity";
 import { UpcomingInterventionsWidget } from "./widgets/upcoming-interventions";
-import { ObjectifsWidget } from "@/components/dashboard/widgets/Objectifs";
+import { ObjectifsWidget } from "./widgets/objectifs";
 import { ActivitesAFaireWidget } from "@/components/dashboard/widgets/ActivitesAFaire";
 import { TresoreriePrevisionnelleWidget } from "@/components/dashboard/widgets/TresoreriePrevisionnelle";
 import { LivraisonsEnRetardWidget } from "./widgets/livraisons-en-retard";
 import { ContratsAFacturerWidget } from "./widgets/contrats-a-facturer";
-import { StockBasWidget } from "@/components/dashboard/widgets/StockBas";
+import { StockBasWidget } from "./widgets/stock-bas";
 import { useDashboard } from "../application/use-dashboard";
 import {
   formatEUR, computeDashboardState, resolveWidgetOrder, parseHidden, visibleWidgetIds, firstNameOf,

@@ -30,3 +30,15 @@ export function useUpcomingInterventions() {
   const { data, isLoading } = trpc.dashboard.getUpcomingInterventions.useQuery();
   return { interventions: (data ?? []) as UpcomingIntervention[], isLoading };
 }
+
+export type LowStockItem = RouterOutputs["stocks"]["getLowStock"][number] & {
+  enRupture?: boolean; designation: string; quantiteEnStock: number; unite?: string | null; seuilAlerte: number; manque: number;
+};
+export function useLowStock() {
+  const { data, isLoading } = trpc.stocks.getLowStock.useQuery();
+  return { items: (data ?? []) as LowStockItem[], isLoading };
+}
+export function useObjectifs() {
+  const { data, isLoading } = trpc.dashboard.getObjectifs.useQuery();
+  return { objectifs: data, isLoading };
+}

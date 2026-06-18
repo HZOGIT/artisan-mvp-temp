@@ -125,5 +125,16 @@
   "ui_aucune": "Aucune intervention planifiée.",
   "ui_client": "Client",
   "ui_intervention": "Intervention",
-  "ui_voirToutes": "Voir toutes les interventions"
+  "ui_voirToutes": "Voir toutes les interventions",
+  "sb_aucun": "Aucun article sous le seuil.",
+  "sb_aReappro": "{{count}} à réapprovisionner",
+  "sb_rupture": " · {{n}} en rupture",
+  "sb_enStock": "{{q}} {{u}} en stock",
+  "sb_seuil": "seuil {{s}}",
+  "sb_manque": "manque {{n}}",
+  "obj_aucun": "Aucun objectif défini.",
+  "obj_configurez": "Configurez vos objectifs dans Paramètres.",
+  "obj_ca": "Chiffre d'affaires",
+  "obj_devis": "Devis créés",
+  "obj_clients": "Nouveaux clients"
 }
