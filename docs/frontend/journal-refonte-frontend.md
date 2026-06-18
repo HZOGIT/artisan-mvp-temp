@@ -755,9 +755,21 @@ durable des gros éditeurs (gate AVANT suppression legacy). **Vérifié** : devi
 0 erreur console ; contrats → liste vide dans le tenant dev → sauté. Marqueurs validés (pas de faux négatif).
 Test-only (pas de déploiement).
 
-## 🎯 PROCHAINE CIBLE : **finding bascule #2 (default-on)** — rendre la bascule active SANS le flag opt-in sur
-chargement plein (risqué : touche auth/login) → **à cadrer avec l'humain (go/no-go)**. Puis **suppression legacy**
-(gros chantier App.tsx, à cadrer). Findings #1 (routes à paramètre) + gate de parité données réelles livrés.
+**Finding bascule #2 (default-on) = DÉJÀ LIVRÉ ✅** (découvert en relisant `v2-flag.ts`) : `isV2Enabled` vaut
+**ON par défaut** (`resolveV2Enabled(null,null)` → `stored !== "0"` → true), seul `?v2=0` force le legacy. La
+bascule est donc active sans flag opt-in.
+
+**GATE CRITIQUE LOGIN — VALIDÉ AU NAVIGATEUR ✅** (le prérequis n°1 avant suppression legacy) : `/signin`
+(formulaire **legacy** `SignIn`) → remplir → soumettre → **authentifie → atterrit sur `/v2/dashboard`**, 0 erreur
+console. `?v2=0` (legacy forcé) marche aussi. **La bascule ne redirige PAS `/signin` vers `/v2/signin`** → login OK.
+**⚠️ Piège suppression** : `/v2/signin` `/v2/sign-in` (montés dans le routeur AUTHENTIFIÉ) sont des **dead-ends
+déconnecté** (415 car., 0 champ — pas montés en public). → **NE PAS supprimer `pages/SignIn` / routes `/signin`**
+tant que les pages auth v2 ne sont pas montées PUBLIQUEMENT. Mémoire : [[v2-auth-login-state]].
+
+## 🎯 PROCHAINE CIBLE : **suppression legacy** — SEUL item restant, à cadrer avec l'humain. Pré-requis identifié :
+**monter les pages auth v2 en PUBLIC** (comme le public-router) + revalider login, AVANT de supprimer `pages/SignIn`.
+Le reste (`client/src/pages/**` hors auth, wouter, `@/lib/trpc`) = gros refactor App.tsx. État : default-on actif,
+login validé, 89 routes /v2, parité éditeurs vérifiée. **Décision/ordre de suppression = go/no-go humain.**
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
