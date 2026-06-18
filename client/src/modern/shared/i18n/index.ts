@@ -62,6 +62,7 @@ import analysesPhotosFr from "@/modern/features/analyses-photos/i18n/fr.json";
 import importFr from "@/modern/features/import/i18n/fr.json";
 import devisIaFr from "@/modern/features/devis-ia/i18n/fr.json";
 import chantiersFr from "@/modern/features/chantiers/i18n/fr.json";
+import assistantFr from "@/modern/features/assistant/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -133,6 +134,7 @@ const resources = {
     import: importFr,
     devisIa: devisIaFr,
     chantiers: chantiersFr,
+    assistant: assistantFr,
   },
 } as const;
 

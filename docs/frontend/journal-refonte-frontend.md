@@ -534,8 +534,20 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   mutations) + ui (liste + création + 6 onglets aperçu/phases/main-d'œuvre/interventions/documents/suivi +
   rappels). i18n. **0 `any`** (12 supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **362**. → findings.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes (les 2 dernières,
-à parité délicate) : `assistant` (chat streaming SSE + voix + speech), `calendrier-chantiers` (1635 l vue calendrier).
+- **Migration `assistant` ✅** (27e — **la page la plus complexe**) : chat IA **streaming SSE** + **voix**
+  (Gemini Live) + **dictée** (Web Speech) + actions rapides. Le flux `/api/assistant/stream` n'est PAS tRPC →
+  **streaming encapsulé dans l'application** (`streamMessage` : fetch + reader + parse) ; **parser SSE +
+  builders markdown en domain PUR** (`parseStreamData`/`splitSseBuffer`/`sseDataLine`/`sliceHistory`/
+  `navigateTarget`/`buildDevisMarkdown`/`buildRelancesMarkdown` — **6 tests**). Voix/dictée via les **hooks
+  partagés réutilisés** (`useVoiceSession`/`useSpeechRecognition`/`useIsMobile` — sans trpc, importables tels
+  quels). Streamdown conservé. **Bugs contrat révélés** : `generateDevis.lignes` & `suggestRelances` typés
+  `unknown` backend → types explicites + assertion à la frontière ; `devis.list` n'a pas `montantTTC` (legacy
+  lisait un champ inexistant) → `totalTTC`. application (getMessages skipToken + 4 actions) + ui (chat +
+  barre micro/voix + actions + dialogs). i18n. **0 `any`** (8 supprimés). Route + V2_ROUTES + sweep.
+  tsc/eslint(0)/vitest **368**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la DERNIÈRE page feature** : `calendrier-chantiers` (1635 l, vue calendrier
++ drag&drop d'affectation/replanification). Après elle → auth/légal + suppression du legacy.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
