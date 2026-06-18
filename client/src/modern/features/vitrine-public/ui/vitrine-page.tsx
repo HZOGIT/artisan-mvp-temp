@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useVitrine } from "../application/use-vitrine";
 import { getTheme, computeInitials, clientNameShort, anneeCreation, buildJsonLd, buildContactMessage, type SpecialiteKey } from "../domain/vitrine";
 
-// Page `/v2/vitrine/:slug` — migration clean-archi de `pages/Vitrine.tsx` (publique). Markup à l'identique.
+// Page `/vitrine/:slug` — migration clean-archi de `pages/Vitrine.tsx` (publique). Markup à l'identique.
 // Thème/helpers/JSON-LD en domain (pur, testé) ; le payload `getBySlug` (unknown backend) est casté en application.
 
 const SPEC_ICON: Record<SpecialiteKey, LucideIcon> = { plomberie: Wrench, electricite: Zap, chauffage: Sparkles, jardinage: HardHat, "multi-services": HardHat, autre: HardHat };

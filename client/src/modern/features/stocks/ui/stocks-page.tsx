@@ -22,7 +22,7 @@ import {
 import { Loader2, Plus, Search, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, History, Bell } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Gestion des Stocks du FRONT NEUF (`/v2/stocks`) — clean-archi : présentation pure. Données &
+// Page Gestion des Stocks du FRONT NEUF (`/stocks`) — clean-archi : présentation pure. Données &
 // mutations via `useStocks`/`useMouvements` (couche application, seule à importer tRPC) ; recherche,
 // seuil d'alerte, valeur de stock et index entrant via le domaine (`../domain/stock`, fonctions pures
 // testées). Parité visuelle stricte : JSX/Tailwind à l'identique (tabs + 4 dialogs + KPIs + alertes).

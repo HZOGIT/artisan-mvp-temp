@@ -25,7 +25,7 @@ import {
 import { Switch } from "@/modern/shared/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/modern/shared/ui/tooltip";
 
-// Page Mes modules du FRONT NEUF (`/v2/modules`) — MIGRATION clean-archi de `pages/Modules.tsx`
+// Page Mes modules du FRONT NEUF (`/modules`) — MIGRATION clean-archi de `pages/Modules.tsx`
 // (activation des fonctionnalités ; legacy chaînes EN DUR + type local + cast → i18n namespace `modules`
 // + types `RouterOutputs`). Données & mutation via `useModules` (couche application, seule à importer
 // tRPC) ; filtres/compteurs/populaires via le domaine (purs, testés). Présentation pure, 0 `any`.

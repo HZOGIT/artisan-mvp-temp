@@ -1,6 +1,6 @@
 import type { RouterInputs, RouterOutputs } from "@/modern/shared/trpc";
 
-// Couche DOMAIN de la feature `portail` (clean-archi) — espace client PUBLIC par token (`/v2/portail/$token`).
+// Couche DOMAIN de la feature `portail` (clean-archi) — espace client PUBLIC par token (`/portail/$token`).
 // SLICE 1 (socle) : vérification d'accès. Les onglets (devis/factures/paiement/interventions/chantiers/
 // rdv/chat/demande IA) arrivent en slices ultérieurs. Types dérivés du routeur, 0 dépendance React/tRPC.
 

@@ -22,7 +22,7 @@ import { Badge } from "@/modern/shared/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/modern/shared/ui/dropdown-menu";
 import { toast } from "sonner";
 
-// Page Bibliothèque d'articles du FRONT NEUF (`/v2/articles`) — clean-archi : présentation pure. Données
+// Page Bibliothèque d'articles du FRONT NEUF (`/articles`) — clean-archi : présentation pure. Données
 // & mutations via `useArticles` (couche application, seule à importer tRPC) ; recherche, filtres,
 // valeurs distinctes, marge et parsing CSV d'import via le domaine (`../domain/article`, fonctions pures
 // testées). Parité visuelle stricte : JSX/Tailwind à l'identique (table native `data-table`). Libellés

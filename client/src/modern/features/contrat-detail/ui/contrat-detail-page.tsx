@@ -19,7 +19,7 @@ import { TYPE_LABEL_KEY, PERIODICITE_LABEL_KEY, STATUT_INTERVENTION, statutContr
 
 const INTER_ICON: Record<string, typeof Calendar> = { planifiee: Calendar, en_cours: Clock, effectuee: CheckCircle, annulee: XCircle };
 
-// Page `/v2/contrats/:id` — migration clean-archi de `pages/ContratDetail.tsx`. Markup à l'identique.
+// Page `/contrats/:id` — migration clean-archi de `pages/ContratDetail.tsx`. Markup à l'identique.
 export default function ContratDetailPage() {
   const { t } = useTranslation("contratDetail");
   const { id: idParam } = useParams({ strict: false }) as { id?: string };

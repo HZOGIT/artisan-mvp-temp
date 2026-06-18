@@ -18,7 +18,7 @@ export function ContratsAFacturerWidget() {
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-amber-600"><CalendarClock className="h-3.5 w-3.5" />{t("caf_aFacturer", { count: contrats.length })}</div>
       {contrats.slice(0, 6).map((c) => (
-        <Link key={c.id} href={`/v2/contrats/${c.id}`} className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 p-2.5 hover:border-amber-300 transition-colors">
+        <Link key={c.id} href={`/contrats/${c.id}`} className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 p-2.5 hover:border-amber-300 transition-colors">
           <FileText className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{c.titre} — {c.clientNom}</p>

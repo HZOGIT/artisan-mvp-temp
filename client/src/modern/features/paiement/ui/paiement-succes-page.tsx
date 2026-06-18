@@ -5,7 +5,7 @@ import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { CheckCircle2, ArrowLeft, Receipt } from "lucide-react";
 
-// Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/v2/paiement/succes`) — PORT CONFORME de
+// Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/paiement/succes`) — PORT CONFORME de
 // `pages/PaiementSucces.tsx`. Montée hors auth (cf. public-router). i18n namespace `paiement`.
 export default function PaiementSuccesPage() {
   const { t } = useTranslation("paiement");

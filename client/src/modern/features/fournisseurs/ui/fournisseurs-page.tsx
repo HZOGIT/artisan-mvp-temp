@@ -20,7 +20,7 @@ import {
 import { Loader2, Plus, Search, Building2, Edit, Trash2, Package, Link2, Unlink } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Fournisseurs du FRONT NEUF (`/v2/fournisseurs`) — clean-archi : présentation pure. Données &
+// Page Fournisseurs du FRONT NEUF (`/fournisseurs`) — clean-archi : présentation pure. Données &
 // mutations via `useFournisseurs`/`useFournisseurArticles` (couche application, seule à importer tRPC) ;
 // recherche, stats et index articles via le domaine (`../domain/fournisseur`, fonctions pures testées).
 // Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (namespace `fournisseurs`).

@@ -4,11 +4,10 @@ import { useLocation } from "@/modern/shared/router/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Building2, FileText, Loader2, Receipt, Search, Users, Wrench, type LucideIcon } from "lucide-react";
 import { trpc } from "@/modern/shared/trpc";
-import { resolveV2Path } from "@/modern/shared/flag/v2-routes";
 import { groupResults, flattenGroups } from "../domain/search";
 
 // Recherche globale (Ctrl+K) du SHELL modern. PORT FIDÈLE de GlobalSearch : debounce 300ms, groupage par type
-// (domain testé), navigation clavier ↑↓↵/Esc. Self-contained (search.global + wouter). Nav via resolveV2Path (/v2).
+// (domain testé), navigation clavier ↑↓↵/Esc. Self-contained (search.global + wouter). Nav directe.
 const TYPE_META: Record<string, { icon: LucideIcon; colorClass: string; iconBg: string }> = {
   client: { icon: Users, colorClass: "text-orange-600", iconBg: "bg-orange-100 dark:bg-orange-900/30" },
   devis: { icon: FileText, colorClass: "text-blue-600", iconBg: "bg-blue-100 dark:bg-blue-900/30" },
@@ -39,7 +38,7 @@ export function GlobalSearch({ open, onOpenChange }: { open: boolean; onOpenChan
   const flatResults = useMemo(() => flattenGroups(grouped), [grouped]);
   useEffect(() => { setSelectedIndex(0); }, [debouncedQuery, results.length]);
 
-  const navigateTo = (url: string) => { setLocation(resolveV2Path(url) ?? url); onOpenChange(false); };
+  const navigateTo = (url: string) => { setLocation(url); onOpenChange(false); };
 
   useEffect(() => {
     if (!open) return;

@@ -7,9 +7,10 @@ import {
 } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { DashboardLayoutMount } from "../../shell/ui/dashboard-layout-mount";
+import NotFoundPage from "../../features/not-found/ui/not-found-page";
 
 // Socle de routage du FRONT NEUF (refonte strangler-fig). TanStack Router prend la main sur tout le
-// sous-arbre d'URL `/v2/*` (cf. `basepath`) tandis que wouter continue de servir le legacy intact.
+// sous-arbre d'URL racine (cf. `basepath: "/"`). wouter a été retiré.
 // Le routeur est rendu DANS l'arbre React existant (cf. ModernRouterMount), donc il partage déjà les
 // providers du legacy : QueryClient + tRPC (@trpc/react-query) + session/auth + DashboardLayout.
 // Routage par CODE (pas de codegen file-based) pour rester explicite et sans plugin de build.
@@ -29,8 +30,7 @@ function RouterError({ error }: ErrorComponentProps) {
 }
 
 function RouterNotFound() {
-  const { t } = useTranslation("common");
-  return <div className="p-6 text-sm text-muted-foreground">{t("routeNotFound")}</div>;
+  return <NotFoundPage />;
 }
 
 const rootRoute = createRootRoute({
@@ -445,7 +445,7 @@ const routeTree = rootRoute.addChildren([clientsRoute, clientDetailRoute, notifi
 
 export const modernRouter = createRouter({
   routeTree,
-  basepath: "/v2",
+  basepath: "/",
   defaultPendingComponent: RouterPending,
   defaultErrorComponent: RouterError,
 });

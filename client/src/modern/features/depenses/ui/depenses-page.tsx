@@ -30,7 +30,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Page Dépenses du FRONT NEUF (`/v2/depenses`) — clean-archi : présentation pure. Données & mutations
+// Page Dépenses du FRONT NEUF (`/depenses`) — clean-archi : présentation pure. Données & mutations
 // via `useDepenses`/`useIndemniteKm` (couche application, seule à importer tRPC) ; totaux, plage de mois,
 // indemnité km, index catégories via le domaine (`../domain/depense`, fonctions pures testées). Parité
 // visuelle stricte : JSX/Tailwind à l'identique (KPIs + filtres + liste + dialog indemnités km).

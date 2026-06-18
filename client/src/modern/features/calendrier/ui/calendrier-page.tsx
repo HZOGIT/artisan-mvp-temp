@@ -53,7 +53,7 @@ export default function CalendrierPage() {
   };
 
   const handleInterventionClick = (intervention: CalendarItem) => {
-    window.location.assign(`/v2/interventions?id=${intervention.id}`);
+    window.location.assign(`/interventions?id=${intervention.id}`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

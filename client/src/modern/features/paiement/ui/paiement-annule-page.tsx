@@ -3,7 +3,7 @@ import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { XCircle, ArrowLeft, RefreshCw } from "lucide-react";
 
-// Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/v2/paiement/annule`) — PORT CONFORME de
+// Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/paiement/annule`) — PORT CONFORME de
 // `pages/PaiementAnnule.tsx`. Montée hors auth (cf. public-router). i18n namespace `paiement`.
 // (Le legacy importe `useLocation` mais ne l'utilise pas — supprimé ici.)
 export default function PaiementAnnulePage() {

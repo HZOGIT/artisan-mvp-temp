@@ -199,17 +199,17 @@ export function buildSidebarGroups(permissions: string[], modulesActifs: string[
     .filter((g) => g.items.length > 0);
 }
 
-// Un item est actif si l'URL = son path OU sa version /v2 migrée. `resolveV2Path` injecté → PUR/testable.
-export function isPathActive(location: string, path: string, resolveV2Path: (p: string) => string | null): boolean {
-  return location === path || location === resolveV2Path(path);
+// Un item est actif si l'URL courante = son path. PUR/testable. (Plus de remapping /v2 : routes directes.)
+export function isPathActive(location: string, path: string): boolean {
+  return location === path;
 }
 
-// Groupe/item actif pour l'URL courante. PUR (resolveV2Path injecté).
-export function resolveActiveItem(groups: NavGroup[], location: string, resolveV2Path: (p: string) => string | null): MenuItem | undefined {
-  return groups.flatMap((g) => g.items).find((i) => isPathActive(location, i.path, resolveV2Path));
+// Groupe/item actif pour l'URL courante. PUR.
+export function resolveActiveItem(groups: NavGroup[], location: string): MenuItem | undefined {
+  return groups.flatMap((g) => g.items).find((i) => isPathActive(location, i.path));
 }
-export function resolveActiveGroup(groups: NavGroup[], location: string, resolveV2Path: (p: string) => string | null): NavGroup | undefined {
-  return groups.find((g) => g.items.some((i) => isPathActive(location, i.path, resolveV2Path)));
+export function resolveActiveGroup(groups: NavGroup[], location: string): NavGroup | undefined {
+  return groups.find((g) => g.items.some((i) => isPathActive(location, i.path)));
 }
 
 // Date relative FR pour la cloche de notifications. PUR.

@@ -3,7 +3,7 @@ import { Wrench, ArrowLeft } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 import { titleKeyForPath } from "../domain/page-construction";
 
-// Page publique `/v2/contact|aide|guide` — migration clean-archi de `pages/PageEnConstruction.tsx`. Markup
+// Page publique `/contact|aide|guide` — migration clean-archi de `pages/PageEnConstruction.tsx`. Markup
 // à l'identique ; le titre dérive du chemin (domain pur).
 export default function PageConstructionPage() {
   const { t } = useTranslation("pageConstruction");

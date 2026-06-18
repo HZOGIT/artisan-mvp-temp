@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/modern/share
 import { Star, MessageSquare, Eye, EyeOff, Send, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Avis clients du FRONT NEUF (`/v2/avis`) — MIGRATION clean-archi de `pages/Avis.tsx` (legacy chaînes
+// Page Avis clients du FRONT NEUF (`/avis`) — MIGRATION clean-archi de `pages/Avis.tsx` (legacy chaînes
 // EN DUR → i18n namespace `avis`). Données & mutations via `useAvis` (couche application, seule à importer
 // tRPC) ; catégorie de statut, % distribution, toggle modération via le domaine (pur & testé). 0 `any`.
 

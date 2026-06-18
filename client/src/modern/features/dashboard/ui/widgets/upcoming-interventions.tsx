@@ -6,7 +6,7 @@ import { Button } from "@/modern/shared/ui/button";
 import { useUpcomingInterventions } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Prochaines interventions du dashboard. Re-port de widgets/UpcomingInterventions (clean-archi, i18n, nav /v2).
+// Prochaines interventions du dashboard. Re-port de widgets/UpcomingInterventions (clean-archi, i18n).
 const STATUT_COLORS: Record<string, string> = {
   planifiee: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", en_cours: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
   terminee: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", annulee: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
@@ -32,7 +32,7 @@ export function UpcomingInterventionsWidget() {
         const statutCls = STATUT_COLORS[intervention.statut] || "bg-muted text-muted-foreground";
         const statutLabel = STATUT_LABELS[intervention.statut] || intervention.statut;
         return (
-          <motion.div key={intervention.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.3 }} onClick={() => setLocation("/v2/interventions")} className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/60 p-3 hover:bg-accent/40 cursor-pointer transition-colors">
+          <motion.div key={intervention.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.3 }} onClick={() => setLocation("/interventions")} className="flex items-start gap-3 rounded-lg border border-border/60 bg-background/60 p-3 hover:bg-accent/40 cursor-pointer transition-colors">
             <div className="h-9 w-9 shrink-0 rounded-lg bg-orange-100 dark:bg-orange-900/30 inline-flex items-center justify-center"><Calendar className="h-4 w-4 text-orange-600 dark:text-orange-400" /></div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
@@ -48,7 +48,7 @@ export function UpcomingInterventionsWidget() {
           </motion.div>
         );
       })}
-      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setLocation("/v2/interventions")}>{t("ui_voirToutes")}<ArrowRight className="h-3 w-3 ml-1" /></Button>
+      <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setLocation("/interventions")}>{t("ui_voirToutes")}<ArrowRight className="h-3 w-3 ml-1" /></Button>
     </div>
   );
 }

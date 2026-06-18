@@ -10,7 +10,7 @@ import { AuthShell } from "./auth-shell";
 import { useAuthForms } from "../application/use-auth-forms";
 import { validateSignin } from "../domain/auth";
 
-// Page `/v2/signin` — migration clean-archi de `pages/SignIn.tsx`. Markup à l'identique.
+// Page `/signin` — migration clean-archi de `pages/SignIn.tsx`. Markup à l'identique.
 export default function SignInPage() {
   const { t } = useTranslation("auth");
   const [email, setEmail] = useState("");

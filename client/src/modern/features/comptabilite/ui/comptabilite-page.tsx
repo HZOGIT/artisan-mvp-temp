@@ -22,7 +22,7 @@ import {
 } from "../domain/comptabilite";
 import { format, startOfYear, endOfYear, startOfMonth, endOfMonth } from "date-fns";
 
-// Page Comptabilité & Exports du FRONT NEUF (`/v2/comptabilite`) — clean-archi : présentation pure
+// Page Comptabilité & Exports du FRONT NEUF (`/comptabilite`) — clean-archi : présentation pure
 // (lecture seule). Les 6 rapports viennent de `useComptabilite` (couche application, seule à importer
 // tRPC) ; totaux balance & sérialisation CSV via le domaine (`../domain/comptabilite`, fonctions pures
 // testées). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`comptabilite`).

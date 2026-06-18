@@ -6,7 +6,7 @@ import AssistantPage from "@/modern/features/assistant/ui/assistant-page";
 
 // Drawer latéral MonAssistant du SHELL modern. Réutilise la page assistant modern en mode `embedded` (qui porte
 // déjà tout le chat + streaming) → bien plus simple que le legacy (340 l). Ouvre/ferme via props ; « pleine page »
-// → /v2/assistant. PORT du comportement d'AssistantDrawer (panneau droit slide-in).
+// → /assistant. PORT du comportement d'AssistantDrawer (panneau droit slide-in).
 export function AssistantDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();
@@ -22,7 +22,7 @@ export function AssistantDrawer({ open, onClose }: { open: boolean; onClose: () 
                 <span className="font-semibold text-sm">{t("assistantTitle")}</span>
               </div>
               <div className="flex items-center gap-1">
-                <button onClick={() => { onClose(); setLocation("/v2/assistant"); }} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent" aria-label={t("ouvrirPleinePage")}><Maximize2 className="h-4 w-4" /></button>
+                <button onClick={() => { onClose(); setLocation("/assistant"); }} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent" aria-label={t("ouvrirPleinePage")}><Maximize2 className="h-4 w-4" /></button>
                 <button onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent" aria-label={t("fermerAssistant")}><X className="h-4 w-4" /></button>
               </div>
             </div>

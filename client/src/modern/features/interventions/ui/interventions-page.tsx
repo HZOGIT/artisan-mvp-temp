@@ -32,7 +32,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Page Interventions du FRONT NEUF (`/v2/interventions`) — clean-archi : présentation pure. Données &
+// Page Interventions du FRONT NEUF (`/interventions`) — clean-archi : présentation pure. Données &
 // mutations via `useInterventions`/`useEquipe` (couche application, seule à importer tRPC) ; filtrage,
 // indexation d'équipe, durée, adresse, statuts via le domaine (`../domain/intervention`, fonctions pures
 // testées). Parité visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge + dialogs +

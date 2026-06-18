@@ -4,7 +4,7 @@ import { PackageX, PackageCheck, AlertTriangle } from "lucide-react";
 import { useLowStock } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Stock à réapprovisionner (lecture seule). Re-port de widgets/StockBas (clean-archi, i18n, nav /v2).
+// Stock à réapprovisionner (lecture seule). Re-port de widgets/StockBas (clean-archi, i18n).
 export function StockBasWidget() {
   const { t } = useTranslation("dashboard");
   const { items, isLoading } = useLowStock();
@@ -15,11 +15,11 @@ export function StockBasWidget() {
   const nbRupture = items.filter((s) => s.enRupture).length;
   return (
     <div className="space-y-2">
-      <Link href="/v2/stocks?filtre=alerte" className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-rose-500 hover:underline">
+      <Link href="/stocks?filtre=alerte" className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-rose-500 hover:underline">
         <AlertTriangle className="h-3.5 w-3.5" />{t("sb_aReappro", { count: items.length })}{nbRupture > 0 ? t("sb_rupture", { n: nbRupture }) : ""}
       </Link>
       {items.slice(0, 6).map((s) => (
-        <Link key={s.id} href="/v2/stocks?filtre=alerte" className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 p-2.5 hover:border-rose-300 transition-colors">
+        <Link key={s.id} href="/stocks?filtre=alerte" className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 p-2.5 hover:border-rose-300 transition-colors">
           <PackageX className={`h-4 w-4 mt-0.5 shrink-0 ${s.enRupture ? "text-rose-600" : "text-amber-500"}`} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{s.designation}</p>

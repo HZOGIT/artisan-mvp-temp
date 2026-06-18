@@ -23,7 +23,7 @@ import { usePortailInfos } from "../application/use-portail-infos";
 import { usePortailDemande } from "../application/use-portail-demande";
 import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, EXEMPLES_DEMANDE, demandeValide, type RdvUrgence, type DemandeStructured } from "../domain/portail";
 
-// SLICE 1 (socle) du portail client `/v2/portail/$token` : gate d'accès (chargement / lien invalide /
+// SLICE 1 (socle) du portail client `/portail/$token` : gate d'accès (chargement / lien invalide /
 // espace valide) + en-tête artisan + coquille d'onglets. Contenu des onglets = slices ultérieurs.
 // Composant additif PUBLIC, non lié au trafic réel tant que le backend n'a pas basculé les liens.
 const TAB_ICON: Record<string, typeof FileText> = {

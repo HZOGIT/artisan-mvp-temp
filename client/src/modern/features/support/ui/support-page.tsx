@@ -13,7 +13,7 @@ import { Mail, BookOpen, Sparkles, Send, MessageCircle, Loader2 } from "lucide-r
 import { Link } from "@/modern/shared/router/navigation";
 import { toast } from "sonner";
 
-// Page Centre d'aide / Support du FRONT NEUF (`/v2/support`) — MIGRATION clean-archi de `pages/Support.tsx`
+// Page Centre d'aide / Support du FRONT NEUF (`/support`) — MIGRATION clean-archi de `pages/Support.tsx`
 // (legacy chaînes EN DUR + FAQ inline → i18n namespace `support`, FAQ via `returnObjects`). Mutation via
 // `useSupport` (couche application, seule à importer tRPC) ; validation via le domaine (pure & testée).
 // Présentation pure, 0 `any`.

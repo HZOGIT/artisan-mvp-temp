@@ -18,7 +18,6 @@ export interface DashboardLayoutProps {
   user: { name?: string; email?: string; initial: string };
   logo?: string | null;
   entrepriseName?: string;
-  resolveV2Path: (p: string) => string | null;
   onNavigate: (finalPath: string) => void;
   onLogout: () => void;
   assistantOpen?: boolean;
@@ -33,16 +32,16 @@ export interface DashboardLayoutProps {
 
 export function DashboardLayout(props: DashboardLayoutProps) {
   const { t } = useTranslation("shell");
-  const { location, permissions, modulesActifs, user, logo, entrepriseName, resolveV2Path, onNavigate, onLogout, assistantOpen, mainExtraClass, topBarActions, banners, assistant, railBadge, itemBadge, children } = props;
+  const { location, permissions, modulesActifs, user, logo, entrepriseName, onNavigate, onLogout, assistantOpen, mainExtraClass, topBarActions, banners, assistant, railBadge, itemBadge, children } = props;
 
   const [openGroupId, setOpenGroupId] = useState<GroupId | null>(null);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [openMobileGroups, setOpenMobileGroups] = useState<Set<GroupId>>(new Set());
 
   const groups = useMemo(() => buildSidebarGroups(permissions, modulesActifs), [permissions, modulesActifs]);
-  const isActive = (p: string) => isPathActive(location, p, resolveV2Path);
-  const activeGroup = resolveActiveGroup(groups, location, resolveV2Path);
-  const activeItem = resolveActiveItem(groups, location, resolveV2Path);
+  const isActive = (p: string) => isPathActive(location, p);
+  const activeGroup = resolveActiveGroup(groups, location);
+  const activeItem = resolveActiveItem(groups, location);
 
   // À l'ouverture du drawer mobile, déplier le groupe actif (port DashboardLayout).
   useEffect(() => {
@@ -50,7 +49,7 @@ export function DashboardLayout(props: DashboardLayoutProps) {
   }, [mobileMoreOpen, activeGroup]);
 
   const navigate = (path: string) => {
-    onNavigate(resolveV2Path(path) ?? path);
+    onNavigate(path);
     setOpenGroupId(null);
     setMobileMoreOpen(false);
   };

@@ -52,10 +52,10 @@ export default function ParametresPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "1") {
       toast.success("Abonnement actif. Bienvenue !");
-      window.history.replaceState(null, "", "/v2/parametres?tab=abonnement");
+      window.history.replaceState(null, "", "/parametres?tab=abonnement");
     } else if (params.get("canceled") === "1") {
       toast("Paiement annulé, vous pouvez réessayer quand vous voulez.");
-      window.history.replaceState(null, "", "/v2/parametres?tab=abonnement");
+      window.history.replaceState(null, "", "/parametres?tab=abonnement");
     }
   }, []);
 

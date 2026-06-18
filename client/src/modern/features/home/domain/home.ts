@@ -1,4 +1,4 @@
-// Couche DOMAIN de la page vitrine (`/v2/home`, legacy `/`). Page statique : pas de données serveur, la
+// Couche DOMAIN de la page vitrine (`/home`, legacy `/`). Page statique : pas de données serveur, la
 // logique pure se limite à la tarification (cycle mensuel/annuel) et aux dimensions des sections (servent
 // à zipper les tableaux i18n avec les données structurelles — icônes/accents — côté UI). 0 dépendance React.
 

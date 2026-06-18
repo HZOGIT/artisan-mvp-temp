@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useInterventionsMobile } from "../application/use-interventions-mobile";
 import { statutVariant, equipeParIntervention, membreName, dureeSurSite, mapsUrl, type MobileIntervention } from "../domain/interventions-mobile";
 
-// Page `/v2/mobile` — migration clean-archi de `pages/InterventionsMobile.tsx`. Markup à l'identique (le
-// DashboardLayout est fourni par le mount /v2). Agrégats/format en domain ; canvas signature/géoloc en UI.
+// Page `/mobile` — migration clean-archi de `pages/InterventionsMobile.tsx`. Markup à l'identique (le
+// DashboardLayout est fourni par le shell modern). Agrégats/format en domain ; canvas signature/géoloc en UI.
 export default function InterventionsMobilePage() {
   const { t } = useTranslation("interventionsMobile");
   const { interventions, equipes, isLoading, refetch, start, end } = useInterventionsMobile();

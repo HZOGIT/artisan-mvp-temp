@@ -10,7 +10,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Page Budgets de dépenses du FRONT NEUF (`/v2/budgets-depenses`) — MIGRATION clean-archi de
+// Page Budgets de dépenses du FRONT NEUF (`/budgets-depenses`) — MIGRATION clean-archi de
 // `pages/BudgetsDepenses.tsx` (legacy en chaînes en dur → i18n namespace `budgetsDepenses`). Données &
 // mutations via `useBudgets` (couche application, seule à importer tRPC) ; totaux/%, mois précédent,
 // niveau de consommation via le domaine (fonctions pures testées). Présentation pure, 0 `any`.

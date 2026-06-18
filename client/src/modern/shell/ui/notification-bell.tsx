@@ -5,7 +5,6 @@ import { Bell } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/modern/shared/ui/popover";
 import { ScrollArea } from "@/modern/shared/ui/scroll-area";
 import { trpc } from "@/modern/shared/trpc";
-import { resolveV2Url } from "@/modern/shared/flag/v2-routes";
 import type { RouterOutputs } from "@/modern/shared/trpc";
 import { formatRelativeDate } from "../domain/nav";
 import { notifTypeMeta } from "../domain/notif-style";
@@ -25,7 +24,7 @@ export function NotificationBell() {
 
   const handleClick = (notif: Notif) => {
     if (!notif.lu) markAsRead.mutate({ id: notif.id });
-    if (notif.lien) { setOpen(false); setLocation(resolveV2Url(notif.lien)); }
+    if (notif.lien) { setOpen(false); setLocation(notif.lien); }
   };
 
   return (

@@ -5,7 +5,7 @@ import { trpc } from "@/modern/shared/trpc";
 import { trialBannerSeverity } from "../domain/subscription";
 
 // Bannière d'essai gratuit du SHELL modern (slot `banners`). PORT FIDÈLE de TrialBanner : affichée si essai ≤ 7j,
-// couleur selon l'urgence (bleu/orange/rouge). Décision en domain (`trialBannerSeverity`, testé). CTA → /v2 abonnement.
+// couleur selon l'urgence (bleu/orange/rouge). Décision en domain (`trialBannerSeverity`, testé). CTA → abonnement.
 export function TrialBanner() {
   const { t } = useTranslation("shell");
   const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });
@@ -25,7 +25,7 @@ export function TrialBanner() {
       <div className="max-w-screen-2xl mx-auto px-4 py-2.5 flex items-center gap-3 text-sm">
         <Icon className={`h-4 w-4 shrink-0 ${severity === "critical" ? "animate-pulse" : ""}`} />
         <span className="flex-1 truncate font-medium">{txt} {t("trialCtaSuffix")}</span>
-        <Link to="/v2/parametres?tab=abonnement" className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-white/80 dark:bg-black/30 px-3 py-1.5 text-xs font-semibold hover:bg-white dark:hover:bg-black/50 transition-colors">
+        <Link to="/parametres?tab=abonnement" className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-white/80 dark:bg-black/30 px-3 py-1.5 text-xs font-semibold hover:bg-white dark:hover:bg-black/50 transition-colors">
           {t("choisirPlan")}
         </Link>
       </div>

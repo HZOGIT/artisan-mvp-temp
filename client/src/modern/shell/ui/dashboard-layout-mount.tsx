@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "@/modern/shared/router/navigation";
 import { Outlet } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { resolveV2Path } from "@/modern/shared/flag/v2-routes";
 import { trpc } from "@/modern/shared/trpc";
 import { useShell } from "../application/use-shell";
 import { accountBlockState } from "../domain/subscription";
@@ -36,7 +35,7 @@ export function DashboardLayoutMount() {
   }, []);
 
   const { isBlocked, blockerAllowed } = accountBlockState(sub, location);
-  const isAssistantPage = location === "/v2/assistant";
+  const isAssistantPage = location === "/assistant";
 
   const topBarActions = (
     <>
@@ -54,7 +53,7 @@ export function DashboardLayoutMount() {
     <>
       <DashboardLayout
         location={location} permissions={permissions} modulesActifs={modulesActifs} user={user}
-        resolveV2Path={resolveV2Path} onNavigate={setLocation} onLogout={logout}
+        onNavigate={setLocation} onLogout={logout}
         assistantOpen={assistantOpen}
         mainExtraClass="md:mr-[520px]"
         topBarActions={topBarActions}

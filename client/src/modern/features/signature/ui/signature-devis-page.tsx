@@ -20,7 +20,7 @@ import { Loader2, Check, Building2, User, Pen, AlertCircle, Download, X, XCircle
 import { toast } from "sonner";
 import { generateDevisPDF } from "@/modern/shared/lib/pdfGenerator";
 
-// Page PUBLIQUE de signature de devis du FRONT NEUF (`/v2/signature/:token`) — clean-archi : présentation
+// Page PUBLIQUE de signature de devis du FRONT NEUF (`/signature/:token`) — clean-archi : présentation
 // pure. Données & mutations via `useSignature` (couche application, seule à importer tRPC) ; validation du
 // formulaire, état traité, construction des lignes PDF via le domaine (`../domain/signature`, fonctions
 // pures testées). Montée hors auth (cf. public-router). JSX/canvas copiés à l'identique ; libellés legacy

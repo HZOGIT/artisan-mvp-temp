@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { exportToCsv, csvDateSuffix } from "@/modern/shared/lib/csvExport";
 
-// Page Factures du FRONT NEUF (`/v2/factures`) — clean-archi : présentation pure. Les données/mutations
+// Page Factures du FRONT NEUF (`/factures`) — clean-archi : présentation pure. Les données/mutations
 // viennent de `useFactures`/`useClientEncours` (couche application, seule à importer tRPC) ; le filtrage
 // et la synthèse d'encours viennent du domaine (`../domain/facture`, fonctions pures testées). Parité
 // visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge). Libellés via i18n (namespace

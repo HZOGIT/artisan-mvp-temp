@@ -5,7 +5,6 @@ import { useLocation, Redirect } from "./modern/shared/router/navigation";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { trpc } from "./modern/shared/trpc";
-import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 import { resolveEntryRoute } from "./modern/shared/router/entry-routes";
 
 // ============================================================================
@@ -13,7 +12,6 @@ import { resolveEntryRoute } from "./modern/shared/router/entry-routes";
 // (route racine + auth + dashboard immediatement disponible apres login)
 // ============================================================================
 import Onboarding from "./modern/features/onboarding/ui/onboarding-page";
-import NotFound from "./modern/features/not-found/ui/not-found-page";
 
 // ============================================================================
 // IMPORTS LAZY — pages chargees a la demande via React.lazy + Suspense.
@@ -48,9 +46,6 @@ const ONBOARDING_BYPASS = new Set([
 
 function AuthenticatedRoutes() {
   const [location, setLocation] = useLocation();
-  // Bascule strangler-fig opt-in (OPE-420) : si `?v2=1` et route migrée → redirige vers `/v2/<route>`.
-  // No-op par défaut (flag inactif) → legacy strictement inchangé.
-  useV2Bascule();
   const { data: onboardingStatus, isLoading: onbLoading } =
     trpc.modules.getOnboardingStatus.useQuery();
 
@@ -62,36 +57,22 @@ function AuthenticatedRoutes() {
     }
   }, [onboardingStatus, onbLoading, location, setLocation]);
 
-  // L'onboarding est plein écran : pas de DashboardLayout autour, et il est
-  // EAGER (pas dans Suspense) pour eviter le flash de skeleton sur le premier
-  // ecran apres signup.
+  // L'onboarding est plein écran : EAGER (pas dans Suspense) pour éviter le flash de skeleton après signup.
   if (location === "/onboarding") {
     return <Onboarding />;
   }
 
-  // Câblage final OPE-403 : `/v2/*` fournit désormais SA PROPRE chrome (shell modern via le root du routeur
-  // TanStack → DashboardLayoutMount). On ne l'enveloppe donc PLUS dans le DashboardLayout legacy (sinon double
-  // shell). Le legacy DashboardLayout n'est plus utilisé que… nulle part : seules restent les redirections et le 404.
-  if (location.startsWith("/v2")) {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <ModernRouterMount />
-      </Suspense>
-    );
-  }
-
-  const search = typeof window !== "undefined" ? window.location.search : "";
-  if (location === "/dashboard") return <Redirect to={`/v2/dashboard${search}`} />;
-  if (location === "/assistant") return <Redirect to={`/v2/assistant${search}`} />;
+  // Toutes les routes authentifiées passent par le routeur modern (shell + Outlet). Le 404 d'une route
+  // inconnue est géré par le `notFoundComponent` du routeur (page not-found modern).
   return (
     <Suspense fallback={<PageLoader />}>
-      <NotFound />
+      <ModernRouterMount />
     </Suspense>
   );
 }
 
-// Routeur d'ENTRÉE (sans wouter) — dispatch impératif sur la location (shim History API). La classification
-// (redirection legacy→/v2 / montage public /v2 / authentifié) est PURE et testée dans `resolveEntryRoute`.
+// Routeur d'ENTRÉE — dispatch impératif sur la location (shim History API). La classification
+// (redirection racine / montage public / authentifié) est PURE et testée dans `resolveEntryRoute`.
 function Router() {
   const [location] = useLocation();
   const search = typeof window !== "undefined" ? window.location.search : "";

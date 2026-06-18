@@ -18,7 +18,7 @@ import { Textarea } from "@/modern/shared/ui/textarea";
 import { useDevisDetail } from "../application/use-devis-detail";
 import { formatCurrency, activitesForDevis, pendingCount, pdfLignes, statutTransition, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, type RappelType } from "../domain/devis-detail";
 
-// Page `/v2/devis/:id` — migration clean-archi de `pages/DevisDetail.tsx`. Markup à l'identique. Le dialog
+// Page `/devis/:id` — migration clean-archi de `pages/DevisDetail.tsx`. Markup à l'identique. Le dialog
 // d'ajout de ligne legacy était DEAD CODE (jamais déclenché — le bouton navigue vers la page ligne) → omis.
 export default function DevisDetailPage() {
   const { t } = useTranslation("devisDetail");

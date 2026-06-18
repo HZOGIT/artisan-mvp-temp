@@ -17,7 +17,7 @@ import { Textarea } from "@/modern/shared/ui/textarea";
 import { useFactureDetail, searchArticlesRest } from "../application/use-facture-detail";
 import { formatCurrency, isAvoirDoc, avoirSolde, avoirLignesMontantTTC, buildAvoirTotalLignes, pdfLignes, activitesForFacture, pendingCount, allowedNext, statutAction, STATUS_LABEL_KEY, STATUS_COLORS, RAPPEL_TYPE_KEY, type ArticleSearchResult, type AvoirLigneForm, type RappelType } from "../domain/facture-detail";
 
-// Page `/v2/factures/:id` — migration clean-archi de `pages/FactureDetail.tsx` (le plus gros éditeur). Markup
+// Page `/factures/:id` — migration clean-archi de `pages/FactureDetail.tsx` (le plus gros éditeur). Markup
 // à l'identique. Logique de solde d'avoir en domain (testée) ; le `handleSelectArticle` legacy était dead code.
 export default function FactureDetailPage() {
   const { t } = useTranslation("factureDetail");

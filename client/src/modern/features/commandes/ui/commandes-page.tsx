@@ -18,7 +18,7 @@ import { Plus, Search, ShoppingCart, MoreHorizontal, Eye, Pencil, Trash2, Downlo
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-// Page Bons de commande fournisseurs du FRONT NEUF (`/v2/commandes`) — clean-archi : présentation pure.
+// Page Bons de commande fournisseurs du FRONT NEUF (`/commandes`) — clean-archi : présentation pure.
 // Données & mutations via `useCommandes` (couche application, seule à importer tRPC) ; filtrage via le
 // domaine (`../domain/commande`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à
 // l'identique (table native + Badge statut). Libellés via i18n (namespace `commandes`).

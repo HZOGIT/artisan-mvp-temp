@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 
 // Socle de routage PUBLIC du FRONT NEUF (pages hors authentification : paiement, signature, portail).
 // Le routeur authentifié (cf. router.tsx) est monté dans `AuthenticatedRoutes` (sous DashboardLayout) ;
-// celui-ci est monté dans le `Router` public de `App.tsx`, sur des chemins `/v2/...` PUBLICS explicites,
+// celui-ci est monté dans le `Router` public de `App.tsx`, sur des chemins `/...` PUBLICS explicites,
 // HORS layout/auth. Même `basepath: /v2`. Deux arbres distincts → à une URL donnée, un seul s'active
 // (wouter route exacte côté public vs catch-all authentifié).
 
@@ -114,7 +114,7 @@ const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRout
 
 export const publicModernRouter = createRouter({
   routeTree,
-  basepath: "/v2",
+  basepath: "/",
   defaultPendingComponent: RouterPending,
   defaultErrorComponent: RouterError,
 });

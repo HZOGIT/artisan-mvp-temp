@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Page Devis du FRONT NEUF (`/v2/devis`) — clean-archi : présentation pure. Données/mutations via
+// Page Devis du FRONT NEUF (`/devis`) — clean-archi : présentation pure. Données/mutations via
 // `useDevis` (couche application, seule à importer tRPC) ; filtrage/décompte via le domaine
 // (`../domain/devis`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à l'identique
 // (table native `data-table`). Couleurs de filtres conservées (classes Tailwind) ; libellés via i18n.

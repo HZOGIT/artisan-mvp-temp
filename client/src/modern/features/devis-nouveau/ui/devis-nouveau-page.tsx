@@ -9,7 +9,7 @@ import { Textarea } from "@/modern/shared/ui/textarea";
 import { useDevisNouveau, useModeleLoader, searchArticlesRest } from "../application/use-devis-nouveau";
 import { emptyLigne, formatCurrency, totals, moveLine, ligneFromArticle, iaToLignes, iaTotals, buildCreatePayload, buildAddLignePayload, buildModeleLignePayload, type LigneDevis, type ArticleSearchResult, type IAProposition } from "../domain/devis-nouveau";
 
-// Page `/v2/devis/nouveau` — migration clean-archi de `pages/DevisNouveauPage.tsx`. Markup à l'identique.
+// Page `/devis/nouveau` — migration clean-archi de `pages/DevisNouveauPage.tsx`. Markup à l'identique.
 // Calculs/mappings en domain (testés) ; recherche article REST + génération IA encapsulées en application.
 export default function DevisNouveauPage() {
   const { t } = useTranslation("devisNouveau");

@@ -11,7 +11,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Page Gestion du Portail Client du FRONT NEUF (`/v2/portail-gestion`) — MIGRATION clean-archi de
+// Page Gestion du Portail Client du FRONT NEUF (`/portail-gestion`) — MIGRATION clean-archi de
 // `pages/PortailGestion.tsx` (page legacy en chaînes en dur → désormais i18n namespace `portailGestion`).
 // Données & mutations via `usePortailClients`/`useClientPortail` (couche application, seule à importer
 // tRPC) ; recherche & état d'accès via le domaine (fonctions pures testées). Présentation pure, 0 `any`.

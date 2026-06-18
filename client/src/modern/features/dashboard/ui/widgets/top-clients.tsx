@@ -5,7 +5,7 @@ import { Users } from "lucide-react";
 import { useTopClients } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Top clients par CA (barres horizontales). Re-port de widgets/TopClients (clean-archi, i18n, nav /v2, typé).
+// Top clients par CA (barres horizontales). Re-port de widgets/TopClients (clean-archi, i18n, typé).
 const formatEUR = (v: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
 
@@ -26,7 +26,7 @@ export function TopClientsWidget() {
   return (
     <div className="h-[240px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }} onClick={(state) => { const pl = (state as { activePayload?: Array<{ payload?: { id?: number } }> })?.activePayload?.[0]?.payload; if (pl?.id) setLocation(`/v2/clients/${pl.id}`); }}>
+        <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 4 }} onClick={(state) => { const pl = (state as { activePayload?: Array<{ payload?: { id?: number } }> })?.activePayload?.[0]?.payload; if (pl?.id) setLocation(`/clients/${pl.id}`); }}>
           <CartesianGrid horizontal={false} stroke="currentColor" opacity={0.08} />
           <XAxis type="number" tick={{ fontSize: 11, fill: "currentColor" }} tickLine={false} axisLine={false} opacity={0.6} tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)} />
           <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "currentColor" }} tickLine={false} axisLine={false} width={110} />

@@ -7,7 +7,7 @@ import type { RouterInputs, RouterOutputs } from "@/modern/shared/trpc";
 export type Client = RouterOutputs["clients"]["list"][number];
 export type EncoursMap = RouterOutputs["clients"]["getEncoursMap"];
 
-// Types de la vue DÉTAIL (`/v2/clients/:id`) — dérivés des sorties serveur (0 `any`).
+// Types de la vue DÉTAIL (`/clients/:id`) — dérivés des sorties serveur (0 `any`).
 export type ClientDetail = NonNullable<RouterOutputs["clients"]["getById"]>;
 export type DevisRow = RouterOutputs["devis"]["list"][number];
 export type FactureRow = RouterOutputs["factures"]["list"][number];

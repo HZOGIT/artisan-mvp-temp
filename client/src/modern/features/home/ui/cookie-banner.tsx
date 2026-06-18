@@ -4,7 +4,7 @@ import { Link } from "@/modern/shared/router/navigation";
 import { Cookie, X } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 
-// Bandeau cookies RGPD (landing). Re-port de components/CookieBanner (i18n, lien /v2).
+// Bandeau cookies RGPD (landing). Re-port de components/CookieBanner (i18n).
 const STORAGE_KEY = "operioz:cookie-consent";
 export function CookieBanner() {
   const { t } = useTranslation("home");
@@ -18,7 +18,7 @@ export function CookieBanner() {
         <div className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/40 text-blue-600 shrink-0"><Cookie className="h-5 w-5" /></div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold">{t("cb_titre")}</h3>
-          <p className="text-xs text-muted-foreground mt-1">{t("cb_texte1")} <strong>{t("cb_necessaires")}</strong> {t("cb_texte2")} <Link to="/v2/confidentialite" className="underline">{t("cb_enSavoirPlus")}</Link>.</p>
+          <p className="text-xs text-muted-foreground mt-1">{t("cb_texte1")} <strong>{t("cb_necessaires")}</strong> {t("cb_texte2")} <Link to="/confidentialite" className="underline">{t("cb_enSavoirPlus")}</Link>.</p>
         </div>
         <button type="button" onClick={() => decide("refused")} aria-label={t("cb_fermer")} className="text-muted-foreground hover:text-foreground shrink-0"><X className="h-4 w-4" /></button>
       </div>

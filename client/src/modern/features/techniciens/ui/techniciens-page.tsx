@@ -40,7 +40,7 @@ import {
 import { Users, Plus, Pencil, Trash2, Phone, Mail, Wrench, Calendar, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Techniciens du FRONT NEUF (`/v2/techniciens`) — clean-archi : présentation pure. Données &
+// Page Techniciens du FRONT NEUF (`/techniciens`) — clean-archi : présentation pure. Données &
 // mutations via `useTechniciens`/`useTechnicienDetail` (couche application, seule à importer tRPC) ;
 // le calcul du badge d'habilitation (échéance/expiration) vient du domaine (`../domain/technicien`,
 // pur & testé). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`techniciens`).

@@ -8,7 +8,7 @@ import { trpc } from "@/modern/shared/trpc";
 
 // Écran de blocage du SHELL modern (abonnement expiré). PORT FIDÈLE d'ExpiredBlocker : rendu À LA PLACE des
 // children quand `accountBlockState().isBlocked` et que la route n'est pas tolérée (cf. layout/câblage).
-// Renouvellement → /v2 abonnement ; portail Stripe ; auto-reload si le sub redevient actif.
+// Renouvellement → abonnement ; portail Stripe ; auto-reload si le sub redevient actif.
 export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) {
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();
@@ -33,7 +33,7 @@ export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) 
             {t("renouvelezAcces")}<br /><span className="text-sm">{t("donneesConservees")}</span>
           </p>
           <div className="space-y-2">
-            <Button className="w-full" onClick={() => setLocation("/v2/parametres?tab=abonnement")}>
+            <Button className="w-full" onClick={() => setLocation("/parametres?tab=abonnement")}>
               <RefreshCw className="h-4 w-4 mr-2" />{t("renouvelerAbo")}
             </Button>
             {sub?.stripeSubscriptionId && (

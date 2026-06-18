@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/mod
 import { AuthShell } from "./auth-shell";
 import { useAuthForms } from "../application/use-auth-forms";
 
-// Page `/v2/forgot-password` — migration clean-archi de `pages/ForgotPassword.tsx`. Markup à l'identique.
+// Page `/forgot-password` — migration clean-archi de `pages/ForgotPassword.tsx`. Markup à l'identique.
 export default function ForgotPasswordPage() {
   const { t } = useTranslation("auth");
   const [email, setEmail] = useState("");

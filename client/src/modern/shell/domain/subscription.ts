@@ -14,7 +14,7 @@ export function trialBannerSeverity(sub: Subscription | null | undefined): Trial
 }
 
 // Compte bloqué (essai fini / expiré / annulé échu) + routes tolérées (renouvellement/profil). PUR.
-// `location` peut être un chemin legacy (`/parametres`) ou /v2 (`/v2/parametres`) → on normalise le préfixe /v2.
+// `location` = chemin courant (ex. `/parametres`).
 export function accountBlockState(sub: Subscription | null | undefined, location: string): { isBlocked: boolean; blockerAllowed: boolean } {
   const trialEnded = sub?.status === "trialing" && sub.trialDaysLeft <= 0;
   const isBlocked = !!(
@@ -22,7 +22,7 @@ export function accountBlockState(sub: Subscription | null | undefined, location
     (sub?.status === "canceled" && sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) < new Date()) ||
     trialEnded
   );
-  const p = location.replace(/^\/v2/, "");
+  const p = location;
   const blockerAllowed = p.startsWith("/parametres") || p.startsWith("/profil");
   return { isBlocked, blockerAllowed };
 }

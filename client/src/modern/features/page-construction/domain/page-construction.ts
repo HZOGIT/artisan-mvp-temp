@@ -7,8 +7,8 @@ const TITLE_KEY: Record<string, string> = {
   "/guide": "titreGuide",
 };
 
-// Clé i18n du titre depuis un chemin (tolère le préfixe /v2). PUR.
+// Clé i18n du titre depuis un chemin. PUR.
 export function titleKeyForPath(pathname: string): string {
-  const path = pathname.replace(/^\/v2/, "") || "/";
+  const path = pathname || "/";
   return TITLE_KEY[path] ?? "titrePage";
 }

@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { matchSearch } from "@/modern/shared/lib/normalize";
 import { exportToCsv, csvDateSuffix } from "@/modern/shared/lib/csvExport";
 
-// Page Clients du FRONT NEUF (`/v2/clients`) — clean-archi : la couche UI (présentation) consomme le
+// Page Clients du FRONT NEUF (`/clients`) — clean-archi : la couche UI (présentation) consomme le
 // hook `useClients()` (couche application, seule à parler à tRPC) et les fonctions PURES du domaine
 // (`findDuplicateGroups`/`findCreateDuplicateMatch`). Aucun import tRPC ici. i18n namespace `clients`,
 // primitives `@/modern/shared/ui`. Parité visuelle stricte vs `pages/Clients.tsx`.

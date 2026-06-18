@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Détail client du FRONT NEUF (`/v2/clients/:id`) — clean-archi : la PRÉSENTATION ne connaît plus le
+// Détail client du FRONT NEUF (`/clients/:id`) — clean-archi : la PRÉSENTATION ne connaît plus le
 // transport. Les données/mutations viennent du hook `useClientDetail` (couche application, seule à
 // importer tRPC) ; les calculs (stats, filtrage par client, tri) viennent du domaine (`../domain/client`,
 // fonctions pures testées). Parité visuelle stricte : JSX/Tailwind copiés à l'identique. Les couleurs de

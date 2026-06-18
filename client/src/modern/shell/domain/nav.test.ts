@@ -66,8 +66,6 @@ describe("shell/nav — domain pur (port fidèle DashboardLayout)", () => {
 import { buildSidebarGroups, isPathActive, resolveActiveGroup, resolveActiveItem, MOBILE_PRIMARY } from "./nav";
 import { RAIL_COLORS } from "./rail-colors";
 
-const idV2 = (p: string) => (p === "/clients" ? "/v2/clients" : p === "/devis" ? "/v2/devis" : null);
-
 describe("shell/nav — composition sidebar + actif (pur)", () => {
   it("buildSidebarGroups : compose permissions + modules + drop vides", () => {
     const all = buildSidebarGroups([], null); // show-all
@@ -78,17 +76,16 @@ describe("shell/nav — composition sidebar + actif (pur)", () => {
     expect(onlyClients.find((g) => g.id === "clients")?.items.map((i) => i.label)).toContain("Clients");
   });
 
-  it("isPathActive : match direct ou via /v2 migrée", () => {
-    expect(isPathActive("/clients", "/clients", idV2)).toBe(true);
-    expect(isPathActive("/v2/clients", "/clients", idV2)).toBe(true); // URL déjà sur /v2
-    expect(isPathActive("/v2/clients", "/devis", idV2)).toBe(false);
+  it("isPathActive : match direct sur le path courant", () => {
+    expect(isPathActive("/clients", "/clients")).toBe(true);
+    expect(isPathActive("/clients", "/devis")).toBe(false);
   });
 
-  it("resolveActiveGroup/Item : trouve le groupe+item de l'URL (y compris /v2)", () => {
+  it("resolveActiveGroup/Item : trouve le groupe+item de l'URL courante", () => {
     const groups = buildSidebarGroups([], null);
-    expect(resolveActiveItem(groups, "/v2/clients", idV2)?.path).toBe("/clients");
-    expect(resolveActiveGroup(groups, "/v2/clients", idV2)?.id).toBe("clients");
-    expect(resolveActiveGroup(groups, "/route-x", idV2)).toBeUndefined();
+    expect(resolveActiveItem(groups, "/clients")?.path).toBe("/clients");
+    expect(resolveActiveGroup(groups, "/clients")?.id).toBe("clients");
+    expect(resolveActiveGroup(groups, "/route-x")).toBeUndefined();
   });
 
   it("MOBILE_PRIMARY : 4 entrées ; RAIL_COLORS couvre les 8 couleurs (dont purple)", () => {
@@ -131,14 +128,13 @@ describe("shell/subscription (pur)", () => {
     expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 1 }))).toBe("critical");
     expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 0 }))).toBe("critical");
   });
-  it("accountBlockState : expiré/essai fini bloque ; /parametres et /v2/parametres tolérés", () => {
-    expect(accountBlockState(sub({ status: "active" }), "/v2/clients").isBlocked).toBe(false);
-    expect(accountBlockState(sub({ status: "expired" }), "/v2/clients").isBlocked).toBe(true);
-    expect(accountBlockState(sub({ status: "trialing", trialDaysLeft: 0 }), "/v2/clients").isBlocked).toBe(true);
-    expect(accountBlockState(sub({ status: "expired" }), "/v2/parametres").blockerAllowed).toBe(true);
+  it("accountBlockState : expiré/essai fini bloque ; /parametres et /profil tolérés", () => {
+    expect(accountBlockState(sub({ status: "active" }), "/clients").isBlocked).toBe(false);
+    expect(accountBlockState(sub({ status: "expired" }), "/clients").isBlocked).toBe(true);
+    expect(accountBlockState(sub({ status: "trialing", trialDaysLeft: 0 }), "/clients").isBlocked).toBe(true);
     expect(accountBlockState(sub({ status: "expired" }), "/parametres").blockerAllowed).toBe(true);
-    expect(accountBlockState(sub({ status: "expired" }), "/v2/profil").blockerAllowed).toBe(true);
-    expect(accountBlockState(sub({ status: "expired" }), "/v2/clients").blockerAllowed).toBe(false);
+    expect(accountBlockState(sub({ status: "expired" }), "/profil").blockerAllowed).toBe(true);
+    expect(accountBlockState(sub({ status: "expired" }), "/clients").blockerAllowed).toBe(false);
   });
 });
 

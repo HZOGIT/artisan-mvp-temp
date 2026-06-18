@@ -18,7 +18,7 @@ export function LivraisonsEnRetardWidget() {
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-rose-500"><AlertTriangle className="h-3.5 w-3.5" />{t("ler_enRetard", { count: commandes.length })}</div>
       {commandes.slice(0, 6).map((c) => (
-        <Link key={c.id} href={`/v2/commandes/${c.id}`} className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 p-2.5 hover:border-rose-300 transition-colors">
+        <Link key={c.id} href={`/commandes/${c.id}`} className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 p-2.5 hover:border-rose-300 transition-colors">
           <TruckIcon className="h-4 w-4 mt-0.5 shrink-0 text-rose-500" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{c.numero || t("ler_commandeNum", { id: c.id })} — {c.fournisseurNom}</p>

@@ -19,7 +19,7 @@ import { Car, Gauge, Wrench, Shield, AlertTriangle, Calendar, TrendingUp, PlusCi
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Page Flotte du FRONT NEUF (`/v2/flotte`) — MIGRATION clean-archi de `pages/Flotte.tsx` (vue d'ensemble
+// Page Flotte du FRONT NEUF (`/flotte`) — MIGRATION clean-archi de `pages/Flotte.tsx` (vue d'ensemble
 // du parc, lecture seule ; legacy chaînes EN DUR → i18n namespace `flotte`). Données via `useFlotte`
 // (couche application, seule à importer tRPC) ; jours-restants, alertes et index par véhicule via le
 // domaine (fonctions pures testées). Présentation pure, 0 `any`.
