@@ -10,7 +10,7 @@ import { Badge } from "@/modern/shared/ui/badge";
 import { Input } from "@/modern/shared/ui/input";
 import { Label } from "@/modern/shared/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
-import { MapView } from "@/components/Map";
+import { MapView } from "@/modern/shared/ui/map-view";
 import { usePlanification, type Coords } from "../application/use-planification";
 import { interventionsNonAssignees, conflictCounts, destMarkerHtml, techMarkerHtml, techPopupHtml } from "../domain/planification";
 

@@ -6,7 +6,7 @@ import { MapPin, Clock, Battery, RefreshCw, Car, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { Button } from "@/modern/shared/ui/button";
 import { Badge } from "@/modern/shared/ui/badge";
-import { MapView } from "@/components/Map";
+import { MapView } from "@/modern/shared/ui/map-view";
 import { useGeolocalisation } from "../application/use-geolocalisation";
 import { withPosition, techId, latLng, batterieColor, markerIconHtml, popupContentHtml, type TechWithPos, type PopupLabels } from "../domain/geolocalisation";
 
