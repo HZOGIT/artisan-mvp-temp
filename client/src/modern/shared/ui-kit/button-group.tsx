@@ -1,7 +1,7 @@
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/modern/shared/lib/utils";
 import { Separator } from "@/modern/shared/ui-kit/separator";
 
 const buttonGroupVariants = cva(

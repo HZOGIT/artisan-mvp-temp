@@ -1,6 +1,6 @@
 import { useDialogComposition } from "@/modern/shared/ui-kit/dialog";
-import { useComposition } from "@/hooks/useComposition";
-import { cn } from "@/lib/utils";
+import { useComposition } from "@/modern/shared/hooks/useComposition";
+import { cn } from "@/modern/shared/lib/utils";
 import * as React from "react";
 
 function Input({

@@ -1,8 +1,8 @@
 import { lazy, Suspense } from "react";
 import { Toaster } from "@/modern/shared/ui-kit/sonner";
 import { TooltipProvider } from "@/modern/shared/ui-kit/tooltip";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
+import ErrorBoundary from "./bootstrap/ErrorBoundary";
+import { ThemeProvider } from "./bootstrap/ThemeContext";
 
 // Routeur UNIFIÉ (OPE-403/F1) : un seul RouterProvider TanStack porte TOUT l'espace d'URL — pages publiques
 // (hors shell), routes authentifiées (sous le shell modern via le layout `app-shell`), onboarding plein écran
