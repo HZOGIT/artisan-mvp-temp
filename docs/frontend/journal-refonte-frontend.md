@@ -778,7 +778,19 @@ au navigateur après déploiement.
 contre une régression du fix « auth v2 public » (re-dead-end si une route auth repassait dans le routeur
 authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test-only (pas de déploiement).
 
-## 🏁 ÉTAT FINAL (2026-06-18) — page-migration + suppression TERMINÉES ; reste la PHASE SHELL
+## ⛔ BLOQUÉ (2026-06-18) — phase PAGES finie, phase SHELL hors périmètre → arbitrage humain demandé
+**App.tsx = 100% /v2** (0 import de page legacy), **88/89 pages migrées**, **87/89 fichiers legacy retirés**, cutover
+complet validé (auth/landing/dashboard/onboarding/404/légales/paiement/assistant), **0 régression** (~15 lots).
+Le **résiduel** = `pages/Assistant` (réf. `components/AssistantDrawer.tsx`) + shell `components/DashboardLayout` +
+`AssistantDrawer` + **wouter** + **`@/lib/trpc`** → tout vit dans **`client/src/components/**` = HORS périmètre**
+(`client/src/modern/**` + câblage App/main). **Notifié `human` sur le bus (BLOCKED).** Décision attendue :
+**(A)** élargir périmètre à `components/**` (je migre le shell lot par lot) · **(B)** déléguer à un agent dédié ·
+**(C)** clore (app 100% /v2, résiduel interne sans impact utilisateur). **En veille d'ici l'arbitrage** — ne PAS
+générer d'itérations marginales ni toucher hors périmètre. Si réponse = A : commencer par bâtir un `modern/shell/`
+(DashboardLayout + drawer en `client/src/modern/**`) puis rebrancher `App.tsx` dessus (câblage), sans supprimer les
+fichiers legacy `components/**` tant que le périmètre ne l'autorise pas explicitement.
+
+### (archive) 🏁 ÉTAT — page-migration + suppression TERMINÉES ; reste la PHASE SHELL
 **86/89 pages legacy supprimées** (lots 1-11), **cutover auth/landing/dashboard validé**, **0 régression**. Les
 **3 pages legacy restantes** (`Assistant`, `NotFound`, `Onboarding`) ne sont PAS de simples retraits — elles sont
 couplées au **SHELL legacy** :
