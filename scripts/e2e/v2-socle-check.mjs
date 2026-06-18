@@ -344,6 +344,22 @@ await page.waitForTimeout(1500);
   const navCount = await page.locator('nav[aria-label="Navigation principale"]').count();
   if (navCount !== 1) add({ route: '/v2/dashboard', type: 'shell', text: `shell modern attendu UNIQUE (1 nav principale), obtenu ${navCount} (0=absent, >1=double shell)` });
 }
+
+// CONVERSATIONS IA (OPE-403) : cliquer un item de l'historique doit OUVRIR cette conversation (URL `?thread=<id>`),
+// pas une nouvelle. Régression passée : la nav passait par /assistant → redirect /v2/assistant en perdant ?thread.
+sidebarCount++;
+current = 'conversations IA → thread';
+await page.goto('/v2/assistant/conversations', { waitUntil: 'networkidle', timeout: 25000 });
+await page.waitForTimeout(1500);
+{
+  const items = page.locator('[class*="cursor-pointer"], li button, ul button');
+  if (await items.count() > 0) {
+    await items.first().click();
+    await page.waitForTimeout(2500);
+    const u = new URL(page.url());
+    if (!u.searchParams.get('thread')) add({ route: '/v2/assistant/conversations', type: 'conversations', text: `clic conversation: attendu /v2/assistant?thread=<id>, obtenu ${u.pathname + u.search} (la query thread est perdue → ouvre une nouvelle conv)` });
+  }
+}
 } // fin sections globales (if !ONLY)
 
 // Pages d'AUTH v2 montées en PUBLIC (OPE-403) : un visiteur DÉCONNECTÉ doit pouvoir afficher le FORMULAIRE
