@@ -51,7 +51,7 @@ tasks:
   db:generate:
     desc: Generate a new migration from schema.ts changes (does NOT touch the DB)
     cmds:
-      - 'DB_DIALECT=postgresql pnpm exec drizzle-kit generate'
+      - 'DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate'
 
   db:migrate:
     desc: Apply pending migrations + verify no drift (the ONLY safe way to change the schema)
