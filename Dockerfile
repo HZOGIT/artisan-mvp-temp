@@ -19,10 +19,8 @@ COPY drizzle ./drizzle
 # `shared/` (racine) = constantes pures partagées legacy↔new-stack (ex. `shared/permissions.ts` :
 # ROLE_TEMPLATES/ALL_PERMISSIONS), importé en relatif depuis src/** → requis au bundle esbuild.
 COPY shared ./shared
-# `server/_core/{pdfGenerator,emailService}` sont bundlés en sidecars (legacy-pdf.mjs / legacy-email.mjs)
-# consommés par les adapters legacy du new-stack (PDF facture/devis, envoi email). Imports type-only
-# côté pdfGenerator → le graphe legacy `../db` n'est PAS tiré.
-COPY server ./server
+# `src/shared/legacy/{pdfGenerator,emailService}` sont bundlés en sidecars (legacy-pdf.mjs / legacy-email.mjs)
+# consommés par les adapters du new-stack (PDF facture/devis, envoi email). Sous src/ → déjà copiés ci-dessus.
 RUN pnpm build:newstack
 
 # ── Runtime : deps de prod + bundle, utilisateur non-root ────────────────────
