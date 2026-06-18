@@ -1228,3 +1228,10 @@ deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
       lib/utils + hooks → modern/shared/lib + modern/shared/hooks
 - [x] B4 drop préfixe `modern/` (77b3280) : client/src/modern/* → client/src/* ; @/modern/→@/ (923 occ/341 fic) ; configs MAJ ; fix import backend relatif (racine cascade 774). 580 fichiers, sweep 0 issue.
 ✅ RESTRUCTURATION FRONTEND TERMINÉE (B1-B4). client/src = {features, shared, shell, bootstrap} + main/App/index.css racine. RESTE (hors cron, à coordonner) : backend/infra — apps/web+apps/api, packages/contract, infra/edge, top-level apps/.
+
+## 🏗️ REORG TOP-LEVEL — par lots (2026-06-18, GO user tous lots)
+- [x] LOT A (db6cb13a) : terraform + Dockerfile + docker-compose → infra/ (build context repo root, refs MAJ, backend smoke OK).
+- [ ] LOT B : shared/ racine → packages/contract (@shared alias front + relatifs backend ../shared).
+- [ ] LOT C : src/ → apps/api (build:newstack, Dockerfile COPY, tsconfig.src, AppRouter relatif front).
+- [ ] LOT D : client/ → apps/web (vite root, deploy-pages, index.html).
+- [ ] LOT E : functions/ → infra/edge SI Pages le permet (contrainte convention functions/ racine).
