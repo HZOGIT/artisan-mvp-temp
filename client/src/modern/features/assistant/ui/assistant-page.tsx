@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Streamdown } from "streamdown";
-import { Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar, Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio, Plus } from "lucide-react";
+import { Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar, Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio, Plus, Wrench, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { Textarea } from "@/modern/shared/ui/textarea";
@@ -39,6 +39,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [threadId, setThreadId] = useState<number | undefined>(initialThreadId);
+  const [activeTools, setActiveTools] = useState<{ name: string; ok?: boolean }[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadedThreadRef = useRef(false);
@@ -98,6 +99,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming) return;
     setMessages((prev) => [...prev, { role: "user", content: text.trim() }, { role: "assistant", content: "" }]);
+    setActiveTools([]);
     setInput(""); setIsStreaming(true);
     try {
       const controller = new AbortController();
@@ -109,6 +111,8 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
         if (ev.error) toast.error(ev.error);
         if (ev.navigate) { window.location.href = navigateTarget(ev.navigate, ev.filtre); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
         if (ev.invalidate) for (const key of ev.invalidate) queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey.some((k) => typeof k === "string" && k.includes(key)) });
+        if (ev.toolStart) setActiveTools((prev) => [...prev, { name: ev.toolStart!.name }]);
+        if (ev.toolEnd) setActiveTools((prev) => prev.map((t) => t.name === ev.toolEnd!.name && t.ok === undefined ? { ...t, ok: ev.toolEnd!.ok } : t));
       }, controller.signal);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
@@ -207,6 +211,21 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
                 <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   {msg.role === "assistant" && (<div className="shrink-0 h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center"><Bot className="h-4 w-4 text-amber-600 dark:text-amber-400" /></div>)}
                   <div className={`max-w-[75%] rounded-lg p-3 ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                    {msg.role === "assistant" && isStreaming && i === messages.length - 1 && activeTools.length > 0 && (
+                      <div className="mb-2 flex flex-col gap-1">
+                        {activeTools.map((tool, ti) => (
+                          <span key={ti} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            {tool.ok === undefined ? (
+                              <><Loader2 className="h-3 w-3 animate-spin text-amber-500" /><span className="font-mono">{tool.name}</span></>
+                            ) : tool.ok ? (
+                              <><CheckCircle2 className="h-3 w-3 text-green-500" /><span className="font-mono">{tool.name}</span></>
+                            ) : (
+                              <><XCircle className="h-3 w-3 text-red-500" /><span className="font-mono">{tool.name}</span></>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {msg.role === "assistant" ? (<div className="text-sm prose-sm"><Streamdown>{msg.content || ""}</Streamdown></div>) : (<p className="text-sm whitespace-pre-wrap">{msg.content}</p>)}
                     {msg.role === "assistant" && isStreaming && i === messages.length - 1 && (<span className="inline-block w-2 h-4 bg-current animate-pulse ml-0.5" />)}
                   </div>

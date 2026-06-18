@@ -15,7 +15,16 @@ export type RelanceItem = { numero: string; objet?: string | null; email?: { suj
 export type Relances = RelanceItem[] | { suggestions: string } | string;
 
 // Événement décodé d'une trame SSE de l'assistant.
-export type StreamEvent = { content?: string; threadId?: number; error?: string; navigate?: string; filtre?: string; invalidate?: string[] };
+export type StreamEvent = {
+  content?: string;
+  threadId?: number;
+  error?: string;
+  navigate?: string;
+  filtre?: string;
+  invalidate?: string[];
+  toolStart?: { name: string; args: Record<string, unknown> };
+  toolEnd?: { name: string; ok: boolean; error?: string };
+};
 
 // Parse une charge utile `data:` (déjà privée du préfixe). `"done"` pour [DONE], `null` si JSON invalide. PUR.
 export function parseStreamData(data: string): StreamEvent | "done" | null {
@@ -29,6 +38,14 @@ export function parseStreamData(data: string): StreamEvent | "done" | null {
   if (typeof p.navigate === "string" && p.navigate.length > 0) ev.navigate = p.navigate;
   if (typeof p.filtre === "string") ev.filtre = p.filtre;
   if (Array.isArray(p.invalidate)) ev.invalidate = p.invalidate.filter((k): k is string => typeof k === "string");
+  if (p.toolStart && typeof p.toolStart === "object") {
+    const ts = p.toolStart as Record<string, unknown>;
+    if (typeof ts.name === "string") ev.toolStart = { name: ts.name, args: (ts.args as Record<string, unknown>) ?? {} };
+  }
+  if (p.toolEnd && typeof p.toolEnd === "object") {
+    const te = p.toolEnd as Record<string, unknown>;
+    if (typeof te.name === "string") ev.toolEnd = { name: te.name, ok: te.ok === true, error: typeof te.error === "string" ? te.error : undefined };
+  }
   return ev;
 }
 

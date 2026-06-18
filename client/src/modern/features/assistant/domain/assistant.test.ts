@@ -9,6 +9,22 @@ describe("assistant — domain pur", () => {
     expect(parseStreamData("pas du json")).toBeNull();
   });
 
+  it("parseStreamData : toolStart + toolEnd", () => {
+    expect(parseStreamData('{"toolStart":{"name":"lister_factures","args":{"statut":"envoyee"}}}')).toEqual({
+      toolStart: { name: "lister_factures", args: { statut: "envoyee" } },
+    });
+    expect(parseStreamData('{"toolEnd":{"name":"lister_factures","ok":true}}')).toEqual({
+      toolEnd: { name: "lister_factures", ok: true, error: undefined },
+    });
+    expect(parseStreamData('{"toolEnd":{"name":"creer_client","ok":false,"error":"Doublon"}}')).toEqual({
+      toolEnd: { name: "creer_client", ok: false, error: "Doublon" },
+    });
+    // toolStart malformé (pas de name) → ignoré
+    const ev = parseStreamData('{"toolStart":{"args":{}}}');
+    expect(ev).not.toBeNull();
+    expect((ev as object & { toolStart?: unknown }).toolStart).toBeUndefined();
+  });
+
   it("splitSseBuffer / sseDataLine", () => {
     expect(splitSseBuffer("a\nb\nrest")).toEqual({ lines: ["a", "b"], rest: "rest" });
     expect(sseDataLine("data: {\"x\":1}")).toBe('{"x":1}');
