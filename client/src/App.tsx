@@ -30,22 +30,14 @@ const Parametres = lazy(() => import("./pages/Parametres"));
 const Calendrier = lazy(() => import("./pages/Calendrier"));
 const RapportCommande = lazy(() => import("./pages/RapportCommande"));
 const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
-const ModelesEmail = lazy(() => import("./pages/ModelesEmail"));
-const ModelesEmailTransactionnels = lazy(() => import("./pages/ModelesEmailTransactionnels"));
-const HistoriqueEmails = lazy(() => import("./pages/HistoriqueEmails"));
 const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFournisseurs"));
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
-const Contrats = lazy(() => import("./pages/Contrats"));
 const Avis = lazy(() => import("./pages/Avis"));
-const Geolocalisation = lazy(() => import("./pages/Geolocalisation"));
 const Planification = lazy(() => import("./pages/Planification"));
 const Rapports = lazy(() => import("./pages/Rapports"));
-const Conges = lazy(() => import("./pages/Conges"));
 const Previsions = lazy(() => import("./pages/Previsions"));
 const Vehicules = lazy(() => import("./pages/Vehicules"));
-const Badges = lazy(() => import("./pages/Badges"));
-const AlertesPrevisions = lazy(() => import("./pages/AlertesPrevisions"));
 const Chantiers = lazy(() => import("./pages/Chantiers"));
 const IntegrationsComptables = lazy(() => import("./pages/IntegrationsComptables"));
 const DevisIA = lazy(() => import("./pages/DevisIA"));
@@ -55,23 +47,19 @@ const RdvEnLigne = lazy(() => import("./pages/RdvEnLigne"));
 const MaVitrine = lazy(() => import("./pages/MaVitrine"));
 const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
 const CalendrierChantiers = lazy(() => import("./pages/CalendrierChantiers"));
-const CommandesFournisseurs = lazy(() => import("./pages/CommandesFournisseurs"));
 const TableauBordSyncComptable = lazy(() => import("./pages/TableauBordSyncComptable"));
 const StatistiquesDevis = lazy(() => import("./pages/StatistiquesDevis"));
 const PortailGestion = lazy(() => import("./pages/PortailGestion"));
-const Documentation = lazy(() => import("./pages/Documentation"));
 const ModulesPage = lazy(() => import("./pages/Modules"));
 const ImportPage = lazy(() => import("./pages/Import"));
 const Support = lazy(() => import("./pages/Support"));
 const DevisOptions = lazy(() => import("./pages/DevisOptions"));
 const Flotte = lazy(() => import("./pages/Flotte"));
-const Classement = lazy(() => import("./pages/Classement"));
 const AnalysesPhotos = lazy(() => import("./pages/AnalysesPhotos"));
 const NouvelleDepense = lazy(() => import("./pages/NouvelleDepense"));
 const NotesFrais = lazy(() => import("./pages/NotesFrais"));
 const TableauBordDepenses = lazy(() => import("./pages/TableauBordDepenses"));
 const ImportReleveDepenses = lazy(() => import("./pages/ImportReleve"));
-const BudgetsDepenses = lazy(() => import("./pages/BudgetsDepenses"));
 const ReglesDepenses = lazy(() => import("./pages/ReglesDepenses"));
 const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
 const CGU = lazy(() => import("./pages/legal/CGU"));
@@ -138,25 +126,18 @@ function AuthenticatedRoutes() {
           <Route path="/calendrier" component={Calendrier} />
           <Route path="/statistiques" component={StatistiquesDevis} />
           <Route path="/parametres" component={Parametres} />
-          <Route path="/contrats" component={Contrats} />
           <Route path="/avis" component={Avis} />
-          <Route path="/geolocalisation" component={Geolocalisation} />
           <Route path="/planification" component={Planification} />
           <Route path="/rapports" component={Rapports} />
-          <Route path="/conges" component={Conges} />
           <Route path="/previsions" component={Previsions} />
           <Route path="/vehicules" component={Vehicules} />
-          <Route path="/badges" component={Badges} />
-          <Route path="/alertes-previsions" component={AlertesPrevisions} />
           <Route path="/devis-options" component={DevisOptions} />
           <Route path="/flotte" component={Flotte} />
-          <Route path="/classement" component={Classement} />
           <Route path="/analyses-photos" component={AnalysesPhotos} />
           <Route path="/depenses/nouvelle" component={NouvelleDepense} />
           <Route path="/notes-de-frais" component={NotesFrais} />
           <Route path="/tableau-bord-depenses" component={TableauBordDepenses} />
           <Route path="/import-releve" component={ImportReleveDepenses} />
-          <Route path="/budgets-depenses" component={BudgetsDepenses} />
           <Route path="/regles-depenses" component={ReglesDepenses} />
           <Route path="/chantiers" component={Chantiers} />
           <Route path="/integrations-comptables" component={IntegrationsComptables} />
@@ -164,10 +145,6 @@ function AuthenticatedRoutes() {
           <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
           <Route path="/tableau-bord-sync-comptable" component={TableauBordSyncComptable} />
           <Route path="/relances" component={RelancesDevis} />
-          <Route path="/modeles-email" component={ModelesEmail} />
-          <Route path="/modeles-email-transactionnels" component={ModelesEmailTransactionnels} />
-          <Route path="/historique-emails" component={HistoriqueEmails} />
-          <Route path="/commandes" component={CommandesFournisseurs} />
           <Route path="/rapport-commande" component={RapportCommande} />
           <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
           <Route path="/portail-gestion" component={PortailGestion} />
@@ -176,7 +153,6 @@ function AuthenticatedRoutes() {
           <Route path="/rdv-en-ligne" component={RdvEnLigne} />
           <Route path="/ma-vitrine" component={MaVitrine} />
           <Route path="/utilisateurs" component={Utilisateurs} />
-          <Route path="/documentation" component={Documentation} />
           <Route path="/modules" component={ModulesPage} />
           <Route path="/import" component={ImportPage} />
           <Route path="/support" component={Support} />
