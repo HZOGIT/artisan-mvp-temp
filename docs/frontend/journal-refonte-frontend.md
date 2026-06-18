@@ -1153,3 +1153,16 @@ Propositions d'actions (front/back/infra) — l'utilisateur doit choisir le pér
 - INFRA ⭐ I1 (M) éteindre+supprimer backend LEGACY — decideTarget() renvoie TOUJOURS "new-stack" (C5, jamais ciblé) = plus gros gain ;
   I2 (S) simplifier dispatcher (retirer DEFAULT_ENABLED 58 domaines + enabledDomains, ~120 l mortes) ; I3 (S) retirer odoo-ref/ (1,2 Go).
 Ordre recommandé : I1+I2 → B1 → F2+F3 → F1. NB: I1/I2/B1 hors périmètre FRONT (outward-facing) → go explicite requis.
+
+## 🏗️ SIMPLIFICATION INFRA STAGING — APPLIQUÉE (2026-06-18, commit c24ff2a)
+Sous-domaines simplifiés + appliqués (terraform run.sh apply) : staging-newstack SUPPRIMÉ → backend new-stack
+exposé sur **staging-backend.operioz.com** (ingress tunnel + DNS) ; fallback legacy staging→app:3000 retiré ;
+dispatcher Pages (functions/api/[[path]].js NEWSTACK) repointé + redéployé. VALIDÉ: front→dispatcher→staging-backend
+→new-stack OK (x-operioz-backend:new-stack, /api 401=sain). RESTE host-side (cosmétique): tunnel `dev` orphelin à
+supprimer (cloudflared rogue à arrêter puis re-apply ; dev.operioz.com déjà décommissionné).
+- B1 RÉÉVALUÉ : server/_core PAS mort — pdfGenerator.ts+emailService.ts sont des entrées esbuild (build:newstack →
+  legacy-pdf.mjs/legacy-email.mjs, dette PDF/email bundlée backend). Consolidation = vrai refacto build+runtime, pas suppression.
+- PROPOSITION EN ATTENTE (validation user) : un seul docker-compose.yml (sans -staging, drop service `app` legacy,
+  GARDER volume postgres_staging_data = data-safe) + cleanup .env (.env.save + .env.production).
+- I2 dispatcher : [[path]].js forwarde déjà tout (dispatch.mjs a des ramifications runtime src/interface/gateway →
+  refacto backend, pas juste code mort). F1 (unification routeur TanStack natif) : approuvé, prêt, NON lancé pendant la bascule infra.
