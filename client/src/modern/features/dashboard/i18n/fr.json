@@ -139,5 +139,18 @@
   "obj_clients": "Nouveaux clients",
   "rc_aucun": "Pas encore de données de CA à afficher.",
   "rc_ca": "CA",
-  "dr_aucun": "Pas encore de devis dans votre base."
+  "dr_aucun": "Pas encore de devis dans votre base.",
+  "tc_aucun": "Pas encore de chiffre d'affaires par client.",
+  "tc_clientNum": "Client #{{id}}",
+  "tc_ca": "CA",
+  "tp_aucun": "Aucune échéance de facture ni dépense récurrente sur les 8 prochaines semaines.",
+  "tp_encaissements": "Encaissements",
+  "tp_decaissements": "Décaissements",
+  "tp_net8": "Net (8 sem.)",
+  "tp_decouvertTitre": "Découvert anticipé",
+  "tp_semaineDu": "Semaine du",
+  "tp_entrees": "Entrées",
+  "tp_sorties": "Sorties",
+  "tp_netCumule": "Net cumulé",
+  "tp_note": "Encaissements = factures à encaisser (par échéance) ; sorties = dépenses récurrentes. Hors solde bancaire actuel."
 }

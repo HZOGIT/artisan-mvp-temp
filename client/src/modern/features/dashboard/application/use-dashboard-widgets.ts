@@ -52,3 +52,15 @@ export function useDevisStats() {
   const { data, isLoading } = trpc.statistiques.getDevisStats.useQuery();
   return { parStatut: (data?.parStatut ?? {}) as Record<string, number>, isLoading };
 }
+
+export type TopClientRow = RouterOutputs["dashboard"]["getTopClients"][number] & {
+  totalCA?: number; client?: { id?: number; prenom?: string | null; nom?: string | null; entreprise?: string | null } | null;
+};
+export function useTopClients() {
+  const { data, isLoading } = trpc.dashboard.getTopClients.useQuery({ limit: 5 });
+  return { rows: (data ?? []) as TopClientRow[], isLoading };
+}
+export function useTresoreriePrevisionnelle() {
+  const { data, isLoading } = trpc.previsions.getTresoreriePrevisionnelle.useQuery({ semaines: 8 });
+  return { data, isLoading };
+}
