@@ -81,6 +81,19 @@ export const V2_ROUTES: Readonly<Record<string, string>> = {
   "/notes-de-frais": "/v2/notes-frais",
 };
 
+// Routes À PARAMÈTRE migrées (le lookup exact de `V2_ROUTES` ne les couvre pas). `:x` = un segment quelconque.
+// Le matching exige le MÊME nombre de segments → pas de collision entre `/devis/:id` et `/devis/:id/ligne/nouvelle`,
+// et les chemins statiques (`/devis/nouveau`, `/clients/import`…) sont résolus AVANT via `V2_ROUTES` (priorité exacte).
+const V2_PARAM_ROUTES: ReadonlyArray<{ legacy: string; v2: string }> = [
+  { legacy: "/devis/:id/ligne/nouvelle", v2: "/v2/devis/:id/ligne/nouvelle" },
+  { legacy: "/commandes/:id/modifier", v2: "/v2/commandes/:id/modifier" },
+  { legacy: "/clients/:id", v2: "/v2/clients/:id" },
+  { legacy: "/devis/:id", v2: "/v2/devis/:id" },
+  { legacy: "/factures/:id", v2: "/v2/factures/:id" },
+  { legacy: "/contrats/:id", v2: "/v2/contrats/:id" },
+  { legacy: "/commandes/:id", v2: "/v2/commandes/:id" },
+];
+
 // Normalise un chemin pour la résolution : retire la query string et le slash final.
 function normalize(pathname: string): string {
   const noQuery = pathname.split("?")[0].split("#")[0];
@@ -88,9 +101,31 @@ function normalize(pathname: string): string {
   return trimmed === "" ? "/" : trimmed;
 }
 
-// Renvoie le chemin `/v2` correspondant à une route legacy SI elle est migrée, sinon `null`.
+// Tente de faire correspondre un chemin à une route à paramètre migrée → chemin `/v2` substitué, sinon `null`. PUR.
+function matchParamRoute(path: string): string | null {
+  const segs = path.split("/").filter(Boolean);
+  for (const { legacy, v2 } of V2_PARAM_ROUTES) {
+    const lsegs = legacy.split("/").filter(Boolean);
+    if (lsegs.length !== segs.length) continue;
+    const params: Record<string, string> = {};
+    let ok = true;
+    for (let i = 0; i < lsegs.length; i++) {
+      if (lsegs[i].startsWith(":")) { if (!segs[i]) { ok = false; break; } params[lsegs[i].slice(1)] = segs[i]; }
+      else if (lsegs[i] !== segs[i]) { ok = false; break; }
+    }
+    if (!ok) continue;
+    let out = v2;
+    for (const [k, val] of Object.entries(params)) out = out.replace(`:${k}`, val);
+    return out;
+  }
+  return null;
+}
+
+// Renvoie le chemin `/v2` correspondant à une route legacy SI elle est migrée, sinon `null`. Essaie d'abord le
+// registre EXACT (`V2_ROUTES`, priorité aux chemins statiques) puis les routes à paramètre (`V2_PARAM_ROUTES`).
 export function resolveV2Path(legacyPath: string): string | null {
-  return V2_ROUTES[normalize(legacyPath)] ?? null;
+  const p = normalize(legacyPath);
+  return V2_ROUTES[p] ?? matchParamRoute(p) ?? null;
 }
 
 // Vrai si le chemin appartient déjà au sous-arbre du front neuf (`/v2` ou `/v2/...`).

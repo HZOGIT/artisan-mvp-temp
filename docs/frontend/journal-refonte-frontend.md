@@ -741,8 +741,16 @@ routes à paramètre — `resolveV2Path` = clé exacte → les URL détail legac
 (3) **suppression du legacy** (`client/src/pages/**`, wouter, `@/lib/trpc`) après validation de parité (login
 critique → valider manuellement avant suppression auth ; gros chantier touchant tout App.tsx → cadrer avec l'humain).
 
-## 🎯 PROCHAINE CIBLE : **findings bascule** (étendre `resolveV2Path`/`useV2Bascule` aux routes à paramètre +
-default-on, OU redirects App.tsx par route détail) → puis **suppression legacy** (à cadrer).
+**Finding bascule #1 (routes à paramètre) ✅** : `resolveV2Path` étendu avec `V2_PARAM_ROUTES` + `matchParamRoute`
+(matching segment-à-segment, `:x` = 1 segment, **même nombre de segments requis** → pas de collision ; **priorité au
+lookup exact** `V2_ROUTES` → les chemins statiques `/devis/nouveau`, `/clients/import`… gagnent). Couvre /clients/:id,
+/devis/:id (+/ligne/nouvelle), /factures/:id, /contrats/:id, /commandes/:id (+/modifier). **4 nouveaux cas de test**
+(vitest **450**). 0 `any`. → la bascule (flag actif / SPA nav) redirige désormais les URL détail legacy paramétrées
+vers /v2.
+
+## 🎯 PROCHAINE CIBLE : **finding bascule #2 (default-on)** — rendre la bascule active SANS le flag opt-in sur
+chargement plein (risqué : touche auth/login) → **à cadrer avec l'humain**. Puis **suppression legacy** (gros
+chantier App.tsx, à cadrer). Le finding #1 (routes à paramètre) est livré.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
