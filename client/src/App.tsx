@@ -26,15 +26,8 @@ import DashboardLayout from "./components/DashboardLayout";
 // Chaque page devient un chunk webpack/Vite separe → bundle initial reduit.
 // ============================================================================
 const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
-const Clients = lazy(() => import("./pages/Clients").then((m) => ({ default: m.Clients })));
-const Devis = lazy(() => import("./pages/Devis"));
-const Factures = lazy(() => import("./pages/Factures"));
-const Interventions = lazy(() => import("./pages/Interventions"));
-const Articles = lazy(() => import("./pages/Articles"));
 const Parametres = lazy(() => import("./pages/Parametres"));
 const Calendrier = lazy(() => import("./pages/Calendrier"));
-const Stocks = lazy(() => import("./pages/Stocks"));
-const Fournisseurs = lazy(() => import("./pages/Fournisseurs"));
 const RapportCommande = lazy(() => import("./pages/RapportCommande"));
 const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
 const ModelesEmail = lazy(() => import("./pages/ModelesEmail"));
@@ -44,11 +37,8 @@ const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFourniss
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
 const Contrats = lazy(() => import("./pages/Contrats"));
-const Chat = lazy(() => import("./pages/Chat"));
-const Techniciens = lazy(() => import("./pages/Techniciens"));
 const Avis = lazy(() => import("./pages/Avis"));
 const Geolocalisation = lazy(() => import("./pages/Geolocalisation"));
-const Comptabilite = lazy(() => import("./pages/Comptabilite"));
 const Planification = lazy(() => import("./pages/Planification"));
 const Rapports = lazy(() => import("./pages/Rapports"));
 const Conges = lazy(() => import("./pages/Conges"));
@@ -61,7 +51,6 @@ const IntegrationsComptables = lazy(() => import("./pages/IntegrationsComptables
 const DevisIA = lazy(() => import("./pages/DevisIA"));
 const Assistant = lazy(() => import("./pages/Assistant"));
 const AssistantConversations = lazy(() => import("./pages/AssistantConversations"));
-const Notifications = lazy(() => import("./pages/Notifications"));
 const RdvEnLigne = lazy(() => import("./pages/RdvEnLigne"));
 const MaVitrine = lazy(() => import("./pages/MaVitrine"));
 const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
@@ -78,7 +67,6 @@ const DevisOptions = lazy(() => import("./pages/DevisOptions"));
 const Flotte = lazy(() => import("./pages/Flotte"));
 const Classement = lazy(() => import("./pages/Classement"));
 const AnalysesPhotos = lazy(() => import("./pages/AnalysesPhotos"));
-const Depenses = lazy(() => import("./pages/Depenses"));
 const NouvelleDepense = lazy(() => import("./pages/NouvelleDepense"));
 const NotesFrais = lazy(() => import("./pages/NotesFrais"));
 const TableauBordDepenses = lazy(() => import("./pages/TableauBordDepenses"));
@@ -144,25 +132,15 @@ function AuthenticatedRoutes() {
       <Suspense fallback={<PageLoader />}>
         <Switch location={location}>
           <Route path="/dashboard" component={Dashboard} />
-          <Route path="/clients" component={Clients} />
           {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
           <Route path="/v2/*" component={ModernRouterMount} />
-          <Route path="/devis" component={Devis} />
-          <Route path="/factures" component={Factures} />
-          <Route path="/interventions" component={Interventions} />
-          <Route path="/articles" component={Articles} />
           <Route path="/calendrier" component={Calendrier} />
           <Route path="/statistiques" component={StatistiquesDevis} />
-          <Route path="/stocks" component={Stocks} />
-          <Route path="/fournisseurs" component={Fournisseurs} />
           <Route path="/parametres" component={Parametres} />
           <Route path="/contrats" component={Contrats} />
-          <Route path="/chat" component={Chat} />
-          <Route path="/techniciens" component={Techniciens} />
           <Route path="/avis" component={Avis} />
           <Route path="/geolocalisation" component={Geolocalisation} />
-          <Route path="/comptabilite" component={Comptabilite} />
           <Route path="/planification" component={Planification} />
           <Route path="/rapports" component={Rapports} />
           <Route path="/conges" component={Conges} />
@@ -174,7 +152,6 @@ function AuthenticatedRoutes() {
           <Route path="/flotte" component={Flotte} />
           <Route path="/classement" component={Classement} />
           <Route path="/analyses-photos" component={AnalysesPhotos} />
-          <Route path="/depenses" component={Depenses} />
           <Route path="/depenses/nouvelle" component={NouvelleDepense} />
           <Route path="/notes-de-frais" component={NotesFrais} />
           <Route path="/tableau-bord-depenses" component={TableauBordDepenses} />
@@ -196,7 +173,6 @@ function AuthenticatedRoutes() {
           <Route path="/portail-gestion" component={PortailGestion} />
           <Route path="/assistant/conversations" component={AssistantConversations} />
           <Route path="/assistant" component={Assistant} />
-          <Route path="/notifications" component={Notifications} />
           <Route path="/rdv-en-ligne" component={RdvEnLigne} />
           <Route path="/ma-vitrine" component={MaVitrine} />
           <Route path="/utilisateurs" component={Utilisateurs} />

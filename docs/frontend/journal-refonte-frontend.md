@@ -784,6 +784,8 @@ authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test
 - **Procédure par lot** : retirer fichiers `pages/<X>.tsx` + leurs import/Route dans `App.tsx` → `vite build` OK →
   deploy → revalider bascule (default-on) + login navigateur → commit chirurgical.
 
+**LOT 3 ✅** : retrait 12 pages domaine listes migrées (Clients, Devis, Factures, Interventions, Articles, Stocks, Fournisseurs, Chat, Techniciens, Comptabilite, Notifications, Depenses) — toutes en PARITE sweep verte, servies par bascule. vite build OK, vitest.v2 450, tsc.v2 0. Cumul lots 1-3 = 24 pages.
+
 **LOT 2 ✅** : retrait 8 pages migrées+validées (ClientDetail, ClientsNouveauPage, DevisDetail, DevisNouveauPage, DevisLigneEdit, FactureDetail, CommandeFournisseurForm, Profil) → routes /clients/:id, /clients/nouveau, /devis/:id(+/nouveau,+/ligne), /factures/:id, /commandes/nouvelle(+/:id/modifier), /profil servies par bascule. vite build OK, vitest.v2 450, tsc.v2 0.
 
 **LOT 1 ✅** : retrait de 4 pages détail/sous-pages migrées+validées (leaf, réf. uniquement dans App.tsx) :
