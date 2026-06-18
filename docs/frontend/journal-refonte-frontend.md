@@ -637,7 +637,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | DevisDetail | /devis/:id | 1116 | 16 | éditeur lourd |
 | DevisNouveauPage | /devis/nouveau | 873 | 11 | créateur devis |
 | Vitrine (public) | /vitrine/:slug | 749 | 3 | vitrine publique artisan |
-| Profil | /profil | 727 | 11 | paramètres compte (email/mdp/delete) |
+| ~~Profil~~ ✅ | ~~/profil~~ → /v2/profil | 727 | 11 | **FAIT** (profil ; 11 `as any` étaient inutiles, champs typés) |
 | DevisLigneEdit | /devis/:id/ligne/nouvelle | 654 | 11 | édition ligne devis |
 | CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
 | ~~ContratDetail~~ ✅ | ~~/contrats/:id~~ → /v2/contrats/:id | 539 | 2 | **FAIT** (contrat-detail ; findings client+factures) |
@@ -653,6 +653,17 @@ TOUJOURS vide en legacy (`contrat.facturesRecurrentes` undefined) → parité = 
 OK). Clean-archi domain (`montantsContrat`/`statutContratVariant`/`buildCreateInterventionPayload` + catalogues
 — **5 tests**) + application (skipToken + client) + ui (3 onglets + dialog planif). useParams TanStack. i18n. **0 `any`**.
 Route `/v2/contrats/$id`. vitest **405**.
+
+**Itération `profil` (`/profil`) ✅** : profil entreprise (raison sociale/SIRET/TVA/forme juridique/capital/RM/
+spécialité/métier IA/adresse/IBAN) + **AccountSettings** (changement email `auth.updateEmail`, mot de passe
+`auth.updatePassword` + jauge de force, **suppression compte** `auth.deleteAccount` + AlertDialog « SUPPRIMER »).
+**Les 11 `as any` legacy étaient INUTILES** : `ArtisanProfile` ET `updateProfile` exposent déjà TOUS les champs
+(numeroTVA/iban/codeAPE/formeJuridique/capitalSocial/villeRCS/numeroRM/metier) → typage propre, **0 `any`**.
+Email courant via `auth.me` (au lieu du hook legacy `useAuth`). Nouvelle primitive `alert-dialog.ts`. Clean-archi
+domain (`formFromArtisan`/`buildUpdatePayload`/`passwordStrength`/`validateEmailChange`/`validatePasswordChange`
++ catalogues SPECIALITES/FORME_OPTIONS/METIERS_IA — **5 tests**) + application (2 hooks) + ui (form + 3 cartes
+compte). Route `/v2/profil` (exact-key → **bascule OK** + V2_ROUTES + sweep). Test `v2-routes` mis à jour
+(`/profil` n'est plus l'exemple « non migré » → `/contact`). vitest **410**.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré

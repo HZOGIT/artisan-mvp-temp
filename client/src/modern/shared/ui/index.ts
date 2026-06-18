@@ -13,6 +13,7 @@ export * from "./tabs";
 export * from "./dialog";
 export * from "./popover";
 export * from "./alert";
+export * from "./alert-dialog";
 export * from "./table";
 export * from "./textarea";
 export * from "./checkbox";
