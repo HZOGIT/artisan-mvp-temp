@@ -1143,3 +1143,13 @@ seul `/`→`/home`, détection public sur chemins bare) ; nav.isPathActive sans 
 replace(/^/v2/) retirés ; 404 routeur → page not-found modern. Backend émet déjà des chemins bare (/portail/:token,
 /parametres) → ALIGNÉ. patches/ (wouter) supprimé. Gates: tsc.v2 0, eslint 0, vitest.v2 458, vite build OK.
 Déployé + testé staging : /→/home, login→/dashboard (plus de /v2), /clients (shell OK), /cgv (public OK), 0 erreur.
+
+## 🧹 AUDIT SIMPLIFICATION POST-REFONTE (2026-06-18) — EN ATTENTE DE CHOIX UTILISATEUR
+Side-panel assistant re-porté (commit 2a8cd6f) : tailles sm/md/lg + auto-open + operioz:open-assistant + ESC.
+Propositions d'actions (front/back/infra) — l'utilisateur doit choisir le périmètre avant exécution :
+- FRONT F1 (M-L) unifier routage TanStack natif (retirer shim navigation.tsx + dispatch App.tsx + 2 routeurs → 1 arbre typé) ;
+  F2 (S) ErrorBoundary/ThemeContext/ModalContext → modern/ ; F3 (S) hooks/app/lib → modern/shared (NB: lib/utils=cn importé par 52 shadcn → churny).
+- BACK B1 (S-M) consolider server/_core (pdf/fonts/email/env, 4 fichiers, 7 imports) → src/shared/.
+- INFRA ⭐ I1 (M) éteindre+supprimer backend LEGACY — decideTarget() renvoie TOUJOURS "new-stack" (C5, jamais ciblé) = plus gros gain ;
+  I2 (S) simplifier dispatcher (retirer DEFAULT_ENABLED 58 domaines + enabledDomains, ~120 l mortes) ; I3 (S) retirer odoo-ref/ (1,2 Go).
+Ordre recommandé : I1+I2 → B1 → F2+F3 → F1. NB: I1/I2/B1 hors périmètre FRONT (outward-facing) → go explicite requis.
