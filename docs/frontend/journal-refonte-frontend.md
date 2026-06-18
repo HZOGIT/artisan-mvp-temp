@@ -784,6 +784,8 @@ authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test
 - **Procédure par lot** : retirer fichiers `pages/<X>.tsx` + leurs import/Route dans `App.tsx` → `vite build` OK →
   deploy → revalider bascule (default-on) + login navigateur → commit chirurgical.
 
+**LOT 6 ✅** : retrait 12 pages (Import, ImportReleve, Modules, NotesFrais, NouvelleDepense, PerformancesFournisseurs, Planification, PortailGestion, Previsions, RapportCommande, Rapports, RdvEnLigne). vite build OK, vitest.v2 450. Cumul lots 1-6 = 60 pages.
+
 **LOT 5 ✅** : retrait 12 pages (AnalysesPhotos, AssistantConversations, Avis, Calendrier, CalendrierChantiers, Chantiers, DevisIA, DevisOptions, Flotte, IntegrationsComptables, MaVitrine, Vehicules). Assistant gardé (réf. par AssistantDrawer). vite build OK, vitest.v2 450. Cumul lots 1-5 = 48 pages.
 
 **LOT 4 ✅** : retrait 12 pages domaine (AlertesPrevisions, Badges, BudgetsDepenses, Classement, CommandesFournisseurs, Conges, Contrats, Documentation, Geolocalisation, HistoriqueEmails, ModelesEmail, ModelesEmailTransactionnels). vite build OK, vitest.v2 450. Cumul lots 1-4 = 36 pages.
