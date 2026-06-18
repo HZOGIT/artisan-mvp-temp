@@ -638,7 +638,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | DevisNouveauPage | /devis/nouveau | 873 | 11 | créateur devis |
 | ~~Vitrine (public)~~ ✅ | ~~/vitrine/:slug~~ → /v2/vitrine/:slug | 749 | 3 | **FAIT** (vitrine-public ; payload getBySlug unknown→typé) |
 | ~~Profil~~ ✅ | ~~/profil~~ → /v2/profil | 727 | 11 | **FAIT** (profil ; 11 `as any` étaient inutiles, champs typés) |
-| DevisLigneEdit | /devis/:id/ligne/nouvelle | 654 | 11 | édition ligne devis |
+| ~~DevisLigneEdit~~ ✅ | ~~/devis/:id/ligne/nouvelle~~ → /v2/... | 654 | 11 | **FAIT** (devis-ligne ; bug prix/réf snake_case corrigé) |
 | CommandeFournisseurForm | /commandes/nouvelle + /:id/modifier | 622 | 12 | 1 composant, 2 routes |
 | ~~ContratDetail~~ ✅ | ~~/contrats/:id~~ → /v2/contrats/:id | 539 | 2 | **FAIT** (contrat-detail ; findings client+factures) |
 | ~~SoumettreAvis (public)~~ ✅ | ~~/avis/:token~~ → /v2/avis/:token | 187 | 0 | **FAIT** (avis-public ; redirect explicite + public-router) |
@@ -673,6 +673,17 @@ déclaré explicitement** + cast en application. Clean-archi domain (`getTheme`/
 + application (skipToken) + ui (framer-motion conservé ; icône thème résolue en UI). **64 clés i18n**. **0 `any`**
 (3 supprimés). Route publique `/v2/vitrine/$slug` (public-router) + **redirect explicite** App.tsx + legacy retiré.
 vitest **416**.
+
+**Itération `devis-ligne` (`/devis/:id/ligne/nouvelle`) ✅** (1re du cluster devis/factures) : ajout de ligne
+(produit/section/note) avec recherche bibliothèque + **suggestions IA** + saisie manuelle. 5 endpoints
+(devis.getById/addLigne, articles.getBibliotheque/suggererArticlesIA/createArtisanArticle). **2 BUGS corrigés** :
+(1) la bibliothèque expose `nom`/`prixBase`/`sousCategorie` (camelCase) mais le legacy lisait `prix_base`/
+`sous_categorie` (snake_case) → **prix & référence TOUJOURS vides** dans le sélecteur → corrigé (helpers typés) ;
+(2) section/note envoyées **sans `prixUnitaireHT`** alors que le schéma `addLigne` l'exige → 400 silencieux →
+corrigé (prix « 0 » pour les lignes d'affichage). Clean-archi domain (`filterArticles`/`groupByCategorie`/
+`lineTotals`/`buildAddLignePayload`/`formFromArticle`/`formFromSuggestion` + accès articles typés — **6 tests**)
++ application (skipToken IA) + ui (dialog recherche + scroll-area). i18n. **0 `any`** (11 supprimés). Route
+`/v2/devis/$id/ligne/nouvelle`. vitest **422**.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
