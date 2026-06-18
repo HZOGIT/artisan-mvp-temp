@@ -11,7 +11,7 @@ import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 // IMPORTS EAGER — pages critiques chargées dans le bundle initial
 // (route racine + auth + dashboard immediatement disponible apres login)
 // ============================================================================
-import Onboarding from "./pages/Onboarding";
+import Onboarding from "./modern/features/onboarding/ui/onboarding-page";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "./components/DashboardLayout";
 
