@@ -2,7 +2,8 @@ import type { Facture, FactureLigne, Artisan, Client } from "./pdf-input-types";
 
 /**
  * Generates Factur-X XML (CII / ZUGFeRD MINIMUM profile)
- * Compliant with EN 16931 for French electronic invoicing 2026
+ * Compliant with EN 16931 for French electronic invoicing 2026.
+ * Emits one ApplicableTradeTax block per distinct TVA rate (multi-rate support).
  */
 export function generateFacturXML(
   facture: Facture & { lignes: FactureLigne[] },
@@ -17,7 +18,31 @@ export function generateFacturXML(
   const totalHT = parseFloat(facture.totalHT?.toString() || "0");
   const totalTVA = parseFloat(facture.totalTVA?.toString() || "0");
   const totalTTC = parseFloat(facture.totalTTC?.toString() || "0");
-  const tauxTVA = parseFloat(a.tauxTVA?.toString() || "20");
+
+  // Aggregate TVA per distinct rate from lines (EN 16931 : one block per rate).
+  // Lines of type section/note carry no price and are excluded.
+  const tvaByRate = new Map<number, { baseHT: number; montantTVA: number }>();
+  for (const l of facture.lignes) {
+    const type = (l as any).type ?? "produit";
+    if (type === "section" || type === "note") continue;
+    const taux = parseFloat(String((l as any).tauxTVA ?? "0")) || 0;
+    const ht = parseFloat(String((l as any).montantHT ?? "0")) || 0;
+    const tva = parseFloat(String((l as any).montantTVA ?? "0")) || 0;
+    const entry = tvaByRate.get(taux) ?? { baseHT: 0, montantTVA: 0 };
+    entry.baseHT += ht;
+    entry.montantTVA += tva;
+    tvaByRate.set(taux, entry);
+  }
+
+  // Fallback when lines have no montantHT/TVA (edge case): single block from totals.
+  const taxBlocks: { taux: number; baseHT: number; montantTVA: number }[] =
+    tvaByRate.size > 0
+      ? Array.from(tvaByRate.entries()).map(([taux, v]) => ({
+          taux,
+          baseHT: round2(v.baseHT),
+          montantTVA: round2(v.montantTVA),
+        }))
+      : [{ taux: parseFloat(a.tauxTVA?.toString() || "20"), baseHT: totalHT, montantTVA: totalTVA }];
 
   const sellerName = escXml(artisan.nomEntreprise || "Artisan");
   const sellerAddr = escXml(artisan.adresse || "");
@@ -30,6 +55,18 @@ export function generateFacturXML(
   const buyerAddr = escXml(client.adresse || "");
   const buyerCP = escXml(client.codePostal || "");
   const buyerVille = escXml(client.ville || "");
+
+  const taxBlocksXml = taxBlocks
+    .map(
+      (b) => `      <ram:ApplicableTradeTax>
+        <ram:CalculatedAmount>${b.montantTVA.toFixed(2)}</ram:CalculatedAmount>
+        <ram:TypeCode>VAT</ram:TypeCode>
+        <ram:BasisAmount>${b.baseHT.toFixed(2)}</ram:BasisAmount>
+        <ram:CategoryCode>S</ram:CategoryCode>
+        <ram:RateApplicablePercent>${b.taux.toFixed(2)}</ram:RateApplicablePercent>
+      </ram:ApplicableTradeTax>`,
+    )
+    .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -84,13 +121,7 @@ export function generateFacturXML(
           <udt:DateTimeString format="102">${echeanceStr}</udt:DateTimeString>
         </ram:DueDateDateTime>` : ""}
       </ram:SpecifiedTradePaymentTerms>
-      <ram:ApplicableTradeTax>
-        <ram:CalculatedAmount>${totalTVA.toFixed(2)}</ram:CalculatedAmount>
-        <ram:TypeCode>VAT</ram:TypeCode>
-        <ram:BasisAmount>${totalHT.toFixed(2)}</ram:BasisAmount>
-        <ram:CategoryCode>S</ram:CategoryCode>
-        <ram:RateApplicablePercent>${tauxTVA.toFixed(2)}</ram:RateApplicablePercent>
-      </ram:ApplicableTradeTax>
+${taxBlocksXml}
       <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
         <ram:LineTotalAmount>${totalHT.toFixed(2)}</ram:LineTotalAmount>
         <ram:TaxBasisTotalAmount>${totalHT.toFixed(2)}</ram:TaxBasisTotalAmount>
@@ -101,6 +132,12 @@ export function generateFacturXML(
     </ram:ApplicableHeaderTradeSettlement>
   </rsm:SupplyChainTradeTransaction>
 </rsm:CrossIndustryInvoice>`;
+}
+
+function round2(n: number): number {
+  if (n === 0) return 0;
+  const eps = Math.sign(n) * Math.pow(2, Math.floor(Math.log2(Math.abs(n))) - 50);
+  return Math.round((n + eps) * 100) / 100;
 }
 
 function formatCIIDate(d: Date | string): string {
