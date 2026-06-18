@@ -611,9 +611,22 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   tests**) + application (4 endpoints) + ui (cartes + canvas signature tactile + dialog). i18n. **0 `any`** (2
   supprimés). Route /v2/mobile + V2_ROUTES + sweep. vitest **393**.
 
-## 🎯 PROCHAINE CIBLE : **sous-pages détail/création restantes** : `profil` (727), `commandes` (form 622/detail
-466), `contrats/:id` (539), éditeurs `devis/:id`(1116)/`factures/:id`(1197)/`devis/nouveau`(873) ; puis stubs
-`/contact /aide /guide` + landing `/` ; puis **suppression du legacy**. Toutes les pages applicatives + auth + légal
+- **Migration `commande-detail` (commandes/:id) ✅** : détail bon de commande fournisseur (466 l). **BUGS
+  contrat révélés** (legacy `any`) : (1) le new-stack `getById` renvoie la commande SEULE (**sans lignes ni
+  fournisseur**) → lignes via `getLignes` + fournisseur via `fournisseurs.list` (le legacy lisait
+  `commande.lignes`/`.fournisseur` inexistants → toujours vides) ; (2) `Depense.montantTtc` (≠ `montant_ttc`) ;
+  (3) `Commande.dateLivraisonPrevue` (≠ `delaiLivraison` inexistant → « — » legacy). Clean-archi : domain
+  (`formatCurrency`/`ligneTotal`/`receptionActive`/`estRecue`/`aDesQuantitesRecues`/`buildReceptionPayload`/
+  `findFournisseur`/`depenseLabel` + catalogues statut — **5 tests**) + application (getById+getLignes+
+  fournisseurs+depenses + 5 mutations) + ui (header actions + cartes + lignes/réception + totaux). useParams
+  TanStack (`strict:false`). i18n. **0 `any`** (8 supprimés). Route `/v2/commandes/$id`. vitest **398**.
+- ⚠️ **FINDING bascule routes à paramètre** : `resolveV2Path` est un lookup de clé EXACTE → les routes
+  `/commandes/:id`, `/clients/:id`, `/devis/:id`, `/factures/:id`… **ne basculent pas** (pas de clé). Les pages
+  /v2 existent et fonctionnent mais ne sont pas servies via la bascule sur un chemin paramétré. À traiter à la
+  refonte bascule (préfixe + extraction de param) en même temps que le finding default-on.
+
+## 🎯 PROCHAINE CIBLE : **sous-pages restantes** : `profil` (727), `commandes/nouvelle`+`:id/modifier`
+(CommandeFournisseurForm 622), `contrats/:id` (539), éditeurs `devis`/`factures` (gros) ; stubs ; puis **legacy**. Toutes les pages applicatives + auth + légal
 sont migrées et basculées via `V2_ROUTES`. Étapes : (1) **audit `comm -23`** des routes App.tsx vs `V2_ROUTES`
 pour lister le résiduel non migré (PageEnConstruction, /contact /aide /guide, /calendrier ≠ calendrier-chantiers,
 Home `/`…) ; (2) **valider la parité au navigateur** (sweep complet + manuel sur login) ; (3) **supprimer**

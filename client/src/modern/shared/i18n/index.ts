@@ -69,6 +69,7 @@ import legalFr from "@/modern/features/legal/i18n/fr.json";
 import clientFormFr from "@/modern/features/client-form/i18n/fr.json";
 import clientsImportFr from "@/modern/features/clients-import/i18n/fr.json";
 import interventionsMobileFr from "@/modern/features/interventions-mobile/i18n/fr.json";
+import commandeDetailFr from "@/modern/features/commande-detail/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -147,6 +148,7 @@ const resources = {
     clientForm: clientFormFr,
     clientsImport: clientsImportFr,
     interventionsMobile: interventionsMobileFr,
+    commandeDetail: commandeDetailFr,
   },
 } as const;
 
