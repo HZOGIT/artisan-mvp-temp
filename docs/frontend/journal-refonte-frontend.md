@@ -748,9 +748,16 @@ lookup exact** `V2_ROUTES` → les chemins statiques `/devis/nouveau`, `/clients
 (vitest **450**). 0 `any`. → la bascule (flag actif / SPA nav) redirige désormais les URL détail legacy paramétrées
 vers /v2.
 
+**Gate de parité données réelles (éditeurs migrés) ✅** : ajout au sweep `v2-socle-check.mjs` d'un bloc
+`DETAIL_ENTITES` qui, pour devis/factures/contrats/commandes, récupère un id RÉEL via `.list` puis vérifie le rendu
+de `/v2/<entité>/:id` avec des **données réelles** (liste vide → saut gracieux, pas d'échec). Anti-régression
+durable des gros éditeurs (gate AVANT suppression legacy). **Vérifié** : devis(29)/factures(22)/commandes(2) → OK,
+0 erreur console ; contrats → liste vide dans le tenant dev → sauté. Marqueurs validés (pas de faux négatif).
+Test-only (pas de déploiement).
+
 ## 🎯 PROCHAINE CIBLE : **finding bascule #2 (default-on)** — rendre la bascule active SANS le flag opt-in sur
-chargement plein (risqué : touche auth/login) → **à cadrer avec l'humain**. Puis **suppression legacy** (gros
-chantier App.tsx, à cadrer). Le finding #1 (routes à paramètre) est livré.
+chargement plein (risqué : touche auth/login) → **à cadrer avec l'humain (go/no-go)**. Puis **suppression legacy**
+(gros chantier App.tsx, à cadrer). Findings #1 (routes à paramètre) + gate de parité données réelles livrés.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré

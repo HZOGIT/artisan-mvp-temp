@@ -201,6 +201,36 @@ if (!ONLY) try {
   add({ route: 'detail', type: 'detail', text: `échec récup id client: ${String(e).slice(0, 120)}` });
 }
 
+// Éditeurs détail migrés (OPE-403) : pour chaque entité, on récupère un id RÉEL via `.list` puis on vérifie
+// que `/v2/<entité>/:id` rend ses marqueurs structurants avec des DONNÉES RÉELLES (gate de parité fonctionnelle
+// AVANT suppression du legacy ; anti-régression durable des gros éditeurs). Liste vide → on saute (pas d'échec).
+const LIST_INPUT = 'input=%7B%220%22%3A%7B%22json%22%3Anull%7D%7D';
+const DETAIL_ENTITES = [
+  { list: 'devis.list', path: 'devis', markers: ['Export PDF', 'Lignes', 'Variantes'] },
+  { list: 'factures.list', path: 'factures', markers: ['Export PDF', 'Total TTC'] },
+  { list: 'contrats.list', path: 'contrats', markers: ['Informations du contrat', 'Interventions'] },
+  { list: 'commandesFournisseurs.list', path: 'commandes', markers: ['Lignes de commande', 'Fournisseur'] },
+];
+if (!ONLY) for (const ent of DETAIL_ENTITES) {
+  try {
+    const res = await ctx.request.get(`/api/trpc/${ent.list}?batch=1&${LIST_INPUT}`);
+    const json = await res.json();
+    const first = json?.[0]?.result?.data?.json?.[0];
+    if (!first?.id) continue; // pas de donnée → on saute (tenant vide)
+    const route = `/v2/${ent.path}/${first.id}`;
+    pariteCount++;
+    current = `rendu ${route}`;
+    await page.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+    await page.waitForTimeout(1500);
+    const body = (await page.textContent('body')) || '';
+    for (const m of ent.markers) {
+      if (!body.includes(m)) add({ route, type: 'detail', text: `marqueur absent: "${m}"` });
+    }
+  } catch (e) {
+    add({ route: `/v2/${ent.path}/:id`, type: 'detail', text: `échec détail ${ent.path}: ${String(e).slice(0, 120)}` });
+  }
+}
+
 // Sections GLOBALES (bascule + signature + sidebar mobile) — SAUTÉES en mode ROUTE ciblé (gain de temps).
 let basculeCount = 0, signCount = 0, sidebarCount = 0;
 if (!ONLY) {
