@@ -784,7 +784,7 @@ authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test
 - **Procédure par lot** : retirer fichiers `pages/<X>.tsx` + leurs import/Route dans `App.tsx` → `vite build` OK →
   deploy → revalider bascule (default-on) + login navigateur → commit chirurgical.
 
-**LOT 8 ✅** : retrait 4 orphelins (SoumettreAvis, Vitrine, ComponentShowcase, DashboardAdvanced — plus importés) + 4 pages légales legacy (MentionsLegales, CGU, CGV, Confidentialite, en V2_ROUTES → bascule) + LegalLayout. vite build OK, vitest.v2 450. Cumul lots 1-8 = 77 fichiers. Reste 12 = bloc sensible (auth/Home/Dashboard/spéciales/Assistant).
+**LOT 8 ✅** : retrait 4 orphelins (SoumettreAvis, Vitrine, ComponentShowcase, DashboardAdvanced — plus importés) + 4 pages légales legacy (MentionsLegales, CGU, CGV, Confidentialite, en V2_ROUTES → bascule) + LegalLayout. vite build OK, vitest.v2 450. Cumul lots 1-8 = 77 fichiers. + FIX légales : pages légales (cgu/cgv/mentions/confidentialite) déplacées vers public-router + mounts /v2 + redirects App.tsx (corrige le shadow PageEnConstruction qui les bloquait — /cgv/mentions/confidentialite montraient un stub au lieu du contenu /v2). Reste 12 = bloc sensible (auth/Home/Dashboard/spéciales/Assistant).
 
 **LOT 7 ✅** : retrait des 8 DERNIÈRES pages domaine non-sensibles (Parametres, ReglesDepenses, RelancesDevis, StatistiquesDevis, Support, TableauBordDepenses, TableauBordSyncComptable, Utilisateurs). vite build OK, vitest.v2 450. Cumul lots 1-7 = 68 pages. Reste UNIQUEMENT le bloc sensible (auth/Home/Dashboard/légales/spéciales/Assistant) + wouter + @/lib/trpc.
 

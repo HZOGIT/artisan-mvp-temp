@@ -108,9 +108,6 @@ function Router() {
         <Route path="/signup" component={SignUp} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
-        <Route path="/mentions-legales" component={PageEnConstruction} />
-        <Route path="/cgv" component={PageEnConstruction} />
-        <Route path="/confidentialite" component={PageEnConstruction} />
         <Route path="/v2/contact" component={PublicModernRouterMount} />
         <Route path="/v2/aide" component={PublicModernRouterMount} />
         <Route path="/v2/guide" component={PublicModernRouterMount} />
@@ -139,6 +136,15 @@ function Router() {
         <Route path="/v2/signup" component={PublicModernRouterMount} />
         <Route path="/v2/forgot-password" component={PublicModernRouterMount} />
         <Route path="/v2/reset-password" component={PublicModernRouterMount} />
+        {/* Pages légales v2 publiques + redirections (corrige le shadow PageEnConstruction des pages migrées). */}
+        <Route path="/v2/mentions-legales" component={PublicModernRouterMount} />
+        <Route path="/v2/cgu" component={PublicModernRouterMount} />
+        <Route path="/v2/cgv" component={PublicModernRouterMount} />
+        <Route path="/v2/confidentialite" component={PublicModernRouterMount} />
+        <Route path="/mentions-legales">{() => <Redirect to={`/v2/mentions-legales${window.location.search}`} />}</Route>
+        <Route path="/cgu">{() => <Redirect to={`/v2/cgu${window.location.search}`} />}</Route>
+        <Route path="/cgv">{() => <Redirect to={`/v2/cgv${window.location.search}`} />}</Route>
+        <Route path="/confidentialite">{() => <Redirect to={`/v2/confidentialite${window.location.search}`} />}</Route>
         <Route path="/portail/:token">{(p) => <Redirect to={`/v2/portail/${p.token}${window.location.search}`} />}</Route>
         <Route path="/avis/:token">{(p) => <Redirect to={`/v2/avis/${p.token}${window.location.search}`} />}</Route>
         <Route path="/vitrine/:slug">{(p) => <Redirect to={`/v2/vitrine/${p.slug}${window.location.search}`} />}</Route>

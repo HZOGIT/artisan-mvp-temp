@@ -103,7 +103,14 @@ const authSignUpRoute = createRoute({ getParentRoute: () => rootRoute, path: "/s
 const authForgotRoute = createRoute({ getParentRoute: () => rootRoute, path: "/forgot-password", component: lazyRouteComponent(() => import("../../features/auth/ui/forgot-password-page")) });
 const authResetRoute = createRoute({ getParentRoute: () => rootRoute, path: "/reset-password", component: lazyRouteComponent(() => import("../../features/auth/ui/reset-password-page")) });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute, vitrineRoute, contactRoute, aideRoute, guideRoute, authSignInRoute, authSignInAliasRoute, authSignUpRoute, authForgotRoute, authResetRoute]);
+// Pages LÉGALES — montées en PUBLIC (consultables hors session, liens de pied de page). Le routeur authentifié
+// ne les rend pas déconnecté → dead-end ; montées ici comme les pages auth.
+const mentionsLegalesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/mentions-legales", component: lazyRouteComponent(() => import("../../features/legal/ui/mentions-legales-page")) });
+const cguRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cgu", component: lazyRouteComponent(() => import("../../features/legal/ui/cgu-page")) });
+const cgvRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cgv", component: lazyRouteComponent(() => import("../../features/legal/ui/cgv-page")) });
+const confidentialiteRoute = createRoute({ getParentRoute: () => rootRoute, path: "/confidentialite", component: lazyRouteComponent(() => import("../../features/legal/ui/confidentialite-page")) });
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute, vitrineRoute, contactRoute, aideRoute, guideRoute, authSignInRoute, authSignInAliasRoute, authSignUpRoute, authForgotRoute, authResetRoute, mentionsLegalesRoute, cguRoute, cgvRoute, confidentialiteRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,
