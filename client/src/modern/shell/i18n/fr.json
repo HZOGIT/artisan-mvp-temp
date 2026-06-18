@@ -49,5 +49,9 @@
   "search_facture": "Factures",
   "search_intervention": "Interventions",
   "search_fournisseur": "Fournisseurs",
-  "escKey": "ESC"
+  "escKey": "ESC",
+  "demanderAssistant": "Demander à MonAssistant",
+  "assistantTitle": "MonAssistant",
+  "fermerAssistant": "Fermer MonAssistant",
+  "ouvrirPleinePage": "Ouvrir en pleine page"
 }
