@@ -25,9 +25,6 @@ import DashboardLayout from "./components/DashboardLayout";
 // IMPORTS LAZY — pages chargees a la demande via React.lazy + Suspense.
 // Chaque page devient un chunk webpack/Vite separe → bundle initial reduit.
 // ============================================================================
-const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
-const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
-const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
 const Assistant = lazy(() => import("./pages/Assistant"));
 // PoC OPE-366 — page « stack cible » (clean archi + REST openapi-typescript), cohabite avec le legacy.
 const ModernRouterMount = lazy(() => import("./modern/shared/router/modern-router-mount"));
@@ -119,8 +116,8 @@ function Router() {
             pages legacy SignatureDevis/PortailClient ont été SUPPRIMÉES (plus de fallback ?v2=0 ici). */}
         <Route path="/signature/:token">{(p) => <Redirect to={`/v2/signature/${p.token}${window.location.search}`} />}</Route>
         <Route path="/devis-public/:token">{(p) => <Redirect to={`/v2/devis-public/${p.token}${window.location.search}`} />}</Route>
-        <Route path="/paiement/succes" component={PaiementSucces} />
-        <Route path="/paiement/annule" component={PaiementAnnule} />
+        <Route path="/paiement/succes">{() => <Redirect to={`/v2/paiement/succes${window.location.search}`} />}</Route>
+        <Route path="/paiement/annule">{() => <Redirect to={`/v2/paiement/annule${window.location.search}`} />}</Route>
         {/* Front neuf PUBLIC (hors auth) — pages paiement `/v2/*` montées avant le catch-all authentifié. */}
         <Route path="/v2/paiement/succes" component={PublicModernRouterMount} />
         <Route path="/v2/paiement/annule" component={PublicModernRouterMount} />
