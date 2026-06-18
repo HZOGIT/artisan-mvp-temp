@@ -778,7 +778,25 @@ au navigateur après déploiement.
 contre une régression du fix « auth v2 public » (re-dead-end si une route auth repassait dans le routeur
 authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test-only (pas de déploiement).
 
-## 🔨 PHASE SHELL DÉMARRÉE (2026-06-18) — build modern/shell EN PÉRIMÈTRE (non câblé = 0 risque runtime)
+## ✅ REFONTE UI COMPLÈTE (2026-06-18) — shell modern câblé + validé ; reste = dette hors périmètre
+**État final** : 89 pages migrées + cutover auth/landing/dashboard/onboarding/404/légales/paiement/assistant +
+**SHELL modern câblé** (bricks 1-12 : sidebar/topbar/recherche Ctrl+K/notif/bannières/blocker/assistant). Validé
+navigateur : login→/v2/dashboard, nav unique (pas de double shell), parité drawer assistant, **sweep 152 cas / 0 issue**.
+Garde-fous anti-régression au sweep (404, shell unique, détail-éditeurs, auth-public). vitest.v2 470.
+
+**Résiduel = DETTE, hors de mon périmètre** (`client/src/modern/**` + câblage App/main) :
+1. **Fichiers legacy SHELL orphelins** (`components/DashboardLayout`, `AssistantDrawer`, `AssistantFAB`, `GlobalSearch`,
+   `TrialBanner`, `ExpiredBlocker`, `AIChatBox`) + `pages/Assistant` (réf. par AssistantDrawer) → non montés (0 impact),
+   suppression = toucher `components/**` → périmètre à élargir.
+2. **Composants legacy LOURDS encore RÉUTILISÉS** par des pages modern (donc PAS orphelins) : 16 widgets dashboard
+   (`@/components/dashboard/**`), `Map`, `Calendar`, `BulletproofModal`, `CookieBanner`, `ConseillerIAWidget`. Re-porter
+   = effort massif, 0 bénéfice utilisateur (ils marchent) → dette assumée, à ne PAS faire sans demande explicite.
+3. **wouter** (App.tsx = redirections + mount /v2 + routes publiques) + **`@/lib/trpc`** (wrappé par
+   `modern/shared/trpc`) → retrait = refacto transverse, hors périmètre/bénéfice.
+> ⇒ Plus de travail safe + non-redondant dans mon périmètre. Pour finir la dette : élargir le périmètre à
+> `client/src/components/**` (suppression des orphelins shell) OU déléguer. Sinon refonte UI = **livrée**.
+
+## (archive) 🔨 PHASE SHELL DÉMARRÉE (2026-06-18) — build modern/shell EN PÉRIMÈTRE (non câblé = 0 risque runtime)
 Levée du blocage partiel : construire le shell modern dans `client/src/modern/**` EST dans le périmètre (seul le
 retrait des fichiers `components/**` ne l'est pas → on les laissera orphelins). Stratégie : bâtir le shell modern
 brique par brique, NON CÂBLÉ (0 impact runtime, pas de deploy), testé ; le câblage App.tsx + suppression legacy =
