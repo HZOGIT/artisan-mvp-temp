@@ -98,3 +98,13 @@ describe("shell/nav — composition sidebar + actif (pur)", () => {
     }
   });
 });
+
+import { userInitial } from "./nav";
+describe("shell/nav — userInitial (pur)", () => {
+  it("1re lettre du nom, sinon email, sinon ?", () => {
+    expect(userInitial("Dupont", "x@y.z")).toBe("D");
+    expect(userInitial("", "alice@op.com")).toBe("A");
+    expect(userInitial(null, null)).toBe("?");
+    expect(userInitial(undefined, undefined)).toBe("?");
+  });
+});

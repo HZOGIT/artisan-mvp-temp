@@ -225,3 +225,8 @@ export function formatRelativeDate(date: string | Date): string {
   if (diffD < 7) return `Il y a ${diffD} jours`;
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
+
+// Initiale d'avatar : 1re lettre du nom, sinon de l'email, sinon « ? ». PUR (port DashboardLayout).
+export function userInitial(name?: string | null, email?: string | null): string {
+  return (name || email || "?").charAt(0).toUpperCase();
+}
