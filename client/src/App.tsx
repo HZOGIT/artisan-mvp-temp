@@ -11,8 +11,6 @@ import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 // IMPORTS EAGER — pages critiques chargées dans le bundle initial
 // (route racine + auth + dashboard immediatement disponible apres login)
 // ============================================================================
-import Home from "./pages/Home";
-import Dashboard from "./pages/Dashboard";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import DashboardLayout from "./components/DashboardLayout";
@@ -76,7 +74,7 @@ function AuthenticatedRoutes() {
     <DashboardLayout>
       <Suspense fallback={<PageLoader />}>
         <Switch location={location}>
-          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/dashboard">{() => <Redirect to={`/v2/dashboard${window.location.search}`} />}</Route>
           {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
           <Route path="/v2/*" component={ModernRouterMount} />
@@ -95,7 +93,7 @@ function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch location={location}>
-        <Route path="/" component={Home} />
+        <Route path="/">{() => <Redirect to={`/v2/home${window.location.search}`} />}</Route>
         <Route path="/signin">{() => <Redirect to={`/v2/signin${window.location.search}`} />}</Route>
         <Route path="/sign-in">{() => <Redirect to={`/v2/sign-in${window.location.search}`} />}</Route>
         <Route path="/signup">{() => <Redirect to={`/v2/signup${window.location.search}`} />}</Route>
