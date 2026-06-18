@@ -19,7 +19,6 @@ import DashboardLayout from "./components/DashboardLayout";
 // IMPORTS LAZY — pages chargees a la demande via React.lazy + Suspense.
 // Chaque page devient un chunk webpack/Vite separe → bundle initial reduit.
 // ============================================================================
-const Assistant = lazy(() => import("./pages/Assistant"));
 // PoC OPE-366 — page « stack cible » (clean archi + REST openapi-typescript), cohabite avec le legacy.
 const ModernRouterMount = lazy(() => import("./modern/shared/router/modern-router-mount"));
 // Montage du front neuf pour les pages PUBLIQUES (hors auth) : paiement (et à venir signature/portail).
@@ -78,7 +77,7 @@ function AuthenticatedRoutes() {
           {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
           <Route path="/v2/*" component={ModernRouterMount} />
-          <Route path="/assistant" component={Assistant} />
+          <Route path="/assistant">{() => <Redirect to={`/v2/assistant${window.location.search}`} />}</Route>
           {/* Pages legales — publiques, pas d'auth requise */}
           <Route component={NotFound} />
         </Switch>
