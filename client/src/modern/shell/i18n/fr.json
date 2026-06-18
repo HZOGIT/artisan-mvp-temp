@@ -33,5 +33,21 @@
   "renouvelerAbo": "Renouveler mon abonnement",
   "gererAboStripe": "Gérer mon abonnement (portail Stripe)",
   "exporterDonnees": "Exporter mes données",
-  "contacterSupport": "Contacter le support"
+  "contacterSupport": "Contacter le support",
+  "rechercheGlobale": "Recherche globale",
+  "searchPlaceholder": "Rechercher clients, devis, factures, interventions…",
+  "tapez2Chars": "Tapez au moins 2 caractères pour rechercher",
+  "searchCategories": "Clients · Devis · Factures · Interventions · Fournisseurs",
+  "rechercheEnCours": "Recherche…",
+  "aucunResultat": "Aucun résultat",
+  "autresMotsCles": "Essayez avec d'autres mots-clés",
+  "naviguer": "naviguer",
+  "ouvrir": "ouvrir",
+  "propulsePar": "Propulsé par Operioz",
+  "search_client": "Clients",
+  "search_devis": "Devis",
+  "search_facture": "Factures",
+  "search_intervention": "Interventions",
+  "search_fournisseur": "Fournisseurs",
+  "escKey": "ESC"
 }

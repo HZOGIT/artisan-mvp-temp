@@ -141,3 +141,17 @@ describe("shell/subscription (pur)", () => {
     expect(accountBlockState(sub({ status: "expired" }), "/v2/clients").blockerAllowed).toBe(false);
   });
 });
+
+import { groupResults, flattenGroups, type SearchResult } from "./search";
+const res = (id: number, type: string): SearchResult => ({ id, type, title: `${type}${id}`, subtitle: "", url: `/${type}/${id}` } as SearchResult);
+describe("shell/search (pur)", () => {
+  it("groupResults : ordre fixe (client→fournisseur), groupes vides retirés", () => {
+    const g = groupResults([res(1, "facture"), res(2, "client"), res(3, "devis"), res(4, "client")]);
+    expect(g.map((x) => x.type)).toEqual(["client", "devis", "facture"]); // ordre fixe, pas d'intervention/fournisseur
+    expect(g[0].items).toHaveLength(2); // 2 clients
+  });
+  it("flattenGroups : aplatit en préservant l'ordre du groupage", () => {
+    const g = groupResults([res(1, "devis"), res(2, "client")]);
+    expect(flattenGroups(g).map((r) => `${r.type}${r.id}`)).toEqual(["client2", "devis1"]);
+  });
+});
