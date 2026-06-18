@@ -1175,3 +1175,15 @@ supprimée, Taskfile MAJ (drizzle/seed en host-run via DEV_DATABASE_URL, db:gene
 .env.production supprimés. #7 (B1) server/_core → src/shared/legacy/ : build:newstack + tsconfig MAJ, backend
 redéployé + SMOKE AUTH OK. Au passage: 2 fix Dockerfile (COPY patches + COPY server obsolètes cassaient le deploy backend).
 RESTE #6 (F1) unification routeur — recommandé déprioriser mais demandé ("lance tout 1 à 7").
+
+## ✅ PASSE DE COHÉRENCE COMPLÈTE (2026-06-18) — tout vert
+Après B1/compose/infra + l'intégration du travail autre-agent (commit b5359d4 = feature signatureReader/portalUrl
+d'envoyer-devis-email livrée incomplète : type+code MAJ mais pas tous les consommateurs). Corrigé :
+- app.ts : devis mailing deps oubliait signatureReader+appUrl (bug latent crash envoi devis signé) → complété.
+- Fixtures tests envoyer-devis-email + agent-wiring (devisMailing helper) : signatureReader+appUrl ajoutés.
+- vitrine-settings-repository-drizzle : test L2 RLS PG écrit (gap OPE-504, guard drizzle-l2-coverage).
+- tsconfig.src exclut src/shared/legacy (dette PDF/email, hors gate clean) ; tsconfig.json (frontend) idem.
+- docker-compose.yml header (ref staging.yml).
+GATES TOUS VERTS : tsc.src 0, tsc.v2 0, vitest.v2 461, vitest src 2763 (532 fichiers), vite build OK,
+build:newstack OK, backend redéployé + SMOKE AUTH OK, staging sain. Refs pendantes : 0 réelle (server/_core +
+staging-newstack = commentaires/noms de scripts only). RESTE #6 (F1) routeur — non lancé.
