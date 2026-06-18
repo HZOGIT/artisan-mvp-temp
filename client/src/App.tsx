@@ -13,7 +13,6 @@ import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 // ============================================================================
 import Onboarding from "./modern/features/onboarding/ui/onboarding-page";
 import NotFound from "./modern/features/not-found/ui/not-found-page";
-import DashboardLayout from "./components/DashboardLayout";
 
 // ============================================================================
 // IMPORTS LAZY — pages chargees a la demande via React.lazy + Suspense.
@@ -69,20 +68,25 @@ function AuthenticatedRoutes() {
     return <Onboarding />;
   }
 
-  return (
-    <DashboardLayout>
+  // Câblage final OPE-403 : `/v2/*` fournit désormais SA PROPRE chrome (shell modern via le root du routeur
+  // TanStack → DashboardLayoutMount). On ne l'enveloppe donc PLUS dans le DashboardLayout legacy (sinon double
+  // shell). Le legacy DashboardLayout n'est plus utilisé que… nulle part : seules restent les redirections et le 404.
+  if (location.startsWith("/v2")) {
+    return (
       <Suspense fallback={<PageLoader />}>
-        <Switch location={location}>
-          <Route path="/dashboard">{() => <Redirect to={`/v2/dashboard${window.location.search}`} />}</Route>
-          {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
-              providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
-          <Route path="/v2/*" component={ModernRouterMount} />
-          <Route path="/assistant">{() => <Redirect to={`/v2/assistant${window.location.search}`} />}</Route>
-          {/* Pages legales — publiques, pas d'auth requise */}
-          <Route component={NotFound} />
-        </Switch>
+        <ModernRouterMount />
       </Suspense>
-    </DashboardLayout>
+    );
+  }
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Switch location={location}>
+        <Route path="/dashboard">{() => <Redirect to={`/v2/dashboard${window.location.search}`} />}</Route>
+        <Route path="/assistant">{() => <Redirect to={`/v2/assistant${window.location.search}`} />}</Route>
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

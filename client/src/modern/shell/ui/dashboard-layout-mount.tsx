@@ -1,49 +1,73 @@
-import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 import { Outlet } from "@tanstack/react-router";
+import { Search } from "lucide-react";
 import { resolveV2Path } from "@/modern/shared/flag/v2-routes";
+import { trpc } from "@/modern/shared/trpc";
 import { useShell } from "../application/use-shell";
+import { accountBlockState } from "../domain/subscription";
 import { DashboardLayout } from "./dashboard-layout";
+import { NotificationBell } from "./notification-bell";
+import { GlobalSearch } from "./global-search";
+import { TrialBanner } from "./trial-banner";
+import { ExpiredBlocker } from "./expired-blocker";
+import { AssistantFAB } from "./assistant-fab";
+import { AssistantDrawer } from "./assistant-drawer";
 
-// MOUNT du SHELL modern : branche les données (`useShell`) + la navigation (wouter `useLocation`/`setLocation`,
-// même mécanisme que le legacy et que les pages /v2 — cf. commandes-page) + `resolveV2Path`, et enveloppe le
-// `<Outlet/>` TanStack dans `DashboardLayout`. Destiné à devenir le composant RACINE du routeur modern (câblage
-// final) pour remplacer le shell legacy `components/DashboardLayout`. Les zones branchées tRPC (recherche/notifs,
-// bannières essai/expiré, FAB+drawer assistant) sont passées en SLOTS — fournies par le câblage pour préserver la
-// parité (à porter avant le cutover, sinon régression de ces fonctionnalités).
-
-export interface DashboardLayoutMountProps {
-  topBarActions?: ReactNode;
-  banners?: ReactNode;
-  assistant?: ReactNode;
-  assistantOpen?: boolean;
-  mainExtraClass?: string;
-  railBadge?: React.ComponentProps<typeof DashboardLayout>["railBadge"];
-  itemBadge?: React.ComponentProps<typeof DashboardLayout>["itemBadge"];
-}
-
-export function DashboardLayoutMount(props: DashboardLayoutMountProps) {
+// MOUNT du SHELL modern — composant RACINE du routeur modern (remplace le shell legacy components/DashboardLayout).
+// Branche données (useShell + subscription) + navigation wouter + remplit TOUS les slots de la chrome
+// (recherche Ctrl+K, notifs, bannière essai, blocage expiré, FAB+drawer assistant). Enveloppe l'<Outlet/> TanStack.
+export function DashboardLayoutMount() {
+  const { t } = useTranslation("shell");
   const [location, setLocation] = useLocation();
   const { user, permissions, modulesActifs, logout } = useShell();
+  const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+
+  // Raccourci Ctrl/Cmd+K → recherche globale.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearchOpen((v) => !v); }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  const { isBlocked, blockerAllowed } = accountBlockState(sub, location);
+  const isAssistantPage = location === "/v2/assistant";
+
+  const topBarActions = (
+    <>
+      <button type="button" onClick={() => setSearchOpen(true)} aria-label={t("rechercherHint")} className="hidden sm:inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/40 hover:bg-accent px-3 text-xs text-muted-foreground transition-colors min-w-[200px]">
+        <Search className="h-4 w-4" />
+        <span className="flex-1 text-left">{t("rechercher")}</span>
+        <kbd className="hidden md:inline-flex h-5 items-center rounded border border-border bg-background px-1.5 font-mono">{t("cmdK")}</kbd>
+      </button>
+      <button type="button" onClick={() => setSearchOpen(true)} aria-label={t("rechercher")} className="sm:hidden h-9 w-9 inline-flex items-center justify-center rounded-lg hover:bg-accent"><Search className="h-4 w-4" /></button>
+      <NotificationBell />
+    </>
+  );
 
   return (
-    <DashboardLayout
-      location={location}
-      permissions={permissions}
-      modulesActifs={modulesActifs}
-      user={user}
-      resolveV2Path={resolveV2Path}
-      onNavigate={setLocation}
-      onLogout={logout}
-      topBarActions={props.topBarActions}
-      banners={props.banners}
-      assistant={props.assistant}
-      assistantOpen={props.assistantOpen}
-      mainExtraClass={props.mainExtraClass}
-      railBadge={props.railBadge}
-      itemBadge={props.itemBadge}
-    >
-      <Outlet />
-    </DashboardLayout>
+    <>
+      <DashboardLayout
+        location={location} permissions={permissions} modulesActifs={modulesActifs} user={user}
+        resolveV2Path={resolveV2Path} onNavigate={setLocation} onLogout={logout}
+        assistantOpen={assistantOpen}
+        topBarActions={topBarActions}
+        banners={<TrialBanner />}
+        assistant={
+          <>
+            <AssistantFAB onClick={() => setAssistantOpen(true)} hidden={isAssistantPage || assistantOpen} />
+            <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+          </>
+        }
+      >
+        {isBlocked && !blockerAllowed ? <ExpiredBlocker /> : <Outlet />}
+      </DashboardLayout>
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
+    </>
   );
 }

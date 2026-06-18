@@ -3,10 +3,10 @@ import {
   createRoute,
   createRouter,
   lazyRouteComponent,
-  Outlet,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { DashboardLayoutMount } from "../../shell/ui/dashboard-layout-mount";
 
 // Socle de routage du FRONT NEUF (refonte strangler-fig). TanStack Router prend la main sur tout le
 // sous-arbre d'URL `/v2/*` (cf. `basepath`) tandis que wouter continue de servir le legacy intact.
@@ -34,7 +34,9 @@ function RouterNotFound() {
 }
 
 const rootRoute = createRootRoute({
-  component: () => <Outlet />,
+  // Câblage final OPE-403 : la racine rend le SHELL modern (sidebar/topbar/chrome) autour de l'<Outlet/>,
+  // remplaçant le DashboardLayout legacy pour toutes les pages /v2 authentifiées.
+  component: DashboardLayoutMount,
   notFoundComponent: RouterNotFound,
 });
 
