@@ -89,7 +89,13 @@ const vitrineRoute = createRoute({
   component: lazyRouteComponent(() => import("../../features/vitrine-public/ui/vitrine-page")),
 });
 
-const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute, vitrineRoute]);
+// Pages publiques « en construction » (contact/aide/guide) — un seul composant, titre dérivé du chemin.
+const pageConstruction = () => import("../../features/page-construction/ui/page-construction-page");
+const contactRoute = createRoute({ getParentRoute: () => rootRoute, path: "/contact", component: lazyRouteComponent(pageConstruction) });
+const aideRoute = createRoute({ getParentRoute: () => rootRoute, path: "/aide", component: lazyRouteComponent(pageConstruction) });
+const guideRoute = createRoute({ getParentRoute: () => rootRoute, path: "/guide", component: lazyRouteComponent(pageConstruction) });
+
+const routeTree = rootRoute.addChildren([paiementSuccesRoute, paiementAnnuleRoute, signatureRoute, devisPublicRoute, portailRoute, homeRoute, avisPublicRoute, vitrineRoute, contactRoute, aideRoute, guideRoute]);
 
 export const publicModernRouter = createRouter({
   routeTree,

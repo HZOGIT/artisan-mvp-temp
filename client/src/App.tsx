@@ -256,9 +256,12 @@ function Router() {
         <Route path="/mentions-legales" component={PageEnConstruction} />
         <Route path="/cgv" component={PageEnConstruction} />
         <Route path="/confidentialite" component={PageEnConstruction} />
-        <Route path="/contact" component={PageEnConstruction} />
-        <Route path="/aide" component={PageEnConstruction} />
-        <Route path="/guide" component={PageEnConstruction} />
+        <Route path="/v2/contact" component={PublicModernRouterMount} />
+        <Route path="/v2/aide" component={PublicModernRouterMount} />
+        <Route path="/v2/guide" component={PublicModernRouterMount} />
+        <Route path="/contact">{() => <Redirect to={`/v2/contact${window.location.search}`} />}</Route>
+        <Route path="/aide">{() => <Redirect to={`/v2/aide${window.location.search}`} />}</Route>
+        <Route path="/guide">{() => <Redirect to={`/v2/guide${window.location.search}`} />}</Route>
         {/* Cutover strangler-fig (OPE-403) : pages publiques par token entièrement migrées → redirection
             INCONDITIONNELLE vers le front neuf /v2 (query string préservée pour le retour Stripe). Les
             pages legacy SignatureDevis/PortailClient ont été SUPPRIMÉES (plus de fallback ?v2=0 ici). */}

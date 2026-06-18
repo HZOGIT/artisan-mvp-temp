@@ -733,9 +733,16 @@ vitest **447**.
 
 ## 🎉 TOUTES LES PAGES RÉELLES MIGRÉES (88/88 — 100 %)
 Les 9 dernières sous-pages (avis/contrat/profil/vitrine + cluster devis/factures 4 pages + commande-form) sont
-faites. **Reste UNIQUEMENT** : (1) 3 stubs triviaux `/contact /aide /guide` (PageEnConstruction) ; (2) findings
-bascule (default-on sur chargement plein + routes à paramètre) ; (3) **suppression du legacy** (`client/src/pages/**`,
-wouter, `@/lib/trpc`) après validation de parité (login critique → valider manuellement avant suppression auth).
+faites. **Stubs `/contact /aide /guide` ✅** : feature `page-construction` (1 composant, titre dérivé du chemin
+via domain pur — **1 test**) sur 3 routes publiques `/v2/...` + redirects App.tsx + V2_ROUTES + i18n. **0 `any`**.
+
+**Reste UNIQUEMENT (non-page)** : (1) ~~3 stubs~~ ✅ ; (2) **findings bascule** (default-on sur chargement plein +
+routes à paramètre — `resolveV2Path` = clé exacte → les URL détail legacy paramétrées ne basculent pas) ;
+(3) **suppression du legacy** (`client/src/pages/**`, wouter, `@/lib/trpc`) après validation de parité (login
+critique → valider manuellement avant suppression auth ; gros chantier touchant tout App.tsx → cadrer avec l'humain).
+
+## 🎯 PROCHAINE CIBLE : **findings bascule** (étendre `resolveV2Path`/`useV2Bascule` aux routes à paramètre +
+default-on, OU redirects App.tsx par route détail) → puis **suppression legacy** (à cadrer).
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré

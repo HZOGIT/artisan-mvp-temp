@@ -14,7 +14,7 @@ describe("resolveV2Path", () => {
   });
 
   it("renvoie null pour une route non migrée", () => {
-    expect(resolveV2Path("/contact")).toBeNull();
+    expect(resolveV2Path("/onboarding")).toBeNull();
   });
 
   it("ne re-bascule pas un chemin déjà sous /v2 (absent du registre)", () => {
