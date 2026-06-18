@@ -3,7 +3,7 @@
 # artisan-staging Cloudflare tunnel (NO Cloudflare Access).
 #
 # Usage (from the staging worktree, see Taskfile `staging:*`):
-#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
+#   docker compose --env-file .env.staging up -d
 name: artisan-staging
 
 services:

@@ -6,5 +6,7 @@
     "incremental": false,
     "tsBuildInfoFile": null
   },
-  "include": ["src/**/*", "drizzle/schema.pg.ts"]
+  "include": ["src/**/*", "drizzle/schema.pg.ts"],
+  "//exclude": "src/shared/legacy = dette PDF/email portée telle quelle (jsPDF/Resend), bundlée en sidecar esbuild (legacy-*.mjs, type-only erased). Hors scope du gate clean comme l'était server/_core — sera ré-incluse au legacy-finish.",
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "src/shared/legacy"]
 }

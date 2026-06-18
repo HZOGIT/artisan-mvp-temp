@@ -851,7 +851,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
       {
         // Mailing deps (parité des routes d'envoi migrées : readers contact + PdfPort/EmailPort legacy + rate-limit).
-        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
         facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
         relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
         commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
