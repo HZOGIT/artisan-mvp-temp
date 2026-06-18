@@ -6,10 +6,10 @@
   "include": [
     "client/src/**/*",
     "shared/**/*",
-    "server/_core/pdfGenerator.ts",
-    "server/_core/fonts.ts",
-    "server/_core/emailService.ts",
-    "server/_core/env.ts"
+    "src/shared/legacy/pdfGenerator.ts",
+    "src/shared/legacy/fonts.ts",
+    "src/shared/legacy/emailService.ts",
+    "src/shared/legacy/env.ts"
   ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
