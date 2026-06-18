@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Euro, FileText, Receipt, Target, TrendingUp, Users, Settings2, LayoutGrid, Check, CircleDashed, CreditCard, Sparkles, UserPlus } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 import { StatCard, type StatCardColor } from "./widgets/stat-card";
-import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
+import { WelcomeBanner } from "./widgets/welcome-banner";
 import { AlertsBar, type DashboardAlert } from "./widgets/alerts-bar";
 import { QuickActions } from "./widgets/quick-actions";
 import { DashboardWidget } from "./widgets/dashboard-widget";
