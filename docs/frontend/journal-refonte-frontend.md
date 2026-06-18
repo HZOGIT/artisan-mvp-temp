@@ -505,8 +505,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   multi-photos + diagnostic + historique + FilePreview). i18n namespace `analysesPhotos`. **0 `any`** (10
   supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **345**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes : `assistant`,
-`chantiers`/`calendrier-chantiers`, `devis-ia`, `import`.
+- **Migration `import` ✅** (24e des ~24 pages feature) : assistant d'import ERP CSV → clients/devis/factures
+  (852 l, wizard 4 étapes source→fichier→mapping→import, **framer-motion conservé**). 3 endpoints
+  (importErp.importClients/importDevis/importFactures) présents. Clean-archi : domain (**parser CSV PUR**
+  `detectSeparator`/`parseCsvLine` (quotes doublés)/`parseCsv` + `autoMap`/`allRequiredMapped`/`bytesToHuman`
+  + catalogues `SOURCES`/`KIND_FIELDS` — **6 tests**) + application (3 mutations + invalidation ciblée) + ui
+  (header animé + stepper + 4 sections). i18n namespace `import` (catalogues FR en domain, rendus comme
+  variables → hors règle i18next). **0 `any`** (2 supprimés). Finding mineur : `autoMap` retire les accents
+  (« Téléphone » non matché). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **351**.
+
+## 🎯 PROCHAINE CIBLE : **migrer la page feature suivante** (cf. `/tmp/eta.sh`). Restantes (les 3 plus
+grosses) : `assistant` (chat streaming), `chantiers` (1035 l), `calendrier-chantiers` (1635 l), `devis-ia` (867 l).
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
