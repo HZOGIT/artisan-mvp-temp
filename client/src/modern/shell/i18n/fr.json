@@ -54,6 +54,10 @@
   "assistantTitle": "MonAssistant",
   "fermerAssistant": "Fermer MonAssistant",
   "ouvrirPleinePage": "Ouvrir en pleine page",
+  "tailleCompact": "Compact",
+  "tailleNormal": "Normal",
+  "tailleLarge": "Large",
+  "taillePanneau": "Taille du panneau : {{label}}",
   "rechercher": "Rechercher",
   "rechercherHint": "Rechercher (Ctrl+K)",
   "cmdK": "⌘K"

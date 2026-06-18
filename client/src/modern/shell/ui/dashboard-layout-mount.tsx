@@ -13,6 +13,7 @@ import { TrialBanner } from "./trial-banner";
 import { ExpiredBlocker } from "./expired-blocker";
 import { AssistantFAB } from "./assistant-fab";
 import { AssistantDrawer } from "./assistant-drawer";
+import { readPanelSize, writePanelSize, initialAssistantOpen, PANEL_MARGIN_CLASS, type AssistantPanelSize } from "../domain/assistant-panel";
 
 // MOUNT du SHELL modern — composant RACINE du routeur modern (remplace le shell legacy components/DashboardLayout).
 // Branche données (useShell + subscription) + navigation wouter + remplit TOUS les slots de la chrome
@@ -23,7 +24,11 @@ export function DashboardLayoutMount() {
   const { user, permissions, modulesActifs, logout } = useShell();
   const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });
   const [searchOpen, setSearchOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  // Auto-open du panneau assistant sur desktop large (port du comportement legacy).
+  const [assistantOpen, setAssistantOpen] = useState(initialAssistantOpen);
+  // Taille du panneau (sm/md/lg) persistée en localStorage.
+  const [panelSize, setPanelSize] = useState<AssistantPanelSize>(readPanelSize);
+  useEffect(() => { writePanelSize(panelSize); }, [panelSize]);
 
   // Raccourci Ctrl/Cmd+K → recherche globale.
   useEffect(() => {
@@ -32,6 +37,14 @@ export function DashboardLayoutMount() {
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  // Bus event 'operioz:open-assistant' : permet à la page Support (et l'action 'navigate' de l'assistant)
+  // de rouvrir le panneau IA sans prop-drilling (port du comportement legacy).
+  useEffect(() => {
+    const onOpen = () => setAssistantOpen(true);
+    window.addEventListener("operioz:open-assistant", onOpen);
+    return () => window.removeEventListener("operioz:open-assistant", onOpen);
   }, []);
 
   const { isBlocked, blockerAllowed } = accountBlockState(sub, location);
@@ -55,13 +68,13 @@ export function DashboardLayoutMount() {
         location={location} permissions={permissions} modulesActifs={modulesActifs} user={user}
         onNavigate={setLocation} onLogout={logout}
         assistantOpen={assistantOpen}
-        mainExtraClass="md:mr-[520px]"
+        mainExtraClass={PANEL_MARGIN_CLASS[panelSize]}
         topBarActions={topBarActions}
         banners={<TrialBanner />}
         assistant={
           <>
             <AssistantFAB onClick={() => setAssistantOpen(true)} hidden={isAssistantPage || assistantOpen} />
-            <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+            <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} panelSize={panelSize} onPanelSizeChange={setPanelSize} />
           </>
         }
       >
