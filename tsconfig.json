@@ -5,7 +5,7 @@
   // explicitement ci-dessous pour conserver leur couverture de types sans glob `server/**` trompeur.
   "include": [
     "client/src/**/*",
-    "shared/**/*"
+    "packages/contract/**/*"
   ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
@@ -24,7 +24,7 @@
     "types": ["node", "vite/client"],
     "paths": {
       "@/*": ["./client/src/*"],
-      "@shared/*": ["./shared/*"]
+      "@shared/*": ["./packages/contract/*"]
     }
   }
 }

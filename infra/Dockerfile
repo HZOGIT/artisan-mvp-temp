@@ -18,7 +18,7 @@ COPY src ./src
 COPY drizzle ./drizzle
 # `shared/` (racine) = constantes pures partagées legacy↔new-stack (ex. `shared/permissions.ts` :
 # ROLE_TEMPLATES/ALL_PERMISSIONS), importé en relatif depuis src/** → requis au bundle esbuild.
-COPY shared ./shared
+COPY packages/contract ./packages/contract
 RUN pnpm build:newstack
 
 # ── Runtime : deps de prod + bundle, utilisateur non-root ────────────────────

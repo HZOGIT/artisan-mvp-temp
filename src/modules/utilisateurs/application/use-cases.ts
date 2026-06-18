@@ -2,7 +2,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from "../../../shared/er
 import type { EmailPort } from "../../../shared/ports/email";
 import type { PasswordHasher } from "../../../shared/ports/password-hasher";
 import type { TenantContext } from "../../../shared/tenant";
-import { ALL_PERMISSIONS, ROLE_TEMPLATES } from "../../../../shared/permissions";
+import { ALL_PERMISSIONS, ROLE_TEMPLATES } from "../../../../packages/contract/permissions";
 import type { CollaborateurRole, InviteInput, PermissionsInfo, UtilisateurListItem } from "../domain/utilisateur";
 import type { IUtilisateurRepository } from "./utilisateur-repository";
 

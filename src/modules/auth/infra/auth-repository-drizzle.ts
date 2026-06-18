@@ -3,7 +3,7 @@ import { artisans, permissionsUtilisateur, subscriptions, users } from "../../..
 import type { DbClient } from "../../../shared/db";
 import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
-import { ALL_PERMISSIONS } from "../../../../shared/permissions";
+import { ALL_PERMISSIONS } from "../../../../packages/contract/permissions";
 
 // Repo auth Drizzle. `users` est HORS RLS (auth précède la résolution du tenant) → accès direct par
 // id/email. Aucune écriture tenant ; seul `lastSignedIn` est mis à jour au login.
