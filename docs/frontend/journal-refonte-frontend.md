@@ -1115,3 +1115,22 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 - **S2 ✅** flag `?v2=1` + bascule par route (`modern/shared/flag/*`, hook `useV2Bascule` câblé dans App). Tests vitest dédiés (12) via `vitest.v2.config.ts` + e2e socle/bascule `cas testés:4 | issues:0`. Déployé. **Boucle basculée sur CronCreate natif Claude** (daemon bash retiré). Prochaine : S3.
 - **S1 ✅** socle TanStack Router sur `/v2/*` (cohabite wouter, providers+auth partagés, lazy, pending/error/notFound par route) + démo `/v2/ping` ; PoC `/v2/clients` repris sous le socle. tsc v2 + `vite build` verts. **Déployé** (Pages) + **vérif navigateur staging** (`scripts/e2e/v2-socle-check.mjs`) : `/v2/ping` rend « pong » **0 erreur** → routing+lazy+providers OK ; `/v2/clients` rend (contenu « Clients » présent) **via le socle**. Prochaine cible : S2 (flag `?v2=1`).
   - ⚠️ **Finding (dette PoC OPE-366, hérité de `09de4d4`, PAS une régression S1)** : `/v2/clients` appelle `GET /api/rest/clients` (openapi-fetch) → **404** (endpoint REST jamais implémenté). À **résorber en Vague 1** en migrant la feature `clients` sur **tRPC** (`@trpc/react-query`) conformément à la mission (« tRPC conservé, pas de REST ») et en supprimant `modern/shared/api/*` (openapi-fetch). Le socle lui-même est OK.
+
+## 📋 AUDIT STACK CIBLE + PLAN NETTOYAGE /v2 (2026-06-18)
+**Stack cible vs OPE-403** (refonte = strangler-fig web vers clean-archi /v2) : FAIT = tRPC11/zod4,
+@trpc-react-query/TanStack Query v5, **TanStack Router (wouter éliminé)**, Tailwind4+shadcn/Radix, recharts,
+date-fns, framer-motion, ESLint custom (no-trpc-in-ui/no-literal-string), TS strict (0 any), Vitest+Playwright,
+auth JWT cookie httpOnly. HORS SCOPE OPE-403 (cible plus large web+mobile) = react-hook-form (deps mais 0 usage),
+Zustand, search-params typés Router, Base UI, TanStack Table+react-virtual, ECharts, Testing Library (render-tests),
+**monorepo pnpm workspaces + Turborepo + Expo mobile**, token SecureStore/Bearer Expo.
+
+**Plan retrait préfixe /v2** (legacy mort → /v2 inutile ; 85 fichiers + basepath×2 + couche resolveV2*) :
+1. `basepath:"/v2"`→`"/"` (router.tsx + public-router.tsx). 2. Retirer redirections d'entrée + simplifier
+resolveEntryRoute. 3. Supprimer resolveV2Path/resolveV2Url/useV2Bascule (deviennent identité). 4. Remplacer
+les `/v2/x`→`/x` (85 fichiers). 5. Re-valider login + portail + **retour Stripe** + sweep. NB: le backend émet
+déjà des chemins SANS /v2 (/portail/:token, /parametres?tab=abonnement, success_url) → retirer /v2 ALIGNE
+(plus de redirection). Risque = change TOUTES les URLs (bookmarks) → validation bout-en-bout obligatoire.
+
+**Wiring fix (2026-06-18, commit 620c290)** : régression refonte — composants modern naviguaient vers chemins
+LEGACY backend (notif.lien, action 'navigate' assistant) via useV2Bascule qui STRIPPE la query (ex. filtre assistant
+perdu). Fix : `resolveV2Url` (résout path→/v2 en conservant query/hash) sur notif + resolveV2Path sur assistant. 2 tests.
