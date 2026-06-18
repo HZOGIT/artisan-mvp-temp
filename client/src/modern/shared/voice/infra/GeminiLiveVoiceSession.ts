@@ -1,4 +1,4 @@
-import type { VoiceSession, VoiceSessionConfig, VoiceState } from '@/domain/voice/VoiceSession';
+import type { VoiceSession, VoiceSessionConfig, VoiceState } from '@/modern/shared/voice/domain/VoiceSession';
 import { WebAudioCapture } from './WebAudioCapture';
 import { WebAudioOutput } from './WebAudioOutput';
 import { vlog } from './voiceDebug';

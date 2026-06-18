@@ -1,4 +1,4 @@
-import type { AudioCapture, AudioCaptureConfig } from '@/domain/voice/AudioCapture';
+import type { AudioCapture, AudioCaptureConfig } from '@/modern/shared/voice/domain/AudioCapture';
 import { vlog } from './voiceDebug';
 import { resumeSharedAudioContext } from './sharedAudioContext';
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { VoiceState } from '@/domain/voice/VoiceSession';
-import { GeminiLiveVoiceSession } from '@/infra-web/GeminiLiveVoiceSession';
-import { vlog } from '@/infra-web/voiceDebug';
+import type { VoiceState } from '@/modern/shared/voice/domain/VoiceSession';
+import { GeminiLiveVoiceSession } from '@/modern/shared/voice/infra/GeminiLiveVoiceSession';
+import { vlog } from '@/modern/shared/voice/infra/voiceDebug';
 
 export interface UseVoiceSessionOptions {
   threadId?: number;

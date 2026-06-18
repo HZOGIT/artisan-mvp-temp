@@ -10,7 +10,7 @@ import { Textarea } from "@/modern/shared/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/modern/shared/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
 import { Label } from "@/modern/shared/ui/label";
-import { useVoiceSession } from "@/app/useVoiceSession";
+import { useVoiceSession } from "@/modern/shared/voice/use-voice-session";
 import { useIsMobile } from "@/modern/shared/hooks/useMobile";
 import { useSpeechRecognition } from "@/modern/shared/hooks/useSpeechRecognition";
 import { useAssistant, streamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
