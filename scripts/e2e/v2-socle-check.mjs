@@ -321,6 +321,17 @@ await page.waitForTimeout(1000);
 if (new URL(page.url()).pathname !== '/v2/dashboard') {
   add({ route: 'sidebar/dashboard', type: 'sidebar', text: `attendu /v2/dashboard (migré), obtenu ${page.url()}` });
 }
+
+// 404 (OPE-403) : une route inconnue (authentifiée) doit rendre la page « Page introuvable » migrée (catch-all
+// wouter → composant v2 `not-found`). Garde-fou anti-régression du retrait de `pages/NotFound`.
+sidebarCount++;
+current = '404 catch-all';
+await page.goto('/route-inconnue-zzz-404', { waitUntil: 'networkidle', timeout: 25000 });
+await page.waitForTimeout(1500);
+{
+  const body404 = (await page.textContent('body')) || '';
+  if (!body404.includes('Page introuvable')) add({ route: '/route-inconnue-zzz-404', type: '404', text: 'page 404 v2 « Page introuvable » absente' });
+}
 } // fin sections globales (if !ONLY)
 
 // Pages d'AUTH v2 montées en PUBLIC (OPE-403) : un visiteur DÉCONNECTÉ doit pouvoir afficher le FORMULAIRE
