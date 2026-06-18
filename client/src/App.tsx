@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch, useLocation, Redirect } from "wouter";
+import { useLocation, Redirect } from "./modern/shared/router/navigation";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { trpc } from "./lib/trpc";
+import { trpc } from "./modern/shared/trpc";
 import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 
 // ============================================================================
@@ -79,76 +79,59 @@ function AuthenticatedRoutes() {
     );
   }
 
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  if (location === "/dashboard") return <Redirect to={`/v2/dashboard${search}`} />;
+  if (location === "/assistant") return <Redirect to={`/v2/assistant${search}`} />;
   return (
     <Suspense fallback={<PageLoader />}>
-      <Switch location={location}>
-        <Route path="/dashboard">{() => <Redirect to={`/v2/dashboard${window.location.search}`} />}</Route>
-        <Route path="/assistant">{() => <Redirect to={`/v2/assistant${window.location.search}`} />}</Route>
-        <Route component={NotFound} />
-      </Switch>
+      <NotFound />
     </Suspense>
   );
 }
 
+// Routeur d'ENTRÉE (sans wouter) — dispatch impératif sur la location (shim History API). Ordre = ancien Switch :
+// (1) redirections legacy→/v2 exactes, (2) redirections à paramètre, (3) montages PUBLICS /v2 (hors auth),
+// (4) catch-all authentifié. Query string préservée (retour Stripe).
+const ENTRY_REDIRECTS: Record<string, string> = {
+  "/": "/v2/home", "/signin": "/v2/signin", "/sign-in": "/v2/sign-in", "/signup": "/v2/signup",
+  "/forgot-password": "/v2/forgot-password", "/reset-password": "/v2/reset-password",
+  "/contact": "/v2/contact", "/aide": "/v2/aide", "/guide": "/v2/guide",
+  "/paiement/succes": "/v2/paiement/succes", "/paiement/annule": "/v2/paiement/annule",
+  "/mentions-legales": "/v2/mentions-legales", "/cgu": "/v2/cgu", "/cgv": "/v2/cgv", "/confidentialite": "/v2/confidentialite",
+};
+// /legacy/:param → /v2/legacy/:param (signature, devis-public, portail, avis, vitrine).
+const PARAM_REDIRECTS: { re: RegExp; to: string }[] = [
+  { re: /^\/(signature|devis-public|portail|avis)\/(.+)$/, to: "/v2/$1/$2" },
+  { re: /^\/vitrine\/(.+)$/, to: "/v2/vitrine/$1" },
+];
+// Pages /v2 PUBLIQUES (hors auth) montées via PublicModernRouterMount.
+const PUBLIC_V2_EXACT = new Set([
+  "/v2/contact", "/v2/aide", "/v2/guide", "/v2/paiement/succes", "/v2/paiement/annule", "/v2/home",
+  "/v2/signin", "/v2/sign-in", "/v2/signup", "/v2/forgot-password", "/v2/reset-password",
+  "/v2/mentions-legales", "/v2/cgu", "/v2/cgv", "/v2/confidentialite",
+]);
+const PUBLIC_V2_PARAM_PREFIXES = ["/v2/signature/", "/v2/devis-public/", "/v2/portail/", "/v2/avis/", "/v2/vitrine/"];
+
 function Router() {
   const [location] = useLocation();
+  const search = typeof window !== "undefined" ? window.location.search : "";
 
+  const exact = ENTRY_REDIRECTS[location];
+  if (exact) return <Redirect to={`${exact}${search}`} />;
+  for (const { re, to } of PARAM_REDIRECTS) {
+    if (re.test(location)) return <Redirect to={`${location.replace(re, to)}${search}`} />;
+  }
+  if (PUBLIC_V2_EXACT.has(location) || PUBLIC_V2_PARAM_PREFIXES.some((p) => location.startsWith(p))) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <PublicModernRouterMount />
+      </Suspense>
+    );
+  }
+  // Tout le reste = authentifié (un seul catch-all pour que le shell modern persiste entre navigations).
   return (
     <Suspense fallback={<PageLoader />}>
-      <Switch location={location}>
-        <Route path="/">{() => <Redirect to={`/v2/home${window.location.search}`} />}</Route>
-        <Route path="/signin">{() => <Redirect to={`/v2/signin${window.location.search}`} />}</Route>
-        <Route path="/sign-in">{() => <Redirect to={`/v2/sign-in${window.location.search}`} />}</Route>
-        <Route path="/signup">{() => <Redirect to={`/v2/signup${window.location.search}`} />}</Route>
-        <Route path="/forgot-password">{() => <Redirect to={`/v2/forgot-password${window.location.search}`} />}</Route>
-        <Route path="/reset-password">{() => <Redirect to={`/v2/reset-password${window.location.search}`} />}</Route>
-        <Route path="/v2/contact" component={PublicModernRouterMount} />
-        <Route path="/v2/aide" component={PublicModernRouterMount} />
-        <Route path="/v2/guide" component={PublicModernRouterMount} />
-        <Route path="/contact">{() => <Redirect to={`/v2/contact${window.location.search}`} />}</Route>
-        <Route path="/aide">{() => <Redirect to={`/v2/aide${window.location.search}`} />}</Route>
-        <Route path="/guide">{() => <Redirect to={`/v2/guide${window.location.search}`} />}</Route>
-        {/* Cutover strangler-fig (OPE-403) : pages publiques par token entièrement migrées → redirection
-            INCONDITIONNELLE vers le front neuf /v2 (query string préservée pour le retour Stripe). Les
-            pages legacy SignatureDevis/PortailClient ont été SUPPRIMÉES (plus de fallback ?v2=0 ici). */}
-        <Route path="/signature/:token">{(p) => <Redirect to={`/v2/signature/${p.token}${window.location.search}`} />}</Route>
-        <Route path="/devis-public/:token">{(p) => <Redirect to={`/v2/devis-public/${p.token}${window.location.search}`} />}</Route>
-        <Route path="/paiement/succes">{() => <Redirect to={`/v2/paiement/succes${window.location.search}`} />}</Route>
-        <Route path="/paiement/annule">{() => <Redirect to={`/v2/paiement/annule${window.location.search}`} />}</Route>
-        {/* Front neuf PUBLIC (hors auth) — pages paiement `/v2/*` montées avant le catch-all authentifié. */}
-        <Route path="/v2/paiement/succes" component={PublicModernRouterMount} />
-        <Route path="/v2/paiement/annule" component={PublicModernRouterMount} />
-        <Route path="/v2/signature/:token" component={PublicModernRouterMount} />
-        <Route path="/v2/devis-public/:token" component={PublicModernRouterMount} />
-        <Route path="/v2/portail/:token" component={PublicModernRouterMount} />
-        <Route path="/v2/home" component={PublicModernRouterMount} />
-        <Route path="/v2/avis/:token" component={PublicModernRouterMount} />
-        <Route path="/v2/vitrine/:slug" component={PublicModernRouterMount} />
-        {/* Pages d'auth v2 montées en PUBLIC (visiteur déconnecté) — AVANT le catch-all authentifié. */}
-        <Route path="/v2/signin" component={PublicModernRouterMount} />
-        <Route path="/v2/sign-in" component={PublicModernRouterMount} />
-        <Route path="/v2/signup" component={PublicModernRouterMount} />
-        <Route path="/v2/forgot-password" component={PublicModernRouterMount} />
-        <Route path="/v2/reset-password" component={PublicModernRouterMount} />
-        {/* Pages légales v2 publiques + redirections (corrige le shadow PageEnConstruction des pages migrées). */}
-        <Route path="/v2/mentions-legales" component={PublicModernRouterMount} />
-        <Route path="/v2/cgu" component={PublicModernRouterMount} />
-        <Route path="/v2/cgv" component={PublicModernRouterMount} />
-        <Route path="/v2/confidentialite" component={PublicModernRouterMount} />
-        <Route path="/mentions-legales">{() => <Redirect to={`/v2/mentions-legales${window.location.search}`} />}</Route>
-        <Route path="/cgu">{() => <Redirect to={`/v2/cgu${window.location.search}`} />}</Route>
-        <Route path="/cgv">{() => <Redirect to={`/v2/cgv${window.location.search}`} />}</Route>
-        <Route path="/confidentialite">{() => <Redirect to={`/v2/confidentialite${window.location.search}`} />}</Route>
-        <Route path="/portail/:token">{(p) => <Redirect to={`/v2/portail/${p.token}${window.location.search}`} />}</Route>
-        <Route path="/avis/:token">{(p) => <Redirect to={`/v2/avis/${p.token}${window.location.search}`} />}</Route>
-        <Route path="/vitrine/:slug">{(p) => <Redirect to={`/v2/vitrine/${p.slug}${window.location.search}`} />}</Route>
-        {/*
-          Toutes les routes authentifiées passent par UN SEUL catch-all
-          AuthenticatedRoutes pour que DashboardLayout (et MonAssistant
-          drawer) persiste entre les navigations.
-        */}
-        <Route component={AuthenticatedRoutes} />
-      </Switch>
+      <AuthenticatedRoutes />
     </Suspense>
   );
 }

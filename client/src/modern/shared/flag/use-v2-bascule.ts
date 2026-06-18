@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation } from "@/modern/shared/router/navigation";
 import { isV2Enabled } from "./v2-flag";
 import { isV2Path, resolveV2Path } from "./v2-routes";
 
