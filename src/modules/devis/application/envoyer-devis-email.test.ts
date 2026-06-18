@@ -18,6 +18,8 @@ function makeMailing(over: Partial<DevisMailingDeps> & { client?: ClientInfo | n
   return {
     artisanReader: { getArtisan: async () => ({ id: 1, nomEntreprise: "ACME Toiture", email: "pro@acme.fr" }) },
     clientReader: { getClient: async () => resolved },
+    signatureReader: { getByDevisId: async () => null },
+    appUrl: "https://staging.operioz.com",
     pdf: new FakePdfPort(),
     email: new FakeEmailPort(),
     rateLimiter: new FakeRateLimiter(),
