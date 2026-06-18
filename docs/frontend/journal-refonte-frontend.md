@@ -773,9 +773,15 @@ catch-all authentifié). → un visiteur **déconnecté** peut désormais affich
 car. / 0 champ). Le login legacy `/signin` reste intact (non touché). Gates verts (tsc 0 / vitest 450). À revalider
 au navigateur après déploiement.
 
-## 🎯 PROCHAINE CIBLE : **suppression legacy** — SEUL item restant. Pré-requis « monter auth v2 en public » = FAIT
-(reste à revalider login sur /v2 déconnecté). Ensuite : retirer `client/src/pages/**` + wouter + `@/lib/trpc` (gros
-refactor App.tsx). État : default-on actif, login validé (legacy), auth v2 public. **Ordre de suppression = go/no-go humain.**
+**Anti-régression auth public ✅** : ajout au sweep `v2-socle-check.mjs` d'un bloc en contexte **ANONYME**
+(sans cookie) vérifiant que `/v2/sign-in` + `/v2/signup` rendent leurs champs (email/mot de passe) — garde-fou
+contre une régression du fix « auth v2 public » (re-dead-end si une route auth repassait dans le routeur
+authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test-only (pas de déploiement).
+
+## 🎯 PROCHAINE CIBLE : **suppression legacy** — SEUL item restant, IRRÉVERSIBLE, touche auth → **go/no-go +
+ordre humain requis**. Tous les prérequis sont levés : default-on actif, login validé (legacy ET /v2), auth v2
+publique + garde-fou e2e, 89 routes /v2, parité éditeurs vérifiée. Ordre sûr proposé : (1) cutover login → /v2 +
+retrait pages auth legacy ; (2) retrait `pages/**` par lots (sweep+login à chaque) ; (3) retrait wouter + `@/lib/trpc`.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré

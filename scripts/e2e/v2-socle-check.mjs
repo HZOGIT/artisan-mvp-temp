@@ -323,8 +323,33 @@ if (new URL(page.url()).pathname !== '/v2/dashboard') {
 }
 } // fin sections globales (if !ONLY)
 
+// Pages d'AUTH v2 montées en PUBLIC (OPE-403) : un visiteur DÉCONNECTÉ doit pouvoir afficher le FORMULAIRE
+// de connexion (régression possible si une route auth repasse dans le routeur authentifié → dead-end). On
+// vérifie dans un contexte ANONYME (sans cookie) que /v2/sign-in et /v2/signup rendent leurs champs.
+let authCount = 0;
+if (!ONLY) {
+  const anon = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true });
+  const ap = await anon.newPage();
+  for (const { route, fields } of [
+    { route: '/v2/sign-in', fields: ['input[type="email"]', 'input[type="password"]'] },
+    { route: '/v2/signup', fields: ['input[type="email"]', 'input[type="password"]'] },
+  ]) {
+    authCount++;
+    try {
+      await ap.goto(route, { waitUntil: 'networkidle', timeout: 25000 });
+      await ap.waitForTimeout(1200);
+      for (const sel of fields) {
+        if (await ap.locator(sel).count() === 0) add({ route, type: 'auth-public', text: `champ absent (déconnecté): ${sel}` });
+      }
+    } catch (e) {
+      add({ route, type: 'auth-public', text: `échec rendu auth public: ${String(e).slice(0, 120)}` });
+    }
+  }
+  await anon.close();
+}
+
 await browser.close();
-const total = (ONLY ? 0 : cases.length) + pariteCount + basculeCount + sidebarCount + signCount;
+const total = (ONLY ? 0 : cases.length) + pariteCount + basculeCount + sidebarCount + signCount + authCount;
 console.log(`${ONLY ? `[ROUTE ${ONLY}] ` : ''}cas testés: ${total} | issues: ${issues.length}`);
 if (issues.length) console.log(JSON.stringify(issues, null, 2));
 process.exit(issues.length ? 1 : 0);
