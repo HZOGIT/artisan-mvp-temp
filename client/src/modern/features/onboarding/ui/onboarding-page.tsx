@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+// Cette page est rendue par App.tsx HORS du ModernRouterMount → on initialise l'i18n du front neuf ici aussi
+// (sinon `t()` renvoie les clés). Idempotent (l'init est gardé par `i18n.isInitialized`).
+import "@/modern/shared/i18n";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, Lock, PartyPopper, Rocket, Sparkles, type LucideIcon, Bell, Calculator, Calendar, FileCheck, FileText, Globe, LayoutGrid, MapPin, MessageCircle, Package, PenTool, Receipt, ShoppingCart, Users, Wrench } from "lucide-react";
