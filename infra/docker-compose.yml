@@ -36,8 +36,8 @@ services:
   new-stack:
     image: operioz-newstack:latest
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: infra/Dockerfile
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -48,7 +48,7 @@ services:
       DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
     # JWT_SECRET (mêmes cookies que le legacy) + autres secrets via .env.staging.
     env_file:
-      - .env.staging
+      - ../.env.staging
     ports:
       - "3010:3001"
     depends_on:

@@ -2,7 +2,7 @@ version: '3'
 
 vars:
   DOCKER: docker
-  COMPOSE: docker compose
+  COMPOSE: docker compose -f infra/docker-compose.yml
   DB_USER: '{{.MYSQL_USER | default "artisan_user"}}'
   DB_PASS: '{{.MYSQL_PASSWORD | default "artisan_password"}}'
   DB_NAME: artisan_mvp
@@ -12,7 +12,7 @@ vars:
   # Consolidé : on développe directement sur la branche `staging` dans ce dépôt
   # (plus de worktree séparé). Le déploiement rebuild le conteneur depuis ce checkout.
   STAGING_DIR: /home/developer/artisan-mvp-temp
-  STAGING_COMPOSE: docker compose --env-file .env.staging
+  STAGING_COMPOSE: docker compose -f infra/docker-compose.yml --env-file .env.staging
 
 env:
   DOCKER_HOST: unix:///run/user/1001/docker.sock
@@ -88,37 +88,37 @@ tasks:
 
   tf:plan:
     desc: Run terraform plan (with tfsec) — Cloudflare
-    dir: terraform
+    dir: infra/terraform
     cmds:
       - ./run.sh plan
 
   tf:apply:
     desc: Run terraform apply (with tfsec) — Cloudflare
-    dir: terraform
+    dir: infra/terraform
     cmds:
       - ./run.sh apply
 
   gcp:init:
     desc: Init terraform GCP provider
-    dir: terraform/gcp
+    dir: infra/terraform/gcp
     cmds:
       - terraform init
 
   gcp:plan:
     desc: Plan GCP infra (Gemini API key)
-    dir: terraform/gcp
+    dir: infra/terraform/gcp
     cmds:
       - ./run.sh plan
 
   gcp:apply:
     desc: Apply GCP infra + write GEMINI_API_KEY to .env.local
-    dir: terraform/gcp
+    dir: infra/terraform/gcp
     cmds:
       - ./run.sh apply
 
   gcp:key:
     desc: Print current Gemini API key
-    dir: terraform/gcp
+    dir: infra/terraform/gcp
     cmds:
       - ./run.sh output
 

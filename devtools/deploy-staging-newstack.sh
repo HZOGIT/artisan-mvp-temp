@@ -15,7 +15,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-COMPOSE="docker compose --env-file .env.staging"
+COMPOSE="docker compose -f infra/docker-compose.yml --env-file .env.staging"
 NEWSTACK_URL="http://localhost:3010"
 
 echo "▶ Rebuild + recreate du conteneur new-stack (docker compose --build)…"

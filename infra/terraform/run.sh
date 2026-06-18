@@ -7,7 +7,7 @@ CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/../.env"
+ENV_FILE="$SCRIPT_DIR/../../.env"
 
 # ─── Load .env ───────────────────────────────────────────────────────────────
 if [[ ! -f "$ENV_FILE" ]]; then
