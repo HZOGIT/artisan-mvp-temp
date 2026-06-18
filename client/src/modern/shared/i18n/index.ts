@@ -66,6 +66,7 @@ import assistantFr from "@/modern/features/assistant/i18n/fr.json";
 import calendrierChantiersFr from "@/modern/features/calendrier-chantiers/i18n/fr.json";
 import authFr from "@/modern/features/auth/i18n/fr.json";
 import legalFr from "@/modern/features/legal/i18n/fr.json";
+import clientFormFr from "@/modern/features/client-form/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
 // Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
@@ -141,6 +142,7 @@ const resources = {
     calendrierChantiers: calendrierChantiersFr,
     auth: authFr,
     legal: legalFr,
+    clientForm: clientFormFr,
   },
 } as const;
 

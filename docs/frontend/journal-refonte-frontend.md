@@ -580,7 +580,22 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   désormais `/v2/cgv` des deux côtés (le legacy n'est pas une baseline utile ici). À traiter à l'étape
   suppression legacy : soit forcer la bascule default-on, soit rediriger explicitement (comme signature/portail).
 
-## 🎯 PROCHAINE CIBLE : **suppression progressive du legacy**. Toutes les pages applicatives + auth + légal
+- **Audit résiduel (`comm -23` App.tsx vs V2_ROUTES)** : il RESTE des **sous-pages détail/création** non
+  migrées (≠ les 28 pages feature) : `clients/nouveau` (400), `clients/import` (385), `devis/nouveau` (873),
+  `devis/:id` (1116), `devis/:id/ligne/nouvelle`, `factures/:id` (1197), `commandes/nouvelle`+`:id`+`:id/modifier`
+  (622/466), `contrats/:id` (539), `profil` (727), `mobile` (418) ; + stubs `/contact /aide /guide`
+  (PageEnConstruction) ; + `/` (landing). Les routes token publiques sont déjà gérées.
+- **🐛 FIX bascule `nouvelle-depense`** : la clé V2_ROUTES était `/nouvelle-depense` (chemin INEXISTANT côté
+  legacy) → bascule morte. Le vrai chemin legacy = **`/depenses/nouvelle`** → corrigé (clé + entrée sweep).
+  (cf. mémoire « v2-bascule : vrai chemin legacy ».)
+- **Migration `client-form` (clients/nouveau) ✅** : formulaire de création client (400 l, inputs natifs
+  conservés). `clients.create` (accepte tous les champs du form). Clean-archi : domain (`ClientForm` +
+  `defaultClientForm`/`validateClientForm` (nom requis)/`buildCreatePayload` — **3 tests**) + application
+  (mutation + invalidation) + ui (form natif + champs pro conditionnels). i18n namespace `clientForm`. **0
+  `any`**. Route `/v2/clients/nouveau` (sous-route, prioritaire sur `/clients/$id`) + V2_ROUTES. vitest **384**.
+
+## 🎯 PROCHAINE CIBLE : **continuer les sous-pages détail/création** (devis/factures editors = gros morceaux ;
+clients/import, commandes, contrat detail, profil, mobile = moyens) puis **suppression du legacy**. Toutes les pages applicatives + auth + légal
 sont migrées et basculées via `V2_ROUTES`. Étapes : (1) **audit `comm -23`** des routes App.tsx vs `V2_ROUTES`
 pour lister le résiduel non migré (PageEnConstruction, /contact /aide /guide, /calendrier ≠ calendrier-chantiers,
 Home `/`…) ; (2) **valider la parité au navigateur** (sweep complet + manuel sur login) ; (3) **supprimer**

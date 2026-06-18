@@ -116,7 +116,7 @@ const PARITE_PAGES = [
   { legacy: '/tableau-bord-sync-comptable', v2: '/v2/tableau-bord-sync-comptable', markers: ['Tableau de Bord Synchronisations', 'Taux de Réussite'] },
   { legacy: '/geolocalisation', v2: '/v2/geolocalisation', markers: ['Géolocalisation', 'Carte en temps réel', 'Légende'] },
   { legacy: '/planification', v2: '/v2/planification', markers: ['Planification Intelligente', 'Techniciens suggérés', 'Carte des techniciens'] },
-  { legacy: '/nouvelle-depense', v2: '/v2/nouvelle-depense', markers: ['Nouvelle dépense', 'Scanner un justificatif', 'Total TTC'] },
+  { legacy: '/depenses/nouvelle', v2: '/v2/nouvelle-depense', markers: ['Nouvelle dépense', 'Scanner un justificatif', 'Total TTC'] },
   { legacy: '/integrations-comptables', v2: '/v2/integrations-comptables', markers: ['Intégrations Comptables', 'Export Manuel', 'Configuration'] },
   { legacy: '/analyses-photos', v2: '/v2/analyses-photos', markers: ['Analyse photos IA', 'Nouvelle analyse', 'Historique des analyses'] },
   { legacy: '/import', v2: '/v2/import', markers: ['Migrez vos données', 'Source', 'Assistance incluse'] },
