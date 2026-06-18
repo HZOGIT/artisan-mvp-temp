@@ -1,7 +1,15 @@
+# Staging stack — isolated from dev (separate project, DB volume, network).
+# Runs the PRODUCTION build (pnpm build + pnpm start), public via the
+# artisan-staging Cloudflare tunnel (NO Cloudflare Access).
+#
+# Usage (from the staging worktree, see Taskfile `staging:*`):
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d
+name: artisan-staging
+
 services:
-  # Postgres — base de données unique du stack (Drizzle pg + RLS). MySQL (legacy) a été retiré :
-  # la migration est complète, le backend tourne sur le nouveau stack Fastify (cf. extinction du
-  # legacy). Le port hôte 5432 est aussi celui du PG jetable utilisé par le gate (tsc/vitest).
+  # Postgres — base de données unique du stack (Drizzle pg + RLS). MySQL (legacy) et le
+  # service `app` (backend Express legacy) ont été retirés : la migration est complète, le
+  # trafic est 100 % new-stack (dispatcher mono-stack, `functions/_lib/dispatch.mjs`).
   postgres:
     image: postgres:18
     restart: unless-stopped
@@ -10,11 +18,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-artisan_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-artisan_password}
     ports:
-      - "5432:5432"
+      # Port hôte différent du dev (5432) pour debug.
+      - "5433:5432"
     volumes:
-      # PG18+ : monter /var/lib/postgresql (données dans un sous-dossier par version),
-      # PAS /var/lib/postgresql/data (cf. docker-library/postgres#1259).
-      - pg_data:/var/lib/postgresql
+      - postgres_staging_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-artisan_user} -d artisan_mvp"]
       interval: 10s
@@ -22,38 +29,43 @@ services:
       retries: 10
       start_period: 20s
 
-  # Backend de dev = nouveau stack Fastify (`pnpm dev` = tsx watch src/server.ts). drizzle-kit migrate
-  # tourne en owner (DATABASE_URL → artisan_user) ; le runtime new-stack utilise APP_DATABASE_URL
-  # (rôle non-superuser app_tenant, soumis RLS — comme en staging). ⚠️ Le rôle app_tenant + les
-  # policies RLS doivent être provisionnés une fois (scripts/rls/setup-app-role.mjs, PG_URL=owner).
-  app:
-    image: node:22-slim
-    working_dir: /app
+  # Stack clean-archi (Fastify + tRPC 11 + Drizzle pg) — désormais le SEUL backend.
+  # Tourne sous le rôle non-superuser app_tenant (soumis RLS). Le tunnel `cloudflared`
+  # le sert directement (le dispatcher edge route tout `/api/*` vers le new-stack).
+  # Exposé sur le port hôte 3010 pour smoke-test.
+  new-stack:
+    image: operioz-newstack:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
-    volumes:
-      - .:/app
-      - app_node_modules:/app/node_modules
-    ports:
-      - "3000:3000"
     environment:
-      NODE_ENV: development
-      DB_DIALECT: postgresql
-      NEW_STACK_PORT: "3000"
+      NODE_ENV: production
+      NEW_STACK_PORT: "3001"
       HOST: 0.0.0.0
-      # migrate (DDL) = owner ; runtime new-stack (RLS) = app_tenant.
-      DATABASE_URL: postgres://${POSTGRES_USER:-artisan_user}:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp
+      # Rôle applicatif non-superuser → soumis aux policies RLS (isolation tenant).
       APP_DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
+      DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
+    # JWT_SECRET (mêmes cookies que le legacy) + autres secrets via .env.staging.
     env_file:
-      - .env.local
-    command: >
-      sh -c "npm install -g pnpm@10.4.1 --silent &&
-             pnpm install --frozen-lockfile &&
-             pnpm exec drizzle-kit migrate &&
-             pnpm dev"
+      - .env.staging
+    ports:
+      - "3010:3001"
     depends_on:
       postgres:
         condition: service_healthy
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # The artisan-staging tunnel routes the new-stack backend hostname -> http://new-stack:3001
+    # (configured in Terraform, cloudflare-managed). cloudflared reaches the service by its
+    # compose name over the shared network — no host ports. L'ancien ingress vers `app:3000`
+    # (backend legacy) est mort (le dispatcher edge ne cible plus que le new-stack) ; son
+    # nettoyage Terraform est traité séparément.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN_STAGING}
+    depends_on:
+      - new-stack
+
 volumes:
-  pg_data:
-  app_node_modules:
+  postgres_staging_data:

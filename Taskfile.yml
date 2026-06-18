@@ -9,7 +9,7 @@ vars:
   # Consolidé : on développe directement sur la branche `staging` dans ce dépôt
   # (plus de worktree séparé). Le déploiement rebuild le conteneur depuis ce checkout.
   STAGING_DIR: /home/developer/artisan-mvp-temp
-  STAGING_COMPOSE: docker compose -f docker-compose.staging.yml --env-file .env.staging
+  STAGING_COMPOSE: docker compose --env-file .env.staging
 
 env:
   DOCKER_HOST: unix:///run/user/1001/docker.sock
