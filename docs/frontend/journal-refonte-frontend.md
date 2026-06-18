@@ -594,8 +594,16 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   (mutation + invalidation) + ui (form natif + champs pro conditionnels). i18n namespace `clientForm`. **0
   `any`**. Route `/v2/clients/nouveau` (sous-route, prioritaire sur `/clients/$id`) + V2_ROUTES. vitest **384**.
 
+- **Migration `clients-import` (clients/import) ✅** : import Excel/CSV de clients (385 l, lib `xlsx`). Endpoint
+  `clients.importFromExcel`. Clean-archi : domain (`rowToPreview` (mapping en-têtes FR/techniques + validation
+  nom/email/tél) + `parseRows`/`validCount`/`errorCount`/`toImportPayload` + `isValidEmail`/`isValidPhone` +
+  `TEMPLATE_ROW` — **4 tests**) + application (mutation) + ui (upload + aperçu tableau + download modèle ; lecture/
+  écriture XLSX = effets en UI). **Nouvelle primitive** `alert.ts` (modern/shared/ui). i18n namespace
+  `clientsImport`. **0 `any`** (le `row: any` legacy → `Record<string, unknown>` + coercions). Route + V2_ROUTES
+  + sweep. vitest **388**.
+
 ## 🎯 PROCHAINE CIBLE : **continuer les sous-pages détail/création** (devis/factures editors = gros morceaux ;
-clients/import, commandes, contrat detail, profil, mobile = moyens) puis **suppression du legacy**. Toutes les pages applicatives + auth + légal
+commandes (form/detail), contrat detail, profil, mobile) puis **suppression du legacy**. Toutes les pages applicatives + auth + légal
 sont migrées et basculées via `V2_ROUTES`. Étapes : (1) **audit `comm -23`** des routes App.tsx vs `V2_ROUTES`
 pour lister le résiduel non migré (PageEnConstruction, /contact /aide /guide, /calendrier ≠ calendrier-chantiers,
 Home `/`…) ; (2) **valider la parité au navigateur** (sweep complet + manuel sur login) ; (3) **supprimer**

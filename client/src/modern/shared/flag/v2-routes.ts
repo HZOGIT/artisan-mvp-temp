@@ -49,6 +49,7 @@ export const V2_ROUTES: Readonly<Record<string, string>> = {
   "/chantiers": "/v2/chantiers",
   "/assistant": "/v2/assistant",
   "/clients/nouveau": "/v2/clients/nouveau",
+  "/clients/import": "/v2/clients/import",
   "/calendrier-chantiers": "/v2/calendrier-chantiers",
   "/signin": "/v2/signin",
   "/sign-in": "/v2/sign-in",
