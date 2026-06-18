@@ -118,3 +118,26 @@ describe("shell/notif-style (pur)", () => {
     expect(notifTypeMeta("zzz").Icon).toBeTruthy();
   });
 });
+
+import { trialBannerSeverity, accountBlockState, type Subscription } from "./subscription";
+const sub = (o: Partial<Subscription>) => o as Subscription;
+describe("shell/subscription (pur)", () => {
+  it("trialBannerSeverity : seuils + non affichée", () => {
+    expect(trialBannerSeverity(null)).toBeNull();
+    expect(trialBannerSeverity(sub({ status: "active" }))).toBeNull();
+    expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 8 }))).toBeNull();
+    expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 5 }))).toBe("normal");
+    expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 3 }))).toBe("urgent");
+    expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 1 }))).toBe("critical");
+    expect(trialBannerSeverity(sub({ status: "trialing", trialDaysLeft: 0 }))).toBe("critical");
+  });
+  it("accountBlockState : expiré/essai fini bloque ; /parametres et /v2/parametres tolérés", () => {
+    expect(accountBlockState(sub({ status: "active" }), "/v2/clients").isBlocked).toBe(false);
+    expect(accountBlockState(sub({ status: "expired" }), "/v2/clients").isBlocked).toBe(true);
+    expect(accountBlockState(sub({ status: "trialing", trialDaysLeft: 0 }), "/v2/clients").isBlocked).toBe(true);
+    expect(accountBlockState(sub({ status: "expired" }), "/v2/parametres").blockerAllowed).toBe(true);
+    expect(accountBlockState(sub({ status: "expired" }), "/parametres").blockerAllowed).toBe(true);
+    expect(accountBlockState(sub({ status: "expired" }), "/v2/profil").blockerAllowed).toBe(true);
+    expect(accountBlockState(sub({ status: "expired" }), "/v2/clients").blockerAllowed).toBe(false);
+  });
+});

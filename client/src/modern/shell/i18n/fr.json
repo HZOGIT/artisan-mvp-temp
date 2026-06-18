@@ -21,5 +21,10 @@
   "notifications": "Notifications",
   "toutMarquerLu": "Tout marquer comme lu",
   "aucuneNotif": "Aucune notification",
-  "voirToutesNotifs": "Voir toutes les notifications"
+  "voirToutesNotifs": "Voir toutes les notifications",
+  "trialToday": "Votre essai gratuit se termine aujourd'hui.",
+  "trialTomorrow": "Votre essai gratuit se termine demain.",
+  "trialDays": "Votre essai gratuit se termine dans {{n}} jours.",
+  "trialCtaSuffix": "Choisissez votre plan pour continuer sans interruption.",
+  "choisirPlan": "Choisir mon plan →"
 }
