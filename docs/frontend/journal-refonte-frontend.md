@@ -1207,3 +1207,12 @@ build OK. TESTÉ STAGING: /→/home, public no-shell, login→dashboard+shell, n
 sur le pathspec manquant → seules les suppressions sont committées, pas les modifs → origin cassé. FIX: ne PAS lister
 les chemins déjà git-rm dans git add (ils sont déjà stagés). Toujours re-vérifier origin après push (grep marqueur).
 RESTE: F1.2 (retrait shim, ~30 fichiers) + legacy Étape B (email).
+
+## ✅ LEGACY-FINISH TERMINÉ (2026-06-18) — src/shared/legacy SUPPRIMÉ
+Étape A (PDF, decad56/df67d3e) + Étape B (email, 7cb1acd) : plus AUCUN code legacy dans le new-stack.
+- Email : emailService.ts (Resend, sidecar legacy-email.mjs, LegacyEmailAdapter 13× app.ts) → internalisé en
+  src/shared/email/resend-email-adapter.ts (EmailPort direct, from/replyTo défaut, attachments, simulation) + test.
+  build:newstack = juste server.mjs (plus de sidecar). logEmail best-effort non reporté (createEmailLog cassé post-B1,
+  boundary EmailPort sans artisanId).
+- Gates: tsc.src 0, suite backend 2766 (533 fichiers), build:newstack OK, backend redéployé + smoke OK, staging sain.
+RESTE: F1.2 (retrait shim navigation ~30 fichiers → hooks TanStack natifs) — dernier chantier.
