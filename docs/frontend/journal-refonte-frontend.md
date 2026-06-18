@@ -1231,7 +1231,7 @@ deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
 
 ## 🏗️ REORG TOP-LEVEL — par lots (2026-06-18, GO user tous lots)
 - [x] LOT A (db6cb13a) : terraform + Dockerfile + docker-compose → infra/ (build context repo root, refs MAJ, backend smoke OK).
-- [ ] LOT B : shared/ racine → packages/contract (@shared alias front + relatifs backend ../shared).
+- [x] LOT B (a5b85220) : shared/ → packages/contract (@shared alias front, 2 fichiers backend, Dockerfile). Smoke + sweep 61/0 OK.
 - [ ] LOT C : src/ → apps/api (build:newstack, Dockerfile COPY, tsconfig.src, AppRouter relatif front).
 - [ ] LOT D : client/ → apps/web (vite root, deploy-pages, index.html).
 - [ ] LOT E : functions/ → infra/edge SI Pages le permet (contrainte convention functions/ racine).
