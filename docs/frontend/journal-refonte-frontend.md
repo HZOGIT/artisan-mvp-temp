@@ -1134,3 +1134,12 @@ déjà des chemins SANS /v2 (/portail/:token, /parametres?tab=abonnement, succes
 **Wiring fix (2026-06-18, commit 620c290)** : régression refonte — composants modern naviguaient vers chemins
 LEGACY backend (notif.lien, action 'navigate' assistant) via useV2Bascule qui STRIPPE la query (ex. filtre assistant
 perdu). Fix : `resolveV2Url` (résout path→/v2 en conservant query/hash) sur notif + resolveV2Path sur assistant. 2 tests.
+
+## 🏁 RETRAIT PRÉFIXE /v2 TERMINÉ (2026-06-18, commits 467d538 + b5359d4)
+Codemod (scripts/codemod-remove-v2.mjs, dry-run validé) : 76 littéraux de path /v2/x→/x (66 fichiers).
+À la main : basepath:"/v2"→"/" (×2 routers) ; SUPPRESSION couche flag/bascule/resolve (v2-routes, v2-flag,
+use-v2-bascule + resolveV2Path/Url/isV2Path/V2_ROUTES) ; entry-routes réécrit (plus de redirections legacy→/v2,
+seul `/`→`/home`, détection public sur chemins bare) ; nav.isPathActive sans remapping ; normalizers
+replace(/^/v2/) retirés ; 404 routeur → page not-found modern. Backend émet déjà des chemins bare (/portail/:token,
+/parametres) → ALIGNÉ. patches/ (wouter) supprimé. Gates: tsc.v2 0, eslint 0, vitest.v2 458, vite build OK.
+Déployé + testé staging : /→/home, login→/dashboard (plus de /v2), /clients (shell OK), /cgv (public OK), 0 erreur.
