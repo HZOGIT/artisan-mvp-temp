@@ -4,7 +4,7 @@
   // au runtime par le new-stack (build:newstack → legacy-pdf.mjs / legacy-email.mjs), listés
   // explicitement ci-dessous pour conserver leur couverture de types sans glob `server/**` trompeur.
   "include": [
-    "client/src/**/*",
+    "apps/web/src/**/*",
     "packages/contract/**/*"
   ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
@@ -23,7 +23,7 @@
     "baseUrl": ".",
     "types": ["node", "vite/client"],
     "paths": {
-      "@/*": ["./client/src/*"],
+      "@/*": ["./apps/web/src/*"],
       "@shared/*": ["./packages/contract/*"]
     }
   }

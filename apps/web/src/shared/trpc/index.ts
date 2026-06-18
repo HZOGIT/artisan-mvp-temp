@@ -1,5 +1,5 @@
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "../../../../apps/api/interface/trpc/router";
+import type { AppRouter } from "../../../../../apps/api/interface/trpc/router";
 
 // Couture tRPC du FRONT NEUF (clean-archi). Les features `modern/**` consomment le **même** client
 // tRPC que le legacy — l'instance unique créée dans `client/src/lib/trpc.ts` et montée dans `main.tsx`

@@ -11,7 +11,7 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "gen:api": "openapi-typescript openapi/operioz.openapi.json -o client/src/modern/shared/api/schema.d.ts",
+    "gen:api": "openapi-typescript openapi/operioz.openapi.json -o apps/web/src/shared/api/schema.d.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
