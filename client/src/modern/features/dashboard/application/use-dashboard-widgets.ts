@@ -42,3 +42,13 @@ export function useObjectifs() {
   const { data, isLoading } = trpc.dashboard.getObjectifs.useQuery();
   return { objectifs: data, isLoading };
 }
+
+export type MonthlyCAItem = RouterOutputs["dashboard"]["getMonthlyCA"][number] & { month?: string; label?: string; ca?: number; total?: number; revenue?: number };
+export function useMonthlyCA() {
+  const { data, isLoading } = trpc.dashboard.getMonthlyCA.useQuery({ months: 6 });
+  return { months: (data ?? []) as MonthlyCAItem[], isLoading };
+}
+export function useDevisStats() {
+  const { data, isLoading } = trpc.statistiques.getDevisStats.useQuery();
+  return { parStatut: (data?.parStatut ?? {}) as Record<string, number>, isLoading };
+}

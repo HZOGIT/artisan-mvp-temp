@@ -136,5 +136,8 @@
   "obj_configurez": "Configurez vos objectifs dans Paramètres.",
   "obj_ca": "Chiffre d'affaires",
   "obj_devis": "Devis créés",
-  "obj_clients": "Nouveaux clients"
+  "obj_clients": "Nouveaux clients",
+  "rc_aucun": "Pas encore de données de CA à afficher.",
+  "rc_ca": "CA",
+  "dr_aucun": "Pas encore de devis dans votre base."
 }
