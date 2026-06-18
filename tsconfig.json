@@ -5,11 +5,7 @@
   // explicitement ci-dessous pour conserver leur couverture de types sans glob `server/**` trompeur.
   "include": [
     "client/src/**/*",
-    "shared/**/*",
-    "src/shared/legacy/pdfGenerator.ts",
-    "src/shared/legacy/fonts.ts",
-    "src/shared/legacy/emailService.ts",
-    "src/shared/legacy/env.ts"
+    "shared/**/*"
   ],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
