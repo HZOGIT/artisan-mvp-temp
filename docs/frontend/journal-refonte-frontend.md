@@ -1226,5 +1226,5 @@ deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
 - [x] B2 ui-kit (600f023) : client/src/components/ui → client/src/modern/shared/ui-kit/ (primitives shadcn)
 - [x] B3 bootstrap (59252b6) : ErrorBoundary+ThemeContext → bootstrap/ ; lib/utils+hooks → modern/shared ; const.ts mort supprimé ; main/App/index.css gardés racine (entry).
       lib/utils + hooks → modern/shared/lib + modern/shared/hooks
-- [ ] B4 drop préfixe `modern/` : client/src/modern/* → client/src/* (mass @/modern/ → @/, tsconfig paths, vite) — LE GROS
-→ PROCHAINE BRIQUE : B4 (drop préfixe `modern/` : client/src/modern/* → client/src/* ; mass @/modern/ → @/ ; tsconfig paths ; vite). LE GROS — faire prudemment, sweep + login après.
+- [x] B4 drop préfixe `modern/` (77b3280) : client/src/modern/* → client/src/* ; @/modern/→@/ (923 occ/341 fic) ; configs MAJ ; fix import backend relatif (racine cascade 774). 580 fichiers, sweep 0 issue.
+✅ RESTRUCTURATION FRONTEND TERMINÉE (B1-B4). client/src = {features, shared, shell, bootstrap} + main/App/index.css racine. RESTE (hors cron, à coordonner) : backend/infra — apps/web+apps/api, packages/contract, infra/edge, top-level apps/.
