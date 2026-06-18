@@ -11,6 +11,7 @@ export * from "./scroll-area";
 export * from "./select";
 export * from "./tabs";
 export * from "./dialog";
+export * from "./popover";
 export * from "./table";
 export * from "./textarea";
 export * from "./checkbox";

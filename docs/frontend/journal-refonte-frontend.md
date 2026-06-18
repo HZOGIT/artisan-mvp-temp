@@ -546,8 +546,19 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   barre micro/voix + actions + dialogs). i18n. **0 `any`** (8 supprimés). Route + V2_ROUTES + sweep.
   tsc/eslint(0)/vitest **368**.
 
-## 🎯 PROCHAINE CIBLE : **migrer la DERNIÈRE page feature** : `calendrier-chantiers` (1635 l, vue calendrier
-+ drag&drop d'affectation/replanification). Après elle → auth/légal + suppression du legacy.
+- **Migration `calendrier-chantiers` ✅** (28e — **DERNIÈRE page feature, la plus grosse : 1635 l**) : planning
+  interventions vues mois/semaine/jour + **drag&drop** (replanifier en déposant sur une date, réassigner en
+  déposant sur un technicien, avec confirmation) + couleurs personnalisables + **export PDF (jsPDF+autoTable)
+  / impression HTML / CSV**. 8 endpoints présents. Clean-archi : domain (`transformInterventions` (jointure)/
+  `filterInterventions`/`interventionColor`/`interventionsForDay`/`daysInMonth`(42)/`daysInWeek`/
+  `rescheduledDate`/`statutVariant`/`conflictCounts`/`buildCsv` + COLORS/JOURS/MOIS — **8 tests**) + application
+  (5 queries + 3 mutations) + ui (toolbar + 3 vues + légende + 3 dialogs). **Nouvelle primitive** `popover.ts`
+  ajoutée à `modern/shared/ui`. **jsPDF autoTable en import fonctionnel** (`autoTable(doc, …)`) → pas de `as
+  any`. i18n. **0 `any`** (12 supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **375**.
+
+## 🎉 TOUTES LES PAGES FEATURE SONT MIGRÉES (28/28). 🎯 PROCHAINE CIBLE : **pages auth/légal** (login,
+inscription, mentions/CGV) puis **suppression du legacy** (pages/**, wouter, @/lib/trpc) une fois la parité
+confirmée sur l'ensemble. Auditer `comm -23` App.tsx vs V2_ROUTES pour confirmer le périmètre restant.
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
