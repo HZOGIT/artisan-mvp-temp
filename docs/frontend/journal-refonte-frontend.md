@@ -1233,5 +1233,5 @@ deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
 - [x] LOT A (db6cb13a) : terraform + Dockerfile + docker-compose → infra/ (build context repo root, refs MAJ, backend smoke OK).
 - [x] LOT B (a5b85220) : shared/ → packages/contract (@shared alias front, 2 fichiers backend, Dockerfile). Smoke + sweep 61/0 OK.
 - [x] LOT C (76b48133) : src/ → apps/api (1287 fic, codemod, drizzle/contract/functions +1 ../, configs+AppRouter). Smoke + sweep 61/0 OK.
-- [ ] LOT D : client/ → apps/web (vite root, deploy-pages, index.html).
+- [x] LOT D (0c04e06a) : client/ → apps/web (codemod, vite root/aliases/index.html, AppRouter +1 ../, fix latent @shared vitest). vite build + vitest.client 457 + sweep 61/0 OK.
 - [ ] LOT E : functions/ → infra/edge SI Pages le permet (contrainte convention functions/ racine).
