@@ -1,11 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/modern/shared/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/modern/shared/ui/card";
+import { Badge } from "@/modern/shared/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/modern/shared/ui/tooltip";
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Columns3 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 interface Intervention {
   id: number;
@@ -49,6 +50,7 @@ type ViewMode = "month" | "week";
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7h - 20h
 
 export default function Calendar({ interventions, onDateClick, onInterventionClick, onAddClick, onInterventionDrop }: CalendarProps) {
+  const { t } = useTranslation("calendrier");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
@@ -136,18 +138,18 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
                   className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-colors ${viewMode === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   <CalendarIcon className="h-3.5 w-3.5" />
-                  Mois
+              {t("cal_mois")}
                 </button>
                 <button
                   onClick={() => setViewMode("week")}
                   className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1 transition-colors ${viewMode === "week" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
                 >
                   <Columns3 className="h-3.5 w-3.5" />
-                  Semaine
+              {t("cal_semaine")}
                 </button>
               </div>
               <Button variant="outline" size="sm" onClick={handleToday}>
-                Aujourd'hui
+            {t("cal_aujourdhui")}
               </Button>
               <Button variant="ghost" size="icon" onClick={handlePrev}>
                 <ChevronLeft className="h-4 w-4" />
@@ -210,7 +212,7 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
             {selectedDate && onAddClick && (
               <Button size="sm" onClick={() => onAddClick(selectedDate)}>
                 <Plus className="h-4 w-4 mr-1" />
-                Ajouter
+                {t("cal_ajouter")}
               </Button>
             )}
           </div>
@@ -262,21 +264,21 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                <p>Aucune intervention prévue</p>
+                <p>{t("cal_aucuneInter")}</p>
                 {onAddClick && (
                   <Button
                     variant="link"
                     className="mt-2"
                     onClick={() => onAddClick(selectedDate)}
                   >
-                    Planifier une intervention
+                    {t("cal_planifier")}
                   </Button>
                 )}
               </div>
             )
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              <p>Cliquez sur une date pour voir les interventions</p>
+              <p>{t("cal_cliquezDate")}</p>
             </div>
           )}
         </CardContent>
@@ -308,6 +310,7 @@ function MonthView({
   onInterventionDrop?: (id: number, d: Date) => void;
   dayLabels: string[];
 }) {
+  const { t } = useTranslation("calendrier");
   return (
     <>
       <div className="grid grid-cols-7 gap-1 mb-2">
@@ -372,7 +375,7 @@ function MonthView({
                 ))}
                 {dayInterventions.length > 2 && (
                   <div className="text-xs text-muted-foreground px-1">
-                    +{dayInterventions.length - 2} autres
+                    {t("cal_autres", { n: dayInterventions.length - 2 })}
                   </div>
                 )}
               </div>
@@ -409,6 +412,7 @@ function WeekView({
   onAddClick?: (date: Date) => void;
   weekGridRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const { t } = useTranslation("calendrier");
   // Build a map: "yyyy-MM-dd-HH" -> interventions that start in that hour
   const interventionsBySlot = useMemo(() => {
     const map = new Map<string, Intervention[]>();
@@ -538,12 +542,12 @@ function WeekView({
                         <div className="space-y-1">
                           <p className="font-semibold">{intervention.titre}</p>
                           <p className="text-xs">
-                            {format(startDate, "EEEE d MMMM yyyy", { locale: fr })} à {format(startDate, "HH:mm")}
+                            {format(startDate, "EEEE d MMMM yyyy", { locale: fr })} {t("cal_a")} {format(startDate, "HH:mm")}
                             {intervention.dateFin && <> — {format(new Date(intervention.dateFin), "HH:mm")}</>}
                           </p>
-                          {clientName && <p className="text-xs">Client : {clientName}</p>}
-                          {intervention.adresse && <p className="text-xs">Adresse : {intervention.adresse}</p>}
-                          <p className="text-xs">Statut : {statusLabels[intervention.statut] || intervention.statut}</p>
+                          {clientName && <p className="text-xs">{t("cal_client")} {clientName}</p>}
+                          {intervention.adresse && <p className="text-xs">{t("cal_adresse")} {intervention.adresse}</p>}
+                          <p className="text-xs">{t("cal_statut")} {statusLabels[intervention.statut] || intervention.statut}</p>
                         </div>
                       </TooltipContent>
                     </Tooltip>

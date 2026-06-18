@@ -22,5 +22,18 @@
   "toastCree": "Intervention planifiée avec succès",
   "toastCreeErreur": "Erreur lors de la création de l'intervention",
   "toastDeplacee": "Intervention déplacée",
-  "toastDeplaceeErreur": "Erreur lors du déplacement"
+  "toastDeplaceeErreur": "Erreur lors du déplacement",
+  "cal_mois": "Mois",
+  "cal_semaine": "Semaine",
+  "cal_aujourdhui": "Aujourd'hui",
+  "cal_ajouter": "Ajouter",
+  "cal_selectionnezDate": "Sélectionnez une date",
+  "cal_aucuneInter": "Aucune intervention prévue",
+  "cal_cliquezDate": "Cliquez sur une date pour voir les interventions",
+  "cal_autres": "+{{n}} autres",
+  "cal_a": "à",
+  "cal_client": "Client :",
+  "cal_adresse": "Adresse :",
+  "cal_statut": "Statut :",
+  "cal_planifier": "Planifier une intervention"
 }
