@@ -778,7 +778,26 @@ au navigateur après déploiement.
 contre une régression du fix « auth v2 public » (re-dead-end si une route auth repassait dans le routeur
 authentifié). Vérifié : sign-in (1 email/1 pwd), signup (1 email/2 pwd). Test-only (pas de déploiement).
 
-## 🚧 SUPPRESSION LEGACY — démarrée par LOTS (build-vérifiés). Mécanique validée :
+## 🏁 ÉTAT FINAL (2026-06-18) — page-migration + suppression TERMINÉES ; reste la PHASE SHELL
+**86/89 pages legacy supprimées** (lots 1-11), **cutover auth/landing/dashboard validé**, **0 régression**. Les
+**3 pages legacy restantes** (`Assistant`, `NotFound`, `Onboarding`) ne sont PAS de simples retraits — elles sont
+couplées au **SHELL legacy** :
+- **`App.tsx → AuthenticatedRoutes`** enveloppe TOUT dans **`<DashboardLayout>` (legacy)** et monte **toutes** les
+  pages /v2 via `<Route path="/v2/*" component={ModernRouterMount} />` **À L'INTÉRIEUR** de ce DashboardLayout.
+  ⇒ le **shell legacy (sidebar + `AssistantDrawer`, ~1400 l) reste la chrome de TOUTES les pages /v2.**
+- **`Assistant`** : rendu dans `components/AssistantDrawer.tsx` (`import Assistant from "@/pages/Assistant"`), dans
+  `DashboardLayout`. **`NotFound`** : catch-all wouter. **`Onboarding`** : 366 l, non migré, gate plein écran post-signup.
+
+### 🎯 PHASE FINALE (architecturale, à cadrer — plus risquée que les lots de pages) :
+1. **Migrer le SHELL** (`DashboardLayout` + `AssistantDrawer` → `client/src/modern/**`) pour que les pages /v2 ne
+   dépendent plus du shell legacy.
+2. **Migrer `Onboarding`** + **dé-coupler `AssistantDrawer`** de `pages/Assistant`.
+3. **Retirer wouter** (Router App.tsx → mount /v2 pur + redirects ; `NotFound` → notFound TanStack), puis **`@/lib/trpc`**.
+4. Valider à chaque étape : sweep + **login + onboarding (compte frais)**.
+> ⚠️ Touche le cœur du shell (enveloppe TOUTES les pages /v2) → validation flux signup/onboarding + revue humaine
+> recommandées avant de retirer wouter. Cf. [[legacy-suppression-build-gate]].
+
+## (historique) SUPPRESSION LEGACY par LOTS (build-vérifiés). Mécanique validée :
 - **Gate de suppression = `npx vite build`** (esbuild, ce que le deploy exécute), PAS `tsc --noEmit` (le legacy
   a **159 erreurs de type pré-existantes** non bloquantes pour le bundle). + vitest.v2 + tsc.v2 (périmètre neuf).
 - **Procédure par lot** : retirer fichiers `pages/<X>.tsx` + leurs import/Route dans `App.tsx` → `vite build` OK →
