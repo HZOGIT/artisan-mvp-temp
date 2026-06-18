@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/mod
 import { Input } from "@/modern/shared/ui/input";
 import { Textarea } from "@/modern/shared/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/modern/shared/ui/table";
-import { BulletproofModal } from "@/components/BulletproofModal";
+import { BulletproofModal } from "./bulletproof-modal";
 import { useModelesTransactionnels } from "../application/use-modeles-transactionnels";
 import { TYPE_OPTIONS, VARIABLES_DISPONIBLES, MODELES_PAR_DEFAUT, varCode, defautToCreateInput, type Modele, type ModeleForm, type EmailType, type ModeleDefaut } from "../domain/modeles-email-transactionnels";
 

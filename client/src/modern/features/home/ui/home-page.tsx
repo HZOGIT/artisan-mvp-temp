@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { CookieBanner } from "@/components/CookieBanner";
+import { CookieBanner } from "./cookie-banner";
 import { useHomeAuth } from "../application/use-home-auth";
 import { priceFor, type BillingCycle } from "../domain/home";
 
