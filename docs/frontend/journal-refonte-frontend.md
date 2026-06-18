@@ -1222,9 +1222,9 @@ Autonome = FRONTEND uniquement (mon périmètre, déployable Pages + vérif navi
 packages/contract, infra/edge, top-level apps/) = coordination séparée APRÈS (risque imports backend/Dockerfile/dispatcher).
 Une brique = un sous-arbre : move + maj imports + gates (tsc.client/vitest.client/vite build) + commit chirurgical +
 deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
-- [ ] B1 voice : client/src/{domain/voice, infra-web, app/useVoiceSession} → client/src/modern/shared/voice/
+- [x] B1 voice (389b9e7) : client/src/{domain/voice, infra-web, app/useVoiceSession} → client/src/modern/shared/voice/
 - [ ] B2 ui-kit : client/src/components/ui → client/src/modern/shared/ui-kit/ (primitives shadcn)
 - [ ] B3 bootstrap : App.tsx/main.tsx/ErrorBoundary/ThemeContext/index.css/const/leaflet.d → client/src/bootstrap/ ;
       lib/utils + hooks → modern/shared/lib + modern/shared/hooks
 - [ ] B4 drop préfixe `modern/` : client/src/modern/* → client/src/* (mass @/modern/ → @/, tsconfig paths, vite) — LE GROS
-→ PROCHAINE BRIQUE : B1 (voice).
+→ PROCHAINE BRIQUE : B2 (ui-kit : client/src/components/ui → client/src/modern/shared/ui-kit/).
