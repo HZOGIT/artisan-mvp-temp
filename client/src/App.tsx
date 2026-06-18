@@ -12,10 +12,6 @@ import { useV2Bascule } from "./modern/shared/flag/use-v2-bascule";
 // (route racine + auth + dashboard immediatement disponible apres login)
 // ============================================================================
 import Home from "./pages/Home";
-import SignInPage from "./pages/SignIn";
-import SignUp from "./pages/SignUp";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
@@ -100,11 +96,11 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch location={location}>
         <Route path="/" component={Home} />
-        <Route path="/signin" component={SignInPage} />
-        <Route path="/sign-in" component={SignInPage} />
-        <Route path="/signup" component={SignUp} />
-        <Route path="/forgot-password" component={ForgotPassword} />
-        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/signin">{() => <Redirect to={`/v2/signin${window.location.search}`} />}</Route>
+        <Route path="/sign-in">{() => <Redirect to={`/v2/sign-in${window.location.search}`} />}</Route>
+        <Route path="/signup">{() => <Redirect to={`/v2/signup${window.location.search}`} />}</Route>
+        <Route path="/forgot-password">{() => <Redirect to={`/v2/forgot-password${window.location.search}`} />}</Route>
+        <Route path="/reset-password">{() => <Redirect to={`/v2/reset-password${window.location.search}`} />}</Route>
         <Route path="/v2/contact" component={PublicModernRouterMount} />
         <Route path="/v2/aide" component={PublicModernRouterMount} />
         <Route path="/v2/guide" component={PublicModernRouterMount} />
