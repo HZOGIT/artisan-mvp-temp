@@ -151,6 +151,8 @@ describe("agent-wiring — envois câblés (Phase 3b-iii) → registry agentique
     return {
       artisanReader: { getArtisan: async () => ({ id: 1, nomEntreprise: "ACME", email: "pro@acme.fr" }) },
       clientReader: { getClient: async () => ({ id: 100, nom: "Durand", prenom: "Marie", email: "marie@x.fr" }) },
+      signatureReader: { getByDevisId: async () => null },
+      appUrl: "https://staging.operioz.com",
       pdf: new FakePdfPort(),
       email,
       rateLimiter: new FakeRateLimiter(),
