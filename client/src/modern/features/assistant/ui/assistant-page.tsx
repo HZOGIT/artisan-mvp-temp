@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Streamdown } from "streamdown";
-import { Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar, Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio, Plus, Wrench, CheckCircle2, XCircle } from "lucide-react";
+import { Sparkles, Send, FileText, RefreshCw, Calculator, TrendingUp, Calendar, Loader2, User, Bot, Mic, MicOff, Phone, PhoneOff, Radio, Plus, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/modern/shared/ui/card";
 import { Textarea } from "@/modern/shared/ui/textarea";
@@ -13,6 +13,7 @@ import { Label } from "@/modern/shared/ui/label";
 import { useVoiceSession } from "@/app/useVoiceSession";
 import { useIsMobile } from "@/modern/shared/hooks/useMobile";
 import { useSpeechRecognition } from "@/modern/shared/hooks/useSpeechRecognition";
+import { resolveV2Path } from "@/modern/shared/flag/v2-routes";
 import { useAssistant, streamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
 import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown, type Message } from "../domain/assistant";
 
@@ -109,7 +110,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
         if (ev.threadId && !threadId) setThreadId(ev.threadId);
         if (ev.content) setMessages((prev) => { const u = [...prev]; const last = u[u.length - 1]; if (last.role === "assistant") u[u.length - 1] = { ...last, content: last.content + ev.content }; return u; });
         if (ev.error) toast.error(ev.error);
-        if (ev.navigate) { window.location.href = navigateTarget(ev.navigate, ev.filtre); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
+        if (ev.navigate) { window.location.href = navigateTarget(resolveV2Path(ev.navigate) ?? ev.navigate, ev.filtre); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
         if (ev.invalidate) for (const key of ev.invalidate) queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey.some((k) => typeof k === "string" && k.includes(key)) });
         if (ev.toolStart) setActiveTools((prev) => [...prev, { name: ev.toolStart!.name }]);
         if (ev.toolEnd) setActiveTools((prev) => prev.map((t) => t.name === ev.toolEnd!.name && t.ok === undefined ? { ...t, ok: ev.toolEnd!.ok } : t));

@@ -61,3 +61,16 @@ describe("V2_ROUTES", () => {
     }
   });
 });
+
+import { resolveV2Url } from "./v2-routes";
+describe("resolveV2Url — résout le path vers /v2 EN PRÉSERVANT la query/hash (wiring liens backend)", () => {
+  it("chemin migré + query → /v2 + query conservée", () => {
+    expect(resolveV2Url("/devis?filtre=impayees")).toBe("/v2/devis?filtre=impayees");
+    expect(resolveV2Url("/factures/123")).toBe("/v2/factures/123");
+    expect(resolveV2Url("/clients/45?tab=devis")).toBe("/v2/clients/45?tab=devis");
+  });
+  it("déjà /v2 ou non migré → inchangé (query conservée)", () => {
+    expect(resolveV2Url("/v2/devis?filtre=x")).toBe("/v2/devis?filtre=x");
+    expect(resolveV2Url("/route-inconnue?a=1")).toBe("/route-inconnue?a=1");
+  });
+});

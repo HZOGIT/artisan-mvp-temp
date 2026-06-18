@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "@/modern/shared/router/navigation";
+import { resolveV2Url } from "@/modern/shared/flag/v2-routes";
 
 // Page Notifications du FRONT NEUF (`/v2/notifications`) — clean-archi : présentation pure. Données &
 // mutations via `useNotifications` (couche application, seule à importer tRPC) ; le calcul de date
@@ -61,7 +62,7 @@ export default function NotificationsPage() {
 
   const handleClick = (notif: Notification) => {
     if (!notif.lu) markAsRead.mutate({ id: notif.id });
-    if (notif.lien) setLocation(notif.lien);
+    if (notif.lien) setLocation(resolveV2Url(notif.lien));
   };
 
   return (

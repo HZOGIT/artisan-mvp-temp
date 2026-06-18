@@ -133,3 +133,12 @@ export function isV2Path(pathname: string): boolean {
   const p = normalize(pathname);
   return p === "/v2" || p.startsWith("/v2/");
 }
+
+// Résout une URL (chemin + query/hash) vers /v2 en PRÉSERVANT la query/hash. Utilisé pour les liens fournis par
+// le backend (notif.lien, action assistant) qui sont des chemins LEGACY : `resolveV2Path` seul stripperait la query.
+export function resolveV2Url(url: string): string {
+  const qIdx = url.search(/[?#]/);
+  const path = qIdx === -1 ? url : url.slice(0, qIdx);
+  const rest = qIdx === -1 ? "" : url.slice(qIdx);
+  return `${resolveV2Path(path) ?? path}${rest}`;
+}
