@@ -15,5 +15,7 @@
   "mobile_dashboard": "Accueil",
   "mobile_commercial": "Commercial",
   "mobile_clients": "Clients",
-  "mobile_terrain": "Terrain"
+  "mobile_terrain": "Terrain",
+  "ouvrirMenu": "Ouvrir le menu",
+  "brand": "Operioz"
 }

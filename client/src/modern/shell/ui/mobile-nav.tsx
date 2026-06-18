@@ -64,7 +64,7 @@ export function MobileNav(props: MobileNavProps) {
                 <div className="flex items-center gap-2">
                   <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 inline-flex items-center justify-center text-white"><Sparkles className="h-5 w-5" /></div>
                   <div>
-                    <p className="text-sm font-semibold leading-tight">{entrepriseName || "Operioz"}</p>
+                    <p className="text-sm font-semibold leading-tight">{entrepriseName || t("brand")}</p>
                     <p className="text-[11px] text-muted-foreground">{userEmail}</p>
                   </div>
                 </div>
