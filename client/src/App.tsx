@@ -27,35 +27,23 @@ import DashboardLayout from "./components/DashboardLayout";
 // ============================================================================
 const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
 const Parametres = lazy(() => import("./pages/Parametres"));
-const Calendrier = lazy(() => import("./pages/Calendrier"));
 const RapportCommande = lazy(() => import("./pages/RapportCommande"));
 const RelancesDevis = lazy(() => import("./pages/RelancesDevis"));
 const PerformancesFournisseurs = lazy(() => import("./pages/PerformancesFournisseurs"));
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
-const Avis = lazy(() => import("./pages/Avis"));
 const Planification = lazy(() => import("./pages/Planification"));
 const Rapports = lazy(() => import("./pages/Rapports"));
 const Previsions = lazy(() => import("./pages/Previsions"));
-const Vehicules = lazy(() => import("./pages/Vehicules"));
-const Chantiers = lazy(() => import("./pages/Chantiers"));
-const IntegrationsComptables = lazy(() => import("./pages/IntegrationsComptables"));
-const DevisIA = lazy(() => import("./pages/DevisIA"));
 const Assistant = lazy(() => import("./pages/Assistant"));
-const AssistantConversations = lazy(() => import("./pages/AssistantConversations"));
 const RdvEnLigne = lazy(() => import("./pages/RdvEnLigne"));
-const MaVitrine = lazy(() => import("./pages/MaVitrine"));
 const Utilisateurs = lazy(() => import("./pages/Utilisateurs"));
-const CalendrierChantiers = lazy(() => import("./pages/CalendrierChantiers"));
 const TableauBordSyncComptable = lazy(() => import("./pages/TableauBordSyncComptable"));
 const StatistiquesDevis = lazy(() => import("./pages/StatistiquesDevis"));
 const PortailGestion = lazy(() => import("./pages/PortailGestion"));
 const ModulesPage = lazy(() => import("./pages/Modules"));
 const ImportPage = lazy(() => import("./pages/Import"));
 const Support = lazy(() => import("./pages/Support"));
-const DevisOptions = lazy(() => import("./pages/DevisOptions"));
-const Flotte = lazy(() => import("./pages/Flotte"));
-const AnalysesPhotos = lazy(() => import("./pages/AnalysesPhotos"));
 const NouvelleDepense = lazy(() => import("./pages/NouvelleDepense"));
 const NotesFrais = lazy(() => import("./pages/NotesFrais"));
 const TableauBordDepenses = lazy(() => import("./pages/TableauBordDepenses"));
@@ -123,35 +111,23 @@ function AuthenticatedRoutes() {
           {/* Socle refonte (OPE-415) : TanStack Router monté sur TOUT `/v2/*` (cohabite avec wouter,
               providers + auth partagés). Reprend l'ancien PoC `/v2/clients` + démo `/v2/ping`. */}
           <Route path="/v2/*" component={ModernRouterMount} />
-          <Route path="/calendrier" component={Calendrier} />
           <Route path="/statistiques" component={StatistiquesDevis} />
           <Route path="/parametres" component={Parametres} />
-          <Route path="/avis" component={Avis} />
           <Route path="/planification" component={Planification} />
           <Route path="/rapports" component={Rapports} />
           <Route path="/previsions" component={Previsions} />
-          <Route path="/vehicules" component={Vehicules} />
-          <Route path="/devis-options" component={DevisOptions} />
-          <Route path="/flotte" component={Flotte} />
-          <Route path="/analyses-photos" component={AnalysesPhotos} />
           <Route path="/depenses/nouvelle" component={NouvelleDepense} />
           <Route path="/notes-de-frais" component={NotesFrais} />
           <Route path="/tableau-bord-depenses" component={TableauBordDepenses} />
           <Route path="/import-releve" component={ImportReleveDepenses} />
           <Route path="/regles-depenses" component={ReglesDepenses} />
-          <Route path="/chantiers" component={Chantiers} />
-          <Route path="/integrations-comptables" component={IntegrationsComptables} />
-          <Route path="/devis-ia" component={DevisIA} />
-          <Route path="/calendrier-chantiers" component={CalendrierChantiers} />
           <Route path="/tableau-bord-sync-comptable" component={TableauBordSyncComptable} />
           <Route path="/relances" component={RelancesDevis} />
           <Route path="/rapport-commande" component={RapportCommande} />
           <Route path="/performances-fournisseurs" component={PerformancesFournisseurs} />
           <Route path="/portail-gestion" component={PortailGestion} />
-          <Route path="/assistant/conversations" component={AssistantConversations} />
           <Route path="/assistant" component={Assistant} />
           <Route path="/rdv-en-ligne" component={RdvEnLigne} />
-          <Route path="/ma-vitrine" component={MaVitrine} />
           <Route path="/utilisateurs" component={Utilisateurs} />
           <Route path="/modules" component={ModulesPage} />
           <Route path="/import" component={ImportPage} />
