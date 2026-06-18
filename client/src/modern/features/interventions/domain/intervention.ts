@@ -1,5 +1,5 @@
 import type { RouterOutputs } from "@/modern/shared/trpc";
-import { matchSearch } from "@/lib/normalize";
+import { matchSearch } from "@/modern/shared/lib/normalize";
 
 // Couche DOMAINE de la feature `interventions` (clean-archi) : types dérivés des sorties du routeur
 // tRPC (source de vérité serveur) + règles PURES testables sans réseau ni i18n.

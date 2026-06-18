@@ -1,4 +1,4 @@
-import { matchSearch } from "@/lib/normalize";
+import { matchSearch } from "@/modern/shared/lib/normalize";
 import type { RouterOutputs } from "@/modern/shared/trpc";
 
 // Couche DOMAIN de la feature `contrats` (clean-archi) : types dérivés du routeur + fonctions PURES

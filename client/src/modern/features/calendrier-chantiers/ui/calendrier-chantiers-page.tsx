@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { matchSearch } from "@/lib/normalize";
+import { matchSearch } from "@/modern/shared/lib/normalize";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Filter, Users, MapPin, Clock, Building2, Download, Eye, Palette, GripVertical, Move, Printer, FileDown, Search } from "lucide-react";
 import { Button } from "@/modern/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/modern/shared/ui/card";

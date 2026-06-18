@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/modern/shared/ui/select";
 import { Label } from "@/modern/shared/ui/label";
 import { useVoiceSession } from "@/app/useVoiceSession";
-import { useIsMobile } from "@/hooks/useMobile";
-import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useIsMobile } from "@/modern/shared/hooks/useMobile";
+import { useSpeechRecognition } from "@/modern/shared/hooks/useSpeechRecognition";
 import { useAssistant, streamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
 import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown, type Message } from "../domain/assistant";
 

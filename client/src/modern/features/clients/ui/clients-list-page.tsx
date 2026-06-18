@@ -10,7 +10,7 @@ import { Label } from "@/modern/shared/ui/label";
 import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Download, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/modern/shared/ui/dropdown-menu";
 import { toast } from "sonner";
-import { matchSearch } from "@/lib/normalize";
+import { matchSearch } from "@/modern/shared/lib/normalize";
 import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
 
 // Page Clients du FRONT NEUF (`/v2/clients`) — clean-archi : la couche UI (présentation) consomme le
