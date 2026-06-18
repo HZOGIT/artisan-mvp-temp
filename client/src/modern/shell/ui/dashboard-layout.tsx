@@ -82,8 +82,11 @@ export function DashboardLayout(props: DashboardLayoutProps) {
           <div className="flex items-center gap-2">{topBarActions}</div>
         </header>
 
-        <main className="flex-1 min-w-0">
-          {banners}
+        {/* Bannières (essai/expiré) pleine largeur, HORS de la zone paddée. */}
+        {banners}
+        {/* Zone de contenu : padding restauré à l'identique du DashboardLayout legacy (p-4, pb-20 mobile pour la
+            nav du bas, overflow-x maîtrisé). Sans ça, les pages étaient collées aux bords (régression du cutover). */}
+        <main className="flex-1 p-4 pb-20 md:pb-4 min-w-0 max-w-full overflow-x-hidden">
           {children}
         </main>
       </div>

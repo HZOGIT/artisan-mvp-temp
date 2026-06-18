@@ -24,7 +24,7 @@ import { Badge } from "@/modern/shared/ui/badge";
 import { StatutBadge } from "@/modern/shared/ui/statut-badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { exportToCsv, csvDateSuffix } from "@/lib/csvExport";
+import { exportToCsv, csvDateSuffix } from "@/modern/shared/lib/csvExport";
 
 // Page Factures du FRONT NEUF (`/v2/factures`) — clean-archi : présentation pure. Les données/mutations
 // viennent de `useFactures`/`useClientEncours` (couche application, seule à importer tRPC) ; le filtrage

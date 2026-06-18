@@ -5,7 +5,7 @@ import { Input } from "@/modern/shared/ui/input";
 import { Button } from "@/modern/shared/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/modern/shared/ui/accordion";
 import { Search, Download, LayoutDashboard, Users, FileText, Receipt, Wrench, ShoppingCart, Package, Sparkles, Globe, Lightbulb, CheckCircle, ArrowRight, BookOpen } from "lucide-react";
-import { generateGuidePDF } from "@/lib/generateGuidePDF";
+import { generateGuidePDF } from "@/modern/shared/lib/generateGuidePDF";
 import { DOC_SECTIONS, filterSections } from "../domain/documentation-content";
 
 // Page `documentation` (guide d'utilisation) — migration clean-archi de `pages/Documentation.tsx`. Le

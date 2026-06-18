@@ -18,7 +18,7 @@ import {
 } from "../domain/signature";
 import { Loader2, Check, Building2, User, Pen, AlertCircle, Download, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { generateDevisPDF } from "@/lib/pdfGenerator";
+import { generateDevisPDF } from "@/modern/shared/lib/pdfGenerator";
 
 // Page PUBLIQUE de signature de devis du FRONT NEUF (`/v2/signature/:token`) — clean-archi : présentation
 // pure. Données & mutations via `useSignature` (couche application, seule à importer tRPC) ; validation du

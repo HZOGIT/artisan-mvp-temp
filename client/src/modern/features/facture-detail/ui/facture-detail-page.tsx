@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ArrowLeft, Plus, Trash2, Receipt, User, CheckCircle, Download, Mail, Search, Loader2, Lock, FileText, History, AlertTriangle, Bell, Circle, AlarmClock } from "lucide-react";
-import { generateFacturePDF } from "@/lib/pdfGenerator";
+import { generateFacturePDF } from "@/modern/shared/lib/pdfGenerator";
 import { Button } from "@/modern/shared/ui/button";
 import { Input } from "@/modern/shared/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/modern/shared/ui/card";
