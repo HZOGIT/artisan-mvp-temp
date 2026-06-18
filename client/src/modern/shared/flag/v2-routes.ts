@@ -9,6 +9,7 @@ export const V2_ROUTES: Readonly<Record<string, string>> = {
   "/fournisseurs": "/v2/fournisseurs",
   "/articles": "/v2/articles",
   "/devis": "/v2/devis",
+  "/devis/nouveau": "/v2/devis/nouveau",
   "/factures": "/v2/factures",
   "/interventions": "/v2/interventions",
   "/commandes": "/v2/commandes",

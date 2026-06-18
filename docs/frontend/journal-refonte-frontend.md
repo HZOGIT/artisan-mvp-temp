@@ -635,7 +635,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 |------|-------------|-------:|----:|------|
 | FactureDetail | /factures/:id | 1197 | 27 | éditeur lourd |
 | DevisDetail | /devis/:id | 1116 | 16 | éditeur lourd |
-| DevisNouveauPage | /devis/nouveau | 873 | 11 | créateur devis |
+| ~~DevisNouveauPage~~ ✅ | ~~/devis/nouveau~~ → /v2/devis/nouveau | 873 | 11 | **FAIT** (devis-nouveau ; IA + modèles + REST search) |
 | ~~Vitrine (public)~~ ✅ | ~~/vitrine/:slug~~ → /v2/vitrine/:slug | 749 | 3 | **FAIT** (vitrine-public ; payload getBySlug unknown→typé) |
 | ~~Profil~~ ✅ | ~~/profil~~ → /v2/profil | 727 | 11 | **FAIT** (profil ; 11 `as any` étaient inutiles, champs typés) |
 | ~~DevisLigneEdit~~ ✅ | ~~/devis/:id/ligne/nouvelle~~ → /v2/... | 654 | 11 | **FAIT** (devis-ligne ; bug prix/réf snake_case corrigé) |
@@ -684,6 +684,15 @@ corrigé (prix « 0 » pour les lignes d'affichage). Clean-archi domain (`filter
 `lineTotals`/`buildAddLignePayload`/`formFromArticle`/`formFromSuggestion` + accès articles typés — **6 tests**)
 + application (skipToken IA) + ui (dialog recherche + scroll-area). i18n. **0 `any`** (11 supprimés). Route
 `/v2/devis/$id/ligne/nouvelle`. vitest **422**.
+
+**Itération `devis-nouveau` (`/devis/nouveau`) ✅** (2e du cluster) : création de devis — client (+ alerte encours
+impayés), objet/réf/dates, **modèles** (charger/enregistrer), lignes (autocomplete article via REST
+`/api/articles/search` + réordonnancement), totaux, **génération IA** (`genererLignesIA` → aperçu + appliquer).
+9 endpoints. `genererLignesIA` retourne un `PropositionDevisIa` **typé** → 0 cast. Clean-archi domain (`totals`/
+`moveLine`/`ligneFromArticle`/`iaToLignes`/`iaTotals`/`buildCreatePayload`/`buildAddLignePayload`/
+`buildModeleLignePayload` — **6 tests**) + application (REST search encapsulé + `utils.*.fetch` pour le modèle)
++ ui (form + sous-composant IA). i18n. **0 `any`** (11 supprimés). Route exact-key `/v2/devis/nouveau` (**bascule
+OK** + V2_ROUTES + sweep). vitest **428**.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré
