@@ -124,6 +124,7 @@ const PARITE_PAGES = [
   { legacy: '/chantiers', v2: '/v2/chantiers', markers: ['Chantiers', 'projets multi-interventions'] },
   { legacy: '/assistant', v2: '/v2/assistant', markers: ['MonAssistant', 'Actions rapides'] },
   { legacy: '/calendrier-chantiers', v2: '/v2/calendrier-chantiers', markers: ['Calendrier des Chantiers', 'Aujourd'] },
+  { legacy: '/signin', v2: '/v2/signin', markers: ['Connexion', 'Se connecter'] },
   { legacy: '/flotte', v2: '/v2/flotte', markers: ['Flotte', "Vue d'ensemble de vos véhicules", 'Véhicules'] },
   { legacy: '/statistiques', v2: '/v2/statistiques', markers: ['Statistiques Devis', 'Analysez les performances de vos devis'] },
   { legacy: '/modules', v2: '/v2/modules', markers: ['Mes modules', 'modules actifs'] },

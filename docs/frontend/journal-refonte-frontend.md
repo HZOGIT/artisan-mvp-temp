@@ -556,9 +556,17 @@ redirige, pour les ~20 non migrés ça reste 100% legacy (ce que l'humain voit).
   ajoutée à `modern/shared/ui`. **jsPDF autoTable en import fonctionnel** (`autoTable(doc, …)`) → pas de `as
   any`. i18n. **0 `any`** (12 supprimés). Route + V2_ROUTES + sweep. tsc/eslint(0)/vitest **375**.
 
-## 🎉 TOUTES LES PAGES FEATURE SONT MIGRÉES (28/28). 🎯 PROCHAINE CIBLE : **pages auth/légal** (login,
-inscription, mentions/CGV) puis **suppression du legacy** (pages/**, wouter, @/lib/trpc) une fois la parité
-confirmée sur l'ensemble. Auditer `comm -23` App.tsx vs V2_ROUTES pour confirmer le périmètre restant.
+- **Migration `auth` ✅ (pages publiques connexion/inscription/mot de passe)** : `signin` (+ alias `sign-in`),
+  `signup`, `forgot-password`, `reset-password` (4 endpoints `auth.*`). Clean-archi : domain
+  (`validateSignin`/`validateSignup`/`validateReset` (clés i18n d'erreur) + `tokenFromSearch` — **4 tests**) +
+  application (4 mutations) + ui (coque `AuthShell` partagée + 4 pages). i18n namespace `auth`. **0 `any`**.
+  **Bascule auto** : `useV2Bascule` est monté au top de App.tsx (avant les deux Switch, donc couvre AUSSI les
+  routes publiques) → ajouter les 5 entrées à `V2_ROUTES` suffit, le legacy reste fallback `?v2=0` (faible
+  risque, pas de suppression). Routes /v2/{signin,sign-in,signup,forgot-password,reset-password}. vitest **379**.
+
+## 🎯 PROCHAINE CIBLE : **pages légales** (mentions-legales, cgu, cgv, confidentialite — `pages/legal/`) puis
+**suppression du legacy** (pages/**, wouter, @/lib/trpc) une fois la parité confirmée. ⚠️ NE PAS supprimer les
+pages auth legacy tant que /v2 n'est pas validé manuellement au navigateur (login = critique).
 (+ `assistant/conversations`), puis `chantiers`/`planification`/`rapports`/`previsions`/`vehicules`/`badges`/
 `geolocalisation`/`devis-ia`/`analyses-photos`/`classement`/`ma-vitrine`/`rdv-en-ligne`/`modeles-email`/…
 Process : audit contrat (combler gap backend si besoin) → clean-archi domain/application/ui → i18n → route +
