@@ -537,16 +537,12 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  // Totaux
-  const sousTotal = devis.lignes.reduce((sum, ligne) => {
-    const q = Number(ligne.quantite) || 0;
-    const pu =
-      typeof ligne.prixUnitaireHT === "string" ? parseFloat(ligne.prixUnitaireHT) : Number(ligne.prixUnitaireHT);
-    return sum + pu * q;
-  }, 0);
-  const tauxTVA = Number(artisan.tauxTVA) || 20;
-  const tva = sousTotal * (tauxTVA / 100);
-  const totalTTC = sousTotal + tva;
+  // Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
+  // avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+  const sousTotal = parseFloat(String(devis.totalHT ?? "0")) || 0;
+  const tva = parseFloat(String(devis.totalTVA ?? "0")) || 0;
+  const totalTTC = parseFloat(String(devis.totalTTC ?? "0")) || 0;
+  const tauxTVALabel = sousTotal > 0 ? Math.round((tva / sousTotal) * 100) : (Number(artisan.tauxTVA) || 20);
 
   const totalsStartY = (doc as any).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
@@ -555,7 +551,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     totalsStartY,
     [
       { label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` },
-      { label: `TVA (${tauxTVA}%)`, value: `${tva.toFixed(2)} €` },
+      { label: `TVA (${tauxTVALabel}%)`, value: `${tva.toFixed(2)} €` },
     ],
     "TOTAL TTC",
     `${totalTTC.toFixed(2)} €`,
@@ -670,14 +666,12 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  // Totaux
-  const sousTotal = facture.lignes.reduce(
-    (sum, l) => sum + Number(l.prixUnitaireHT) * (Number(l.quantite) || 0),
-    0,
-  );
-  const tauxTVA = Number(artisan.tauxTVA) || 20;
-  const tva = sousTotal * (tauxTVA / 100);
-  const totalTTC = sousTotal + tva;
+  // Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
+  // avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+  const sousTotal = parseFloat(String(facture.totalHT ?? "0")) || 0;
+  const tva = parseFloat(String(facture.totalTVA ?? "0")) || 0;
+  const totalTTC = parseFloat(String(facture.totalTTC ?? "0")) || 0;
+  const tauxTVALabel = sousTotal > 0 ? Math.round((tva / sousTotal) * 100) : (Number(artisan.tauxTVA) || 20);
 
   const totalsStartY = (doc as any).lastAutoTable.finalY + 8;
   const totalsEndY = renderTotalsBox(
@@ -686,7 +680,7 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     totalsStartY,
     [
       { label: "Sous-total HT", value: `${sousTotal.toFixed(2)} €` },
-      { label: `TVA (${tauxTVA}%)`, value: `${tva.toFixed(2)} €` },
+      { label: `TVA (${tauxTVALabel}%)`, value: `${tva.toFixed(2)} €` },
     ],
     "TOTAL TTC",
     `${totalTTC.toFixed(2)} €`,

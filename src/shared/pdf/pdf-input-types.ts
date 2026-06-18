@@ -22,6 +22,9 @@ export interface Devis {
   dateDevis?: any;
   dateValidite?: any;
   referenceClient?: any;
+  totalHT?: any;
+  totalTVA?: any;
+  totalTTC?: any;
 }
 
 export interface Facture {
