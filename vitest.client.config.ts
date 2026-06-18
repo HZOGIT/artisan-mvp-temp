@@ -1,9 +1,9 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
-// Gate de tests du FRONT NEUF de la refonte (`client/src/modern/**` = code `/v2`). Config DÉDIÉE,
+// Gate de tests du FRONTEND (`client/src/**`). Config DÉDIÉE,
 // distincte de `vitest.config.ts` (qui ne collecte que `src/**` = backend) pour ne pas perturber le
-// gate des autres agents. Exécution : `pnpm exec vitest run -c vitest.v2.config.ts`.
+// gate des autres agents. Exécution : `pnpm exec vitest run -c vitest.client.config.ts`.
 const root = path.resolve(import.meta.dirname);
 
 export default defineConfig({
@@ -17,6 +17,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["client/src/modern/**/*.test.ts", "client/src/modern/**/*.test.tsx"],
+    include: ["client/src/**/*.test.ts", "client/src/**/*.test.tsx"],
   },
 });

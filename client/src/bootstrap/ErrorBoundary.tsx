@@ -20,7 +20,7 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     // Pour la prod, on logue dans la console — le stack trace n'est PAS
     // expose a l'utilisateur final (UI user-friendly, voir render()).
     console.error("[App ErrorBoundary]", error, info);
@@ -38,7 +38,7 @@ class ErrorBoundary extends Component<Props, State> {
     } catch { /* ignore */ }
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       const isProd = (import.meta as any).env?.PROD;
       return (

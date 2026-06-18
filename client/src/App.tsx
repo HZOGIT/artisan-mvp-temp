@@ -1,13 +1,13 @@
 import { lazy, Suspense } from "react";
-import { Toaster } from "@/modern/shared/ui-kit/sonner";
-import { TooltipProvider } from "@/modern/shared/ui-kit/tooltip";
+import { Toaster } from "@/shared/ui-kit/sonner";
+import { TooltipProvider } from "@/shared/ui-kit/tooltip";
 import ErrorBoundary from "./bootstrap/ErrorBoundary";
 import { ThemeProvider } from "./bootstrap/ThemeContext";
 
 // Routeur UNIFIÉ (OPE-403/F1) : un seul RouterProvider TanStack porte TOUT l'espace d'URL — pages publiques
 // (hors shell), routes authentifiées (sous le shell modern via le layout `app-shell`), onboarding plein écran
 // et la redirection racine `/`→`/home`. Plus de dispatch manuel ni de double routeur (public/auth) dans App.
-const ModernRouterMount = lazy(() => import("./modern/shared/router/modern-router-mount"));
+const ModernRouterMount = lazy(() => import("./shared/router/modern-router-mount"));
 
 // Skeleton de chargement pour le montage lazy du routeur.
 function PageLoader() {

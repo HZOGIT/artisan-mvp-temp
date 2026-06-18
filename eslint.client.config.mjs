@@ -1,6 +1,6 @@
-// Gate ESLint DÉDIÉ au FRONT NEUF de la refonte (`client/src/modern/**`). Distinct de l'ESLint global
+// Gate ESLint DÉDIÉ au FRONT NEUF de la refonte (`client/src/**`). Distinct de l'ESLint global
 // (OPE-413) : il ne lint QUE le code neuf et fait respecter ses specs (frontière strangler, pas de REST,
-// kebab-case des fichiers, i18n). Enrichi itérativement. Exécution : `pnpm exec eslint -c eslint.v2.config.mjs client/src/modern`.
+// kebab-case des fichiers, i18n). Enrichi itérativement. Exécution : `pnpm exec eslint -c eslint.client.config.mjs client/src`.
 import tseslint from "typescript-eslint";
 import i18next from "eslint-plugin-i18next";
 
@@ -54,7 +54,7 @@ const noTrpcInUi = {
 };
 
 export default tseslint.config({
-  files: ["client/src/modern/**/*.{ts,tsx}"],
+  files: ["client/src/**/*.{ts,tsx}"],
   languageOptions: {
     parser: tseslint.parser,
     parserOptions: { ecmaFeatures: { jsx: true } },
@@ -89,11 +89,11 @@ export default tseslint.config({
 // Coutures vers le legacy : SEULS endroits autorisés à importer `@/components/ui/*` (copie conforme)
 // et `@/lib/trpc` (instance partagée). On y désactive donc la frontière d'imports.
 {
-  files: ["client/src/modern/shared/ui/**", "client/src/modern/shared/trpc/**"],
+  files: ["client/src/shared/ui/**", "client/src/shared/trpc/**"],
   rules: { "no-restricted-imports": "off" },
 },
 // Page de démonstration du socle (dev only, pas une vraie page produit) → pas d'exigence i18n.
 {
-  files: ["client/src/modern/features/_demo/**"],
+  files: ["client/src/features/_demo/**"],
   rules: { "i18next/no-literal-string": "off" },
 });
