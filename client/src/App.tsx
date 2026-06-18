@@ -29,14 +29,10 @@ const PageEnConstruction = lazy(() => import("./pages/PageEnConstruction"));
 const PaiementSucces = lazy(() => import("./pages/PaiementSucces"));
 const PaiementAnnule = lazy(() => import("./pages/PaiementAnnule"));
 const Assistant = lazy(() => import("./pages/Assistant"));
-const MentionsLegales = lazy(() => import("./pages/legal/MentionsLegales"));
-const CGU = lazy(() => import("./pages/legal/CGU"));
 // PoC OPE-366 — page « stack cible » (clean archi + REST openapi-typescript), cohabite avec le legacy.
 const ModernRouterMount = lazy(() => import("./modern/shared/router/modern-router-mount"));
 // Montage du front neuf pour les pages PUBLIQUES (hors auth) : paiement (et à venir signature/portail).
 const PublicModernRouterMount = lazy(() => import("./modern/shared/router/public-router-mount"));
-const CGV = lazy(() => import("./pages/legal/CGV"));
-const Confidentialite = lazy(() => import("./pages/legal/Confidentialite"));
 
 // Skeleton de chargement pour les pages lazy.
 function PageLoader() {
@@ -93,10 +89,6 @@ function AuthenticatedRoutes() {
           <Route path="/v2/*" component={ModernRouterMount} />
           <Route path="/assistant" component={Assistant} />
           {/* Pages legales — publiques, pas d'auth requise */}
-          <Route path="/mentions-legales" component={MentionsLegales} />
-          <Route path="/cgu" component={CGU} />
-          <Route path="/cgv" component={CGV} />
-          <Route path="/confidentialite" component={Confidentialite} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>
