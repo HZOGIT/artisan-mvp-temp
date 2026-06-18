@@ -120,5 +120,10 @@
   "ler_joursRetard": "{{n}} j de retard",
   "ler_prevueLe": "prévue le {{date}}",
   "ler_commandeNum": "Commande #{{id}}",
-  "caf_ttc": "{{m}} € TTC"
+  "caf_ttc": "{{m}} € TTC",
+  "ra_aucune": "Aucune activité récente à afficher.",
+  "ui_aucune": "Aucune intervention planifiée.",
+  "ui_client": "Client",
+  "ui_intervention": "Intervention",
+  "ui_voirToutes": "Voir toutes les interventions"
 }

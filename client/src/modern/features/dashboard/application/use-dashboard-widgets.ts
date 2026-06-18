@@ -16,3 +16,17 @@ export function useLivraisonsEnRetard() {
   const { data, isLoading } = trpc.commandesFournisseurs.getEnRetard.useQuery();
   return { commandes: (data ?? []) as LivraisonEnRetard[], isLoading };
 }
+
+export type RecentActivityItem = RouterOutputs["dashboard"]["getRecentActivity"][number];
+export type UpcomingIntervention = RouterOutputs["dashboard"]["getUpcomingInterventions"][number] & {
+  titre?: string; statut: string; dateDebut: string; adresse?: string | null;
+  client?: { prenom?: string | null; nom?: string | null } | null;
+};
+export function useRecentActivity() {
+  const { data, isLoading } = trpc.dashboard.getRecentActivity.useQuery({ limit: 8 });
+  return { activities: (data ?? []) as RecentActivityItem[], isLoading };
+}
+export function useUpcomingInterventions() {
+  const { data, isLoading } = trpc.dashboard.getUpcomingInterventions.useQuery();
+  return { interventions: (data ?? []) as UpcomingIntervention[], isLoading };
+}
