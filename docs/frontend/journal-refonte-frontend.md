@@ -634,7 +634,7 @@ domaines coeur), auth (4), légal (4) + clients/nouveau, clients/import, mobile,
 | Page | Route legacy | Lignes | any | Note |
 |------|-------------|-------:|----:|------|
 | FactureDetail | /factures/:id | 1197 | 27 | éditeur lourd |
-| DevisDetail | /devis/:id | 1116 | 16 | éditeur lourd |
+| ~~DevisDetail~~ ✅ | ~~/devis/:id~~ → /v2/devis/:id | 1116 | 16 | **FAIT** (devis-detail ; getById riche, dead-code retiré) |
 | ~~DevisNouveauPage~~ ✅ | ~~/devis/nouveau~~ → /v2/devis/nouveau | 873 | 11 | **FAIT** (devis-nouveau ; IA + modèles + REST search) |
 | ~~Vitrine (public)~~ ✅ | ~~/vitrine/:slug~~ → /v2/vitrine/:slug | 749 | 3 | **FAIT** (vitrine-public ; payload getBySlug unknown→typé) |
 | ~~Profil~~ ✅ | ~~/profil~~ → /v2/profil | 727 | 11 | **FAIT** (profil ; 11 `as any` étaient inutiles, champs typés) |
@@ -693,6 +693,18 @@ impayés), objet/réf/dates, **modèles** (charger/enregistrer), lignes (autocom
 `buildModeleLignePayload` — **6 tests**) + application (REST search encapsulé + `utils.*.fetch` pour le modèle)
 + ui (form + sous-composant IA). i18n. **0 `any`** (11 supprimés). Route exact-key `/v2/devis/nouveau` (**bascule
 OK** + V2_ROUTES + sweep). vitest **428**.
+
+**Itération `devis-detail` (`/devis/:id`) ✅** (3e du cluster — **le plus gros**, 1116 l, ~12 sous-features) :
+éditeur de devis complet — statut (machine à états : envoyer/accepter/refuser), cartes client/date/total, **carte
+signature** (accepté/refusé/attente + copier lien + voir signature), onglets **Lignes** (table section/note + suppr)
++ **Variantes** (devisOptions : sélectionner/convertir/supprimer + créer), **rappels CRM** (activites), **email**,
+**duplication**, **conversion en facture**, **PDF** (`generateDevisPDF`). `getById` renvoie un **`DevisDetail`
+riche** (lignes+client+totaux+referenceClient+conditionsPaiement tous typés → les 16 `as any` legacy étaient
+inutiles). **Dead code retiré** : le dialog d'ajout de ligne (+lineForm/handleSelectArticle/articles query) n'était
+JAMAIS déclenché (bouton → page ligne) → supprimé. 7 modules d'endpoints (devis/devisOptions/activites/signature/
+artisan/parametres). Clean-archi domain (`formatCurrency`/`activitesForDevis`/`pendingCount`/`pdfLignes`/
+`statutTransition` + catalogues — **5 tests**) + application (1 hook, ~20 endpoints) + ui. i18n **110 clés**. **0
+`any`** (16 supprimés). Route `/v2/devis/$id`. vitest **433**.
 
 **FAUX résiduels (déjà migrés, chemin /v2 différent → bascule OK)** : `/`→/v2/home, `/depenses/nouvelle`→
 /v2/nouvelle-depense, `/relances`→/v2/relances-devis, `/notes-de-frais`→/v2/notes-frais. **Public déjà géré

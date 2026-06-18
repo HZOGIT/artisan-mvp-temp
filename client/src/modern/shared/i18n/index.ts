@@ -75,6 +75,7 @@ import contratDetailFr from "@/modern/features/contrat-detail/i18n/fr.json";
 import profilFr from "@/modern/features/profil/i18n/fr.json";
 import devisLigneFr from "@/modern/features/devis-ligne/i18n/fr.json";
 import devisNouveauFr from "@/modern/features/devis-nouveau/i18n/fr.json";
+import devisDetailFr from "@/modern/features/devis-detail/i18n/fr.json";
 import vitrinePublicFr from "@/modern/features/vitrine-public/i18n/fr.json";
 
 // i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
@@ -160,6 +161,7 @@ const resources = {
     profil: profilFr,
     devisLigne: devisLigneFr,
     devisNouveau: devisNouveauFr,
+    devisDetail: devisDetailFr,
     vitrinePublic: vitrinePublicFr,
   },
 } as const;
