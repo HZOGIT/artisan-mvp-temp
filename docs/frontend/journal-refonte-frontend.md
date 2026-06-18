@@ -1187,3 +1187,10 @@ d'envoyer-devis-email livrée incomplète : type+code MAJ mais pas tous les cons
 GATES TOUS VERTS : tsc.src 0, tsc.v2 0, vitest.v2 461, vitest src 2763 (532 fichiers), vite build OK,
 build:newstack OK, backend redéployé + SMOKE AUTH OK, staging sain. Refs pendantes : 0 réelle (server/_core +
 staging-newstack = commentaires/noms de scripts only). RESTE #6 (F1) routeur — non lancé.
+
+## ✅ LEGACY-FINISH ÉTAPE A (2026-06-18, decad56) — PDF legacy mort supprimé
+Audit: le PDF était DÉJÀ migré (JsPdfAdapter → src/shared/pdf/pdf-generator.ts internalisé ; LegacyPdfAdapter 0 usage).
+Supprimé: legacy/pdfGenerator.ts (1215l) + fonts.ts + LegacyPdfAdapter/LEGACY_PDF_MODULE (adapters.ts) + entrée
+esbuild legacy-pdf.mjs (build:newstack). Gates: tsc.src 0, build:newstack OK, tests 276/276, backend redéployé + smoke OK.
+RESTE Étape B: internaliser email (legacy/emailService.ts Resend 544l + env.ts + sidecar legacy-email.mjs + LegacyEmailAdapter
+10× dans app.ts → src/shared/email/ impl directe EmailPort) → src/shared/legacy/ entièrement supprimable. + #6 F1 routeur (attend go).
