@@ -5,7 +5,9 @@ import { provisionDatabase, assertAppRoleExistsAndRestricted } from "./shared/db
 
 async function main(): Promise<void> {
   /* Provision automatique au boot (sous verrou) : migrations schéma + RLS, rôle applicatif + droits. */
+  const dbProvisionStart = Date.now();
   await provisionDatabase();
+  const dbProvisionMs = Date.now() - dbProvisionStart;
   /* Fail-closed : refuse de servir si le pool runtime peut contourner la RLS. */
   await assertAppRoleExistsAndRestricted(getDbHandle().db);
 
@@ -27,6 +29,7 @@ async function main(): Promise<void> {
       resend: !!process.env.RESEND_API_KEY,
       gemini: !!process.env.GEMINI_API_KEY,
       jwtConfigured: !!process.env.JWT_SECRET,
+      dbProvisionMs,
       heapUsedMb: Math.round(startMem.heapUsed / 1024 / 1024),
       rssMb: Math.round(startMem.rss / 1024 / 1024),
     },
