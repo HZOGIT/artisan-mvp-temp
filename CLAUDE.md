@@ -31,6 +31,39 @@ eslint/
 
 > **⚠️ INTERDIT — variables d'environnement dans `.env.production`** — Ne jamais écrire une valeur d'env runtime (URL de backend, clé API, feature flag d'infra) dans `.env.production` committé. Ces variables se configurent **dans le dashboard du service de déploiement** (Cloudflare Pages : `wrangler pages secret put <KEY> --project-name <project>` ; Railway : dashboard env). `.env.production` ne contient que des constantes publiques non-sensibles (ex. titre de l'app, logo).
 
+## Environnements — déploiement
+
+**Staging = seul env de dev.** Il n'existe pas d'env de développement local distinct ; tout test d'intégration / vérification navigateur se fait sur staging.
+
+### Frontend (Cloudflare Pages)
+
+Déployé via **intégration GitHub** : un push sur la branche `staging` déclenche automatiquement un build CF Pages. Aucun script de déploiement manuel.
+
+Variables build-time (`VITE_*`) → à configurer dans le **projet CF Pages** (ces variables sont disponibles pendant le build CF, Vite les bake dans le bundle) :
+```bash
+wrangler pages secret put VITE_STRIPE_PUBLISHABLE_KEY --project-name artisan-staging
+# (et non dans .env.production commité — la clé serait vide lors du build CF)
+```
+
+### Backend (Railway / Docker)
+
+```bash
+./scripts/deploy-backend.sh   # rebuild + smoke (health + auth)
+```
+
+Variables runtime → Railway dashboard (jamais dans `.env.production`).
+
+## Règle commentaires
+
+**`//` interdit dans tout le code TypeScript** (règle ESLint `local/comments-jsdoc-only` active sur `apps/api/**` et `apps/web/src/**`).
+
+- Utiliser `/** … */` pour les JSDoc
+- Utiliser `/* … */` pour les blocs inline si absolument nécessaire
+- Les séparateurs visuels (`// ── Section ──`) sont **interdits**
+- Seules exceptions : directives TypeScript (`// @ts-ignore`, `// @ts-expect-error`, `// eslint-disable`) et directives de build (`// #region`)
+
+Un `//` dans un fichier stagé fait échouer le pre-commit hook → vérifier avant de `git add`.
+
 ### Gates TypeScript
 
 ```bash
