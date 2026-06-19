@@ -537,6 +537,22 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(ev.actor).toBe("user:1");
   });
 
+  it("updateSubscriptionStatus vers 'active' sans PM → viole chk_pm_required (garde-fou scheduler)", async () => {
+    // La contrainte DB chk_pm_required garantit que le scheduler Phase 2 ne peut pas activer
+    // une subscription sans PM. Le scheduler doit séquencer : updateSubscriptionPaymentMethod
+    // PUIS updateSubscriptionStatus('active'). Cette contrainte attrape l'inversion.
+    await admin.query(
+      "update billing_subscriptions set status='trialing', payment_method_id=null where artisan_id=$1",
+      [A],
+    );
+    await repo.saveSubscription({
+      artisanId: A, planId: "starter", billingMode: "maison", status: "trialing",
+      currentPeriodStart: new Date(), currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await expect(repo.updateSubscriptionStatus(ctx(A), "active")).rejects.toThrow();
+  });
+
   it("appendEvent deux fois → deux événements distincts (append-only — pas de déduplication)", async () => {
     // billing_events est un ledger immuable : deux appels identiques produisent deux lignes distinctes.
     // Important pour l'audit : chaque action génère son propre enregistrement.

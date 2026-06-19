@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 21 — 2026-06-19
+**Cible :** L2 — contrainte `chk_pm_required` non testée
+**Cas ajoutés (1) :**
+- L2 : `updateSubscriptionStatus` → 'active' sans PM viole `chk_pm_required` (DB CHECK) — le test existant (iter 11) couvrait le chemin positif (trialing → active avec PM) ; ce test couvre le cas d'inversion : le scheduler Phase 2 qui ferait `updateSubscriptionStatus` AVANT `updateSubscriptionPaymentMethod` serait attrapé par la contrainte DB. Reset admin `status='trialing', pm=null` en début de test pour garantir l'état, puis `saveSubscription` upsert pour confirmer la sub existe sans PM.
+**Résultat :** L2 25/25 ✅
+**Total billing :** 108 tests (107 → 108)
+
 ### Itération 20 — 2026-06-19
 **Cible :** L1 — payload `payment_method.confirmed` non asserté
 **Cas ajoutés (1) :**
