@@ -42,6 +42,6 @@ describe.skipIf(!HAS_DB)("cohérence du registre des domaines migrés (anti-drif
   it("les deux ensembles ont exactement la même cardinalité (30 CRUD + nouveaux routeurs migrés)", () => {
     expect(mounted.size).toBe(MIGRATED_DOMAINS.length);
     // 30 domaines CRUD initiaux + routeurs legacy migrés depuis (artisan, …, integrationsComptables, devisIA).
-    expect(MIGRATED_DOMAINS.length).toBe(58);
+    expect(MIGRATED_DOMAINS.length).toBe(59);
   });
 });

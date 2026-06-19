@@ -78,6 +78,11 @@
   "badges.modifierBadge": "Modifier un badge existant",
   "badges.supprimerBadge": "Supprimer un badge",
   "badges.verifierBadges": "Vérifier l'obtention des badges",
+  "billing.confirmPaymentMethod": "Valider le moyen de paiement",
+  "billing.createSetupIntent": "Ajouter un moyen de paiement",
+  "billing.getBillingInfo": "Consulter les informations de facturation",
+  "billing.revokePaymentMethod": "Supprimer un moyen de paiement",
+  "billing.setDefaultPaymentMethod": "Définir le paiement par défaut",
   "budgets-categories.budgetsParMois": "Suivi des budgets mensuels",
   "budgets-categories.copierBudgetsMois": "Dupliquer un budget mensuel",
   "budgets-categories.creerBudget": "Créer un nouveau budget",
@@ -395,7 +400,9 @@
   "notes-de-frais.computeNextNoteFraisNumero": "Générer le numéro suivant",
   "notes-de-frais.creerNoteDeFrais": "Créer une note de frais",
   "notes-de-frais.getNoteDeFrais": "Consulter une note de frais",
+  "notes-de-frais.getNoteFraisDetail": "Consulter une note de frais",
   "notes-de-frais.listNotesDeFrais": "Liste des notes de frais",
+  "notes-de-frais.listNotesDeFraisAvecCompte": "Suivi des notes de frais",
   "notes-de-frais.modifierNoteDeFrais": "Modifier une note de frais",
   "notes-de-frais.payerNoteDeFrais": "Rembourser la note de frais",
   "notes-de-frais.rejeterNoteDeFrais": "Refuser la note de frais",
@@ -517,6 +524,8 @@
   "vitrine.convertirDemandeEnClient": "Transformer un prospect en client",
   "vitrine.getBySlug": "Consulter la page vitrine",
   "vitrine.getDemandesContact": "Consulter les demandes de contact",
+  "vitrine.getVitrineSettings": "Consulter les réglages de vitrine",
   "vitrine.submitContact": "Envoyer une demande de contact",
-  "vitrine.updateDemandeContactStatut": "Modifier le statut d'une demande"
+  "vitrine.updateDemandeContactStatut": "Modifier le statut d'une demande",
+  "vitrine.updateVitrineSettings": "Modifier les réglages de vitrine"
 }

@@ -6,8 +6,8 @@
  * et ne touche QUE les colonnes "machine" — jamais les colonnes éditées par un humain.
  *
  * Usage :
- *   tsx scripts/notion-usecases-sync.ts            # dry-run : imprime l'inventaire (sans réseau si pas de token)
- *   tsx scripts/notion-usecases-sync.ts --apply    # écrit réellement dans Notion (token requis)
+ *   pnpm tsx scripts/notion/notion-usecases-sync.ts            # dry-run
+ *   pnpm tsx scripts/notion/notion-usecases-sync.ts --apply    # écrit dans Notion (token requis)
  *
  * Env :
  *   NOTION_TOKEN          secret de l'intégration Notion (requis pour --apply)
@@ -24,8 +24,8 @@ import { join, basename, dirname, relative } from "node:path";
 // Config
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ROOT = join(import.meta.dirname, "..");
-const MODULES_DIR = join(ROOT, "src", "modules");
+const ROOT = join(import.meta.dirname, "../..");   // racine du projet (scripts/notion/ → ../../)
+const MODULES_DIR = join(ROOT, "apps", "api", "modules");
 
 // Charge les secrets depuis un fichier gitignored (évite d'exposer le token en CLI).
 // Priorité à process.env déjà défini. Cherche .env.notion puis .env.local.
@@ -42,7 +42,7 @@ const BRANCH = process.env.GIT_BRANCH ?? "staging";
 const APPLY = process.argv.includes("--apply");
 
 // Noms lisibles générés par Gemini — source de vérité dans le repo (versionné).
-const NAMES_FILE = join(ROOT, "scripts", "notion-usecases-names.json");
+const NAMES_FILE = join(import.meta.dirname, "notion-usecases-names.json");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? "";
 const GEMINI_MODEL = process.env.GEMINI_TEXT_MODEL ?? "gemini-2.0-flash";
@@ -67,7 +67,7 @@ const MODULE_TO_BLOC: Record<string, string> = {
   interventions: "Terrain & Chantiers", chantiers: "Terrain & Chantiers",
   calendrier: "Terrain & Chantiers", geolocalisation: "Terrain & Chantiers",
   subscription: "Billing & Abonnement", paiement: "Billing & Abonnement",
-  "feature-modules": "Billing & Abonnement",
+  billing: "Billing & Abonnement", "feature-modules": "Billing & Abonnement",
   assistant: "IA & Assistant", "conseils-ia": "IA & Assistant",
   dashboard: "Pilotage", statistiques: "Pilotage", rapports: "Pilotage",
   "previsions-ca": "Pilotage", search: "Pilotage",
@@ -80,7 +80,8 @@ const MODULE_TO_BLOC: Record<string, string> = {
 // Ajouter ici si un nouveau module devient critique — un re-run suffit à mettre à jour Notion.
 const CRITICAL_PATH_MODULES = new Set([
   "paiement",       // Stripe : génération lien, webhook, sync
-  "subscription",   // Abonnement + résiliation
+  "subscription",   // Abonnement + résiliation (legacy Stripe)
+  "billing",        // Billing maison : SetupIntent, PM, cycles, dunning
   "factures",       // Facturation : création, transitions, envoi
   "devis",          // Devis : création, envoi, transitions
   "signature",      // Signature électronique
