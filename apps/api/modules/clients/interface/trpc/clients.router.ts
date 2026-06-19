@@ -88,7 +88,11 @@ export function createClientsRouter(repo: IClientRepository) {
 
     create: gerer
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerClient(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerClient(repo, ctx.tenant, input);
+        ctx.log.info({ event: "client_created", clientId: result.id, type: input.type ?? "particulier" }, "Nouveau client créé");
+        return result;
+      }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -101,6 +105,7 @@ export function createClientsRouter(repo: IClientRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerClient(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "client_deleted", clientId: input.id }, "Client supprimé définitivement");
         return { success: true };
       }),
 
@@ -127,6 +132,10 @@ export function createClientsRouter(repo: IClientRepository) {
             .max(5000, "Import limité à 5000 clients par envoi"),
         }),
       )
-      .mutation(({ ctx, input }) => importerClients(repo, ctx.tenant, input.clients)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await importerClients(repo, ctx.tenant, input.clients);
+        ctx.log.info({ event: "clients_imported", total: input.clients.length, imported: result.imported, skipped: result.skipped }, `Import clients : ${result.imported} importés, ${result.skipped} ignorés`);
+        return result;
+      }),
   });
 }
