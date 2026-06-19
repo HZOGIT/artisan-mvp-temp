@@ -136,7 +136,11 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerFacture(repo, ctx.tenant, { ...input, dateEcheance: toDate(input.dateEcheance) })),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerFacture(repo, ctx.tenant, { ...input, dateEcheance: toDate(input.dateEcheance) });
+        ctx.log.info({ event: "facture_created", factureId: result.id, clientId: input.clientId }, "Facture créée");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -179,7 +183,11 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
      */
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta);
+        ctx.log.info({ event: "facture_envoyee", factureId: input.id }, "Facture envoyée au client");
+        return result;
+      }),
 
     marquerEnRetard: protectedProcedure
       .input(z.object({ id: z.number().int() }))
@@ -188,7 +196,11 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     /** Convertir un devis accepté en facture (cross-domaine : lit le devis via le reader injecté). */
     convertirDepuisDevis: protectedProcedure
       .input(z.object({ devisId: z.number().int() }))
-      .mutation(({ ctx, input }) => convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await convertirDevisEnFacture(repo, devisReader, ctx.tenant, input.devisId);
+        ctx.log.info({ event: "facture_depuis_devis", factureId: result.id, devisId: input.devisId }, "Devis converti en facture");
+        return result;
+      }),
 
     /** Émettre un avoir (note de crédit) sur une facture d'origine — montants négatifs. */
     creerAvoir: protectedProcedure.input(avoirInputSchema).mutation(({ ctx, input }) => {
@@ -205,15 +217,17 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
     /** Enregistrement d'un paiement (partiel ou soldant) — passe `payee` si soldée. */
     enregistrerPaiement: protectedProcedure
       .input(z.object({ id: z.number().int(), montant: decimal, date: isoDate.optional(), mode: z.string().max(50).optional() }))
-      .mutation(({ ctx, input }) =>
-        enregistrerPaiementFacture(
+      .mutation(async ({ ctx, input }) => {
+        const result = await enregistrerPaiementFacture(
           repo,
           ctx.tenant,
           input.id,
           { montant: input.montant, date: toDate(input.date), mode: input.mode ?? null },
           compta,
-        ),
-      ),
+        );
+        ctx.log.info({ event: "facture_paiement_enregistre", factureId: input.id, montant: Number(input.montant), mode: input.mode ?? null }, "Paiement facture enregistré");
+        return result;
+      }),
 
     /*
      * Marquer payée (parité client `trpc.factures.markAsPaid`) : écrase montantPaye + force `payee` +
@@ -221,9 +235,11 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
      */
     markAsPaid: protectedProcedure
       .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: z.string() }))
-      .mutation(({ ctx, input }) =>
-        marquerFacturePayee(repo, ctx.tenant, input.id, { montantPaye: input.montantPaye, datePaiement: input.datePaiement }, compta),
-      ),
+      .mutation(async ({ ctx, input }) => {
+        const result = await marquerFacturePayee(repo, ctx.tenant, input.id, { montantPaye: input.montantPaye, datePaiement: input.datePaiement }, compta);
+        ctx.log.info({ event: "facture_payee", factureId: input.id, montantPaye: Number(input.montantPaye) }, "Facture marquée payée");
+        return result;
+      }),
 
     /*
      * Envoi de la facture par email (PDF en pièce jointe) — parité client `trpc.factures.sendByEmail`.
