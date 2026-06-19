@@ -43,7 +43,11 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
     /** Génère (idempotent) le lien de signature d'un devis du tenant + email client + notification. */
     createSignatureLink: protectedProcedure
       .input(devisIdInput)
-      .mutation(({ ctx, input }) => createSignatureLink(deps, ctx.tenant!, input.devisId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await createSignatureLink(deps, ctx.tenant!, input.devisId);
+        ctx.log.info({ event: "signature_link_created", devisId: input.devisId }, "Lien de signature généré");
+        return result;
+      }),
 
     /*
      * ── Surface PUBLIQUE (portail de signature par token) ─────────────────────────────────────────
@@ -62,27 +66,37 @@ export function createSignatureRouter(deps: SignatureDeps, publicDeps: Signature
     /** Signature du devis : immutabilité (statut doit être en_attente) + capture IP probante/UA (ctx). */
     signDevis: publicProcedure
       .input(signInput)
-      .mutation(({ ctx, input }) =>
-        signDevis(publicDeps, {
+      .mutation(async ({ ctx, input }) => {
+        const result = await signDevis(publicDeps, {
           token: input.token,
           signatureData: input.signatureData,
           signataireName: input.signataireName,
           signataireEmail: input.signataireEmail,
           ipAddress: ctx.clientIp,
           userAgent: ctx.userAgent,
-        }),
-      ),
+        });
+        ctx.log.info(
+          { event: "devis_signe", signataireName: input.signataireName, signataireEmail: input.signataireEmail, ipAddress: ctx.clientIp },
+          "Devis signé par le client",
+        );
+        return result;
+      }),
 
     /** Refus du devis (+ motif optionnel) : même immutabilité + capture IP/UA. */
     refuseDevis: publicProcedure
       .input(refuseInput)
-      .mutation(({ ctx, input }) =>
-        refuseDevis(publicDeps, {
+      .mutation(async ({ ctx, input }) => {
+        const result = await refuseDevis(publicDeps, {
           token: input.token,
           motifRefus: input.motifRefus ?? null,
           ipAddress: ctx.clientIp,
           userAgent: ctx.userAgent,
-        }),
-      ),
+        });
+        ctx.log.warn(
+          { event: "devis_refuse_client", motif: input.motifRefus ?? null, ipAddress: ctx.clientIp },
+          "Devis refusé par le client",
+        );
+        return result;
+      }),
   });
 }
