@@ -28,10 +28,24 @@ const SERIALIZERS: PinoLoggerOptions["serializers"] = {
   res(res: { statusCode: number }) {
     return { statusCode: res.statusCode };
   },
-  /** Clé conventionnelle `err` → { type, message, stack } (convention pino-std-serializers). */
+  /**
+   * Clé conventionnelle `err` → { type, message, stack, code?, statusCode?, cause? }.
+   * `code` = code pg (ex. "23505") ou node:fs/axios (ex. "ECONNREFUSED") — filtrable dans BetterStack.
+   * `statusCode` = code HTTP (http-errors, undici).
+   * `cause` = Error.cause (Node 16+, une profondeur) — debug des erreurs wrappées.
+   */
   err(e: unknown) {
     if (!(e instanceof Error)) return e;
-    return { type: e.name, message: e.message, stack: e.stack };
+    const base: Record<string, unknown> = { type: e.name, message: e.message, stack: e.stack };
+    const typed = e as unknown as Record<string, unknown>;
+    if (typeof typed.code === "string") base.code = typed.code;
+    if (typeof typed.statusCode === "number") base.statusCode = typed.statusCode;
+    if (e.cause != null) {
+      base.cause = e.cause instanceof Error
+        ? { type: (e.cause as Error).name, message: (e.cause as Error).message }
+        : String(e.cause);
+    }
+    return base;
   },
 };
 
