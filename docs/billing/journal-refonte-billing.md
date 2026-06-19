@@ -73,6 +73,18 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 6 — 2026-06-19
+**Cible :** L3 — validations Zod (schéma Zod vérifié avant d'atteindre le use-case)
+**Motivation :** Pattern présent dans 8+ autres router tests du projet, absent du billing.
+**Cas ajoutés (1 test, 5 assertions) :**
+- `revokePaymentMethod paymentMethodId=0` → 400 (z.number().int().positive() : 0 exclu)
+- `revokePaymentMethod paymentMethodId=-1` → 400
+- `setDefaultPaymentMethod paymentMethodId=0` → 400
+- `confirmPaymentMethod stripePaymentMethodId=""` → 400 (z.string().min(1))
+- `confirmPaymentMethod stripeCustomerId=""` → 400
+**Résultat :** 8/8 ✅ (L3 PG)
+**État final :** Toutes les lacunes testables sans Phase 2 et sans billingPort override sont couvertes. La suite nécessite : (a) Phase 2 scheduler ou (b) billingPort dans AppDeps pour débloquer createSetupIntent/confirmPaymentMethod L3.
+
 ### Itération 5 — 2026-06-19
 **Cible :** L2 — branche legacy de `findStripeCustomerId` (fallback `subscriptions` table)
 **Motivation :** `createSetupIntent` utilise ce fallback pour ne pas créer de doublon Stripe customer lors de la migration billing Stripe → maison. Seule la branche PM maison était testée.
