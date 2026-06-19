@@ -13,7 +13,7 @@ import {
   AlertDialogHeader, AlertDialogTitle,
 } from "@/shared/ui/alert-dialog";
 import { useBillingMaison } from "../application/use-billing-maison";
-import type { BillingPaymentMethod, BillingSubscription, BillingInvoice } from "../application/use-billing-maison";
+import type { BillingPaymentMethod, BillingSubscription, BillingInvoice, PlanId } from "../application/use-billing-maison";
 import { AddCardDialog } from "./add-card-dialog";
 
 const fmtDate = (d: Date | string | null | undefined): string =>
@@ -245,6 +245,91 @@ function PaymentMethodsCard({
   );
 }
 
+const PLAN_CATALOG: Array<{ id: PlanId; name: string; monthly: number }> = [
+  { id: "starter", name: "Starter", monthly: 29 },
+  { id: "pro", name: "Pro", monthly: 49 },
+  { id: "enterprise", name: "Enterprise", monthly: 99 },
+];
+
+function PlanSelectorCard({
+  currentPlanId,
+  onChangePlan,
+  isChangingPlan,
+}: {
+  currentPlanId: string;
+  onChangePlan: (planId: PlanId) => Promise<void>;
+  isChangingPlan: boolean;
+}) {
+  const { t } = useTranslation("abonnement");
+  const [pendingPlanId, setPendingPlanId] = useState<PlanId | null>(null);
+
+  const handleChange = async (planId: PlanId) => {
+    setPendingPlanId(planId);
+    try {
+      await onChangePlan(planId);
+      toast.success(t("billingMaison.planChange", "Plan mis à jour."));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : undefined;
+      toast.error(msg ?? t("billingMaison.erreurPlan", "Impossible de changer de plan."));
+    } finally {
+      setPendingPlanId(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          {t("billingMaison.changerPlan", "Changer de plan")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {PLAN_CATALOG.map((plan) => {
+            const isCurrent = plan.id === currentPlanId;
+            const isPending = pendingPlanId === plan.id;
+            return (
+              <div
+                key={plan.id}
+                className={`flex flex-col gap-2 rounded-lg border p-4 ${isCurrent ? "border-primary bg-primary/5" : "border-border"}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">{plan.name}</span>
+                  {isCurrent && (
+                    <Badge variant="secondary" className="text-xs">
+                      {t("billingMaison.planActuel", "Actuel")}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-2xl font-bold tabular-nums">
+                  {plan.monthly}€
+                  <span className="text-sm font-normal text-muted-foreground">/mois</span>
+                </span>
+                {!isCurrent && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={isChangingPlan}
+                    onClick={() => handleChange(plan.id)}
+                    className="mt-auto"
+                  >
+                    {isPending && isChangingPlan ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      t("billingMaison.choisir", "Choisir")
+                    )}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function InvoicesCard({ invoices }: { invoices: BillingInvoice[] }) {
   const { t } = useTranslation("abonnement");
   return (
@@ -294,6 +379,7 @@ export function BillingMaisonSection() {
     billingInfo, isLoading, isError,
     revokePaymentMethod, isRevoking,
     setDefaultPaymentMethod, isSettingDefault,
+    changePlan, isChangingPlan,
   } = useBillingMaison();
   const [addCardOpen, setAddCardOpen] = useState(false);
 
@@ -320,7 +406,14 @@ export function BillingMaisonSection() {
   return (
     <div className="space-y-4">
       {subscription ? (
-        <SubscriptionCard sub={subscription} planName={plan?.name} />
+        <>
+          <SubscriptionCard sub={subscription} planName={plan?.name} />
+          <PlanSelectorCard
+            currentPlanId={subscription.plan_id}
+            onChangePlan={changePlan}
+            isChangingPlan={isChangingPlan}
+          />
+        </>
       ) : (
         <Card>
           <CardContent className="py-6">

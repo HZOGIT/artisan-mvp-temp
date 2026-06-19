@@ -53,6 +53,7 @@ export interface IBillingRepository {
   saveSubscription(params: SaveSubscriptionParams): Promise<BillingSubscription>;
   updateSubscriptionStatus(ctx: TenantContext, status: string): Promise<void>;
   updateSubscriptionPaymentMethod(ctx: TenantContext, paymentMethodId: number): Promise<void>;
+  updateSubscriptionPlan(ctx: TenantContext, planId: string): Promise<void>;
 
   /** Cycles */
   findPendingCycle(subscriptionId: number): Promise<BillingCycle | null>;

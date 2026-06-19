@@ -7,12 +7,15 @@ import {
   revokePaymentMethod,
   setDefaultPaymentMethod,
   getBillingInfo,
+  changePlan,
   NotFoundError,
+  InvalidPlanError,
 } from "../../application/billing-use-cases";
 import { TRPCError } from "@trpc/server";
 
 function mapError(err: unknown): never {
   if (err instanceof NotFoundError) throw new TRPCError({ code: "NOT_FOUND", message: err.message });
+  if (err instanceof InvalidPlanError) throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
   throw err;
 }
 
@@ -53,6 +56,13 @@ export function createBillingRouter(deps: BillingDeps) {
       .input(z.object({ paymentMethodId: z.number().int().positive() }))
       .mutation(({ ctx, input }) =>
         setDefaultPaymentMethod(deps, ctx.tenant, input.paymentMethodId).catch(mapError),
+      ),
+
+    /** Change de plan (upgrade ou downgrade). */
+    changePlan: protectedProcedure
+      .input(z.object({ planId: z.enum(["starter", "pro", "enterprise"]) }))
+      .mutation(({ ctx, input }) =>
+        changePlan(deps, ctx.tenant, input.planId).catch(mapError),
       ),
 
     /** Retourne subscription + cartes + 12 dernières factures. */

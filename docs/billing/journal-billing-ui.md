@@ -60,7 +60,19 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 7 (COMPLÈTE)** — Toutes les phases 1–6 sont livrées. Prochaine action : déployer sur staging (`./scripts/deploy-staging-newstack.sh` + `./scripts/deploy-staging-pages.sh`) et vérifier le sweep e2e (`./scripts/pw-run.sh scripts/staging-e2e-mutations.mjs E2E_PASS='…'`). Si `issues: 0`, la billing UI maison est considérée terminée.
+**Phase 9** — Backend: `cancelAtPeriodEnd` + `reactivate` use-cases + `updateCancelAt` repo + tRPC + boutons UI (annuler/réactiver abonnement dans `BillingMaisonSection`).
+
+## Log d'itérations
+
+### Itération 8 — 2026-06-19
+**Phase 8 — `changePlan` backend + UI (upgrade/downgrade)**
+- Backend `changePlan` use-case ajouté dans `billing-use-cases.ts` : valide le plan, vérifie l'existence de la sub, no-op si même plan, appelle `updateSubscriptionPlan` + `appendEvent(subscription.plan_changed)`
+- `InvalidPlanError` ajouté (nouvelle classe d'erreur domaine)
+- `IBillingRepository.updateSubscriptionPlan` ajouté dans l'interface + `BillingRepositoryDrizzle` + `FakeBillingRepository`
+- `billing.changePlan` tRPC procedure ajoutée (input: `planId: z.enum(["starter","pro","enterprise"])`) ; `mapError` étendu à `InvalidPlanError → BAD_REQUEST`
+- `use-billing-maison.ts` : `changePlan(planId)` + `isChangingPlan` exposés ; `PlanId` type exporté
+- `billing-maison-section.tsx` : `PlanSelectorCard` ajouté — grille 3 colonnes (starter/pro/enterprise), plan actuel mis en avant (badge + bordure), bouton "Choisir" pour les plans non-actifs, toast succès/erreur, spinner sur le plan en cours de changement
+- Gate : `tsc -p tsconfig.web.json --noEmit` ✅ · `pnpm build` ✅ (31s)
 
 ## Log d'itérations
 

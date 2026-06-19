@@ -7,6 +7,7 @@ export type BillingSubscription = NonNullable<BillingInfo["subscription"]>;
 export type BillingInvoice = BillingInfo["recentInvoices"][number];
 
 type ConfirmParams = RouterInputs["billing"]["confirmPaymentMethod"];
+export type PlanId = RouterInputs["billing"]["changePlan"]["planId"];
 
 export function useBillingMaison() {
   const utils = trpc.useUtils();
@@ -19,6 +20,7 @@ export function useBillingMaison() {
   const setDefaultMut = trpc.billing.setDefaultPaymentMethod.useMutation({ onSuccess: invalidate });
   const setupIntentMut = trpc.billing.createSetupIntent.useMutation();
   const confirmMut = trpc.billing.confirmPaymentMethod.useMutation({ onSuccess: invalidate });
+  const changePlanMut = trpc.billing.changePlan.useMutation({ onSuccess: invalidate });
 
   return {
     billingInfo: infoQ.data,
@@ -38,5 +40,8 @@ export function useBillingMaison() {
 
     confirmPaymentMethod: (params: ConfirmParams) => confirmMut.mutateAsync(params),
     isConfirming: confirmMut.isPending,
+
+    changePlan: (planId: PlanId) => changePlanMut.mutateAsync({ planId }),
+    isChangingPlan: changePlanMut.isPending,
   };
 }

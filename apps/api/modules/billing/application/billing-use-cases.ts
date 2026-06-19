@@ -147,6 +147,34 @@ export async function setDefaultPaymentMethod(deps: BillingDeps, ctx: TenantCont
   });
 }
 
+// ── Changement de plan ────────────────────────────────────────────────────────
+
+export class InvalidPlanError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidPlanError";
+  }
+}
+
+export async function changePlan(deps: Pick<BillingDeps, "repo">, ctx: TenantContext, newPlanId: string): Promise<void> {
+  const knownPlan = planById(newPlanId);
+  if (!knownPlan) throw new InvalidPlanError(`Plan inconnu : ${newPlanId}`);
+
+  const sub = await deps.repo.findSubscription(ctx);
+  if (!sub) throw new NotFoundError("Aucun abonnement actif");
+
+  if (sub.plan_id === newPlanId) return;
+
+  await deps.repo.updateSubscriptionPlan(ctx, newPlanId);
+  await deps.repo.appendEvent({
+    entityType: "billing_subscription",
+    entityId: sub.id,
+    eventType: "subscription.plan_changed",
+    payload: { from: sub.plan_id, to: newPlanId },
+    actor: `user:${ctx.userId}`,
+  });
+}
+
 // ── Erreurs domaine ───────────────────────────────────────────────────────────
 
 export class NotFoundError extends Error {

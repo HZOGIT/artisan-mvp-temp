@@ -141,6 +141,13 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
       .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
   }
 
+  async updateSubscriptionPlan(ctx: TenantContext, planId: string): Promise<void> {
+    await this.db
+      .update(billingSubscriptions)
+      .set({ plan_id: planId, updated_at: new Date() })
+      .where(eq(billingSubscriptions.artisan_id, ctx.artisanId));
+  }
+
   // ── Cycles ────────────────────────────────────────────────────────────────
 
   async findPendingCycle(subscriptionId: number): Promise<BillingCycle | null> {
