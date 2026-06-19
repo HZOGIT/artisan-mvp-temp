@@ -19,7 +19,7 @@ prouve la **parité visuelle** (screenshots `/v2/<route>` vs legacy via `scripts
 2. `./scripts/agents/listen.sh ope-403-refonte-frontend --drain` (agis selon les messages).
 3. Relis le journal → prends la **🎯 PROCHAINE CIBLE** → exécute **le runbook** (section « Runbook
    d'une itération »). Tu choisis toi-même le périmètre (1 page / 1 slice) ; si trop gros, **split**.
-4. **Gates verts obligatoires avant commit** : `tsc -p tsconfig.client.json`, `vitest run`, **parité
+4. **Gates verts obligatoires avant commit** : `tsc -p tsconfig.web.json`, `vitest run -c vitest.api.config.ts`, **parité
    visuelle**, e2e mutation si la page mute (les e2e lourds peuvent être **batchés** sur un groupe).
 5. Mets à jour le journal, `broadcast.sh`, **commit chirurgical** (`git add` de TES chemins, jamais
    `-A`), push, **re-vérifie `origin/staging`**, puis `deploy-staging-pages.sh` si le bundle a changé.
@@ -27,11 +27,12 @@ prouve la **parité visuelle** (screenshots `/v2/<route>` vs legacy via `scripts
 
 ## Garde-fous (règle d'or CLAUDE.md)
 - Travail **direct sur `staging`**, **pas de worktree**. Ne touche QUE ton périmètre (cf. journal :
-  `client/src/modern/**`, câblage `/v2` dans main/App, e2e `/v2`, `tsconfig.client.json`, le journal).
+  `client/src/modern/**`, câblage `/v2` dans main/App, e2e `/v2`, `tsconfig.web.json`, le journal).
 - **HORS périmètre** (NE PAS faire en autonome) : monorepo, garde-fous backend, ESLint global. Si une
   cible en dépend → marque-la 🚧, `broadcast.sh blocked` + `notify human BLOCKED`, passe à la suivante.
 - tRPC est **conservé** (pas de REST). Data = `@trpc/react-query`.
 - Jamais `git add -A`/`reset --hard`/`push --force`. Re-vérifie `origin` après chaque push.
+- **Ne jamais créer `devtools/`** — dissout, n'existe plus. Prompts → `scripts/prompts/`, scripts → `scripts/`.
 - Si bloqué ou ambigu sur la parité → demande à l'humain via le bus, ne devine pas, avance ailleurs.
 
 ## Identifiants e2e (staging)

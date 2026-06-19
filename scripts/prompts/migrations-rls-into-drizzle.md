@@ -57,12 +57,12 @@ Tout est dans `scripts/rls/` :
 
 **P5 — Vérif end-to-end**
 - DB locale neuve (ou reset) : `setup-app-role` → `drizzle-kit migrate` → policies présentes.
-- **`pnpm exec vitest run`** vert (≈2755 tests) — dont le **test d'isolation RLS** : `apps/api/interface/trpc/protected.test.ts` (et les routers L2 qui dépendent de `app.tenant`). C'est LE garde-fou : si la RLS casse, ils tombent.
+- **`pnpm exec vitest run -c vitest.api.config.ts`** vert (≈2755 tests) — dont le **test d'isolation RLS** : `apps/api/interface/trpc/protected.test.ts` (et les routers L2 qui dépendent de `app.tenant`). C'est LE garde-fou : si la RLS casse, ils tombent.
 - Sur **staging** : `drizzle-kit migrate` (rejoue la RLS idempotente) → re-tester l'isolation + smoke (`./scripts/smoke-staging-newstack.sh`).
 
 ## 🚦 Gates obligatoires (à CHAQUE phase)
-- `pnpm exec tsc -p tsconfig.src.json --noEmit` → **0 erreur**.
-- `pnpm exec vitest run` → vert (le test d'isolation prouve que la RLS marche).
+- `pnpm exec tsc -p tsconfig.api.json --noEmit` → **0 erreur**.
+- `pnpm exec vitest run -c vitest.api.config.ts` → vert (le test d'isolation prouve que la RLS marche).
 - `drizzle-kit generate` (no-op attendu après) + `migrate` local OK.
 - **Commit chirurgical** : `git add <chemins explicites>` — **JAMAIS** `git add -A`/`.`/`commit -a` (branche `staging` partagée). Pas de `OPE-XXX` dans le code (seulement les commits). Après push : `git fetch origin staging` + re-vérifier que ton commit est dans `origin/staging`.
 - Pas de déploiement nécessaire pour un changement de migrations (sauf si tu touches `src`/runtime). Un `drizzle-kit migrate` sur staging applique le SQL — fais-le **explicitement et prudemment** (data-safety).

@@ -21,6 +21,20 @@ docs/
   audits/                 # Rapports d'audit de la codebase
 .claude/
   skills/                 # Skills et conventions pour les agents
+eslint/
+  comments-jsdoc-only.mjs # Règle : // interdit sauf directives
+  kebab-filename.mjs      # Règle : noms de fichiers kebab-case
+  no-trpc-in-ui.mjs       # Règle : tRPC interdit dans la couche ui/
+```
+
+> **⚠️ Répertoires INTERDITS à recréer** — le dossier `devtools/` a été dissout dans `scripts/` (commit `c1cb0b4f`). Ne jamais le recréer. Tout nouveau prompt va dans `scripts/prompts/`. Tout nouveau script va dans `scripts/`.
+
+### Gates TypeScript
+
+```bash
+pnpm check                          # = tsc -p tsconfig.api.json && tsc -p tsconfig.web.json
+tsc -p tsconfig.api.json --noEmit   # backend seul
+tsc -p tsconfig.web.json --noEmit   # frontend seul (strict)
 ```
 
 ## Provisionner la base (schéma + RLS)

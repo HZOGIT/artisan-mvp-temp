@@ -41,4 +41,4 @@ screen -S <session-name> -X quit    # tuer
 
 ## Prompts d'init
 
-Stockés dans `scripts/prompts/`. Chaque fichier doit être **auto-suffisant** : la session accomplit sa mission sans accès à la conversation qui l'a lancée.
+Stockés dans **`scripts/prompts/`** — c'est le seul emplacement valide. **Ne jamais créer ni recréer `devtools/`** (dissout dans `scripts/` — toute apparition de `devtools/` est un bug à corriger immédiatement). Chaque fichier doit être **auto-suffisant** : la session accomplit sa mission sans accès à la conversation qui l'a lancée.
