@@ -17,15 +17,28 @@ export function createUtilisateursRouter(deps: UtilisateurDeps) {
 
     invite: gere
       .input(z.object({ email: z.string().email().max(320), nom: z.string().min(1).max(255), prenom: z.string().max(255).optional(), role: roleEnum }))
-      .mutation(({ ctx, input }) => inviterUtilisateur(deps, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await inviterUtilisateur(deps, ctx.tenant, input);
+        ctx.log.info({ event: "user_invited", targetRole: input.role }, "Collaborateur invité");
+        return result;
+      }),
 
     updateRole: gere
       .input(z.object({ userId: z.number().int(), role: roleEnum }))
-      .mutation(({ ctx, input }) => changerRole(deps, ctx.tenant, input.userId, input.role)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerRole(deps, ctx.tenant, input.userId, input.role);
+        ctx.log.warn({ event: "user_role_changed", targetUserId: input.userId, newRole: input.role }, "Rôle utilisateur modifié");
+        return result;
+      }),
 
     toggleActif: gere
       .input(z.object({ userId: z.number().int(), actif: z.boolean() }))
-      .mutation(({ ctx, input }) => basculerActif(deps, ctx.tenant, input.userId, input.actif)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await basculerActif(deps, ctx.tenant, input.userId, input.actif);
+        const level = input.actif ? "info" : "warn";
+        ctx.log[level]({ event: "user_access_toggled", targetUserId: input.userId, actif: input.actif }, input.actif ? "Accès collaborateur réactivé" : "Accès collaborateur désactivé");
+        return result;
+      }),
 
     getPermissions: gere
       .input(z.object({ userId: z.number().int() }))
@@ -33,10 +46,18 @@ export function createUtilisateursRouter(deps: UtilisateurDeps) {
 
     updatePermissions: gere
       .input(z.object({ userId: z.number().int(), permissions: z.array(z.string().max(100)).max(200) }))
-      .mutation(({ ctx, input }) => definirPermissions(deps, ctx.tenant, input.userId, input.permissions)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await definirPermissions(deps, ctx.tenant, input.userId, input.permissions);
+        ctx.log.warn({ event: "user_permissions_updated", targetUserId: input.userId, count: input.permissions.length }, "Permissions collaborateur mises à jour");
+        return result;
+      }),
 
     resetPermissions: gere
       .input(z.object({ userId: z.number().int() }))
-      .mutation(({ ctx, input }) => reinitialiserPermissions(deps, ctx.tenant, input.userId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await reinitialiserPermissions(deps, ctx.tenant, input.userId);
+        ctx.log.info({ event: "user_permissions_reset", targetUserId: input.userId }, "Permissions collaborateur réinitialisées");
+        return result;
+      }),
   });
 }
