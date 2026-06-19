@@ -1,5 +1,4 @@
 {
-  "//": "@fastify/cookie dans types : tsc suit AppRouter → source backend → augmentation declare module 'fastify' (setCookie/cookies).",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,

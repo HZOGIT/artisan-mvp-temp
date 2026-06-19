@@ -185,8 +185,7 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
    `M=$(ls client/src/pages/*.tsx | wc -l)`, `X=$((N*100/M))`.
 6. **Commit UNIQUE chirurgical** (`git add <mes chemins>`) → `git push origin staging` → **re-vérifier
    `origin/staging`**. Message `feat(front-v2): <quoi>` + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-7. **Déployer le SPA** si le bundle a changé (page migrée) : `./scripts/deploy-staging-pages.sh`.
-   (Squelette/tsconfig/test pur → pas de déploiement.)
+7. **Déployer le SPA** : `git push origin staging` suffit — Cloudflare Pages rebuild et déploie automatiquement (GitHub integration). Pas de script manuel.
 8. **Linear** : commentaire « migré: <page> ✅ » sur l'issue de la vague (OPE-421→424).
 
 ## Reprise sur erreur (ne jamais bloquer la boucle)

@@ -22,7 +22,7 @@ prouve la **parité visuelle** (screenshots `/v2/<route>` vs legacy via `scripts
 4. **Gates verts obligatoires avant commit** : `tsc -p tsconfig.web.json`, `vitest run -c vitest.api.config.ts`, **parité
    visuelle**, e2e mutation si la page mute (les e2e lourds peuvent être **batchés** sur un groupe).
 5. Mets à jour le journal, `broadcast.sh`, **commit chirurgical** (`git add` de TES chemins, jamais
-   `-A`), push, **re-vérifie `origin/staging`**, puis `deploy-staging-pages.sh` si le bundle a changé.
+   `-A`), push, **re-vérifie `origin/staging`** — Cloudflare Pages auto-déploie (GitHub integration).
 6. Commente l'avancement sur l'issue Linear de la vague (OPE-421→424).
 
 ## Garde-fous (règle d'or CLAUDE.md)

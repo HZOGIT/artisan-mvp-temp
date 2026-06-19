@@ -52,4 +52,4 @@ done
 echo "▶ Smoke authentifié (faux users staging)…"
 ./scripts/smoke-staging-newstack.sh
 
-echo "✓ Nouveau stack déployé + smoke (anonyme & authentifié) OK ($NEWSTACK_URL). Routage trafic = ./scripts/deploy-staging-pages.sh (wrangler)."
+echo "✓ Nouveau stack déployé + smoke (anonyme & authentifié) OK ($NEWSTACK_URL). Front : auto-déployé par Cloudflare Pages (GitHub integration, branche staging)."

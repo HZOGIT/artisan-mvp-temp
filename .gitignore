@@ -121,3 +121,6 @@ infra/terraform/terraform.tfvars
 
 # Bundle du nouveau stack (esbuild)
 dist-newstack
+
+# Wrangler local state (Cloudflare CLI artifacts)
+.wrangler/
