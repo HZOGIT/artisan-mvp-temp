@@ -46,6 +46,26 @@ Stack 100% PostgreSQL. Le schéma **ET** la sécurité niveau ligne (RLS) sont p
 (`0003_rls-tenant-isolation`) et l'accès public par token (`0004_rls-public-token`). Une base neuve
 n'a donc plus besoin d'aucun script RLS manuel.
 
+**⚠️ Créer une migration — TOUJOURS via drizzle-kit, JAMAIS à la main**
+
+**Règle : deux migrations pour toute évolution de schéma significative**
+
+1. **Migration auto** (tables, colonnes, FK simples, UNIQUE standards) — drizzle-kit diff automatique :
+   ```bash
+   DATABASE_URL=postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp \
+     pnpm drizzle-kit generate
+   # → drizzle/pg/XXXX_<nom-auto>.sql + entrée journal automatique
+   ```
+
+2. **Migration custom** (ce que Drizzle ne peut PAS auto-générer : index partiels `WHERE`, CHECK constraints, triggers, self-ref FK, RLS) :
+   ```bash
+   DATABASE_URL=... pnpm drizzle-kit generate --custom --name=<même-nom>-extras
+   # → drizzle/pg/XXXX_<nom>-extras.sql VIDE + entrée journal
+   # Remplir le SQL, puis : pnpm check && task db:migrate
+   ```
+
+Ne jamais créer un fichier `.sql` à la main ni éditer `drizzle/pg/meta/_journal.json` manuellement — drizzle-kit gère l'idx, le timestamp et l'entrée journal de façon atomique.
+
 **Ordre pour une base NEUVE :**
 1. **Bootstrap du rôle applicatif** (non-superuser, soumis à la RLS) — *hors migrations* (mot de passe
    + GRANTs point-in-time) : `task db:bootstrap` (= `node scripts/rls/setup-app-role.mjs`). À faire **une fois**.
