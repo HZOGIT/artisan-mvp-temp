@@ -1,12 +1,12 @@
 import type { IAssistantThreadsRepository } from "./application/assistant-threads-repository";
 import type { AssistantGeneratorDeps } from "./application/generator-use-cases";
-import type { AssistantStreamDeps } from "./application/stream-use-cases";
+import type { AssistantAgentDeps } from "./application/assistant-agent-use-cases";
 import { createAssistantRouter } from "./interface/trpc/assistant.router";
 
 export interface AssistantModuleDeps {
   readonly threadsRepo: IAssistantThreadsRepository;
   readonly generators: AssistantGeneratorDeps;
-  readonly streamDeps: AssistantStreamDeps;
+  readonly agentDeps: AssistantAgentDeps;
 }
 
 export interface AssistantModule {
@@ -15,5 +15,5 @@ export interface AssistantModule {
 }
 
 export function createAssistantModule(deps: AssistantModuleDeps): AssistantModule {
-  return { deps, router: createAssistantRouter(deps.threadsRepo, deps.generators, deps.streamDeps) };
+  return { deps, router: createAssistantRouter(deps.threadsRepo, deps.generators, deps.agentDeps) };
 }

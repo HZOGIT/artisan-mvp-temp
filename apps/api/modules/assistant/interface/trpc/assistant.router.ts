@@ -10,14 +10,27 @@ import {
   analyseRentabilite,
   predictionTresorerie,
 } from "../../application/generator-use-cases";
-import { streamAssistantReply, type AssistantStreamDeps } from "../../application/stream-use-cases";
+import { runAssistantAgent, type AssistantAgentDeps } from "../../application/assistant-agent-use-cases";
 import { ValidationError, TooManyRequestsError } from "../../../../shared/errors";
 
-/** Routeur tRPC assistant : 2 lectures + 4 générateurs IA + 1 subscription de chat en streaming. */
+/**
+ * Schéma Zod de l'union discriminée des événements émis par la subscription `stream`.
+ * Doit rester en parité avec `AssistantAgentEvent` (assistant-agent-use-cases.ts).
+ */
+const assistantStreamEventSchema = z.union([
+  z.object({ threadId: z.number().int() }),
+  z.object({ content: z.string() }),
+  z.object({ toolStart: z.object({ name: z.string(), args: z.record(z.unknown()) }) }),
+  z.object({ toolEnd: z.object({ name: z.string(), ok: z.boolean(), error: z.string().optional() }) }),
+  z.object({ invalidate: z.array(z.string()) }),
+  z.object({ navigate: z.string(), filtre: z.string().optional(), message: z.string().optional() }),
+]);
+
+/** Routeur tRPC assistant : 2 lectures + 4 générateurs IA + 1 subscription de chat en streaming agentique. */
 export function createAssistantRouter(
   threadsRepo: IAssistantThreadsRepository,
   generators: AssistantGeneratorDeps,
-  streamDeps: AssistantStreamDeps,
+  agentDeps: AssistantAgentDeps,
 ) {
   return router({
     getThreads: protectedProcedure.query(({ ctx }) => getThreads(threadsRepo, ctx.tenant!)),
@@ -34,7 +47,10 @@ export function createAssistantRouter(
       .query(({ ctx, input }) => analyseRentabilite(generators, ctx.tenant!, input)),
     predictionTresorerie: protectedProcedure.query(({ ctx }) => predictionTresorerie(generators, ctx.tenant!)),
 
-    /** Chat IA en streaming SSE (remplace POST /api/assistant/stream, désormais via tRPC subscription). */
+    /**
+     * Chat IA en streaming agentique (function-calling, outils navigate/invalide/écriture).
+     * Remplace l'ancien text-mode ; émet threadId, content, toolStart, toolEnd, navigate, invalidate.
+     */
     stream: protectedProcedure
       .input(
         z.object({
@@ -44,9 +60,10 @@ export function createAssistantRouter(
           threadId: z.number().int().optional(),
         }),
       )
+      .output(assistantStreamEventSchema)
       .subscription(async function* ({ ctx, input }) {
         try {
-          yield* streamAssistantReply(streamDeps, ctx.tenant!, input);
+          yield* runAssistantAgent(agentDeps, ctx.tenant!, input);
         } catch (e) {
           if (e instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
           if (e instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: e.message });
