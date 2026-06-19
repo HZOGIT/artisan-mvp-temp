@@ -338,6 +338,22 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     maxParamLength: 5000,
     logger: buildFastifyLoggerConfig(),
     genReqId: (req) => (req.headers["x-request-id"] as string | undefined) ?? randomUUID().slice(0, 8),
+    disableRequestLogging: true,
+  });
+
+  /*
+   * Un seul log par requête (vs deux avec le logging auto Fastify) : method + path + statusCode +
+   * responseTime dans une entrée structurée. On ignore /health (silence checker uptime).
+   */
+  app.addHook("onResponse", (req, reply, done) => {
+    if (req.url === "/health") { done(); return; }
+    const path = req.url.split("?")[0] ?? req.url;
+    const level = reply.statusCode >= 500 ? "error" : reply.statusCode >= 400 ? "warn" : "info";
+    req.log[level](
+      { method: req.method, path, statusCode: reply.statusCode, responseTime: Math.round(reply.elapsedTime) },
+      `${req.method} ${path} ${reply.statusCode}`,
+    );
+    done();
   });
 
   app.register(cookie);
@@ -355,7 +371,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     void reply.code(status).send({ error: error.message ?? "Erreur serveur" });
   });
 
-  app.get("/health", { logLevel: "silent" }, async () => ({ status: "ok" }));
+  app.get("/health", async () => ({ status: "ok" }));
 
   const vehiculeRepo = deps.vehiculeRepo ?? new VehiculeRepositoryDrizzle(getDbHandle().db);
   const avis = createAvisModule({
