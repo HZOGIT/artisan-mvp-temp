@@ -36,11 +36,20 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
 
     repondre: protectedProcedure
       .input(repondreSchema)
-      .mutation(({ ctx, input }) => repondreAvis(repo, ctx.tenant, input.avisId, input.reponse)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await repondreAvis(repo, ctx.tenant, input.avisId, input.reponse);
+        ctx.log.info({ event: "avis_repondu", avisId: input.avisId }, "Réponse artisan publiée");
+        return result;
+      }),
 
     moderer: protectedProcedure
       .input(modererSchema)
-      .mutation(({ ctx, input }) => changerStatutAvis(repo, ctx.tenant, input.avisId, input.statut)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerStatutAvis(repo, ctx.tenant, input.avisId, input.statut);
+        const level = input.statut === "masque" ? "warn" : "info";
+        ctx.log[level]({ event: "avis_modere", avisId: input.avisId, statut: input.statut }, `Avis ${input.statut}`);
+        return result;
+      }),
 
     /** Workflow demande d'avis (parité legacy) : envoi d'un lien d'avis au client. */
     envoyerDemande: protectedProcedure
@@ -62,6 +71,11 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
     /** Soumission d'un avis par le client via son lien token. 400 si déjà complété / expiré. */
     submitAvis: publicProcedure
       .input(z.object({ token: z.string().min(1).max(64), note: z.number().int().min(1).max(5), commentaire: z.string().max(5000).optional() }))
-      .mutation(({ input }) => soumettreAvisPublic(publicDeps, { token: input.token, note: input.note, commentaire: input.commentaire })),
+      .mutation(async ({ ctx, input }) => {
+        const result = await soumettreAvisPublic(publicDeps, { token: input.token, note: input.note, commentaire: input.commentaire });
+        /** Note loggée (KPI qualité) ; commentaire non loggué (PII client). Token non loggué (secret). */
+        ctx.log.info({ event: "avis_soumis", note: input.note, hasCommentaire: input.commentaire != null && input.commentaire.length > 0 }, "Avis client soumis");
+        return result;
+      }),
   });
 }
