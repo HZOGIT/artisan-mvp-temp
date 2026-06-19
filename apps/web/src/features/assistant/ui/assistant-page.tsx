@@ -14,14 +14,15 @@ import { useVoiceSession } from "@/shared/voice/use-voice-session";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useSpeechRecognition } from "@/shared/hooks/use-speech-recognition";
 import { useAssistant, useStreamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
-import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown, type Message } from "../domain/assistant";
+import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown } from "../domain/assistant";
 import { navigate } from "@/shared/router/navigation";
-
-const THREAD_LS_KEY = "operioz.assistant.thread";
+import { useAssistantStore } from "../application/assistant-store";
 
 /*
  * Page `assistant` — migration clean-archi de `pages/Assistant.tsx`. Markup à l'identique. Flux SSE +
  * parsing/markdown en domain/application ; voix & dictée via les hooks partagés (useVoiceSession/Speech).
+ * State (messages, threadId, isStreaming) géré dans useAssistantStore (Zustand + persist) pour survivre
+ * aux navigations SPA.
  */
 export default function AssistantPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation("assistant");
@@ -29,19 +30,17 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
   const queryClient = useQueryClient();
   const compact = embedded || isMobile;
 
-  const initialThreadId = (() => {
-    if (typeof window === "undefined") return undefined;
-    const raw = new URLSearchParams(window.location.search).get("thread");
-    const n = raw ? parseInt(raw, 10) : NaN;
-    if (Number.isFinite(n)) return n;
-    if (embedded) { const saved = parseInt(window.localStorage.getItem(THREAD_LS_KEY) || "", 10); if (Number.isFinite(saved)) return saved; }
-    return undefined;
-  })();
+  const {
+    messages,
+    setMessages,
+    threadId,
+    setThreadId,
+    isStreaming,
+    setIsStreaming,
+    reset: resetStore,
+  } = useAssistantStore();
 
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [threadId, setThreadId] = useState<number | undefined>(initialThreadId);
   const [activeTools, setActiveTools] = useState<{ name: string; ok?: boolean }[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -54,10 +53,8 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
   const [showRentabiliteDialog, setShowRentabiliteDialog] = useState(false);
   const [selectedDevisId, setSelectedDevisId] = useState("");
 
-  const { threadQuery, generateDevis, suggestRelances, rentabilite, tresorerie, devisList } = useAssistant(initialThreadId, selectedDevisId);
+  const { threadQuery, generateDevis, suggestRelances, rentabilite, tresorerie, devisList } = useAssistant(threadId, selectedDevisId);
   const streamMessage = useStreamMessage();
-
-  useEffect(() => { if (threadId) { try { window.localStorage.setItem(THREAD_LS_KEY, String(threadId)); } catch { /* ignore */ } } }, [threadId]);
 
   useEffect(() => {
     if (loadedThreadRef.current || !threadQuery.data) return;
@@ -67,7 +64,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
 
   const voice = useVoiceSession({
     threadId,
-    onThreadId: useCallback((id: number) => setThreadId((prev) => prev ?? id), []),
+    onThreadId: useCallback((id: number) => { if (!threadId) setThreadId(id); }, [threadId, setThreadId]),
     onUserTranscript: useCallback((text: string) => {
       if (!text.trim()) return;
       const startNew = !liveUserRef.current;
@@ -113,7 +110,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
         if (ev.threadId && !threadId) { setThreadId(ev.threadId); navigate(`/assistant?thread=${ev.threadId}`, { replace: true }); }
         if (ev.content) setMessages((prev) => { const u = [...prev]; const last = u[u.length - 1]; if (last.role === "assistant") u[u.length - 1] = { ...last, content: last.content + ev.content }; return u; });
         if (ev.error) toast.error(ev.error);
-        if (ev.navigate) { window.location.href = navigateTarget(ev.navigate, ev.filtre); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
+        if (ev.navigate) { navigate(navigateTarget(ev.navigate, ev.filtre)); try { window.dispatchEvent(new CustomEvent("operioz:open-assistant")); } catch { /* ignore */ } }
         if (ev.invalidate) for (const key of ev.invalidate) queryClient.invalidateQueries({ predicate: (q) => Array.isArray(q.queryKey) && q.queryKey.some((k) => typeof k === "string" && k.includes(key)) });
         if (ev.toolStart) setActiveTools((prev) => [...prev, { name: ev.toolStart!.name }]);
         if (ev.toolEnd) setActiveTools((prev) => prev.map((t) => t.name === ev.toolEnd!.name && t.ok === undefined ? { ...t, ok: ev.toolEnd!.ok } : t));
@@ -177,9 +174,8 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
 
   const newThread = useCallback(() => {
     try { abortRef.current?.abort(); } catch { /* ignore */ }
-    setIsStreaming(false); setMessages([]); setThreadId(undefined); setInput("");
-    try { window.localStorage.removeItem(THREAD_LS_KEY); } catch { /* ignore */ }
-  }, []);
+    resetStore(); setInput("");
+  }, [resetStore]);
 
   const quickActions = [
     { icon: FileText, label: t("genererDevis"), color: "text-blue-500", onClick: () => setShowDevisDialog(true) },
