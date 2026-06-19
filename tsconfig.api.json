@@ -1,5 +1,5 @@
 {
-  "//": "OPE-184 — gate typecheck du CODE NEUF clean archi uniquement (src/** + schéma PG). Le legacy (server/, client/) garde sa dette tsc (OPE-253), hors scope. Lancer : pnpm exec tsc -p tsconfig.src.json",
+  "//": "Gate typecheck du backend Fastify/tRPC (apps/api/** + schéma PG). Lancer : pnpm exec tsc -p tsconfig.api.json --noEmit",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,

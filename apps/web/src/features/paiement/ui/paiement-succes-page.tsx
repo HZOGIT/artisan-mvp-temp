@@ -12,10 +12,6 @@ export default function PaiementSuccesPage() {
   const { t } = useTranslation("paiement");
   const [, setLocation] = useLocation();
 
-  const params = new URLSearchParams(window.location.search);
-  const sessionId = params.get("session_id");
-  const token = params.get("token");
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
       <Card className="w-full max-w-md text-center">

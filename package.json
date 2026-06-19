@@ -7,12 +7,13 @@
     "build": "vite build",
     "build:newstack": "esbuild apps/api/server.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-newstack/server.mjs",
     "start:newstack": "node dist-newstack/server.mjs",
-    "check": "tsc --noEmit",
+    "check": "tsc -p tsconfig.api.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run",
+    "test": "vitest run -c vitest.api.config.ts",
+    "test:web": "vitest run -c vitest.web.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "lint:web": "eslint -c eslint.client.config.mjs apps/web/src",
+    "lint:web": "eslint -c eslint.web.config.mjs apps/web/src",
     "lint:api": "eslint -c eslint.api.config.mjs apps/api"
   },
   "dependencies": {

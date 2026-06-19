@@ -1,5 +1,5 @@
 {
-  "//": "OPE-403 — gate typecheck du FRONTEND (apps/web/src/**). DOIT rester vert : `pnpm exec tsc -p tsconfig.client.json`. tsc suit les imports transitifs (AppRouter, primitives) même hors `include`. `types` ajoute `@fastify/cookie` : le front neuf consomme tRPC via `AppRouter` (modern/shared/trpc) donc tsc traverse la source backend qui s'appuie sur l'augmentation globale `declare module 'fastify'` (setCookie/cookies) — la base tsconfig.json limite `types` à node+vite/client. N'affecte que ce gate, pas le bundle.",
+  "//": "Gate typecheck strict du frontend React (apps/web/src/**). Lancer : pnpm exec tsc -p tsconfig.web.json --noEmit. `types` ajoute `@fastify/cookie` car tsc suit les imports transitifs AppRouter → source backend qui augmente le module fastify (setCookie/cookies).",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,

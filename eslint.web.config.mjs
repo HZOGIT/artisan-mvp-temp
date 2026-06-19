@@ -2,7 +2,7 @@
  * Gate ESLint DÉDIÉ au FRONT NEUF de la refonte (`apps/web/src/**`). Distinct de l'ESLint global :
  * il ne lint QUE le code neuf et fait respecter ses specs (frontière strangler, pas de REST,
  * kebab-case des fichiers, i18n). Enrichi itérativement.
- * Exécution : `pnpm exec eslint -c eslint.client.config.mjs apps/web/src`
+ * Exécution : `pnpm exec eslint -c eslint.web.config.mjs apps/web/src`
  */
 import tseslint from "typescript-eslint";
 import i18next from "eslint-plugin-i18next";

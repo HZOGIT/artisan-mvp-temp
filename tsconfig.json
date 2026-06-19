@@ -1,5 +1,5 @@
 {
-  // Typecheck legacy (dette OPE-253, non gated — le gate du code neuf = tsconfig.src.json). `server/`
+  // Typecheck legacy (dette OPE-253, non gated — les gates du code neuf = tsconfig.api.json + tsconfig.web.json). `server/`
   // a été supprimé (extinction du legacy) : il ne reste que les 4 sidecars PDF/email encore bundlés
   // au runtime par le new-stack (build:newstack → legacy-pdf.mjs / legacy-email.mjs), listés
   // explicitement ci-dessous pour conserver leur couverture de types sans glob `server/**` trompeur.
