@@ -43,9 +43,11 @@ services:
       NODE_ENV: production
       NEW_STACK_PORT: "3001"
       HOST: 0.0.0.0
-      # Rôle applicatif non-superuser → soumis aux policies RLS (isolation tenant).
-      APP_DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
-      DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
+      # OWNER (artisan_user) : provision au boot (migrations schéma + RLS, création/grants du rôle app). Éphémère.
+      DATABASE_URL: postgres://artisan_user:${POSTGRES_PASSWORD:-artisan_password}@postgres:5432/artisan_mvp
+      # APP (app_tenant) non-superuser → soumis aux policies RLS. Sert toutes les requêtes (long-lived).
+      # Source unique du secret app : ensureAppRole provisionne le rôle avec CE user+password.
+      APP_DATABASE_URL: postgres://app_tenant:${APP_DB_PASSWORD:-app_tenant_pw}@postgres:5432/artisan_mvp
       BETTERSTACK_TOKEN: ${BETTERSTACK_TOKEN:-}
     # JWT_SECRET (mêmes cookies que le legacy) + autres secrets via .env.staging.
     env_file:

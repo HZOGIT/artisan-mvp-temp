@@ -1,6 +1,13 @@
 import { buildApp } from "./app";
+import { getDbHandle } from "./shared/db/client";
+import { provisionDatabase, assertAppRoleExistsAndRestricted } from "./shared/db/provision-database";
 
 async function main(): Promise<void> {
+  /* Provision automatique au boot (sous verrou) : migrations schéma + RLS, rôle applicatif + droits. */
+  await provisionDatabase();
+  /* Fail-closed : refuse de servir si le pool runtime peut contourner la RLS. */
+  await assertAppRoleExistsAndRestricted(getDbHandle().db);
+
   const app = buildApp();
   const port = Number(process.env.NEW_STACK_PORT ?? process.env.PORT ?? 3001);
   const host = process.env.HOST ?? "0.0.0.0";

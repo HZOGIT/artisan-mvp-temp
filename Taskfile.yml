@@ -52,23 +52,12 @@ tasks:
     cmds:
       - '{{.COMPOSE}} ps'
 
-  # Provisioning d'une base NEUVE : (1) task db:bootstrap → (2) task db:migrate.
-  # db:migrate applique schéma + RLS (tenant-isolation + public-token) en une chaîne.
-  db:bootstrap:
-    desc: Bootstrap the non-superuser app role (app_tenant) — run ONCE before db:migrate on a fresh DB
-    cmds:
-      # Connexion admin/owner ; mot de passe du rôle via APP_DB_PASSWORD (défaut app_tenant_pw, à surcharger hors-local).
-      - 'PG_URL={{.LOCAL_DATABASE_URL}} node scripts/rls/setup-app-role.mjs'
-
+  # Provision de la base (rôle applicatif + migrations schéma/RLS) = AUTOMATIQUE au boot du serveur
+  # (apps/api/shared/db/provision-database.ts). Staging = dev : `task stack:up`/`stack:restart` (re)provisionne.
   db:generate:
     desc: Generate a new migration from schema.ts changes (does NOT touch the DB)
     cmds:
       - 'DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate'
-
-  db:migrate:
-    desc: Apply pending migrations + verify no drift (the ONLY safe way to change the schema)
-    cmds:
-      - 'DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate && DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit migrate'
 
   db:seed:
     desc: Seed user dev@operioz.com / Operioz on the local DB (PostgreSQL, bcrypt)

@@ -12,7 +12,6 @@
     "test": "vitest run -c vitest.api.config.ts",
     "test:web": "vitest run -c vitest.web.config.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
     "lint:web": "eslint -c eslint.web.config.mjs apps/web/src",
     "lint:api": "eslint -c eslint.api.config.mjs apps/api"
   },

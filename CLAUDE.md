@@ -61,18 +61,25 @@ n'a donc plus besoin d'aucun script RLS manuel.
    ```bash
    DATABASE_URL=... pnpm drizzle-kit generate --custom --name=<même-nom>-extras
    # → drizzle/pg/XXXX_<nom>-extras.sql VIDE + entrée journal
-   # Remplir le SQL, puis : pnpm check && task db:migrate
+   # Remplir le SQL, puis : pnpm check ; redémarre le stack (task stack:restart) → appliqué au boot
    ```
 
 Ne jamais créer un fichier `.sql` à la main ni éditer `drizzle/pg/meta/_journal.json` manuellement — drizzle-kit gère l'idx, le timestamp et l'entrée journal de façon atomique.
 
-**Ordre pour une base NEUVE :**
-1. **Bootstrap du rôle applicatif** (non-superuser, soumis à la RLS) — *hors migrations* (mot de passe
-   + GRANTs point-in-time) : `task db:bootstrap` (= `node scripts/rls/setup-app-role.mjs`). À faire **une fois**.
-2. **Migrations** : `task db:migrate` (= `drizzle-kit migrate`) → applique schéma + RLS en owner (`artisan_user`).
+**Provision = AUTOMATIQUE au boot du serveur** (plus aucune étape manuelle oubliable). Au démarrage,
+`apps/api/shared/db/provision-database.ts` exécute, sous un `pg_advisory_lock` (sûr en multi-réplicas)
+et via la connexion OWNER (`DATABASE_URL`) :
+1. **migrations** (schéma + RLS) par le SDK Drizzle `migrate()` ;
+2. **(ré)assure le rôle applicatif** `app_tenant` (non-superuser, GRANTs + `ALTER DEFAULT PRIVILEGES`),
+   provisionné à partir des identifiants de `APP_DATABASE_URL` (**source unique** du secret app).
+Puis le serveur **refuse de démarrer** si le rôle runtime peut contourner la RLS (fail-closed).
 
-⚠️ `drizzle-kit migrate` **ne crée PAS** le rôle `app_tenant` : sans l'étape (1), `migrate` réussit mais
-l'app ne peut pas se connecter. Le runtime se connecte en `app_tenant` (RLS active) ; les migrations en owner.
+**Deux rôles, deux URLs** (nommées par rôle, jamais croisées) :
+- `DATABASE_URL` = `artisan_user` (owner) → provision au boot (migrations + grants). Connexion **éphémère**.
+- `APP_DATABASE_URL` = `app_tenant` (non-superuser, RLS) → pool runtime qui sert **toutes** les requêtes.
+
+**Staging = dev** (pas d'env de dev séparé) : la base se (re)provisionne en démarrant le stack
+(`task stack:up` / `stack:restart`). Créer de nouvelles migrations : `task db:generate` (+ `--custom`, cf. ci-dessus).
 
 **Faire évoluer la RLS** (ne JAMAIS éditer une migration appliquée — toujours une nouvelle migration custom append) :
 - **Tenant** (nouvelle table avec `artisanId`/`artisan_id`) : `node scripts/rls/generate-tenant-rls.mjs`

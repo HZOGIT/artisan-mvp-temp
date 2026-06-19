@@ -21,15 +21,20 @@ export function createDbClient(connectionString: string, max = 10): DbHandle {
 }
 
 /*
- * Client par défaut (lazy). Le nouveau stack utilise en priorité APP_DATABASE_URL
- * (rôle applicatif NON-superuser soumis à la RLS) ; à défaut DATABASE_URL. Le legacy,
- * lui, garde DATABASE_URL (rôle superuser qui bypasse la RLS) — non impacté.
+ * Client par défaut (lazy) du runtime. Il utilise EXCLUSIVEMENT APP_DATABASE_URL — le rôle
+ * applicatif NON-superuser soumis à la RLS. Pas de fallback sur DATABASE_URL (rôle owner) :
+ * un mauvais câblage d'environnement ne doit jamais pouvoir servir les requêtes en owner et
+ * désactiver silencieusement l'isolation tenant (fail-closed).
  */
 let defaultHandle: DbHandle | null = null;
 export function getDbHandle(): DbHandle {
   if (defaultHandle) return defaultHandle;
-  const url = process.env.APP_DATABASE_URL || process.env.DATABASE_URL;
-  if (!url) throw new Error("APP_DATABASE_URL / DATABASE_URL manquant");
+  const url = process.env.APP_DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "APP_DATABASE_URL manquant — le runtime DOIT utiliser le rôle applicatif non-superuser (RLS)",
+    );
+  }
   defaultHandle = createDbClient(url);
   return defaultHandle;
 }
