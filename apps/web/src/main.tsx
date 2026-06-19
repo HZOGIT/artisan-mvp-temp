@@ -1,10 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
+import App from './app.tsx'
 import './index.css'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { trpc } from './shared/trpc'
-import { httpBatchLink, httpLink, splitLink } from '@trpc/client'
+import { httpBatchLink, httpLink, httpSubscriptionLink, splitLink } from '@trpc/client'
 import superjson from 'superjson'
 
 /*
@@ -82,9 +82,17 @@ import { BACKEND_URL } from "./shared/backend-url"
 const trpcClient = trpc.createClient({
   links: [
     splitLink({
-      condition: (op) => op.path.startsWith('dashboard.') || DASHBOARD_UNBATCHED.has(op.path),
-      true: httpLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
-      false: httpBatchLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
+      condition: (op) => op.type === 'subscription',
+      true: httpSubscriptionLink({
+        url: `${BACKEND_URL}/api/trpc`,
+        transformer: superjson,
+        eventSourceOptions: { withCredentials: true },
+      }),
+      false: splitLink({
+        condition: (op) => op.path.startsWith('dashboard.') || DASHBOARD_UNBATCHED.has(op.path),
+        true: httpLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
+        false: httpBatchLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
+      }),
     }),
   ],
 })

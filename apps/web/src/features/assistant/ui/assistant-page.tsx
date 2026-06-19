@@ -11,9 +11,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { Label } from "@/shared/ui/label";
 import { useVoiceSession } from "@/shared/voice/use-voice-session";
-import { useIsMobile } from "@/shared/hooks/useMobile";
-import { useSpeechRecognition } from "@/shared/hooks/useSpeechRecognition";
-import { useAssistant, streamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useSpeechRecognition } from "@/shared/hooks/use-speech-recognition";
+import { useAssistant, useStreamMessage, type DevisLigne, type Relances } from "../application/use-assistant";
 import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown, type Message } from "../domain/assistant";
 
 const THREAD_LS_KEY = "operioz.assistant.thread";
@@ -54,6 +54,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
   const [selectedDevisId, setSelectedDevisId] = useState("");
 
   const { threadQuery, generateDevis, suggestRelances, rentabilite, tresorerie, devisList } = useAssistant(initialThreadId, selectedDevisId);
+  const streamMessage = useStreamMessage();
 
   useEffect(() => { if (threadId) { try { window.localStorage.setItem(THREAD_LS_KEY, String(threadId)); } catch { /* ignore */ } } }, [threadId]);
 
@@ -121,7 +122,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
       toast.error(error instanceof Error ? error.message : t("errConnexion"));
       setMessages((prev) => { const u = [...prev]; if (u.length > 0 && u[u.length - 1].role === "assistant" && !u[u.length - 1].content) u.pop(); return u; });
     } finally { setIsStreaming(false); abortRef.current = null; }
-  }, [isStreaming, messages, threadId, queryClient, t]);
+  }, [isStreaming, messages, threadId, queryClient, t, streamMessage]);
 
   /** Compte à rebours d'envoi auto après dictée */
   useEffect(() => {

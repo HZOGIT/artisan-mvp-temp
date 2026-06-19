@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IAssistantThreadsRepository } from "../../application/assistant-threads-repository";
 import { getThreads, getMessages } from "../../application/read-use-cases";
@@ -9,21 +10,21 @@ import {
   analyseRentabilite,
   predictionTresorerie,
 } from "../../application/generator-use-cases";
+import { streamAssistantReply, type AssistantStreamDeps } from "../../application/stream-use-cases";
+import { ValidationError, TooManyRequestsError } from "../../../../shared/errors";
 
-/*
- * Routeur tRPC du domaine assistant (6 procs appelées par le client). Toutes `protectedProcedure`,
- * request/response (PAS de SSE). 2 lectures (threads/messages) + 4 générateurs IA. Transport mince :
- * délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors.
- */
-export function createAssistantRouter(threadsRepo: IAssistantThreadsRepository, generators: AssistantGeneratorDeps) {
+/** Routeur tRPC assistant : 2 lectures + 4 générateurs IA + 1 subscription de chat en streaming. */
+export function createAssistantRouter(
+  threadsRepo: IAssistantThreadsRepository,
+  generators: AssistantGeneratorDeps,
+  streamDeps: AssistantStreamDeps,
+) {
   return router({
-    /** ── Lectures (historique conversations) ────────────────────────────────────────────────────── */
     getThreads: protectedProcedure.query(({ ctx }) => getThreads(threadsRepo, ctx.tenant!)),
     getMessages: protectedProcedure
       .input(z.object({ threadId: z.number().int() }))
       .query(({ ctx, input }) => getMessages(threadsRepo, ctx.tenant!, input.threadId)),
 
-    /** ── Générateurs IA (request/response) ──────────────────────────────────────────────────────── */
     suggestRelances: protectedProcedure.query(({ ctx }) => suggestRelances(generators, ctx.tenant!)),
     generateDevis: protectedProcedure
       .input(z.object({ description: z.string().min(1) }))
@@ -32,5 +33,25 @@ export function createAssistantRouter(threadsRepo: IAssistantThreadsRepository, 
       .input(z.object({ devisId: z.number().int() }))
       .query(({ ctx, input }) => analyseRentabilite(generators, ctx.tenant!, input)),
     predictionTresorerie: protectedProcedure.query(({ ctx }) => predictionTresorerie(generators, ctx.tenant!)),
+
+    /** Chat IA en streaming SSE (remplace POST /api/assistant/stream, désormais via tRPC subscription). */
+    stream: protectedProcedure
+      .input(
+        z.object({
+          message: z.string().min(1),
+          history: z.array(z.object({ role: z.string(), content: z.string() })).optional(),
+          pageContext: z.string().optional(),
+          threadId: z.number().int().optional(),
+        }),
+      )
+      .subscription(async function* ({ ctx, input }) {
+        try {
+          yield* streamAssistantReply(streamDeps, ctx.tenant!, input);
+        } catch (e) {
+          if (e instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
+          if (e instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: e.message });
+          throw e;
+        }
+      }),
   });
 }
