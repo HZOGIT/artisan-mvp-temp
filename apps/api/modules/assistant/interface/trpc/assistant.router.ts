@@ -62,11 +62,20 @@ export function createAssistantRouter(
         }),
       )
       .subscription(async function* ({ ctx, input }) {
+        const t0 = Date.now();
+        let contentEvents = 0;
+        let toolCalls = 0;
         try {
           for await (const ev of runAssistantAgent(agentDeps, ctx.tenant!, input)) {
-            yield assistantStreamEventSchema.parse(ev);
+            const validated = assistantStreamEventSchema.parse(ev);
+            if ("content" in validated) contentEvents++;
+            if ("toolStart" in validated) toolCalls++;
+            yield validated;
           }
+          ctx.log.info({ event: "assistant_stream_completed", durationMs: Date.now() - t0, contentEvents, toolCalls, threadId: input.threadId ?? null }, "Chat IA terminé");
         } catch (e) {
+          const err = e instanceof Error ? e : new Error(String(e));
+          ctx.log.error({ event: "assistant_stream_error", err, durationMs: Date.now() - t0 }, "Erreur chat IA agentique");
           if (e instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
           if (e instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: e.message });
           throw e;
