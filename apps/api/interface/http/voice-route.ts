@@ -26,7 +26,8 @@ export function registerVoiceRoute(app: FastifyInstance, deps: VoiceRouteDeps): 
     let outcome;
     try {
       outcome = await persistVoiceTranscript(deps, { artisanId: auth.artisanId, userId: auth.userId }, input);
-    } catch {
+    } catch (e) {
+      req.log.error({ event: "voice_persist_error", err: e instanceof Error ? e : new Error(String(e)), artisanId: auth.artisanId }, "Erreur persistence transcript vocal");
       return reply.code(500).send({ error: "Erreur serveur" });
     }
     switch (outcome.kind) {
@@ -35,6 +36,7 @@ export function registerVoiceRoute(app: FastifyInstance, deps: VoiceRouteDeps): 
       case "not-found":
         return reply.code(404).send({ error: "Thread introuvable" });
       case "ok":
+        req.log.info({ event: "voice_transcript_persisted", artisanId: auth.artisanId, threadId: input.threadId, hasUserTranscript: !!input.userTranscript, hasAssistantTranscript: !!input.assistantTranscript }, "Transcript vocal persisté");
         return reply.send({ ok: true });
     }
   });
