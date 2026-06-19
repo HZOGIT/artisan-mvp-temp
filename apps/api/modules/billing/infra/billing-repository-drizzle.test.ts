@@ -94,6 +94,29 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(new Date(found!.consented_at!).toISOString().slice(0, 16)).toBe("2026-07-01T14:30");
   });
 
+  it("savePaymentMethod : shape complète round-trip — exp_month/exp_year/brand/stripe_payment_method_id/stripe_customer_id (scheduler MIT)", async () => {
+    // Le scheduler Phase 2 lit stripe_payment_method_id + stripe_customer_id pour construire
+    // le PaymentIntent off-session (billing.createPaymentIntent). Il lit exp_month/exp_year
+    // pour détecter les cartes expirées et les exclure du dunning. Si Drizzle perd l'un
+    // de ces champs, le scheduler échouerait silencieusement avec une clé Stripe invalide.
+    const pm = await repo.savePaymentMethod({
+      artisanId: A,
+      stripeCustomerId: "cus_shape_chk",
+      stripePaymentMethodId: "pm_shape_chk",
+      brand: "amex",
+      last4: "0001",
+      expMonth: 3,
+      expYear: 2031,
+      consentedAt: new Date(),
+    });
+    const found = await repo.findPaymentMethodById(ctx(A), pm.id);
+    expect(found?.stripe_payment_method_id).toBe("pm_shape_chk");
+    expect(found?.stripe_customer_id).toBe("cus_shape_chk");
+    expect(found?.brand).toBe("amex");
+    expect(found?.exp_month).toBe(3);
+    expect(found?.exp_year).toBe(2031);
+  });
+
   it("setDefaultPaymentMethod + findDefaultPaymentMethod", async () => {
     const pm = await repo.savePaymentMethod({
       artisanId: A,

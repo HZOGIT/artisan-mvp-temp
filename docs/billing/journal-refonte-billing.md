@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 24 — 2026-06-19
+**Cible :** L2 — shape complète PM jamais vérifiée (champs scheduler Phase 2)
+**Cas ajoutés (1) :**
+- L2 : `savePaymentMethod` → `exp_month`, `exp_year`, `brand`, `stripe_payment_method_id`, `stripe_customer_id` vérifiés via `findPaymentMethodById` — ces 5 champs n'étaient jamais assertés depuis la DB. Le scheduler Phase 2 lit `stripe_payment_method_id` + `stripe_customer_id` pour construire le PaymentIntent off-session ; lit `exp_month`/`exp_year` pour détecter les cartes expirées en dunning. Un bug de mapping Drizzle ferait échouer silencieusement les prélèvements automatiques avec un ID Stripe invalide.
+**Résultat :** L2 28/28 ✅
+**Total billing :** 111 tests (110 → 111)
+
 ### Itération 23 — 2026-06-19
 **Cible :** L2 — `consented_at` jamais relu depuis la DB
 **Cas ajoutés (1) :**
