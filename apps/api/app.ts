@@ -103,6 +103,9 @@ import { createAuthModule } from "./modules/auth/auth.module";
 import { AuthRepositoryDrizzle } from "./modules/auth/infra/auth-repository-drizzle";
 import type { IAuthRepository } from "./modules/auth/application/auth-repository";
 import { createSubscriptionModule, pricesFromEnv } from "./modules/subscription/subscription.module";
+import { createBillingModule } from "./modules/billing/billing.module";
+import { BillingRepositoryDrizzle } from "./modules/billing/infra/billing-repository-drizzle";
+import { BillingAdapter } from "./shared/ports/billing-adapter";
 import { SubscriptionReaderDrizzle } from "./modules/subscription/infra/subscription-reader-drizzle";
 import type { ISubscriptionRepository } from "./modules/subscription/application/subscription-reader";
 import { StripeAdapter } from "./shared/ports/stripe-adapter";
@@ -887,7 +890,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     bibliotheque: deps.bibliothequeReader ?? new BibliothequeReaderDrizzle(getDbHandle().db),
   });
-  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA });
+
+  const billingRepo = new BillingRepositoryDrizzle(getDbHandle().db);
+  const billing = createBillingModule({
+    repo: billingRepo,
+    deps: { repo: billingRepo, billing: new BillingAdapter(), stripe: deps.stripePort ?? new StripeAdapter() },
+  });
+
+  const appRouter = createAppRouter({ vehiculeRepo, avis, badges, techniciens, notifications, fournisseurs, commandes, stocks, clients, interventions, conges, notesDeFrais, chantiers, depenses, devis, factures, ecritures, articles, parametres, modelesEmail, modelesDevis, configRelances, rdvEnLigne, relancesDevis, categoriesDepenses, contratsMaintenance, demandesContact, budgetsCategories, reglesCategorisation, previsionsCA, artisan, devisOptions, activites, modules, statistiques, calendrier, emails, search, geolocalisation, dashboard, rapports, utilisateurs, comptabilite, auth, subscription, signature, conseilsIa, assistant, chat, support, devices, alertesPrevisions, importErp, interventionsMobile, vitrine, clientPortal, integrationsComptables, devisIA, billing });
 
   app.register(fastifyTRPCPlugin, {
     prefix: "/api/trpc",

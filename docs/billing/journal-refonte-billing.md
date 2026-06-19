@@ -9,7 +9,15 @@ Stripe reste processeur de paiement, Operioz gère les cycles, les factures, la 
 
 ## État courant
 
-**Phase 0 — Infrastructure Drizzle** : EN COURS (iter 2/5)
+**Phase 1 — SetupIntent flow + tRPC router** : EN COURS
+
+## TODO transversal
+
+- [ ] Nettoyer les variables d'env Stripe relatives aux pricings (ex. `STRIPE_PRICE_ID_*`, `STRIPE_PRODUCT_*`) qui ne servent plus une fois billing_mode=maison actif.
+
+---
+
+**Phase 0 — Infrastructure Drizzle** : DONE
 
 Ports créés :
 - `apps/api/shared/ports/billing.ts` — BillingPort interface
@@ -27,10 +35,10 @@ Schema Drizzle :
 | Iter | État | Description |
 |------|------|-------------|
 | 1 | ✅ DONE (6fad058b) | 9 tables finales dans schema.pg.ts |
-| 2 | 🔄 EN COURS | migrations 0005 (auto) + 0006 (custom extras) + CLAUDE.md |
-| 3 | TODO | Domain types `apps/api/modules/billing/domain/` |
-| 4 | TODO | BillingPort + BillingAdapter : ajouter retrievePaymentIntent() |
-| 5 | TODO | Bilan Phase 0 — Linear OPE-308 |
+| 2 | ✅ DONE (f075749b) | migrations 0005 (auto) + 0006 (custom extras) + CLAUDE.md |
+| 3 | ✅ DONE (5a894e14) | Domain types `apps/api/modules/billing/domain/` |
+| 4 | ✅ DONE (f3612657) | BillingPort + BillingAdapter : retrievePaymentIntent() |
+| 5 | ✅ DONE | Bilan Phase 0 posté sur OPE-308 |
 
 ## Log d'itérations
 
@@ -46,9 +54,15 @@ Schema Drizzle :
 - Migration custom `0006_billing-maison-extras.sql` (partial indexes, CHECK, self-ref FK)
 - CLAUDE.md : règle "deux migrations" documentée
 
-## Prochaine cible
+## Prochaine cible (Phase 1)
 
-**Iter 3** : créer `apps/api/modules/billing/domain/` avec plan.ts, billing-cycle.ts, subscription-maison.ts
+1. tRPC billing router (`apps/api/modules/billing/interface/trpc/billing.router.ts`)
+2. SetupIntent flow + feature flag `billing_mode`
+3. Front Stripe Elements
+
+**Tests prioritaires à livrer (Vitest)** : tous les cas de changement de plan —
+upgrade/downgrade starter↔pro↔enterprise, passage monthly↔yearly,
+calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Phases futures
 

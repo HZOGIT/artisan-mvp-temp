@@ -58,6 +58,7 @@ import type { VitrineModule } from "../../modules/vitrine/vitrine.module";
 import type { ClientPortalModule } from "../../modules/client-portal/client-portal.module";
 import type { IntegrationsComptablesModule } from "../../modules/integrations-comptables/integrations-comptables.module";
 import type { DevisIAModule } from "../../modules/devis-ia/devis-ia.module";
+import type { BillingModule } from "../../modules/billing/billing.module";
 
 export interface AppRouterDeps {
   readonly vehiculeRepo: IVehiculeRepository;
@@ -119,6 +120,7 @@ export interface AppRouterDeps {
   readonly clientPortal: ClientPortalModule;
   readonly integrationsComptables: IntegrationsComptablesModule;
   readonly devisIA: DevisIAModule;
+  readonly billing: BillingModule;
 }
 
 /*
@@ -192,6 +194,7 @@ export function createAppRouter(deps: AppRouterDeps) {
     clientPortal: deps.clientPortal.router,
     integrationsComptables: deps.integrationsComptables.router,
     devisIA: deps.devisIA.router,
+    billing: deps.billing.router,
   });
 }
 
