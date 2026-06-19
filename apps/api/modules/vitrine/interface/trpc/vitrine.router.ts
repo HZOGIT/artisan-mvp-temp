@@ -45,14 +45,28 @@ export interface VitrineRouterDeps extends SubmitContactDeps, LeadsAdminDeps {
 export function createVitrineRouter(deps: VitrineRouterDeps) {
   return router({
     getBySlug: publicProcedure.input(z.object({ slug: z.string().min(1) })).query(({ input }) => getBySlug(deps.reader, input.slug)),
-    submitContact: publicProcedure.input(submitSchema).mutation(({ ctx, input }) => submitContact(deps, input, ctx.clientIp)),
+    submitContact: publicProcedure.input(submitSchema).mutation(async ({ ctx, input }) => {
+      const result = await submitContact(deps, input, ctx.clientIp);
+      /** slug identifie l'artisan cible — KPI : nombre de leads par vitrine. Aucune donnée PII loggée. */
+      ctx.log.info({ event: "vitrine_contact_soumis", slug: input.slug, hasPhone: input.telephone != null }, "Formulaire contact vitrine soumis");
+      return result;
+    }),
     getDemandesContact: protectedProcedure.query(({ ctx }) => getDemandesContact(deps, ctx.tenant)),
     updateDemandeContactStatut: protectedProcedure
       .input(z.object({ id: z.number().int().positive(), statut: statutEnum }))
-      .mutation(({ ctx, input }) => updateDemandeContactStatut(deps, ctx.tenant, input.id, input.statut)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await updateDemandeContactStatut(deps, ctx.tenant, input.id, input.statut);
+        const level = input.statut === "perdu" ? "warn" : "info";
+        ctx.log[level]({ event: "vitrine_lead_statut_changed", demandeId: input.id, newStatut: input.statut }, `Lead vitrine → ${input.statut}`);
+        return result;
+      }),
     convertirDemandeEnClient: protectedProcedure
       .input(z.object({ id: z.number().int().positive() }))
-      .mutation(({ ctx, input }) => convertirDemandeEnClient(deps, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await convertirDemandeEnClient(deps, ctx.tenant, input.id);
+        ctx.log.info({ event: "vitrine_lead_converti", demandeId: input.id }, "Lead vitrine converti en client");
+        return result;
+      }),
     /*
      * Réglages vitrine (ADMIN, scopé tenant). Lecture + mise à jour partielle des colonnes
      * `vitrine*` de `parametres_artisan`. Consommé par la section « Ma page vitrine » de `/v2/parametres`.
@@ -60,6 +74,11 @@ export function createVitrineRouter(deps: VitrineRouterDeps) {
     getSettings: protectedProcedure.query(({ ctx }) => getVitrineSettings(deps.settings, ctx.tenant)),
     updateSettings: protectedProcedure
       .input(settingsSchema)
-      .mutation(({ ctx, input }) => updateVitrineSettings(deps.settings, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await updateVitrineSettings(deps.settings, ctx.tenant, input);
+        const level = input.vitrineActive === false ? "warn" : "info";
+        ctx.log[level]({ event: "vitrine_settings_updated", vitrineActive: input.vitrineActive ?? null }, "Réglages vitrine mis à jour");
+        return result;
+      }),
   });
 }
