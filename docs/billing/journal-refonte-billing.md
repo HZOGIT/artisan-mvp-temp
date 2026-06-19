@@ -73,6 +73,15 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 11 — 2026-06-19
+**Cible :** L1 — gaps confirmPaymentMethod sans sub + getBillingInfo plan_id inconnu + fix bug stale return
+**Bug découvert :** `confirmPaymentMethod` retournait `pm` avec `is_default=false` stale même quand `setAsDefault=true` (savePaymentMethod insère avec is_default=false, puis setDefaultPaymentMethod met à jour le DB, mais l'objet `pm` n'était pas rafraîchi). Fix dans `billing-use-cases.ts` : `return { paymentMethod: params.setAsDefault ? { ...pm, is_default: true } : pm }`.
+**Cas ajoutés (2) :**
+- `confirmPaymentMethod setAsDefault=true` sans subscription → PM promu default, chemin `if(sub)=false` no-op sans crash (onboarding sans sub créée)
+- `getBillingInfo` plan_id inconnu → `plan=undefined` (résilience aux données corrompues / plans dépréciés)
+**Résultat :** 31/31 ✅ (L1 sans DB)
+**Total billing :** 89 tests (87 → 89)
+
 ### Itération 10 — 2026-06-19
 **Cible :** L2 Drizzle — gaps onConflictDoUpdate, append-only events, ordering DB réel
 **Cas ajoutés (3) :**

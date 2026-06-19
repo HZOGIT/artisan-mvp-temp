@@ -93,6 +93,20 @@ describe("confirmPaymentMethod", () => {
     expect(sub?.payment_method_id).toBe(result.paymentMethod.id);
   });
 
+  it("setAsDefault=true sans subscription — PM promu default, pas de crash sur if(sub)", async () => {
+    // Scénario : artisan en période d'essai sans sub encore créée (onboarding).
+    // setAsDefault doit promouvoir la carte sans tenter de mettre à jour une sub inexistante.
+    const deps = makeDeps();
+    const result = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_nosub",
+      stripeCustomerId: "cus_test",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+    expect(result.paymentMethod.is_default).toBe(true);
+    expect(await deps.repo.findSubscription(A)).toBeNull();
+  });
+
   it("setAsDefault=true remplace l'ancien PM de la sub (rotation de carte)", async () => {
     // Un artisan enregistre une 1ère carte (default), puis en ajoute une 2ème (nouvelle default).
     // La sub doit pointer vers la 2ème carte après la rotation.
@@ -283,6 +297,20 @@ describe("getBillingInfo", () => {
     await deps.repo.saveSubscription({ artisanId: A.artisanId, planId: "pro", billingMode: "maison", status: "active", currentPeriodStart: null, currentPeriodEnd: null, trialEndsAt: null, paymentMethodId: null });
     const info = await getBillingInfo(deps, A);
     expect(info.plan?.id).toBe("pro");
+  });
+
+  it("plan=undefined si plan_id inconnu (donnée corrompue) — getBillingInfo reste robuste", async () => {
+    // Si la DB contient un plan_id qui n'existe plus dans le catalogue, planById() retourne
+    // undefined. getBillingInfo ne doit pas crasher — il expose plan=undefined à l'UI.
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "plan_supprimé_xyz", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const info = await getBillingInfo(deps, A);
+    expect(info.subscription).not.toBeNull();
+    expect(info.plan).toBeUndefined();
   });
 
   it("isolation cross-tenant — artisan B ne voit pas les données de A", async () => {

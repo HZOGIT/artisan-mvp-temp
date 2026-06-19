@@ -88,7 +88,8 @@ export async function confirmPaymentMethod(
     actor: `user:${ctx.userId}`,
   });
 
-  return { paymentMethod: pm };
+  // Reflect the is_default update in the returned object (savePaymentMethod inserts with is_default=false).
+  return { paymentMethod: params.setAsDefault ? { ...pm, is_default: true } : pm };
 }
 
 // ── Révocation d'une carte ────────────────────────────────────────────────────
