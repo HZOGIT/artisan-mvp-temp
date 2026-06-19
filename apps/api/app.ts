@@ -149,6 +149,8 @@ import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
 import { registerBillingSchedulerRoute } from "./interface/http/billing-scheduler-route";
 import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
+import fastifySchedule from "@fastify/schedule";
+import { billingCronPlugin } from "./shared/infra/billing-cron";
 import { SubscriptionWebhookWriterDrizzle } from "./modules/subscription/infra/subscription-webhook-writer-drizzle";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -379,6 +381,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const emailAdapter = deps.emailPort ?? new ResendEmailAdapter(app.log as unknown as AppLogger);
 
   app.register(cookie);
+  app.register(fastifySchedule);
   app.register(cors, {
     origin: process.env.CORS_ORIGIN ?? process.env.APP_URL ?? false,
     credentials: true,
@@ -959,6 +962,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repo: billingRepo,
     billing: new BillingAdapter(),
     secret: process.env.SCHEDULER_SECRET ?? "",
+  });
+
+  /** Cron billing maison — tick toutes les heures, lock pg_advisory pour éviter les doublons multi-réplica. */
+  app.register(billingCronPlugin, {
+    schedulerDeps: { repo: billingRepo, billing: new BillingAdapter() },
+    db: getDbHandle().db,
   });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
