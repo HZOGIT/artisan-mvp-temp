@@ -199,6 +199,10 @@ describe("isCancelable", () => {
     expect(isCancelable(baseSub({ status: "past_due" }))).toBe(true);
   });
 
+  it("true si trialing — annuler un essai est autorisé", () => {
+    expect(isCancelable(baseSub({ status: "trialing" }))).toBe(true);
+  });
+
   it("false si déjà canceled", () => {
     expect(isCancelable(baseSub({ status: "canceled" }))).toBe(false);
   });
@@ -227,5 +231,12 @@ describe("nextCycleAmount", () => {
 
   it("montant du plan si past_due (paiement en retard — scheduler doit retenter, pas annuler)", () => {
     expect(nextCycleAmount(baseSub({ status: "past_due" }), pro, "monthly")).toBe(pro.amountCentsByInterval.monthly);
+  });
+
+  it("montant du plan si canceled (pas de cas spécial — le scheduler doit garder canceled avant d'appeler)", () => {
+    // nextCycleAmount ne connaît pas la notion de sub annulée : il retourne le montant du plan.
+    // Le scheduler ne doit jamais appeler cette fonction pour une sub canceled.
+    // Ce test documente le comportement attendu et protège contre l'ajout accidentel d'un guard.
+    expect(nextCycleAmount(baseSub({ status: "canceled" }), pro, "monthly")).toBe(pro.amountCentsByInterval.monthly);
   });
 });

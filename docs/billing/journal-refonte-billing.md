@@ -73,6 +73,15 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 15 — 2026-06-19
+**Cible :** Domaine (2 cas) + L2 (1 cas)
+**Cas ajoutés (3) :**
+- Domaine : `isCancelable(trialing)` → true — annuler un essai est autorisé (seuls active/past_due étaient testés, trialing oublié)
+- Domaine : `nextCycleAmount(canceled)` → plan amount — pas de cas spécial pour canceled ; le scheduler ne doit jamais appeler cette fonction pour une sub canceled (documenté pour la Phase 2)
+- L2 : `findPendingCycle` avec 2 cycles pending → retourne le plus récent (orderBy period_start DESC limit 1) — cas de backfill ou bug scheduler avec cycles dupliqués
+**Résultat :** Domaine 34/34 ✅ · L2 22/22 ✅
+**Total billing :** 97 tests (94 → 97)
+
 ### Itération 14 — 2026-06-19
 **Cible :** L1 — comportement de revokePaymentMethod vis-à-vis de la subscription
 **Cas ajoutés (2) :**

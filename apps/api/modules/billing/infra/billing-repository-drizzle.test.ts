@@ -218,6 +218,38 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(found?.id).toBe(cycle.id);
   });
 
+  it("findPendingCycle : plusieurs cycles pending → retourne le plus récent (orderBy period_start DESC)", async () => {
+    // Si deux cycles pending existent pour la même sub (ex. backfill ou bug de scheduler),
+    // findPendingCycle retourne le plus récent. Documente le comportement de tri.
+    const sub = await repo.saveSubscription({
+      artisanId: A,
+      planId: "starter",
+      billingMode: "maison",
+      status: "trialing",
+      currentPeriodStart: new Date("2026-09-01"),
+      currentPeriodEnd: new Date("2026-10-01"),
+      trialEndsAt: null,
+      paymentMethodId: null,
+    });
+    const older = await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-09-01"),
+      periodEnd: new Date("2026-10-01"),
+      amountCents: 2900,
+      currency: "eur",
+    });
+    const newer = await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-10-01"),
+      periodEnd: new Date("2026-11-01"),
+      amountCents: 2900,
+      currency: "eur",
+    });
+    const found = await repo.findPendingCycle(sub.id);
+    expect(found?.id).toBe(newer.id);
+    expect(found?.id).not.toBe(older.id);
+  });
+
   it("findPendingCycle : null si aucun cycle pending (status paid)", async () => {
     const sub = await repo.saveSubscription({
       artisanId: B,
