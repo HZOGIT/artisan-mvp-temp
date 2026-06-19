@@ -167,9 +167,81 @@ async function casBillingMutations() {
   }
 }
 
+// ── CAS 5 — billing.changePlan persiste en DB (skip si aucune subscription) ──────────────────────────
+// Anti-régression : vérifie que changePlan met bien à jour plan_id dans billing_subscriptions.
+// Restaure le plan initial en fin de test pour ne pas polluer l'état du compte e2e.
+async function casBillingChangePlan() {
+  casesRun++;
+  const tag = 'billing.changePlan-persist';
+  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+  try {
+    const info = await trpcGet('billing.getBillingInfo', null);
+    if (!info?.subscription) { issues.push({ tag, skipped: 'aucune subscription active sur le compte e2e' }); return; }
+    const originalPlan = info.subscription.plan_id;
+    const target = originalPlan === 'starter' ? 'pro' : 'starter';
+
+    const r = await trpcPost('billing.changePlan', { planId: target });
+    if (!r.ok()) { issues.push({ tag, step: 'changePlan', error: `HTTP ${r.status()}` }); return; }
+
+    const after = await trpcGet('billing.getBillingInfo', null);
+    if (after?.subscription?.plan_id !== target) {
+      issues.push({ tag, step: 'persist', expected: target, got: after?.subscription?.plan_id });
+    }
+
+    // Restaure le plan initial
+    await trpcPost('billing.changePlan', { planId: originalPlan });
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  }
+}
+
+// ── CAS 6 — cancelAtPeriodEnd + reactivate round-trip (skip si aucune subscription) ─────────────────
+// Anti-régression : vérifie que cancel_at est positionné puis effacé. Les 2 mutations sont testées
+// ensemble pour restaurer l'état (ne pas laisser le compte e2e en état "en attente d'annulation").
+async function casBillingCancelReactivate() {
+  casesRun++;
+  const tag = 'billing.cancelAtPeriodEnd+reactivate';
+  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+  try {
+    const info = await trpcGet('billing.getBillingInfo', null);
+    if (!info?.subscription) { issues.push({ tag, skipped: 'aucune subscription active sur le compte e2e' }); return; }
+
+    // Si déjà annulée, réactive d'abord pour avoir un état propre
+    if (info.subscription.cancel_at !== null) {
+      await trpcPost('billing.reactivate', {});
+    }
+
+    // Cancel
+    const rc = await trpcPost('billing.cancelAtPeriodEnd', {});
+    if (!rc.ok()) { issues.push({ tag, step: 'cancel', error: `HTTP ${rc.status()}` }); return; }
+    const afterCancel = await trpcGet('billing.getBillingInfo', null);
+    if (afterCancel?.subscription?.cancel_at === null) {
+      issues.push({ tag, step: 'cancel-persist', error: 'cancel_at reste null après cancelAtPeriodEnd' });
+    }
+
+    // Reactivate (restaure l'état)
+    const rr = await trpcPost('billing.reactivate', {});
+    if (!rr.ok()) { issues.push({ tag, step: 'reactivate', error: `HTTP ${rr.status()}` }); return; }
+    const afterReactivate = await trpcGet('billing.getBillingInfo', null);
+    if (afterReactivate?.subscription?.cancel_at !== null) {
+      issues.push({ tag, step: 'reactivate-persist', error: 'cancel_at non-null après reactivate' });
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  }
+}
+
 await casBillingGetInfo();
 await casBillingRender();
 await casBillingMutations();
+await casBillingChangePlan();
+await casBillingCancelReactivate();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');

@@ -60,9 +60,16 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 10** — E2E anti-régression : ajouter cas dans `scripts/staging-e2e-mutations.mjs` pour `changePlan`, `cancelAtPeriodEnd`, `reactivate` (actions UI → vérif persistance via refetch).
+**Toutes les phases sont complètes ✅**
 
 ## Log d'itérations
+
+### Itération 10 — 2026-06-19
+**Phase 10 — E2E anti-régression Phase 8+9**
+- CAS 5 `billing.changePlan-persist` : changePlan starter↔pro → plan_id persisté + restauration plan initial
+- CAS 6 `billing.cancelAtPeriodEnd+reactivate` : round-trip complet cancel_at → reactivate (skip gracieux si pas de sub)
+- Skip gracieux si aucune subscription active sur le compte e2e (pas de données de test en dur)
+- Syntaxe JS valide ✅
 
 ### Itération 9 — 2026-06-19
 **Phase 9 — `cancelAtPeriodEnd` + `reactivate` backend + UI**
