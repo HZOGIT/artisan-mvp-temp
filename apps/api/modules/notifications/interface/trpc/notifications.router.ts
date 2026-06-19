@@ -58,6 +58,11 @@ export function createNotificationsRouter(repo: INotificationRepository) {
     /** Logique dérivée : génère les rappels pour les factures impayées en retard (idempotent). */
     generateOverdueReminders: protectedProcedure.mutation(async ({ ctx }) => {
       const { rappelsCreated } = await genererRappelsFacturesEnRetard(repo, ctx.tenant);
+      /** warn si > 0 : indique des factures impayées en retard — KPI santé financière de l'artisan. */
+      ctx.log[rappelsCreated > 0 ? "warn" : "info"](
+        { event: "notifications_overdue_rappels_created", rappelsCreated },
+        rappelsCreated > 0 ? `${rappelsCreated} rappel(s) de factures en retard générés` : "Aucun rappel de retard à générer",
+      );
       return { success: true, rappelsCreated };
     }),
   });
