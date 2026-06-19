@@ -14,9 +14,14 @@ Mis à jour manuellement après chaque itération. Une itération = un commit.
 - [x] **iter A** — Supprimer `// ──` separators dans `billing-use-cases.test.ts` (bloque ESLint pre-commit sur futurs commits test)
 - [x] **iter B** — L1 tests `cancelAtPeriodEnd` + `reactivateSubscription` (3-4 cas, no-op + event + NotFoundError)
 - [x] **iter C** — Phase 10 E2E : ajouter cas `changePlan` / `cancelAtPeriodEnd` / `reactivate` dans `scripts/staging-e2e-mutations.mjs`
-- [ ] **iter D** — CLAUDE.md : section règle `//` interdit → utiliser `/** … */` ; exemples ; quand utiliser des separators
+- [x] **iter D** — CLAUDE.md : section règle `//` interdit → utiliser `/** … */` ; exemples ; quand utiliser des separators (commit 73889434)
 
 ## Log
+
+### iter D — 2026-06-19
+- CLAUDE.md : section "Environnements — déploiement" (env dev = staging, CF Pages = GitHub integration, wrangler secret pour VITE_*)
+- CLAUDE.md : section "Règle commentaires" (// interdit, /** … */ à la place, exemples)
+- Commité dans 73889434
 
 ### iter C — 2026-06-19
 - CAS 5 `billing.changePlan-persist` : change plan starter↔pro → plan_id refetch + restaure le plan initial
