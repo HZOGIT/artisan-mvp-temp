@@ -27,13 +27,18 @@ export function registerPortailFacturePdfRoute(app: FastifyInstance, deps: Porta
 
     try {
       const { buffer, filename } = await getPortalFacturePdf(deps, token, id);
+      req.log.info({ event: "portail_facture_pdf_viewed", factureId: id }, "PDF facture portail consulté par le client");
       return reply
         .header("Content-Type", "application/pdf")
         .header("Content-Disposition", `inline; filename="${filename}"`)
         .send(buffer);
     } catch (e) {
-      if (e instanceof ForbiddenError) return reply.code(403).send({ error: e.message });
+      if (e instanceof ForbiddenError) {
+        req.log.warn({ event: "portail_pdf_forbidden", factureId: id }, "Token portail invalide — accès refusé au PDF facture");
+        return reply.code(403).send({ error: e.message });
+      }
       if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
+      req.log.error({ event: "portail_pdf_error", document: "facture", factureId: id, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération PDF facture portail");
       return reply.code(500).send({ error: "Erreur lors de la génération du PDF" });
     }
   });

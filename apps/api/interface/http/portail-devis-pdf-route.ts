@@ -27,13 +27,18 @@ export function registerPortailDevisPdfRoute(app: FastifyInstance, deps: Portail
 
     try {
       const { buffer, filename } = await getPortalDevisPdf(deps, token, id);
+      req.log.info({ event: "portail_devis_pdf_viewed", devisId: id }, "PDF devis portail consulté par le client");
       return reply
         .header("Content-Type", "application/pdf")
         .header("Content-Disposition", `inline; filename="${filename}"`)
         .send(buffer);
     } catch (e) {
-      if (e instanceof ForbiddenError) return reply.code(403).send({ error: e.message });
+      if (e instanceof ForbiddenError) {
+        req.log.warn({ event: "portail_pdf_forbidden", devisId: id }, "Token portail invalide — accès refusé au PDF devis");
+        return reply.code(403).send({ error: e.message });
+      }
       if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
+      req.log.error({ event: "portail_pdf_error", document: "devis", devisId: id, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération PDF devis portail");
       return reply.code(500).send({ error: "Erreur lors de la génération du PDF" });
     }
   });
