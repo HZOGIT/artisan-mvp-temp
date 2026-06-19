@@ -60,9 +60,18 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 6** — Tests e2e anti-régression dans `scripts/staging-e2e-mutations.mjs` : vérifier que `BillingMaisonSection` se charge (getBillingInfo 200), que le bouton "Ajouter une carte" ouvre le dialog, et que `revokePaymentMethod` / `setDefaultPaymentMethod` persistent en DB (avec une PM pré-insérée pour l'artisan e2e).
+**Phase 7 (COMPLÈTE)** — Toutes les phases 1–6 sont livrées. Prochaine action : déployer sur staging (`./scripts/deploy-staging-newstack.sh` + `./scripts/deploy-staging-pages.sh`) et vérifier le sweep e2e (`./scripts/pw-run.sh scripts/staging-e2e-mutations.mjs E2E_PASS='…'`). Si `issues: 0`, la billing UI maison est considérée terminée.
 
 ## Log d'itérations
+
+### Itération 6 — 2026-06-19
+**Phase 6 — Tests e2e anti-régression**
+- `scripts/staging-e2e-mutations.mjs` : 3 cas ajoutés
+  - CAS 2 `billing.getBillingInfo-shape` : shape API (paymentMethods + recentInvoices arrays) — empêche rendu silencieux cassé
+  - CAS 3 `billing.section-render+dialog` : page `/parametres?tab=abonnement` sans pageerror + bouton "Ajouter" visible + clic → dialog ouvert
+  - CAS 4 `billing.mutations-persist` : setDefaultPaymentMethod + revokePaymentMethod vérifiés via refetch (skip gracieux si 0 PM ; revoke seulement si ≥ 2 PM pour garder au moins 1 carte)
+- Gate : syntaxe JS valide (pas de gate TS pour fichier .mjs)
+- Exception scope billing UI autorisée (Phase 6 = scripts/staging-e2e-mutations.mjs)
 
 ### Itération 5 — 2026-06-19
 **Phase 5 — Intégration dans la page**

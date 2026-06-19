@@ -59,6 +59,117 @@ async function casDevisStatut() {
 }
 
 await casDevisStatut();
+
+// ── CAS 2 — billing.getBillingInfo : shape valide (BillingMaisonSection peut se rendre) ──────────
+// Anti-régression : si getBillingInfo renvoie une shape cassée, BillingMaisonSection plante en silencieux.
+async function casBillingGetInfo() {
+  casesRun++;
+  const tag = 'billing.getBillingInfo-shape';
+  try {
+    const data = await trpcGet('billing.getBillingInfo', null);
+    if (!Array.isArray(data?.paymentMethods)) {
+      issues.push({ tag, error: 'paymentMethods absent ou non-array', got: JSON.stringify(data)?.slice(0, 200) });
+      return;
+    }
+    if (!Array.isArray(data?.recentInvoices)) {
+      issues.push({ tag, error: 'recentInvoices absent ou non-array', got: JSON.stringify(data)?.slice(0, 200) });
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  }
+}
+
+// ── CAS 3 — Page /parametres?tab=abonnement : section billing visible + dialog "Ajouter" s'ouvre ──
+// Anti-régression : vérifie que BillingMaisonSection est monté et que le bouton "Ajouter" ouvre bien
+// AddCardDialog (bug possible : dialog ne s'ouvre pas si state addCardOpen mal propagé).
+async function casBillingRender() {
+  casesRun++;
+  const tag = 'billing.section-render+dialog';
+  const page = await ctx.newPage();
+  const consoleErrors = [];
+  page.on('pageerror', (e) => consoleErrors.push(String(e).slice(0, 200)));
+  page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 200)); });
+  try {
+    await page.goto('/parametres?tab=abonnement', { waitUntil: 'networkidle' });
+    const btn = page.getByRole('button', { name: /Ajouter/i }).first();
+    const btnVisible = await btn.isVisible({ timeout: 4000 }).catch(() => false);
+    if (!btnVisible) {
+      issues.push({ tag, error: 'Bouton "Ajouter" non visible sur /parametres?tab=abonnement', consoleErrors });
+      return;
+    }
+    await btn.click();
+    await page.waitForTimeout(700);
+    const dialog = page.getByRole('dialog');
+    const dialogVisible = await dialog.isVisible({ timeout: 2000 }).catch(() => false);
+    if (!dialogVisible) {
+      issues.push({ tag, error: 'Dialog "Ajouter une carte" non ouvert après clic', consoleErrors });
+      return;
+    }
+    if (consoleErrors.length > 0) {
+      issues.push({ tag, warning: 'erreurs console/page', consoleErrors });
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  } finally {
+    await page.close();
+  }
+}
+
+// ── CAS 4 — setDefaultPaymentMethod + revokePaymentMethod persistent en DB (skip si 0 PM) ─────────
+// Anti-régression : vérifie que les mutations billing non-Stripe (setDefault, revoke) écrivent bien
+// en DB et sont reflétées dans un refetch getBillingInfo.
+// Revoke : seulement si >= 2 PM (ne pas laisser le compte sans carte).
+async function casBillingMutations() {
+  casesRun++;
+  const tag = 'billing.mutations-persist';
+  const trpcPost = async (proc, input) => ctx.request.post(`/api/trpc/${proc}?batch=1`, {
+    headers: { 'content-type': 'application/json' },
+    data: { '0': { json: input } },
+  });
+  try {
+    const info = await trpcGet('billing.getBillingInfo', null);
+    const pms = info?.paymentMethods ?? [];
+    if (pms.length === 0) { issues.push({ tag, skipped: 'aucune PM disponible pour le compte e2e' }); return; }
+
+    // setDefault : PM non-default → doit devenir is_default=true après refetch
+    const nonDefault = pms.find((p) => !p.is_default);
+    if (nonDefault) {
+      const r = await trpcPost('billing.setDefaultPaymentMethod', { paymentMethodId: nonDefault.id });
+      if (!r.ok()) {
+        issues.push({ tag, step: 'setDefault', error: `HTTP ${r.status()}`, pmId: nonDefault.id });
+      } else {
+        const after = await trpcGet('billing.getBillingInfo', null);
+        const updated = (after?.paymentMethods ?? []).find((p) => p.id === nonDefault.id);
+        if (!updated?.is_default) {
+          issues.push({ tag, step: 'setDefault-persist', pmId: nonDefault.id, got: updated?.is_default });
+        }
+      }
+    }
+
+    // revoke : PM non-default uniquement, seulement si >= 2 PM (garder au moins 1 carte)
+    const info2 = await trpcGet('billing.getBillingInfo', null);
+    const pms2 = info2?.paymentMethods ?? [];
+    const toRevoke = pms2.length >= 2 ? pms2.find((p) => !p.is_default) : null;
+    if (toRevoke) {
+      const r = await trpcPost('billing.revokePaymentMethod', { paymentMethodId: toRevoke.id });
+      if (!r.ok()) {
+        issues.push({ tag, step: 'revoke', error: `HTTP ${r.status()}`, pmId: toRevoke.id });
+      } else {
+        const after = await trpcGet('billing.getBillingInfo', null);
+        const stillExists = (after?.paymentMethods ?? []).some((p) => p.id === toRevoke.id);
+        if (stillExists) {
+          issues.push({ tag, step: 'revoke-persist', pmId: toRevoke.id, error: 'PM encore présente après revoke' });
+        }
+      }
+    }
+  } catch (e) {
+    issues.push({ tag, error: String(e).slice(0, 200) });
+  }
+}
+
+await casBillingGetInfo();
+await casBillingRender();
+await casBillingMutations();
 // ── (Ajouter ici les cas factures/contrats et tout futur bug d'intégration front↔tRPC) ─────────────
 
 console.log('=== E2E MUTATIONS RESULT ===');
