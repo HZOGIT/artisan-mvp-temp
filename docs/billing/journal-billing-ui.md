@@ -60,9 +60,16 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 5** — Intégration dans la page : ajouter bouton "Ajouter une carte" dans `billing-maison-section.tsx` + `AddCardDialog`, puis wire `BillingMaisonSection` dans `parametres-page.tsx`
+**Phase 6** — Tests e2e anti-régression dans `scripts/staging-e2e-mutations.mjs` : vérifier que `BillingMaisonSection` se charge (getBillingInfo 200), que le bouton "Ajouter une carte" ouvre le dialog, et que `revokePaymentMethod` / `setDefaultPaymentMethod` persistent en DB (avec une PM pré-insérée pour l'artisan e2e).
 
 ## Log d'itérations
+
+### Itération 5 — 2026-06-19
+**Phase 5 — Intégration dans la page**
+- `billing-maison-section.tsx` : bouton "Ajouter une carte" (icône `Plus`) ajouté dans le `CardHeader` de `PaymentMethodsCard` ; prop `onAddCard` transmise depuis `BillingMaisonSection` ; state `addCardOpen` + `<AddCardDialog>` intégrés
+- `abonnement-section.tsx` : import `BillingMaisonSection` + rendu à la fin de la section (après le `</Dialog>` de résiliation)
+- Gate TypeScript : ✅ 0 erreur sur nos fichiers
+- `parametres-page.tsx` hors scope — passage par `abonnement-section.tsx` (même résultat, dans le périmètre autorisé)
 
 ### Itération 4 — 2026-06-19
 **Phase 4 — Ajout de carte (Stripe Elements)**
