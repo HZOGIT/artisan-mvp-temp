@@ -42,6 +42,20 @@ export interface ContextDeps {
   readonly permissionsReader?: PermissionsReader;
 }
 
+/** `info@gmail.com` → `i**o@g**l.com` — premier + étoiles + dernier char de chaque partie. */
+function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at < 0) return "***";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const dot = domain.lastIndexOf(".");
+  const domainName = dot > 0 ? domain.slice(0, dot) : domain;
+  const tld = dot > 0 ? domain.slice(dot) : "";
+  const mask = (s: string): string =>
+    s.length <= 2 ? `${s[0] ?? ""}*` : `${s[0]}${"*".repeat(s.length - 2)}${s[s.length - 1]}`;
+  return `${mask(local)}@${mask(domainName)}${tld}`;
+}
+
 export function makeCreateContext(deps: ContextDeps = {}) {
   const secret = deps.jwtSecret ?? process.env.JWT_SECRET ?? "";
   return async function createContext(opts: { req: FastifyRequest; res: FastifyReply }): Promise<AppContext> {
@@ -61,10 +75,20 @@ export function makeCreateContext(deps: ContextDeps = {}) {
     const headers = (opts.req.headers ?? {}) as Record<string, unknown>;
     const clientIp = extractClientIp(headers, opts.req.ip ?? null);
     const userAgent = extractUserAgent(headers);
-    /** Bind userId + artisanId so every ctx.log call porte l'identité sans la passer manuellement. */
+    /**
+     * Child logger avec userId + email masqué + artisanId bindés — tous les ctx.log et req.log
+     * (onResponse inclus) porteront l'identité automatiquement sans la passer manuellement.
+     */
     const log = claims
-      ? opts.req.log.child({ userId: claims.userId, ...(tenant ? { artisanId: tenant.artisanId } : {}) })
+      ? opts.req.log.child({
+          userId: claims.userId,
+          userEmail: maskEmail(claims.email),
+          ...(tenant ? { artisanId: tenant.artisanId } : {}),
+        })
       : opts.req.log;
+    if (log !== opts.req.log) {
+      (opts.req as unknown as { log: FastifyBaseLogger }).log = log;
+    }
     return { claims, tenant, role, permissions, res: opts.res, log, clientIp, userAgent };
   };
 }
