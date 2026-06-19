@@ -73,6 +73,15 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 5 — 2026-06-19
+**Cible :** L2 — branche legacy de `findStripeCustomerId` (fallback `subscriptions` table)
+**Motivation :** `createSetupIntent` utilise ce fallback pour ne pas créer de doublon Stripe customer lors de la migration billing Stripe → maison. Seule la branche PM maison était testée.
+**Cas ajoutés (2) :**
+- `findStripeCustomerId fallback legacy` : artisan sans PM maison mais avec `subscriptions.stripe_customer_id` → retourne le customer legacy
+- `findStripeCustomerId PM maison prioritaire` : si PM maison ET subscription legacy coexistent, le PM maison gagne (priorité 1 documentée dans le repo)
+**Résultat :** 15/15 ✅ (L2 PG)
+**État des priorités :** P1 ✅ P2 ✅ P3 ✅ P4 (Phase 2 inexistante) P5 partiellement bloquée (createSetupIntent/confirmPaymentMethod → BillingAdapter, nécessite billingPort override dans AppDeps ou clé Stripe). Prochaine itération utile = Phase 2 scheduler.
+
 ### Itération 4 — 2026-06-19
 **Cible :** L3 router — chemins positifs (procédures repo-only) + fix régression auth
 **Bug découvert :** Le `beforeAll` billing L3 n'insérait pas dans la table `artisans`.

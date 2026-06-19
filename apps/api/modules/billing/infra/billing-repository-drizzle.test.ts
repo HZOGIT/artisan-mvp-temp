@@ -292,6 +292,48 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(await repo.findStripeCustomerId(99999)).toBeNull();
   });
 
+  it("findStripeCustomerId : fallback table subscriptions legacy (migration billing Stripe → maison)", async () => {
+    // Artisan C : aucun billing_payment_methods, mais a un stripe_customer_id dans la table legacy.
+    // createSetupIntent l'utilise pour éviter de créer un doublon Stripe customer.
+    const C = 997903;
+    await admin.query(
+      "insert into subscriptions (artisan_id, stripe_customer_id) values ($1,$2) on conflict (artisan_id) do update set stripe_customer_id=$2",
+      [C, "cus_legacy_fallback"],
+    );
+    try {
+      expect(await repo.findStripeCustomerId(C)).toBe("cus_legacy_fallback");
+    } finally {
+      await admin.query("delete from subscriptions where artisan_id=$1", [C]);
+    }
+  });
+
+  it("findStripeCustomerId : PM maison prioritaire sur subscription legacy (même artisan)", async () => {
+    // Si un artisan a à la fois un PM maison et une subscription legacy avec des customer IDs
+    // différents, c'est le PM maison qui gagne (priorité 1).
+    const C = 997903;
+    await admin.query(
+      "insert into subscriptions (artisan_id, stripe_customer_id) values ($1,$2) on conflict (artisan_id) do update set stripe_customer_id=$2",
+      [C, "cus_legacy_should_be_ignored"],
+    );
+    try {
+      // Insérer un PM maison pour C avec un customer ID différent
+      await repo.savePaymentMethod({
+        artisanId: C,
+        stripeCustomerId: "cus_maison_wins",
+        stripePaymentMethodId: "pm_priority_test",
+        brand: "visa",
+        last4: "0000",
+        expMonth: 1,
+        expYear: 2032,
+        consentedAt: new Date(),
+      });
+      expect(await repo.findStripeCustomerId(C)).toBe("cus_maison_wins");
+    } finally {
+      await admin.query("delete from billing_payment_methods where artisan_id=$1", [C]);
+      await admin.query("delete from subscriptions where artisan_id=$1", [C]);
+    }
+  });
+
   // ── Événements (append-only) ──────────────────────────────────────────────
 
   it("appendEvent persiste et est retrouvable", async () => {
