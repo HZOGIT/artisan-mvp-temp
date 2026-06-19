@@ -29,6 +29,13 @@
       "when": 1781843848952,
       "tag": "0003_rls-tenant-isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781844661100,
+      "tag": "0004_rls-public-token",
+      "breakpoints": true
     }
   ]
 }
