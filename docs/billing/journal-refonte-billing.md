@@ -73,6 +73,15 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 12 — 2026-06-19
+**Cible :** L2 + L3 — findDefaultPaymentMethod après revoke + Zod setAsDefault non-boolean
+**Cas ajoutés (1 test L2 + 2 assertions L3) :**
+- L2 : `revokePaymentMethod sur carte default → findDefaultPaymentMethod retourne null` — documente que `revokePaymentMethod` pose `is_default=false`, garantissant que `findDefaultPaymentMethod` retourne null même si la query Drizzle ne filtre pas `revoked_at IS NULL` (inconsistance fake vs Drizzle documentée en commentaire)
+- L3 : `setAsDefault: "oui"` → 400 (Zod `.boolean()` rejette les strings)
+- L3 : `setAsDefault: 1` → 400 (Zod `.boolean()` rejette les numbers)
+**Résultat :** L2 19/19 ✅ · L3 8/8 ✅
+**Total billing :** 90 tests (89 → 90)
+
 ### Itération 11 — 2026-06-19
 **Cible :** L1 — gaps confirmPaymentMethod sans sub + getBillingInfo plan_id inconnu + fix bug stale return
 **Bug découvert :** `confirmPaymentMethod` retournait `pm` avec `is_default=false` stale même quand `setAsDefault=true` (savePaymentMethod insère avec is_default=false, puis setDefaultPaymentMethod met à jour le DB, mais l'objet `pm` n'était pas rafraîchi). Fix dans `billing-use-cases.ts` : `return { paymentMethod: params.setAsDefault ? { ...pm, is_default: true } : pm }`.

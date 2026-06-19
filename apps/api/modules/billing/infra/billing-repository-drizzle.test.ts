@@ -108,6 +108,28 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(list.some((p) => p.id === pm.id)).toBe(false);
   });
 
+  it("revokePaymentMethod sur la carte default → findDefaultPaymentMethod retourne null", async () => {
+    // revokePaymentMethod pose is_default=false (en plus de revoked_at).
+    // findDefaultPaymentMethod filtre is_default=true → null après révocation.
+    // Note : le fake BillingRepository filtre aussi revoked_at IS NULL ; le vrai Drizzle
+    // ne filtre que is_default=true. Les deux convergent parce que revoke pose is_default=false.
+    const pm = await repo.savePaymentMethod({
+      artisanId: B,
+      stripeCustomerId: "cus_def_revoke",
+      stripePaymentMethodId: "pm_def_revoke",
+      brand: "visa",
+      last4: "8888",
+      expMonth: 6,
+      expYear: 2030,
+      consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod(ctx(B), pm.id);
+    expect((await repo.findDefaultPaymentMethod(ctx(B)))?.id).toBe(pm.id);
+
+    await repo.revokePaymentMethod(ctx(B), pm.id);
+    expect(await repo.findDefaultPaymentMethod(ctx(B))).toBeNull();
+  });
+
   it("findPaymentMethodById : A peut lire sa carte, B ne la voit pas", async () => {
     const pm = await repo.savePaymentMethod({
       artisanId: A,

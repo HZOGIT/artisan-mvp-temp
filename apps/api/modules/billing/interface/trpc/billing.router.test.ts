@@ -106,6 +106,9 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     // stripePaymentMethodId et stripeCustomerId doivent être non-vides (min(1))
     expect((await injectTrpc(app, "POST", "billing.confirmPaymentMethod", { stripePaymentMethodId: "", stripeCustomerId: "cus_x", setAsDefault: true }, tok)).statusCode).toBe(400);
     expect((await injectTrpc(app, "POST", "billing.confirmPaymentMethod", { stripePaymentMethodId: "pm_x", stripeCustomerId: "", setAsDefault: true }, tok)).statusCode).toBe(400);
+    // setAsDefault doit être un booléen strict — un string ou un number est rejeté
+    expect((await injectTrpc(app, "POST", "billing.confirmPaymentMethod", { stripePaymentMethodId: "pm_x", stripeCustomerId: "cus_x", setAsDefault: "oui" }, tok)).statusCode).toBe(400);
+    expect((await injectTrpc(app, "POST", "billing.confirmPaymentMethod", { stripePaymentMethodId: "pm_x", stripeCustomerId: "cus_x", setAsDefault: 1 }, tok)).statusCode).toBe(400);
   });
 
   it("revokePaymentMethod (cookie) sur id inexistant → 404", async () => {
