@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "./chantier-repository";
 import type { ChantierPointage } from "../domain/chantier";
 
-// Use-cases « pointages de chantier » (saisie de temps). Purs (repo injecté). ⚠️ Anti-IDOR : toute
-// opération exige l'ownership du **chantier parent** (404 sinon). À l'ajout, `technicienId` est
-// **validé anti-IDOR-FK** : un technicien hors tenant est **ignoré** (→ null), pas lié (parité legacy).
+/*
+ * Use-cases « pointages de chantier » (saisie de temps). Purs (repo injecté). ⚠️ Anti-IDOR : toute
+ * opération exige l'ownership du **chantier parent** (404 sinon). À l'ajout, `technicienId` est
+ * **validé anti-IDOR-FK** : un technicien hors tenant est **ignoré** (→ null), pas lié (parité legacy).
+ */
 
 // Pointages d'un chantier (ownership chantier requis → 404 sinon).
 export async function getPointagesChantier(repo: IChantierRepository, ctx: TenantContext, chantierId: number): Promise<ChantierPointage[]> {
@@ -23,8 +25,10 @@ export interface AjouterPointageInput {
   readonly description?: string | null;
 }
 
-// Ajoute un pointage sous un chantier possédé (404 sinon). Date invalide → 400. `technicienId` lié
-// seulement s'il appartient au tenant (sinon null — parité legacy, pas d'erreur).
+/*
+ * Ajoute un pointage sous un chantier possédé (404 sinon). Date invalide → 400. `technicienId` lié
+ * seulement s'il appartient au tenant (sinon null — parité legacy, pas d'erreur).
+ */
 export async function ajouterPointage(repo: IChantierRepository, ctx: TenantContext, input: AjouterPointageInput): Promise<ChantierPointage> {
   if (!(await repo.getById(ctx, input.chantierId))) throw new NotFoundError("Chantier introuvable");
   const d = new Date(input.date);

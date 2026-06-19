@@ -21,9 +21,11 @@ export type PaiementStatutOutcome =
   | { readonly kind: "not-found" }
   | { readonly kind: "ok"; readonly payload: PaiementStatutResult };
 
-// Statut de paiement d'une facture via le token de portail (PUBLIC). Parité legacy : token absent →
-// 400 ; accès portail inconnu/expiré → 403 ; facture inexistante/non rattachée au client de l'accès
-// → 404 (anti-IDOR par l'accès portail) ; sinon le statut + le dernier paiement.
+/*
+ * Statut de paiement d'une facture via le token de portail (PUBLIC). Parité legacy : token absent →
+ * 400 ; accès portail inconnu/expiré → 403 ; facture inexistante/non rattachée au client de l'accès
+ * → 404 (anti-IDOR par l'accès portail) ; sinon le statut + le dernier paiement.
+ */
 export async function getPaiementStatut(
   reader: PortalPaymentReader,
   input: { token: string | undefined; factureId: number },
@@ -68,11 +70,13 @@ export type CreateCheckoutOutcome =
 
 const clientFullName = (c: { prenom: string | null; nom: string }): string => `${c.prenom ?? ""} ${c.nom}`.trim();
 
-// `create-checkout-session` (parité legacy, PUBLIC par token portail) : ouvre un Checkout Stripe (mode
-// payment) pour qu'un client paie une facture. {factureId, token} requis sinon 400 ; accès portail
-// inconnu/expiré → 403 ; facture inexistante/d'un autre client → 404 (anti-IDOR) ; **garde paiement** :
-// statut `payee` → 400 (déjà payée), `brouillon`/`annulee` → 400 (non payable). Crée la ligne
-// `paiements_stripe` (en_attente) que le webhook soldera.
+/*
+ * `create-checkout-session` (parité legacy, PUBLIC par token portail) : ouvre un Checkout Stripe (mode
+ * payment) pour qu'un client paie une facture. {factureId, token} requis sinon 400 ; accès portail
+ * inconnu/expiré → 403 ; facture inexistante/d'un autre client → 404 (anti-IDOR) ; **garde paiement** :
+ * statut `payee` → 400 (déjà payée), `brouillon`/`annulee` → 400 (non payable). Crée la ligne
+ * `paiements_stripe` (en_attente) que le webhook soldera.
+ */
 export async function createInvoiceCheckout(
   deps: CreateCheckoutDeps,
   input: { factureId: number | undefined; token: string | undefined; origin: string },

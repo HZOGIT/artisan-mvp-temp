@@ -4,9 +4,11 @@ import type { IRelanceDevisRepository } from "./relance-devis-repository";
 import { STATUTS_RELANCE, TYPES_RELANCE } from "../domain/relance-devis";
 import type { CreateRelanceInput, RelanceDevis } from "../domain/relance-devis";
 
-// Use-cases d'écriture — purs, repository injecté. ⚠️ Journal append-only : pas de `modifier` (une
-// relance est immuable) ; seulement enregistrer + supprimer. Validation métier + anti-IDOR-FK sur
-// `devisId`. Le scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. ⚠️ Journal append-only : pas de `modifier` (une
+ * relance est immuable) ; seulement enregistrer + supprimer. Validation métier + anti-IDOR-FK sur
+ * `devisId`. Le scoping tenant est porté par le repo.
+ */
 
 export async function enregistrerRelance(
   repo: IRelanceDevisRepository,

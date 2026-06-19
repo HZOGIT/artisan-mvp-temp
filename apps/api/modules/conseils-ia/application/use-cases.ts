@@ -19,9 +19,11 @@ export interface ConseilsIaDeps {
 
 const STATS_VIDE: ConseilsStats = { nbDevisEnAttente: 0, nbFacturesImpayees: 0, montantImpayees: 0, nbStocksBas: 0 };
 
-// `conseilsIA` (parité legacy) : 3 conseils personnalisés via l'IA, à partir de stats minimales du
-// tenant. ⚠️ **Dégradation SILENCIEUSE STRICTE** (parité legacy) : pas d'artisan, rate-limit atteint,
-// stats indisponibles, erreur provider ou JSON non parsable ⇒ `{conseils: []}`. Jamais d'exception.
+/*
+ * `conseilsIA` (parité legacy) : 3 conseils personnalisés via l'IA, à partir de stats minimales du
+ * tenant. ⚠️ **Dégradation SILENCIEUSE STRICTE** (parité legacy) : pas d'artisan, rate-limit atteint,
+ * stats indisponibles, erreur provider ou JSON non parsable ⇒ `{conseils: []}`. Jamais d'exception.
+ */
 export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext): Promise<ConseilsResult> {
   const artisan = await deps.artisanReader.getArtisan(ctx);
   if (!artisan) return CONSEILS_VIDE;
@@ -53,7 +55,7 @@ export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext): P
     if (conseils.length === 0) return CONSEILS_VIDE;
     return { conseils, genereLe: now.toISOString() };
   } catch (e) {
-    // eslint-disable-next-line no-console
+     
     console.warn("[conseilsIA]", sanitizeIaError(e));
     return CONSEILS_VIDE;
   }

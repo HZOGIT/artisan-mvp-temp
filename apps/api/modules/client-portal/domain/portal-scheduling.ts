@@ -1,5 +1,7 @@
-// RDV en ligne + suivi de chantier côté portail client. Le calcul des créneaux libres et la validation
-// de la date proposée sont PURS (parité legacy `getCreneauxDisponibles` / `demanderRdv`).
+/*
+ * RDV en ligne + suivi de chantier côté portail client. Le calcul des créneaux libres et la validation
+ * de la date proposée sont PURS (parité legacy `getCreneauxDisponibles` / `demanderRdv`).
+ */
 
 export interface CreneauOccupe {
   readonly dateDebut: Date;
@@ -12,8 +14,10 @@ const FENETRE_MIN_MS = 24 * 60 * 60 * 1000; // un créneau au plus tôt à +24h
 const FENETRE_MAX_JOURS = 14;
 const SLOT_MS = 60 * 60 * 1000;
 
-// Créneaux libres ISO sur [now+24h, now+14j], jours ouvrés (lun-ven), 8h→17h, pas 1h, hors occupations
-// (chevauchement strict). PUR (parité legacy `getCreneauxDisponibles`).
+/*
+ * Créneaux libres ISO sur [now+24h, now+14j], jours ouvrés (lun-ven), 8h→17h, pas 1h, hors occupations
+ * (chevauchement strict). PUR (parité legacy `getCreneauxDisponibles`).
+ */
 export function computeCreneauxLibres(occupied: readonly CreneauOccupe[], now: Date): string[] {
   const debut = new Date(now.getTime() + FENETRE_MIN_MS);
   const fin = new Date(now.getTime() + FENETRE_MAX_JOURS * 24 * 60 * 60 * 1000);

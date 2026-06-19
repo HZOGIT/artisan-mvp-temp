@@ -8,9 +8,11 @@ export function getThreads(repo: IAssistantThreadsRepository, ctx: TenantContext
   return repo.listThreads(ctx, clampThreadsLimit());
 }
 
-// `assistant.getMessages` (parité legacy) : messages d'un thread, **après vérif d'appartenance** au
-// tenant. Thread inexistant / d'un autre tenant → `[]` (parité legacy : pas d'erreur, anti-IDOR via
-// le thread parent ; `ai_messages` n'a pas d'artisanId).
+/*
+ * `assistant.getMessages` (parité legacy) : messages d'un thread, **après vérif d'appartenance** au
+ * tenant. Thread inexistant / d'un autre tenant → `[]` (parité legacy : pas d'erreur, anti-IDOR via
+ * le thread parent ; `ai_messages` n'a pas d'artisanId).
+ */
 export async function getMessages(
   repo: IAssistantThreadsRepository,
   ctx: TenantContext,

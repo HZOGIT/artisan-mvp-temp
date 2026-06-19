@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IStockRepository } from "./stock-repository";
 import type { Stock, CreateStockInput, UpdateStockInput, AdjustStockInput } from "../domain/stock";
 
-// Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible : la quantité n'est
-// jamais modifiée ici (ni create au-delà de l'init, ni update) — seul un mouvement tracé
-// l'ajuste (étape ultérieure). `modifierStock` ne touche que les métadonnées.
+/*
+ * Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible : la quantité n'est
+ * jamais modifiée ici (ni create au-delà de l'init, ni update) — seul un mouvement tracé
+ * l'ajuste (étape ultérieure). `modifierStock` ne touche que les métadonnées.
+ */
 
 export async function creerStock(repo: IStockRepository, ctx: TenantContext, input: CreateStockInput): Promise<Stock> {
   if (!input.reference?.trim()) throw new ValidationError("Référence requise");
@@ -34,8 +36,10 @@ export async function supprimerStock(repo: IStockRepository, ctx: TenantContext,
   if (!ok) throw new NotFoundError("Stock introuvable");
 }
 
-// Ajuste la quantité d'un stock via un mouvement tracé — l'UNIQUE voie de modification de
-// la quantité (invariant d'audit). Une `sortie` qui rendrait le stock négatif est refusée.
+/*
+ * Ajuste la quantité d'un stock via un mouvement tracé — l'UNIQUE voie de modification de
+ * la quantité (invariant d'audit). Une `sortie` qui rendrait le stock négatif est refusée.
+ */
 export async function ajusterQuantiteStock(
   repo: IStockRepository,
   ctx: TenantContext,

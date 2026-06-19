@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IParametresRepository } from "./parametres-repository";
 import type { ParametresArtisan, UpdateParametresInput } from "../domain/parametres";
 
-// Use-case d'écriture — pur, repository injecté. Valide la config avant `upsert` (singleton).
-// ⚠️ `UpdateParametresInput` n'expose AUCUN compteur de numérotation → toute écriture de compteur
-// est rejetée structurellement par le typage (les compteurs sont pilotés par la numérotation des
-// documents). Le scoping tenant est porté par le repo.
+/*
+ * Use-case d'écriture — pur, repository injecté. Valide la config avant `upsert` (singleton).
+ * ⚠️ `UpdateParametresInput` n'expose AUCUN compteur de numérotation → toute écriture de compteur
+ * est rejetée structurellement par le typage (les compteurs sont pilotés par la numérotation des
+ * documents). Le scoping tenant est porté par le repo.
+ */
 
 const DELAIS_VALIDES = ["net", "fin_de_mois"] as const;
 const DECIMAL_2 = /^\d+(\.\d{1,2})?$/; // montant ≥ 0 à 2 décimales max

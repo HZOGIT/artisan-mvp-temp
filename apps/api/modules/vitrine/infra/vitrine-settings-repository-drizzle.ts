@@ -30,9 +30,11 @@ function toSet(input: UpdateVitrineSettingsInput): Partial<ParametresInsert> {
   return set;
 }
 
-// Implémentation Drizzle des réglages vitrine (colonnes `vitrine*` de `parametres_artisan`, singleton
-// par tenant). Double cloisonnement RLS + filtre `artisanId`. Même pattern d'upsert idempotent que
-// `ParametresRepositoryDrizzle` (crée la ligne si absente, sinon met à jour les seuls champs fournis).
+/*
+ * Implémentation Drizzle des réglages vitrine (colonnes `vitrine*` de `parametres_artisan`, singleton
+ * par tenant). Double cloisonnement RLS + filtre `artisanId`. Même pattern d'upsert idempotent que
+ * `ParametresRepositoryDrizzle` (crée la ligne si absente, sinon met à jour les seuls champs fournis).
+ */
 export class VitrineSettingsRepositoryDrizzle implements IVitrineSettingsRepository {
   constructor(private readonly db: DbClient) {}
 

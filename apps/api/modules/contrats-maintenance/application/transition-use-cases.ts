@@ -3,13 +3,15 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
 import type { Contrat, ContratStatut } from "../domain/contrat";
 
-// État machine des contrats de maintenance (cœur du domaine). Transitions autorisées par statut :
-//  - actif    → suspendu | termine | annule
-//  - suspendu → actif | termine | annule
-//  - termine  → ∅ (terminal)
-//  - annule   → ∅ (terminal)
-// Toute transition hors de cette table est refusée (ConflictError : le contrat est dans un état
-// incompatible).
+/*
+ * État machine des contrats de maintenance (cœur du domaine). Transitions autorisées par statut :
+ *  - actif    → suspendu | termine | annule
+ *  - suspendu → actif | termine | annule
+ *  - termine  → ∅ (terminal)
+ *  - annule   → ∅ (terminal)
+ * Toute transition hors de cette table est refusée (ConflictError : le contrat est dans un état
+ * incompatible).
+ */
 const TRANSITIONS: Record<ContratStatut, readonly ContratStatut[]> = {
   actif: ["suspendu", "termine", "annule"],
   suspendu: ["actif", "termine", "annule"],
@@ -21,8 +23,10 @@ export function peutTransitionner(from: ContratStatut, to: ContratStatut): boole
   return TRANSITIONS[from].includes(to);
 }
 
-// Applique une transition de statut après vérification de l'ownership (scopé tenant) et de la
-// légalité de la transition.
+/*
+ * Applique une transition de statut après vérification de l'ownership (scopé tenant) et de la
+ * légalité de la transition.
+ */
 async function appliquerTransition(repo: IContratRepository, ctx: TenantContext, id: number, cible: ContratStatut): Promise<Contrat> {
   const contrat = await repo.getById(ctx, id);
   if (!contrat) throw new NotFoundError("Contrat introuvable");

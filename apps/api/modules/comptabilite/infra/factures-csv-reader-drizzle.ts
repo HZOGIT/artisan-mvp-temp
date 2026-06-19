@@ -7,8 +7,10 @@ import type { FactureCsvRow } from "../domain/csv-export";
 import type { FacturesCsvReader } from "../application/factures-csv-reader";
 import type { Periode } from "../application/comptabilite-reader";
 
-// Factures de la période (dateFacture ∈ [début, fin]) + nom client, sous RLS (withTenant) + filtre
-// artisanId explicite. Lecture seule, scopée tenant.
+/*
+ * Factures de la période (dateFacture ∈ [début, fin]) + nom client, sous RLS (withTenant) + filtre
+ * artisanId explicite. Lecture seule, scopée tenant.
+ */
 export class FacturesCsvReaderDrizzle implements FacturesCsvReader {
   constructor(private readonly db: DbClient) {}
 

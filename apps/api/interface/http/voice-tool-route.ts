@@ -8,10 +8,12 @@ export interface VoiceToolRouteDeps extends CookieAuthDeps {
   readonly rateLimiter: RateLimiterPort;
 }
 
-// Route HORS-tRPC `POST /api/voice/tool` : exécute UN outil demandé par la session vocale Live (le
-// navigateur reçoit le `toolCall` Gemini, appelle ici avec le contexte tenant, renvoie le résultat à
-// Gemini). Auth cookie JWT + rate-limit IA (les outils d'envoi déclenchent des emails → borne anti-abus).
-// Parité legacy : renvoie `{ result: ToolResult }`. ⚠️ MONTÉ mais NON routé (legacy sert encore).
+/*
+ * Route HORS-tRPC `POST /api/voice/tool` : exécute UN outil demandé par la session vocale Live (le
+ * navigateur reçoit le `toolCall` Gemini, appelle ici avec le contexte tenant, renvoie le résultat à
+ * Gemini). Auth cookie JWT + rate-limit IA (les outils d'envoi déclenchent des emails → borne anti-abus).
+ * Parité legacy : renvoie `{ result: ToolResult }`. ⚠️ MONTÉ mais NON routé (legacy sert encore).
+ */
 export function registerVoiceToolRoute(app: FastifyInstance, deps: VoiceToolRouteDeps): void {
   app.post("/api/voice/tool", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

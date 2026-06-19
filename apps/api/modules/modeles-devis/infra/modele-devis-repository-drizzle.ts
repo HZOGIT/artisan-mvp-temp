@@ -55,10 +55,12 @@ function ligneValues(modeleId: number, l: CreateModeleDevisLigneInput) {
   };
 }
 
-// Implémentation Drizzle du repository modeles-devis (agrégat en-tête + lignes). Double cloisonnement
-// RLS + filtre `artisanId` sur `modeles_devis`. Les `modeles_devis_lignes` (SANS artisanId) sont
-// scopées via l'appartenance du modèle parent au tenant : on ne lit/écrit jamais une ligne sans avoir
-// vérifié l'ownership du modèle. Pas de montants dérivés (gabarit, pas de pièce financière).
+/*
+ * Implémentation Drizzle du repository modeles-devis (agrégat en-tête + lignes). Double cloisonnement
+ * RLS + filtre `artisanId` sur `modeles_devis`. Les `modeles_devis_lignes` (SANS artisanId) sont
+ * scopées via l'appartenance du modèle parent au tenant : on ne lit/écrit jamais une ligne sans avoir
+ * vérifié l'ownership du modèle. Pas de montants dérivés (gabarit, pas de pièce financière).
+ */
 export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -133,8 +135,10 @@ export class ModeleDevisRepositoryDrizzle implements IModeleDevisRepository {
     });
   }
 
-  // Charge l'agrégat (en-tête scopé + lignes ordonnées). Les lignes ne sont lues qu'APRÈS avoir
-  // confirmé l'ownership du modèle par le tenant (scoping via le parent).
+  /*
+   * Charge l'agrégat (en-tête scopé + lignes ordonnées). Les lignes ne sont lues qu'APRÈS avoir
+   * confirmé l'ownership du modèle par le tenant (scoping via le parent).
+   */
   private async loadAggregate(tx: DbClient, ctx: TenantContext, id: number): Promise<ModeleDevis | null> {
     const [header] = await tx
       .select()

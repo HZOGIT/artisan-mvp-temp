@@ -1,8 +1,10 @@
 import type { IBudgetCategorieRepository } from "./application/budget-categorie-repository";
 import { createBudgetsCategoriesRouter } from "./interface/trpc/budgets-categories.router";
 
-// Wiring DI du module budgets-categories : assemble le routeur tRPC (CRUD catalogue + byMois) à partir
-// du repository injecté.
+/*
+ * Wiring DI du module budgets-categories : assemble le routeur tRPC (CRUD catalogue + byMois) à partir
+ * du repository injecté.
+ */
 export interface BudgetsCategoriesModuleDeps {
   readonly repository: IBudgetCategorieRepository;
 }

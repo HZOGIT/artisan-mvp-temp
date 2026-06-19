@@ -27,9 +27,11 @@ function toEcriture(r: EcritureRow): EcritureComptable {
   };
 }
 
-// Implémentation Drizzle du repository ecritures comptables. Double cloisonnement RLS + filtre
-// `artisanId` sur `ecritures_comptables`. ⚠️ Domaine financier CRITIQUE : le repo écrit des
-// lignes déjà calculées et **équilibrées** par le use-case ; l'`artisanId` est forcé au tenant.
+/*
+ * Implémentation Drizzle du repository ecritures comptables. Double cloisonnement RLS + filtre
+ * `artisanId` sur `ecritures_comptables`. ⚠️ Domaine financier CRITIQUE : le repo écrit des
+ * lignes déjà calculées et **équilibrées** par le use-case ; l'`artisanId` est forcé au tenant.
+ */
 export class EcritureRepositoryDrizzle implements IEcritureRepository {
   constructor(private readonly db: DbClient) {}
 

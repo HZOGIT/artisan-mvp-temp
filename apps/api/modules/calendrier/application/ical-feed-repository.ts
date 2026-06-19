@@ -1,7 +1,9 @@
 import type { TenantContext } from "../../../shared/tenant";
 
-// Port du jeton de flux iCal du tenant (colonne `artisans.icalToken`, table d'identité hors RLS →
-// scope par `id = ctx.artisanId`).
+/*
+ * Port du jeton de flux iCal du tenant (colonne `artisans.icalToken`, table d'identité hors RLS →
+ * scope par `id = ctx.artisanId`).
+ */
 export interface IIcalFeedRepository {
   // Jeton iCal courant du tenant (null si jamais généré).
   getToken(ctx: TenantContext): Promise<string | null>;

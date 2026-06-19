@@ -5,9 +5,11 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IPortalDocsReader, PortalContrat, PortalDevis, PortalFacture, PortalIntervention } from "../application/portal-docs-reader";
 
-// Lecteur Drizzle des documents du portail. Tables SOUS RLS (devis/factures/interventions/contrats/
-// paiements) → lectures via `withTenant(artisanId)` + filtre explicite `clientId` (anti-IDOR). Renvoie
-// uniquement des sous-ensembles client-safe (ex. contrats SANS `notes` internes).
+/*
+ * Lecteur Drizzle des documents du portail. Tables SOUS RLS (devis/factures/interventions/contrats/
+ * paiements) → lectures via `withTenant(artisanId)` + filtre explicite `clientId` (anti-IDOR). Renvoie
+ * uniquement des sous-ensembles client-safe (ex. contrats SANS `notes` internes).
+ */
 export class PortalDocsReaderDrizzle implements IPortalDocsReader {
   constructor(private readonly db: DbClient) {}
 

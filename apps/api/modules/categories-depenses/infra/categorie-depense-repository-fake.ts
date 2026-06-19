@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ICategorieDepenseRepository } from "../application/categorie-depense-repository";
 import type { CategorieDepense, CreateCategorieInput, UpdateCategorieInput } from "../domain/categorie-depense";
 
-// Implémentation in-memory du repository categories-depenses (tests sans DB). Reproduit les
-// invariants du repo Drizzle : scope par artisanId, artisanId forcé, défauts, et ⚠️ unicité
-// (artisanId, nom) → ConflictError (anti-doublon vérifié en mémoire avant insert/rename).
+/*
+ * Implémentation in-memory du repository categories-depenses (tests sans DB). Reproduit les
+ * invariants du repo Drizzle : scope par artisanId, artisanId forcé, défauts, et ⚠️ unicité
+ * (artisanId, nom) → ConflictError (anti-doublon vérifié en mémoire avant insert/rename).
+ */
 export class FakeCategorieDepenseRepository implements ICategorieDepenseRepository {
   private readonly store: CategorieDepense[] = [];
   private seq = 0;

@@ -1,7 +1,9 @@
-// Types de domaine du module chantiers (cœur métier : chantiers/projets regroupant des
-// interventions) — découplés du schéma Drizzle. ⚠️ FK `clientId` scopée tenant (anti-IDOR-FK),
-// isolation cross-tenant, montants (budgets) en decimal/string. Détails des dérivés/transitions
-// portés aux étapes ultérieures.
+/*
+ * Types de domaine du module chantiers (cœur métier : chantiers/projets regroupant des
+ * interventions) — découplés du schéma Drizzle. ⚠️ FK `clientId` scopée tenant (anti-IDOR-FK),
+ * isolation cross-tenant, montants (budgets) en decimal/string. Détails des dérivés/transitions
+ * portés aux étapes ultérieures.
+ */
 
 export type ChantierStatut = "planifie" | "en_cours" | "en_pause" | "termine" | "annule";
 export type ChantierPriorite = "basse" | "normale" | "haute" | "urgente";
@@ -49,8 +51,10 @@ export interface CreateChantierInput {
 }
 
 export interface UpdateChantierInput {
-  // ⚠️ `clientId` n'est pas modifiable via update : le client d'un chantier ne change pas
-  // (cohérence référentielle). Présent dans Create uniquement.
+  /*
+   * ⚠️ `clientId` n'est pas modifiable via update : le client d'un chantier ne change pas
+   * (cohérence référentielle). Présent dans Create uniquement.
+   */
   readonly reference?: string;
   readonly nom?: string;
   readonly description?: string | null;
@@ -68,10 +72,12 @@ export interface UpdateChantierInput {
   readonly notes?: string | null;
 }
 
-// ── Pointages (saisie de temps sur un chantier) ──────────────────────────────────────────────
-// Table `pointages_chantier` : heures passées par un technicien sur un chantier (et phase
-// optionnelle). Scopée tenant (artisanId) ET via le chantier parent (anti-IDOR). `date` = jour PG
-// (YYYY-MM-DD), `heures` = decimal/string.
+/*
+ * ── Pointages (saisie de temps sur un chantier) ──────────────────────────────────────────────
+ * Table `pointages_chantier` : heures passées par un technicien sur un chantier (et phase
+ * optionnelle). Scopée tenant (artisanId) ET via le chantier parent (anti-IDOR). `date` = jour PG
+ * (YYYY-MM-DD), `heures` = decimal/string.
+ */
 export interface ChantierPointage {
   readonly id: number;
   readonly chantierId: number;
@@ -83,8 +89,10 @@ export interface ChantierPointage {
   readonly createdAt: Date;
 }
 
-// Entrée de création d'un pointage. `artisanId` forcé serveur ; `technicienId` validé (anti-IDOR-FK,
-// ignoré → null s'il n'appartient pas au tenant). `date` = YYYY-MM-DD (validée au use-case).
+/*
+ * Entrée de création d'un pointage. `artisanId` forcé serveur ; `technicienId` validé (anti-IDOR-FK,
+ * ignoré → null s'il n'appartient pas au tenant). `date` = YYYY-MM-DD (validée au use-case).
+ */
 export interface CreatePointageInput {
   readonly chantierId: number;
   readonly phaseId?: number | null;
@@ -94,10 +102,12 @@ export interface CreatePointageInput {
   readonly description?: string | null;
 }
 
-// ── Suivi de chantier (avancement / jalons) ──────────────────────────────────────────────────
-// Table `suivi_chantier` : étapes de suivi d'un chantier. ⚠️ **SANS artisanId** → scopée UNIQUEMENT
-// via le chantier parent (anti-IDOR : toute opération exige l'ownership du chantier ; pas de RLS sur
-// cette table). `dateDebut`/`dateFin` = jour PG (YYYY-MM-DD).
+/*
+ * ── Suivi de chantier (avancement / jalons) ──────────────────────────────────────────────────
+ * Table `suivi_chantier` : étapes de suivi d'un chantier. ⚠️ **SANS artisanId** → scopée UNIQUEMENT
+ * via le chantier parent (anti-IDOR : toute opération exige l'ownership du chantier ; pas de RLS sur
+ * cette table). `dateDebut`/`dateFin` = jour PG (YYYY-MM-DD).
+ */
 export type SuiviStatut = "a_faire" | "en_cours" | "termine";
 
 export interface ChantierSuivi {
@@ -141,10 +151,12 @@ export interface UpdateSuiviInput {
   readonly commentaire?: string | null;
 }
 
-// ── Phases de chantier (planification / découpage en lots) ────────────────────────────────────
-// Table `phases_chantier` : ⚠️ **SANS artisanId** → scopée UNIQUEMENT via le chantier parent
-// (anti-IDOR ; pas de RLS sur cette table). Les colonnes `date*` = jour PG (YYYY-MM-DD) ;
-// `budgetPhase`/`coutReel`/`heuresPrevues` = décimaux string.
+/*
+ * ── Phases de chantier (planification / découpage en lots) ────────────────────────────────────
+ * Table `phases_chantier` : ⚠️ **SANS artisanId** → scopée UNIQUEMENT via le chantier parent
+ * (anti-IDOR ; pas de RLS sur cette table). Les colonnes `date*` = jour PG (YYYY-MM-DD) ;
+ * `budgetPhase`/`coutReel`/`heuresPrevues` = décimaux string.
+ */
 export type PhaseStatut = "a_faire" | "en_cours" | "termine" | "annule";
 
 export interface ChantierPhase {
@@ -186,9 +198,11 @@ export interface UpdatePhaseInput {
   readonly heuresPrevues?: string | null;
 }
 
-// ── Interventions rattachées à un chantier (table de liaison `interventions_chantier`) ─────────
-// ⚠️ **SANS artisanId** → scopée via le chantier parent. L'association exige que LE CHANTIER **et**
-// L'INTERVENTION appartiennent au tenant (anti-IDOR DOUBLE).
+/*
+ * ── Interventions rattachées à un chantier (table de liaison `interventions_chantier`) ─────────
+ * ⚠️ **SANS artisanId** → scopée via le chantier parent. L'association exige que LE CHANTIER **et**
+ * L'INTERVENTION appartiennent au tenant (anti-IDOR DOUBLE).
+ */
 export interface ChantierInterventionLien {
   readonly id: number;
   readonly chantierId: number;
@@ -205,8 +219,10 @@ export interface AssocierInterventionInput {
   readonly ordre?: number;
 }
 
-// ── Documents de chantier (`documents_chantier`) ───────────────────────────────────────────────
-// ⚠️ **SANS artisanId** → scopée via le chantier parent (anti-IDOR ; pas de RLS sur cette table).
+/*
+ * ── Documents de chantier (`documents_chantier`) ───────────────────────────────────────────────
+ * ⚠️ **SANS artisanId** → scopée via le chantier parent (anti-IDOR ; pas de RLS sur cette table).
+ */
 export type DocumentChantierType = "plan" | "photo" | "permis" | "contrat" | "facture" | "autre";
 
 export interface ChantierDocument {
@@ -227,9 +243,11 @@ export interface AddDocumentInput {
   readonly taille?: number | null;
 }
 
-// ── Statistiques agrégées d'un chantier (lecture seule) ────────────────────────────────────────
-// `coutReel` = somme des dépenses TTC rattachées (repli sur `budgetRealise` manuel si aucune).
-// `marge`/`margePct` = null si pas de budget prévisionnel.
+/*
+ * ── Statistiques agrégées d'un chantier (lecture seule) ────────────────────────────────────────
+ * `coutReel` = somme des dépenses TTC rattachées (repli sur `budgetRealise` manuel si aucune).
+ * `marge`/`margePct` = null si pas de budget prévisionnel.
+ */
 export interface ChantierStatistiques {
   readonly nombrePhases: number;
   readonly phasesTerminees: number;

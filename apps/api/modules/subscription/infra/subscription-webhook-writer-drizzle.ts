@@ -4,8 +4,10 @@ import type { DbClient } from "../../../shared/db";
 import type { SubscriptionUpsertFields } from "../domain/webhook";
 import type { SubscriptionWebhookWriter } from "../application/subscription-webhook-writer";
 
-// Écriture `subscriptions` (HORS RLS — denylist : webhook sans cookie tenant) par `artisan_id` unique.
-// L'artisanId est résolu en amont (metadata ou customerId). Upsert via ON CONFLICT(artisan_id).
+/*
+ * Écriture `subscriptions` (HORS RLS — denylist : webhook sans cookie tenant) par `artisan_id` unique.
+ * L'artisanId est résolu en amont (metadata ou customerId). Upsert via ON CONFLICT(artisan_id).
+ */
 export class SubscriptionWebhookWriterDrizzle implements SubscriptionWebhookWriter {
   constructor(private readonly db: DbClient) {}
 

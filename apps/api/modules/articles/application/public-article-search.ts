@@ -1,6 +1,8 @@
-// Recherche PUBLIQUE du catalogue de référence (`bibliotheque_articles`, global — pas de tenant).
-// Route HORS-tRPC `/api/articles/search` (autocomplete). Forme de sortie = snake_case legacy (parité
-// du contrat client). Le catalogue est public (visible=true), aucune donnée tenant.
+/*
+ * Recherche PUBLIQUE du catalogue de référence (`bibliotheque_articles`, global — pas de tenant).
+ * Route HORS-tRPC `/api/articles/search` (autocomplete). Forme de sortie = snake_case legacy (parité
+ * du contrat client). Le catalogue est public (visible=true), aucune donnée tenant.
+ */
 
 export interface PublicArticleRow {
   readonly id: number;

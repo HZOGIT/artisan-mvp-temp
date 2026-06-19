@@ -2,11 +2,13 @@ import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
 
-// PDF du bon d'intervention (parité legacy `/api/interventions/:id/bon-pdf`) : intervention possédée +
-// client + profil artisan + nom du technicien (si assigné) → `PdfPort.render('intervention', …)`.
-// ⚠️ `mobile` (signature client / heures / notes terrain) = `null` : pas encore de reader migré pour
-// `intervention_mobile` → la section signature du compte-rendu est absente (parité du cas sans mobile ;
-// le legacy renvoyait aussi null en l'absence/échec). À porter ultérieurement si nécessaire.
+/*
+ * PDF du bon d'intervention (parité legacy `/api/interventions/:id/bon-pdf`) : intervention possédée +
+ * client + profil artisan + nom du technicien (si assigné) → `PdfPort.render('intervention', …)`.
+ * ⚠️ `mobile` (signature client / heures / notes terrain) = `null` : pas encore de reader migré pour
+ * `intervention_mobile` → la section signature du compte-rendu est absente (parité du cas sans mobile ;
+ * le legacy renvoyait aussi null en l'absence/échec). À porter ultérieurement si nécessaire.
+ */
 export interface InterventionPdfDeps {
   readonly interventionRepo: { getById(ctx: TenantContext, id: number): Promise<{ clientId: number; technicienId: number | null } | null> };
   readonly clientReader: { getById(ctx: TenantContext, id: number): Promise<unknown | null> };

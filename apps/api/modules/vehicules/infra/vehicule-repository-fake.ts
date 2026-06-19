@@ -13,8 +13,10 @@ import type {
   StatistiquesFlotte,
 } from "../domain/vehicule";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
-// scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
+ * scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+ */
 export class FakeVehiculeRepository implements IVehiculeRepository {
   private vehiculesStore: Vehicule[] = [];
   private entretiensStore: EntretienVehicule[] = [];

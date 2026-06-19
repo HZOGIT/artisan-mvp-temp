@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IFournisseurRepository } from "./fournisseur-repository";
 import type { ArticleFournisseur, AjouterAssociationInput } from "../domain/article-fournisseur";
 
-// Use-cases des associations article↔fournisseur (prix d'achat) — purs, repo injecté.
-// Anti-IDOR : lectures sans oracle ([] si ressource hors tenant), écritures → NotFound.
+/*
+ * Use-cases des associations article↔fournisseur (prix d'achat) — purs, repo injecté.
+ * Anti-IDOR : lectures sans oracle ([] si ressource hors tenant), écritures → NotFound.
+ */
 
 export function listerFournisseursDeArticle(
   repo: IFournisseurRepository,

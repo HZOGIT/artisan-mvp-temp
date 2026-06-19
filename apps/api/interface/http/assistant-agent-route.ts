@@ -5,10 +5,12 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface AssistantAgentRouteDeps extends CookieAuthDeps, AssistantAgentDeps {}
 
-// Route HORS-tRPC `POST /api/assistant/stream` en mode AGENTIQUE (function-calling, outils du registry).
-// SSE : `data: {threadId}` puis `{content}` (texte), `{toolCall}` (outil exécuté), `{invalidate}` (caches
-// à rafraîchir). Auth cookie JWT. Le dispatcher edge est streaming-safe (pipe). ⚠️ MONTÉ mais NON routé
-// tant que la parité agentique n'est pas validée (le legacy sert encore) — voir MIGRATED_ROUTES.
+/*
+ * Route HORS-tRPC `POST /api/assistant/stream` en mode AGENTIQUE (function-calling, outils du registry).
+ * SSE : `data: {threadId}` puis `{content}` (texte), `{toolCall}` (outil exécuté), `{invalidate}` (caches
+ * à rafraîchir). Auth cookie JWT. Le dispatcher edge est streaming-safe (pipe). ⚠️ MONTÉ mais NON routé
+ * tant que la parité agentique n'est pas validée (le legacy sert encore) — voir MIGRATED_ROUTES.
+ */
 export function registerAssistantAgentRoute(app: FastifyInstance, deps: AssistantAgentRouteDeps): void {
   app.post("/api/assistant/stream", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

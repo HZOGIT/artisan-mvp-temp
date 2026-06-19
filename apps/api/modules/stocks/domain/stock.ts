@@ -1,6 +1,8 @@
-// Types de domaine du module stocks (inventaire) — découplés du schéma Drizzle.
-// ⚠️ Domaine sensible (quantités, mouvements/audit) : invariants à préserver
-// (traçabilité des mouvements, scoping tenant).
+/*
+ * Types de domaine du module stocks (inventaire) — découplés du schéma Drizzle.
+ * ⚠️ Domaine sensible (quantités, mouvements/audit) : invariants à préserver
+ * (traçabilité des mouvements, scoping tenant).
+ */
 
 export type StockArticleType = "bibliotheque" | "artisan";
 export type MouvementType = "entree" | "sortie" | "ajustement";
@@ -34,8 +36,10 @@ export interface MouvementStock {
   readonly createdAt: Date;
 }
 
-// Quantité en commande (non encore reçue) pour un stock donné. `entrant` = somme des
-// `quantite - quantiteRecue` des lignes de commandes fournisseurs non soldées liées à ce stock.
+/*
+ * Quantité en commande (non encore reçue) pour un stock donné. `entrant` = somme des
+ * `quantite - quantiteRecue` des lignes de commandes fournisseurs non soldées liées à ce stock.
+ */
 export interface StockEntrant {
   readonly stockId: number;
   readonly entrant: number;
@@ -62,13 +66,17 @@ export interface UpdateStockInput {
   readonly prixAchat?: string | null;
   readonly emplacement?: string | null;
   readonly fournisseur?: string | null;
-  // ⚠️ `quantiteEnStock` n'est PAS modifiable via update : seul un mouvement (ajustement
-  // tracé) change la quantité (invariant d'audit).
+  /*
+   * ⚠️ `quantiteEnStock` n'est PAS modifiable via update : seul un mouvement (ajustement
+   * tracé) change la quantité (invariant d'audit).
+   */
 }
 
-// Entrée d'un mouvement de stock — l'UNIQUE voie de modification de la quantité.
-// `entree`/`ajustement` ajoutent `quantite` à la quantité physique, `sortie` la retranche.
-// `quantite` est le montant (absolu, ≥ 0) du mouvement, pas la quantité cible.
+/*
+ * Entrée d'un mouvement de stock — l'UNIQUE voie de modification de la quantité.
+ * `entree`/`ajustement` ajoutent `quantite` à la quantité physique, `sortie` la retranche.
+ * `quantite` est le montant (absolu, ≥ 0) du mouvement, pas la quantité cible.
+ */
 export interface AdjustStockInput {
   readonly type: MouvementType;
   readonly quantite: string; // montant du mouvement, ≥ 0 (numeric PG en string)

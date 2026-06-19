@@ -2,10 +2,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisOptionRepository } from "../application/devis-option-repository";
 import type { CreateDevisOptionInput, DevisOption } from "../domain/devis-option";
 
-// Fake in-memory déterministe (aucun réseau) pour les tests d'use-case. Reproduit l'anti-IDOR du
-// repository réel : l'appartenance est portée par le DEVIS parent (`devisOwner`), pas par l'option.
-// Toute opération sur un devis/option dont le devis n'est pas possédé renvoie le sentinel null/false.
-// Vue mutable interne (DevisOption est readonly côté domaine ; le fake mute selectionnee/dateSelection).
+/*
+ * Fake in-memory déterministe (aucun réseau) pour les tests d'use-case. Reproduit l'anti-IDOR du
+ * repository réel : l'appartenance est portée par le DEVIS parent (`devisOwner`), pas par l'option.
+ * Toute opération sur un devis/option dont le devis n'est pas possédé renvoie le sentinel null/false.
+ * Vue mutable interne (DevisOption est readonly côté domaine ; le fake mute selectionnee/dateSelection).
+ */
 type MutableOption = { -readonly [K in keyof DevisOption]: DevisOption[K] };
 
 export class FakeDevisOptionRepository implements IDevisOptionRepository {

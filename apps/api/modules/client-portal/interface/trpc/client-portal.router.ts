@@ -13,8 +13,10 @@ import { getCreneauxDisponibles, demanderRdv, getMesRdv, getSuiviChantiers } fro
 import { getConversations, getConversationMessages, sendClientMessage, markClientMessagesAsRead, demanderModification } from "../../application/chat-use-cases";
 import { soumettreDemandeIA } from "../../application/ia-use-cases";
 
-// Toutes les dépendances des procs du portail (admin cookie + public token). Interface CONCRÈTE (les
-// types larges satisfont structurellement les deps étroites de chaque use-case lors de l'appel).
+/*
+ * Toutes les dépendances des procs du portail (admin cookie + public token). Interface CONCRÈTE (les
+ * types larges satisfont structurellement les deps étroites de chaque use-case lors de l'appel).
+ */
 export interface ClientPortalRouterDeps {
   readonly defaultOrigin: string; // origine de base des liens portail (fallback APP_URL au wiring)
   readonly access: IPortalAccessRepository;
@@ -33,9 +35,11 @@ export interface ClientPortalRouterDeps {
 
 const tokenInput = z.object({ token: z.string() });
 
-// Routeur tRPC `clientPortal` (espace client). ADMIN (cookie artisan) : génération/statut/désactivation
-// de l'accès. PUBLIC (token = capacité, pas de cookie) : identité, documents (devis/factures/
-// interventions/contrats), RDV, suivi chantiers, chat, demandes (modification + IA).
+/*
+ * Routeur tRPC `clientPortal` (espace client). ADMIN (cookie artisan) : génération/statut/désactivation
+ * de l'accès. PUBLIC (token = capacité, pas de cookie) : identité, documents (devis/factures/
+ * interventions/contrats), RDV, suivi chantiers, chat, demandes (modification + IA).
+ */
 export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
   return router({
     // ── ADMIN (protégé) ──

@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IFournisseurRepository } from "./fournisseur-repository";
 import type { Fournisseur, CreateFournisseurInput, UpdateFournisseurInput } from "../domain/fournisseur";
 
-// Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
-// une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
+ * une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
+ */
 
 export async function creerFournisseur(
   repo: IFournisseurRepository,

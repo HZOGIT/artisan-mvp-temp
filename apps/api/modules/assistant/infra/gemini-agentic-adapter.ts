@@ -1,9 +1,11 @@
 import type { AgenticEvent, AgenticFunctionCall, AgenticMessage, AgenticTurnInput, LlmAgenticPort } from "../application/agentic-port";
 import type { ToolParamSchema, ToolSchema } from "../domain/assistant-tools-catalog";
 
-// Adapter Gemini du port AGENTIQUE (function-calling streamé). Comme `GeminiLlmAdapter`, le SDK est
-// importé par CHEMIN VARIABLE (`GENAI_MODULE`, type `string`) → hors graphe de typecheck `src`. Les
-// mappers `toGeminiTools`/`toGeminiContents` sont PURS et testés sans réseau ; `streamTurn` fait l'I/O.
+/*
+ * Adapter Gemini du port AGENTIQUE (function-calling streamé). Comme `GeminiLlmAdapter`, le SDK est
+ * importé par CHEMIN VARIABLE (`GENAI_MODULE`, type `string`) → hors graphe de typecheck `src`. Les
+ * mappers `toGeminiTools`/`toGeminiContents` sont PURS et testés sans réseau ; `streamTurn` fait l'I/O.
+ */
 
 // ── Types minimaux du SDK (runtime via import variable-de-chemin) ──────────────────────────────
 interface GenAiPart {
@@ -29,8 +31,10 @@ type AgenticContent =
 
 // ── Mappers PURS (testables) ───────────────────────────────────────────────────────────────────
 
-// `ToolParamSchema` neutre → schéma de paramètres Gemini (le type devient MAJUSCULE : `Type.OBJECT`
-// est la string "OBJECT" dans `@google/genai`, donc "object" → "OBJECT" sans importer l'enum).
+/*
+ * `ToolParamSchema` neutre → schéma de paramètres Gemini (le type devient MAJUSCULE : `Type.OBJECT`
+ * est la string "OBJECT" dans `@google/genai`, donc "object" → "OBJECT" sans importer l'enum).
+ */
 export function toGeminiParam(p: ToolParamSchema): Record<string, unknown> {
   return {
     type: p.type.toUpperCase(),
@@ -51,9 +55,11 @@ export function toGeminiTools(tools: readonly ToolSchema[]): unknown[] {
   return [{ functionDeclarations: tools.map(toGeminiFunctionDeclaration) }];
 }
 
-// Messages agentiques → `contents` Gemini. user/historique `text` → parts texte ; `tool` → parts
-// `functionResponse` (role `user`, parité legacy) ; `model` brut → parts BRUTES round-trip (conserve
-// le `thoughtSignature` Gemini 3.x, requis au tour suivant sous peine de 400).
+/*
+ * Messages agentiques → `contents` Gemini. user/historique `text` → parts texte ; `tool` → parts
+ * `functionResponse` (role `user`, parité legacy) ; `model` brut → parts BRUTES round-trip (conserve
+ * le `thoughtSignature` Gemini 3.x, requis au tour suivant sous peine de 400).
+ */
 export function toGeminiContents(messages: readonly AgenticMessage[]): unknown[] {
   return messages.map((m) => {
     const c = m.content as AgenticContent;

@@ -6,9 +6,11 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface AssistantStreamRouteDeps extends CookieAuthDeps, AssistantStreamDeps {}
 
-// Route HORS-tRPC `POST /api/assistant/stream` (SSE) : chat assistant en streaming, auth cookie JWT.
-// Émet `data: {threadId}` puis `data: {content}` par fragment (parité legacy). Le dispatcher edge est
-// streaming-safe (pipe). ⚠️ Mode TEXT only — le mode AGENTIQUE (outils) reste sur le legacy (non routé).
+/*
+ * Route HORS-tRPC `POST /api/assistant/stream` (SSE) : chat assistant en streaming, auth cookie JWT.
+ * Émet `data: {threadId}` puis `data: {content}` par fragment (parité legacy). Le dispatcher edge est
+ * streaming-safe (pipe). ⚠️ Mode TEXT only — le mode AGENTIQUE (outils) reste sur le legacy (non routé).
+ */
 export function registerAssistantStreamRoute(app: FastifyInstance, deps: AssistantStreamRouteDeps): void {
   app.post("/api/assistant/stream", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

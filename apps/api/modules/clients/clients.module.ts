@@ -1,8 +1,10 @@
 import type { IClientRepository } from "./application/client-repository";
 import { createClientsRouter } from "./interface/trpc/clients.router";
 
-// Wiring DI du module clients : assemble le routeur tRPC à partir du repository injecté.
-// Découple `app.ts`/`createAppRouter` des détails d'instanciation.
+/*
+ * Wiring DI du module clients : assemble le routeur tRPC à partir du repository injecté.
+ * Découple `app.ts`/`createAppRouter` des détails d'instanciation.
+ */
 export interface ClientsModuleDeps {
   readonly repository: IClientRepository;
 }

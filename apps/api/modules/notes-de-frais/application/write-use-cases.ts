@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { INoteDeFraisRepository } from "./note-de-frais-repository";
 import type { NoteDeFrais, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
 
-// Use-cases d'écriture — purs, repository injecté. ⚠️ **Le demandeur est TOUJOURS l'utilisateur
-// courant** (`userId = ctx.userId`) — parité legacy `createNoteFrais` (`userId: ctx.user.id`) :
-// on ne crée une note que pour soi-même, donc pas d'IDOR possible sur le demandeur. Le workflow
-// d'approbation (statut/montant remboursé) est porté séparément.
+/*
+ * Use-cases d'écriture — purs, repository injecté. ⚠️ **Le demandeur est TOUJOURS l'utilisateur
+ * courant** (`userId = ctx.userId`) — parité legacy `createNoteFrais` (`userId: ctx.user.id`) :
+ * on ne crée une note que pour soi-même, donc pas d'IDOR possible sur le demandeur. Le workflow
+ * d'approbation (statut/montant remboursé) est porté séparément.
+ */
 
 // Dates ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique.
 function assertPeriodeCoherente(debut?: string, fin?: string): void {
@@ -59,12 +61,14 @@ export async function supprimerNoteDeFrais(
   if (!ok) throw new NotFoundError("Note de frais introuvable");
 }
 
-// --- Workflow (transitions de statut). ⚠️ Anti self-approbation sur approuver/rejeter. CASCADE :
-// chaque transition propage le statut aux `depenses` REMBOURSABLES liées (`notes_frais_depenses`)
-// via `repo.appliquerStatutDepensesLiees` (parité legacy) — soumise/approuvee/rejetee, et au
-// PAIEMENT `remboursee` + `rembourse=TRUE` + `dateRemboursement`. Appliquée APRÈS la mise à jour
-// de la note (si elle échoue, pas de cascade). ⚠️ Sensible compta : les dépenses `remboursee`
-// entrent dans les charges/TVA → propagation scopée tenant + filtre `remboursable`. ---
+/*
+ * --- Workflow (transitions de statut). ⚠️ Anti self-approbation sur approuver/rejeter. CASCADE :
+ * chaque transition propage le statut aux `depenses` REMBOURSABLES liées (`notes_frais_depenses`)
+ * via `repo.appliquerStatutDepensesLiees` (parité legacy) — soumise/approuvee/rejetee, et au
+ * PAIEMENT `remboursee` + `rembourse=TRUE` + `dateRemboursement`. Appliquée APRÈS la mise à jour
+ * de la note (si elle échoue, pas de cascade). ⚠️ Sensible compta : les dépenses `remboursee`
+ * entrent dans les charges/TVA → propagation scopée tenant + filtre `remboursable`. ---
+ */
 
 const aujourdhui = (): string => new Date().toISOString().slice(0, 10);
 
@@ -74,8 +78,10 @@ async function chargerNote(repo: INoteDeFraisRepository, ctx: TenantContext, id:
   return note;
 }
 
-// ⚠️ Anti self-approbation : l'approbateur (utilisateur courant) ne doit pas être le demandeur
-// (`userId` de la note). Ségrégation des tâches : on n'approuve/refuse pas sa propre note.
+/*
+ * ⚠️ Anti self-approbation : l'approbateur (utilisateur courant) ne doit pas être le demandeur
+ * (`userId` de la note). Ségrégation des tâches : on n'approuve/refuse pas sa propre note.
+ */
 function assertPasSelfApprobation(ctx: TenantContext, note: NoteDeFrais): void {
   if (ctx.userId === note.userId) {
     throw new ForbiddenError("Vous ne pouvez pas valider votre propre note de frais");
@@ -139,9 +145,11 @@ export async function payerNoteDeFrais(repo: INoteDeFraisRepository, ctx: Tenant
   return updated;
 }
 
-// Lie une dépense (remboursable, du tenant) à une note (du tenant) — anti-IDOR + recalcul du total
-// portés par le repo (skip silencieux si ownership/remboursable KO ; idempotent). Renvoie `{success}`
-// quoi qu'il arrive (parité legacy : ne révèle pas l'existence cross-tenant).
+/*
+ * Lie une dépense (remboursable, du tenant) à une note (du tenant) — anti-IDOR + recalcul du total
+ * portés par le repo (skip silencieux si ownership/remboursable KO ; idempotent). Renvoie `{success}`
+ * quoi qu'il arrive (parité legacy : ne révèle pas l'existence cross-tenant).
+ */
 export async function ajouterDepenseANote(repo: INoteDeFraisRepository, ctx: TenantContext, noteId: number, depenseId: number): Promise<{ success: true }> {
   await repo.addDepenseLink(ctx, noteId, depenseId);
   return { success: true };

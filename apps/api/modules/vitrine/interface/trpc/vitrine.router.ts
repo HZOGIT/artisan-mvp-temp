@@ -36,10 +36,12 @@ export interface VitrineRouterDeps extends SubmitContactDeps, LeadsAdminDeps {
   readonly settings: IVitrineSettingsRepository;
 }
 
-// Routeur tRPC `vitrine`. Surface PUBLIQUE (par slug, sans cookie) : `getBySlug` (page agrégée) +
-// `submitContact` (message à l'artisan, anti-flood par IP via ctx.clientIp). Surface ADMIN (protégée,
-// gestion des leads) : `getDemandesContact` / `updateDemandeContactStatut` / `convertirDemandeEnClient`,
-// déléguée au domaine migré `demandesContact` (+ `clients` pour la conversion), scopée tenant.
+/*
+ * Routeur tRPC `vitrine`. Surface PUBLIQUE (par slug, sans cookie) : `getBySlug` (page agrégée) +
+ * `submitContact` (message à l'artisan, anti-flood par IP via ctx.clientIp). Surface ADMIN (protégée,
+ * gestion des leads) : `getDemandesContact` / `updateDemandeContactStatut` / `convertirDemandeEnClient`,
+ * déléguée au domaine migré `demandesContact` (+ `clients` pour la conversion), scopée tenant.
+ */
 export function createVitrineRouter(deps: VitrineRouterDeps) {
   return router({
     getBySlug: publicProcedure.input(z.object({ slug: z.string().min(1) })).query(({ input }) => getBySlug(deps.reader, input.slug)),
@@ -51,8 +53,10 @@ export function createVitrineRouter(deps: VitrineRouterDeps) {
     convertirDemandeEnClient: protectedProcedure
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(({ ctx, input }) => convertirDemandeEnClient(deps, ctx.tenant, input.id)),
-    // Réglages vitrine (ADMIN, scopé tenant — OPE-504). Lecture + mise à jour partielle des colonnes
-    // `vitrine*` de `parametres_artisan`. Consommé par la section « Ma page vitrine » de `/v2/parametres`.
+    /*
+     * Réglages vitrine (ADMIN, scopé tenant). Lecture + mise à jour partielle des colonnes
+     * `vitrine*` de `parametres_artisan`. Consommé par la section « Ma page vitrine » de `/v2/parametres`.
+     */
     getSettings: protectedProcedure.query(({ ctx }) => getVitrineSettings(deps.settings, ctx.tenant)),
     updateSettings: protectedProcedure
       .input(settingsSchema)

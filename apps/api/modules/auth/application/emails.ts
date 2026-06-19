@@ -32,8 +32,10 @@ export function welcomeEmail(name: string | undefined, appUrl?: string): string 
 </body></html>`;
 }
 
-// Corps HTML des emails d'auth (parité legacy). Le `resetUrl` provient d'une source de confiance
-// (APP_URL injectée), JAMAIS de l'Origin de la requête (anti-vol de jeton).
+/*
+ * Corps HTML des emails d'auth (parité legacy). Le `resetUrl` provient d'une source de confiance
+ * (APP_URL injectée), JAMAIS de l'Origin de la requête (anti-vol de jeton).
+ */
 export function resetPasswordEmail(resetUrl: string): string {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background-color:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">

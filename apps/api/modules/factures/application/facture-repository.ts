@@ -10,12 +10,14 @@ import type {
   AuditLogEntry,
 } from "../domain/facture";
 
-// Port du repository factures. Chaque méthode exige le TenantContext (scope tenant + RLS).
-// `factures` possède un `artisanId` → double cloisonnement RLS + filtre. Les `factures_lignes`
-// (SANS artisanId) sont scopées via la facture parente du tenant. ⚠️ Domaine financier CRITIQUE :
-// totaux dérivés des lignes (jamais fournis par le client), numérotation serveur (`nextNumero`),
-// et les invariants sensibles (TVA dérivée, **immutabilité post-émission**, transitions de
-// statut, paiement, avoir, FEC) sont portés par les use-cases (étapes ultérieures), pas le CRUD.
+/*
+ * Port du repository factures. Chaque méthode exige le TenantContext (scope tenant + RLS).
+ * `factures` possède un `artisanId` → double cloisonnement RLS + filtre. Les `factures_lignes`
+ * (SANS artisanId) sont scopées via la facture parente du tenant. ⚠️ Domaine financier CRITIQUE :
+ * totaux dérivés des lignes (jamais fournis par le client), numérotation serveur (`nextNumero`),
+ * et les invariants sensibles (TVA dérivée, **immutabilité post-émission**, transitions de
+ * statut, paiement, avoir, FEC) sont portés par les use-cases (étapes ultérieures), pas le CRUD.
+ */
 export interface IFactureRepository {
   list(ctx: TenantContext): Promise<Facture[]>;
   // null si la facture n'appartient pas au tenant.
@@ -28,9 +30,11 @@ export interface IFactureRepository {
 
   // Définit le statut (transition pilotée par le use-case workflow) — null hors tenant.
   setStatut(ctx: TenantContext, id: number, statut: FactureStatut): Promise<Facture | null>;
-  // Enregistre un paiement (écrit montantPaye cumulé + date/mode + statut calculés par le
-  // use-case) — null hors tenant. Les invariants (montant > 0, anti-sur-paiement, statut
-  // soldée) sont portés par le use-case ; le repo ne fait qu'écrire le patch scopé tenant.
+  /*
+   * Enregistre un paiement (écrit montantPaye cumulé + date/mode + statut calculés par le
+   * use-case) — null hors tenant. Les invariants (montant > 0, anti-sur-paiement, statut
+   * soldée) sont portés par le use-case ; le repo ne fait qu'écrire le patch scopé tenant.
+   */
   enregistrerPaiement(ctx: TenantContext, id: number, patch: PaiementPatch): Promise<Facture | null>;
   // Prochain numéro de facture, scopé tenant, généré serveur (parité `getNextFactureNumber`).
   nextNumero(ctx: TenantContext): Promise<string>;
@@ -38,21 +42,29 @@ export interface IFactureRepository {
   nextNumeroAvoir(ctx: TenantContext): Promise<string>;
   // Avoirs émis sur une facture d'origine (typeDocument='avoir'), scopés tenant.
   listAvoirs(ctx: TenantContext, factureOrigineId: number): Promise<Facture[]>;
-  // Journal d'audit d'une facture (table `audit_log`, scopé artisanId + entityType='facture'),
-  // trié du plus récent au plus ancien. Lecture seule (parité legacy `getAuditLog`).
+  /*
+   * Journal d'audit d'une facture (table `audit_log`, scopé artisanId + entityType='facture'),
+   * trié du plus récent au plus ancien. Lecture seule (parité legacy `getAuditLog`).
+   */
   listAuditLog(ctx: TenantContext, factureId: number): Promise<AuditLogEntry[]>;
-  // Crée un avoir (note de crédit) + ses lignes (montants négatifs déjà calculés) dans une
-  // transaction — null si la facture d'origine n'appartient pas au tenant.
+  /*
+   * Crée un avoir (note de crédit) + ses lignes (montants négatifs déjà calculés) dans une
+   * transaction — null si la facture d'origine n'appartient pas au tenant.
+   */
   createAvoir(ctx: TenantContext, input: CreateAvoirInput): Promise<Facture | null>;
   // true si le client référencé appartient au tenant (anti-IDOR-FK).
   ownsClient(ctx: TenantContext, clientId: number): Promise<boolean>;
   // true si le devis référencé appartient au tenant (anti-IDOR-FK sur le lien devis→facture).
   ownsDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
-  // true s'il existe déjà une facture (typeDocument='facture') liée à ce devis (anti-doublon
-  // de conversion), scopé tenant.
+  /*
+   * true s'il existe déjà une facture (typeDocument='facture') liée à ce devis (anti-doublon
+   * de conversion), scopé tenant.
+   */
   existsForDevis(ctx: TenantContext, devisId: number): Promise<boolean>;
-  // Crée une facture à partir d'un devis (lignes copiées, totaux recalculés des lignes,
-  // statut brouillon, devisId lié) — null si le devis n'appartient pas au tenant.
+  /*
+   * Crée une facture à partir d'un devis (lignes copiées, totaux recalculés des lignes,
+   * statut brouillon, devisId lié) — null si le devis n'appartient pas au tenant.
+   */
   createFromDevis(ctx: TenantContext, input: CreateFromDevisInput): Promise<Facture | null>;
 
   // Lignes d'une facture — [] si la facture n'appartient pas au tenant.
@@ -102,8 +114,10 @@ export interface CopiedLigneData {
   readonly type: string;
 }
 
-// Entrée de conversion devis→facture (numéro déjà généré ; totaux recalculés des lignes par
-// l'infra ; statut "brouillon", typeDocument "facture" posés par l'infra).
+/*
+ * Entrée de conversion devis→facture (numéro déjà généré ; totaux recalculés des lignes par
+ * l'infra ; statut "brouillon", typeDocument "facture" posés par l'infra).
+ */
 export interface CreateFromDevisInput {
   readonly devisId: number;
   readonly clientId: number;
@@ -115,8 +129,10 @@ export interface CreateFromDevisInput {
   readonly lignes: readonly CopiedLigneData[];
 }
 
-// Entrée de création d'un avoir (numéro/totaux déjà calculés par le use-case ; statut "validee",
-// typeDocument "avoir" posés par l'infra).
+/*
+ * Entrée de création d'un avoir (numéro/totaux déjà calculés par le use-case ; statut "validee",
+ * typeDocument "avoir" posés par l'infra).
+ */
 export interface CreateAvoirInput {
   readonly factureOrigineId: number;
   readonly clientId: number;

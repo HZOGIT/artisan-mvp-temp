@@ -5,8 +5,10 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PublicDemandeContextReader, DemandeAvisContext } from "../application/avis-public-use-cases";
 
-// Lecture des noms (artisan/client/intervention) d'une demande, sous le **tenant résolu** (la demande
-// a été obtenue via le token, puis ses effets se lisent normalement sous RLS). Scopé `ctx.artisanId`.
+/*
+ * Lecture des noms (artisan/client/intervention) d'une demande, sous le **tenant résolu** (la demande
+ * a été obtenue via le token, puis ses effets se lisent normalement sous RLS). Scopé `ctx.artisanId`.
+ */
 export class PublicDemandeContextReaderDrizzle implements PublicDemandeContextReader {
   constructor(private readonly db: DbClient) {}
 

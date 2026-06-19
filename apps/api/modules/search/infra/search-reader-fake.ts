@@ -4,8 +4,10 @@ import type { SearchMatches } from "../domain/search";
 
 const EMPTY: SearchMatches = { clients: [], devis: [], factures: [], interventions: [], fournisseurs: [] };
 
-// Lecteur fake déterministe : renvoie des correspondances préprogrammées par tenant et capture la
-// dernière requête reçue (assertions sur la garde de longueur côté use-case).
+/*
+ * Lecteur fake déterministe : renvoie des correspondances préprogrammées par tenant et capture la
+ * dernière requête reçue (assertions sur la garde de longueur côté use-case).
+ */
 export class FakeSearchReader implements ISearchReader {
   private readonly matches = new Map<number, SearchMatches>();
   public lastQuery: string | null = null;

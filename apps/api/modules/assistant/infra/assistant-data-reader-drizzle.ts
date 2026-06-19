@@ -17,10 +17,12 @@ import type { AssistantDataReader, DevisNonSigneAvecClient } from "../applicatio
 const fmtDate = (d: Date | null): string => (d ? d.toISOString().slice(0, 10) : "non définie");
 const clientNom = (prenom: string | null, nom: string): string => `${prenom ?? ""} ${nom}`.trim() || "Client";
 
-// Accès données des générateurs IA de l'assistant, sous RLS (withTenant) + filtre artisanId explicite.
-// Catalogues/tarifs pré-formatés ici (parité legacy). `getDevisAnalyse` renvoie null si le devis n'est
-// pas du tenant (anti-IDOR). `articles_artisan`/`devis`/`factures`/`clients` sont sous RLS ;
-// `bibliotheque_articles` est un catalogue GLOBAL (filtre métier, pas de scope tenant).
+/*
+ * Accès données des générateurs IA de l'assistant, sous RLS (withTenant) + filtre artisanId explicite.
+ * Catalogues/tarifs pré-formatés ici (parité legacy). `getDevisAnalyse` renvoie null si le devis n'est
+ * pas du tenant (anti-IDOR). `articles_artisan`/`devis`/`factures`/`clients` sont sous RLS ;
+ * `bibliotheque_articles` est un catalogue GLOBAL (filtre métier, pas de scope tenant).
+ */
 export class AssistantDataReaderDrizzle implements AssistantDataReader {
   constructor(private readonly db: DbClient) {}
 

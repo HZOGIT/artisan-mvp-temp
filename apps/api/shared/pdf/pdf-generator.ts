@@ -4,9 +4,11 @@ import autoTable from "jspdf-autotable";
 import type { Devis, DevisLigne, Facture, FactureLigne, Artisan, Client, ContratMaintenance, CommandeFournisseur, LigneCommandeFournisseur, Fournisseur } from "./pdf-input-types";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 
-// ============================================================================
-// Layout & palette — single source of truth for the 4 generators
-// ============================================================================
+/*
+ * ============================================================================
+ * Layout & palette — single source of truth for the 4 generators
+ * ============================================================================
+ */
 
 type RGB = [number, number, number];
 
@@ -48,9 +50,11 @@ function tint(c: RGB, factor: number): RGB {
   ];
 }
 
-// ============================================================================
-// Fonts — Roboto pour les accents français
-// ============================================================================
+/*
+ * ============================================================================
+ * Fonts — Roboto pour les accents français
+ * ============================================================================
+ */
 
 function registerFonts(doc: jsPDF) {
   doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_REGULAR);
@@ -60,10 +64,12 @@ function registerFonts(doc: jsPDF) {
   doc.setFont("Roboto", "normal");
 }
 
-// ============================================================================
-// Image dimensions parser (PNG / JPEG / WEBP) — preserve aspect ratio
-// without adding a dependency.
-// ============================================================================
+/*
+ * ============================================================================
+ * Image dimensions parser (PNG / JPEG / WEBP) — preserve aspect ratio
+ * without adding a dependency.
+ * ============================================================================
+ */
 
 type ImgFormat = "PNG" | "JPEG" | "WEBP";
 
@@ -137,10 +143,12 @@ function getImageDimensions(buf: Buffer, format: ImgFormat): { width: number; he
   }
 }
 
-// ============================================================================
-// Logo — preserves aspect ratio inside a 35x28mm box centered vertically
-// in the 40mm header band, anchored 10mm from the left edge.
-// ============================================================================
+/*
+ * ============================================================================
+ * Logo — preserves aspect ratio inside a 35x28mm box centered vertically
+ * in the 40mm header band, anchored 10mm from the left edge.
+ * ============================================================================
+ */
 
 function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
   const logo = (artisan as any).logo as string | null | undefined;
@@ -182,10 +190,12 @@ function renderLogo(doc: jsPDF, artisan: Artisan): boolean {
   }
 }
 
-// ============================================================================
-// Header band — coloured strip with logo, company name + document title,
-// and optional dates on the right.
-// ============================================================================
+/*
+ * ============================================================================
+ * Header band — coloured strip with logo, company name + document title,
+ * and optional dates on the right.
+ * ============================================================================
+ */
 
 interface HeaderOpts {
   primaryColor: RGB;
@@ -230,10 +240,12 @@ function renderHeaderBand(doc: jsPDF, opts: HeaderOpts): void {
   doc.setTextColor(...TEXT_BODY);
 }
 
-// ============================================================================
-// Info blocks — émetteur (left) + destinataire (right) under the band,
-// with a thin vertical divider.
-// ============================================================================
+/*
+ * ============================================================================
+ * Info blocks — émetteur (left) + destinataire (right) under the band,
+ * with a thin vertical divider.
+ * ============================================================================
+ */
 
 interface InfoBlock {
   label: string;       // 'ÉMETTEUR' / 'CLIENT' / 'FOURNISSEUR'
@@ -241,9 +253,11 @@ interface InfoBlock {
   lines: string[];     // body lines (address, phone, email, SIRET, ...)
 }
 
-// OPE-151 — mentions légales obligatoires de l'émetteur (Code de commerce R123-237) :
-// pour une société, forme juridique + capital + RCS (ville + SIREN dérivé du SIRET) ;
-// « RM … » si inscrit au Répertoire des Métiers. Rien d'imposé en plus pour un EI/micro.
+/*
+ * ⚠️ Mentions légales obligatoires de l'émetteur (Code de commerce R123-237) :
+ * pour une société, forme juridique + capital + RCS (ville + SIREN dérivé du SIRET) ;
+ * « RM … » si inscrit au Répertoire des Métiers. Rien d'imposé en plus pour un EI/micro.
+ */
 function buildMentionsLegalesEmetteur(artisan: Artisan): string[] {
   const a = artisan as any;
   const lines: string[] = [];
@@ -278,13 +292,17 @@ function buildArtisanBlock(artisan: Artisan): InfoBlock {
 function buildClientBlock(client: Client): InfoBlock {
   const lines: string[] = [];
   const personName = `${client.prenom || ""} ${client.nom}`.trim();
-  // OPE-92 — un client professionnel : la raison sociale devient l'intitulé,
-  // le contact figure en première ligne, et SIRET / n° TVA sont rappelés (mentions B2B).
+  /*
+   * Client professionnel : la raison sociale devient l'intitulé,
+   * le contact figure en première ligne, et SIRET / n° TVA sont rappelés (mentions B2B).
+   */
   const isPro = (client as any).type === "professionnel";
   const raisonSociale = (client as any).raisonSociale as string | null | undefined;
   if (isPro && raisonSociale && personName) lines.push(`Contact: ${personName}`);
-  // OPE-93 — sur une facture/devis on utilise l'adresse de FACTURATION si renseignée
-  // (fallback par champ vers l'adresse principale = adresse de chantier).
+  /*
+   * Sur une facture/devis on utilise l'adresse de FACTURATION si renseignée
+   * (fallback par champ vers l'adresse principale = adresse de chantier).
+   */
   const adrFact = (client as any).adresseFacturation || client.adresse;
   const cpFact = (client as any).codePostalFacturation || client.codePostal;
   const villeFact = (client as any).villeFacturation || client.ville;
@@ -358,9 +376,11 @@ function renderInfoBlocks(doc: jsPDF, primary: RGB, left: InfoBlock, right: Info
   return bottomY;
 }
 
-// ============================================================================
-// Totals box — tinted background, big TTC, bottom-right.
-// ============================================================================
+/*
+ * ============================================================================
+ * Totals box — tinted background, big TTC, bottom-right.
+ * ============================================================================
+ */
 
 interface TotalLine {
   label: string;
@@ -410,9 +430,11 @@ function renderTotalsBox(
   return startY + boxH;
 }
 
-// ============================================================================
-// Common autoTable styling
-// ============================================================================
+/*
+ * ============================================================================
+ * Common autoTable styling
+ * ============================================================================
+ */
 
 const TABLE_THEME = {
   headStyles: {
@@ -433,16 +455,20 @@ const TABLE_THEME = {
   alternateRowStyles: { fillColor: TABLE_ALT_BG },
 };
 
-// ============================================================================
-// Public types
-// ============================================================================
+/*
+ * ============================================================================
+ * Public types
+ * ============================================================================
+ */
 
 export interface PDFDevisData {
   devis: Devis & { lignes: DevisLigne[] };
   artisan: Artisan;
   client: Client;
-  // OPE-127 — CGV réutilisables (parametres_artisan.conditionsGenerales). Si fournies,
-  // ajoutées sur une page dédiée en fin de document. Parité avec le générateur client.
+  /*
+   * CGV réutilisables (parametres_artisan.conditionsGenerales). Si fournies,
+   * ajoutées sur une page dédiée en fin de document.
+   */
   cgv?: string | null;
 }
 
@@ -450,11 +476,10 @@ export interface PDFFactureData {
   facture: Facture & { lignes: FactureLigne[] };
   artisan: Artisan;
   client: Client;
-  cgv?: string | null; // OPE-127 — CGV (cf. PDFDevisData) ; pas sur un avoir.
+  cgv?: string | null; // CGV (cf. PDFDevisData) ; pas sur un avoir.
 }
 
-// OPE-127 — page CGV dédiée (mirroir de `addCgvPage` du générateur client), avec saut
-// de page si le texte déborde (CGV potentiellement longues). Lecture seule, additif.
+// Page CGV dédiée, avec saut de page si le texte déborde. Lecture seule, additif.
 function renderCgvPage(doc: jsPDF, cgv: string): void {
   doc.addPage();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -475,9 +500,11 @@ function renderCgvPage(doc: jsPDF, cgv: string): void {
   }
 }
 
-// ============================================================================
-// DEVIS
-// ============================================================================
+/*
+ * ============================================================================
+ * DEVIS
+ * ============================================================================
+ */
 
 export function generateDevisPDF(data: PDFDevisData): Buffer {
   const { devis, artisan, client } = data;
@@ -494,7 +521,7 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     dateLines: [
       `Date : ${new Date(devis.dateDevis).toLocaleDateString("fr-FR")}`,
       `Validité : ${devis.dateValidite ? new Date(devis.dateValidite).toLocaleDateString("fr-FR") : "Non définie"}`,
-      // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+      // Référence/N° de commande du client (B2B), rappelée si renseignée.
       ...(devis.referenceClient ? [`Votre réf. : ${devis.referenceClient}`] : []),
     ],
   });
@@ -503,8 +530,10 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
 
   // Tableau des lignes
   const tableData = devis.lignes.map((ligne) => {
-    // OPE-168 — section (en-tête de lot, gras) / note (texte libre, italique) en
-    // pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+    /*
+     * Section (en-tête de lot, gras) / note (texte libre, italique) en
+     * pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+     */
     const type = (ligne as any).type ?? "produit";
     if (type === "section") {
       return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
@@ -537,8 +566,10 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  // Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
-  // avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+  /*
+   * Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
+   * avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+   */
   const sousTotal = parseFloat(String(devis.totalHT ?? "0")) || 0;
   const tva = parseFloat(String(devis.totalTVA ?? "0")) || 0;
   const totalTTC = parseFloat(String(devis.totalTTC ?? "0")) || 0;
@@ -581,9 +612,11 @@ export function generateDevisPDF(data: PDFDevisData): Buffer {
   return Buffer.from(doc.output("arraybuffer"));
 }
 
-// ============================================================================
-// FACTURE
-// ============================================================================
+/*
+ * ============================================================================
+ * FACTURE
+ * ============================================================================
+ */
 
 export function generateFacturePDF(data: PDFFactureData): Buffer {
   const { facture, artisan, client } = data;
@@ -594,11 +627,13 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   const successColor: RGB = [16, 185, 129];
   const dangerColor: RGB = [239, 68, 68];
 
-  // OPE-165 — un avoir (note de crédit) est un document DISTINCT d'une facture :
-  // titré « AVOIR », rappelant la facture d'origine, sans échéance ni mentions de
-  // pénalité de retard. Parité avec le générateur PDF client (déjà avoir-aware).
-  // typeDocument ∈ { facture, avoir } (défaut « facture ») → comportement inchangé
-  // pour toute facture normale (isAvoir = false).
+  /*
+   * OPE-165 — un avoir (note de crédit) est un document DISTINCT d'une facture :
+   * titré « AVOIR », rappelant la facture d'origine, sans échéance ni mentions de
+   * pénalité de retard. Parité avec le générateur PDF client (déjà avoir-aware).
+   * typeDocument ∈ { facture, avoir } (défaut « facture ») → comportement inchangé
+   * pour toute facture normale (isAvoir = false).
+   */
   const isAvoir = (facture as any).typeDocument === "avoir";
   const avoirRed: RGB = [220, 53, 69];
 
@@ -609,18 +644,22 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     number: `N° ${facture.numero}`,
     dateLines: [
       `Date : ${new Date(facture.dateFacture).toLocaleDateString("fr-FR")}`,
-      // Un avoir n'a pas d'échéance de règlement : on rappelle la facture d'origine
-      // (l'objet par défaut d'un avoir = « Avoir sur facture {numéro} »).
+      /*
+       * Un avoir n'a pas d'échéance de règlement : on rappelle la facture d'origine
+       * (l'objet par défaut d'un avoir = « Avoir sur facture {numéro} »).
+       */
       ...(isAvoir
         ? ((facture as any).objet ? [String((facture as any).objet)] : [])
         : [`Échéance : ${facture.dateEcheance ? new Date(facture.dateEcheance).toLocaleDateString("fr-FR") : "Non définie"}`]),
-      // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+      // Référence/N° de commande du client (B2B), rappelée si renseignée.
       ...(facture.referenceClient ? [`Votre réf. : ${facture.referenceClient}`] : []),
     ],
   });
 
-  // OPE-165 — sous-bandeau rouge distinctif pour un avoir, placé dans l'espace
-  // entre le bandeau d'en-tête (y=HEADER_H) et les blocs émetteur/client (y=50).
+  /*
+   * OPE-165 — sous-bandeau rouge distinctif pour un avoir, placé dans l'espace
+   * entre le bandeau d'en-tête (y=HEADER_H) et les blocs émetteur/client (y=50).
+   */
   if (isAvoir) {
     doc.setFillColor(...avoirRed);
     doc.rect(0, HEADER_H, PAGE_W, 8, "F");
@@ -635,8 +674,10 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
 
   // Tableau des lignes
   const tableData = facture.lignes.map((ligne) => {
-    // OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
-    // en pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+    /*
+     * OPE-168 (volet 2) — section (en-tête de lot, gras) / note (texte libre, italique)
+     * en pleine largeur, sans colonnes chiffrées ; exclues des totaux (montants 0).
+     */
     const type = (ligne as any).type ?? "produit";
     if (type === "section") {
       return [{ content: ligne.designation, colSpan: 4, styles: { fontStyle: "bold" as const, fillColor: [226, 232, 240] as [number, number, number], textColor: [30, 41, 59] as [number, number, number] } }];
@@ -666,8 +707,10 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
     margin: { left: MARGIN, right: MARGIN },
   });
 
-  // Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
-  // avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+  /*
+   * Totaux — lus depuis les champs DB (pré-calculés) pour garantir la cohérence
+   * avec ce qui est stocké et éviter tout recalcul divergent côté PDF.
+   */
   const sousTotal = parseFloat(String(facture.totalHT ?? "0")) || 0;
   const tva = parseFloat(String(facture.totalTVA ?? "0")) || 0;
   const totalTTC = parseFloat(String(facture.totalTTC ?? "0")) || 0;
@@ -690,8 +733,10 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFont("Roboto", "bold");
   doc.setFontSize(11);
   if (isAvoir) {
-    // OPE-165 — un avoir n'a pas de statut de paiement : il vient en déduction
-    // ou remboursement, pas « en attente de paiement ».
+    /*
+     * OPE-165 — un avoir n'a pas de statut de paiement : il vient en déduction
+     * ou remboursement, pas « en attente de paiement ».
+     */
     doc.setTextColor(...primary);
     doc.text("AVOIR — montant à déduire ou rembourser", MARGIN, totalsStartY + 6);
   } else if (facture.statut === "payee") {
@@ -710,9 +755,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   doc.setFontSize(8);
   doc.setTextColor(...TEXT_BODY);
 
-  // OPE-165 — `fy` = ordonnée de la dernière ligne de pied dessinée (avant les
-  // mentions légales émetteur). Un avoir n'appelle aucun règlement : pas d'IBAN,
-  // pas de conditions de paiement, pas de pénalités de retard ni d'escompte.
+  /*
+   * OPE-165 — `fy` = ordonnée de la dernière ligne de pied dessinée (avant les
+   * mentions légales émetteur). Un avoir n'appelle aucun règlement : pas d'IBAN,
+   * pas de conditions de paiement, pas de pénalités de retard ni d'escompte.
+   */
   let fy: number;
   if (isAvoir) {
     doc.setFontSize(7);
@@ -736,8 +783,10 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
 
     doc.setFontSize(7);
     doc.setTextColor(...TEXT_MUTED);
-    // OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
-    // `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
+    /*
+     * OPE-164 — condition de paiement RÉELLE de la facture (au lieu du « 30 jours » figé) :
+     * `conditionsPaiement` si renseignée, sinon repli sur l'échéance, sinon « à réception ».
+     */
     const fctr = facture as any;
     const condRaw = fctr.conditionsPaiement && String(fctr.conditionsPaiement).trim()
       ? String(fctr.conditionsPaiement).trim()
@@ -782,9 +831,11 @@ export function generateFacturePDF(data: PDFFactureData): Buffer {
   return Buffer.from(doc.output("arraybuffer"));
 }
 
-// ============================================================================
-// CONTRAT DE MAINTENANCE
-// ============================================================================
+/*
+ * ============================================================================
+ * CONTRAT DE MAINTENANCE
+ * ============================================================================
+ */
 
 export interface PDFContratData {
   contrat: ContratMaintenance;
@@ -924,11 +975,13 @@ export function generateContratPDF(data: PDFContratData): Buffer {
   return Buffer.from(doc.output("arraybuffer"));
 }
 
-// ============================================================================
-// BON D'INTERVENTION / COMPTE-RENDU SIGNÉ (OPE-161)
-// ============================================================================
-// Matérialise en PDF une intervention terminée + sa signature client déjà
-// capturée (interventions_mobile). Rapport FIXE (pas de worksheet paramétrable).
+/*
+ * ============================================================================
+ * BON D'INTERVENTION / COMPTE-RENDU SIGNÉ (OPE-161)
+ * ============================================================================
+ * Matérialise en PDF une intervention terminée + sa signature client déjà
+ * capturée (interventions_mobile). Rapport FIXE (pas de worksheet paramétrable).
+ */
 
 export interface PDFInterventionData {
   intervention: any; // titre, description, dateDebut, dateFin, adresse, statut, numero?
@@ -1062,9 +1115,11 @@ export function generateInterventionPDF(data: PDFInterventionData): Buffer {
   return Buffer.from(doc.output("arraybuffer"));
 }
 
-// ============================================================================
-// BON DE COMMANDE FOURNISSEUR
-// ============================================================================
+/*
+ * ============================================================================
+ * BON DE COMMANDE FOURNISSEUR
+ * ============================================================================
+ */
 
 export interface PDFBonCommandeData {
   commande: CommandeFournisseur & { lignes: LigneCommandeFournisseur[] };

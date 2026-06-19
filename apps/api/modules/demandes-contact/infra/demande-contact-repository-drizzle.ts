@@ -24,10 +24,12 @@ function toDemande(r: DemandeRow): DemandeContact {
   };
 }
 
-// Implémentation Drizzle du repository demandes-contact. Double cloisonnement RLS + filtre
-// `artisanId` sur `demandes_contact`. `artisanId` forcé et `statut="nouveau"` posé à la création.
-// Les transitions de statut passent par `setStatut` (+ clientId à la conversion) ; `update` ne touche
-// que les métadonnées. `clientId` validé via `ownsClient`.
+/*
+ * Implémentation Drizzle du repository demandes-contact. Double cloisonnement RLS + filtre
+ * `artisanId` sur `demandes_contact`. `artisanId` forcé et `statut="nouveau"` posé à la création.
+ * Les transitions de statut passent par `setStatut` (+ clientId à la conversion) ; `update` ne touche
+ * que les métadonnées. `clientId` validé via `ownsClient`.
+ */
 export class DemandeContactRepositoryDrizzle implements IDemandeContactRepository {
   constructor(private readonly db: DbClient) {}
 

@@ -59,9 +59,11 @@ function toCreateLignes(lignes: z.infer<typeof ligneSchema>[]): CreateLigneInput
   }));
 }
 
-// Routeur tRPC du domaine commandes fournisseurs. Transport mince : valide les inputs
-// (zod), délègue aux use-cases (scoping tenant via ctx.tenant + totaux serveur), laisse
-// remonter les Domain errors (NotFound→404, Validation→400). Repository injecté (DI).
+/*
+ * Routeur tRPC du domaine commandes fournisseurs. Transport mince : valide les inputs
+ * (zod), délègue aux use-cases (scoping tenant via ctx.tenant + totaux serveur), laisse
+ * remonter les Domain errors (NotFound→404, Validation→400). Repository injecté (DI).
+ */
 export function createCommandesRouter(
   repo: ICommandeRepository,
   fournisseurRepo: IFournisseurRepository,
@@ -124,12 +126,16 @@ export function createCommandesRouter(
 
     getEnRetard: protectedProcedure.query(({ ctx }) => listerCommandesEnRetard(repo, ctx.tenant)),
 
-    // Performances par fournisseur (parité client `trpc.commandesFournisseurs.getPerformances`) :
-    // stats dérivées des commandes × fournisseurs du tenant (cross-domaine, scopé).
+    /*
+     * Performances par fournisseur (parité client `trpc.commandesFournisseurs.getPerformances`) :
+     * stats dérivées des commandes × fournisseurs du tenant (cross-domaine, scopé).
+     */
     getPerformances: protectedProcedure.query(({ ctx }) => getPerformancesFournisseurs(repo, fournisseurRepo, ctx.tenant)),
 
-    // Devis acceptés du tenant, enrichis du nom client (parité client `listDevisAcceptes`) — base
-    // de création d'une commande fournisseur. Cross-domaine (devis × clients), scopé.
+    /*
+     * Devis acceptés du tenant, enrichis du nom client (parité client `listDevisAcceptes`) — base
+     * de création d'une commande fournisseur. Cross-domaine (devis × clients), scopé.
+     */
     listDevisAcceptes: protectedProcedure.query(({ ctx }) => listerDevisAcceptes(devisRepo, clientRepo, ctx.tenant)),
 
     recevoir: protectedProcedure
@@ -162,14 +168,18 @@ export function createCommandesRouter(
         definirStatutFacturation(repo, ctx.tenant, input.id, input.statutFacturation, input.depenseId ?? null),
       ),
 
-    // Envoi du bon de commande au fournisseur par email (PDF en PJ) — parité `sendEmail`.
-    // ownership 404 / fournisseur.email 400 / rate-limit 429 ; statut → envoyee après envoi.
+    /*
+     * Envoi du bon de commande au fournisseur par email (PDF en PJ) — parité `sendEmail`.
+     * ownership 404 / fournisseur.email 400 / rate-limit 429 ; statut → envoyee après envoi.
+     */
     sendEmail: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => envoyerCommandeParEmail(mailing, ctx.tenant, input.id)),
 
-    // Proposition IA de lignes de commande à partir d'un devis accepté (LECTURE SEULE, non persistée).
-    // rate-limit IA 429 / devis 404 / statut accepté 400. Parité `genererDepuisDevisIA`.
+    /*
+     * Proposition IA de lignes de commande à partir d'un devis accepté (LECTURE SEULE, non persistée).
+     * rate-limit IA 429 / devis 404 / statut accepté 400. Parité `genererDepuisDevisIA`.
+     */
     genererDepuisDevisIA: protectedProcedure
       .input(z.object({ devisId: z.number().int().positive() }))
       .mutation(({ ctx, input }) => genererCommandeDepuisDevisIA(ia, ctx.tenant, input.devisId)),

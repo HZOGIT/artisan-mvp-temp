@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
 import type { PortalAccessResolver } from "./portal-devis-pdf";
 
-// PDF d'une facture depuis le PORTAIL CLIENT (parité legacy `/api/portail/:token/factures/:id/pdf`).
-// Symétrique de `getPortalDevisPdf` : token public → accès (clientId+artisanId) sous RLS public-token,
-// puis facture SOUS le tenant résolu (facture.clientId === access.clientId sinon 404, anti-IDOR portail).
-// CGV ajoutées (le générateur ne les imprime pas sur un avoir — géré côté template).
+/*
+ * PDF d'une facture depuis le PORTAIL CLIENT (parité legacy `/api/portail/:token/factures/:id/pdf`).
+ * Symétrique de `getPortalDevisPdf` : token public → accès (clientId+artisanId) sous RLS public-token,
+ * puis facture SOUS le tenant résolu (facture.clientId === access.clientId sinon 404, anti-IDOR portail).
+ * CGV ajoutées (le générateur ne les imprime pas sur un avoir — géré côté template).
+ */
 export interface PortalFacturePdfDeps {
   readonly accessReader: PortalAccessResolver;
   readonly factureReader: {

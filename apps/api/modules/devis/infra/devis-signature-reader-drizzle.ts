@@ -5,8 +5,10 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { DevisSignatureReader, DevisSignatureInfo } from "../application/devis-signature-reader";
 
-// Lecture d'une signature par devisId (`signatures_devis`, sans RLS/artisanId). ⚠️ N'est appelée que
-// pour des devis déjà confirmés du tenant (scoping par le parent) → pas de fuite cross-tenant.
+/*
+ * Lecture d'une signature par devisId (`signatures_devis`, sans RLS/artisanId). ⚠️ N'est appelée que
+ * pour des devis déjà confirmés du tenant (scoping par le parent) → pas de fuite cross-tenant.
+ */
 export class DevisSignatureReaderDrizzle implements DevisSignatureReader {
   constructor(private readonly db: DbClient) {}
 

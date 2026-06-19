@@ -7,9 +7,11 @@ import type { DevisSignatureReader } from "./application/devis-signature-reader"
 import type { DevisIaDeps } from "./application/generer-lignes-ia";
 import { createDevisRouter } from "./interface/trpc/devis.router";
 
-// Wiring DI du module devis : assemble le routeur tRPC à partir du repository, des dépendances
-// d'envoi par email (artisan/client readers partagés + PdfPort + EmailPort + rate-limiter) et du
-// convertisseur devis→facture (cross-domaine), injectés.
+/*
+ * Wiring DI du module devis : assemble le routeur tRPC à partir du repository, des dépendances
+ * d'envoi par email (artisan/client readers partagés + PdfPort + EmailPort + rate-limiter) et du
+ * convertisseur devis→facture (cross-domaine), injectés.
+ */
 export interface DevisModuleDeps {
   readonly repository: IDevisRepository;
   readonly mailing: DevisMailingDeps;

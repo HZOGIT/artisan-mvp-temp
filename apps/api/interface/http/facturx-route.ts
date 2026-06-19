@@ -5,9 +5,11 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface FacturxRouteDeps extends CookieAuthDeps, FacturxPdfDeps {}
 
-// Routes HORS-tRPC Factur-X (auth cookie JWT) : `GET /api/comptabilite/facturx-xml/:factureId` (XML CII)
-// + `GET /api/comptabilite/facturx/:factureId` (PDF facture, filename Factur-X). 404 anti-IDOR. ⚠️ MONTÉES
-// mais NON routées tant qu'absentes de MIGRATED_ROUTES.
+/*
+ * Routes HORS-tRPC Factur-X (auth cookie JWT) : `GET /api/comptabilite/facturx-xml/:factureId` (XML CII)
+ * + `GET /api/comptabilite/facturx/:factureId` (PDF facture, filename Factur-X). 404 anti-IDOR. ⚠️ MONTÉES
+ * mais NON routées tant qu'absentes de MIGRATED_ROUTES.
+ */
 export function registerFacturxRoutes(app: FastifyInstance, deps: FacturxRouteDeps): void {
   app.get("/api/comptabilite/facturx-xml/:factureId", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

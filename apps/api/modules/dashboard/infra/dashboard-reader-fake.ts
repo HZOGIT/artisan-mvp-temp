@@ -13,8 +13,10 @@ interface TenantData {
 
 const EMPTY = (): TenantData => ({ factures: [], devis: [], clients: [], interventions: [], objectifs: { objectifCA: null, objectifDevis: null, objectifClients: null }, upcoming: [] });
 
-// Fake in-memory déterministe : lots du dashboard par tenant. Les `list*` sont supposés déjà triés
-// createdAt desc par l'appelant du seed (comme le ferait le reader réel).
+/*
+ * Fake in-memory déterministe : lots du dashboard par tenant. Les `list*` sont supposés déjà triés
+ * createdAt desc par l'appelant du seed (comme le ferait le reader réel).
+ */
 export class FakeDashboardReader implements IDashboardReader {
   private readonly data = new Map<number, TenantData>();
 

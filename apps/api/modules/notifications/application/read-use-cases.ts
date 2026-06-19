@@ -2,8 +2,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { INotificationRepository } from "./notification-repository";
 import type { Notification, ListNotificationsOptions } from "../domain/notification";
 
-// Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par
-// le `TenantContext` (le repo l'applique) ; la pagination est bornée côté repo.
+/*
+ * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par
+ * le `TenantContext` (le repo l'applique) ; la pagination est bornée côté repo.
+ */
 
 export function listNotifications(
   repo: INotificationRepository,

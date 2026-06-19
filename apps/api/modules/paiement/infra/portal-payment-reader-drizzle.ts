@@ -12,10 +12,12 @@ import type {
   ClientContact,
 } from "../application/portal-payment-reader";
 
-// Lectures paiement portail. `resolveAccessByToken` lit `client_portal_access` sous la policy
-// public-token RLS (token actif + non expiré) ; les lectures facture/paiement repassent sous le
-// tenant résolu (RLS). `paiements_stripe` (sous RLS) est lu via le tenant résolu (≠ le webhook qui
-// résout par tokenPaiement).
+/*
+ * Lectures paiement portail. `resolveAccessByToken` lit `client_portal_access` sous la policy
+ * public-token RLS (token actif + non expiré) ; les lectures facture/paiement repassent sous le
+ * tenant résolu (RLS). `paiements_stripe` (sous RLS) est lu via le tenant résolu (≠ le webhook qui
+ * résout par tokenPaiement).
+ */
 export class PortalPaymentReaderDrizzle implements PortalPaymentReader {
   constructor(private readonly db: DbClient) {}
 

@@ -1,9 +1,11 @@
-// Types de domaine du module budgets-categories (budget mensuel prévu par catégorie de dépense ;
-// suivi budget vs dépense réelle) — découplés du schéma Drizzle. Table `budgets_categories` (RLS sur
-// artisan_id ; ⚠️ colonnes snake_case → le mapper Drizzle traduit snake_case↔camelCase). ⚠️
-// Contrainte DB UNIQUE (artisan_id, categorie, mois) → un seul budget par (catégorie, mois) par
-// artisan (invariant anti-doublon). `categorie`/`mois` forment la clé d'unicité : immuables après
-// création (changer = supprimer + recréer) ; l'update ne touche que les montants.
+/*
+ * Types de domaine du module budgets-categories (budget mensuel prévu par catégorie de dépense ;
+ * suivi budget vs dépense réelle) — découplés du schéma Drizzle. Table `budgets_categories` (RLS sur
+ * artisan_id ; ⚠️ colonnes snake_case → le mapper Drizzle traduit snake_case↔camelCase). ⚠️
+ * Contrainte DB UNIQUE (artisan_id, categorie, mois) → un seul budget par (catégorie, mois) par
+ * artisan (invariant anti-doublon). `categorie`/`mois` forment la clé d'unicité : immuables après
+ * création (changer = supprimer + recréer) ; l'update ne touche que les montants.
+ */
 
 export interface BudgetCategorie {
   readonly id: number;

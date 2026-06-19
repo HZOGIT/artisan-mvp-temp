@@ -14,10 +14,12 @@ const createSchema = z.object({
   statut: z.enum(STATUTS_RELANCE).optional(),
 });
 
-// Routeur tRPC du domaine relances-devis (journal append-only). Transport mince : valide les inputs
-// (zod), délègue aux use-cases (scoping tenant via ctx.tenant + anti-IDOR devisId au use-case),
-// laisse remonter les Domain errors (NotFound→404, Validation→400). ⚠️ PAS de procédure `update` :
-// une relance est immuable. Repo injecté.
+/*
+ * Routeur tRPC du domaine relances-devis (journal append-only). Transport mince : valide les inputs
+ * (zod), délègue aux use-cases (scoping tenant via ctx.tenant + anti-IDOR devisId au use-case),
+ * laisse remonter les Domain errors (NotFound→404, Validation→400). ⚠️ PAS de procédure `update` :
+ * une relance est immuable. Repo injecté.
+ */
 export function createRelancesDevisRouter(repo: IRelanceDevisRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listRelances(repo, ctx.tenant)),

@@ -25,8 +25,10 @@ function toEntry(r: Row): EmailLogEntry {
   };
 }
 
-// Lecteur Drizzle du journal d'emails : scopé tenant (RLS via withTenant + filtre explicite
-// `artisanId`), plus récents d'abord, limite bornée [1,500]. Aucune écriture.
+/*
+ * Lecteur Drizzle du journal d'emails : scopé tenant (RLS via withTenant + filtre explicite
+ * `artisanId`), plus récents d'abord, limite bornée [1,500]. Aucune écriture.
+ */
 export class EmailLogReaderDrizzle implements IEmailLogReader {
   constructor(private readonly db: DbClient) {}
 

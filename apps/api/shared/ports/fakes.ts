@@ -22,8 +22,10 @@ export class FakeEmailPort implements EmailPort {
   }
 }
 
-// Limiteur de débit factice : autorise tout par défaut ; `denyKey(key)` fait échouer
-// la prochaine vérification de cette clé. Mémorise les clés vérifiées (assertions).
+/*
+ * Limiteur de débit factice : autorise tout par défaut ; `denyKey(key)` fait échouer
+ * la prochaine vérification de cette clé. Mémorise les clés vérifiées (assertions).
+ */
 export class FakeRateLimiter implements RateLimiterPort {
   readonly checked: string[] = [];
   private denied = new Set<string>();
@@ -67,8 +69,10 @@ export class FakePdfPort implements PdfPort {
   }
 }
 
-// LLM factice déterministe : renvoie une réponse scriptée et mémorise les prompts (assertions).
-// Aucun appel réseau. `responses` = une réponse fixe, ou une file (une par appel `complete`/`stream`).
+/*
+ * LLM factice déterministe : renvoie une réponse scriptée et mémorise les prompts (assertions).
+ * Aucun appel réseau. `responses` = une réponse fixe, ou une file (une par appel `complete`/`stream`).
+ */
 export class FakeLlmPort implements LlmPort {
   readonly prompts: string[] = [];
   private readonly queue: string[];
@@ -91,8 +95,10 @@ export class FakeLlmPort implements LlmPort {
   }
 }
 
-// Vision factice déterministe : renvoie une réponse scriptée et capture les requêtes (assertions).
-// Aucun appel réseau. `responses` = réponse fixe ou file (une par appel). `throwOn` force une erreur.
+/*
+ * Vision factice déterministe : renvoie une réponse scriptée et capture les requêtes (assertions).
+ * Aucun appel réseau. `responses` = réponse fixe ou file (une par appel). `throwOn` force une erreur.
+ */
 export class FakeVisionPort implements VisionPort {
   readonly requests: VisionRequest[] = [];
   private readonly queue: string[];

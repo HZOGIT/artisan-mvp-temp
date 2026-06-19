@@ -1,5 +1,7 @@
-// Domaine `auth` : authentification par email/mot de passe (tables `users` — HORS RLS) + émission JWT
-// (cookie `token`). ⚠️ SENSIBLE : un bug = lockout. Hash bcrypt (PasswordHasher), claims JWT `{userId,email}`.
+/*
+ * Domaine `auth` : authentification par email/mot de passe (tables `users` — HORS RLS) + émission JWT
+ * (cookie `token`). ⚠️ SENSIBLE : un bug = lockout. Hash bcrypt (PasswordHasher), claims JWT `{userId,email}`.
+ */
 
 // Utilisateur exposé par `me`/`signin` (jamais le hash de mot de passe).
 export interface AuthUser {

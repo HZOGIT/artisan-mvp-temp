@@ -9,8 +9,10 @@ import type { TechnicienStats } from "../domain/stats";
 
 type InterventionStatut = "planifiee" | "en_cours" | "terminee" | "annulee";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
-// scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
+ * scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+ */
 export class FakeTechnicienRepository implements ITechnicienRepository {
   private store: Technicien[] = [];
   private dispos: Disponibilite[] = [];

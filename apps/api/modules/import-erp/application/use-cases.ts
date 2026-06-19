@@ -9,8 +9,10 @@ export interface ImportInput {
 
 const JOUR_MS = 86_400_000;
 
-// Importe des clients (parité legacy `importClients`). Dedup par email (existants + dans le lot) :
-// `nom` requis sinon erreur de ligne. Renvoie les compteurs {imported,errors,duplicates,errorDetails}.
+/*
+ * Importe des clients (parité legacy `importClients`). Dedup par email (existants + dans le lot) :
+ * `nom` requis sinon erreur de ligne. Renvoie les compteurs {imported,errors,duplicates,errorDetails}.
+ */
 export async function importClients(repo: IImportErpRepository, ctx: TenantContext, input: ImportInput): Promise<ImportResult> {
   const existing = await repo.listClients(ctx);
   const seenEmails = new Set(existing.map((c) => (c.email || "").toLowerCase().trim()).filter((e) => e.length > 0));
@@ -51,8 +53,10 @@ export async function importClients(repo: IImportErpRepository, ctx: TenantConte
   return res;
 }
 
-// Importe des devis « légers » (parité legacy `importDevis`). Le client est résolu par nom (lookup) ;
-// introuvable → erreur de ligne (« importez d'abord les clients »). Validité = dateDevis + 30 jours.
+/*
+ * Importe des devis « légers » (parité legacy `importDevis`). Le client est résolu par nom (lookup) ;
+ * introuvable → erreur de ligne (« importez d'abord les clients »). Validité = dateDevis + 30 jours.
+ */
 export async function importDevis(repo: IImportErpRepository, ctx: TenantContext, input: ImportInput): Promise<ImportResult> {
   const clients = await repo.listClients(ctx);
   const res = emptyResult();
@@ -93,13 +97,17 @@ export async function importDevis(repo: IImportErpRepository, ctx: TenantContext
   return res;
 }
 
-// Importe des factures « légères » (parité legacy `importFactures`). Client résolu par nom ; échéance =
-// dateFacture + 30 jours. Montant TTC brut (pas de lignes ni d'écritures — reprise de données).
+/*
+ * Importe des factures « légères » (parité legacy `importFactures`). Client résolu par nom ; échéance =
+ * dateFacture + 30 jours. Montant TTC brut (pas de lignes ni d'écritures — reprise de données).
+ */
 export async function importFactures(repo: IImportErpRepository, ctx: TenantContext, input: ImportInput): Promise<ImportResult> {
   const clients = await repo.listClients(ctx);
   const res = emptyResult();
-  // Numéros déjà présents (existants + au fil de l'import) → on REFUSE un doublon plutôt que de
-  // ré-attribuer silencieusement (numéro légal immuable). Vide tant qu'aucun `numeroFacture` n'est mappé.
+  /*
+   * Numéros déjà présents (existants + au fil de l'import) → on REFUSE un doublon plutôt que de
+   * ré-attribuer silencieusement (numéro légal immuable). Vide tant qu'aucun `numeroFacture` n'est mappé.
+   */
   const numerosVus = new Set(await repo.listFactureNumeros(ctx));
 
   let lineNum = 1;

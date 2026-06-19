@@ -1,15 +1,19 @@
 import { RealtimeTokenError, type RealtimeVoiceTokenPort, type VoiceTokenMinted, type VoiceTokenSetup } from "../application/voice-token-use-cases";
 import { toGeminiTools } from "./gemini-agentic-adapter";
 
-// Adapter Gemini du mint vocal : POST `v1alpha/auth_tokens` (token éphémère pour la session Live). Body
-// FLAT snake_case (l'endpoint éphémère n'est pas exposé par le SDK @google/genai). `fetch` global (Node
-// 18+) → pas de SDK ni d'import variable-de-chemin. Le mapping du body est PUR (`buildAuthTokenBody`).
+/*
+ * Adapter Gemini du mint vocal : POST `v1alpha/auth_tokens` (token éphémère pour la session Live). Body
+ * FLAT snake_case (l'endpoint éphémère n'est pas exposé par le SDK @google/genai). `fetch` global (Node
+ * 18+) → pas de SDK ni d'import variable-de-chemin. Le mapping du body est PUR (`buildAuthTokenBody`).
+ */
 
 const LIVE_MODEL_DEFAULT = "gemini-2.5-flash-native-audio-latest";
 const WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained";
 
-// Construit le body d'auth_tokens (PUR, testable) : 1 usage, token 30 min, session à démarrer < 1 min ;
-// setup Live AUDIO + transcriptions in/out + system instruction + outils (`function_declarations`).
+/*
+ * Construit le body d'auth_tokens (PUR, testable) : 1 usage, token 30 min, session à démarrer < 1 min ;
+ * setup Live AUDIO + transcriptions in/out + system instruction + outils (`function_declarations`).
+ */
 export function buildAuthTokenBody(setup: VoiceTokenSetup, model: string, now: number): Record<string, unknown> {
   const wrapped = toGeminiTools(setup.tools)[0] as { functionDeclarations?: unknown } | undefined;
   const functionDeclarations = wrapped?.functionDeclarations ?? [];

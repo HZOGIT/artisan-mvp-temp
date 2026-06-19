@@ -5,9 +5,11 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PublicAvisWriter, SoumettreAvisData } from "../application/avis-public-use-cases";
 
-// Écrit la soumission publique d'un avis sous le **tenant résolu** (RLS) en une transaction :
-// 1) insère l'avis (`avis_clients`, statut `publie`) ; 2) marque la demande `completee` (+ avisRecuAt) ;
-// 3) notifie l'artisan. `artisanId` forcé = `ctx.artisanId` (cohérent RLS with-check).
+/*
+ * Écrit la soumission publique d'un avis sous le **tenant résolu** (RLS) en une transaction :
+ * 1) insère l'avis (`avis_clients`, statut `publie`) ; 2) marque la demande `completee` (+ avisRecuAt) ;
+ * 3) notifie l'artisan. `artisanId` forcé = `ctx.artisanId` (cohérent RLS with-check).
+ */
 export class PublicAvisWriterDrizzle implements PublicAvisWriter {
   constructor(private readonly db: DbClient) {}
 

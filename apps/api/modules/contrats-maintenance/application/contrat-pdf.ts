@@ -2,8 +2,10 @@ import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
 
-// PDF d'un contrat de maintenance (parité legacy `/api/contrats/:id/pdf`) : contrat possédé + client +
-// profil artisan → `PdfPort.render('contrat', …)`. Ownership via repos migrés (404 anti-IDOR, sans oracle).
+/*
+ * PDF d'un contrat de maintenance (parité legacy `/api/contrats/:id/pdf`) : contrat possédé + client +
+ * profil artisan → `PdfPort.render('contrat', …)`. Ownership via repos migrés (404 anti-IDOR, sans oracle).
+ */
 export interface ContratPdfDeps {
   readonly contratRepo: { getById(ctx: TenantContext, id: number): Promise<{ clientId: number; reference: string } | null> };
   readonly clientReader: { getById(ctx: TenantContext, id: number): Promise<unknown | null> };

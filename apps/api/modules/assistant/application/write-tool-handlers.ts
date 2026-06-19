@@ -1,10 +1,12 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ToolHandler } from "./assistant-tool-registry";
 
-// Handlers d'ÉCRITURE de l'assistant agentique (Phase 2, opt-in). Chaque écriture est mappée à un
-// use-case DÉJÀ MIGRÉ du domaine (anti-IDOR ownership, validation, jamais de SQL brut) ; on formate
-// le `data` à la **forme legacy** + on capture les exceptions (parité legacy `try/catch → fail`).
-// Phase 2a : `creer_client` + `creer_intervention` (les moins risquées).
+/*
+ * Handlers d'ÉCRITURE de l'assistant agentique (Phase 2, opt-in). Chaque écriture est mappée à un
+ * use-case DÉJÀ MIGRÉ du domaine (anti-IDOR ownership, validation, jamais de SQL brut) ; on formate
+ * le `data` à la **forme legacy** + on capture les exceptions (parité legacy `try/catch → fail`).
+ * Phase 2a : `creer_client` + `creer_intervention` (les moins risquées).
+ */
 
 const optStr = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
 const errMsg = (e: unknown, fallback: string): string => (e instanceof Error && e.message ? e.message : fallback);
@@ -53,8 +55,10 @@ export interface InterventionUpdaterForAgent {
   modifier(ctx: TenantContext, id: number, patch: InterventionUpdatePatch): Promise<{ id: number; titre: string; statut: string }>;
 }
 
-// Devis : on s'appuie sur les use-cases migrés (création header + ajout de lignes, montants HT/TVA/TTC
-// recalculés par le repo) ; l'orchestration (header → lignes → relecture des totaux) reste ici.
+/*
+ * Devis : on s'appuie sur les use-cases migrés (création header + ajout de lignes, montants HT/TVA/TTC
+ * recalculés par le repo) ; l'orchestration (header → lignes → relecture des totaux) reste ici.
+ */
 export interface DevisLigneInput {
   readonly designation: string;
   readonly quantite: string;
@@ -68,8 +72,10 @@ export interface DevisWriterForAgent {
   getById(ctx: TenantContext, devisId: number): Promise<{ numero: string; totalTTC: string; statut: string } | null>;
 }
 
-// Facture : 2 modes — depuis un devis (conversion migrée : ⚠️ devis ACCEPTÉ requis + pas déjà
-// converti, invariant durci du module factures) ou depuis des lignes (comme `creer_devis`).
+/*
+ * Facture : 2 modes — depuis un devis (conversion migrée : ⚠️ devis ACCEPTÉ requis + pas déjà
+ * converti, invariant durci du module factures) ou depuis des lignes (comme `creer_devis`).
+ */
 export interface FactureLigneInput {
   readonly designation: string;
   readonly quantite: string;
@@ -85,8 +91,10 @@ export interface FactureWriterForAgent {
   getById(ctx: TenantContext, factureId: number): Promise<{ numero: string; totalTTC: string; statut: string; objet: string | null } | null>;
 }
 
-// Envoi par email (devis/facture) : mappé aux use-cases d'envoi migrés (PDF via `PdfPort`, email via
-// `EmailPort`, statut→envoye/envoyee, rate-limit). Renvoie `{success, message}` (les erreurs lèvent).
+/*
+ * Envoi par email (devis/facture) : mappé aux use-cases d'envoi migrés (PDF via `PdfPort`, email via
+ * `EmailPort`, statut→envoye/envoyee, rate-limit). Renvoie `{success, message}` (les erreurs lèvent).
+ */
 export interface EnvoiResultForAgent {
   readonly success: boolean;
   readonly message: string;
@@ -102,8 +110,10 @@ export interface RelanceSenderForAgent {
   envoyer(ctx: TenantContext, factureId: number, customMessage?: string): Promise<EnvoiResultForAgent>;
 }
 
-// Commande fournisseur : création (lignes inline, totaux + ownership fournisseur par le use-case
-// migré) + envoi par email (PDF via PdfPort). Legacy `prixUnitaireHT` → `prixUnitaire` migré.
+/*
+ * Commande fournisseur : création (lignes inline, totaux + ownership fournisseur par le use-case
+ * migré) + envoi par email (PDF via PdfPort). Legacy `prixUnitaireHT` → `prixUnitaire` migré.
+ */
 export interface CommandeLigneInput {
   readonly designation: string;
   readonly quantite: string;
@@ -160,8 +170,10 @@ function makeCreerClient(clients: ClientWriterForAgent): ToolHandler {
   };
 }
 
-// `creer_intervention` : statut `planifiee` forcé ; adresse par défaut = adresse postale du client si
-// non fournie ; ownership client (404 si cross-tenant — `getById` renvoie null). Parité legacy.
+/*
+ * `creer_intervention` : statut `planifiee` forcé ; adresse par défaut = adresse postale du client si
+ * non fournie ; ownership client (404 si cross-tenant — `getById` renvoie null). Parité legacy.
+ */
 function makeCreerIntervention(clientsById: ClientByIdReaderForAgent, interventions: InterventionWriterForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     if (!args?.clientId || !args?.titre || !args?.dateDebut || !args?.dateFin) {
@@ -212,9 +224,11 @@ function makeCreerIntervention(clientsById: ClientByIdReaderForAgent, interventi
   };
 }
 
-// Orchestration de création d'un devis brouillon + lignes (montants recalculés par le repo), validité
-// `validiteDays` jours (défaut 30). Lève en cas d'erreur use-case (ownership client, etc.). Réutilisée
-// par `creer_devis` et `creer_et_envoyer_devis`. `null` si paramètres manquants.
+/*
+ * Orchestration de création d'un devis brouillon + lignes (montants recalculés par le repo), validité
+ * `validiteDays` jours (défaut 30). Lève en cas d'erreur use-case (ownership client, etc.). Réutilisée
+ * par `creer_devis` et `creer_et_envoyer_devis`. `null` si paramètres manquants.
+ */
 async function creerDevisOrchestration(
   devis: DevisWriterForAgent,
   ctx: TenantContext,
@@ -259,8 +273,10 @@ function makeCreerDevis(devis: DevisWriterForAgent): ToolHandler {
   };
 }
 
-// `creer_et_envoyer_devis` : crée le devis puis l'envoie (email `messageEmail`). Si l'envoi échoue,
-// le devis reste créé (message explicite, parité legacy).
+/*
+ * `creer_et_envoyer_devis` : crée le devis puis l'envoie (email `messageEmail`). Si l'envoi échoue,
+ * le devis reste créé (message explicite, parité legacy).
+ */
 function makeCreerEtEnvoyerDevis(devis: DevisWriterForAgent, sender: DevisSenderForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     try {
@@ -283,8 +299,10 @@ function makeCreerEtEnvoyerDevis(devis: DevisWriterForAgent, sender: DevisSender
   };
 }
 
-// `creer_facture` : depuis un devis (conversion — devis ACCEPTÉ requis) OU depuis des lignes (clientId
-// + lignes). `objet` requis. Ownership client/devis assurés par les use-cases migrés (404 cross-tenant).
+/*
+ * `creer_facture` : depuis un devis (conversion — devis ACCEPTÉ requis) OU depuis des lignes (clientId
+ * + lignes). `objet` requis. Ownership client/devis assurés par les use-cases migrés (404 cross-tenant).
+ */
 function makeCreerFacture(facture: FactureWriterForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     const objet = typeof args?.objet === "string" ? args.objet : "";
@@ -334,8 +352,10 @@ function makeCreerFacture(facture: FactureWriterForAgent): ToolHandler {
   };
 }
 
-// `envoyer_devis` / `envoyer_facture` : envoi par email (PDF joint) via le use-case migré ; ownership
-// 404 / email client requis / rate-limit captés en exception → `{ok:false}`. `{message}` en succès.
+/*
+ * `envoyer_devis` / `envoyer_facture` : envoi par email (PDF joint) via le use-case migré ; ownership
+ * 404 / email client requis / rate-limit captés en exception → `{ok:false}`. `{message}` en succès.
+ */
 function makeEnvoyerDevis(sender: DevisSenderForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     if (!args?.devisId) return { ok: false, error: "devisId est requis" };
@@ -372,8 +392,10 @@ function makeEnvoyerRelance(sender: RelanceSenderForAgent): ToolHandler {
   };
 }
 
-// `creer_commande_fournisseur` : crée un BC brouillon + lignes (totaux + ownership fournisseur par le
-// use-case migré). `delaiLivraison` (texte libre, sans champ migré dédié) est replié dans les notes.
+/*
+ * `creer_commande_fournisseur` : crée un BC brouillon + lignes (totaux + ownership fournisseur par le
+ * use-case migré). `delaiLivraison` (texte libre, sans champ migré dédié) est replié dans les notes.
+ */
 function makeCreerCommande(commandes: CommandeWriterForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     const fournisseurId = Number(args?.fournisseurId);
@@ -425,8 +447,10 @@ function makeEnvoyerCommande(sender: CommandeSenderForAgent): ToolHandler {
   };
 }
 
-// `modifier_intervention` : met à jour les champs fournis (titre/dates/statut/notes). Ownership via le
-// use-case migré (404 cross-tenant). Dates ISO validées. `Aucun champ` → refus (parité legacy).
+/*
+ * `modifier_intervention` : met à jour les champs fournis (titre/dates/statut/notes). Ownership via le
+ * use-case migré (404 cross-tenant). Dates ISO validées. `Aucun champ` → refus (parité legacy).
+ */
 function makeModifierIntervention(updater: InterventionUpdaterForAgent): ToolHandler {
   return async (args, ctx: TenantContext) => {
     if (!args?.interventionId) return { ok: false, error: "interventionId est requis" };
@@ -457,9 +481,11 @@ function makeModifierIntervention(updater: InterventionUpdaterForAgent): ToolHan
   };
 }
 
-// Construit les handlers d'écriture câblés (par lots, risque croissant). Un outil n'est inclus que si
-// ses readers/writers sont fournis. 2a : creer_client/intervention ; 2b : creer_devis ; 2c : creer_facture ;
-// 2d : envoyer_devis/envoyer_facture ; 2e : creer_et_envoyer_devis + commandes ; 2f : modifier_intervention.
+/*
+ * Construit les handlers d'écriture câblés (par lots, risque croissant). Un outil n'est inclus que si
+ * ses readers/writers sont fournis. 2a : creer_client/intervention ; 2b : creer_devis ; 2c : creer_facture ;
+ * 2d : envoyer_devis/envoyer_facture ; 2e : creer_et_envoyer_devis + commandes ; 2f : modifier_intervention.
+ */
 export function buildAssistantWriteHandlers(deps: AssistantWriteDeps): Record<string, ToolHandler> {
   const handlers: Record<string, ToolHandler> = {};
   if (deps.clients) handlers.creer_client = makeCreerClient(deps.clients);

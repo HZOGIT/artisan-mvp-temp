@@ -32,17 +32,21 @@ export async function addPhoto(repo: IDevisIARepository, ctx: TenantContext, ana
   return photo;
 }
 
-// Met à jour une suggestion (404 si elle ne relève pas d'une analyse du tenant). ⚠️ Comble l'IDOR
-// du legacy (qui mettait à jour par id sans vérifier l'appartenance).
+/*
+ * Met à jour une suggestion (404 si elle ne relève pas d'une analyse du tenant). ⚠️ Comble l'IDOR
+ * du legacy (qui mettait à jour par id sans vérifier l'appartenance).
+ */
 export async function updateSuggestion(repo: IDevisIARepository, ctx: TenantContext, suggestionId: number, patch: UpdateSuggestionInput): Promise<Suggestion> {
   const updated = await repo.updateSuggestionOwned(ctx, suggestionId, patch);
   if (!updated) throw new NotFoundError("Suggestion introuvable");
   return updated;
 }
 
-// Génère un devis (brouillon) depuis les suggestions sélectionnées d'une analyse possédée. Valide
-// l'analyse (404) ET le client rattaché (404 anti-IDOR-FK — sinon fuite PII via relecture du devis).
-// null si aucune suggestion sélectionnée (parité legacy).
+/*
+ * Génère un devis (brouillon) depuis les suggestions sélectionnées d'une analyse possédée. Valide
+ * l'analyse (404) ET le client rattaché (404 anti-IDOR-FK — sinon fuite PII via relecture du devis).
+ * null si aucune suggestion sélectionnée (parité legacy).
+ */
 export async function genererDevis(repo: IDevisIARepository, ctx: TenantContext, params: { analyseId: number; clientId: number; suggestionIds?: number[] }): Promise<{ devisId: number; montantEstime: number } | null> {
   if (!(await repo.getAnalyseOwned(ctx, params.analyseId))) throw new NotFoundError("Analyse non trouvée");
   if (!(await repo.ownsClient(ctx, params.clientId))) throw new NotFoundError("Client introuvable");
@@ -57,10 +61,12 @@ export interface AnalyserPhotosDeps {
   readonly bibliotheque: { list(filtre?: unknown): Promise<Array<{ id: number; nom: string }>> };
 }
 
-// Analyse les photos d'une analyse via l'IA Vision (parité legacy `analyserPhotos`). Ownership (404),
-// rate-limit IA (429). Statut `en_cours` → appel Vision multi-image (prompt métier) → parse JSON →
-// enregistre résultats + suggestions (match bibliothèque) → statut `termine`. Sur échec Vision/parse :
-// statut `erreur` + Error 500 (message sanitisé, sans payload base64). 400 si aucune photo.
+/*
+ * Analyse les photos d'une analyse via l'IA Vision (parité legacy `analyserPhotos`). Ownership (404),
+ * rate-limit IA (429). Statut `en_cours` → appel Vision multi-image (prompt métier) → parse JSON →
+ * enregistre résultats + suggestions (match bibliothèque) → statut `termine`. Sur échec Vision/parse :
+ * statut `erreur` + Error 500 (message sanitisé, sans payload base64). 400 si aucune photo.
+ */
 export async function analyserPhotos(deps: AnalyserPhotosDeps, ctx: TenantContext, analyseId: number): Promise<{ success: true; nombreTravaux: number }> {
   if (!(await deps.repo.getAnalyseOwned(ctx, analyseId))) throw new NotFoundError("Analyse non trouvée");
   if (!(await deps.rateLimiter.check(`ia:${ctx.artisanId}`))) throw new TooManyRequestsError("Limite atteinte");

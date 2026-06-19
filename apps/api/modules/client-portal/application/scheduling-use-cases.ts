@@ -38,8 +38,10 @@ export interface DemanderRdvInput {
   readonly dateProposee: string;
 }
 
-// Crée une demande de RDV (public, anti-flood par artisan:client) + notifie l'artisan. Date validée
-// (≥ +24h, ≤ +2 ans, non NaN). Statut/durée par défaut posés à l'insertion (parité legacy).
+/*
+ * Crée une demande de RDV (public, anti-flood par artisan:client) + notifie l'artisan. Date validée
+ * (≥ +24h, ≤ +2 ans, non NaN). Statut/durée par défaut posés à l'insertion (parité legacy).
+ */
 export async function demanderRdv(deps: PortalSchedulingDeps, token: string, input: DemanderRdvInput, now: Date = new Date()): Promise<PortalRdv> {
   const { ctx, clientId, artisanId } = await resolve(deps, token, now);
   if (!(await deps.rateLimiter.check(`portal-rdv:${artisanId}:${clientId}`))) {

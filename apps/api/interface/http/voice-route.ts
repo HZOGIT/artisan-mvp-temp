@@ -5,8 +5,10 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface VoiceRouteDeps extends CookieAuthDeps, VoicePersistDeps {}
 
-// Route HORS-tRPC `POST /api/voice/persist` (auth cookie JWT) : persiste les transcripts d'une session
-// vocale (MonAssistant Live) dans un thread du tenant. Anti-IDOR via l'ownership du thread.
+/*
+ * Route HORS-tRPC `POST /api/voice/persist` (auth cookie JWT) : persiste les transcripts d'une session
+ * vocale (MonAssistant Live) dans un thread du tenant. Anti-IDOR via l'ownership du thread.
+ */
 export function registerVoiceRoute(app: FastifyInstance, deps: VoiceRouteDeps): void {
   app.post("/api/voice/persist", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

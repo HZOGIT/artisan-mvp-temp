@@ -7,13 +7,15 @@ import type { AssistantToolRegistry, ToolResult } from "./agentic-port";
 export type ToolHandler = (args: Record<string, unknown>, ctx: TenantContext) => Promise<ToolResult>;
 export type ReadToolHandler = ToolHandler; // alias historique (lecture)
 
-// Registre des outils de l'assistant agentique.
-//   - `naviguer_vers` : handler PUR intégré (aucune dépendance données).
-//   - LECTURES : injectées au fil de l'eau (un domaine migré par firing), mappées aux readers.
-//   - ÉCRITURES : **opt-in** via `writeHandlers` (Phase 2, garde-fous). Sans handler d'écriture →
-//     refus (défaut sûr : le registry de LECTURE seule reste le défaut).
-// `tools` = les schémas des outils EFFECTIVEMENT câblés (on n'expose pas au modèle un outil qui
-// répondrait « indisponible »). Un outil inconnu / non câblé / écriture sans handler → `{ok:false}`.
+/*
+ * Registre des outils de l'assistant agentique.
+ *   - `naviguer_vers` : handler PUR intégré (aucune dépendance données).
+ *   - LECTURES : injectées au fil de l'eau (un domaine migré par firing), mappées aux readers.
+ *   - ÉCRITURES : **opt-in** via `writeHandlers` (Phase 2, garde-fous). Sans handler d'écriture →
+ *     refus (défaut sûr : le registry de LECTURE seule reste le défaut).
+ * `tools` = les schémas des outils EFFECTIVEMENT câblés (on n'expose pas au modèle un outil qui
+ * répondrait « indisponible »). Un outil inconnu / non câblé / écriture sans handler → `{ok:false}`.
+ */
 export class AssistantReadToolRegistry implements AssistantToolRegistry {
   private readonly handlers: Map<string, ToolHandler>;
   private readonly writeHandlers: Map<string, ToolHandler>;

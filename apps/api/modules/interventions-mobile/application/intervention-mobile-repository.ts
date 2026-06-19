@@ -21,8 +21,10 @@ export interface UpdateDepartData {
   readonly signatureDate?: Date;
 }
 
-// Port du repository des données mobiles d'intervention (`interventions_mobile`, SOUS RLS → l'impl
-// scope via withTenant + artisanId à l'insertion). Une ligne au plus par intervention.
+/*
+ * Port du repository des données mobiles d'intervention (`interventions_mobile`, SOUS RLS → l'impl
+ * scope via withTenant + artisanId à l'insertion). Une ligne au plus par intervention.
+ */
 export interface IInterventionMobileRepository {
   getByIntervention(ctx: TenantContext, interventionId: number): Promise<InterventionMobile | null>;
   // Lecture en lot (anti N+1 pour l'enrichissement de la liste du jour) : map interventionId → données.

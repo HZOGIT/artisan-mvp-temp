@@ -1,8 +1,10 @@
-// Extraction de l'IP cliente à **valeur probante** (signature de devis) : on priorise
-// `cf-connecting-ip` (posé par Cloudflare, non falsifiable par le client) plutôt que
-// `x-forwarded-for[0]` (que le signataire peut usurper). On ne garde qu'UNE IP (pas toute la chaîne
-// XFF) et on borne à 45 caractères (colonne `signatures_devis.ipAddress` VARCHAR(45) → évite un
-// dépassement à l'écriture). Parité legacy (server/routers.ts `signDevis`/`refuseDevis`).
+/*
+ * Extraction de l'IP cliente à **valeur probante** (signature de devis) : on priorise
+ * `cf-connecting-ip` (posé par Cloudflare, non falsifiable par le client) plutôt que
+ * `x-forwarded-for[0]` (que le signataire peut usurper). On ne garde qu'UNE IP (pas toute la chaîne
+ * XFF) et on borne à 45 caractères (colonne `signatures_devis.ipAddress` VARCHAR(45) → évite un
+ * dépassement à l'écriture). Parité legacy (server/routers.ts `signDevis`/`refuseDevis`).
+ */
 const IP_MAX = 45;
 
 function header(headers: Record<string, unknown>, name: string): string | null {

@@ -1,9 +1,11 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Activite, ActiviteEntiteType, CreateActiviteInput } from "../domain/activite";
 
-// Port du repository « activités » (suivi commercial). Table `activites` sous RLS (porte `artisanId`)
-// → toutes les opérations sont scopées au tenant courant. `ownsEntite` sert l'anti-IDOR FK du
-// rattachement optionnel (l'entité liée doit appartenir au tenant).
+/*
+ * Port du repository « activités » (suivi commercial). Table `activites` sous RLS (porte `artisanId`)
+ * → toutes les opérations sont scopées au tenant courant. `ownsEntite` sert l'anti-IDOR FK du
+ * rattachement optionnel (l'entité liée doit appartenir au tenant).
+ */
 export interface IActiviteRepository {
   // Activités du tenant, triées « à faire d'abord » puis par échéance croissante (parité legacy).
   list(ctx: TenantContext): Promise<Activite[]>;

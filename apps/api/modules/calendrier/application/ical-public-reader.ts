@@ -1,7 +1,9 @@
 import type { IcalEvent } from "../domain/ical";
 
-// Flux iCal résolu par jeton public (`icalToken` sur l'artisan). Le jeton EST la capacité (pas de
-// cookie tenant). `null` si le jeton est inconnu → 404 uniforme (anti-énumération).
+/*
+ * Flux iCal résolu par jeton public (`icalToken` sur l'artisan). Le jeton EST la capacité (pas de
+ * cookie tenant). `null` si le jeton est inconnu → 404 uniforme (anti-énumération).
+ */
 export interface IcalFeedData {
   readonly calName: string;
   readonly events: IcalEvent[];

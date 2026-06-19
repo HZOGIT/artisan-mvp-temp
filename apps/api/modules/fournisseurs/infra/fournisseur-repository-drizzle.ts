@@ -39,10 +39,12 @@ function toFournisseur(r: FournisseurRow): Fournisseur {
   };
 }
 
-// Implémentation Drizzle du repository fournisseurs. Double cloisonnement : RLS (rôle app
-// + app.tenant via withTenant) ET filtre explicite `artisanId`. La suppression purge les
-// associations article-fournisseur (table SANS artisanId : prix d'achat/références
-// tenant-privés) après vérification d'ownership — anti-IDOR.
+/*
+ * Implémentation Drizzle du repository fournisseurs. Double cloisonnement : RLS (rôle app
+ * + app.tenant via withTenant) ET filtre explicite `artisanId`. La suppression purge les
+ * associations article-fournisseur (table SANS artisanId : prix d'achat/références
+ * tenant-privés) après vérification d'ownership — anti-IDOR.
+ */
 export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -91,8 +93,10 @@ export class FournisseurRepositoryDrizzle implements IFournisseurRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Vérifie l'appartenance AVANT de toucher les associations (articles_fournisseurs
-      // n'a pas d'artisanId → on ne doit pas supprimer celles d'un autre tenant). Atomique.
+      /*
+       * Vérifie l'appartenance AVANT de toucher les associations (articles_fournisseurs
+       * n'a pas d'artisanId → on ne doit pas supprimer celles d'un autre tenant). Atomique.
+       */
       const [owned] = await tx
         .select({ id: fournisseurs.id })
         .from(fournisseurs)

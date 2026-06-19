@@ -1,9 +1,11 @@
 import type { TenantContext } from "../../../shared/tenant";
 
-// Port de LECTURE du domaine factures, vu depuis ecritures (génération FEC). On évite le couplage
-// inter-modules : ecritures dépend d'une **abstraction de lecture minimale** (modèles propres),
-// pas du module factures. L'impl Drizzle lit `factures`/`factures_lignes` (RLS) ; un fake sert
-// aux tests. Tout est scopé tenant (→ null/[] hors tenant).
+/*
+ * Port de LECTURE du domaine factures, vu depuis ecritures (génération FEC). On évite le couplage
+ * inter-modules : ecritures dépend d'une **abstraction de lecture minimale** (modèles propres),
+ * pas du module factures. L'impl Drizzle lit `factures`/`factures_lignes` (RLS) ; un fake sert
+ * aux tests. Tout est scopé tenant (→ null/[] hors tenant).
+ */
 
 export interface FactureReadModel {
   readonly id: number;

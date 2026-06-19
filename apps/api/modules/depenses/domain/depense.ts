@@ -1,11 +1,13 @@
-// Types de domaine du module depenses (compta — dépenses/achats) — découplés du schéma
-// Drizzle. ⚠️ Domaine sensible : montants/TVA exacts (decimal/string, pas de float ;
-// montant_ttc = montant_ht + montant_tva), isolation cross-tenant, FK (chantier/intervention/
-// client) scopées tenant (anti-IDOR-FK). Le workflow (soumettre/approuver/rejeter/rembourser)
-// + la récurrence + l'OCR sont portés aux étapes ultérieures.
-//
-// NB : la table `depenses` est en snake_case (`artisan_id`, `montant_ht`, `date_depense`…) —
-// le mapping vers ces noms camelCase est fait dans l'infra (Drizzle).
+/*
+ * Types de domaine du module depenses (compta — dépenses/achats) — découplés du schéma
+ * Drizzle. ⚠️ Domaine sensible : montants/TVA exacts (decimal/string, pas de float ;
+ * montant_ttc = montant_ht + montant_tva), isolation cross-tenant, FK (chantier/intervention/
+ * client) scopées tenant (anti-IDOR-FK). Le workflow (soumettre/approuver/rejeter/rembourser)
+ * + la récurrence + l'OCR sont portés aux étapes ultérieures.
+ * 
+ * NB : la table `depenses` est en snake_case (`artisan_id`, `montant_ht`, `date_depense`…) —
+ * le mapping vers ces noms camelCase est fait dans l'infra (Drizzle).
+ */
 
 export type DepenseStatut = "brouillon" | "soumise" | "approuvee" | "rejetee" | "remboursee";
 export type DepenseModePaiement = "carte" | "especes" | "virement" | "cheque" | "prelevement";
@@ -73,8 +75,10 @@ export interface CreateDepenseInput {
 }
 
 export interface UpdateDepenseInput {
-  // ⚠️ `statut`/`rembourse`/`dateRemboursement`/`userId` ne sont PAS modifiables ici : ils
-  // changent via le workflow (étape ultérieure) qui porte l'anti self-approbation + intégrité.
+  /*
+   * ⚠️ `statut`/`rembourse`/`dateRemboursement`/`userId` ne sont PAS modifiables ici : ils
+   * changent via le workflow (étape ultérieure) qui porte l'anti self-approbation + intégrité.
+   */
   readonly numero?: string;
   readonly dateDepense?: string;
   readonly categorie?: string;

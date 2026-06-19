@@ -3,8 +3,10 @@ import type { IEmailLogReader } from "../application/email-log-reader";
 import { clampLimit } from "../domain/email-log";
 import type { EmailLogEntry, EmailLogFilter } from "../domain/email-log";
 
-// Lecteur fake déterministe : journal d'emails par tenant. Reproduit tri (createdAt desc), filtres
-// entité et bornage de limite.
+/*
+ * Lecteur fake déterministe : journal d'emails par tenant. Reproduit tri (createdAt desc), filtres
+ * entité et bornage de limite.
+ */
 export class FakeEmailLogReader implements IEmailLogReader {
   private readonly entries = new Map<number, EmailLogEntry[]>();
 

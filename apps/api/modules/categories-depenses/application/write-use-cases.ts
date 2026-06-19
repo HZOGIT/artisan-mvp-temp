@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ICategorieDepenseRepository } from "./categorie-depense-repository";
 import type { CategorieDepense, CreateCategorieInput, UpdateCategorieInput } from "../domain/categorie-depense";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier. ⚠️ L'unicité du nom
-// (artisan_id, nom) est garantie par la contrainte DB et remonte du repo sous forme de
-// `ConflictError` (on la laisse propager — formatter TRPC → 409). Le scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier. ⚠️ L'unicité du nom
+ * (artisan_id, nom) est garantie par la contrainte DB et remonte du repo sous forme de
+ * `ConflictError` (on la laisse propager — formatter TRPC → 409). Le scoping tenant est porté par le repo.
+ */
 
 const HEX_COULEUR = /^#[0-9a-fA-F]{6}$/;
 const DECIMAL_2 = /^\d+(\.\d{1,2})?$/;

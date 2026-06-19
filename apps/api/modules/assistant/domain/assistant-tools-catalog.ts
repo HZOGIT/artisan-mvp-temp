@@ -1,10 +1,12 @@
-// Catalogue d'outils de l'assistant agentique — PUR et neutre (aucune dépendance provider).
-//
-// Le legacy (`server/_core/assistantTools.ts`) déclare ces outils en `FunctionDeclaration`
-// `@google/genai` (`Type.OBJECT`, …). Pour garder le domaine indépendant du provider, on les
-// redéclare ici avec un type `ToolSchema` neutre (chaînes `"object" | "string" | …`). Un mapper
-// côté adapter (infra) traduit `ToolSchema` → schéma Gemini. **Noms + descriptions + paramètres
-// doivent rester identiques au legacy** : le comportement du modèle en dépend (parité agentique).
+/*
+ * Catalogue d'outils de l'assistant agentique — PUR et neutre (aucune dépendance provider).
+ * 
+ * Le legacy (`server/_core/assistantTools.ts`) déclare ces outils en `FunctionDeclaration`
+ * `@google/genai` (`Type.OBJECT`, …). Pour garder le domaine indépendant du provider, on les
+ * redéclare ici avec un type `ToolSchema` neutre (chaînes `"object" | "string" | …`). Un mapper
+ * côté adapter (infra) traduit `ToolSchema` → schéma Gemini. **Noms + descriptions + paramètres
+ * doivent rester identiques au legacy** : le comportement du modèle en dépend (parité agentique).
+ */
 
 // Type d'un paramètre d'outil (sous-ensemble JSON-Schema commun à Gemini/OpenAI).
 export type ToolParamType = "object" | "string" | "number" | "boolean" | "array";
@@ -298,10 +300,12 @@ export const ASSISTANT_TOOLS: readonly ToolSchema[] = [
   },
 ];
 
-// Mapping outil → caches tRPC à invalider côté client après une exécution réussie (parité legacy
-// `TOOL_INVALIDATIONS`). La route SSE émet un event `{ invalidate: [...] }` après chaque tool_use.
-// Les clés sont matchées en substring sur le queryKey. `notifications` est inclus pour les outils
-// qui créent une notification (envoi devis/facture/relance/commande) — rafraîchit la cloche.
+/*
+ * Mapping outil → caches tRPC à invalider côté client après une exécution réussie (parité legacy
+ * `TOOL_INVALIDATIONS`). La route SSE émet un event `{ invalidate: [...] }` après chaque tool_use.
+ * Les clés sont matchées en substring sur le queryKey. `notifications` est inclus pour les outils
+ * qui créent une notification (envoi devis/facture/relance/commande) — rafraîchit la cloche.
+ */
 export const TOOL_INVALIDATIONS: Record<string, readonly string[]> = {
   creer_client: ["clients"],
   creer_devis: ["devis"],
@@ -316,8 +320,10 @@ export const TOOL_INVALIDATIONS: Record<string, readonly string[]> = {
   envoyer_commande_fournisseur: ["commandesFournisseurs", "notifications"],
 };
 
-// Outils d'ÉCRITURE = exactement ceux qui déclarent une invalidation de cache (effet de bord tenant).
-// Les écritures sont portées EN DERNIER et avec garde-fous (cf. plan de portage agentique).
+/*
+ * Outils d'ÉCRITURE = exactement ceux qui déclarent une invalidation de cache (effet de bord tenant).
+ * Les écritures sont portées EN DERNIER et avec garde-fous (cf. plan de portage agentique).
+ */
 export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set(Object.keys(TOOL_INVALIDATIONS));
 
 // Un outil a-t-il un effet d'écriture (vs lecture/navigation) ?

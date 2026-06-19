@@ -30,8 +30,10 @@ const CONFIG_COLS = new Set<string>([
   "journalVentes", "journalAchats", "journalBanque", "prefixeFacture", "prefixeAvoir", "exerciceDebut", "actif", "syncAutoFactures", "syncAutoPaiements", "frequenceSync", "heureSync", "notifierErreurs", "notifierSucces",
 ]);
 
-// Repository Drizzle des intégrations comptables. Tables SOUS RLS (artisanId via withTenant). Lecture
-// seule des factures pour l'IIF (jamais d'altération d'écriture). Une config par artisan (upsert).
+/*
+ * Repository Drizzle des intégrations comptables. Tables SOUS RLS (artisanId via withTenant). Lecture
+ * seule des factures pour l'IIF (jamais d'altération d'écriture). Une config par artisan (upsert).
+ */
 export class IntegrationsComptablesRepositoryDrizzle implements IIntegrationsComptablesRepository {
   constructor(private readonly db: DbClient) {}
 

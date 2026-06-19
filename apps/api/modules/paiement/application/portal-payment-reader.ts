@@ -35,9 +35,11 @@ export interface ClientContact {
   readonly prenom: string | null;
 }
 
-// Lectures de la surface PUBLIQUE de paiement de facture (portail client). `resolveAccessByToken` lit
-// `client_portal_access` sous la policy public-token RLS (token actif + non expiré). Les lectures
-// facture/paiement repassent sous le tenant résolu (`withTenant(artisanId)`).
+/*
+ * Lectures de la surface PUBLIQUE de paiement de facture (portail client). `resolveAccessByToken` lit
+ * `client_portal_access` sous la policy public-token RLS (token actif + non expiré). Les lectures
+ * facture/paiement repassent sous le tenant résolu (`withTenant(artisanId)`).
+ */
 export interface PortalPaymentReader {
   resolveAccessByToken(token: string, now: Date): Promise<PortalAccess | null>;
   getFactureStatut(ctx: TenantContext, factureId: number): Promise<FacturePaiementStatut | null>;

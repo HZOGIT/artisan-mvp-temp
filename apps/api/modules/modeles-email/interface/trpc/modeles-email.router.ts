@@ -25,9 +25,11 @@ const updateSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
-// Routeur tRPC du domaine modeles-email. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors (NotFound→404,
-// Validation→400). L'unicité du défaut par type est portée par les write use-cases. Repo injecté.
+/*
+ * Routeur tRPC du domaine modeles-email. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors (NotFound→404,
+ * Validation→400). L'unicité du défaut par type est portée par les write use-cases. Repo injecté.
+ */
 export function createModelesEmailRouter(repo: IModeleEmailRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listModelesEmail(repo, ctx.tenant)),

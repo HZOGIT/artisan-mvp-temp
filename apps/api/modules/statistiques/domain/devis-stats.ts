@@ -11,8 +11,10 @@ export interface DevisStatRow {
   readonly totalTTC: string | null;
 }
 
-// Agrège un lot de devis : compte par statut (défaut « brouillon ») et somme les TTC. Fonction PURE
-// (testable sans DB) — somme brute des `parseFloat` comme le legacy (pas d'arrondi imposé).
+/*
+ * Agrège un lot de devis : compte par statut (défaut « brouillon ») et somme les TTC. Fonction PURE
+ * (testable sans DB) — somme brute des `parseFloat` comme le legacy (pas d'arrondi imposé).
+ */
 export function computeDevisStats(devis: readonly DevisStatRow[]): DevisStats {
   const parStatut: Record<string, number> = {};
   let montantTotal = 0;

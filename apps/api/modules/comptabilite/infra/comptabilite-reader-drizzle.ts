@@ -27,8 +27,10 @@ function toEcriture(r: Row): Ecriture {
   };
 }
 
-// Lecteur Drizzle comptable : écritures + agrégats scopés tenant (RLS via withTenant + filtre explicite
-// `artisanId`). Lecture seule.
+/*
+ * Lecteur Drizzle comptable : écritures + agrégats scopés tenant (RLS via withTenant + filtre explicite
+ * `artisanId`). Lecture seule.
+ */
 export class ComptabiliteReaderDrizzle implements IComptabiliteReader {
   constructor(private readonly db: DbClient) {}
 

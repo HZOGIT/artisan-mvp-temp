@@ -37,8 +37,10 @@ function toInsert(input: CreateBibliothequeInput): typeof bibliothequeArticles.$
   };
 }
 
-// Écritures du catalogue PARTAGÉ (table sans `artisanId`, RLS OFF) — pas de scope tenant. La garde
-// d'autorisation (admin) est portée par la procédure tRPC `adminProcedure`.
+/*
+ * Écritures du catalogue PARTAGÉ (table sans `artisanId`, RLS OFF) — pas de scope tenant. La garde
+ * d'autorisation (admin) est portée par la procédure tRPC `adminProcedure`.
+ */
 export class BibliothequeWriterDrizzle implements BibliothequeWriter {
   constructor(private readonly db: DbClient) {}
 

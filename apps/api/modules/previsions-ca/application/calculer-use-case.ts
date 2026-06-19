@@ -3,9 +3,11 @@ import type { IPrevisionCARepository } from "./prevision-ca-repository";
 import type { FacturesCAReader } from "./factures-ca-reader";
 import type { HistoriqueCA, PrevisionMethode, PredictionMois, CalculPrevisionsResult } from "../domain/prevision-ca";
 
-// Use-case `calculer` (forecasting). Recalcule l'historique de CA depuis les factures PAYÉES du
-// tenant, puis projette les prévisions de l'année courante selon la méthode. Parité legacy
-// `calculerHistoriqueCAMensuel` + `calculerPrevisionsCA`.
+/*
+ * Use-case `calculer` (forecasting). Recalcule l'historique de CA depuis les factures PAYÉES du
+ * tenant, puis projette les prévisions de l'année courante selon la méthode. Parité legacy
+ * `calculerHistoriqueCAMensuel` + `calculerPrevisionsCA`.
+ */
 
 export interface CalculerDeps {
   readonly repo: IPrevisionCARepository;
@@ -17,8 +19,10 @@ function num(s: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// PUR : à partir de l'historique (≤24 mois) et de la méthode, calcule 12 prédictions mensuelles
-// (CA prévisionnel + confiance). Parité legacy `calculerPrevisionsCA` (mêmes formules/arrondis).
+/*
+ * PUR : à partir de l'historique (≤24 mois) et de la méthode, calcule 12 prédictions mensuelles
+ * (CA prévisionnel + confiance). Parité legacy `calculerPrevisionsCA` (mêmes formules/arrondis).
+ */
 export function computePredictions(historique: readonly HistoriqueCA[], methode: PrevisionMethode): PredictionMois[] {
   const moyenneParMois = new Map<number, { total: number; count: number }>();
   for (const h of historique) {

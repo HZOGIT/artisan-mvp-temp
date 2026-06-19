@@ -2,8 +2,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ITransactionBancaireRepository } from "../application/transaction-bancaire-repository";
 import type { TransactionBancaire, ReleveItem, ImportReleveResult } from "../domain/transaction-bancaire";
 
-// Double in-memory du repository des transactions bancaires (tests sans DB). Reproduit le scoping
-// tenant + filtre `ignoree=false` + tri récent d'abord.
+/*
+ * Double in-memory du repository des transactions bancaires (tests sans DB). Reproduit le scoping
+ * tenant + filtre `ignoree=false` + tri récent d'abord.
+ */
 export class FakeTransactionBancaireRepository implements ITransactionBancaireRepository {
   private store: TransactionBancaire[] = [];
   private seq = 0;

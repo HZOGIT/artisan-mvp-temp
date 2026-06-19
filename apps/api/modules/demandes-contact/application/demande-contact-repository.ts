@@ -1,10 +1,12 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateDemandeInput, DemandeContact, DemandeContactStatut, UpdateDemandeInput } from "../domain/demande-contact";
 
-// Port du repository demandes-contact. Chaque méthode exige le TenantContext (scope tenant + RLS).
-// `demandes_contact` possède un `artisanId` → double cloisonnement RLS + filtre. Les transitions de
-// statut passent par `setStatut` (use-cases dédiés) ; la conversion peut lier un `clientId` validé
-// via `ownsClient` (anti-IDOR-FK).
+/*
+ * Port du repository demandes-contact. Chaque méthode exige le TenantContext (scope tenant + RLS).
+ * `demandes_contact` possède un `artisanId` → double cloisonnement RLS + filtre. Les transitions de
+ * statut passent par `setStatut` (use-cases dédiés) ; la conversion peut lier un `clientId` validé
+ * via `ownsClient` (anti-IDOR-FK).
+ */
 export interface IDemandeContactRepository {
   list(ctx: TenantContext): Promise<DemandeContact[]>;
   // Demandes du tenant filtrées par statut (scopé tenant ; [] si aucune).

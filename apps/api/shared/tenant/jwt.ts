@@ -1,10 +1,12 @@
 import { jwtVerify, SignJWT } from "jose";
 import type { TokenClaims } from "./tenant-context";
 
-// Émet un JWT HS256 d'authentification (contrepartie de `verifyAuthToken`). Secret INJECTÉ (pas d'env
-// ici) → pur/testable. Algo épinglé HS256, claims `{userId,email}` + expiration (défaut 7 j, parité
-// legacy `createToken`). ⚠️ Utiliser le MÊME secret que le legacy (JWT_SECRET) pendant la transition
-// pour que les tokens soient inter-opérables (legacy ↔ new-stack).
+/*
+ * Émet un JWT HS256 d'authentification (contrepartie de `verifyAuthToken`). Secret INJECTÉ (pas d'env
+ * ici) → pur/testable. Algo épinglé HS256, claims `{userId,email}` + expiration (défaut 7 j, parité
+ * legacy `createToken`). ⚠️ Utiliser le MÊME secret que le legacy (JWT_SECRET) pendant la transition
+ * pour que les tokens soient inter-opérables (legacy ↔ new-stack).
+ */
 export async function signAuthToken(claims: TokenClaims, secret: string, expiresIn: string | number = "7d"): Promise<string> {
   const key = new TextEncoder().encode(secret);
   return new SignJWT({ userId: claims.userId, email: claims.email })
@@ -14,10 +16,12 @@ export async function signAuthToken(claims: TokenClaims, secret: string, expires
     .sign(key);
 }
 
-// Vérifie un JWT HS256 et en extrait les claims d'authentification. Le secret est
-// INJECTÉ (pas de lecture d'env ici) → fonction pure, testable, découplée du legacy.
-// L'algorithme est épinglé (HS256) en défense contre la confusion d'algo / alg:none.
-// Retourne null si le token est absent, invalide, expiré, ou de forme inattendue.
+/*
+ * Vérifie un JWT HS256 et en extrait les claims d'authentification. Le secret est
+ * INJECTÉ (pas de lecture d'env ici) → fonction pure, testable, découplée du legacy.
+ * L'algorithme est épinglé (HS256) en défense contre la confusion d'algo / alg:none.
+ * Retourne null si le token est absent, invalide, expiré, ou de forme inattendue.
+ */
 export async function verifyAuthToken(
   token: string | undefined | null,
   secret: string,

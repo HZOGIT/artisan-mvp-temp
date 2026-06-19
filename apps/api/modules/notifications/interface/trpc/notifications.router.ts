@@ -17,9 +17,11 @@ const listInput = z
 
 const idInput = z.object({ id: z.number().int() });
 
-// Routeur tRPC du domaine notifications. Transport mince : valide les inputs (zod), délègue
-// aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404). Repository injecté (DI) → testable. `delete` = alias d'`archive` (legacy).
+/*
+ * Routeur tRPC du domaine notifications. Transport mince : valide les inputs (zod), délègue
+ * aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404). Repository injecté (DI) → testable. `delete` = alias d'`archive` (legacy).
+ */
 export function createNotificationsRouter(repo: INotificationRepository) {
   return router({
     list: protectedProcedure.input(listInput).query(({ ctx, input }) => listNotifications(repo, ctx.tenant, input)),

@@ -12,9 +12,11 @@ export interface Device {
   readonly createdAt: Date | null;
 }
 
-// Détection device/browser/OS + fingerprint « grossier » (parité legacy `_core/deviceUtils`). PUR :
-// basé sur OS+browser+type (pas l'IP qui change sur mobile, pas la version qui change à chaque MAJ) →
-// regroupe « le même appareil même si l'IP change » pour la limite d'appareils (pas du tracking fin).
+/*
+ * Détection device/browser/OS + fingerprint « grossier » (parité legacy `_core/deviceUtils`). PUR :
+ * basé sur OS+browser+type (pas l'IP qui change sur mobile, pas la version qui change à chaque MAJ) →
+ * regroupe « le même appareil même si l'IP change » pour la limite d'appareils (pas du tracking fin).
+ */
 export function detectDeviceType(ua: string): "desktop" | "mobile" | "tablet" {
   if (!ua) return "desktop";
   if (/iPad|Tablet|PlayBook|Silk/i.test(ua)) return "tablet";
@@ -46,8 +48,10 @@ export function detectOS(ua: string): string {
   return "Unknown";
 }
 
-// Fingerprint : SHA-1 court (32 car.) de `OS|browser|deviceType`. Inclure le type distingue un même
-// Chrome sur desktop vs mobile (tablette + PC). Parité legacy `generateFingerprint`.
+/*
+ * Fingerprint : SHA-1 court (32 car.) de `OS|browser|deviceType`. Inclure le type distingue un même
+ * Chrome sur desktop vs mobile (tablette + PC). Parité legacy `generateFingerprint`.
+ */
 export function generateFingerprint(ua: string): string {
   const os = detectOS(ua);
   const browser = detectBrowser(ua);

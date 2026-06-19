@@ -28,8 +28,10 @@ function toActivite(r: Row): Activite {
 // Table d'appartenance par type d'entité (toutes sous RLS + colonne `artisanId`) pour l'anti-IDOR FK.
 const ENTITE_TABLE = { client: clients, devis, facture: factures, chantier: chantiers } as const;
 
-// Implémentation Drizzle des activités. Double cloisonnement RLS (GUC app.tenant) + filtre explicite
-// `artisanId` (défense en profondeur). Le rattachement FK est vérifié possédé via `ownsEntite`.
+/*
+ * Implémentation Drizzle des activités. Double cloisonnement RLS (GUC app.tenant) + filtre explicite
+ * `artisanId` (défense en profondeur). Le rattachement FK est vérifié possédé via `ownsEntite`.
+ */
 export class ActiviteRepositoryDrizzle implements IActiviteRepository {
   constructor(private readonly db: DbClient) {}
 

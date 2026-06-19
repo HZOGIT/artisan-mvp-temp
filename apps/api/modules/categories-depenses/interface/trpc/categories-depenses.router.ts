@@ -32,9 +32,11 @@ const updateSchema = z.object({
   ordre: z.number().int().optional(),
 });
 
-// Routeur tRPC du domaine categories-depenses (catalogue). Transport mince : valide les inputs
-// (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400, Conflict→409 [unicité du nom]). Repo injecté.
+/*
+ * Routeur tRPC du domaine categories-depenses (catalogue). Transport mince : valide les inputs
+ * (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400, Conflict→409 [unicité du nom]). Repo injecté.
+ */
 export function createCategoriesDepensesRouter(repo: ICategorieDepenseRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listCategories(repo, ctx.tenant)),

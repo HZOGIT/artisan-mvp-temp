@@ -9,8 +9,10 @@ import type {
   AjouterMembreEquipeInput,
 } from "../domain/intervention";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant et les valeurs par défaut PG (`statut` → planifiee). Aucune fuite cross-tenant.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant et les valeurs par défaut PG (`statut` → planifiee). Aucune fuite cross-tenant.
+ */
 export class FakeInterventionRepository implements IInterventionRepository {
   private store: Intervention[] = [];
   private seq = 0;

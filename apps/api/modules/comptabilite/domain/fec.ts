@@ -1,8 +1,10 @@
-// Générateur FEC (Fichier des Écritures Comptables, format réglementaire FR, arrêté 29/07/2013).
-// PORT FIDÈLE du legacy `db.genererFEC`. ⚠️ Fichier OPPOSABLE à l'administration fiscale : le format
-// (18 colonnes AFNOR, TAB, décimale virgule, dates YYYYMMDD) et l'**équilibre Σdébit=Σcrédit** sont
-// des invariants. Aucun montant négatif (les avoirs inversent le sens des comptes en valeur absolue).
-// 100% PUR (aucune I/O) → testable (invariant d'équilibre + parité de format).
+/*
+ * Générateur FEC (Fichier des Écritures Comptables, format réglementaire FR, arrêté 29/07/2013).
+ * PORT FIDÈLE du legacy `db.genererFEC`. ⚠️ Fichier OPPOSABLE à l'administration fiscale : le format
+ * (18 colonnes AFNOR, TAB, décimale virgule, dates YYYYMMDD) et l'**équilibre Σdébit=Σcrédit** sont
+ * des invariants. Aucun montant négatif (les avoirs inversent le sens des comptes en valeur absolue).
+ * 100% PUR (aucune I/O) → testable (invariant d'équilibre + parité de format).
+ */
 
 export interface FecConfig {
   readonly compteVentes: string;
@@ -123,8 +125,10 @@ const ymd = (d: Date | string): string => {
 };
 const n = (v: unknown): number => Number(v ?? 0) || 0;
 
-// Nom de fichier FEC réglementaire (parité legacy) : SIREN (9 chiffres, dérivé du SIRET) + "FEC" +
-// date de clôture (YYYYMMDD) + ".txt". PUR.
+/*
+ * Nom de fichier FEC réglementaire (parité legacy) : SIREN (9 chiffres, dérivé du SIRET) + "FEC" +
+ * date de clôture (YYYYMMDD) + ".txt". PUR.
+ */
 export function fecFileName(siret: string | null, dateFin: Date): string {
   const siren = (siret || "000000000").replace(/\D/g, "").slice(0, 9).padEnd(9, "0");
   return `${siren}FEC${ymd(dateFin)}.txt`;

@@ -3,14 +3,18 @@ import type { IParametresRepository } from "../application/parametres-repository
 import { defaultParametres } from "../domain/parametres";
 import type { ParametresArtisan, UpdateParametresInput } from "../domain/parametres";
 
-// Implémentation in-memory du repository parametres (tests sans DB). Reproduit les invariants du
-// repo Drizzle : singleton par artisanId, défauts si absent (jamais null), upsert qui ne fusionne
-// QUE les champs config (jamais les compteurs), `artisanId` forcé au tenant.
+/*
+ * Implémentation in-memory du repository parametres (tests sans DB). Reproduit les invariants du
+ * repo Drizzle : singleton par artisanId, défauts si absent (jamais null), upsert qui ne fusionne
+ * QUE les champs config (jamais les compteurs), `artisanId` forcé au tenant.
+ */
 export class FakeParametresRepository implements IParametresRepository {
   private readonly store = new Map<number, ParametresArtisan>();
 
-  // Permet aux tests de simuler une ligne préexistante (ex. compteurs déjà avancés par la
-  // numérotation) afin de vérifier que l'upsert config ne les écrase pas.
+  /*
+   * Permet aux tests de simuler une ligne préexistante (ex. compteurs déjà avancés par la
+   * numérotation) afin de vérifier que l'upsert config ne les écrase pas.
+   */
   seed(p: ParametresArtisan): void {
     this.store.set(p.artisanId, p);
   }

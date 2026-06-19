@@ -1,13 +1,15 @@
-// Types de domaine du module devis (commercial/financier) — découplés du schéma Drizzle.
-// ⚠️ Domaine financier SENSIBLE : montants/TVA exacts (decimal/string ; totalTTC = totalHT +
-// totalTVA), numérotation maîtrisée côté serveur, **immutabilité post-signature** (un devis
-// accepté/envoyé ne se modifie plus librement → porté par les use-cases d'écriture), isolation
-// cross-tenant, anti-IDOR-FK (clientId du tenant). Le calcul des totaux à partir des lignes, les
-// transitions de statut et la conversion en facture sont portés aux étapes ultérieures.
-//
-// NB : `devis` et `devis_lignes` sont en camelCase côté colonnes (artisanId, totalHT…), mais les
-// lignes (`devis_lignes`) n'ont PAS d'artisanId → elles sont scopées via l'appartenance du devis
-// parent au tenant (cf. pattern commandes/lignes).
+/*
+ * Types de domaine du module devis (commercial/financier) — découplés du schéma Drizzle.
+ * ⚠️ Domaine financier SENSIBLE : montants/TVA exacts (decimal/string ; totalTTC = totalHT +
+ * totalTVA), numérotation maîtrisée côté serveur, **immutabilité post-signature** (un devis
+ * accepté/envoyé ne se modifie plus librement → porté par les use-cases d'écriture), isolation
+ * cross-tenant, anti-IDOR-FK (clientId du tenant). Le calcul des totaux à partir des lignes, les
+ * transitions de statut et la conversion en facture sont portés aux étapes ultérieures.
+ * 
+ * NB : `devis` et `devis_lignes` sont en camelCase côté colonnes (artisanId, totalHT…), mais les
+ * lignes (`devis_lignes`) n'ont PAS d'artisanId → elles sont scopées via l'appartenance du devis
+ * parent au tenant (cf. pattern commandes/lignes).
+ */
 
 export type DevisStatut = "brouillon" | "envoye" | "accepte" | "refuse" | "expire";
 export type LigneType = "produit" | "section" | "note";
@@ -49,9 +51,11 @@ export interface Devis {
   readonly updatedAt: Date;
 }
 
-// Entrée de création (niveau repo) : `numero` est fourni par le use-case (généré serveur via
-// `nextNumero`), jamais par le client. `statut` (brouillon) et les totaux (0) sont des défauts
-// posés par l'infra.
+/*
+ * Entrée de création (niveau repo) : `numero` est fourni par le use-case (généré serveur via
+ * `nextNumero`), jamais par le client. `statut` (brouillon) et les totaux (0) sont des défauts
+ * posés par l'infra.
+ */
 export interface CreateDevisInput {
   readonly clientId: number;
   readonly numero: string;
@@ -62,9 +66,11 @@ export interface CreateDevisInput {
   readonly dateValidite?: Date | null;
 }
 
-// Entrée de modification : ⚠️ `clientId` (client immuable), `numero` (numérotation maîtrisée),
-// `statut` (transitions = workflow) et `totalHT/TVA/TTC` (dérivés des lignes) sont ABSENTS — ils
-// ne passent pas par un `update` de métadonnées.
+/*
+ * Entrée de modification : ⚠️ `clientId` (client immuable), `numero` (numérotation maîtrisée),
+ * `statut` (transitions = workflow) et `totalHT/TVA/TTC` (dérivés des lignes) sont ABSENTS — ils
+ * ne passent pas par un `update` de métadonnées.
+ */
 export interface UpdateDevisInput {
   readonly objet?: string | null;
   readonly referenceClient?: string | null;

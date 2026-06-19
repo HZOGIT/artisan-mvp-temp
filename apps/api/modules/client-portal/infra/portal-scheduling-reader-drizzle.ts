@@ -12,9 +12,11 @@ function toRdv(r: RdvRow): PortalRdv {
   return { id: r.id, titre: r.titre, description: r.description ?? null, dateProposee: r.dateProposee, dureeEstimee: r.dureeEstimee ?? null, statut: r.statut ?? null, motifRefus: r.motifRefus ?? null, urgence: r.urgence ?? null, createdAt: r.createdAt };
 }
 
-// Lecteur Drizzle de planification du portail. Tables rdv_en_ligne / interventions / chantiers SOUS RLS
-// (artisanId via withTenant). `suivi_chantier` (sans artisanId) n'est lu QUE pour les chantiers du
-// client déjà résolus → anti-IDOR par le chantier parent.
+/*
+ * Lecteur Drizzle de planification du portail. Tables rdv_en_ligne / interventions / chantiers SOUS RLS
+ * (artisanId via withTenant). `suivi_chantier` (sans artisanId) n'est lu QUE pour les chantiers du
+ * client déjà résolus → anti-IDOR par le chantier parent.
+ */
 export class PortalSchedulingReaderDrizzle implements IPortalSchedulingReader {
   constructor(private readonly db: DbClient) {}
 

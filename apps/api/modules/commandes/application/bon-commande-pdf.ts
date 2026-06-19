@@ -2,9 +2,11 @@ import { NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
 
-// Génère le PDF d'un bon de commande fournisseur (parité legacy `/api/commandes-fournisseurs/:id/pdf`).
-// Composition : commande possédée (+ lignes) + fournisseur + profil artisan → `PdfPort.render`. Ownership
-// porté par les repos migrés (scopés tenant) : un id hors tenant → null → 404 (anti-IDOR, sans oracle).
+/*
+ * Génère le PDF d'un bon de commande fournisseur (parité legacy `/api/commandes-fournisseurs/:id/pdf`).
+ * Composition : commande possédée (+ lignes) + fournisseur + profil artisan → `PdfPort.render`. Ownership
+ * porté par les repos migrés (scopés tenant) : un id hors tenant → null → 404 (anti-IDOR, sans oracle).
+ */
 export interface BonCommandePdfDeps {
   readonly commandeRepo: {
     getById(ctx: TenantContext, id: number): Promise<{ id: number; fournisseurId: number; numero: string | null } | null>;

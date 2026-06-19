@@ -19,9 +19,11 @@ function toDevice(r: Row): Device {
   };
 }
 
-// Repository Drizzle `devices`. ⚠️ Table HORS RLS (denylist) → AUCUN `withTenant` ne la protège ;
-// l'isolation est portée par un filtre EXPLICITE `user_id = userId` dans chaque requête (anti-IDOR :
-// un utilisateur ne lit/supprime QUE ses appareils). Parité legacy (getDevices/deleteDevice/deleteOtherDevices).
+/*
+ * Repository Drizzle `devices`. ⚠️ Table HORS RLS (denylist) → AUCUN `withTenant` ne la protège ;
+ * l'isolation est portée par un filtre EXPLICITE `user_id = userId` dans chaque requête (anti-IDOR :
+ * un utilisateur ne lit/supprime QUE ses appareils). Parité legacy (getDevices/deleteDevice/deleteOtherDevices).
+ */
 export class DeviceRepositoryDrizzle implements IDeviceRepository {
   constructor(private readonly db: DbClient) {}
 

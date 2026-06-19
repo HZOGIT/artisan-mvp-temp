@@ -11,7 +11,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
+   
   console.error("[new-stack] échec du démarrage :", err);
   process.exit(1);
 });

@@ -5,8 +5,10 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ClientReader, ClientInfo } from "../application/contact-readers";
 
-// Lecture d'un client du tenant (destinataire) pour l'email + le PDF facture. Anti-IDOR : filtre
-// `clients.artisanId = ctx.artisanId` (+ RLS) → null si le client n'appartient pas au tenant.
+/*
+ * Lecture d'un client du tenant (destinataire) pour l'email + le PDF facture. Anti-IDOR : filtre
+ * `clients.artisanId = ctx.artisanId` (+ RLS) → null si le client n'appartient pas au tenant.
+ */
 export class ClientReaderDrizzle implements ClientReader {
   constructor(private readonly db: DbClient) {}
 

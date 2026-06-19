@@ -22,9 +22,11 @@ function toDemande(r: DemandeRow): DemandeAvis {
   };
 }
 
-// Implémentation Drizzle du repository demande d'avis. Double cloisonnement : RLS (rôle
-// app + app.tenant via withTenant) ET filtre explicite `artisanId`. Toute lecture
-// d'ownership renvoie null si la ressource n'appartient pas au tenant (NOT_FOUND uniforme).
+/*
+ * Implémentation Drizzle du repository demande d'avis. Double cloisonnement : RLS (rôle
+ * app + app.tenant via withTenant) ET filtre explicite `artisanId`. Toute lecture
+ * d'ownership renvoie null si la ressource n'appartient pas au tenant (NOT_FOUND uniforme).
+ */
 export class DemandeAvisRepositoryDrizzle implements IDemandeAvisRepository {
   constructor(private readonly db: DbClient) {}
 

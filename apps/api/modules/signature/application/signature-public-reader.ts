@@ -1,11 +1,13 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Signature } from "../domain/signature";
 
-// ── Surface PUBLIQUE par token (portail de signature, sans cookie tenant) ────────────────────────
-// Résolution du token → signature + devis rattaché (lue via la policy RLS `public_token_select` sur
-// `devis`, `signatures_devis` étant HORS RLS). Renvoie l'`artisanId` pour basculer ensuite sous le
-// tenant résolu (`withTenant`) et lire les sous-ressources (client/artisan/lignes/options), comme le
-// portail d'avis. Le token EST la capacité ; token inconnu → `null`.
+/*
+ * ── Surface PUBLIQUE par token (portail de signature, sans cookie tenant) ────────────────────────
+ * Résolution du token → signature + devis rattaché (lue via la policy RLS `public_token_select` sur
+ * `devis`, `signatures_devis` étant HORS RLS). Renvoie l'`artisanId` pour basculer ensuite sous le
+ * tenant résolu (`withTenant`) et lire les sous-ressources (client/artisan/lignes/options), comme le
+ * portail d'avis. Le token EST la capacité ; token inconnu → `null`.
+ */
 export interface SignatureTokenResolution {
   readonly signature: Signature;
   readonly devisId: number;
@@ -13,8 +15,10 @@ export interface SignatureTokenResolution {
   readonly dateVue: Date | null;
 }
 
-// Vue d'affichage du devis pour le portail public (parité legacy `getDevisForSignature`). Les rangs
-// sont renvoyés assez riches pour l'affichage + le PDF côté client (montants en `string` decimal).
+/*
+ * Vue d'affichage du devis pour le portail public (parité legacy `getDevisForSignature`). Les rangs
+ * sont renvoyés assez riches pour l'affichage + le PDF côté client (montants en `string` decimal).
+ */
 export interface SignatureDevisRow {
   readonly id: number;
   readonly artisanId: number;

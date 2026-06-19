@@ -5,9 +5,11 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface CommandePdfRouteDeps extends CookieAuthDeps, BonCommandePdfDeps {}
 
-// Route HORS-tRPC `GET /api/commandes-fournisseurs/:id/pdf` : télécharge le PDF d'un bon de commande
-// (auth cookie JWT). 404 anti-IDOR si la commande/fournisseur n'appartient pas au tenant. ⚠️ MONTÉ mais
-// NON routé tant qu'absent de MIGRATED_ROUTES (le legacy sert encore).
+/*
+ * Route HORS-tRPC `GET /api/commandes-fournisseurs/:id/pdf` : télécharge le PDF d'un bon de commande
+ * (auth cookie JWT). 404 anti-IDOR si la commande/fournisseur n'appartient pas au tenant. ⚠️ MONTÉ mais
+ * NON routé tant qu'absent de MIGRATED_ROUTES (le legacy sert encore).
+ */
 export function registerCommandePdfRoute(app: FastifyInstance, deps: CommandePdfRouteDeps): void {
   app.get("/api/commandes-fournisseurs/:id/pdf", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

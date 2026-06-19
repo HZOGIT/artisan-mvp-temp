@@ -15,9 +15,11 @@ const saveConfigSchema = z.object({
   actif: z.boolean().optional(),
 });
 
-// Routeur tRPC `alertesPrevisions` (alertes du prévisionnel de trésorerie). Transport mince : délègue
-// aux use-cases scopés `ctx.tenant` (RLS artisanId). `verifierEtEnvoyer` enregistre une alerte si
-// l'écart CA réalisé/prévisionnel du mois franchit un seuil (envoi réel = scheduler externe).
+/*
+ * Routeur tRPC `alertesPrevisions` (alertes du prévisionnel de trésorerie). Transport mince : délègue
+ * aux use-cases scopés `ctx.tenant` (RLS artisanId). `verifierEtEnvoyer` enregistre une alerte si
+ * l'écart CA réalisé/prévisionnel du mois franchit un seuil (envoi réel = scheduler externe).
+ */
 export function createAlertesPrevisionsRouter(repo: IAlertesPrevisionsRepository) {
   return router({
     getConfig: protectedProcedure.query(({ ctx }) => getConfig(repo, ctx.tenant)),

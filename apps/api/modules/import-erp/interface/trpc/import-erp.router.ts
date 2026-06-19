@@ -9,9 +9,11 @@ const importSchema = z.object({
   mapping: z.record(z.string(), z.string()),
 });
 
-// Routeur tRPC `importErp` (import de reprise de données depuis un ERP). Transport mince : délègue aux
-// use-cases scopés `ctx.tenant` (RLS artisanId). 3 imports « légers » par lot : clients / devis /
-// factures (montant TTC brut, sans lignes — reprise, pas d'émission).
+/*
+ * Routeur tRPC `importErp` (import de reprise de données depuis un ERP). Transport mince : délègue aux
+ * use-cases scopés `ctx.tenant` (RLS artisanId). 3 imports « légers » par lot : clients / devis /
+ * factures (montant TTC brut, sans lignes — reprise, pas d'émission).
+ */
 export function createImportErpRouter(repo: IImportErpRepository) {
   return router({
     importClients: protectedProcedure.input(importSchema).mutation(({ ctx, input }) => importClients(repo, ctx.tenant, input)),

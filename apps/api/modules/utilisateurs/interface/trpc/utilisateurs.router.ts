@@ -5,8 +5,10 @@ import { basculerActif, changerRole, definirPermissions, inviterUtilisateur, lir
 
 const roleEnum = z.enum(["artisan", "secretaire", "technicien"]);
 
-// Toutes les procédures sont gardées par la permission `utilisateurs.gerer` (admin bypasse). Parité
-// legacy `utilisateursGererProcedure`.
+/*
+ * Toutes les procédures sont gardées par la permission `utilisateurs.gerer` (admin bypasse). Parité
+ * legacy `utilisateursGererProcedure`.
+ */
 const gere = permissionProcedure("utilisateurs.gerer");
 
 export function createUtilisateursRouter(deps: UtilisateurDeps) {

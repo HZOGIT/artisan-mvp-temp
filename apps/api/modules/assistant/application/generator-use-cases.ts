@@ -15,8 +15,10 @@ import {
 } from "../domain/generators";
 import type { AssistantDataReader } from "./assistant-data-reader";
 
-// Dépendances des générateurs IA de l'assistant (lecture seule, NON persistée). Rate-limit IA partagé
-// (30/h par artisan, parité legacy `checkRateLimit`).
+/*
+ * Dépendances des générateurs IA de l'assistant (lecture seule, NON persistée). Rate-limit IA partagé
+ * (30/h par artisan, parité legacy `checkRateLimit`).
+ */
 export interface AssistantGeneratorDeps {
   readonly llm: LlmPort;
   readonly rateLimiter: RateLimiterPort;
@@ -35,8 +37,10 @@ async function complete(deps: AssistantGeneratorDeps, parts: { system: string; u
   return deps.llm.complete(parts.user, { system: parts.system, temperature: parts.temperature, maxOutputTokens: parts.maxOutputTokens });
 }
 
-// `assistant.suggestRelances` (parité legacy) : pas d'artisan → [] ; rate-limit → **429** ; aucun
-// devis à relancer (>7 j) → [] ; sinon emails de relance générés (JSON, `[{error}]` si non parsable).
+/*
+ * `assistant.suggestRelances` (parité legacy) : pas d'artisan → [] ; rate-limit → **429** ; aucun
+ * devis à relancer (>7 j) → [] ; sinon emails de relance générés (JSON, `[{error}]` si non parsable).
+ */
 export async function suggestRelances(deps: AssistantGeneratorDeps, ctx: TenantContext): Promise<unknown[]> {
   const artisan = await deps.artisanReader.getArtisan(ctx);
   if (!artisan) return [];
@@ -53,8 +57,10 @@ export async function suggestRelances(deps: AssistantGeneratorDeps, ctx: TenantC
   return parseRelances(text);
 }
 
-// `assistant.generateDevis` (parité legacy) : pas d'artisan → **404** ; rate-limit → **429** ; renvoie
-// `{lignes, raw}` (lignes = [] si JSON non parsable).
+/*
+ * `assistant.generateDevis` (parité legacy) : pas d'artisan → **404** ; rate-limit → **429** ; renvoie
+ * `{lignes, raw}` (lignes = [] si JSON non parsable).
+ */
 export async function generateDevis(
   deps: AssistantGeneratorDeps,
   ctx: TenantContext,
@@ -69,8 +75,10 @@ export async function generateDevis(
   return { lignes: parseDevisLignes(raw), raw };
 }
 
-// `assistant.analyseRentabilite` (parité legacy) : pas d'artisan → **404** ; rate-limit → **429** ;
-// devis hors tenant/inexistant → **404** (anti-IDOR) ; renvoie `{analyse: markdown}`.
+/*
+ * `assistant.analyseRentabilite` (parité legacy) : pas d'artisan → **404** ; rate-limit → **429** ;
+ * devis hors tenant/inexistant → **404** (anti-IDOR) ; renvoie `{analyse: markdown}`.
+ */
 export async function analyseRentabilite(
   deps: AssistantGeneratorDeps,
   ctx: TenantContext,
@@ -87,8 +95,10 @@ export async function analyseRentabilite(
   return { analyse };
 }
 
-// `assistant.predictionTresorerie` (parité legacy) : pas d'artisan → **404** ; rate-limit → **429** ;
-// renvoie `{prediction: markdown}`.
+/*
+ * `assistant.predictionTresorerie` (parité legacy) : pas d'artisan → **404** ; rate-limit → **429** ;
+ * renvoie `{prediction: markdown}`.
+ */
 export async function predictionTresorerie(deps: AssistantGeneratorDeps, ctx: TenantContext): Promise<{ prediction: string }> {
   const artisan = await deps.artisanReader.getArtisan(ctx);
   if (!artisan) throw new NotFoundError("Artisan non trouvé");

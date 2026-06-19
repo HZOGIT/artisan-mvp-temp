@@ -6,10 +6,12 @@ export interface FactureCreeeRef {
   readonly numero: string;
 }
 
-// Port cross-domaine : convertit un devis (accepté) en facture brouillon. L'adapter (infra) compose
-// le use-case de conversion du domaine factures (numéro serveur, lignes copiées, anti-doublon).
-// ⚠️ Invariants portés par le use-case factures : devis du tenant (404), **statut `accepte`** requis
-// (Conflict), **anti-doublon** de conversion (Conflict).
+/*
+ * Port cross-domaine : convertit un devis (accepté) en facture brouillon. L'adapter (infra) compose
+ * le use-case de conversion du domaine factures (numéro serveur, lignes copiées, anti-doublon).
+ * ⚠️ Invariants portés par le use-case factures : devis du tenant (404), **statut `accepte`** requis
+ * (Conflict), **anti-doublon** de conversion (Conflict).
+ */
 export interface DevisToFactureConverter {
   convertir(ctx: TenantContext, devisId: number): Promise<FactureCreeeRef>;
 }

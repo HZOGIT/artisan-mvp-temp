@@ -11,10 +11,12 @@ import {
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 
-// Routeur tRPC du domaine ecritures (comptabilité/FEC) — **lecture seule** : aucune mutation,
-// la génération des écritures est un effet de bord du workflow facture (émission/paiement via le
-// ComptaPort). Transport mince : valide les inputs (zod), délègue aux use-cases (scoping tenant
-// via ctx.tenant). Repo injecté (DI).
+/*
+ * Routeur tRPC du domaine ecritures (comptabilité/FEC) — **lecture seule** : aucune mutation,
+ * la génération des écritures est un effet de bord du workflow facture (émission/paiement via le
+ * ComptaPort). Transport mince : valide les inputs (zod), délègue aux use-cases (scoping tenant
+ * via ctx.tenant). Repo injecté (DI).
+ */
 export function createEcrituresRouter(repo: IEcritureRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listEcritures(repo, ctx.tenant)),

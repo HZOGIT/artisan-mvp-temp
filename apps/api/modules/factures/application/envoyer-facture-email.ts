@@ -6,8 +6,10 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { IFactureRepository } from "./facture-repository";
 import type { ArtisanReader, ClientReader } from "./contact-readers";
 
-// Dépendances de l'envoi d'une facture par email (composition cross-domaine : artisan + client +
-// PDF + email + rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
+/*
+ * Dépendances de l'envoi d'une facture par email (composition cross-domaine : artisan + client +
+ * PDF + email + rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
+ */
 export interface FactureMailingDeps {
   readonly artisanReader: ArtisanReader;
   readonly clientReader: ClientReader;
@@ -42,9 +44,11 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Construit le sujet + corps HTML de l'email facture (pur, testable). Parité fonctionnelle avec le
-// template legacy `generateFactureEmailContent` (en-tête entreprise, n° facture, montant TTC,
-// échéance) ; le `customMessage` éventuel est ajouté en bas (échappé).
+/*
+ * Construit le sujet + corps HTML de l'email facture (pur, testable). Parité fonctionnelle avec le
+ * template legacy `generateFactureEmailContent` (en-tête entreprise, n° facture, montant TTC,
+ * échéance) ; le `customMessage` éventuel est ajouté en bas (échappé).
+ */
 export function buildFactureEmail(params: {
   artisanName: string;
   clientName: string;
@@ -94,14 +98,16 @@ export function buildFactureEmail(params: {
   return { subject, body };
 }
 
-// Envoie une facture par email (parité legacy `factures.sendByEmail`) :
-//  - ownership : facture du tenant (sinon NotFound 404 — RLS + filtre via getById) ;
-//  - **client.email requis** (sinon Validation 400) ;
-//  - **rate-limit** anti-abus (sinon TooManyRequests 429) — AVANT tout effet de bord ;
-//  - corps email (template + customMessage) ; si `attachPdf` → PDF via `PdfPort` ({facture+lignes,
-//    artisan, client}) joint à l'email (`EmailPort`) ;
-//  - **si l'envoi réussit ET statut brouillon/validee → passe `envoyee`** (NE fait PAS régresser
-//    payee/en_retard ; NB : pas de génération d'écritures FEC ici — parité legacy `updateFacture`).
+/*
+ * Envoie une facture par email (parité legacy `factures.sendByEmail`) :
+ *  - ownership : facture du tenant (sinon NotFound 404 — RLS + filtre via getById) ;
+ *  - **client.email requis** (sinon Validation 400) ;
+ *  - **rate-limit** anti-abus (sinon TooManyRequests 429) — AVANT tout effet de bord ;
+ *  - corps email (template + customMessage) ; si `attachPdf` → PDF via `PdfPort` ({facture+lignes,
+ *    artisan, client}) joint à l'email (`EmailPort`) ;
+ *  - **si l'envoi réussit ET statut brouillon/validee → passe `envoyee`** (NE fait PAS régresser
+ *    payee/en_retard ; NB : pas de génération d'écritures FEC ici — parité legacy `updateFacture`).
+ */
 export async function envoyerFactureParEmail(
   repo: IFactureRepository,
   deps: FactureMailingDeps,

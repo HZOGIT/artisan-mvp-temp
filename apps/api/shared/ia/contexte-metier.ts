@@ -1,8 +1,10 @@
-// Contextes métier spécialisés pour les appels IA (system prompts « expert » par métier : prix
-// marché, normes, marques, vocabulaire, temps de main d'œuvre). Données de référence PURES (aucune
-// I/O) — home clean-archi partagé : consommé par les suggestions d'articles, la génération de lignes
-// de devis, et (à venir) l'assistant. `getContexteMetier()` normalise le métier (accents/casse) pour
-// matcher la clé du Record. Porté à l'identique depuis le legacy (`server/_core/contexteMetier.ts`).
+/*
+ * Contextes métier spécialisés pour les appels IA (system prompts « expert » par métier : prix
+ * marché, normes, marques, vocabulaire, temps de main d'œuvre). Données de référence PURES (aucune
+ * I/O) — home clean-archi partagé : consommé par les suggestions d'articles, la génération de lignes
+ * de devis, et (à venir) l'assistant. `getContexteMetier()` normalise le métier (accents/casse) pour
+ * matcher la clé du Record. Porté à l'identique depuis le legacy (`server/_core/contexteMetier.ts`).
+ */
 
 export const CONTEXTES_METIER: Record<string, string> = {
   plombier: `Tu es un expert plombier français avec 20 ans d'expérience. Tu connais parfaitement :

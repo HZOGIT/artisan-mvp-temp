@@ -1,9 +1,11 @@
 import type { TenantContext } from "../../../shared/tenant";
 
-// Port de LECTURE du domaine devis, vu depuis factures (conversion devis→facture). On évite le
-// couplage inter-modules : factures dépend d'une **abstraction de lecture minimale** (modèles
-// propres), pas du module devis. L'impl Drizzle lit `devis`/`devis_lignes` (RLS) ; un fake sert
-// aux tests. Tout est scopé tenant (→ null/[] hors tenant : anti-IDOR-FK).
+/*
+ * Port de LECTURE du domaine devis, vu depuis factures (conversion devis→facture). On évite le
+ * couplage inter-modules : factures dépend d'une **abstraction de lecture minimale** (modèles
+ * propres), pas du module devis. L'impl Drizzle lit `devis`/`devis_lignes` (RLS) ; un fake sert
+ * aux tests. Tout est scopé tenant (→ null/[] hors tenant : anti-IDOR-FK).
+ */
 
 export interface DevisReadModel {
   readonly id: number;

@@ -15,8 +15,10 @@ import {
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 
-// ⚠️ `userId`/`statut`/dates workflow ABSENTS de create/update : `userId` est forcé à
-// l'utilisateur courant par le use-case ; le statut ne change que via le workflow.
+/*
+ * ⚠️ `userId`/`statut`/dates workflow ABSENTS de create/update : `userId` est forcé à
+ * l'utilisateur courant par le use-case ; le statut ne change que via le workflow.
+ */
 const createSchema = z.object({
   numero: z.string().min(1).max(20),
   titre: z.string().min(1).max(255),
@@ -34,9 +36,11 @@ const updateSchema = z.object({
   montantRembourse: decimal.optional(),
 });
 
-// Routeur tRPC du domaine notes-de-frais. Transport mince : valide les inputs (zod), délègue
-// aux use-cases (scoping tenant + userId forcé via ctx.tenant), laisse remonter les Domain
-// errors (NotFound→404, Validation→400). Repo injecté (DI).
+/*
+ * Routeur tRPC du domaine notes-de-frais. Transport mince : valide les inputs (zod), délègue
+ * aux use-cases (scoping tenant + userId forcé via ctx.tenant), laisse remonter les Domain
+ * errors (NotFound→404, Validation→400). Repo injecté (DI).
+ */
 export function createNotesDeFraisRouter(repo: INoteDeFraisRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listNotesDeFrais(repo, ctx.tenant)),

@@ -1,6 +1,8 @@
-// Domaine CONSEILS IA (recommandations personnalisées du tableau de bord). Lecture seule, NON
-// persistée : l'IA propose 3 conseils actionnables à partir de stats minimales du tenant. Parité
-// legacy `conseilsIA` (server/routers.ts). Aucune donnée sensible (montants agrégés du seul tenant).
+/*
+ * Domaine CONSEILS IA (recommandations personnalisées du tableau de bord). Lecture seule, NON
+ * persistée : l'IA propose 3 conseils actionnables à partir de stats minimales du tenant. Parité
+ * legacy `conseilsIA` (server/routers.ts). Aucune donnée sensible (montants agrégés du seul tenant).
+ */
 
 // Un conseil affiché sur le tableau de bord (carte + bouton d'action vers un lien interne).
 export interface Conseil {
@@ -63,8 +65,10 @@ Reponds UNIQUEMENT en JSON pur :
 {"conseils":[{"icone":"💡","titre":"court","message":"phrase","actionLabel":"texte bouton","actionLien":"/devis"}]}`;
 }
 
-// Parse défensif de la sortie LLM (non fiable) : extrait le 1er objet JSON, coerce chaque conseil,
-// borne à 3. Renvoie [] si non parsable. Le lien est validé contre la liste autorisée (défaut /devis).
+/*
+ * Parse défensif de la sortie LLM (non fiable) : extrait le 1er objet JSON, coerce chaque conseil,
+ * borne à 3. Renvoie [] si non parsable. Le lien est validé contre la liste autorisée (défaut /devis).
+ */
 export function parseConseils(text: string): Conseil[] {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return [];

@@ -1,5 +1,7 @@
-// Dernière position GPS d'un technicien (table `positions_techniciens`, SANS artisanId → l'isolation
-// est portée par l'appartenance du technicien parent). Données RGPD : lecture seule, scopée tenant.
+/*
+ * Dernière position GPS d'un technicien (table `positions_techniciens`, SANS artisanId → l'isolation
+ * est portée par l'appartenance du technicien parent). Données RGPD : lecture seule, scopée tenant.
+ */
 export interface PositionPoint {
   readonly id: number;
   readonly technicienId: number;

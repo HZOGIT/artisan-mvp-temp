@@ -10,13 +10,17 @@ import type {
   UpdateContratInterventionInput,
 } from "../domain/contrat";
 
-// Use-cases de la sous-ressource « interventions de contrat » + liste « à facturer ». Purs (repo
-// injecté). ⚠️ Anti-IDOR : toute opération sur une intervention exige que le contrat parent
-// appartienne au tenant (vérifié via getById → 404 sinon), ET que l'intervention relève bien de ce
-// contrat (appariement id↔contratId) — sinon un id d'intervention d'un autre tenant serait modifiable.
+/*
+ * Use-cases de la sous-ressource « interventions de contrat » + liste « à facturer ». Purs (repo
+ * injecté). ⚠️ Anti-IDOR : toute opération sur une intervention exige que le contrat parent
+ * appartienne au tenant (vérifié via getById → 404 sinon), ET que l'intervention relève bien de ce
+ * contrat (appariement id↔contratId) — sinon un id d'intervention d'un autre tenant serait modifiable.
+ */
 
-// Contrats dont l'échéance de facturation est atteinte, enrichis (TTC dérivé HT×(1+TVA), jours de
-// retard depuis `prochainFacturation`). Parité legacy `contrats.getAFacturer`.
+/*
+ * Contrats dont l'échéance de facturation est atteinte, enrichis (TTC dérivé HT×(1+TVA), jours de
+ * retard depuis `prochainFacturation`). Parité legacy `contrats.getAFacturer`.
+ */
 export async function listContratsAFacturer(
   repo: IContratRepository,
   ctx: TenantContext,
@@ -58,8 +62,10 @@ export async function creerInterventionContrat(
 // Nombre de mois d'une période de facturation, par périodicité.
 const MOIS_PAR_PERIODICITE: Record<ContratPeriodicite, number> = { mensuel: 1, trimestriel: 3, semestriel: 6, annuel: 12 };
 
-// Ajout de `n` mois avec clamp de fin de mois (équivalent relativedelta — parité legacy
-// `addMonthsClamped`) : évite le débordement (31 jan + 1 mois → 28/29 fév, pas 2/3 mars). Pur.
+/*
+ * Ajout de `n` mois avec clamp de fin de mois (équivalent relativedelta — parité legacy
+ * `addMonthsClamped`) : évite le débordement (31 jan + 1 mois → 28/29 fév, pas 2/3 mars). Pur.
+ */
 export function addMonthsClamped(base: Date, n: number): Date {
   const day = base.getDate();
   const r = new Date(base);
@@ -70,13 +76,15 @@ export function addMonthsClamped(base: Date, n: number): Date {
   return r;
 }
 
-// Génère une facture (émise) pour un contrat (parité legacy `contrats.generateFacture`) :
-//  - ownership du contrat (404 sinon) ;
-//  - crée une facture **émise** via le `ContratFactureGenerator` (1 ligne = prestation du contrat,
-//    totaux dérivés, numéro serveur ; ⚠️ PAS d'écritures FEC — parité legacy) ;
-//  - enregistre la **facture récurrente** (période courante → period+1 selon la périodicité, clamp) ;
-//  - **avance `prochainFacturation`** à la fin de période.
-// Horloge injectable (`maintenant`) pour des tests déterministes.
+/*
+ * Génère une facture (émise) pour un contrat (parité legacy `contrats.generateFacture`) :
+ *  - ownership du contrat (404 sinon) ;
+ *  - crée une facture **émise** via le `ContratFactureGenerator` (1 ligne = prestation du contrat,
+ *    totaux dérivés, numéro serveur ; ⚠️ PAS d'écritures FEC — parité legacy) ;
+ *  - enregistre la **facture récurrente** (période courante → period+1 selon la périodicité, clamp) ;
+ *  - **avance `prochainFacturation`** à la fin de période.
+ * Horloge injectable (`maintenant`) pour des tests déterministes.
+ */
 export async function genererFactureContrat(
   repo: IContratRepository,
   factureGen: ContratFactureGenerator,
@@ -88,9 +96,11 @@ export async function genererFactureContrat(
   if (!contrat) throw new NotFoundError("Contrat introuvable");
 
   const now = maintenant();
-  // Idempotence / échéance : on n'émet PAS une nouvelle facture tant que la prochaine échéance de
-  // facturation n'est pas atteinte. Sans cette garde, un double-clic / retry réseau crée DEUX factures
-  // `envoyee` (finalisées, corrigibles par avoir uniquement) → double facturation du client.
+  /*
+   * Idempotence / échéance : on n'émet PAS une nouvelle facture tant que la prochaine échéance de
+   * facturation n'est pas atteinte. Sans cette garde, un double-clic / retry réseau crée DEUX factures
+   * `envoyee` (finalisées, corrigibles par avoir uniquement) → double facturation du client.
+   */
   if (contrat.prochainFacturation && now < new Date(contrat.prochainFacturation)) {
     throw new ConflictError("Une facture a déjà été émise pour cette période (prochaine échéance de facturation non atteinte).");
   }
@@ -116,8 +126,10 @@ export async function genererFactureContrat(
   return facture;
 }
 
-// Met à jour une intervention. ⚠️ Anti-IDOR (parité legacy/OPE-89) : le contrat parent doit être du
-// tenant ET l'intervention doit relever de CE contrat (sinon `id` découplé de `contratId` → IDOR).
+/*
+ * Met à jour une intervention. ⚠️ Anti-IDOR (parité legacy) : le contrat parent doit être du
+ * tenant ET l'intervention doit relever de CE contrat (sinon `id` découplé de `contratId` → IDOR).
+ */
 export async function modifierInterventionContrat(
   repo: IContratRepository,
   ctx: TenantContext,

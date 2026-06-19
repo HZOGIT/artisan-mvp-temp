@@ -1,5 +1,7 @@
-// Export CSV des factures (parité legacy `/api/comptabilite/export-csv`). Helpers PURS d'anti-injection
-// et de formatage, + assemblage du CSV. Aucun effet de bord.
+/*
+ * Export CSV des factures (parité legacy `/api/comptabilite/export-csv`). Helpers PURS d'anti-injection
+ * et de formatage, + assemblage du CSV. Aucun effet de bord.
+ */
 
 // Montant FR (virgule décimale, 2 décimales) — parité legacy `fecAmount`.
 export function fecAmount(val: string | number | null | undefined): string {
@@ -17,9 +19,11 @@ export function ymdCompact(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// Neutralise une cellule CSV (parité legacy `csvCell`, OPE-180) : (1) injection de formule (cellule
-// commençant par = + - @ TAB CR exécutée par Excel/LibreOffice) → préfixe apostrophe ; (2) rupture de
-// structure (`;` `"` newline) → échappement RFC 4180. Nombres/dates sains laissés inchangés. PUR.
+/*
+ * Neutralise une cellule CSV (parité legacy `csvCell`) : (1) injection de formule (cellule
+ * commençant par = + - @ TAB CR exécutée par Excel/LibreOffice) → préfixe apostrophe ; (2) rupture de
+ * structure (`;` `"` newline) → échappement RFC 4180. Nombres/dates sains laissés inchangés. PUR.
+ */
 export function csvCell(val: string | number | null | undefined): string {
   let s = String(val ?? "");
   if (/^-?\d+(?:[.,]\d+)?$/.test(s)) return s; // nombre pur : inchangé

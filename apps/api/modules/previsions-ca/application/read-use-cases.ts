@@ -8,8 +8,10 @@ function num(s: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// Agrégat PUR : compare, mois par mois, le CA prévisionnel (previsions_ca) au CA réalisé
-// (historique_ca). Parité legacy `getComparaisonPrevisionsRealise` (arrondis identiques).
+/*
+ * Agrégat PUR : compare, mois par mois, le CA prévisionnel (previsions_ca) au CA réalisé
+ * (historique_ca). Parité legacy `getComparaisonPrevisionsRealise` (arrondis identiques).
+ */
 export function computeComparaison(previsions: readonly PrevisionCA[], historique: readonly HistoriqueCA[]): ComparaisonMois[] {
   const realiseParMois = new Map(historique.map((h) => [h.mois, num(h.caTotal)]));
   return previsions.map((p) => {
@@ -27,8 +29,10 @@ export function computeComparaison(previsions: readonly PrevisionCA[], historiqu
   });
 }
 
-// Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
-// `getPrevision` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+/*
+ * Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
+ * `getPrevision` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+ */
 
 export function listPrevisions(repo: IPrevisionCARepository, ctx: TenantContext): Promise<PrevisionCA[]> {
   return repo.list(ctx);

@@ -2,9 +2,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRegleCategorisationRepository } from "../application/regle-categorisation-repository";
 import type { RegleCategorisation, CreateRegleInput, UpdateRegleInput } from "../domain/regle-categorisation";
 
-// Implémentation in-memory du repository regles-categorisation (tests sans DB). Reproduit les
-// invariants du repo Drizzle : scope par artisanId, artisanId forcé, défaut `actif` true, update
-// partiel. Pas d'unicité (plusieurs règles peuvent partager motif/catégorie).
+/*
+ * Implémentation in-memory du repository regles-categorisation (tests sans DB). Reproduit les
+ * invariants du repo Drizzle : scope par artisanId, artisanId forcé, défaut `actif` true, update
+ * partiel. Pas d'unicité (plusieurs règles peuvent partager motif/catégorie).
+ */
 export class FakeRegleCategorisationRepository implements IRegleCategorisationRepository {
   private readonly store: RegleCategorisation[] = [];
   private seq = 0;

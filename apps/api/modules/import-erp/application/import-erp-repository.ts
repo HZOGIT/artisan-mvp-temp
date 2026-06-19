@@ -38,16 +38,20 @@ export interface ImportFactureData {
   readonly totalTTC: string;
 }
 
-// Port du repository d'import ERP. Tables clients/devis/factures SOUS RLS → l'impl scope via withTenant
-// (artisanId). La numérotation devis/facture est générée SERVEUR (mêmes compteurs que la création
-// normale). Les insertions sont « légères » (montant TTC brut, pas de lignes ni d'écritures FEC —
-// parité legacy : un import n'émet rien, il reprend des données).
+/*
+ * Port du repository d'import ERP. Tables clients/devis/factures SOUS RLS → l'impl scope via withTenant
+ * (artisanId). La numérotation devis/facture est générée SERVEUR (mêmes compteurs que la création
+ * normale). Les insertions sont « légères » (montant TTC brut, pas de lignes ni d'écritures FEC —
+ * parité legacy : un import n'émet rien, il reprend des données).
+ */
 export interface IImportErpRepository {
   listClients(ctx: TenantContext): Promise<ClientRef[]>;
   createClient(ctx: TenantContext, data: ImportClientData): Promise<void>;
   createDevisLight(ctx: TenantContext, data: ImportDevisData): Promise<void>;
   createFactureLight(ctx: TenantContext, data: ImportFactureData): Promise<void>;
-  // Numéros de facture déjà présents pour le tenant — pour refuser un doublon à l'import (le numéro
-  // émis est immuable ; on ne réattribue pas et on ne crée pas deux factures au même numéro).
+  /*
+   * Numéros de facture déjà présents pour le tenant — pour refuser un doublon à l'import (le numéro
+   * émis est immuable ; on ne réattribue pas et on ne crée pas deux factures au même numéro).
+   */
   listFactureNumeros(ctx: TenantContext): Promise<string[]>;
 }

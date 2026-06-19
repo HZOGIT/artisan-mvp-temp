@@ -14,11 +14,13 @@ export type InterventionAvecConflits = Intervention & { readonly conflits: Confl
 
 const ymd = (d: Date): string => d.toISOString().slice(0, 10);
 
-// Affecte un technicien à une intervention (parité legacy `assignerTechnicien`). ⚠️ Ownership :
-// intervention du tenant (404) + **technicien du tenant** (403, anti-IDOR-FK). Renvoie l'intervention
-// mise à jour + **conflits NON bloquants** : double-booking (interventions planifiée/en cours du même
-// technicien chevauchant la fenêtre, hors elle-même) + **congés approuvés** chevauchant. La détection
-// est best-effort (une erreur de calcul ne casse pas l'affectation — conflits vides).
+/*
+ * Affecte un technicien à une intervention (parité legacy `assignerTechnicien`). ⚠️ Ownership :
+ * intervention du tenant (404) + **technicien du tenant** (403, anti-IDOR-FK). Renvoie l'intervention
+ * mise à jour + **conflits NON bloquants** : double-booking (interventions planifiée/en cours du même
+ * technicien chevauchant la fenêtre, hors elle-même) + **congés approuvés** chevauchant. La détection
+ * est best-effort (une erreur de calcul ne casse pas l'affectation — conflits vides).
+ */
 export async function assignerTechnicien(
   repo: IInterventionRepository,
   congeRepo: ICongeRepository,

@@ -10,8 +10,10 @@ export interface LigneBalance {
   readonly solde: string; // débit − crédit (signé)
 }
 
-// Balance générale : agrège les écritures par compte (Σdébit, Σcrédit, solde), triée par compte.
-// ⚠️ Invariant : sur un ensemble équilibré, **Σ des soldes = 0** (Σdébit = Σcrédit).
+/*
+ * Balance générale : agrège les écritures par compte (Σdébit, Σcrédit, solde), triée par compte.
+ * ⚠️ Invariant : sur un ensemble équilibré, **Σ des soldes = 0** (Σdébit = Σcrédit).
+ */
 export function calculerBalance(ecritures: readonly EcritureComptable[]): LigneBalance[] {
   const parCompte = new Map<string, { lib: string | null; debit: number; credit: number }>();
   for (const e of ecritures) {
@@ -44,8 +46,10 @@ export interface LigneGrandLivre {
   readonly soldeProgressif: string; // cumul (débit − crédit) jusqu'à cette ligne incluse
 }
 
-// Grand livre : écritures (optionnellement filtrées sur un compte) triées par date puis id, avec
-// le **solde progressif** cumulé. Si `numeroCompte` fourni, le solde progressif est par compte.
+/*
+ * Grand livre : écritures (optionnellement filtrées sur un compte) triées par date puis id, avec
+ * le **solde progressif** cumulé. Si `numeroCompte` fourni, le solde progressif est par compte.
+ */
 export function grandLivre(ecritures: readonly EcritureComptable[], numeroCompte?: string): LigneGrandLivre[] {
   const filtrees = (numeroCompte ? ecritures.filter((e) => e.numeroCompte === numeroCompte) : ecritures)
     .slice()

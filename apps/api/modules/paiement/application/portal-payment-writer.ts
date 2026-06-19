@@ -1,7 +1,9 @@
 import type { TenantContext } from "../../../shared/tenant";
 
-// Création d'une ligne `paiements_stripe` (en_attente) à l'ouverture d'un Checkout, sous le tenant
-// résolu par le token de portail. Le webhook `checkout.session.completed` (déjà porté) la soldera.
+/*
+ * Création d'une ligne `paiements_stripe` (en_attente) à l'ouverture d'un Checkout, sous le tenant
+ * résolu par le token de portail. Le webhook `checkout.session.completed` (déjà porté) la soldera.
+ */
 export interface PortalPaymentWriter {
   createPaiement(
     ctx: TenantContext,

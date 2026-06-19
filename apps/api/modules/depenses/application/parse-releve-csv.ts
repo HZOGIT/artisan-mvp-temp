@@ -1,11 +1,13 @@
 import { ValidationError } from "../../../shared/errors";
 import type { ImportTransaction } from "../domain/transaction-bancaire";
 
-// Parse PUR d'un relevé bancaire CSV (parité legacy `importReleve`). Ligne 1 = header ; séparateur
-// `;`/`,` auto-détecté. Heuristique colonnes : date(0), libellé(1), montant(2) — sinon colonnes
-// débit(2)/crédit(3). Date `DD/MM/YYYY` → `YYYY-MM-DD`. Lignes invalides ignorées.
-//  - CSV vide/< 2 lignes → [] (l'appelant renvoie un message).
-//  - > 5000 lignes de données → ValidationError (anti-DoS).
+/*
+ * Parse PUR d'un relevé bancaire CSV (parité legacy `importReleve`). Ligne 1 = header ; séparateur
+ * `;`/`,` auto-détecté. Heuristique colonnes : date(0), libellé(1), montant(2) — sinon colonnes
+ * débit(2)/crédit(3). Date `DD/MM/YYYY` → `YYYY-MM-DD`. Lignes invalides ignorées.
+ *  - CSV vide/< 2 lignes → [] (l'appelant renvoie un message).
+ *  - > 5000 lignes de données → ValidationError (anti-DoS).
+ */
 export function parseReleveCsv(contenuCsv: string): ImportTransaction[] {
   const lignes = contenuCsv.split(/\r?\n/).filter((l) => l.trim());
   if (lignes.length < 2) return [];

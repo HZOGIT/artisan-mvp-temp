@@ -1,6 +1,8 @@
-// Bibliothèque d'articles = catalogue de référence **PARTAGÉ** entre tous les artisans (table
-// `bibliotheque_articles`, SANS `artisanId` → RLS OFF). Lecture publique (non sensible). Le port
-// est volontairement NON tenant : aucune `TenantContext` requise.
+/*
+ * Bibliothèque d'articles = catalogue de référence **PARTAGÉ** entre tous les artisans (table
+ * `bibliotheque_articles`, SANS `artisanId` → RLS OFF). Lecture publique (non sensible). Le port
+ * est volontairement NON tenant : aucune `TenantContext` requise.
+ */
 
 export interface BibliothequeArticle {
   readonly id: number;
@@ -22,8 +24,10 @@ export interface BibliothequeFiltre {
   readonly categorie?: string;
 }
 
-// Lecture du catalogue partagé. Aucune écriture ici (les mutations sont réservées au staff Operioz
-// via une procédure admin — concern séparée). Pas de scope tenant : référentiel commun.
+/*
+ * Lecture du catalogue partagé. Aucune écriture ici (les mutations sont réservées au staff Operioz
+ * via une procédure admin — concern séparée). Pas de scope tenant : référentiel commun.
+ */
 export interface BibliothequeReader {
   // Liste filtrable par métier/catégorie (parité legacy `getBibliothequeArticles`).
   list(filtre?: BibliothequeFiltre): Promise<BibliothequeArticle[]>;

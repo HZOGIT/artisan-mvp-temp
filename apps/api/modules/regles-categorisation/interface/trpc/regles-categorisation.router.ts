@@ -17,9 +17,11 @@ const updateSchema = z.object({
   actif: z.boolean().optional(),
 });
 
-// Routeur tRPC du domaine regles-categorisation (catalogue de règles de catégorisation auto).
-// Transport mince : valide les inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant),
-// laisse remonter les Domain errors (NotFound→404, Validation→400). Repo injecté.
+/*
+ * Routeur tRPC du domaine regles-categorisation (catalogue de règles de catégorisation auto).
+ * Transport mince : valide les inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant),
+ * laisse remonter les Domain errors (NotFound→404, Validation→400). Repo injecté.
+ */
 export function createReglesCategorisationRouter(repo: IRegleCategorisationRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listRegles(repo, ctx.tenant)),

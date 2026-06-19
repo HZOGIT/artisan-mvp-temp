@@ -1,13 +1,15 @@
-// Types de domaine du module parametres (configuration de l'artisan) — découplés du schéma
-// Drizzle. Table `parametres_artisan` : **singleton par tenant** (artisanId UNIQUE, RLS). Forme
-// get/upsert et NON CRUD by-id. Regroupe : numérotation (préfixes + compteurs), CGV/mentions,
-// délais & conditions de paiement, notifications/rappels, objectifs, couleurs de marque.
-//
-// ⚠️ INVARIANT MÉTIER CENTRAL : les **compteurs** de numérotation (compteurDevis/Facture/Avoir)
-// sont **pilotés par la numérotation** des documents (devis/factures/avoir) et NE sont PAS
-// modifiables via la configuration — les exposer en écriture libre casserait la séquence (doublons
-// de numéros). Ils sont donc en lecture seule ici et ABSENTS de UpdateParametresInput. Les préfixes
-// restent modifiables. La vitrine publique est une concern séparée (hors périmètre de ce domaine).
+/*
+ * Types de domaine du module parametres (configuration de l'artisan) — découplés du schéma
+ * Drizzle. Table `parametres_artisan` : **singleton par tenant** (artisanId UNIQUE, RLS). Forme
+ * get/upsert et NON CRUD by-id. Regroupe : numérotation (préfixes + compteurs), CGV/mentions,
+ * délais & conditions de paiement, notifications/rappels, objectifs, couleurs de marque.
+ * 
+ * ⚠️ INVARIANT MÉTIER CENTRAL : les **compteurs** de numérotation (compteurDevis/Facture/Avoir)
+ * sont **pilotés par la numérotation** des documents (devis/factures/avoir) et NE sont PAS
+ * modifiables via la configuration — les exposer en écriture libre casserait la séquence (doublons
+ * de numéros). Ils sont donc en lecture seule ici et ABSENTS de UpdateParametresInput. Les préfixes
+ * restent modifiables. La vitrine publique est une concern séparée (hors périmètre de ce domaine).
+ */
 
 export interface ParametresArtisan {
   readonly artisanId: number;
@@ -59,8 +61,10 @@ export interface UpdateParametresInput {
   readonly couleurSecondaire?: string;
 }
 
-// Valeurs par défaut (alignées sur les DEFAULT de la table) renvoyées par `get` quand aucune ligne
-// n'existe encore pour le tenant — le domaine garantit ainsi un singleton toujours lisible.
+/*
+ * Valeurs par défaut (alignées sur les DEFAULT de la table) renvoyées par `get` quand aucune ligne
+ * n'existe encore pour le tenant — le domaine garantit ainsi un singleton toujours lisible.
+ */
 export function defaultParametres(artisanId: number): ParametresArtisan {
   return {
     artisanId,

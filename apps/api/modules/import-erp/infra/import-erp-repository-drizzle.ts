@@ -9,11 +9,13 @@ import { FactureRepositoryDrizzle } from "../../factures/infra/facture-repositor
 import type { IImportErpRepository, ImportClientData, ImportDevisData, ImportFactureData } from "../application/import-erp-repository";
 import type { ClientRef } from "../domain/import";
 
-// Repository Drizzle de l'import ERP. Tables clients/devis/factures SOUS RLS → withTenant (artisanId).
-// La numérotation devis/facture réutilise les MÊMES générateurs serveur que la création normale
-// (compteurs `parametres_artisan` + MAX en base, anti-doublon) via les repos migrés ; la création
-// client réutilise le repo clients migré. Les insertions devis/facture sont « légères » (TTC brut, pas
-// de lignes/écritures — parité legacy : un import reprend des données, il n'émet rien).
+/*
+ * Repository Drizzle de l'import ERP. Tables clients/devis/factures SOUS RLS → withTenant (artisanId).
+ * La numérotation devis/facture réutilise les MÊMES générateurs serveur que la création normale
+ * (compteurs `parametres_artisan` + MAX en base, anti-doublon) via les repos migrés ; la création
+ * client réutilise le repo clients migré. Les insertions devis/facture sont « légères » (TTC brut, pas
+ * de lignes/écritures — parité legacy : un import reprend des données, il n'émet rien).
+ */
 export class ImportErpRepositoryDrizzle implements IImportErpRepository {
   private readonly clientRepo: ClientRepositoryDrizzle;
   private readonly devisRepo: DevisRepositoryDrizzle;
@@ -66,8 +68,10 @@ export class ImportErpRepositoryDrizzle implements IImportErpRepository {
   }
 
   async createFactureLight(ctx: TenantContext, data: ImportFactureData): Promise<void> {
-    // Préserve le numéro LÉGAL d'origine s'il est fourni (facture historique d'un autre logiciel) ;
-    // sinon génère un numéro serveur (parité création normale).
+    /*
+     * Préserve le numéro LÉGAL d'origine s'il est fourni (facture historique d'un autre logiciel) ;
+     * sinon génère un numéro serveur (parité création normale).
+     */
     const numero = data.numero && data.numero.trim() ? data.numero.trim() : await this.factureRepo.nextNumero(ctx);
     await withTenant(this.db, ctx, async (tx) => {
       await tx.insert(facturesTable).values({

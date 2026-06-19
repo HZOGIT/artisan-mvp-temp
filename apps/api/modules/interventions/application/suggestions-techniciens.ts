@@ -2,11 +2,13 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IInterventionRepository } from "./intervention-repository";
 import type { ITechnicienRepository } from "../../techniciens/application/technicien-repository";
 
-// Suggestion de technicien pour une intervention géolocalisée (parité legacy
-// `getSuggestionsTechniciens`). ⚠️ GÉO/RGPD : les positions des techniciens sont des données
-// sensibles — l'accès passe par `technicienRepo.getDernierePosition` (scopé tenant : un artisan ne
-// voit JAMAIS les positions des techniciens d'un autre tenant). Le tri par proximité + disponibilité
-// reste une logique PURE et testable.
+/*
+ * Suggestion de technicien pour une intervention géolocalisée (parité legacy
+ * `getSuggestionsTechniciens`). ⚠️ GÉO/RGPD : les positions des techniciens sont des données
+ * sensibles — l'accès passe par `technicienRepo.getDernierePosition` (scopé tenant : un artisan ne
+ * voit JAMAIS les positions des techniciens d'un autre tenant). Le tri par proximité + disponibilité
+ * reste une logique PURE et testable.
+ */
 
 export interface SuggestionInput {
   readonly latitude: number;

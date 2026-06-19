@@ -21,9 +21,11 @@ const updateSchema = z.object({
   depenseReelle: decimal.optional(),
 });
 
-// Routeur tRPC du domaine budgets-categories (budget mensuel par catégorie). Transport mince : valide
-// les inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain
-// errors (NotFound→404, Validation→400, Conflict→409 [unicité (categorie, mois)]). Repo injecté.
+/*
+ * Routeur tRPC du domaine budgets-categories (budget mensuel par catégorie). Transport mince : valide
+ * les inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain
+ * errors (NotFound→404, Validation→400, Conflict→409 [unicité (categorie, mois)]). Repo injecté.
+ */
 export function createBudgetsCategoriesRouter(repo: IBudgetCategorieRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listBudgets(repo, ctx.tenant)),

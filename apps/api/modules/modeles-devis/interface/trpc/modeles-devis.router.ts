@@ -6,8 +6,10 @@ import { creerModeleDevis, modifierModeleDevis, supprimerModeleDevis } from "../
 
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 
-// Ligne de modèle (defense-in-depth aligné sur `modeles_devis_lignes`). Pas de montants dérivés
-// (gabarit) : seules les valeurs saisies sont bornées ; la validation métier fine est au use-case.
+/*
+ * Ligne de modèle (defense-in-depth aligné sur `modeles_devis_lignes`). Pas de montants dérivés
+ * (gabarit) : seules les valeurs saisies sont bornées ; la validation métier fine est au use-case.
+ */
 const ligneSchema = z.object({
   articleId: z.number().int().nullish(),
   designation: z.string().min(1).max(255),
@@ -36,10 +38,12 @@ const updateSchema = z.object({
   lignes: z.array(ligneSchema).optional(), // si fourni → remplacement complet des lignes
 });
 
-// Routeur tRPC du domaine modeles-devis (agrégat en-tête + lignes). Transport mince : valide les
-// inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain
-// errors (NotFound→404, Validation→400). L'unicité du défaut par artisan est portée par les write
-// use-cases. Repo injecté.
+/*
+ * Routeur tRPC du domaine modeles-devis (agrégat en-tête + lignes). Transport mince : valide les
+ * inputs (zod), délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain
+ * errors (NotFound→404, Validation→400). L'unicité du défaut par artisan est portée par les write
+ * use-cases. Repo injecté.
+ */
 export function createModelesDevisRouter(repo: IModeleDevisRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listModelesDevis(repo, ctx.tenant)),

@@ -1,6 +1,8 @@
-// Calcul de la TVA d'une dépense — PUR, testable. ⚠️ Parité legacy `depensesRouter.create` :
-// `montantTva` et `montantTtc` sont **DÉRIVÉS** de `montantHt` + `tauxTva` côté serveur
-// (jamais acceptés du client) → pas de TTC falsifiable. Arrondi à 2 décimales (centimes).
+/*
+ * Calcul de la TVA d'une dépense — PUR, testable. ⚠️ Parité legacy `depensesRouter.create` :
+ * `montantTva` et `montantTtc` sont **DÉRIVÉS** de `montantHt` + `tauxTva` côté serveur
+ * (jamais acceptés du client) → pas de TTC falsifiable. Arrondi à 2 décimales (centimes).
+ */
 
 export interface MontantsTva {
   readonly montantTva: string;

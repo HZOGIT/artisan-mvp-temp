@@ -4,10 +4,12 @@ import type { ClientReader, ClientInfo } from "../../../shared/readers/contact-r
 import type { IDevisRepository } from "./devis-repository";
 import type { Devis, DevisLigne } from "../domain/devis";
 
-// Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
-// `TenantContext` (le repo l'applique). `getDevis` sur une ressource d'un autre tenant → le repo
-// renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant). Les lignes sont scopées
-// via le devis parent (→ [] si le devis n'appartient pas au tenant).
+/*
+ * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
+ * `TenantContext` (le repo l'applique). `getDevis` sur une ressource d'un autre tenant → le repo
+ * renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant). Les lignes sont scopées
+ * via le devis parent (→ [] si le devis n'appartient pas au tenant).
+ */
 
 export function listDevis(repo: IDevisRepository, ctx: TenantContext): Promise<Devis[]> {
   return repo.list(ctx);
@@ -23,9 +25,11 @@ export function listLignesDevis(repo: IDevisRepository, ctx: TenantContext, devi
   return repo.listLignes(ctx, devisId);
 }
 
-// Devis enrichi pour l'affichage détail (parité legacy `devis.getById` qui renvoie
-// `{ ...devis, lignes, client }` — consommé par `DevisDetail` côté client ; la signature est lue
-// séparément via `trpc.signature.*`). `client` peut être null (client supprimé). 404 hors tenant.
+/*
+ * Devis enrichi pour l'affichage détail (parité legacy `devis.getById` qui renvoie
+ * `{ ...devis, lignes, client }` — consommé par `DevisDetail` côté client ; la signature est lue
+ * séparément via `trpc.signature.*`). `client` peut être null (client supprimé). 404 hors tenant.
+ */
 export type DevisDetail = Devis & { readonly lignes: DevisLigne[]; readonly client: ClientInfo | null };
 
 export async function getDevisDetail(

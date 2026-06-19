@@ -10,10 +10,12 @@ import type {
   UpdateContratInterventionInput,
 } from "../domain/contrat";
 
-// Implémentation in-memory du repository contrats-maintenance (tests sans DB). Reproduit les
-// invariants du repo Drizzle : scope par artisanId, artisanId forcé, statut="actif" à la création,
-// reference passée en argument, update qui ne touche pas le statut, setStatut pour les transitions,
-// ownsClient via Set seedable, nextReference compteur en mémoire par tenant.
+/*
+ * Implémentation in-memory du repository contrats-maintenance (tests sans DB). Reproduit les
+ * invariants du repo Drizzle : scope par artisanId, artisanId forcé, statut="actif" à la création,
+ * reference passée en argument, update qui ne touche pas le statut, setStatut pour les transitions,
+ * ownsClient via Set seedable, nextReference compteur en mémoire par tenant.
+ */
 export class FakeContratRepository implements IContratRepository {
   private readonly store: Contrat[] = [];
   private seq = 0;

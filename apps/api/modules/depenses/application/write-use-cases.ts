@@ -4,14 +4,16 @@ import type { IDepenseRepository, DepenseRefKind } from "./depense-repository";
 import type { Depense, CreateDepenseInput, UpdateDepenseInput } from "../domain/depense";
 import { calculerTva } from "./tva";
 
-// Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible (compta) :
-//  - **TVA dérivée côté serveur** : `montantTva`/`montantTtc` sont TOUJOURS recalculés à partir
-//    de `montantHt` + `tauxTva` (parité legacy `depensesRouter.create`) → jamais acceptés du
-//    client (pas de TTC falsifiable).
-//  - **userId forcé** à `ctx.userId` (le créateur), jamais usurpable.
-//  - **anti-IDOR-FK** : toute FK fournie (chantier/intervention/client) DOIT appartenir au
-//    tenant, sinon NotFound (on ne révèle pas l'existence cross-tenant).
-//  - montants ≥ 0, taux ∈ [0,100], numero/categorie non vides.
+/*
+ * Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible (compta) :
+ *  - **TVA dérivée côté serveur** : `montantTva`/`montantTtc` sont TOUJOURS recalculés à partir
+ *    de `montantHt` + `tauxTva` (parité legacy `depensesRouter.create`) → jamais acceptés du
+ *    client (pas de TTC falsifiable).
+ *  - **userId forcé** à `ctx.userId` (le créateur), jamais usurpable.
+ *  - **anti-IDOR-FK** : toute FK fournie (chantier/intervention/client) DOIT appartenir au
+ *    tenant, sinon NotFound (on ne révèle pas l'existence cross-tenant).
+ *  - montants ≥ 0, taux ∈ [0,100], numero/categorie non vides.
+ */
 
 const REF_LABEL: Record<DepenseRefKind, string> = {
   chantier: "Chantier",
@@ -19,11 +21,15 @@ const REF_LABEL: Record<DepenseRefKind, string> = {
   client: "Client",
 };
 
-// Entrée de création : pas de userId (forcé), ni montants TVA (dérivés), ni numero (généré
-// côté serveur). tauxTva optionnel.
+/*
+ * Entrée de création : pas de userId (forcé), ni montants TVA (dérivés), ni numero (généré
+ * côté serveur). tauxTva optionnel.
+ */
 export type CreerDepenseInput = Omit<CreateDepenseInput, "userId" | "numero" | "montantTva" | "montantTtc">;
-// Entrée de modification : montants TVA dérivés (recalculés si montantHt/tauxTva changent) ;
-// `numero` immuable après création (numérotation comptable maîtrisée).
+/*
+ * Entrée de modification : montants TVA dérivés (recalculés si montantHt/tauxTva changent) ;
+ * `numero` immuable après création (numérotation comptable maîtrisée).
+ */
 export type ModifierDepenseInput = Omit<UpdateDepenseInput, "montantTva" | "montantTtc" | "numero">;
 
 async function assertRefOwned(
@@ -116,9 +122,11 @@ export async function supprimerDepense(
   if (!ok) throw new NotFoundError("Dépense introuvable");
 }
 
-// Crée une dépense « indemnité kilométrique » (parité legacy `creerIndemniteKm`). Montant forfaitaire
-// = km × tarif, **sans TVA** (régime forfait, `tvaDeductible:false`), remboursable. Réutilise
-// `creerDepense` → anti-IDOR FK (client/chantier du tenant), numéro serveur, TVA dérivée (taux 0).
+/*
+ * Crée une dépense « indemnité kilométrique » (parité legacy `creerIndemniteKm`). Montant forfaitaire
+ * = km × tarif, **sans TVA** (régime forfait, `tvaDeductible:false`), remboursable. Réutilise
+ * `creerDepense` → anti-IDOR FK (client/chantier du tenant), numéro serveur, TVA dérivée (taux 0).
+ */
 export interface CreerIndemniteKmInput {
   readonly dateDepense: string;
   readonly kilometres: number;

@@ -9,9 +9,11 @@ import type {
   UpsertPrevisionInput,
 } from "../domain/prevision-ca";
 
-// Implémentation in-memory du repository previsions-ca (tests sans DB). Reproduit les invariants du
-// repo Drizzle : scope par artisanId, artisanId forcé, défauts montants "0.00", confiance null, update
-// qui ne touche que les montants/méthode/confiance (mois/annee immuables). Pas d'unicité.
+/*
+ * Implémentation in-memory du repository previsions-ca (tests sans DB). Reproduit les invariants du
+ * repo Drizzle : scope par artisanId, artisanId forcé, défauts montants "0.00", confiance null, update
+ * qui ne touche que les montants/méthode/confiance (mois/annee immuables). Pas d'unicité.
+ */
 export class FakePrevisionCARepository implements IPrevisionCARepository {
   private readonly store: PrevisionCA[] = [];
   private seq = 0;

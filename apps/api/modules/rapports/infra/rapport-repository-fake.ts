@@ -5,8 +5,10 @@ import type { CreateRapportInput, RapportPersonnalise, RapportType } from "../do
 
 type MutableRapport = { -readonly [K in keyof RapportPersonnalise]: RapportPersonnalise[K] };
 
-// Fake in-memory déterministe : rapports + données d'entité (pour `runReport`) + log d'exécutions,
-// scopés par tenant.
+/*
+ * Fake in-memory déterministe : rapports + données d'entité (pour `runReport`) + log d'exécutions,
+ * scopés par tenant.
+ */
 export class FakeRapportRepository implements IRapportRepository {
   private seq = 0;
   private rapports: MutableRapport[] = [];

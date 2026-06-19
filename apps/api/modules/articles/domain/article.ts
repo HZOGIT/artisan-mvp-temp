@@ -1,10 +1,12 @@
-// Types de domaine du module articles (catalogue produits/services de l'artisan) — découplés du
-// schéma Drizzle. Table `articles_artisan` (camelCase, RLS sur artisanId). Domaine CRUD standard
-// (réutilisé par les lignes devis/factures côté front). Invariants : isolation cross-tenant ;
-// prixUnitaireHT ≥ 0 ; bornes alignées sur la table.
-//
-// NB : la « bibliothèque » publique (catalogue commun) et la recherche/IA sont une concern
-// séparée (référentiel partagé) — hors périmètre de ce domaine tenant-scopé.
+/*
+ * Types de domaine du module articles (catalogue produits/services de l'artisan) — découplés du
+ * schéma Drizzle. Table `articles_artisan` (camelCase, RLS sur artisanId). Domaine CRUD standard
+ * (réutilisé par les lignes devis/factures côté front). Invariants : isolation cross-tenant ;
+ * prixUnitaireHT ≥ 0 ; bornes alignées sur la table.
+ * 
+ * NB : la « bibliothèque » publique (catalogue commun) et la recherche/IA sont une concern
+ * séparée (référentiel partagé) — hors périmètre de ce domaine tenant-scopé.
+ */
 
 export interface Article {
   readonly id: number;

@@ -1,6 +1,8 @@
-// Domaine « modules » : catalogue de fonctionnalités activables par artisan + onboarding.
-// - `modules` = catalogue GLOBAL (hors tenant, hors RLS) ; `artisan_modules` = activation par tenant
-//   (sous RLS) ; l'onboarding (onboardingCompleted/metier/plan) vit sur la table d'identité `artisans`.
+/*
+ * Domaine « modules » : catalogue de fonctionnalités activables par artisan + onboarding.
+ * - `modules` = catalogue GLOBAL (hors tenant, hors RLS) ; `artisan_modules` = activation par tenant
+ *   (sous RLS) ; l'onboarding (onboardingCompleted/metier/plan) vit sur la table d'identité `artisans`.
+ */
 
 // Une entrée du catalogue global (telle quelle, sans état tenant).
 export interface ModuleCatalogue {

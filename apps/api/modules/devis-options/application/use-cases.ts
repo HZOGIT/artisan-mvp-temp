@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisOptionRepository } from "./devis-option-repository";
 import type { CreateDevisOptionInput, DevisOption } from "../domain/devis-option";
 
-// Use-cases minces des options de devis : transport + traduction du sentinel d'appartenance en
-// NotFoundError (parité legacy : `assertDevisOwner` → 404 « Devis non trouvé », `assertOptionOwner`
-// → 404 « Option non trouvée »). L'anti-IDOR réel (appartenance du devis parent) est appliqué dans
-// le repository, jamais ici.
+/*
+ * Use-cases minces des options de devis : transport + traduction du sentinel d'appartenance en
+ * NotFoundError (parité legacy : `assertDevisOwner` → 404 « Devis non trouvé », `assertOptionOwner`
+ * → 404 « Option non trouvée »). L'anti-IDOR réel (appartenance du devis parent) est appliqué dans
+ * le repository, jamais ici.
+ */
 
 export async function listOptions(repo: IDevisOptionRepository, ctx: TenantContext, devisId: number): Promise<DevisOption[]> {
   const options = await repo.listByDevis(ctx, devisId);

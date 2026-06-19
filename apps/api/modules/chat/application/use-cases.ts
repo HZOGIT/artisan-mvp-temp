@@ -27,8 +27,10 @@ export async function getMessages(deps: ChatDeps, ctx: TenantContext, conversati
   return deps.repo.listMessages(ctx, conversationId);
 }
 
-// `chat.sendMessage` (parité legacy) : ownership → crée le message (auteur artisan) → notifie le
-// client (email best-effort, jamais bloquant). Renvoie le message créé.
+/*
+ * `chat.sendMessage` (parité legacy) : ownership → crée le message (auteur artisan) → notifie le
+ * client (email best-effort, jamais bloquant). Renvoie le message créé.
+ */
 export async function sendMessage(
   deps: ChatDeps,
   ctx: TenantContext,
@@ -44,8 +46,10 @@ export async function sendMessage(
   return msg;
 }
 
-// `chat.startConversation` (parité legacy) : ownership du client → conversation (réutilisée si ouverte)
-// + 1er message optionnel.
+/*
+ * `chat.startConversation` (parité legacy) : ownership du client → conversation (réutilisée si ouverte)
+ * + 1er message optionnel.
+ */
 export async function startConversation(
   deps: ChatDeps,
   ctx: TenantContext,

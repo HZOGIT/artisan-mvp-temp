@@ -7,9 +7,11 @@ import { buildVoiceSystemInstruction } from "../domain/voice-system-prompt";
 import type { AssistantThreadWriter } from "./assistant-thread-writer";
 import type { IAssistantThreadsRepository } from "./assistant-threads-repository";
 
-// Mint d'un token éphémère pour la session vocale Live (parité legacy `/api/voice/token`) : crée/réutilise
-// un thread (pour persister les tours via voice/persist), construit l'instruction système (métier + stats
-// + historique + outils + règles), puis délègue le mint au provider (port). Le setup déclare les outils.
+/*
+ * Mint d'un token éphémère pour la session vocale Live (parité legacy `/api/voice/token`) : crée/réutilise
+ * un thread (pour persister les tours via voice/persist), construit l'instruction système (métier + stats
+ * + historique + outils + règles), puis délègue le mint au provider (port). Le setup déclare les outils.
+ */
 
 export interface VoiceTokenSetup {
   readonly systemText: string;

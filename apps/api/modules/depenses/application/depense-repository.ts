@@ -4,10 +4,12 @@ import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, De
 // Nature d'une FK référencée par une dépense (toutes des tables scopées tenant).
 export type DepenseRefKind = "chantier" | "intervention" | "client";
 
-// Port du repository depenses. Chaque méthode exige le TenantContext (scope tenant + RLS).
-// `depenses` possède un `artisan_id` → double cloisonnement RLS + filtre. ⚠️ Les invariants
-// sensibles (cohérence TVA, anti-IDOR-FK des liens chantier/intervention/client, workflow de
-// remboursement) sont portés par les use-cases (étapes ultérieures), pas par le CRUD.
+/*
+ * Port du repository depenses. Chaque méthode exige le TenantContext (scope tenant + RLS).
+ * `depenses` possède un `artisan_id` → double cloisonnement RLS + filtre. ⚠️ Les invariants
+ * sensibles (cohérence TVA, anti-IDOR-FK des liens chantier/intervention/client, workflow de
+ * remboursement) sont portés par les use-cases (étapes ultérieures), pas par le CRUD.
+ */
 export interface IDepenseRepository {
   list(ctx: TenantContext): Promise<Depense[]>;
   // null si la dépense n'appartient pas au tenant.
@@ -17,24 +19,36 @@ export interface IDepenseRepository {
   update(ctx: TenantContext, id: number, input: UpdateDepenseInput): Promise<Depense | null>;
   // false si la dépense n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
-  // true si la ressource référencée (chantier/intervention/client) appartient au tenant.
-  // Garde anti-IDOR-FK : interdit de lier une dépense à la ressource d'un autre tenant.
+  /*
+   * true si la ressource référencée (chantier/intervention/client) appartient au tenant.
+   * Garde anti-IDOR-FK : interdit de lier une dépense à la ressource d'un autre tenant.
+   */
   ownsRef(ctx: TenantContext, kind: DepenseRefKind, id: number): Promise<boolean>;
-  // Prochain numéro de dépense (format `DEP-00001`), scopé tenant, incrémenté depuis la
-  // dernière dépense de l'artisan. Le numéro est généré côté serveur (jamais fourni par le
-  // client) → intégrité de la numérotation comptable (parité legacy `getNextDepenseNumero`).
+  /*
+   * Prochain numéro de dépense (format `DEP-00001`), scopé tenant, incrémenté depuis la
+   * dernière dépense de l'artisan. Le numéro est généré côté serveur (jamais fourni par le
+   * client) → intégrité de la numérotation comptable (parité legacy `getNextDepenseNumero`).
+   */
   nextNumero(ctx: TenantContext): Promise<string>;
-  // Réalisé du mois agrégé par catégorie : SUM(montantTtc) des dépenses dont `dateDepense` est dans
-  // le mois "YYYY-MM", groupé par `categorie`. Sert au read dérivé « budgets réalisés » (parité
-  // legacy `calculerBudgetsRealises`). Montant rendu en string (numeric PG).
+  /*
+   * Réalisé du mois agrégé par catégorie : SUM(montantTtc) des dépenses dont `dateDepense` est dans
+   * le mois "YYYY-MM", groupé par `categorie`. Sert au read dérivé « budgets réalisés » (parité
+   * legacy `calculerBudgetsRealises`). Montant rendu en string (numeric PG).
+   */
   realisesParCategorie(ctx: TenantContext, mois: string): Promise<{ categorie: string; reel: string }[]>;
-  // Doublons potentiels d'une dépense (même montant TTC ±0.01, même date, même fournisseur), scopé
-  // tenant, hors `excludeId`, triés récent d'abord, ≤10. Aide à la saisie (parité `findDepensesDoublons`).
+  /*
+   * Doublons potentiels d'une dépense (même montant TTC ±0.01, même date, même fournisseur), scopé
+   * tenant, hors `excludeId`, triés récent d'abord, ≤10. Aide à la saisie (parité `findDepensesDoublons`).
+   */
   findDoublons(ctx: TenantContext, params: DoublonParams): Promise<DepenseDoublon[]>;
-  // Statistiques agrégées du mois `YYYY-MM` (total, par catégorie, top dépenses/fournisseurs,
-  // évolution sur 6 mois…), scopé tenant. Parité legacy `getDepensesStats`.
+  /*
+   * Statistiques agrégées du mois `YYYY-MM` (total, par catégorie, top dépenses/fournisseurs,
+   * évolution sur 6 mois…), scopé tenant. Parité legacy `getDepensesStats`.
+   */
   getStats(ctx: TenantContext, mois: string): Promise<DepenseStats>;
-  // Enregistre le résultat OCR d'une dépense (`ocr_brut` JSON tronqué 5000, `ocr_traite=true`),
-  // scopé tenant. No-op si la dépense n'appartient pas au tenant. Parité `markDepenseOcrTraite`.
+  /*
+   * Enregistre le résultat OCR d'une dépense (`ocr_brut` JSON tronqué 5000, `ocr_traite=true`),
+   * scopé tenant. No-op si la dépense n'appartient pas au tenant. Parité `markDepenseOcrTraite`.
+   */
   setOcr(ctx: TenantContext, id: number, data: unknown): Promise<void>;
 }

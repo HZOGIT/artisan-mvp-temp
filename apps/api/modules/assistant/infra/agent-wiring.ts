@@ -30,10 +30,12 @@ import { envoyerFactureParEmail, type FactureMailingDeps } from "../../factures/
 import { envoyerRelanceFacture, type RelanceMailingDeps } from "../../factures/application/envoyer-relance-facture";
 import { envoyerCommandeParEmail, type CommandeMailingDeps } from "../../commandes/application/envoyer-commande-email";
 
-// Câblage de l'assistant agentique : adapte les repos/use-cases DÉJÀ MIGRÉS aux ports `*ForAgent` et
-// construit le registry. Les repos migrés satisfont STRUCTURELLEMENT les interfaces de lecture (méthode
-// `list(ctx)` renvoyant le type domaine, sur-ensemble du sous-type agent) → passage direct. Seul
-// `get_statistiques` compose le dashboard reader migré via `getStats`.
+/*
+ * Câblage de l'assistant agentique : adapte les repos/use-cases DÉJÀ MIGRÉS aux ports `*ForAgent` et
+ * construit le registry. Les repos migrés satisfont STRUCTURELLEMENT les interfaces de lecture (méthode
+ * `list(ctx)` renvoyant le type domaine, sur-ensemble du sous-type agent) → passage direct. Seul
+ * `get_statistiques` compose le dashboard reader migré via `getStats`.
+ */
 export interface AssistantAgentReadRepos {
   readonly clients: ClientsReaderForAgent;
   readonly factures: FacturesReaderForAgent;
@@ -57,9 +59,11 @@ export function buildAssistantReadDeps(repos: AssistantAgentReadRepos): Assistan
   };
 }
 
-// Repos d'ÉCRITURE. `clientRepo`/`interventionRepo`/`devisRepo` requis (3b-i) ; `factureRepo`+`devisReader`
-// (conversion devis→facture) et `commandeRepo` optionnels (3b-ii créations). Les ENVOIS (3b-iii) exigent
-// en plus les mailing deps (cf. `AssistantAgentSenders`).
+/*
+ * Repos d'ÉCRITURE. `clientRepo`/`interventionRepo`/`devisRepo` requis (3b-i) ; `factureRepo`+`devisReader`
+ * (conversion devis→facture) et `commandeRepo` optionnels (3b-ii créations). Les ENVOIS (3b-iii) exigent
+ * en plus les mailing deps (cf. `AssistantAgentSenders`).
+ */
 export interface AssistantAgentWriteRepos {
   readonly clientRepo: IClientRepository;
   readonly interventionRepo: IInterventionRepository;
@@ -69,8 +73,10 @@ export interface AssistantAgentWriteRepos {
   readonly commandeRepo?: ICommandeRepository;
 }
 
-// Mailing deps (construits dans buildApp pour les routes d'envoi) requis pour câbler les ENVOIS. Un
-// sender n'est câblé que si son mailing (et son repo) est fourni. La relance n'attache PAS de PDF.
+/*
+ * Mailing deps (construits dans buildApp pour les routes d'envoi) requis pour câbler les ENVOIS. Un
+ * sender n'est câblé que si son mailing (et son repo) est fourni. La relance n'attache PAS de PDF.
+ */
 export interface AssistantAgentMailing {
   readonly devis?: DevisMailingDeps;
   readonly facture?: FactureMailingDeps;
@@ -78,8 +84,10 @@ export interface AssistantAgentMailing {
   readonly commande?: CommandeMailingDeps; // embarque repo + fournisseurRepo
 }
 
-// Adapte les use-cases d'écriture migrés aux ports `*ForAgent` (wrappers triviaux ; ownership/validation
-// dans les use-cases). Un outil n'est câblé que si ses repos/mailing sont fournis.
+/*
+ * Adapte les use-cases d'écriture migrés aux ports `*ForAgent` (wrappers triviaux ; ownership/validation
+ * dans les use-cases). Un outil n'est câblé que si ses repos/mailing sont fournis.
+ */
 export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos, mailing: AssistantAgentMailing = {}): AssistantWriteDeps {
   const { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader, commandeRepo } = repos;
   return {
@@ -114,8 +122,10 @@ export function buildAssistantWriteDeps(repos: AssistantAgentWriteRepos, mailing
     ...(commandeRepo
       ? {
           commandes: {
-            // `numero` est généré par le repo à la création (CMD-xxxxx) ; le type `string | null` est
-            // permissif → on coerce (jamais nul en pratique).
+            /*
+             * `numero` est généré par le repo à la création (CMD-xxxxx) ; le type `string | null` est
+             * permissif → on coerce (jamais nul en pratique).
+             */
             creer: async (ctx, input) => {
               const c = await creerCommande(commandeRepo, ctx, input);
               return { id: c.id, numero: c.numero ?? "", totalTTC: c.totalTTC ?? "0" };
@@ -143,8 +153,10 @@ export function buildAssistantWriteHandlersFromRepos(repos: AssistantAgentWriteR
   return buildAssistantWriteHandlers(buildAssistantWriteDeps(repos, mailing));
 }
 
-// Construit le registry agentique : lectures câblées (toujours) + écritures (opt-in — Phase 3b fournit
-// `writeHandlers` ; vides → registry de lecture seule, défaut sûr).
+/*
+ * Construit le registry agentique : lectures câblées (toujours) + écritures (opt-in — Phase 3b fournit
+ * `writeHandlers` ; vides → registry de lecture seule, défaut sûr).
+ */
 export function buildAssistantAgentRegistry(repos: AssistantAgentReadRepos, writeHandlers: Record<string, ToolHandler> = {}): AssistantReadToolRegistry {
   return new AssistantReadToolRegistry(buildAssistantReadHandlers(buildAssistantReadDeps(repos)), writeHandlers);
 }

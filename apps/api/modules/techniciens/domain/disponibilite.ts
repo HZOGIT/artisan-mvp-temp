@@ -1,6 +1,8 @@
-// Disponibilité hebdomadaire d'un technicien (un créneau par jour de semaine).
-// La table `disponibilites_techniciens` n'a PAS d'artisanId → l'isolation passe par
-// l'appartenance du technicien au tenant (anti-IDOR).
+/*
+ * Disponibilité hebdomadaire d'un technicien (un créneau par jour de semaine).
+ * La table `disponibilites_techniciens` n'a PAS d'artisanId → l'isolation passe par
+ * l'appartenance du technicien au tenant (anti-IDOR).
+ */
 
 export interface Disponibilite {
   readonly id: number;

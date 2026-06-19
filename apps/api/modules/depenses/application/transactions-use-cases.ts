@@ -8,8 +8,10 @@ import type { Depense } from "../domain/depense";
 import type { RegleCategorisation } from "../../regles-categorisation/domain/regle-categorisation";
 import { parseReleveCsv } from "./parse-releve-csv";
 
-// Use-cases « transactions bancaires » : lecture, ignorer, import de relevé, conversion en dépense.
-// Parité legacy `getTransactionsBancaires`/`ignorerTransaction`/`importReleve`/`convertirTransaction`.
+/*
+ * Use-cases « transactions bancaires » : lecture, ignorer, import de relevé, conversion en dépense.
+ * Parité legacy `getTransactionsBancaires`/`ignorerTransaction`/`importReleve`/`convertirTransaction`.
+ */
 
 export function getTransactionsBancaires(repo: ITransactionBancaireRepository, ctx: TenantContext, releveId?: number): Promise<TransactionBancaire[]> {
   return repo.list(ctx, releveId);
@@ -34,8 +36,10 @@ export interface ImportReleveInput {
   readonly contenuCsv: string;
 }
 
-// Importe un relevé CSV : parse (pur) → enrichit chaque transaction d'une catégorie suggérée (règles
-// du tenant) → crée le relevé + insère les transactions. CSV vide → {releveId:0, message}.
+/*
+ * Importe un relevé CSV : parse (pur) → enrichit chaque transaction d'une catégorie suggérée (règles
+ * du tenant) → crée le relevé + insère les transactions. CSV vide → {releveId:0, message}.
+ */
 export async function importReleve(
   deps: { transactionRepo: ITransactionBancaireRepository; regleRepo: IRegleCategorisationRepository },
   ctx: TenantContext,
@@ -60,9 +64,11 @@ export interface ConvertirTransactionInput {
   readonly description?: string;
 }
 
-// Convertit une transaction bancaire en dépense. ⚠️ Idempotence (anti double-dépense → impact
-// FEC/TVA) : refuse si la transaction est déjà liée à une dépense (400). TVA 20% dérivée du TTC
-// (= |montant| de la transaction). Crée la dépense (numéro serveur) puis lie la transaction.
+/*
+ * Convertit une transaction bancaire en dépense. ⚠️ Idempotence (anti double-dépense → impact
+ * FEC/TVA) : refuse si la transaction est déjà liée à une dépense (400). TVA 20% dérivée du TTC
+ * (= |montant| de la transaction). Crée la dépense (numéro serveur) puis lie la transaction.
+ */
 export async function convertirTransaction(
   deps: { transactionRepo: ITransactionBancaireRepository; depenseRepo: IDepenseRepository },
   ctx: TenantContext,
@@ -71,8 +77,10 @@ export async function convertirTransaction(
   const t = await deps.transactionRepo.getById(ctx, input.transactionId);
   if (!t) throw new NotFoundError("Transaction introuvable");
   if (t.depenseId) throw new ValidationError("Transaction déjà convertie en dépense");
-  // Une transaction au CRÉDIT est un encaissement, pas une dépense : la convertir créerait une
-  // dépense fictive (TVA déductible & FEC achats faussés). On refuse explicitement.
+  /*
+   * Une transaction au CRÉDIT est un encaissement, pas une dépense : la convertir créerait une
+   * dépense fictive (TVA déductible & FEC achats faussés). On refuse explicitement.
+   */
   if (t.typeTransaction === "credit") {
     throw new ValidationError("Une transaction au crédit (encaissement) ne peut pas être convertie en dépense");
   }

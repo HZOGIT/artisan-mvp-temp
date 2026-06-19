@@ -3,11 +3,13 @@ import type { IStockRepository } from "./stock-repository";
 import type { IFournisseurRepository } from "../../fournisseurs/application/fournisseur-repository";
 import type { Fournisseur } from "../../fournisseurs/domain/fournisseur";
 
-// Rapport de réapprovisionnement (parité legacy `getRapportCommandeFournisseur`). **Cross-domaine** :
-// croise les stocks sous le seuil (domaine stocks) avec les associations article↔fournisseur et la
-// fiche fournisseur (domaine fournisseurs, repo composé). Regroupé par fournisseur (clé 0 = stock
-// sans fournisseur lié). Scopé tenant des deux côtés (TenantContext propagé). Montants en NUMBER
-// (parité legacy `parseFloat`/calcul JS).
+/*
+ * Rapport de réapprovisionnement (parité legacy `getRapportCommandeFournisseur`). **Cross-domaine** :
+ * croise les stocks sous le seuil (domaine stocks) avec les associations article↔fournisseur et la
+ * fiche fournisseur (domaine fournisseurs, repo composé). Regroupé par fournisseur (clé 0 = stock
+ * sans fournisseur lié). Scopé tenant des deux côtés (TenantContext propagé). Montants en NUMBER
+ * (parité legacy `parseFloat`/calcul JS).
+ */
 
 export interface RapportLigne {
   readonly stock: {

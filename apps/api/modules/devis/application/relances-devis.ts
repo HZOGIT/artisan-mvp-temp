@@ -6,8 +6,10 @@ import type { ArtisanReader, ClientReader, ArtisanInfo, ClientInfo } from "../..
 import type { IDevisRepository } from "./devis-repository";
 import type { IRelanceDevisRepository } from "../../relances-devis/application/relance-devis-repository";
 
-// Dépendances des relances de devis (composition : devis + relances + client/artisan + email +
-// rate-limit). Tout injecté → testable sans infra ni legacy.
+/*
+ * Dépendances des relances de devis (composition : devis + relances + client/artisan + email +
+ * rate-limit). Tout injecté → testable sans infra ni legacy.
+ */
 export interface DevisRelanceDeps {
   readonly devisRepo: IDevisRepository;
   readonly relanceRepo: IRelanceDevisRepository;
@@ -80,10 +82,12 @@ async function envoyerEtEnregistrer(
   return ok;
 }
 
-// Envoie une relance pour un devis (parité legacy `devis.envoyerRelance`) : ownership 404,
-// **client.email requis 400**, **rate-limit 429** (`relance:${artisanId}`), email best-effort +
-// **enregistrement de la relance** (statut envoye/echec). Renvoie toujours `{success:true}` (le
-// résultat d'envoi est porté par le statut de la relance — parité legacy).
+/*
+ * Envoie une relance pour un devis (parité legacy `devis.envoyerRelance`) : ownership 404,
+ * **client.email requis 400**, **rate-limit 429** (`relance:${artisanId}`), email best-effort +
+ * **enregistrement de la relance** (statut envoye/echec). Renvoie toujours `{success:true}` (le
+ * résultat d'envoi est porté par le statut de la relance — parité legacy).
+ */
 export async function envoyerRelanceDevis(
   deps: DevisRelanceDeps,
   ctx: TenantContext,
@@ -106,9 +110,11 @@ export async function envoyerRelanceDevis(
   return { success: true, message: "Relance envoyée avec succès" };
 }
 
-// Envoie des relances pour TOUS les devis non signés ≥ joursMinimum, en respectant un délai
-// `joursEntreRelances` depuis la dernière relance (parité legacy `devis.envoyerRelancesAutomatiques`).
-// rate-limit `relance-auto:${artisanId}`. Renvoie le nombre de relances effectivement envoyées.
+/*
+ * Envoie des relances pour TOUS les devis non signés ≥ joursMinimum, en respectant un délai
+ * `joursEntreRelances` depuis la dernière relance (parité legacy `devis.envoyerRelancesAutomatiques`).
+ * rate-limit `relance-auto:${artisanId}`. Renvoie le nombre de relances effectivement envoyées.
+ */
 export async function envoyerRelancesAutomatiques(
   deps: DevisRelanceDeps,
   ctx: TenantContext,

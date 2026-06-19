@@ -13,8 +13,10 @@ const createSchema = z.object({
   note: z.string().max(5000).optional(),
 });
 
-// Routeur tRPC des activités (suivi commercial « à faire »). Surface client : list/create/toggleFait/
-// delete. Transport mince ; scoping tenant + anti-IDOR FK dans le repo/use-case. Domain errors → 400/403.
+/*
+ * Routeur tRPC des activités (suivi commercial « à faire »). Surface client : list/create/toggleFait/
+ * delete. Transport mince ; scoping tenant + anti-IDOR FK dans le repo/use-case. Domain errors → 400/403.
+ */
 export function createActivitesRouter(repo: IActiviteRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listActivites(repo, ctx.tenant)),

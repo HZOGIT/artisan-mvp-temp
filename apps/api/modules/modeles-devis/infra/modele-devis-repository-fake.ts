@@ -13,10 +13,12 @@ interface StoredModele {
   updatedAt: Date;
 }
 
-// Implémentation in-memory du repository modeles-devis (tests sans DB). Reproduit les invariants du
-// repo Drizzle : en-tête scopé par artisanId (artisanId forcé à la création), lignes stockées par
-// modeleId et **scopées via le parent** (jamais lisibles sans ownership), remplacement complet des
-// lignes à l'update, list « léger » (lignes = []), isDefault défaut false.
+/*
+ * Implémentation in-memory du repository modeles-devis (tests sans DB). Reproduit les invariants du
+ * repo Drizzle : en-tête scopé par artisanId (artisanId forcé à la création), lignes stockées par
+ * modeleId et **scopées via le parent** (jamais lisibles sans ownership), remplacement complet des
+ * lignes à l'update, list « léger » (lignes = []), isDefault défaut false.
+ */
 export class FakeModeleDevisRepository implements IModeleDevisRepository {
   private readonly modeles: StoredModele[] = [];
   private readonly lignes = new Map<number, ModeleDevisLigne[]>();

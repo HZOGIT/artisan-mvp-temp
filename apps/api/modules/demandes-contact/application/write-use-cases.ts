@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDemandeContactRepository } from "./demande-contact-repository";
 import type { CreateDemandeInput, DemandeContact, UpdateDemandeInput } from "../domain/demande-contact";
 
-// Use-cases d'écriture (création / métadonnées / suppression) — purs, repository injecté.
-// ⚠️ Les transitions de statut (marquerContacte/convertir/marquerPerdu) sont des use-cases dédiés
-// (7/9) : elles ne passent pas par `modifierDemande`. Validation métier.
+/*
+ * Use-cases d'écriture (création / métadonnées / suppression) — purs, repository injecté.
+ * ⚠️ Les transitions de statut (marquerContacte/convertir/marquerPerdu) sont des use-cases dédiés
+ * (7/9) : elles ne passent pas par `modifierDemande`. Validation métier.
+ */
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 

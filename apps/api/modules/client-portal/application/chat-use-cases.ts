@@ -13,11 +13,13 @@ export interface PortalChatMessage {
   readonly conversationId: number;
   readonly auteur: string;
   readonly contenu: string;
-  // OPE-403 : exposé pour l'UI portail (`createdAt` du message ; déjà présent au runtime, type élargi).
+  // exposé pour l'UI portail (`createdAt` du message ; déjà présent au runtime, type élargi).
   readonly createdAt: Date;
 }
-// Vue « liste » d'une conversation côté portail (sujet + aperçu + non-lus) — déjà fourni par le repo
-// chat migré (ConversationWithClient), type ici élargi pour que l'UI portail le consomme (OPE-403).
+/*
+ * Vue « liste » d'une conversation côté portail (sujet + aperçu + non-lus) — déjà fourni par le repo
+ * chat migré (ConversationWithClient), type ici élargi pour que l'UI portail le consomme.
+ */
 export interface PortalChatConversationSummary {
   readonly id: number;
   readonly clientId: number;
@@ -48,8 +50,10 @@ async function resolve(deps: { access: Pick<IPortalAccessRepository, "resolveByT
   return { ctx: { artisanId: access.artisanId, userId: 0 }, clientId: access.clientId, artisanId: access.artisanId };
 }
 
-// Conversation possédée par le tenant ET appartenant au client du token (double anti-IDOR : ownership
-// tenant via le repo + appariement clientId du token). FORBIDDEN sinon.
+/*
+ * Conversation possédée par le tenant ET appartenant au client du token (double anti-IDOR : ownership
+ * tenant via le repo + appariement clientId du token). FORBIDDEN sinon.
+ */
 async function conversationDuClient(deps: PortalChatDeps, ctx: TenantContext, clientId: number, conversationId: number): Promise<PortalChatConversation> {
   const conv = await deps.chat.getConversationOwned(ctx, conversationId);
   if (!conv || conv.clientId !== clientId || conv.artisanId !== ctx.artisanId) throw new ForbiddenError("Accès non autorisé");
@@ -110,8 +114,10 @@ function safeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-// Le client demande une modification de ses infos → email à l'artisan (anti-flood). 404 si artisan
-// sans email ou client introuvable (parité legacy).
+/*
+ * Le client demande une modification de ses infos → email à l'artisan (anti-flood). 404 si artisan
+ * sans email ou client introuvable (parité legacy).
+ */
 export async function demanderModification(deps: DemanderModificationDeps, token: string, message: string, now: Date = new Date()): Promise<{ success: true }> {
   const { ctx, clientId, artisanId } = await resolve(deps, token, now);
   if (!(await deps.rateLimiter.check(`portal-modif:${artisanId}:${clientId}`))) {

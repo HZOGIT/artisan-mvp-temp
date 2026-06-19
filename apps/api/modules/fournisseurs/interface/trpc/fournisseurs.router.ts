@@ -33,9 +33,11 @@ const updateSchema = z.object({
   notes: z.string().max(5000).nullish(),
 });
 
-// Routeur tRPC du domaine fournisseurs. Transport mince : valide les inputs (zod), délègue
-// aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400). Repository injecté (DI) → testable.
+/*
+ * Routeur tRPC du domaine fournisseurs. Transport mince : valide les inputs (zod), délègue
+ * aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400). Repository injecté (DI) → testable.
+ */
 export function createFournisseursRouter(repo: IFournisseurRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFournisseurs(repo, ctx.tenant)),

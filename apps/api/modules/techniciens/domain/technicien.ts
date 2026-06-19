@@ -1,5 +1,7 @@
-// Types de domaine du module techniciens (membres d'équipe de l'artisan) — découplés
-// du schéma Drizzle.
+/*
+ * Types de domaine du module techniciens (membres d'équipe de l'artisan) — découplés
+ * du schéma Drizzle.
+ */
 
 export type TechnicienStatut = "actif" | "inactif" | "conge";
 

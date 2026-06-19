@@ -7,8 +7,10 @@ import { marquerContacte, convertir, marquerPerdu } from "../../application/tran
 
 const statutEnum = z.enum(["nouveau", "contacte", "converti", "perdu"]);
 
-// Bornes alignées sur la table `demandes_contact` (defense-in-depth). ⚠️ Le client NE fournit PAS
-// `statut` (forcé "nouveau" / transitions en 7/9) ni `clientId` (lié à la conversion en 7/9).
+/*
+ * Bornes alignées sur la table `demandes_contact` (defense-in-depth). ⚠️ Le client NE fournit PAS
+ * `statut` (forcé "nouveau" / transitions en 7/9) ni `clientId` (lié à la conversion en 7/9).
+ */
 const createSchema = z.object({
   nom: z.string().min(1).max(200),
   email: z.string().email().max(320).nullish(),
@@ -25,10 +27,12 @@ const updateSchema = z.object({
   source: z.string().max(50).optional(),
 });
 
-// Routeur tRPC du domaine demandes-contact (inbox CRM). Transport mince : valide les inputs (zod),
-// délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions de statut (marquerContacte/
-// convertir/marquerPerdu) seront exposées en 7/9. Repo injecté.
+/*
+ * Routeur tRPC du domaine demandes-contact (inbox CRM). Transport mince : valide les inputs (zod),
+ * délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions de statut (marquerContacte/
+ * convertir/marquerPerdu) seront exposées en 7/9. Repo injecté.
+ */
 export function createDemandesContactRouter(repo: IDemandeContactRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDemandes(repo, ctx.tenant)),

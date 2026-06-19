@@ -7,10 +7,12 @@ import {
   generateInterventionPDF,
 } from "./pdf-generator";
 
-// Adapter PDF jsPDF INTERNALISÉ dans le new-stack — SEUL adapter PDF (le `LegacyPdfAdapter`/sidecar a été supprimé). Le
-// générateur `./pdf-generator` (jsPDF). Route `render(template, data)` vers le bon générateur ; les
-// `data` sont les objets domaine migrés (Devis/Facture/Commande + artisan/client/fournisseur), qui
-// satisfont structurellement les types d'entrée (cf. `pdf-input-types.ts`).
+/*
+ * Adapter PDF jsPDF INTERNALISÉ dans le new-stack — SEUL adapter PDF (le `LegacyPdfAdapter`/sidecar a été supprimé). Le
+ * générateur `./pdf-generator` (jsPDF). Route `render(template, data)` vers le bon générateur ; les
+ * `data` sont les objets domaine migrés (Devis/Facture/Commande + artisan/client/fournisseur), qui
+ * satisfont structurellement les types d'entrée (cf. `pdf-input-types.ts`).
+ */
 export class JsPdfAdapter implements PdfPort {
   async render(template: string, data: Record<string, unknown>): Promise<Buffer> {
     switch (template) {

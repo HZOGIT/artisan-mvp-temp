@@ -28,9 +28,11 @@ function toDomain(r: typeof signaturesDevis.$inferSelect): Signature {
   };
 }
 
-// Effets d'écriture de la surface publique, SOUS LE TENANT résolu par le token. L'immutabilité
-// post-signature est garantie par la garde SQL `statut='en_attente'` dans le WHERE (anti-rejeu :
-// une 2ᵉ tentative ne réécrit rien). devis + signatures_devis sont modifiés dans la MÊME transaction.
+/*
+ * Effets d'écriture de la surface publique, SOUS LE TENANT résolu par le token. L'immutabilité
+ * post-signature est garantie par la garde SQL `statut='en_attente'` dans le WHERE (anti-rejeu :
+ * une 2ᵉ tentative ne réécrit rien). devis + signatures_devis sont modifiés dans la MÊME transaction.
+ */
 export class SignaturePublicWriterDrizzle implements SignaturePublicWriter {
   constructor(private readonly db: DbClient) {}
 

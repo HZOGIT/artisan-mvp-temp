@@ -3,13 +3,17 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IClientRepository } from "./client-repository";
 import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier (defense-in-depth,
-// indépendante du transport) : `nom` requis, e-mail au format basique si fourni. ⚠️ PII :
-// le scoping tenant est porté par le repo (cross-tenant → null → NotFound).
-// La suppression avec garde d'intégrité référentielle est traitée séparément (étape dédiée).
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier (defense-in-depth,
+ * indépendante du transport) : `nom` requis, e-mail au format basique si fourni. ⚠️ PII :
+ * le scoping tenant est porté par le repo (cross-tenant → null → NotFound).
+ * La suppression avec garde d'intégrité référentielle est traitée séparément (étape dédiée).
+ */
 
-// Format e-mail volontairement permissif (présence d'un « x@y.z »), aligné sur l'intention
-// du legacy : on rejette une saisie manifestement invalide sans sur-contraindre.
+/*
+ * Format e-mail volontairement permissif (présence d'un « x@y.z »), aligné sur l'intention
+ * du legacy : on rejette une saisie manifestement invalide sans sur-contraindre.
+ */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function creerClient(repo: IClientRepository, ctx: TenantContext, input: CreateClientInput): Promise<Client> {
@@ -35,10 +39,12 @@ export async function modifierClient(
   return updated;
 }
 
-// Supprime un client AVEC garde d'intégrité référentielle : un client encore référencé par
-// des documents métier (devis/factures/interventions/chantiers/contrats) ne peut pas être
-// supprimé (sinon documents orphelins / factures cassées). Corrige le défaut du legacy
-// (hard delete sans garde). NotFound si le client n'appartient pas au tenant.
+/*
+ * Supprime un client AVEC garde d'intégrité référentielle : un client encore référencé par
+ * des documents métier (devis/factures/interventions/chantiers/contrats) ne peut pas être
+ * supprimé (sinon documents orphelins / factures cassées). Corrige le défaut du legacy
+ * (hard delete sans garde). NotFound si le client n'appartient pas au tenant.
+ */
 export async function supprimerClient(repo: IClientRepository, ctx: TenantContext, id: number): Promise<void> {
   const client = await repo.getById(ctx, id);
   if (!client) throw new NotFoundError("Client introuvable");

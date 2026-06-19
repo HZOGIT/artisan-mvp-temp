@@ -1,10 +1,12 @@
 import { Resend } from "resend";
 import type { EmailPort, EmailMessage } from "../ports/email";
 
-// Adapter email INTERNALISÉ dans le new-stack (remplace LegacyEmailAdapter/sidecar legacy-email.mjs).
-// Implémente directement EmailPort via Resend. Config par env (RESEND_API_KEY/EMAIL_FROM). Fidèle au
-// comportement legacy au niveau du contrat EmailPort (from/replyTo par défaut Operioz — le boundary
-// EmailMessage ne portait déjà ni identité artisan ni reply-to). Simulation si Resend non configuré.
+/*
+ * Adapter email INTERNALISÉ dans le new-stack (remplace LegacyEmailAdapter/sidecar legacy-email.mjs).
+ * Implémente directement EmailPort via Resend. Config par env (RESEND_API_KEY/EMAIL_FROM). Fidèle au
+ * comportement legacy au niveau du contrat EmailPort (from/replyTo par défaut Operioz — le boundary
+ * EmailMessage ne portait déjà ni identité artisan ni reply-to). Simulation si Resend non configuré.
+ */
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const EMAIL_FROM = process.env.EMAIL_FROM || "Operioz <noreply@operioz.com>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;

@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "./chantier-repository";
 import type { Chantier, CreateChantierInput, UpdateChantierInput } from "../domain/chantier";
 
-// Use-cases d'écriture — purs, repository injecté. Validations (reference/nom, avancement,
-// budgets, cohérence des dates) + ⚠️ **garde anti-IDOR-FK** : le `clientId` rattaché DOIT
-// appartenir au tenant, sinon NotFound (on ne révèle pas l'existence cross-tenant).
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validations (reference/nom, avancement,
+ * budgets, cohérence des dates) + ⚠️ **garde anti-IDOR-FK** : le `clientId` rattaché DOIT
+ * appartenir au tenant, sinon NotFound (on ne révèle pas l'existence cross-tenant).
+ */
 
 function assertAvancement(avancement?: number): void {
   if (avancement != null && (avancement < 0 || avancement > 100)) {

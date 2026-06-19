@@ -1,8 +1,10 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateModeleEmailInput, ModeleEmail, TypeModeleEmail, UpdateModeleEmailInput } from "../domain/modele-email";
 
-// Port du repository modeles-email. Chaque méthode exige le TenantContext (scope tenant + RLS).
-// `modeles_email` possède un `artisanId` → double cloisonnement RLS + filtre explicite.
+/*
+ * Port du repository modeles-email. Chaque méthode exige le TenantContext (scope tenant + RLS).
+ * `modeles_email` possède un `artisanId` → double cloisonnement RLS + filtre explicite.
+ */
 export interface IModeleEmailRepository {
   list(ctx: TenantContext): Promise<ModeleEmail[]>;
   // Modèles du tenant filtrés par type (scopé tenant ; [] si aucun).

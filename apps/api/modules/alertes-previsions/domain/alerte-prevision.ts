@@ -1,13 +1,17 @@
-// Domaine « alertes du prévisionnel de trésorerie » (parité legacy `alertesPrevisions`). Compare le
-// CA réalisé du mois au CA prévisionnel ; au-delà d'un seuil (+/-), enregistre une alerte d'historique.
+/*
+ * Domaine « alertes du prévisionnel de trésorerie » (parité legacy `alertesPrevisions`). Compare le
+ * CA réalisé du mois au CA prévisionnel ; au-delà d'un seuil (+/-), enregistre une alerte d'historique.
+ */
 
 export type AlerteFrequence = "quotidien" | "hebdomadaire" | "mensuel";
 export type AlerteType = "depassement_positif" | "depassement_negatif";
 export type AlerteCanal = "email" | "sms" | "les_deux";
 export type AlerteStatut = "envoye" | "echec" | "lu";
 
-// Configuration d'alerte d'un artisan (1 par tenant, clé unique artisanId). Numériques en string
-// (parité Drizzle `numeric`). `null` = pas encore configuré.
+/*
+ * Configuration d'alerte d'un artisan (1 par tenant, clé unique artisanId). Numériques en string
+ * (parité Drizzle `numeric`). `null` = pas encore configuré.
+ */
 export interface AlerteConfig {
   readonly seuilAlertePositif: string | null;
   readonly seuilAlerteNegatif: string | null;
@@ -51,8 +55,10 @@ export function calculerEcartPct(caReel: number, caPrev: number): number {
   return ((caReel - caPrev) / caPrev) * 100;
 }
 
-// Type d'alerte déclenché selon l'écart et les seuils (positif/négatif), sinon null. PUR.
-// Défaut des seuils = 10 % (parité legacy). Seuils en valeur absolue (% de dépassement).
+/*
+ * Type d'alerte déclenché selon l'écart et les seuils (positif/négatif), sinon null. PUR.
+ * Défaut des seuils = 10 % (parité legacy). Seuils en valeur absolue (% de dépassement).
+ */
 export function evaluerTypeAlerte(ecartPct: number, seuilPositif: number, seuilNegatif: number): AlerteType | null {
   if (ecartPct >= seuilPositif) return "depassement_positif";
   if (ecartPct <= -seuilNegatif) return "depassement_negatif";
@@ -74,8 +80,10 @@ export function construireMessage(type: AlerteType, caReel: number, caPrev: numb
     : `Attention : votre CA realise (${caReel.toFixed(0)} EUR) est inferieur de ${Math.abs(ecartPct).toFixed(1)}% au previsionnel (${caPrev.toFixed(0)} EUR) pour ${mois}/${annee}.`;
 }
 
-// Seuil numérique depuis la config, parité legacy EXACTE `Number(config.seuil || 10)` : valeur
-// falsy (null/undefined/chaîne vide) → 10 ; sinon `Number(v)` (ex. "0.00" → 0, "10.00" → 10).
+/*
+ * Seuil numérique depuis la config, parité legacy EXACTE `Number(config.seuil || 10)` : valeur
+ * falsy (null/undefined/chaîne vide) → 10 ; sinon `Number(v)` (ex. "0.00" → 0, "10.00" → 10).
+ */
 export function seuilOuDefaut(v: string | null | undefined): number {
   return Number(v || 10);
 }

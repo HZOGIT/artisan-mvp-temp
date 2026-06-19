@@ -16,8 +16,10 @@ export interface SeedNotificationInput {
 const LIMIT_MAX = 100;
 const PAGE_MAX = 100000;
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
-// scoping tenant + les filtres/pagination + l'anti-IDOR (markAsRead/archive hors tenant → false).
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
+ * scoping tenant + les filtres/pagination + l'anti-IDOR (markAsRead/archive hors tenant → false).
+ */
 export class FakeNotificationRepository implements INotificationRepository {
   private store: Notification[] = [];
   private facturesRetard = new Map<number, FactureEnRetard[]>();

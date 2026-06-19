@@ -5,9 +5,11 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IFactureReader, FactureReadModel, FactureLigneReadModel } from "../application/facture-reader";
 
-// Lecture du domaine factures pour la génération FEC. Scopé tenant (RLS + filtre
-// `factures.artisanId`). Les `factures_lignes` (SANS artisanId) sont scopées via la facture
-// parente. Modèles de lecture propres (pas de couplage au module factures).
+/*
+ * Lecture du domaine factures pour la génération FEC. Scopé tenant (RLS + filtre
+ * `factures.artisanId`). Les `factures_lignes` (SANS artisanId) sont scopées via la facture
+ * parente. Modèles de lecture propres (pas de couplage au module factures).
+ */
 export class FactureReaderDrizzle implements IFactureReader {
   constructor(private readonly db: DbClient) {}
 

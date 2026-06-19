@@ -26,8 +26,10 @@ export async function basculerFavori(repo: IRapportRepository, ctx: TenantContex
   return rapport;
 }
 
-// Exécute un rapport possédé (anti-IDOR via getById scopé), journalise l'exécution et renvoie les
-// lignes + métadonnées. `tempsExecution` mesuré via l'horloge injectée (parité legacy `executerRapport`).
+/*
+ * Exécute un rapport possédé (anti-IDOR via getById scopé), journalise l'exécution et renvoie les
+ * lignes + métadonnées. `tempsExecution` mesuré via l'horloge injectée (parité legacy `executerRapport`).
+ */
 export async function executerRapport(repo: IRapportRepository, ctx: TenantContext, rapportId: number, parametres: unknown, now: ClockMs = () => Date.now()): Promise<ExecutionResult> {
   const start = now();
   const rapport = await repo.getById(ctx, rapportId);

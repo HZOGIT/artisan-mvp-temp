@@ -3,9 +3,11 @@ import type { INoteDeFraisRepository, NoteDeFraisWorkflowPatch, DepenseLieeStatu
 import type { NoteDeFrais, NoteFraisDepense, CreateNoteDeFraisInput, UpdateNoteDeFraisInput } from "../domain/note-de-frais";
 import { computeNextNoteFraisNumero } from "../application/numero";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant et les valeurs par défaut PG (`statut` → brouillon, montants → "0", dates workflow
-// null). ⚠️ `update` ne touche pas statut/dates workflow/commentaire (réservés au workflow).
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant et les valeurs par défaut PG (`statut` → brouillon, montants → "0", dates workflow
+ * null). ⚠️ `update` ne touche pas statut/dates workflow/commentaire (réservés au workflow).
+ */
 export class FakeNoteDeFraisRepository implements INoteDeFraisRepository {
   private store: NoteDeFrais[] = [];
   private seq = 0;

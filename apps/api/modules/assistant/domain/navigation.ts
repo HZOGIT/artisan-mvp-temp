@@ -1,6 +1,8 @@
-// Navigation UI de l'assistant (outil `naviguer_vers`) — PUR (aucun accès données). Parité legacy
-// `server/_core/assistantTools.ts` : whitelist de pages connues + deep-links `/<ressource>/<id>`. La
-// route SSE consomme `navigate` pour émettre un event au client AVANT de renvoyer le résultat au modèle.
+/*
+ * Navigation UI de l'assistant (outil `naviguer_vers`) — PUR (aucun accès données). Parité legacy
+ * `server/_core/assistantTools.ts` : whitelist de pages connues + deep-links `/<ressource>/<id>`. La
+ * route SSE consomme `navigate` pour émettre un event au client AVANT de renvoyer le résultat au modèle.
+ */
 
 // Pages connues du front (whitelist stricte — le modèle ne doit JAMAIS inventer un chemin).
 export const VALID_NAV_PAGES: readonly string[] = [
@@ -68,8 +70,10 @@ export const VALID_NAV_PAGES: readonly string[] = [
   "/support",
 ];
 
-// Deep-links autorisés : `/<ressource>/<id numérique>` (ouvre la vue détail du document). Pas de
-// `/interventions/:id` côté front → la nav intervention va sur `/interventions` ou `/calendrier`.
+/*
+ * Deep-links autorisés : `/<ressource>/<id numérique>` (ouvre la vue détail du document). Pas de
+ * `/interventions/:id` côté front → la nav intervention va sur `/interventions` ou `/calendrier`.
+ */
 export const NAV_DEEP_LINK_RE = /^\/(devis|factures|clients|contrats|commandes)\/\d+$/;
 
 // La page est-elle une cible de navigation valide (page connue OU deep-link autorisé) ?
@@ -81,8 +85,10 @@ export type NavigationResult =
   | { readonly ok: true; readonly navigate: { page: string; filtre?: string; message?: string }; readonly confirmation: string }
   | { readonly ok: false; readonly error: string };
 
-// Résout l'intention de navigation (parité legacy `execNaviguerVers`) : valide la page, normalise
-// filtre/message, renvoie le payload `navigate` + une confirmation lisible. Page invalide → erreur.
+/*
+ * Résout l'intention de navigation (parité legacy `execNaviguerVers`) : valide la page, normalise
+ * filtre/message, renvoie le payload `navigate` + une confirmation lisible. Page invalide → erreur.
+ */
 export function resolveNavigation(input: { page?: unknown; filtre?: unknown; message?: unknown }): NavigationResult {
   const page = String(input?.page ?? "").trim();
   if (!isValidNavPage(page)) {

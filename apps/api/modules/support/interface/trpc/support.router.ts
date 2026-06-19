@@ -10,9 +10,11 @@ const contactSchema = z.object({
   message: z.string().min(10).max(5000),
 });
 
-// Routeur tRPC du domaine `support` (formulaire de contact → email à l'équipe). Transport mince :
-// valide l'input (zod), délègue au use-case (anti-flood + envoi), laisse remonter TooManyRequestsError
-// (→ TOO_MANY_REQUESTS). Authentifié (protectedProcedure : l'anti-flood est par utilisateur).
+/*
+ * Routeur tRPC du domaine `support` (formulaire de contact → email à l'équipe). Transport mince :
+ * valide l'input (zod), délègue au use-case (anti-flood + envoi), laisse remonter TooManyRequestsError
+ * (→ TOO_MANY_REQUESTS). Authentifié (protectedProcedure : l'anti-flood est par utilisateur).
+ */
 export function createSupportRouter(deps: SupportDeps) {
   return router({
     contact: protectedProcedure

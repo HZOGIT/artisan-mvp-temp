@@ -1,8 +1,10 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { AiThread, AiMessage } from "../domain/assistant";
 
-// Lecture des threads/messages de l'assistant IA, scopée tenant. `ai_threads` filtré par artisanId
-// (RLS) ; `ai_messages` (sans artisanId) lu UNIQUEMENT après vérif d'appartenance du thread parent.
+/*
+ * Lecture des threads/messages de l'assistant IA, scopée tenant. `ai_threads` filtré par artisanId
+ * (RLS) ; `ai_messages` (sans artisanId) lu UNIQUEMENT après vérif d'appartenance du thread parent.
+ */
 export interface IAssistantThreadsRepository {
   // Threads du tenant, triés lastMessageAt desc, bornés (clamp côté use-case).
   listThreads(ctx: TenantContext, limit: number): Promise<AiThread[]>;

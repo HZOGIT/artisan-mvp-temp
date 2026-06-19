@@ -19,9 +19,11 @@ const toResultat = (r: ResultatRow): Resultat => ({ id: r.id, analyseId: r.analy
 const toSuggestion = (r: SuggestionRow): Suggestion => ({ id: r.id, resultatId: r.resultatId, articleId: r.articleId ?? null, nomArticle: r.nomArticle ?? null, description: r.description ?? null, quantiteSuggeree: r.quantiteSuggeree ?? null, unite: r.unite ?? null, prixEstime: r.prixEstime ?? null, confiance: r.confiance ?? null, selectionne: r.selectionne ?? null, createdAt: r.createdAt });
 const toDevis = (r: DevisRow): DevisGenere => ({ id: r.id, analyseId: r.analyseId, devisId: r.devisId ?? null, montantEstime: r.montantEstime ?? null, createdAt: r.createdAt });
 
-// Repository Drizzle devis-IA. `analyses_photos_chantier` SOUS RLS (withTenant) ; les tables filles
-// (sans artisanId) ne sont lues/écrites QUE pour des analyses du tenant déjà résolues → anti-IDOR par
-// le parent. `updateSuggestionOwned` vérifie la chaîne suggestion→résultat→analyse(tenant).
+/*
+ * Repository Drizzle devis-IA. `analyses_photos_chantier` SOUS RLS (withTenant) ; les tables filles
+ * (sans artisanId) ne sont lues/écrites QUE pour des analyses du tenant déjà résolues → anti-IDOR par
+ * le parent. `updateSuggestionOwned` vérifie la chaîne suggestion→résultat→analyse(tenant).
+ */
 export class DevisIARepositoryDrizzle implements IDevisIARepository {
   constructor(private readonly db: DbClient) {}
 
@@ -87,8 +89,10 @@ export class DevisIARepositoryDrizzle implements IDevisIARepository {
 
   updateSuggestionOwned(ctx: TenantContext, suggestionId: number, patch: UpdateSuggestionInput): Promise<Suggestion | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Anti-IDOR : la suggestion doit relever d'une analyse du tenant (jointure suggestion→résultat→analyse,
-      // l'analyse étant filtrée RLS+artisanId). Sinon on n'écrit rien.
+      /*
+       * Anti-IDOR : la suggestion doit relever d'une analyse du tenant (jointure suggestion→résultat→analyse,
+       * l'analyse étant filtrée RLS+artisanId). Sinon on n'écrit rien.
+       */
       const [owned] = await tx
         .select({ id: suggestionsArticlesIA.id })
         .from(suggestionsArticlesIA)

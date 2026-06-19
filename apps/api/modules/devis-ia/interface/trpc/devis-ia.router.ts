@@ -8,9 +8,11 @@ export interface DevisIARouterDeps extends Omit<AnalyserPhotosDeps, "repo"> {
   readonly repo: IDevisIARepository;
 }
 
-// Routeur tRPC `devisIA` (analyse photos chantier → suggestions → devis). Tous protégés.
-// `analyserPhotos` = Vision multimodal ; `genererDevis` = devis brouillon depuis suggestions. Anti-IDOR
-// systématique (analyse/suggestion/client scopés tenant).
+/*
+ * Routeur tRPC `devisIA` (analyse photos chantier → suggestions → devis). Tous protégés.
+ * `analyserPhotos` = Vision multimodal ; `genererDevis` = devis brouillon depuis suggestions. Anti-IDOR
+ * systématique (analyse/suggestion/client scopés tenant).
+ */
 export function createDevisIARouter(deps: DevisIARouterDeps) {
   const { repo } = deps;
   return router({

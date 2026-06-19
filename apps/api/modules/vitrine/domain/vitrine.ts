@@ -1,6 +1,8 @@
-// Domaine du site vitrine public de l'artisan (parité legacy `vitrine`). La page est consultée par
-// SLUG (capacité publique, sans cookie) ; l'artisan est résolu depuis la table `artisans` (HORS RLS),
-// puis ses données publiques sont lues sous son propre scope tenant.
+/*
+ * Domaine du site vitrine public de l'artisan (parité legacy `vitrine`). La page est consultée par
+ * SLUG (capacité publique, sans cookie) ; l'artisan est résolu depuis la table `artisans` (HORS RLS),
+ * puis ses données publiques sont lues sous son propre scope tenant.
+ */
 
 export interface ArtisanVitrine {
   readonly id: number;
@@ -44,8 +46,10 @@ export interface VitrinePublicStats {
   readonly totalInterventions: number;
 }
 
-// Stats des avis publiés (moyenne arrondie au dixième + distribution 1..5). PUR (parité legacy
-// `getPublishedAvisStats`, calculé depuis les avis déjà chargés plutôt qu'une 2ᵉ requête).
+/*
+ * Stats des avis publiés (moyenne arrondie au dixième + distribution 1..5). PUR (parité legacy
+ * `getPublishedAvisStats`, calculé depuis les avis déjà chargés plutôt qu'une 2ᵉ requête).
+ */
 export function computeAvisStats(avis: readonly AvisPublic[]): AvisStats {
   const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   let sum = 0;
@@ -57,8 +61,10 @@ export function computeAvisStats(avis: readonly AvisPublic[]): AvisStats {
   return { moyenne: total > 0 ? Math.round((sum / total) * 10) / 10 : 0, total, distribution };
 }
 
-// Liste des services : JSON `vitrineServices` s'il est non vide, sinon repli sur les catégories
-// d'articles (parité legacy). PUR. JSON invalide → [].
+/*
+ * Liste des services : JSON `vitrineServices` s'il est non vide, sinon repli sur les catégories
+ * d'articles (parité legacy). PUR. JSON invalide → [].
+ */
 export function resoudreServices(vitrineServices: string | null, categories: readonly string[]): string[] {
   let services: string[] = [];
   try {

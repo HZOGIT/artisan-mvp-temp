@@ -90,10 +90,12 @@ function toAssurance(r: AssuranceRow): AssuranceVehicule {
   };
 }
 
-// Implémentation Drizzle du repository vehicules. Double cloisonnement : RLS (rôle app
-// + app.tenant via withTenant) ET filtre explicite `artisanId` dans chaque requête.
-// entretiens/assurances n'ont pas d'artisanId (scopés via le véhicule) → on vérifie
-// l'appartenance du véhicule au tenant avant tout accès (ressource hors tenant → null/[]).
+/*
+ * Implémentation Drizzle du repository vehicules. Double cloisonnement : RLS (rôle app
+ * + app.tenant via withTenant) ET filtre explicite `artisanId` dans chaque requête.
+ * entretiens/assurances n'ont pas d'artisanId (scopés via le véhicule) → on vérifie
+ * l'appartenance du véhicule au tenant avant tout accès (ressource hors tenant → null/[]).
+ */
 export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -142,11 +144,15 @@ export class VehiculeRepositoryDrizzle implements IVehiculeRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Vérifie l'appartenance AVANT de toucher l'historique (entretiens/assurances
-      // n'ont pas d'artisanId → on ne doit pas supprimer celui d'un autre tenant).
+      /*
+       * Vérifie l'appartenance AVANT de toucher l'historique (entretiens/assurances
+       * n'ont pas d'artisanId → on ne doit pas supprimer celui d'un autre tenant).
+       */
       if (!(await this.ownsVehicule(tx, ctx, id))) return false;
-      // Cascade applicative dans la transaction (pas de FK ON DELETE CASCADE en base) :
-      // historique d'abord, puis le véhicule. Atomique (rollback si échec).
+      /*
+       * Cascade applicative dans la transaction (pas de FK ON DELETE CASCADE en base) :
+       * historique d'abord, puis le véhicule. Atomique (rollback si échec).
+       */
       await tx.delete(entretiensVehicules).where(eq(entretiensVehicules.vehiculeId, id));
       await tx.delete(assurancesVehicules).where(eq(assurancesVehicules.vehiculeId, id));
       const deleted = await tx

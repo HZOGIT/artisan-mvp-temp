@@ -3,8 +3,10 @@ import type { IClientRepository } from "../application/client-repository";
 import type { FactureEncoursLigne } from "../application/encours";
 import type { Client, CreateClientInput, UpdateClientInput } from "../domain/client";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant et les valeurs par défaut PG (`type` → particulier). Aucune fuite cross-tenant.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant et les valeurs par défaut PG (`type` → particulier). Aucune fuite cross-tenant.
+ */
 export class FakeClientRepository implements IClientRepository {
   private store: Client[] = [];
   private seq = 0;
@@ -82,8 +84,10 @@ export class FakeClientRepository implements IClientRepository {
   }
 
   async search(ctx: TenantContext, query: string): Promise<Client[]> {
-    // Substring case-insensitive sur les mêmes champs ; `includes` traite `%`/`_` comme des
-    // littéraux → parité avec le LIKE échappé du repo réel (pas d'injection de wildcard).
+    /*
+     * Substring case-insensitive sur les mêmes champs ; `includes` traite `%`/`_` comme des
+     * littéraux → parité avec le LIKE échappé du repo réel (pas d'injection de wildcard).
+     */
     const q = query.toLowerCase();
     return this.store.filter(
       (c) =>

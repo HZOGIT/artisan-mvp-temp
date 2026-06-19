@@ -1,5 +1,7 @@
-// Types de domaine du module badges (gamification : badges définis par l'artisan +
-// attribution aux techniciens) — découplés du schéma Drizzle.
+/*
+ * Types de domaine du module badges (gamification : badges définis par l'artisan +
+ * attribution aux techniciens) — découplés du schéma Drizzle.
+ */
 
 export type BadgeCategorie = "interventions" | "avis" | "ca" | "anciennete" | "special";
 
@@ -19,8 +21,10 @@ export interface Badge {
   readonly createdAt: Date;
 }
 
-// Attribution d'un badge à un technicien. La table n'a pas d'artisanId → l'isolation
-// passe par l'appartenance du technicien (et du badge) au tenant (anti-IDOR).
+/*
+ * Attribution d'un badge à un technicien. La table n'a pas d'artisanId → l'isolation
+ * passe par l'appartenance du technicien (et du badge) au tenant (anti-IDOR).
+ */
 export interface BadgeTechnicien {
   readonly id: number;
   readonly technicienId: number;
@@ -30,9 +34,11 @@ export interface BadgeTechnicien {
   readonly notifie: boolean;
 }
 
-// Objectif mensuel d'un technicien (gamification : cibles + réalisé). La table a un `artisanId`
-// (isolation RLS) mais l'accès passe AUSSI par l'appartenance du technicien au tenant (anti-IDOR,
-// données salarié). Montants `numeric` → string ; cibles/réalisés entiers nullable (défaut 0).
+/*
+ * Objectif mensuel d'un technicien (gamification : cibles + réalisé). La table a un `artisanId`
+ * (isolation RLS) mais l'accès passe AUSSI par l'appartenance du technicien au tenant (anti-IDOR,
+ * données salarié). Montants `numeric` → string ; cibles/réalisés entiers nullable (défaut 0).
+ */
 export interface ObjectifTechnicien {
   readonly id: number;
   readonly technicienId: number;

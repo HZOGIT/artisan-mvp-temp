@@ -11,8 +11,10 @@ import type {
   RefuseDevisInput,
 } from "../application/signature-public-writer";
 
-// Reader public fake : on enregistre une résolution par token + une vue par (artisanId, devisId).
-// `markDevisVu` est tracé pour les assertions de read-receipt.
+/*
+ * Reader public fake : on enregistre une résolution par token + une vue par (artisanId, devisId).
+ * `markDevisVu` est tracé pour les assertions de read-receipt.
+ */
 export class FakeSignaturePublicReader implements SignaturePublicReader {
   private resolutions = new Map<string, SignatureTokenResolution>();
   private views = new Map<string, SignatureDevisView>();
@@ -43,8 +45,10 @@ export class FakeSignaturePublicReader implements SignaturePublicReader {
   }
 }
 
-// Writer public fake : applique les transitions sur des signatures en mémoire (garde `en_attente`)
-// + options. Sert aux tests des use-cases de mutation publique.
+/*
+ * Writer public fake : applique les transitions sur des signatures en mémoire (garde `en_attente`)
+ * + options. Sert aux tests des use-cases de mutation publique.
+ */
 export class FakeSignaturePublicWriter implements SignaturePublicWriter {
   private signatures = new Map<string, Signature>();
   // optionId → devisId (ownership) ; sélection courante par devisId.

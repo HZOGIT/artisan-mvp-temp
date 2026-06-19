@@ -3,8 +3,10 @@ import type { ICongeRepository } from "../conges/application/conge-repository";
 import type { ITechnicienRepository } from "../techniciens/application/technicien-repository";
 import { createInterventionsRouter } from "./interface/trpc/interventions.router";
 
-// Wiring DI du module interventions : repository injecté + repo congés (`assignerTechnicien` :
-// conflits d'agenda) + repo techniciens (`getSuggestionsTechniciens` : positions/dispo, scopé tenant).
+/*
+ * Wiring DI du module interventions : repository injecté + repo congés (`assignerTechnicien` :
+ * conflits d'agenda) + repo techniciens (`getSuggestionsTechniciens` : positions/dispo, scopé tenant).
+ */
 export interface InterventionsModuleDeps {
   readonly repository: IInterventionRepository;
   readonly congeRepository: ICongeRepository;

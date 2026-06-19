@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IArticleRepository } from "./article-repository";
 import type { Article, CreateArticleInput, UpdateArticleInput } from "../domain/article";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier (reference/designation non
-// vides, prixUnitaireHT ≥ 0, tauxTVA ∈ [0,100]). Le scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier (reference/designation non
+ * vides, prixUnitaireHT ≥ 0, tauxTVA ∈ [0,100]). Le scoping tenant est porté par le repo.
+ */
 
 function assertPrixValide(prixUnitaireHT: string): void {
   const p = Number(prixUnitaireHT);

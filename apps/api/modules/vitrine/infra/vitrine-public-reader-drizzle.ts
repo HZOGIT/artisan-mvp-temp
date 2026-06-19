@@ -6,9 +6,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IVitrinePublicReader } from "../application/vitrine-public-reader";
 import type { ArtisanVitrine, AvisPublic, VitrineParams, VitrinePublicStats } from "../domain/vitrine";
 
-// Lecture publique de la vitrine. `artisans` est HORS RLS → résolution directe par slug. Les autres
-// tables (parametres/avis/clients/interventions/articles) sont SOUS RLS → lues sous le scope de
-// l'artisan résolu (`withTenant`), le slug faisant office de capacité publique.
+/*
+ * Lecture publique de la vitrine. `artisans` est HORS RLS → résolution directe par slug. Les autres
+ * tables (parametres/avis/clients/interventions/articles) sont SOUS RLS → lues sous le scope de
+ * l'artisan résolu (`withTenant`), le slug faisant office de capacité publique.
+ */
 export class VitrinePublicReaderDrizzle implements IVitrinePublicReader {
   constructor(private readonly db: DbClient) {}
 

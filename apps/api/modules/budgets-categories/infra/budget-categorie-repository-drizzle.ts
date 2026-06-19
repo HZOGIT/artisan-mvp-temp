@@ -21,8 +21,10 @@ function toBudget(r: BudgetRow): BudgetCategorie {
   };
 }
 
-// Violation de contrainte unique PostgreSQL (uq_budget_mois) → ConflictError métier. ⚠️ Drizzle
-// enveloppe l'erreur pg (« Failed query: … ») : le code `23505` est porté par la chaîne de `cause`.
+/*
+ * Violation de contrainte unique PostgreSQL (uq_budget_mois) → ConflictError métier. ⚠️ Drizzle
+ * enveloppe l'erreur pg (« Failed query: … ») : le code `23505` est porté par la chaîne de `cause`.
+ */
 function estViolationUnique(err: unknown): boolean {
   let e: unknown = err;
   for (let i = 0; e != null && i < 5; i++) {
@@ -32,10 +34,12 @@ function estViolationUnique(err: unknown): boolean {
   return false;
 }
 
-// Implémentation Drizzle du repository budgets-categories. Double cloisonnement RLS + filtre
-// `artisan_id` sur `budgets_categories`. `artisan_id` forcé à la création. ⚠️ Contrainte DB UNIQUE
-// (artisan_id, categorie, mois) → les violations (PG 23505) sont traduites en ConflictError. L'update
-// ne touche que les montants (categorie/mois immuables = clé d'unicité).
+/*
+ * Implémentation Drizzle du repository budgets-categories. Double cloisonnement RLS + filtre
+ * `artisan_id` sur `budgets_categories`. `artisan_id` forcé à la création. ⚠️ Contrainte DB UNIQUE
+ * (artisan_id, categorie, mois) → les violations (PG 23505) sont traduites en ConflictError. L'update
+ * ne touche que les montants (categorie/mois immuables = clé d'unicité).
+ */
 export class BudgetCategorieRepositoryDrizzle implements IBudgetCategorieRepository {
   constructor(private readonly db: DbClient) {}
 

@@ -5,9 +5,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDemandeAvisRepository } from "./demande-avis-repository";
 import type { ClientRef, DemandeAvis, InterventionRef } from "../domain/demande-avis";
 
-// Dépendances injectées du workflow demande d'avis. `lienBaseUrl` vient d'une source de
-// confiance (APP_URL), jamais du header Origin. `genererToken`/`maintenant` injectables
-// pour des tests déterministes (défaut : uuid v4 + horloge système).
+/*
+ * Dépendances injectées du workflow demande d'avis. `lienBaseUrl` vient d'une source de
+ * confiance (APP_URL), jamais du header Origin. `genererToken`/`maintenant` injectables
+ * pour des tests déterministes (défaut : uuid v4 + horloge système).
+ */
 export interface DemandeAvisDeps {
   readonly repo: IDemandeAvisRepository;
   readonly email: EmailPort;
@@ -24,8 +26,10 @@ function rateLimitKey(artisanId: number): string {
   return `avis:${artisanId}`;
 }
 
-// Crée la demande + envoie l'email. Suppose ownership déjà vérifié (client possédé,
-// email présent). Applique le rate limit AVANT tout effet de bord.
+/*
+ * Crée la demande + envoie l'email. Suppose ownership déjà vérifié (client possédé,
+ * email présent). Applique le rate limit AVANT tout effet de bord.
+ */
 async function creerEtEnvoyer(
   deps: DemandeAvisDeps,
   ctx: TenantContext,

@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDepenseRepository } from "./depense-repository";
 import type { Depense, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
 
-// Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
-// `TenantContext` (le repo l'applique). `getDepense` sur une ressource d'un autre tenant → le
-// repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+/*
+ * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
+ * `TenantContext` (le repo l'applique). `getDepense` sur une ressource d'un autre tenant → le
+ * repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+ */
 
 export function listDepenses(repo: IDepenseRepository, ctx: TenantContext): Promise<Depense[]> {
   return repo.list(ctx);
@@ -17,8 +19,10 @@ export async function getDepense(repo: IDepenseRepository, ctx: TenantContext, i
   return depense;
 }
 
-// Détection de doublons (aide à la saisie). Parité legacy : pas de détection sur montant nul/date
-// invalide (évite des faux positifs en masse) → renvoie [].
+/*
+ * Détection de doublons (aide à la saisie). Parité legacy : pas de détection sur montant nul/date
+ * invalide (évite des faux positifs en masse) → renvoie [].
+ */
 export async function checkDoublons(repo: IDepenseRepository, ctx: TenantContext, params: DoublonParams): Promise<DepenseDoublon[]> {
   if (!(params.montantTtc > 0)) return [];
   if (Number.isNaN(new Date(params.dateDepense).getTime())) return [];

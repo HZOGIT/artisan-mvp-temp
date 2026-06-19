@@ -1,8 +1,10 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { Conversation, ConversationWithClient, Message, MessageAuteur, ConversationStatut } from "../domain/chat";
 
-// Accès aux conversations/messages support, scopé tenant (`conversations` RLS + filtre artisanId ;
-// `messages` sans artisanId → l'appelant prouve l'ownership de la conversation parente).
+/*
+ * Accès aux conversations/messages support, scopé tenant (`conversations` RLS + filtre artisanId ;
+ * `messages` sans artisanId → l'appelant prouve l'ownership de la conversation parente).
+ */
 export interface IChatRepository {
   // Conversations du tenant (enrichies du client), triées dernierMessageDate desc puis updatedAt desc.
   listConversations(ctx: TenantContext): Promise<ConversationWithClient[]>;
@@ -24,8 +26,10 @@ export interface IChatRepository {
   getUnreadCount(ctx: TenantContext): Promise<number>;
 }
 
-// Notification best-effort au client lors d'un nouveau message artisan (email + lien portail). Séparée
-// du repo (effet de bord). Impl Drizzle/email branchée au câblage ; jamais bloquante.
+/*
+ * Notification best-effort au client lors d'un nouveau message artisan (email + lien portail). Séparée
+ * du repo (effet de bord). Impl Drizzle/email branchée au câblage ; jamais bloquante.
+ */
 export interface ChatClientNotifier {
   notifyNewMessage(ctx: TenantContext, conversation: Conversation, contenu: string): Promise<void>;
 }

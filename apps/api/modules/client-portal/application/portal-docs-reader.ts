@@ -1,7 +1,9 @@
 import type { TenantContext } from "../../../shared/tenant";
 
-// Sous-ensembles « client-safe » des documents exposés dans l'espace client (parité legacy : on
-// n'expose QUE des champs sûrs — ex. les `notes` internes des contrats sont EXCLUES).
+/*
+ * Sous-ensembles « client-safe » des documents exposés dans l'espace client (parité legacy : on
+ * n'expose QUE des champs sûrs — ex. les `notes` internes des contrats sont EXCLUES).
+ */
 export interface PortalDevis {
   readonly id: number;
   readonly numero: string;
@@ -49,8 +51,10 @@ export interface PortalContrat {
   readonly statut: string | null;
 }
 
-// Port de lecture des documents du client pour le portail. Toutes les lectures sont SCOPÉES au tenant
-// résolu (artisanId) ET filtrées par `clientId` (anti-IDOR : un client ne voit QUE ses documents).
+/*
+ * Port de lecture des documents du client pour le portail. Toutes les lectures sont SCOPÉES au tenant
+ * résolu (artisanId) ET filtrées par `clientId` (anti-IDOR : un client ne voit QUE ses documents).
+ */
 export interface IPortalDocsReader {
   listDevis(ctx: TenantContext, clientId: number): Promise<PortalDevis[]>;
   listFactures(ctx: TenantContext, clientId: number): Promise<PortalFacture[]>;

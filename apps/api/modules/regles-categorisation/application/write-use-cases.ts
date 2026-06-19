@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRegleCategorisationRepository } from "./regle-categorisation-repository";
 import type { RegleCategorisation, CreateRegleInput, UpdateRegleInput } from "../domain/regle-categorisation";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier. Pas de contrainte d'unicité sur
-// ce domaine (plusieurs règles peuvent partager motif/catégorie). Le scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier. Pas de contrainte d'unicité sur
+ * ce domaine (plusieurs règles peuvent partager motif/catégorie). Le scoping tenant est porté par le repo.
+ */
 
 export async function creerRegle(
   repo: IRegleCategorisationRepository,

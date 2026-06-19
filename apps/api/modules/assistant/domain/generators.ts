@@ -1,5 +1,7 @@
-// Constructeurs de prompts + parseurs des 4 générateurs IA de l'assistant (parité legacy
-// `assistantRouter`). Purs et testables. La sortie LLM n'est PAS fiable → parse défensif.
+/*
+ * Constructeurs de prompts + parseurs des 4 générateurs IA de l'assistant (parité legacy
+ * `assistantRouter`). Purs et testables. La sortie LLM n'est PAS fiable → parse défensif.
+ */
 
 export interface PromptParts {
   readonly system: string;

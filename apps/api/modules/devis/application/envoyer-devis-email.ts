@@ -7,8 +7,10 @@ import type { ArtisanReader, ClientReader } from "../../../shared/readers/contac
 import type { IDevisRepository } from "./devis-repository";
 import type { DevisSignatureReader } from "./devis-signature-reader";
 
-// Dépendances de l'envoi d'un devis par email (composition : artisan + client + PDF + email +
-// rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
+/*
+ * Dépendances de l'envoi d'un devis par email (composition : artisan + client + PDF + email +
+ * rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
+ */
 export interface DevisMailingDeps {
   readonly artisanReader: ArtisanReader;
   readonly clientReader: ClientReader;
@@ -43,9 +45,11 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Sujet + corps HTML de l'email devis (pur, testable) — parité fonctionnelle du template legacy
-// `generateDevisEmailContent`. `customMessage` éventuel ajouté en bas (échappé).
-// `portalUrl` : lien de signature en ligne (`/portail/<token>`), ajouté si disponible.
+/*
+ * Sujet + corps HTML de l'email devis (pur, testable) — parité fonctionnelle du template legacy
+ * `generateDevisEmailContent`. `customMessage` éventuel ajouté en bas (échappé).
+ * `portalUrl` : lien de signature en ligne (`/portail/<token>`), ajouté si disponible.
+ */
 export function buildDevisEmail(params: {
   artisanName: string;
   clientName: string;
@@ -103,9 +107,11 @@ export function buildDevisEmail(params: {
   return { subject, body };
 }
 
-// Envoie un devis par email (parité legacy `devis.sendByEmail`) : ownership 404, **client.email
-// requis 400**, **rate-limit 429** ; si `attachPdf` → PDF via `PdfPort.render("devis", …)` joint ;
-// **passe `envoye` si le devis est `brouillon`** (durci vs legacy : ne régresse pas accepte/refuse).
+/*
+ * Envoie un devis par email (parité legacy `devis.sendByEmail`) : ownership 404, **client.email
+ * requis 400**, **rate-limit 429** ; si `attachPdf` → PDF via `PdfPort.render("devis", …)` joint ;
+ * **passe `envoye` si le devis est `brouillon`** (durci vs legacy : ne régresse pas accepte/refuse).
+ */
 export async function envoyerDevisParEmail(
   repo: IDevisRepository,
   deps: DevisMailingDeps,

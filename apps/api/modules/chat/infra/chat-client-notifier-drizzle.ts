@@ -9,10 +9,12 @@ import type { Conversation } from "../domain/chat";
 import { buildNewMessageEmail } from "../domain/chat";
 import type { ChatClientNotifier } from "../application/chat-repository";
 
-// Notifie le client par email lors d'un nouveau message artisan (parité legacy `sendMessage`).
-// Best-effort + non bloquant : lit le client (scopé tenant), le lien portail actif, applique le
-// rate-limit anti-spam (`chat:<artisanId>`, 20/15 min), puis envoie via l'EmailPort. ⚠️ L'EmailPort
-// du new-stack ne porte pas fromName/replyTo (parité acceptable, comme les autres emails migrés).
+/*
+ * Notifie le client par email lors d'un nouveau message artisan (parité legacy `sendMessage`).
+ * Best-effort + non bloquant : lit le client (scopé tenant), le lien portail actif, applique le
+ * rate-limit anti-spam (`chat:<artisanId>`, 20/15 min), puis envoie via l'EmailPort. ⚠️ L'EmailPort
+ * du new-stack ne porte pas fromName/replyTo (parité acceptable, comme les autres emails migrés).
+ */
 export class ChatClientNotifierDrizzle implements ChatClientNotifier {
   constructor(
     private readonly db: DbClient,

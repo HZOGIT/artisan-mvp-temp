@@ -8,9 +8,11 @@ export interface PortailFacturePdfRouteDeps extends PortalFacturePdfDeps {
   readonly rateLimiter: RateLimiterPort;
 }
 
-// Route HORS-tRPC PUBLIQUE `GET /api/portail/:token/factures/:id/pdf` : PDF d'une facture depuis le
-// portail client (token = capacité, rate-limit IP). 403 token invalide, 404 facture hors clientId.
-// ⚠️ MONTÉ mais NON routé tant qu'absent de MIGRATED_ROUTES.
+/*
+ * Route HORS-tRPC PUBLIQUE `GET /api/portail/:token/factures/:id/pdf` : PDF d'une facture depuis le
+ * portail client (token = capacité, rate-limit IP). 403 token invalide, 404 facture hors clientId.
+ * ⚠️ MONTÉ mais NON routé tant qu'absent de MIGRATED_ROUTES.
+ */
 export function registerPortailFacturePdfRoute(app: FastifyInstance, deps: PortailFacturePdfRouteDeps): void {
   app.get("/api/portail/:token/factures/:id/pdf", async (req, reply) => {
     const ip = extractClientIp((req.headers ?? {}) as Record<string, unknown>, req.ip ?? null);

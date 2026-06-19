@@ -48,9 +48,11 @@ export interface PortalChantier {
   readonly etapes: readonly PortalChantierEtape[];
 }
 
-// Port de planification du portail (RDV + chantiers). Lectures/écritures SCOPÉES tenant (artisanId
-// résolu) + filtrées par `clientId`. Le suivi de chantier n'est lu QUE pour les chantiers du client
-// (anti-IDOR via le chantier parent) et limité aux étapes `visibleClient`.
+/*
+ * Port de planification du portail (RDV + chantiers). Lectures/écritures SCOPÉES tenant (artisanId
+ * résolu) + filtrées par `clientId`. Le suivi de chantier n'est lu QUE pour les chantiers du client
+ * (anti-IDOR via le chantier parent) et limité aux étapes `visibleClient`.
+ */
 export interface IPortalSchedulingReader {
   // Occupations (interventions non annulées + RDV en attente/confirmés) sur la fenêtre.
   getCreneauxOccupes(ctx: TenantContext, debut: Date, fin: Date): Promise<CreneauOccupe[]>;

@@ -65,8 +65,10 @@ function toLigne(r: LigneRow): LigneCommande {
   };
 }
 
-// Totaux calculés CÔTÉ SERVEUR (jamais fournis par le client). Parité legacy :
-// ligneHT = quantite × prixUnitaire ; ligneTVA = ligneHT × tauxTVA/100 ; totaux = Σ.
+/*
+ * Totaux calculés CÔTÉ SERVEUR (jamais fournis par le client). Parité legacy :
+ * ligneHT = quantite × prixUnitaire ; ligneTVA = ligneHT × tauxTVA/100 ; totaux = Σ.
+ */
 function calculerTotaux(lignes: readonly CreateLigneInput[]): {
   totalHT: number;
   totalTVA: number;
@@ -86,9 +88,11 @@ function calculerTotaux(lignes: readonly CreateLigneInput[]): {
   return { totalHT, totalTVA, totalTTC: totalHT + totalTVA, lignesHT };
 }
 
-// Implémentation Drizzle du repository commandes fournisseurs. Double cloisonnement RLS +
-// filtre artisanId sur `commandes_fournisseurs`. Lignes (SANS artisanId) scopées via la
-// commande. ⚠️ Domaine sensible : totaux serveur, fournisseur owned, cascade lignes.
+/*
+ * Implémentation Drizzle du repository commandes fournisseurs. Double cloisonnement RLS +
+ * filtre artisanId sur `commandes_fournisseurs`. Lignes (SANS artisanId) scopées via la
+ * commande. ⚠️ Domaine sensible : totaux serveur, fournisseur owned, cascade lignes.
+ */
 export class CommandeRepositoryDrizzle implements ICommandeRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -273,9 +277,11 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
           .set({ quantiteRecue: valeur.toFixed(2) })
           .where(eq(lignesCommandesFournisseurs.id, ligneId));
 
-        // Intégration stock : entrée/sortie du DELTA reçu (anti double-comptage : variation
-        // seulement). Uniquement si la ligne est liée à un stock APPARTENANT au tenant
-        // (scoping strict). Atomique (même transaction) + trace mouvement_stock.
+        /*
+         * Intégration stock : entrée/sortie du DELTA reçu (anti double-comptage : variation
+         * seulement). Uniquement si la ligne est liée à un stock APPARTENANT au tenant
+         * (scoping strict). Atomique (même transaction) + trace mouvement_stock.
+         */
         const delta = valeur - ancienneRecue;
         if (ligne.stockId != null && Math.abs(delta) > 1e-9) {
           const [stock] = await tx
@@ -341,8 +347,10 @@ export class CommandeRepositoryDrizzle implements ICommandeRepository {
   ): Promise<Commande | null> {
     return withTenant(this.db, ctx, async (tx) => {
       if (!(await this.ownsCommande(tx, ctx, id))) return null;
-      // Lien dépense posé UNIQUEMENT si la dépense appartient au tenant (anti-IDOR-FK) ;
-      // `a_facturer` délie (depenseId = null).
+      /*
+       * Lien dépense posé UNIQUEMENT si la dépense appartient au tenant (anti-IDOR-FK) ;
+       * `a_facturer` délie (depenseId = null).
+       */
       let lien: number | null = null;
       if (statutFacturation === "facturee" && depenseId != null) {
         const [dep] = await tx

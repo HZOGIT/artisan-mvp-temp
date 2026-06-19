@@ -11,10 +11,12 @@ import type {
 } from "../domain/facture";
 import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant, la numérotation (préfixe "FAC" + compteur), le recalcul des totaux côté serveur et le
-// scoping des lignes via la facture parente (factures_lignes SANS artisanId). ⚠️ `update` ne
-// touche que les métadonnées (clientId/devisId/numero/statut/totaux/montantPaye réservés).
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant, la numérotation (préfixe "FAC" + compteur), le recalcul des totaux côté serveur et le
+ * scoping des lignes via la facture parente (factures_lignes SANS artisanId). ⚠️ `update` ne
+ * touche que les métadonnées (clientId/devisId/numero/statut/totaux/montantPaye réservés).
+ */
 export class FakeFactureRepository implements IFactureRepository {
   private factureStore: Facture[] = [];
   private lignesStore: FactureLigne[] = [];
@@ -49,8 +51,10 @@ export class FakeFactureRepository implements IFactureRepository {
   registerDevis(artisanId: number, devisId: number): void {
     this.ownedDevis.add(`${artisanId}:${devisId}`);
   }
-  // Aide de test : force le statut d'une facture (non modifiable via l'interface publique —
-  // piloté par le workflow en 7/9). Sert à tester l'immutabilité post-émission.
+  /*
+   * Aide de test : force le statut d'une facture (non modifiable via l'interface publique —
+   * piloté par le workflow en 7/9). Sert à tester l'immutabilité post-émission.
+   */
   setStatutForTest(id: number, statut: Facture["statut"]): void {
     this.factureStore = this.factureStore.map((f) => (f.id === id ? { ...f, statut } : f));
   }

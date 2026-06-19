@@ -1,6 +1,8 @@
-// Gestion des utilisateurs/collaborateurs d'un artisan (tables `users` + `permissions_utilisateur`,
-// toutes deux HORS RLS → l'isolation est portée par un scope EXPLICITE `artisanId` dans chaque requête).
-// Rôles assignables à un collaborateur (PAS `admin` — réservé au staff Operioz).
+/*
+ * Gestion des utilisateurs/collaborateurs d'un artisan (tables `users` + `permissions_utilisateur`,
+ * toutes deux HORS RLS → l'isolation est portée par un scope EXPLICITE `artisanId` dans chaque requête).
+ * Rôles assignables à un collaborateur (PAS `admin` — réservé au staff Operioz).
+ */
 export type CollaborateurRole = "artisan" | "secretaire" | "technicien";
 
 export interface UtilisateurListItem {

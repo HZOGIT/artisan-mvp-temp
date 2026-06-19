@@ -14,8 +14,10 @@ export interface DeclarationTVABrut {
   readonly tvaDeductible: number;
 }
 
-// Port de lecture comptable : écritures scopées tenant (RLS) + agrégat TVA détaillé (SQL group-by).
-// Lecture seule — aucune écriture comptable (la génération d'écritures reste hors de ce reader).
+/*
+ * Port de lecture comptable : écritures scopées tenant (RLS) + agrégat TVA détaillé (SQL group-by).
+ * Lecture seule — aucune écriture comptable (la génération d'écritures reste hors de ce reader).
+ */
 export interface IComptabiliteReader {
   // Toutes les écritures de la période, triées (numeroCompte, dateEcriture) — grand livre/balance/TVA.
   listEcritures(ctx: TenantContext, p: Periode): Promise<Ecriture[]>;

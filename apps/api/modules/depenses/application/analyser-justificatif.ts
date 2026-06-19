@@ -5,12 +5,14 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { IDepenseRepository } from "./depense-repository";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
 
-// Use-case `analyserJustificatif` : OCR d'un justificatif (facture/note de frais) via un modèle
-// vision. Parité legacy `depenses.analyserJustificatif`. ⚠️ Invariants :
-//  - **rate-limit IA AVANT tout** (anti-coût) → 429 ;
-//  - **anti-IDOR** : si `depenseId` fourni, on vérifie l'ownership AVANT l'appel modèle (évite un
-//    appel gaspillé + une écriture cross-tenant de l'OCR) ;
-//  - parse JSON défensif ; erreurs **assainies** (jamais de fuite base64/clé) → `{success:false}`.
+/*
+ * Use-case `analyserJustificatif` : OCR d'un justificatif (facture/note de frais) via un modèle
+ * vision. Parité legacy `depenses.analyserJustificatif`. ⚠️ Invariants :
+ *  - **rate-limit IA AVANT tout** (anti-coût) → 429 ;
+ *  - **anti-IDOR** : si `depenseId` fourni, on vérifie l'ownership AVANT l'appel modèle (évite un
+ *    appel gaspillé + une écriture cross-tenant de l'OCR) ;
+ *  - parse JSON défensif ; erreurs **assainies** (jamais de fuite base64/clé) → `{success:false}`.
+ */
 
 export interface AnalyserJustificatifDeps {
   readonly vision: VisionPort;
@@ -45,8 +47,10 @@ export async function analyserJustificatif(
   if (!(await deps.rateLimiter.check(rateLimitKey(ctx.artisanId)))) {
     throw new TooManyRequestsError("Limite IA atteinte. Réessayez dans un moment.");
   }
-  // Anti-IDOR : la dépense ciblée doit appartenir au tenant AVANT l'appel modèle (anti gaspillage +
-  // anti-écriture cross-tenant de l'OCR).
+  /*
+   * Anti-IDOR : la dépense ciblée doit appartenir au tenant AVANT l'appel modèle (anti gaspillage +
+   * anti-écriture cross-tenant de l'OCR).
+   */
   if (input.depenseId != null) {
     if (!(await deps.depenseRepo.getById(ctx, input.depenseId))) throw new NotFoundError("Dépense introuvable");
   }

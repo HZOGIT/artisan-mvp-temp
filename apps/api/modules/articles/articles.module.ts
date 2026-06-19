@@ -4,9 +4,11 @@ import type { BibliothequeReader } from "./application/bibliotheque-reader";
 import type { BibliothequeWriter } from "./application/bibliotheque-writer";
 import { createArticlesRouter } from "./interface/trpc/articles.router";
 
-// Wiring DI du module articles : assemble le routeur tRPC à partir du repository injecté + (optionnel)
-// le seam IA (`suggererArticlesIA`) + (optionnel) le reader bibliothèque partagée (read public) + le
-// writer bibliothèque (writes admin-only). Les seams sont optionnels : sans IA → [] ; sans biblio → [].
+/*
+ * Wiring DI du module articles : assemble le routeur tRPC à partir du repository injecté + (optionnel)
+ * le seam IA (`suggererArticlesIA`) + (optionnel) le reader bibliothèque partagée (read public) + le
+ * writer bibliothèque (writes admin-only). Les seams sont optionnels : sans IA → [] ; sans biblio → [].
+ */
 export interface ArticlesModuleDeps {
   readonly repository: IArticleRepository;
   readonly ia?: ArticlesIaDeps;

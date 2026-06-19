@@ -5,8 +5,10 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { ArtisanReader, ArtisanInfo } from "../application/contact-readers";
 
-// Lecture de l'artisan émetteur (tenant courant) pour l'email + le PDF facture. Renvoie la ligne
-// brute `artisans` (transmise au générateur PDF legacy) ; scopée par `ctx.artisanId` (RLS).
+/*
+ * Lecture de l'artisan émetteur (tenant courant) pour l'email + le PDF facture. Renvoie la ligne
+ * brute `artisans` (transmise au générateur PDF legacy) ; scopée par `ctx.artisanId` (RLS).
+ */
 export class ArtisanReaderDrizzle implements ArtisanReader {
   constructor(private readonly db: DbClient) {}
 

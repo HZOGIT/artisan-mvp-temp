@@ -26,10 +26,12 @@ function toRdv(r: RdvRow): Rdv {
   };
 }
 
-// Implémentation Drizzle du repository rdv-en-ligne. Double cloisonnement RLS + filtre `artisanId`
-// sur `rdv_en_ligne`. `artisanId` forcé et `statut="en_attente"` posé à la création (jamais fournis
-// par l'appelant). Les transitions de statut passent par `setStatut` ; `update` ne touche que les
-// métadonnées. `clientId` validé via `ownsClient` (anti-IDOR-FK, cf. devis).
+/*
+ * Implémentation Drizzle du repository rdv-en-ligne. Double cloisonnement RLS + filtre `artisanId`
+ * sur `rdv_en_ligne`. `artisanId` forcé et `statut="en_attente"` posé à la création (jamais fournis
+ * par l'appelant). Les transitions de statut passent par `setStatut` ; `update` ne touche que les
+ * métadonnées. `clientId` validé via `ownsClient` (anti-IDOR-FK, cf. devis).
+ */
 export class RdvRepositoryDrizzle implements IRdvRepository {
   constructor(private readonly db: DbClient) {}
 

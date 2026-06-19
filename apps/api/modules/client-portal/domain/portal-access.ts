@@ -1,7 +1,9 @@
-// Domaine de l'espace client (portail) — accès PUBLIC par token (capacité), pas de cookie tenant.
-// Le token résout un accès `client_portal_access` (actif + non expiré) → {clientId, artisanId} ; les
-// lectures du client repassent sous le scope du tenant résolu (RLS). Slice 1 : cycle de vie de l'accès
-// (génération/statut/désactivation, côté artisan) + identité (verifyAccess/getClientInfo, public).
+/*
+ * Domaine de l'espace client (portail) — accès PUBLIC par token (capacité), pas de cookie tenant.
+ * Le token résout un accès `client_portal_access` (actif + non expiré) → {clientId, artisanId} ; les
+ * lectures du client repassent sous le scope du tenant résolu (RLS). Slice 1 : cycle de vie de l'accès
+ * (génération/statut/désactivation, côté artisan) + identité (verifyAccess/getClientInfo, public).
+ */
 
 export interface PortalAccessRef {
   readonly id: number;

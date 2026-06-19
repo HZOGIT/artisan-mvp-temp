@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IInterventionRepository, InterventionRefKind } from "./intervention-repository";
 import type { Intervention, CreateInterventionInput, UpdateInterventionInput } from "../domain/intervention";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier (titre, cohérence des
-// dates) + ⚠️ **garde anti-IDOR-FK** : toute FK fournie (client/technicien/devis/facture)
-// DOIT appartenir au tenant, sinon NotFound (on ne révèle pas l'existence cross-tenant).
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier (titre, cohérence des
+ * dates) + ⚠️ **garde anti-IDOR-FK** : toute FK fournie (client/technicien/devis/facture)
+ * DOIT appartenir au tenant, sinon NotFound (on ne révèle pas l'existence cross-tenant).
+ */
 
 const REF_LABEL: Record<InterventionRefKind, string> = {
   client: "Client",

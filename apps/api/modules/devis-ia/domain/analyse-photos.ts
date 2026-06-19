@@ -1,8 +1,10 @@
 import type { VisionImage } from "../../../shared/ports/vision";
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
 
-// Prompts spécialisés par métier (parité legacy `PROMPTS_METIER`) : l'IA devient un expert du métier
-// de l'artisan → quantités/prix/marques plus réalistes.
+/*
+ * Prompts spécialisés par métier (parité legacy `PROMPTS_METIER`) : l'IA devient un expert du métier
+ * de l'artisan → quantités/prix/marques plus réalistes.
+ */
 const PROMPTS_METIER: Record<string, string> = {
   carreleur: "Analyse cette photo comme un expert carreleur. Calcule la surface a carreler visible. Identifie le type de support (mur/sol/humide). Propose le carrelage adapte. Calcule les quantites (carrelage + colle + joint + pertes 15%). Liste tous les materiaux avec prix realistes.",
   paysagiste: "Analyse ce jardin/espace exterieur. Estime la surface totale visible. Identifie la vegetation existante. Propose un plan d'amenagement adapte. Liste les plantes recommandees avec quantites. Calcule le volume de terre/mulch necessaire.",
@@ -16,8 +18,10 @@ const PROMPTS_METIER: Record<string, string> = {
   terrassier: "Analyse cette zone de terrassement. Estime volumes a deplacer en m³. Identifie l'acces engins, les reseaux. Propose le materiel necessaire + prix.",
 };
 
-// Construit les blocs image pour l'appel multimodal (parité legacy) : data:URL → inline base64 ;
-// URL http(s) → fileData (fileUri). PUR.
+/*
+ * Construit les blocs image pour l'appel multimodal (parité legacy) : data:URL → inline base64 ;
+ * URL http(s) → fileData (fileUri). PUR.
+ */
 export function buildImageBlocks(urls: readonly string[]): VisionImage[] {
   return urls.map((url) => {
     const m = String(url || "").match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
@@ -60,8 +64,10 @@ export interface TravailIA {
   readonly articles?: ArticleIA[];
 }
 
-// Parse robuste de la réponse IA (parité legacy) : supporte le wrap markdown ```json … ```, extrait le
-// 1er objet JSON, valide la présence du tableau `travaux`. Renvoie null si non parsable/format invalide.
+/*
+ * Parse robuste de la réponse IA (parité legacy) : supporte le wrap markdown ```json … ```, extrait le
+ * 1er objet JSON, valide la présence du tableau `travaux`. Renvoie null si non parsable/format invalide.
+ */
 export function parseAnalyseResponse(responseText: string): TravailIA[] | null {
   let cleaned = (responseText || "").trim();
   const codeFence = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);

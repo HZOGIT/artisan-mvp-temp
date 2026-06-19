@@ -4,11 +4,13 @@ import type { PdfPort } from "../../../shared/ports/pdf";
 import { generateFacturXML } from "../../../shared/pdf/facturx";
 import { ymdCompact } from "../domain/csv-export";
 
-// Exports en lot (ZIP par période) — parité legacy `/api/comptabilite/export-pdf-lot` et
-// `export-facturx-lot`. On sélectionne les factures du tenant SUR la période (bornes incluses),
-// en EXCLUANT `brouillon` et `annulee` (parité legacy), puis on génère pour chacune le PDF facture
-// ou le XML CII Factur-X. Les use-cases sont PURS (renvoient la liste d'entrées + le nom d'archive) :
-// l'assemblage ZIP (archiver, infra) reste à l'interface. 404 si aucune facture sur la période.
+/*
+ * Exports en lot (ZIP par période) — parité legacy `/api/comptabilite/export-pdf-lot` et
+ * `export-facturx-lot`. On sélectionne les factures du tenant SUR la période (bornes incluses),
+ * en EXCLUANT `brouillon` et `annulee` (parité legacy), puis on génère pour chacune le PDF facture
+ * ou le XML CII Factur-X. Les use-cases sont PURS (renvoient la liste d'entrées + le nom d'archive) :
+ * l'assemblage ZIP (archiver, infra) reste à l'interface. 404 si aucune facture sur la période.
+ */
 
 // Sous-ensemble du domaine Facture nécessaire à la sélection (le lister renvoie le domaine complet).
 interface FactureLotItem {

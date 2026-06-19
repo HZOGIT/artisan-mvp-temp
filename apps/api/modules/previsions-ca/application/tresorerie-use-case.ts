@@ -3,8 +3,10 @@ import { addMonthsClamped } from "../../../shared/date/add-months-clamped";
 import type { TresorerieReader } from "./tresorerie-reader";
 import type { TresorerieData, TresoreriePrevisionnelle } from "../domain/prevision-ca";
 
-// Use-case `getTresoreriePrevisionnelle` : projette par SEMAINE le flux net (encaissements attendus
-// − décaissements attendus) sur N semaines. Parité legacy `getTresoreriePrevisionnelle`.
+/*
+ * Use-case `getTresoreriePrevisionnelle` : projette par SEMAINE le flux net (encaissements attendus
+ * − décaissements attendus) sur N semaines. Parité legacy `getTresoreriePrevisionnelle`.
+ */
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 const STEP_MONTHS: Record<string, number> = { mensuelle: 1, trimestrielle: 3, annuelle: 12 };
@@ -15,9 +17,11 @@ function num(s: string | null | undefined): number {
 }
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
-// PUR : calcule la trésorerie prévisionnelle à partir des données brutes + `now` (testable). Une date
-// passée (échue/en retard) retombe en semaine 0 ; hors fenêtre = ignorée. Les avoirs nettent les
-// entrées les plus proches (planché à 0). Les dépenses récurrentes sont expansées (clamp fin de mois).
+/*
+ * PUR : calcule la trésorerie prévisionnelle à partir des données brutes + `now` (testable). Une date
+ * passée (échue/en retard) retombe en semaine 0 ; hors fenêtre = ignorée. Les avoirs nettent les
+ * entrées les plus proches (planché à 0). Les dépenses récurrentes sont expansées (clamp fin de mois).
+ */
 export function computeTresorerie(data: TresorerieData, semaines: number, now: Date): TresoreriePrevisionnelle {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);

@@ -1,7 +1,9 @@
-// Types de domaine du module clients (CRM) — découplés du schéma Drizzle.
-// ⚠️ Données personnelles (PII : nom, e-mail, téléphone, adresse, SIRET/TVA) : isolation
-// cross-tenant stricte (historique d'IDOR/fuite PII). Domaine fondamental réutilisé par
-// devis/factures/interventions → la suppression doit préserver l'intégrité référentielle.
+/*
+ * Types de domaine du module clients (CRM) — découplés du schéma Drizzle.
+ * ⚠️ Données personnelles (PII : nom, e-mail, téléphone, adresse, SIRET/TVA) : isolation
+ * cross-tenant stricte (historique d'IDOR/fuite PII). Domaine fondamental réutilisé par
+ * devis/factures/interventions → la suppression doit préserver l'intégrité référentielle.
+ */
 
 export type ClientType = "particulier" | "professionnel";
 

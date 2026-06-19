@@ -6,8 +6,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDashboardReader } from "../application/dashboard-reader";
 import type { DashClient, DashDevis, DashFacture, DashIntervention, UpcomingInterventionItem } from "../domain/dashboard";
 
-// Lecteur Drizzle du dashboard : lots bruts scopés tenant (RLS via withTenant + filtre explicite
-// `artisanId`). Lecture seule. Les agrégations sont faites par les fonctions pures du domaine.
+/*
+ * Lecteur Drizzle du dashboard : lots bruts scopés tenant (RLS via withTenant + filtre explicite
+ * `artisanId`). Lecture seule. Les agrégations sont faites par les fonctions pures du domaine.
+ */
 export class DashboardReaderDrizzle implements IDashboardReader {
   constructor(private readonly db: DbClient) {}
 

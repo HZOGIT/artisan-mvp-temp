@@ -3,9 +3,11 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDepenseRepository } from "../../application/depense-repository";
 import { listDepenses, getDepense, checkDoublons, getDepensesStats } from "../../application/read-use-cases";
 import { creerDepense, modifierDepense, supprimerDepense, creerIndemniteKm } from "../../application/write-use-cases";
-// Composition : le client appelle les catégories de dépense via `trpc.depenses.getCategories/...`
-// (le legacy les expose sous le routeur `depenses`). On délègue aux use-cases du domaine
-// categories-depenses (déjà migré) — parité de surface, pas de duplication de logique.
+/*
+ * Composition : le client appelle les catégories de dépense via `trpc.depenses.getCategories/...`
+ * (le legacy les expose sous le routeur `depenses`). On délègue aux use-cases du domaine
+ * categories-depenses (déjà migré) — parité de surface, pas de duplication de logique.
+ */
 import type { ICategorieDepenseRepository } from "../../../categories-depenses/application/categorie-depense-repository";
 import { listCategories } from "../../../categories-depenses/application/read-use-cases";
 import { creerCategorie, modifierCategorie, supprimerCategorie } from "../../../categories-depenses/application/write-use-cases";
@@ -18,8 +20,10 @@ import { budgetsRealises } from "../../application/budgets-realises-use-case";
 import type { IRegleCategorisationRepository } from "../../../regles-categorisation/application/regle-categorisation-repository";
 import { listRegles } from "../../../regles-categorisation/application/read-use-cases";
 import { creerRegle, supprimerRegle } from "../../../regles-categorisation/application/write-use-cases";
-// Composition : notes de frais via `trpc.depenses.listNotesFrais/...` (workflow anti self-approbation
-// porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
+/*
+ * Composition : notes de frais via `trpc.depenses.listNotesFrais/...` (workflow anti self-approbation
+ * porté par le domaine notes-de-frais ; les mutations seront ajoutées en slices dédiés).
+ */
 import type { INoteDeFraisRepository } from "../../../notes-de-frais/application/note-de-frais-repository";
 import { listNotesDeFraisAvecCompte, getNoteFraisDetail } from "../../../notes-de-frais/application/read-use-cases";
 import { creerNoteDeFrais, soumettreNoteDeFrais, approuverNoteDeFrais, rejeterNoteDeFrais, payerNoteDeFrais, ajouterDepenseANote, retirerDepenseDeNote } from "../../../notes-de-frais/application/write-use-cases";
@@ -35,10 +39,12 @@ const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide
 const modePaiementEnum = z.enum(["carte", "especes", "virement", "cheque", "prelevement"]);
 const frequenceEnum = z.enum(["mensuelle", "trimestrielle", "annuelle"]);
 
-// Bornes alignées sur la table `depenses` (defense-in-depth). ⚠️ Le client NE fournit PAS
-// `numero` (généré côté serveur), ni `userId` (forcé au créateur), ni `montantTva`/`montantTtc`
-// (dérivés côté serveur de montantHt+tauxTva) → garde l'intégrité comptable (numérotation
-// maîtrisée + pas de TTC falsifiable).
+/*
+ * Bornes alignées sur la table `depenses` (defense-in-depth). ⚠️ Le client NE fournit PAS
+ * `numero` (généré côté serveur), ni `userId` (forcé au créateur), ni `montantTva`/`montantTtc`
+ * (dérivés côté serveur de montantHt+tauxTva) → garde l'intégrité comptable (numérotation
+ * maîtrisée + pas de TTC falsifiable).
+ */
 const createSchema = z.object({
   dateDepense: isoDate,
   categorie: z.string().min(1).max(50),
@@ -61,8 +67,10 @@ const createSchema = z.object({
   tvaDeductible: z.boolean().optional(),
 });
 
-// ⚠️ `numero` (numérotation maîtrisée, immuable), `userId`, `statut`/`rembourse`/
-// `dateRemboursement` ABSENTS : l'identité du créateur et le numéro ne passent pas par `update`.
+/*
+ * ⚠️ `numero` (numérotation maîtrisée, immuable), `userId`, `statut`/`rembourse`/
+ * `dateRemboursement` ABSENTS : l'identité du créateur et le numéro ne passent pas par `update`.
+ */
 const updateSchema = z.object({
   dateDepense: isoDate.optional(),
   categorie: z.string().min(1).max(50).optional(),
@@ -85,9 +93,11 @@ const updateSchema = z.object({
   tvaDeductible: z.boolean().optional(),
 });
 
-// Catégories de dépense — schémas alignés sur le contrat client legacy (`trpc.depenses.*Categorie`).
-// ⚠️ `plafondMensuel` est un NUMBER côté client legacy (mappé en string décimale pour le domaine) ;
-// `couleur` accepte "" (mappé en défaut). Noms de procédures identiques au legacy (parité).
+/*
+ * Catégories de dépense — schémas alignés sur le contrat client legacy (`trpc.depenses.*Categorie`).
+ * ⚠️ `plafondMensuel` est un NUMBER côté client legacy (mappé en string décimale pour le domaine) ;
+ * `couleur` accepte "" (mappé en défaut). Noms de procédures identiques au legacy (parité).
+ */
 const hexCouleur = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Couleur invalide (#RRGGBB attendu)").or(z.literal(""));
 const createCategorieSchema = z.object({
   nom: z.string().max(100),
@@ -106,10 +116,12 @@ const updateCategorieSchema = z.object({
   actif: z.boolean().optional(),
 });
 
-// Routeur tRPC du domaine depenses. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant + TVA dérivée + anti-IDOR-FK via ctx.tenant), laisse remonter les
-// Domain errors (NotFound→404, Validation→400). Repos injectés (DI) : `repo` (dépenses) +
-// `categorieRepo` (catégories de dépense, composées sous ce routeur pour parité avec le client).
+/*
+ * Routeur tRPC du domaine depenses. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant + TVA dérivée + anti-IDOR-FK via ctx.tenant), laisse remonter les
+ * Domain errors (NotFound→404, Validation→400). Repos injectés (DI) : `repo` (dépenses) +
+ * `categorieRepo` (catégories de dépense, composées sous ce routeur pour parité avec le client).
+ */
 export function createDepensesRouter(
   repo: IDepenseRepository,
   categorieRepo: ICategorieDepenseRepository,
@@ -145,8 +157,10 @@ export function createDepensesRouter(
         return { success: true };
       }),
 
-    // ── Analytics dépenses (lecture seule) ────────────────────────────────────────────
-    // Doublons potentiels (aide saisie) : pas de détection si montant ≤ 0 / date invalide → [].
+    /*
+     * ── Analytics dépenses (lecture seule) ────────────────────────────────────────────
+     * Doublons potentiels (aide saisie) : pas de détection si montant ≤ 0 / date invalide → [].
+     */
     checkDoublons: protectedProcedure
       .input(
         z.object({
@@ -197,14 +211,18 @@ export function createDepensesRouter(
         return { success: true };
       }),
 
-    // ── Budgets mensuels par catégorie (parité client : trpc.depenses.getBudgets/setBudget) ──
-    // Read DÉRIVÉ : budget vs réalisé (SUM dépenses du mois) par catégorie + écart + pourcentage.
+    /*
+     * ── Budgets mensuels par catégorie (parité client : trpc.depenses.getBudgets/setBudget) ──
+     * Read DÉRIVÉ : budget vs réalisé (SUM dépenses du mois) par catégorie + écart + pourcentage.
+     */
     getBudgets: protectedProcedure
       .input(z.object({ mois: z.string().regex(/^\d{4}-\d{2}$/, "Format mois attendu (YYYY-MM)") }))
       .query(({ ctx, input }) => budgetsRealises(categorieRepo, budgetRepo, repo, ctx.tenant, input.mois)),
 
-    // Upsert (categorie, mois) : crée si absent, sinon met à jour le montant — délègue au domaine
-    // budgets-categories (contrainte UNIQUE (artisan, categorie, mois) garantie côté DB).
+    /*
+     * Upsert (categorie, mois) : crée si absent, sinon met à jour le montant — délègue au domaine
+     * budgets-categories (contrainte UNIQUE (artisan, categorie, mois) garantie côté DB).
+     */
     setBudget: protectedProcedure
       .input(
         z.object({
@@ -271,17 +289,20 @@ export function createDepensesRouter(
         return { success: true };
       }),
 
-    // ── Notes de frais (parité client : trpc.depenses.listNotesFrais/...) ──────────────
-    // Read seul pour l'instant ; les mutations (create/soumettre/approuver/rejeter/payer) viendront
-    // en slices dédiés en préservant l'anti self-approbation porté par le domaine notes-de-frais.
-    // OPE-490 : enrichi de `nbDepenses` (compteur de dépenses liées) par note.
+    /*
+     * ── Notes de frais (parité client : trpc.depenses.listNotesFrais/...) ──────────────
+     * Read seul pour l'instant ; les mutations (create/soumettre/approuver/rejeter/payer) viendront
+     * en slices dédiés en préservant l'anti self-approbation porté par le domaine notes-de-frais.
+     */
     listNotesFrais: protectedProcedure.query(({ ctx }) => listNotesDeFraisAvecCompte(noteRepo, ctx.tenant)),
 
-    // Création d'une note de frais (parité client : trpc.depenses.createNoteFrais). ⚠️ `numero`
-    // est généré CÔTÉ SERVEUR (noteRepo.nextNumero) — jamais fourni par le client — et `userId`
-    // est forcé au créateur dans le use-case (anti-IDOR demandeur). OPE-490 : `depenseIds` est
-    // désormais HONORÉ — cascade `addDepenseLink` (anti-IDOR : skip silencieux des dépenses hors
-    // tenant / non remboursables ; recalcul du `montant_total` porté par addDepenseLink).
+    /*
+     * Création d'une note de frais (parité client : trpc.depenses.createNoteFrais). ⚠️ `numero`
+     * est généré CÔTÉ SERVEUR (noteRepo.nextNumero) — jamais fourni par le client — et `userId`
+     * est forcé au créateur dans le use-case (anti-IDOR demandeur). `depenseIds` est
+     * désormais HONORÉ — cascade `addDepenseLink` (anti-IDOR : skip silencieux des dépenses hors
+     * tenant / non remboursables ; recalcul du `montant_total` porté par addDepenseLink).
+     */
     createNoteFrais: protectedProcedure
       .input(
         z.object({
@@ -306,17 +327,21 @@ export function createDepensesRouter(
         return (await noteRepo.getById(ctx.tenant, note.id)) ?? note;
       }),
 
-    // Soumission d'une note de frais (parité client : trpc.depenses.soumettreNoteFrais). ⚠️ Le
-    // use-case porte les invariants : transition `brouillon→soumise` uniquement (sinon Conflict→409),
-    // idempotent (déjà soumise → no-op), hors tenant → NotFound→404.
+    /*
+     * Soumission d'une note de frais (parité client : trpc.depenses.soumettreNoteFrais). ⚠️ Le
+     * use-case porte les invariants : transition `brouillon→soumise` uniquement (sinon Conflict→409),
+     * idempotent (déjà soumise → no-op), hors tenant → NotFound→404.
+     */
     soumettreNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => soumettreNoteDeFrais(noteRepo, ctx.tenant, input.id)),
 
-    // Approbation/rejet d'une note de frais (parité client). ⚠️ INVARIANT SENSIBLE — **anti
-    // self-approbation** : l'approbateur (ctx.userId) ≠ le demandeur (note.userId) → sinon 403
-    // (porté par le use-case). Transition `soumise→approuvee|rejetee` (sinon 409), idempotent,
-    // hors tenant → 404. `rejeterNoteFrais` exige un commentaire (motif).
+    /*
+     * Approbation/rejet d'une note de frais (parité client). ⚠️ INVARIANT SENSIBLE — **anti
+     * self-approbation** : l'approbateur (ctx.userId) ≠ le demandeur (note.userId) → sinon 403
+     * (porté par le use-case). Transition `soumise→approuvee|rejetee` (sinon 409), idempotent,
+     * hors tenant → 404. `rejeterNoteFrais` exige un commentaire (motif).
+     */
     approuverNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
       .mutation(({ ctx, input }) => approuverNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire ?? undefined)),
@@ -325,14 +350,18 @@ export function createDepensesRouter(
       .input(z.object({ id: z.number().int(), commentaire: z.string().min(1).max(2000) }))
       .mutation(({ ctx, input }) => rejeterNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire)),
 
-    // Paiement d'une note de frais (parité client). Transition `approuvee→payee` + datePaiement ;
-    // idempotent (déjà payee → no-op) ; 409 si non approuvée ; hors tenant → 404.
+    /*
+     * Paiement d'une note de frais (parité client). Transition `approuvee→payee` + datePaiement ;
+     * idempotent (déjà payee → no-op) ; 409 si non approuvée ; hors tenant → 404.
+     */
     payerNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => payerNoteDeFrais(noteRepo, ctx.tenant, input.id)),
 
-    // ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
-    // OPE-490 : enrichi des `depenses[]` liées (détails) via `getNoteFraisDetail` (qui préserve le null).
+    /*
+     * ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
+     * enrichi des `depenses[]` liées (détails) via `getNoteFraisDetail` (qui préserve le null).
+     */
     getNoteFraisById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(({ ctx, input }) => getNoteFraisDetail(noteRepo, ctx.tenant, input.id)),

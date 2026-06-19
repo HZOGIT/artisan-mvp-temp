@@ -2,8 +2,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IAvisRepository } from "../application/avis-repository";
 import type { Avis, AvisClientResume, AvisEnrichi, AvisInterventionResume, AvisStats, StatutAvis } from "../domain/avis";
 
-// Entrée de seed pour les tests (le port n'expose pas de create : les avis naissent
-// côté public/portail client). `seed` est un utilitaire de test, hors contrat.
+/*
+ * Entrée de seed pour les tests (le port n'expose pas de create : les avis naissent
+ * côté public/portail client). `seed` est un utilitaire de test, hors contrat.
+ */
 export interface SeedAvisInput {
   readonly artisanId: number;
   readonly clientId?: number;
@@ -20,8 +22,10 @@ interface SeedIntervention extends AvisInterventionResume {
   readonly artisanId: number;
 }
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
-// scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
+ * scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+ */
 export class FakeAvisRepository implements IAvisRepository {
   private store: Avis[] = [];
   private clientsStore: SeedClient[] = [];

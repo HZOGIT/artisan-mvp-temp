@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IBudgetCategorieRepository } from "./budget-categorie-repository";
 import type { BudgetCategorie } from "../domain/budget-categorie";
 
-// Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
-// `getBudget` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+/*
+ * Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
+ * `getBudget` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+ */
 
 export function listBudgets(repo: IBudgetCategorieRepository, ctx: TenantContext): Promise<BudgetCategorie[]> {
   return repo.list(ctx);

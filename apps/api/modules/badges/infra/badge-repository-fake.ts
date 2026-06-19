@@ -3,10 +3,12 @@ import type { IBadgeRepository } from "../application/badge-repository";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, ObjectifTechnicien, UpdateBadgeInput } from "../domain/badge";
 import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
-// Double in-memory du repository badges pour les tests de use-cases (sans DB). Reproduit
-// le scoping tenant (artisanId forcé du contexte) ET l'anti-IDOR sur badges_techniciens :
-// un technicien doit avoir été déclaré (seedTechnicien) comme appartenant à un tenant,
-// sinon attribuer/listBadgesTechnicien refusent (null/[]).
+/*
+ * Double in-memory du repository badges pour les tests de use-cases (sans DB). Reproduit
+ * le scoping tenant (artisanId forcé du contexte) ET l'anti-IDOR sur badges_techniciens :
+ * un technicien doit avoir été déclaré (seedTechnicien) comme appartenant à un tenant,
+ * sinon attribuer/listBadgesTechnicien refusent (null/[]).
+ */
 export class FakeBadgeRepository implements IBadgeRepository {
   private badgesStore: Badge[] = [];
   private attributions: BadgeTechnicien[] = [];
@@ -128,8 +130,10 @@ export class FakeBadgeRepository implements IBadgeRepository {
       .sort((a, b) => a.rang - b.rang);
   }
 
-  // Recompute no-op (l'agrégation SQL interventions/factures est testée en PG) :
-  // renvoie le classement déjà seedé pour la période, scopé tenant.
+  /*
+   * Recompute no-op (l'agrégation SQL interventions/factures est testée en PG) :
+   * renvoie le classement déjà seedé pour la période, scopé tenant.
+   */
   async recalculerClassement(ctx: TenantContext, periode: PeriodeClassement): Promise<ClassementEntry[]> {
     return this.getClassement(ctx, periode);
   }

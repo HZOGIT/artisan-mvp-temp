@@ -1,5 +1,7 @@
-// Types de domaine du module notifications (cloche applicative de l'artisan) — découplés
-// du schéma Drizzle.
+/*
+ * Types de domaine du module notifications (cloche applicative de l'artisan) — découplés
+ * du schéma Drizzle.
+ */
 
 export type NotificationType = "info" | "alerte" | "rappel" | "succes" | "erreur";
 

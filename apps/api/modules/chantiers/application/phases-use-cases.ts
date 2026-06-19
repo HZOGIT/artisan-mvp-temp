@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "./chantier-repository";
 import type { ChantierPhase, CreatePhaseInput, UpdatePhaseInput } from "../domain/chantier";
 
-// Use-cases « phases de chantier » (planification/découpage en lots). ⚠️ `phases_chantier` n'a
-// **pas d'artisanId** (ni RLS) → toute opération **DOIT** vérifier l'ownership du **chantier parent**
-// avant d'agir (anti-IDOR). Pour update/delete (entrée = `id` de la phase seul), on lit d'abord la
-// phase (non scopée) pour récupérer son `chantierId`, puis on vérifie que ce chantier est au tenant.
+/*
+ * Use-cases « phases de chantier » (planification/découpage en lots). ⚠️ `phases_chantier` n'a
+ * **pas d'artisanId** (ni RLS) → toute opération **DOIT** vérifier l'ownership du **chantier parent**
+ * avant d'agir (anti-IDOR). Pour update/delete (entrée = `id` de la phase seul), on lit d'abord la
+ * phase (non scopée) pour récupérer son `chantierId`, puis on vérifie que ce chantier est au tenant.
+ */
 
 // Normalise/valide une date optionnelle (YYYY-MM-DD). undefined → undefined ; null → null.
 function normDate(s: string | null | undefined, champ: string): string | null | undefined {
@@ -34,8 +36,10 @@ export async function creerPhase(repo: IChantierRepository, ctx: TenantContext, 
   });
 }
 
-// Met à jour une phase (par id). Anti-IDOR : la phase doit exister (404) ET son chantier parent
-// appartenir au tenant (404 sinon — la table phases n'est pas scopée tenant).
+/*
+ * Met à jour une phase (par id). Anti-IDOR : la phase doit exister (404) ET son chantier parent
+ * appartenir au tenant (404 sinon — la table phases n'est pas scopée tenant).
+ */
 export async function modifierPhase(
   repo: IChantierRepository,
   ctx: TenantContext,

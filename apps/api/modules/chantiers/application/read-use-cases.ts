@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "./chantier-repository";
 import type { Chantier } from "../domain/chantier";
 
-// Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
-// `TenantContext` (le repo l'applique). `getChantier` sur une ressource d'un autre tenant →
-// le repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+/*
+ * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
+ * `TenantContext` (le repo l'applique). `getChantier` sur une ressource d'un autre tenant →
+ * le repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+ */
 
 export function listChantiers(repo: IChantierRepository, ctx: TenantContext): Promise<Chantier[]> {
   return repo.list(ctx);

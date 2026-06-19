@@ -6,8 +6,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisStatsReader } from "../application/devis-stats-reader";
 import type { DevisStatRow } from "../domain/devis-stats";
 
-// Lecteur Drizzle des stats devis : projection minimale (statut, totalTTC) scopée tenant (RLS via
-// withTenant + filtre explicite `artisanId`). Aucune écriture.
+/*
+ * Lecteur Drizzle des stats devis : projection minimale (statut, totalTTC) scopée tenant (RLS via
+ * withTenant + filtre explicite `artisanId`). Aucune écriture.
+ */
 export class DevisStatsReaderDrizzle implements IDevisStatsReader {
   constructor(private readonly db: DbClient) {}
 

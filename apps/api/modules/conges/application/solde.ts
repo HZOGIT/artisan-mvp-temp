@@ -1,12 +1,14 @@
-// Calcul du nombre de jours d'un congé + détermination de l'année d'imputation — PUR,
-// testable sans DB. ⚠️ Parité legacy stricte (montants de solde RH).
-//
-// Règles (parité legacy `congesRouter.approuver`/`annuler`) :
-// - jours = ceil(|dateFin − dateDebut| en jours) + 1 (bornes incluses), moins 0,5 par
-//   demi-journée (début/fin) ;
-// - seuls les types `conge_paye`/`rtt` impactent le solde (`soldes_conges`) ;
-// - l'imputation se fait sur **l'année de `dateDebut`** (évite la corruption inter-exercices :
-//   un congé approuvé en N et annulé en N+1 doit recréditer l'année N).
+/*
+ * Calcul du nombre de jours d'un congé + détermination de l'année d'imputation — PUR,
+ * testable sans DB. ⚠️ Parité legacy stricte (montants de solde RH).
+ * 
+ * Règles (parité legacy `congesRouter.approuver`/`annuler`) :
+ * - jours = ceil(|dateFin − dateDebut| en jours) + 1 (bornes incluses), moins 0,5 par
+ *   demi-journée (début/fin) ;
+ * - seuls les types `conge_paye`/`rtt` impactent le solde (`soldes_conges`) ;
+ * - l'imputation se fait sur **l'année de `dateDebut`** (évite la corruption inter-exercices :
+ *   un congé approuvé en N et annulé en N+1 doit recréditer l'année N).
+ */
 
 export type SoldeCongeType = "conge_paye" | "rtt";
 

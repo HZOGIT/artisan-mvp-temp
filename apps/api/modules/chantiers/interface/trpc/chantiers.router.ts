@@ -63,9 +63,11 @@ const updateSchema = z.object({
   notes: z.string().max(5000).nullish(),
 });
 
-// Routeur tRPC du domaine chantiers. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400). Repo injecté (DI).
+/*
+ * Routeur tRPC du domaine chantiers. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400). Repo injecté (DI).
+ */
 export function createChantiersRouter(repo: IChantierRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listChantiers(repo, ctx.tenant)),

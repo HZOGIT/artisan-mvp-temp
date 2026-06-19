@@ -1,5 +1,7 @@
-// Flux iCal d'abonnement au calendrier des interventions. Le jeton (`icalToken`) vit sur l'artisan
-// (table d'identité) ; le chemin public est servi hors tRPC (route `/api/calendar/:token.ics`).
+/*
+ * Flux iCal d'abonnement au calendrier des interventions. Le jeton (`icalToken`) vit sur l'artisan
+ * (table d'identité) ; le chemin public est servi hors tRPC (route `/api/calendar/:token.ics`).
+ */
 export interface IcalFeed {
   readonly path: string;
 }
@@ -36,8 +38,10 @@ export function icalDate(d: Date): string {
   return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 }
 
-// Sérialise le flux VCALENDAR (parité legacy `/api/calendar/:token.ics`). PURE : prend les évènements
-// déjà filtrés/scopés. Une intervention sans `dateFin` → +1 h. `statut=annulee` → `CANCELLED`.
+/*
+ * Sérialise le flux VCALENDAR (parité legacy `/api/calendar/:token.ics`). PURE : prend les évènements
+ * déjà filtrés/scopés. Une intervention sans `dateFin` → +1 h. `statut=annulee` → `CANCELLED`.
+ */
 export function buildIcalFeed(input: { calName: string; events: readonly IcalEvent[]; now?: Date }): string {
   const stamp = icalDate(input.now ?? new Date());
   const lines: string[] = [

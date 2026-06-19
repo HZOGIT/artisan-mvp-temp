@@ -5,8 +5,10 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisReader, DevisReadModel, DevisLigneReadModel } from "../application/devis-reader";
 
-// Lecture du domaine devis pour la conversion devis→facture. Scopé tenant (RLS + filtre
-// `devis.artisanId`). Les `devis_lignes` (SANS artisanId) sont scopées via le devis parent.
+/*
+ * Lecture du domaine devis pour la conversion devis→facture. Scopé tenant (RLS + filtre
+ * `devis.artisanId`). Les `devis_lignes` (SANS artisanId) sont scopées via le devis parent.
+ */
 export class DevisReaderDrizzle implements IDevisReader {
   constructor(private readonly db: DbClient) {}
 

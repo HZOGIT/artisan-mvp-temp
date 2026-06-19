@@ -3,9 +3,11 @@ import type { FacturesCAReader } from "./application/factures-ca-reader";
 import type { TresorerieReader } from "./application/tresorerie-reader";
 import { createPrevisionsCARouter } from "./interface/trpc/previsions-ca.router";
 
-// Wiring DI du module previsions-ca : assemble le routeur tRPC (CRUD + forecasting) à partir du
-// repository injecté + (optionnels) le reader CA factures pour `calculer` + le reader trésorerie
-// pour `getTresoreriePrevisionnelle` (sans eux : message « pas assez de données » / trésorerie vide).
+/*
+ * Wiring DI du module previsions-ca : assemble le routeur tRPC (CRUD + forecasting) à partir du
+ * repository injecté + (optionnels) le reader CA factures pour `calculer` + le reader trésorerie
+ * pour `getTresoreriePrevisionnelle` (sans eux : message « pas assez de données » / trésorerie vide).
+ */
 export interface PrevisionsCAModuleDeps {
   readonly repository: IPrevisionCARepository;
   readonly facturesCAReader?: FacturesCAReader;

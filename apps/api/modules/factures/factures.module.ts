@@ -5,9 +5,11 @@ import { NOOP_COMPTA } from "./application/compta-port";
 import type { FactureMailingDeps } from "./application/envoyer-facture-email";
 import { createFacturesRouter } from "./interface/trpc/factures.router";
 
-// Wiring DI du module factures : assemble le routeur tRPC à partir du repository, du lecteur de
-// devis (conversion cross-domaine), du port compta (effet de bord FEC) et des dépendances d'envoi
-// par email (artisan/client readers + PDF + email + rate-limit), tous injectés.
+/*
+ * Wiring DI du module factures : assemble le routeur tRPC à partir du repository, du lecteur de
+ * devis (conversion cross-domaine), du port compta (effet de bord FEC) et des dépendances d'envoi
+ * par email (artisan/client readers + PDF + email + rate-limit), tous injectés.
+ */
 export interface FacturesModuleDeps {
   readonly repository: IFactureRepository;
   readonly devisReader: IDevisReader;

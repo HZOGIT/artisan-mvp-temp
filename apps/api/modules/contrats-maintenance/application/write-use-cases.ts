@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IContratRepository } from "./contrat-repository";
 import type { Contrat, CreateContratInput, UpdateContratInput } from "../domain/contrat";
 
-// Use-cases d'écriture (création / métadonnées / suppression) — purs, repository injecté.
-// ⚠️ Les transitions de statut (suspendre/reactiver/terminer/annuler) sont des use-cases dédiés
-// (7/9) : elles ne passent pas par `modifierContrat`. Validation métier + anti-IDOR-FK clientId +
-// référence générée serveur.
+/*
+ * Use-cases d'écriture (création / métadonnées / suppression) — purs, repository injecté.
+ * ⚠️ Les transitions de statut (suspendre/reactiver/terminer/annuler) sont des use-cases dédiés
+ * (7/9) : elles ne passent pas par `modifierContrat`. Validation métier + anti-IDOR-FK clientId +
+ * référence générée serveur.
+ */
 
 const DECIMAL_2 = /^\d+(\.\d{1,2})?$/;
 

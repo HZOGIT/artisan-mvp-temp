@@ -7,8 +7,10 @@ import type { ICommandeRepository } from "./commande-repository";
 import type { IFournisseurRepository } from "../../fournisseurs/application/fournisseur-repository";
 import type { ArtisanReader } from "./artisan-reader";
 
-// Dépendances de l'envoi d'un bon de commande par email (composition : commande + fournisseur +
-// artisan + PDF + email + rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
+/*
+ * Dépendances de l'envoi d'un bon de commande par email (composition : commande + fournisseur +
+ * artisan + PDF + email + rate-limit). Tout est injecté (interfaces) → testable sans infra ni legacy.
+ */
 export interface CommandeMailingDeps {
   readonly repo: ICommandeRepository;
   readonly fournisseurRepo: IFournisseurRepository;
@@ -54,12 +56,14 @@ export function buildCommandeEmail(params: {
   return { subject, body };
 }
 
-// Envoie un bon de commande par email (parité legacy `commandesFournisseurs.sendEmail`) :
-//  - ownership : commande du tenant (404 sinon) ;
-//  - **fournisseur.email requis** (400 sinon) ;
-//  - **rate-limit** anti-abus (429) ;
-//  - PDF bon de commande via `PdfPort` ({commande+lignes, artisan, fournisseur}) joint à l'email ;
-//  - statut → `envoyee` après envoi (parité legacy, inconditionnel).
+/*
+ * Envoie un bon de commande par email (parité legacy `commandesFournisseurs.sendEmail`) :
+ *  - ownership : commande du tenant (404 sinon) ;
+ *  - **fournisseur.email requis** (400 sinon) ;
+ *  - **rate-limit** anti-abus (429) ;
+ *  - PDF bon de commande via `PdfPort` ({commande+lignes, artisan, fournisseur}) joint à l'email ;
+ *  - statut → `envoyee` après envoi (parité legacy, inconditionnel).
+ */
 export async function envoyerCommandeParEmail(
   deps: CommandeMailingDeps,
   ctx: TenantContext,

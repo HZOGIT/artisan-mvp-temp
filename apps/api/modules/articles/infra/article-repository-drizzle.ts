@@ -24,8 +24,10 @@ function toArticle(r: ArticleRow): Article {
   };
 }
 
-// Implémentation Drizzle du repository articles (catalogue artisan). Double cloisonnement RLS +
-// filtre `artisanId` sur `articles_artisan`. `artisanId` est forcé au tenant à la création.
+/*
+ * Implémentation Drizzle du repository articles (catalogue artisan). Double cloisonnement RLS +
+ * filtre `artisanId` sur `articles_artisan`. `artisanId` est forcé au tenant à la création.
+ */
 export class ArticleRepositoryDrizzle implements IArticleRepository {
   constructor(private readonly db: DbClient) {}
 

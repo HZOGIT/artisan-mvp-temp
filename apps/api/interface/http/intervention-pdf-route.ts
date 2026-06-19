@@ -5,9 +5,11 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface InterventionPdfRouteDeps extends CookieAuthDeps, InterventionPdfDeps {}
 
-// Route HORS-tRPC `GET /api/interventions/:id/bon-pdf` : télécharge le bon d'intervention en PDF (auth
-// cookie JWT). 404 anti-IDOR si l'intervention n'appartient pas au tenant. ⚠️ MONTÉ mais NON routé tant
-// qu'absent de MIGRATED_ROUTES.
+/*
+ * Route HORS-tRPC `GET /api/interventions/:id/bon-pdf` : télécharge le bon d'intervention en PDF (auth
+ * cookie JWT). 404 anti-IDOR si l'intervention n'appartient pas au tenant. ⚠️ MONTÉ mais NON routé tant
+ * qu'absent de MIGRATED_ROUTES.
+ */
 export function registerInterventionPdfRoute(app: FastifyInstance, deps: InterventionPdfRouteDeps): void {
   app.get("/api/interventions/:id/bon-pdf", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

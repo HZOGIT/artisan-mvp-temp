@@ -3,8 +3,10 @@ import type { IFournisseurRepository } from "../application/fournisseur-reposito
 import type { Fournisseur, CreateFournisseurInput, UpdateFournisseurInput } from "../domain/fournisseur";
 import type { ArticleFournisseur, AjouterAssociationInput } from "../domain/article-fournisseur";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
-// scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
+ * scoping tenant : artisanId forcé du contexte, ressource hors tenant invisible.
+ */
 export class FakeFournisseurRepository implements IFournisseurRepository {
   private store: Fournisseur[] = [];
   private articles: Array<{ id: number; artisanId: number }> = [];

@@ -1,8 +1,10 @@
-// Types de domaine du module previsions-ca (prévision de chiffre d'affaires par mois/année : CA
-// prévisionnel vs réalisé, écart absolu et en %, méthode de calcul, indice de confiance) — découplés
-// du schéma Drizzle. Table `previsions_ca` (RLS sur artisanId ; colonnes camelCase en base → pas de
-// mapping snake_case ; montants `numeric` exposés en string). `mois`/`annee` identifient la période :
-// immuables après création (l'update ne touche que les montants/méthode/confiance).
+/*
+ * Types de domaine du module previsions-ca (prévision de chiffre d'affaires par mois/année : CA
+ * prévisionnel vs réalisé, écart absolu et en %, méthode de calcul, indice de confiance) — découplés
+ * du schéma Drizzle. Table `previsions_ca` (RLS sur artisanId ; colonnes camelCase en base → pas de
+ * mapping snake_case ; montants `numeric` exposés en string). `mois`/`annee` identifient la période :
+ * immuables après création (l'update ne touche que les montants/méthode/confiance).
+ */
 
 export type PrevisionMethode = "moyenne_mobile" | "regression_lineaire" | "saisonnalite" | "manuel";
 
@@ -42,9 +44,11 @@ export interface UpdatePrevisionInput {
   readonly confiance?: string | null;
 }
 
-// Historique de CA mensuel agrégé (table `historique_ca`, RLS sur artisanId). Lecture seule côté
-// new-stack pour l'instant (le recalcul `calculerHistoriqueCAMensuel` reste à porter — agrège les
-// factures payées). Montants `numeric` exposés en string.
+/*
+ * Historique de CA mensuel agrégé (table `historique_ca`, RLS sur artisanId). Lecture seule côté
+ * new-stack pour l'instant (le recalcul `calculerHistoriqueCAMensuel` reste à porter — agrège les
+ * factures payées). Montants `numeric` exposés en string.
+ */
 export interface HistoriqueCA {
   readonly id: number;
   readonly artisanId: number;
@@ -58,8 +62,10 @@ export interface HistoriqueCA {
   readonly createdAt: Date;
 }
 
-// Comparaison prévu vs réalisé pour un mois (agrégat lecture seule, montants en nombre). Parité
-// legacy `getComparaisonPrevisionsRealise`.
+/*
+ * Comparaison prévu vs réalisé pour un mois (agrégat lecture seule, montants en nombre). Parité
+ * legacy `getComparaisonPrevisionsRealise`.
+ */
 export interface ComparaisonMois {
   readonly mois: number;
   readonly caPrevisionnel: number;
@@ -68,8 +74,10 @@ export interface ComparaisonMois {
   readonly ecartPourcentage: number;
 }
 
-// Agrégat de CA réalisé par mois (issu des factures PAYÉES du tenant) — sert au recalcul de
-// l'historique (`calculer`). Montant en string (numeric PG).
+/*
+ * Agrégat de CA réalisé par mois (issu des factures PAYÉES du tenant) — sert au recalcul de
+ * l'historique (`calculer`). Montant en string (numeric PG).
+ */
 export interface CAParMois {
   readonly mois: number;
   readonly annee: number;
@@ -112,8 +120,10 @@ export interface CalculPrevisionsResult {
   readonly message?: string;
 }
 
-// ── Trésorerie prévisionnelle (flux net hebdomadaire) ─────────────────────────────────────────
-// Créance = facture non soldée (encaissement attendu à `dateEcheance`, reste dû = totalTTC−montantPaye).
+/*
+ * ── Trésorerie prévisionnelle (flux net hebdomadaire) ─────────────────────────────────────────
+ * Créance = facture non soldée (encaissement attendu à `dateEcheance`, reste dû = totalTTC−montantPaye).
+ */
 export interface Creance {
   readonly dateEcheance: string | null;
   readonly totalTTC: string;

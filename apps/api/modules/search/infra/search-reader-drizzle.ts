@@ -6,8 +6,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ISearchReader } from "../application/search-reader";
 import type { SearchMatches } from "../domain/search";
 
-// Lecteur Drizzle de la recherche globale : 5 requêtes `ilike` scopées tenant (RLS via withTenant +
-// filtre explicite `artisanId`), bornées par entité (parité legacy : 5/5/5/5/3). Lecture seule.
+/*
+ * Lecteur Drizzle de la recherche globale : 5 requêtes `ilike` scopées tenant (RLS via withTenant +
+ * filtre explicite `artisanId`), bornées par entité (parité legacy : 5/5/5/5/3). Lecture seule.
+ */
 export class SearchReaderDrizzle implements ISearchReader {
   constructor(private readonly db: DbClient) {}
 

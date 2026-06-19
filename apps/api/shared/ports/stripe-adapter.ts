@@ -1,8 +1,10 @@
 import type { CreateCheckoutParams, CreateCustomerParams, CreateInvoiceCheckoutParams, StripePort, StripeWebhookEvent } from "./stripe";
 
-// Adapter Stripe : instancie le SDK `stripe` via un import variable-de-chemin (le SDK n'entre PAS dans
-// le typecheck de src/**), avec la clé `STRIPE_SECRET_KEY` (réutilisée du legacy). Mappe le port vers
-// l'API SDK (snake_case). Le client est mémoïsé.
+/*
+ * Adapter Stripe : instancie le SDK `stripe` via un import variable-de-chemin (le SDK n'entre PAS dans
+ * le typecheck de src/**), avec la clé `STRIPE_SECRET_KEY` (réutilisée du legacy). Mappe le port vers
+ * l'API SDK (snake_case). Le client est mémoïsé.
+ */
 const STRIPE_MODULE = "stripe";
 
 type StripeSDK = {

@@ -7,8 +7,10 @@ import type { ConseilsStatsReader } from "../../conseils-ia/application/conseils
 import { buildAssistantSystemPrompt, buildUserPrompt } from "../domain/system-prompt";
 import type { AssistantThreadWriter } from "./assistant-thread-writer";
 
-// Dépendances du chat assistant en streaming (text mode, parité PARTIELLE legacy `/api/assistant/stream`
-// — le mode AGENTIQUE [outils function-calling] reste à porter). Persiste user+assistant à la fin.
+/*
+ * Dépendances du chat assistant en streaming (text mode, parité PARTIELLE legacy `/api/assistant/stream`
+ * — le mode AGENTIQUE [outils function-calling] reste à porter). Persiste user+assistant à la fin.
+ */
 export interface AssistantStreamDeps {
   readonly llm: LlmPort;
   readonly rateLimiter: RateLimiterPort;
@@ -27,9 +29,11 @@ export interface AssistantStreamInput {
 // Évènement SSE émis vers le client (parité legacy : `{threadId}` au début, puis `{content}` par chunk).
 export type AssistantStreamEvent = { readonly threadId: number } | { readonly content: string };
 
-// Chat assistant en streaming : rate-limit IA (429), message requis (400), construit le prompt
-// (système métier + stats best-effort + historique), STREAME la réponse Gemini fragment par fragment,
-// persiste le message user et la réponse complète. Renvoie un AsyncIterable d'évènements SSE.
+/*
+ * Chat assistant en streaming : rate-limit IA (429), message requis (400), construit le prompt
+ * (système métier + stats best-effort + historique), STREAME la réponse Gemini fragment par fragment,
+ * persiste le message user et la réponse complète. Renvoie un AsyncIterable d'évènements SSE.
+ */
 export async function* streamAssistantReply(
   deps: AssistantStreamDeps,
   ctx: TenantContext,

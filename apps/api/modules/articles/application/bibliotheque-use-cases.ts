@@ -2,16 +2,20 @@ import { NotFoundError } from "../../../shared/errors";
 import type { BibliothequeReader, BibliothequeArticle, BibliothequeFiltre } from "./bibliotheque-reader";
 import type { BibliothequeWriter, CreateBibliothequeInput, UpdateBibliothequeInput } from "./bibliotheque-writer";
 
-// Use-cases du catalogue partagé. Lecture publique (read) ; écriture réservée admin (write — la
-// garde admin est portée par la procédure tRPC, pas ici). Aucun scope tenant (référentiel commun).
-// Parité legacy `articles.getBibliotheque`/`search`/`create`/`update`/`delete`/`importBibliothequeArticles`.
+/*
+ * Use-cases du catalogue partagé. Lecture publique (read) ; écriture réservée admin (write — la
+ * garde admin est portée par la procédure tRPC, pas ici). Aucun scope tenant (référentiel commun).
+ * Parité legacy `articles.getBibliotheque`/`search`/`create`/`update`/`delete`/`importBibliothequeArticles`.
+ */
 
 export async function getBibliotheque(reader: BibliothequeReader, filtre?: BibliothequeFiltre): Promise<BibliothequeArticle[]> {
   return reader.list(filtre);
 }
 
-// Recherche plein-texte. `query` vide/blanc → liste filtrée par métier seul (le reader gère le
-// ILIKE %%, qui matche tout) ; on délègue au reader (limit 50 côté infra).
+/*
+ * Recherche plein-texte. `query` vide/blanc → liste filtrée par métier seul (le reader gère le
+ * ILIKE %%, qui matche tout) ; on délègue au reader (limit 50 côté infra).
+ */
 export async function rechercherBibliotheque(reader: BibliothequeReader, query: string, metier?: string): Promise<BibliothequeArticle[]> {
   return reader.search(query, metier);
 }

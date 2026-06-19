@@ -1,10 +1,12 @@
 import type { EcritureComptable, JournalComptable } from "../domain/ecriture";
 
-// Export FEC — Fichier des Écritures Comptables (format légal DGFiP, arrêté du 29 juillet 2013).
-// PUR, testable. Fichier **tabulé (TAB)**, **18 colonnes**, dates `YYYYMMDD`, montants à
-// **virgule** décimale. Les écritures sont regroupées en **pièces** (EcritureNum incrémental) :
-// une pièce = les lignes partageant (factureId, journal) — elles portent le même EcritureNum et
-// sont équilibrées (Σdébit = Σcrédit par pièce).
+/*
+ * Export FEC — Fichier des Écritures Comptables (format légal DGFiP, arrêté du 29 juillet 2013).
+ * PUR, testable. Fichier **tabulé (TAB)**, **18 colonnes**, dates `YYYYMMDD`, montants à
+ * **virgule** décimale. Les écritures sont regroupées en **pièces** (EcritureNum incrémental) :
+ * une pièce = les lignes partageant (factureId, journal) — elles portent le même EcritureNum et
+ * sont équilibrées (Σdébit = Σcrédit par pièce).
+ */
 
 export const FEC_HEADER = [
   "JournalCode", "JournalLib", "EcritureNum", "EcritureDate", "CompteNum",
@@ -40,9 +42,11 @@ function clePiece(e: EcritureComptable): string {
   return `${e.factureId ?? `P:${e.pieceRef ?? ""}`}|${e.journal}`;
 }
 
-// Génère le contenu FEC (string) à partir d'écritures déjà filtrées par période. Trie par date,
-// puis par pièce (EcritureNum stable), puis par id. `validDate` = date de validation (par défaut
-// la date d'écriture).
+/*
+ * Génère le contenu FEC (string) à partir d'écritures déjà filtrées par période. Trie par date,
+ * puis par pièce (EcritureNum stable), puis par id. `validDate` = date de validation (par défaut
+ * la date d'écriture).
+ */
 export function exporterFEC(ecritures: readonly EcritureComptable[]): string {
   // Attribue un EcritureNum incrémental par pièce, dans l'ordre chronologique d'apparition.
   const tri = ecritures

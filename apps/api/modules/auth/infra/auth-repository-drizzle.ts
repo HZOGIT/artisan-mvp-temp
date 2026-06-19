@@ -5,8 +5,10 @@ import type { IAuthRepository } from "../application/auth-repository";
 import type { AuthCredentials, AuthUser } from "../domain/auth";
 import { ALL_PERMISSIONS } from "../../../../../packages/contract/permissions";
 
-// Repo auth Drizzle. `users` est HORS RLS (auth précède la résolution du tenant) → accès direct par
-// id/email. Aucune écriture tenant ; seul `lastSignedIn` est mis à jour au login.
+/*
+ * Repo auth Drizzle. `users` est HORS RLS (auth précède la résolution du tenant) → accès direct par
+ * id/email. Aucune écriture tenant ; seul `lastSignedIn` est mis à jour au login.
+ */
 export class AuthRepositoryDrizzle implements IAuthRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -71,8 +73,10 @@ export class AuthRepositoryDrizzle implements IAuthRepository {
     return { id: row.id, email: row.email ?? null };
   }
 
-  // Provisionne le compte propriétaire (idempotent). ⚠️ `artisans`/`subscriptions`/`permissions_utilisateur`
-  // sont HORS RLS → accès direct scopé par les ids ; seul l'artisan est requis, le reste est best-effort.
+  /*
+   * Provisionne le compte propriétaire (idempotent). ⚠️ `artisans`/`subscriptions`/`permissions_utilisateur`
+   * sont HORS RLS → accès direct scopé par les ids ; seul l'artisan est requis, le reste est best-effort.
+   */
   async bootstrapAccount(userId: number): Promise<void> {
     // 1. Artisan (idempotent via UNIQUE(userId)).
     let [artisan] = await this.db.select({ id: artisans.id }).from(artisans).where(eq(artisans.userId, userId)).limit(1);

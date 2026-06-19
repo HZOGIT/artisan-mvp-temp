@@ -3,17 +3,21 @@ import type { IDepenseRepository, DepenseRefKind } from "../application/depense-
 import type { Depense, CreateDepenseInput, UpdateDepenseInput, DoublonParams, DepenseDoublon, DepenseStats } from "../domain/depense";
 import { computeNextNumero } from "../application/numero";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant et les valeurs par défaut PG (statut brouillon, montants/flags). ⚠️ `update` ne touche
-// pas statut/rembourse/dateRemboursement (réservés au workflow).
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant et les valeurs par défaut PG (statut brouillon, montants/flags). ⚠️ `update` ne touche
+ * pas statut/rembourse/dateRemboursement (réservés au workflow).
+ */
 export class FakeDepenseRepository implements IDepenseRepository {
   private store: Depense[] = [];
   private seq = 0;
   // FK appartenant à un tenant (injectable) : clé `${artisanId}:${kind}:${id}` → owned.
   private ownedRefs = new Set<string>();
 
-  // Aide de test : déclare qu'une ressource référencée (chantier/intervention/client) appartient
-  // au tenant. Sert à valider la garde anti-IDOR-FK des use-cases d'écriture.
+  /*
+   * Aide de test : déclare qu'une ressource référencée (chantier/intervention/client) appartient
+   * au tenant. Sert à valider la garde anti-IDOR-FK des use-cases d'écriture.
+   */
   registerRef(artisanId: number, kind: DepenseRefKind, id: number): void {
     this.ownedRefs.add(`${artisanId}:${kind}:${id}`);
   }
@@ -133,8 +137,10 @@ export class FakeDepenseRepository implements IDepenseRepository {
     );
   }
 
-  // ⚠️ Version simplifiée (suffisante pour les tests de use-case : défaut du mois + délégation).
-  // L'agrégation fidèle est validée par le test DB du repo Drizzle.
+  /*
+   * ⚠️ Version simplifiée (suffisante pour les tests de use-case : défaut du mois + délégation).
+   * L'agrégation fidèle est validée par le test DB du repo Drizzle.
+   */
   async getStats(ctx: TenantContext, mois: string): Promise<DepenseStats> {
     const dansMois = this.store.filter((d) => d.artisanId === ctx.artisanId && d.dateDepense.slice(0, 7) === mois);
     const totalMois = dansMois.reduce((s, d) => s + Number(d.montantTtc), 0);

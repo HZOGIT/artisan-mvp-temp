@@ -1,14 +1,16 @@
-// Types de domaine du module factures (financier CRITIQUE — pièce comptable légale) —
-// découplés du schéma Drizzle. ⚠️ Invariants à préserver (étapes ultérieures) :
-//  - montants/TVA exacts (decimal/string ; totalTTC = totalHT + totalTVA, **dérivés des lignes**) ;
-//  - numérotation maîtrisée serveur (jamais fournie par le client) ;
-//  - **immutabilité post-émission** : une facture émise/payée est une pièce légale INALTÉRABLE
-//    (bien plus stricte qu'un devis) ;
-//  - **FEC débit=crédit** si des écritures comptables sont liées (à vérifier au câblage) ;
-//  - isolation cross-tenant, anti-IDOR-FK (clientId/devisId du tenant).
-//
-// NB : `factures` est en camelCase ; `factures_lignes` n'a PAS d'artisanId → scopées via la
-// facture parente du tenant (cf. pattern devis/commandes).
+/*
+ * Types de domaine du module factures (financier CRITIQUE — pièce comptable légale) —
+ * découplés du schéma Drizzle. ⚠️ Invariants à préserver (étapes ultérieures) :
+ *  - montants/TVA exacts (decimal/string ; totalTTC = totalHT + totalTVA, **dérivés des lignes**) ;
+ *  - numérotation maîtrisée serveur (jamais fournie par le client) ;
+ *  - **immutabilité post-émission** : une facture émise/payée est une pièce légale INALTÉRABLE
+ *    (bien plus stricte qu'un devis) ;
+ *  - **FEC débit=crédit** si des écritures comptables sont liées (à vérifier au câblage) ;
+ *  - isolation cross-tenant, anti-IDOR-FK (clientId/devisId du tenant).
+ * 
+ * NB : `factures` est en camelCase ; `factures_lignes` n'a PAS d'artisanId → scopées via la
+ * facture parente du tenant (cf. pattern devis/commandes).
+ */
 
 export type FactureStatut = "brouillon" | "validee" | "envoyee" | "payee" | "en_retard" | "annulee";
 export type FactureTypeDocument = "facture" | "avoir";
@@ -57,8 +59,10 @@ export interface Facture {
   readonly updatedAt: Date;
 }
 
-// Entrée de création (niveau repo) : `numero` fourni par le use-case (généré serveur), jamais
-// par le client. `statut` (brouillon), totaux (0) et montantPaye (0) = défauts posés par l'infra.
+/*
+ * Entrée de création (niveau repo) : `numero` fourni par le use-case (généré serveur), jamais
+ * par le client. `statut` (brouillon), totaux (0) et montantPaye (0) = défauts posés par l'infra.
+ */
 export interface CreateFactureInput {
   readonly clientId: number;
   readonly numero: string;
@@ -73,9 +77,11 @@ export interface CreateFactureInput {
   readonly dateEcheance?: Date | null;
 }
 
-// Entrée de modification : ⚠️ `clientId`/`devisId`/`numero`/`statut`/`typeDocument`/totaux/
-// `montantPaye` ABSENTS — client & pièce immuables, transitions = workflow, totaux dérivés des
-// lignes, paiement = use-case dédié.
+/*
+ * Entrée de modification : ⚠️ `clientId`/`devisId`/`numero`/`statut`/`typeDocument`/totaux/
+ * `montantPaye` ABSENTS — client & pièce immuables, transitions = workflow, totaux dérivés des
+ * lignes, paiement = use-case dédié.
+ */
 export interface UpdateFactureInput {
   readonly objet?: string | null;
   readonly referenceClient?: string | null;
@@ -109,8 +115,10 @@ export interface UpdateFactureLigneInput {
   readonly type?: LigneType;
 }
 
-// Entrée du journal d'audit d'une facture (lecture seule, parité legacy `getAuditLog`).
-// Table `audit_log` (scopée artisanId + entityType/entityId). `details` = JSON/texte libre.
+/*
+ * Entrée du journal d'audit d'une facture (lecture seule, parité legacy `getAuditLog`).
+ * Table `audit_log` (scopée artisanId + entityType/entityId). `details` = JSON/texte libre.
+ */
 export interface AuditLogEntry {
   readonly id: number;
   readonly userId: number;

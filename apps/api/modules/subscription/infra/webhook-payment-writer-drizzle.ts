@@ -7,9 +7,11 @@ import type { WebhookPaymentWriter, PaiementResolu } from "../application/webhoo
 
 const clientNom = (prenom: string | null, nom: string | null): string => `${prenom ?? ""} ${nom ?? ""}`.trim() || "Client";
 
-// Effets paiement/facture du webhook. `resolvePaiement` lit `paiements_stripe` par token (policy
-// public-token RLS), puis les écritures repassent sous le tenant résolu (`withTenant`). `messages`-like
-// : facture/notifications sont sous RLS → scopées par l'artisanId résolu.
+/*
+ * Effets paiement/facture du webhook. `resolvePaiement` lit `paiements_stripe` par token (policy
+ * public-token RLS), puis les écritures repassent sous le tenant résolu (`withTenant`). `messages`-like
+ * : facture/notifications sont sous RLS → scopées par l'artisanId résolu.
+ */
 export class WebhookPaymentWriterDrizzle implements WebhookPaymentWriter {
   constructor(private readonly db: DbClient) {}
 

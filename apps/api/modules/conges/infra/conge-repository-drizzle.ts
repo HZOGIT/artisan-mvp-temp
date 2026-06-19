@@ -28,10 +28,12 @@ function toConge(r: CongeRow): Conge {
   };
 }
 
-// Implémentation Drizzle du repository conges. Double cloisonnement RLS + filtre `artisanId`.
-// ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))` → aucune fuite
-// cross-tenant. `update` ne touche que les métadonnées de la demande (`UpdateCongeInput`
-// exclut statut/validePar/dateValidation) → le workflow d'approbation est porté ailleurs.
+/*
+ * Implémentation Drizzle du repository conges. Double cloisonnement RLS + filtre `artisanId`.
+ * ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))` → aucune fuite
+ * cross-tenant. `update` ne touche que les métadonnées de la demande (`UpdateCongeInput`
+ * exclut statut/validePar/dateValidation) → le workflow d'approbation est porté ailleurs.
+ */
 export class CongeRepositoryDrizzle implements ICongeRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -80,8 +82,10 @@ export class CongeRepositoryDrizzle implements ICongeRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateCongeInput): Promise<Conge | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // `input` (UpdateCongeInput) n'inclut pas statut/validePar/dateValidation → ces champs
-      // du workflow d'approbation restent intacts ; seules les métadonnées changent.
+      /*
+       * `input` (UpdateCongeInput) n'inclut pas statut/validePar/dateValidation → ces champs
+       * du workflow d'approbation restent intacts ; seules les métadonnées changent.
+       */
       const [row] = await tx
         .update(conges)
         .set({ ...input, updatedAt: new Date() })

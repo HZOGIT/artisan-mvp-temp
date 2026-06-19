@@ -58,8 +58,10 @@ const assuranceSchema = z.object({
 const idInput = z.object({ id: z.number().int() });
 const vehiculeIdInput = z.object({ vehiculeId: z.number().int() });
 
-// Routeur tRPC du domaine vehicules. Toutes les procédures sont protégées (tenant requis) ;
-// les use-cases reçoivent ctx.tenant. Le repository est injecté (DI) → testable.
+/*
+ * Routeur tRPC du domaine vehicules. Toutes les procédures sont protégées (tenant requis) ;
+ * les use-cases reçoivent ctx.tenant. Le repository est injecté (DI) → testable.
+ */
 export function createVehiculesRouter(repo: IVehiculeRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listVehicules(repo, ctx.tenant)),

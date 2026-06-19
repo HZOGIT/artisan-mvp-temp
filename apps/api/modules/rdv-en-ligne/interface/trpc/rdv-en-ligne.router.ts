@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 
-// Tout le routeur rdv exige `rdv.gerer` (parité legacy ; pas de permission `rdv.voir` distincte).
-// Le propriétaire l'a (ALL_PERMISSIONS au provisioning) ; un collaborateur sans la permission → 403.
+/*
+ * Tout le routeur rdv exige `rdv.gerer` (parité legacy ; pas de permission `rdv.voir` distincte).
+ * Le propriétaire l'a (ALL_PERMISSIONS au provisioning) ; un collaborateur sans la permission → 403.
+ */
 const gerer = permissionProcedure("rdv.gerer");
 import type { IRdvRepository } from "../../application/rdv-repository";
 import type { IInterventionRepository } from "../../../interventions/application/intervention-repository";
@@ -14,11 +16,15 @@ import { confirmerRdvAvecIntervention } from "../../application/confirm-use-case
 import { proposerAutreCreneau } from "../../application/propose-use-cases";
 
 const urgenceEnum = z.enum(["normale", "urgente", "tres_urgente"]);
-// `dateProposee` arrive en string ISO (transport JSON) ; `z.coerce.date()` la convertit en Date pour
-// le domaine (le use-case revalide qu'elle est valide).
+/*
+ * `dateProposee` arrive en string ISO (transport JSON) ; `z.coerce.date()` la convertit en Date pour
+ * le domaine (le use-case revalide qu'elle est valide).
+ */
 
-// Bornes alignées sur la table `rdv_en_ligne` (defense-in-depth). ⚠️ Le client NE fournit PAS
-// `statut`/`motifRefus` (état machine → transitions dédiées en 7/9), ni `interventionId`.
+/*
+ * Bornes alignées sur la table `rdv_en_ligne` (defense-in-depth). ⚠️ Le client NE fournit PAS
+ * `statut`/`motifRefus` (état machine → transitions dédiées en 7/9), ni `interventionId`.
+ */
 const createSchema = z.object({
   clientId: z.number().int(),
   titre: z.string().min(1).max(255),
@@ -36,10 +42,12 @@ const updateSchema = z.object({
   urgence: urgenceEnum.optional(),
 });
 
-// Routeur tRPC du domaine rdv-en-ligne. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant via ctx.tenant + anti-IDOR clientId au use-case), laisse remonter les
-// Domain errors (NotFound→404, Validation→400). ⚠️ Les transitions de statut (confirmer/refuser/
-// annuler) seront exposées en 7/9 (procédures dédiées). Repo injecté.
+/*
+ * Routeur tRPC du domaine rdv-en-ligne. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant via ctx.tenant + anti-IDOR clientId au use-case), laisse remonter les
+ * Domain errors (NotFound→404, Validation→400). ⚠️ Les transitions de statut (confirmer/refuser/
+ * annuler) seront exposées en 7/9 (procédures dédiées). Repo injecté.
+ */
 export function createRdvEnLigneRouter(
   repo: IRdvRepository,
   interventionRepo: IInterventionRepository,
@@ -81,20 +89,26 @@ export function createRdvEnLigneRouter(
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => confirmerRdv(repo, ctx.tenant, input.id)),
 
-    // Confirmation « métier » (parité client `trpc.rdv.confirm`) : crée l'intervention planifiée +
-    // passe le RDV à confirme avec le lien interventionId. Garde en_attente (sinon 400).
+    /*
+     * Confirmation « métier » (parité client `trpc.rdv.confirm`) : crée l'intervention planifiée +
+     * passe le RDV à confirme avec le lien interventionId. Garde en_attente (sinon 400).
+     */
     confirm: gerer
       .input(z.object({ rdvId: z.number().int() }))
       .mutation(({ ctx, input }) => confirmerRdvAvecIntervention(repo, interventionRepo, ctx.tenant, input.rdvId)),
 
-    // Refus « métier » (parité client `trpc.rdv.refuse`) : passe le RDV à refuse avec motif.
-    // (Délègue au use-case de transition — en_attente→refuse. Email client ajouté au slice email.)
+    /*
+     * Refus « métier » (parité client `trpc.rdv.refuse`) : passe le RDV à refuse avec motif.
+     * (Délègue au use-case de transition — en_attente→refuse. Email client ajouté au slice email.)
+     */
     refuse: gerer
       .input(z.object({ rdvId: z.number().int(), motif: z.string().min(1).max(5000) }))
       .mutation(({ ctx, input }) => refuserRdv(repo, ctx.tenant, input.rdvId, input.motif)),
 
-    // Proposition d'un autre créneau (parité client `trpc.rdv.proposeAutreCreneau`) : refuse l'ancien
-    // RDV + crée un nouveau RDV au créneau proposé (date validée AVANT mutation). Email au slice email.
+    /*
+     * Proposition d'un autre créneau (parité client `trpc.rdv.proposeAutreCreneau`) : refuse l'ancien
+     * RDV + crée un nouveau RDV au créneau proposé (date validée AVANT mutation). Email au slice email.
+     */
     proposeAutreCreneau: gerer
       .input(z.object({ rdvId: z.number().int(), nouvelleDateProposee: z.string() }))
       .mutation(({ ctx, input }) => proposerAutreCreneau(repo, ctx.tenant, input.rdvId, input.nouvelleDateProposee)),

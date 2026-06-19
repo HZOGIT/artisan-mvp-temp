@@ -8,10 +8,12 @@ import type {
   UpsertPrevisionInput,
 } from "../domain/prevision-ca";
 
-// Port du repository previsions-ca (prévisions de CA par période). Chaque méthode exige le
-// TenantContext (scope tenant + RLS). `previsions_ca` possède un `artisanId` → double cloisonnement
-// RLS + filtre. Pas de contrainte d'unicité DB (plusieurs prévisions par période possibles). L'update
-// ne touche que les montants/méthode/confiance (mois/annee immuables).
+/*
+ * Port du repository previsions-ca (prévisions de CA par période). Chaque méthode exige le
+ * TenantContext (scope tenant + RLS). `previsions_ca` possède un `artisanId` → double cloisonnement
+ * RLS + filtre. Pas de contrainte d'unicité DB (plusieurs prévisions par période possibles). L'update
+ * ne touche que les montants/méthode/confiance (mois/annee immuables).
+ */
 export interface IPrevisionCARepository {
   list(ctx: TenantContext): Promise<PrevisionCA[]>;
   // Prévisions du tenant pour une année donnée ; [] si aucune.
@@ -24,8 +26,10 @@ export interface IPrevisionCARepository {
   // false si la prévision n'appartient pas au tenant.
   delete(ctx: TenantContext, id: number): Promise<boolean>;
 
-  // Historique de CA mensuel agrégé du tenant (table `historique_ca`), trié récent d'abord, borné
-  // aux `nombreMois` derniers mois. [] si aucun historique.
+  /*
+   * Historique de CA mensuel agrégé du tenant (table `historique_ca`), trié récent d'abord, borné
+   * aux `nombreMois` derniers mois. [] si aucun historique.
+   */
   listHistorique(ctx: TenantContext, nombreMois: number): Promise<HistoriqueCA[]>;
   // Historique de CA d'une année donnée (pour la comparaison prévu vs réalisé). [] si aucun.
   listHistoriqueAnnee(ctx: TenantContext, annee: number): Promise<HistoriqueCA[]>;

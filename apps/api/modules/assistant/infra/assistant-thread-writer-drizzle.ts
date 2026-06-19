@@ -10,8 +10,10 @@ function threadTitle(firstMessage: string): string {
   return firstMessage.slice(0, 80) + (firstMessage.length > 80 ? "…" : "");
 }
 
-// Écriture threads/messages assistant sous RLS (withTenant) + filtre artisanId. `ai_messages` (sans
-// artisanId) est scopé via le thread parent (l'ownership est vérifiée à l'ajout via l'update du thread).
+/*
+ * Écriture threads/messages assistant sous RLS (withTenant) + filtre artisanId. `ai_messages` (sans
+ * artisanId) est scopé via le thread parent (l'ownership est vérifiée à l'ajout via l'update du thread).
+ */
 export class AssistantThreadWriterDrizzle implements AssistantThreadWriter {
   constructor(private readonly db: DbClient) {}
 

@@ -1,10 +1,12 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { BudgetCategorie, CreateBudgetInput, UpdateBudgetInput } from "../domain/budget-categorie";
 
-// Port du repository budgets-categories. Chaque méthode exige le TenantContext (scope tenant + RLS).
-// `budgets_categories` possède un `artisan_id` → double cloisonnement RLS + filtre. ⚠️ Contrainte DB
-// UNIQUE (artisan_id, categorie, mois) : create peut lever une violation d'unicité → traduite en
-// ConflictError par le repo. L'update ne modifie que les montants (categorie/mois immuables).
+/*
+ * Port du repository budgets-categories. Chaque méthode exige le TenantContext (scope tenant + RLS).
+ * `budgets_categories` possède un `artisan_id` → double cloisonnement RLS + filtre. ⚠️ Contrainte DB
+ * UNIQUE (artisan_id, categorie, mois) : create peut lever une violation d'unicité → traduite en
+ * ConflictError par le repo. L'update ne modifie que les montants (categorie/mois immuables).
+ */
 export interface IBudgetCategorieRepository {
   list(ctx: TenantContext): Promise<BudgetCategorie[]>;
   // Budgets du tenant pour un mois donné ("YYYY-MM") ; [] si aucun.

@@ -15,8 +15,10 @@ const endSchema = z.object({
   signatureClient: z.string().max(500000).optional(),
 });
 
-// Routeur tRPC `interventionsMobile` (app mobile technicien). Transport mince : délègue aux use-cases
-// scopés `ctx.tenant`. RGPD : la liste du jour applique la data-minimisation par rôle technicien.
+/*
+ * Routeur tRPC `interventionsMobile` (app mobile technicien). Transport mince : délègue aux use-cases
+ * scopés `ctx.tenant`. RGPD : la liste du jour applique la data-minimisation par rôle technicien.
+ */
 export function createInterventionsMobileRouter(deps: InterventionsMobileDeps) {
   return router({
     getTodayInterventions: protectedProcedure.query(({ ctx }) => getTodayInterventions(deps, ctx.tenant)),

@@ -1,10 +1,12 @@
-// Harnais d'isolation cross-tenant réutilisable par tous les domaines.
-//
-// Idée : pour un accès « par id » (ou une liste) effectué EN TANT QUE tenant A sur une
-// ressource appartenant au tenant B, l'accès doit être refusé — sans révéler la ressource.
-// Un refus valide = soit une erreur de refus (NOT_FOUND / FORBIDDEN / non authentifié /
-// tenant manquant), soit un résultat vide (null / undefined / tableau vide). Toute autre
-// issue (renvoi de la ressource) est une FUITE cross-tenant et fait échouer le test.
+/*
+ * Harnais d'isolation cross-tenant réutilisable par tous les domaines.
+ * 
+ * Idée : pour un accès « par id » (ou une liste) effectué EN TANT QUE tenant A sur une
+ * ressource appartenant au tenant B, l'accès doit être refusé — sans révéler la ressource.
+ * Un refus valide = soit une erreur de refus (NOT_FOUND / FORBIDDEN / non authentifié /
+ * tenant manquant), soit un résultat vide (null / undefined / tableau vide). Toute autre
+ * issue (renvoi de la ressource) est une FUITE cross-tenant et fait échouer le test.
+ */
 
 const DENIAL_NAMES = new Set([
   "NotFoundError",
@@ -27,8 +29,10 @@ function isEmpty(value: unknown): boolean {
   return value === null || value === undefined || (Array.isArray(value) && value.length === 0);
 }
 
-// Exécute `action` (un accès cross-tenant qui DEVRAIT être refusé) et vérifie qu'il ne
-// fuit aucune ressource. Lève une erreur explicite en cas de fuite ou d'erreur inattendue.
+/*
+ * Exécute `action` (un accès cross-tenant qui DEVRAIT être refusé) et vérifie qu'il ne
+ * fuit aucune ressource. Lève une erreur explicite en cas de fuite ou d'erreur inattendue.
+ */
 export async function expectCrossTenantDenied(action: () => Promise<unknown>): Promise<void> {
   let result: unknown;
   try {

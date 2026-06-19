@@ -25,9 +25,11 @@ function toAvis(r: AvisRow): Avis {
   };
 }
 
-// Implémentation Drizzle du repository avis. Double cloisonnement : RLS (rôle app
-// + app.tenant via withTenant) ET filtre explicite `artisanId` dans chaque requête.
-// Table `avis_clients` (sous RLS car possède une colonne artisanId).
+/*
+ * Implémentation Drizzle du repository avis. Double cloisonnement : RLS (rôle app
+ * + app.tenant via withTenant) ET filtre explicite `artisanId` dans chaque requête.
+ * Table `avis_clients` (sous RLS car possède une colonne artisanId).
+ */
 export class AvisRepositoryDrizzle implements IAvisRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -44,9 +46,11 @@ export class AvisRepositoryDrizzle implements IAvisRepository {
 
   listEnrichi(ctx: TenantContext): Promise<AvisEnrichi[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Jointures scopées tenant : le client et l'intervention liés doivent appartenir
-      // au même artisan (RLS sur les 3 tables + condition artisanId dans le ON). Un avis
-      // ne peut donc jamais exposer le client/intervention d'un autre tenant.
+      /*
+       * Jointures scopées tenant : le client et l'intervention liés doivent appartenir
+       * au même artisan (RLS sur les 3 tables + condition artisanId dans le ON). Un avis
+       * ne peut donc jamais exposer le client/intervention d'un autre tenant.
+       */
       const rows = await tx
         .select({
           avis: avisClients,
@@ -83,8 +87,10 @@ export class AvisRepositoryDrizzle implements IAvisRepository {
 
   getStats(ctx: TenantContext): Promise<AvisStats> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Agrégats scopés tenant : moyenne, total, distribution des notes 1..5.
-      // Seuls les avis publiés comptent dans les statistiques publiques.
+      /*
+       * Agrégats scopés tenant : moyenne, total, distribution des notes 1..5.
+       * Seuls les avis publiés comptent dans les statistiques publiques.
+       */
       const rows = await tx
         .select({ note: avisClients.note, count: sql<number>`count(*)::int` })
         .from(avisClients)

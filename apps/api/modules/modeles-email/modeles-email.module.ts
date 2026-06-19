@@ -1,8 +1,10 @@
 import type { IModeleEmailRepository } from "./application/modele-email-repository";
 import { createModelesEmailRouter } from "./interface/trpc/modeles-email.router";
 
-// Wiring DI du module modeles-email : assemble le routeur tRPC (CRUD + byType) à partir du
-// repository injecté.
+/*
+ * Wiring DI du module modeles-email : assemble le routeur tRPC (CRUD + byType) à partir du
+ * repository injecté.
+ */
 export interface ModelesEmailModuleDeps {
   readonly repository: IModeleEmailRepository;
 }

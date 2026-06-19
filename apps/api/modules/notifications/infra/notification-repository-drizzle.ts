@@ -26,9 +26,11 @@ function toNotification(r: NotificationRow): Notification {
   };
 }
 
-// Implémentation Drizzle du repository notifications. Double cloisonnement : RLS (rôle app
-// + app.tenant via withTenant) ET filtre explicite `artisanId`. Filtres + pagination
-// poussés en SQL ; bornes anti-DoS (limit≤100, page≤100000).
+/*
+ * Implémentation Drizzle du repository notifications. Double cloisonnement : RLS (rôle app
+ * + app.tenant via withTenant) ET filtre explicite `artisanId`. Filtres + pagination
+ * poussés en SQL ; bornes anti-DoS (limit≤100, page≤100000).
+ */
 export class NotificationRepositoryDrizzle implements INotificationRepository {
   constructor(private readonly db: DbClient) {}
 

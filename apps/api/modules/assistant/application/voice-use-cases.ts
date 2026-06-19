@@ -19,9 +19,11 @@ export type VoicePersistOutcome =
   | { readonly kind: "not-found" }
   | { readonly kind: "ok" };
 
-// `voice/persist` (parité legacy) : persiste les transcripts d'une session vocale dans un thread du
-// tenant. threadId + au moins un transcript requis (sinon 400) ; thread non possédé → 404 (anti-IDOR).
-// Les messages sont marqués `{source:'voice'}` (+ usage Gemini sur la réponse assistant).
+/*
+ * `voice/persist` (parité legacy) : persiste les transcripts d'une session vocale dans un thread du
+ * tenant. threadId + au moins un transcript requis (sinon 400) ; thread non possédé → 404 (anti-IDOR).
+ * Les messages sont marqués `{source:'voice'}` (+ usage Gemini sur la réponse assistant).
+ */
 export async function persistVoiceTranscript(
   deps: VoicePersistDeps,
   ctx: TenantContext,

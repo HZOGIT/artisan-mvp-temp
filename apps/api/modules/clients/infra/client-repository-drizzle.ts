@@ -41,10 +41,12 @@ function toClient(r: ClientRow): Client {
   };
 }
 
-// Implémentation Drizzle du repository clients. Double cloisonnement RLS + filtre `artisanId`
-// sur `clients` (PII). ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))`
-// → aucune fuite cross-tenant. `delete` ici = suppression simple scopée ; la garde d'intégrité
-// référentielle (documents liés) est portée par le use-case d'écriture.
+/*
+ * Implémentation Drizzle du repository clients. Double cloisonnement RLS + filtre `artisanId`
+ * sur `clients` (PII). ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))`
+ * → aucune fuite cross-tenant. `delete` ici = suppression simple scopée ; la garde d'intégrité
+ * référentielle (documents liés) est portée par le use-case d'écriture.
+ */
 export class ClientRepositoryDrizzle implements IClientRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -104,8 +106,10 @@ export class ClientRepositoryDrizzle implements IClientRepository {
   countDocumentsLies(ctx: TenantContext, clientId: number): Promise<number> {
     return withTenant(this.db, ctx, async (tx) => {
       const a = ctx.artisanId;
-      // Double cloisonnement : clientId + artisanId (en plus de la RLS). Chaque table porte
-      // un `artisanId` (toutes RLS-isolées) → on compte uniquement les documents du tenant.
+      /*
+       * Double cloisonnement : clientId + artisanId (en plus de la RLS). Chaque table porte
+       * un `artisanId` (toutes RLS-isolées) → on compte uniquement les documents du tenant.
+       */
       const n = sql<number>`count(*)::int`;
       const [d] = await tx.select({ n }).from(devis).where(and(eq(devis.clientId, clientId), eq(devis.artisanId, a)));
       const [f] = await tx.select({ n }).from(factures).where(and(eq(factures.clientId, clientId), eq(factures.artisanId, a)));
@@ -127,8 +131,10 @@ export class ClientRepositoryDrizzle implements IClientRepository {
 
   search(ctx: TenantContext, query: string): Promise<Client[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Échappe les métacaractères LIKE (`\` d'abord, puis `%` et `_`) avec le caractère
-      // d'échappement par défaut de Postgres (`\`) → la saisie est traitée littéralement.
+      /*
+       * Échappe les métacaractères LIKE (`\` d'abord, puis `%` et `_`) avec le caractère
+       * d'échappement par défaut de Postgres (`\`) → la saisie est traitée littéralement.
+       */
       const escaped = query.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
       const term = `%${escaped}%`;
       const rows = await tx

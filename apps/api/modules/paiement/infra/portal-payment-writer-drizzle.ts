@@ -4,8 +4,10 @@ import { withTenant } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PortalPaymentWriter } from "../application/portal-payment-writer";
 
-// Insère la ligne `paiements_stripe` (statut en_attente) à l'ouverture d'un Checkout, sous le tenant
-// résolu par le token de portail (`artisanId` forcé du contexte). Le webhook la soldera.
+/*
+ * Insère la ligne `paiements_stripe` (statut en_attente) à l'ouverture d'un Checkout, sous le tenant
+ * résolu par le token de portail (`artisanId` forcé du contexte). Le webhook la soldera.
+ */
 export class PortalPaymentWriterDrizzle implements PortalPaymentWriter {
   constructor(private readonly db: DbClient) {}
 

@@ -1,10 +1,12 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ReadToolHandler } from "./assistant-tool-registry";
 
-// Handlers de LECTURE de l'assistant agentique (Phase 1b-ii) : clients + factures. Chaque handler
-// appelle un reader DÉJÀ MIGRÉ (scopé tenant/RLS) et formate le `data` à la **forme legacy**
-// (`server/_core/assistantTools.ts`) — le modèle a été calibré sur ces formes. Les fonctions de
-// formatage sont PURES (testables sans I/O).
+/*
+ * Handlers de LECTURE de l'assistant agentique (Phase 1b-ii) : clients + factures. Chaque handler
+ * appelle un reader DÉJÀ MIGRÉ (scopé tenant/RLS) et formate le `data` à la **forme legacy**
+ * (`server/_core/assistantTools.ts`) — le modèle a été calibré sur ces formes. Les fonctions de
+ * formatage sont PURES (testables sans I/O).
+ */
 
 // Sous-ensemble des champs client/facture nécessaires (compatible avec les types migrés Client/Facture).
 export interface AgentClient {
@@ -89,9 +91,11 @@ export interface StatsReaderForAgent {
   getStats(ctx: TenantContext): Promise<AgentDashboardStats>;
 }
 
-// `clients`/`factures` requis (lectures de base) ; les autres sont optionnels (câblés au fil de l'eau —
-// le registry n'expose au modèle que les outils dont le reader est fourni). `get_statistiques` exige
-// `stats` + `interventions` + `stocks` (il les compose).
+/*
+ * `clients`/`factures` requis (lectures de base) ; les autres sont optionnels (câblés au fil de l'eau —
+ * le registry n'expose au modèle que les outils dont le reader est fourni). `get_statistiques` exige
+ * `stats` + `interventions` + `stocks` (il les compose).
+ */
 export interface AssistantReadDeps {
   readonly clients: ClientsReaderForAgent;
   readonly factures: FacturesReaderForAgent;
@@ -121,8 +125,10 @@ const clientCard = (c: AgentClient) => ({
   ville: c.ville || null,
 });
 
-// `chercher_client` : recherche multi-mots tolérante (parité legacy) — passe 1 chaîne complète, passe 2
-// tous les mots (ordre libre), passe 3 partielle scorée ; ≤5 résultats. Renvoie `{matches, count}`.
+/*
+ * `chercher_client` : recherche multi-mots tolérante (parité legacy) — passe 1 chaîne complète, passe 2
+ * tous les mots (ordre libre), passe 3 partielle scorée ; ≤5 résultats. Renvoie `{matches, count}`.
+ */
 export function formatChercherClient(clients: readonly AgentClient[], rawNom: string): { matches: ReturnType<typeof clientCard>[]; count: number } {
   const queryNorm = normalizeForSearch(rawNom);
   const words = queryNorm.split(/\s+/).filter((w) => w.length > 0);
@@ -166,8 +172,10 @@ export function buildClientNameMap(clients: readonly AgentClient[]): Map<number,
   return map;
 }
 
-// `lister_factures` : toutes les factures (filtre statut optionnel), nom client résolu, plus récente
-// d'abord. `{count, factures}`.
+/*
+ * `lister_factures` : toutes les factures (filtre statut optionnel), nom client résolu, plus récente
+ * d'abord. `{count, factures}`.
+ */
 export function formatListerFactures(factures: readonly AgentFacture[], names: Map<number, string>, statut: string | undefined): { count: number; factures: object[] } {
   const wantStatut = statut ? String(statut).trim() : undefined;
   let list = factures.map((f) => ({
@@ -314,8 +322,10 @@ export function countInterventionsSemaine(interventions: readonly AgentIntervent
   }).length;
 }
 
-// `get_statistiques` : compose dashboard (CA/clients/devis/impayées) + interventions à venir 7 j +
-// compteurs de stock (alerte/rupture, même classification que `verifier_stocks`).
+/*
+ * `get_statistiques` : compose dashboard (CA/clients/devis/impayées) + interventions à venir 7 j +
+ * compteurs de stock (alerte/rupture, même classification que `verifier_stocks`).
+ */
 export function formatGetStatistiques(
   stats: AgentDashboardStats,
   interventionsSemaine: number,
@@ -337,8 +347,10 @@ export function formatGetStatistiques(
   };
 }
 
-// Construit les handlers de lecture mappés aux readers migrés (scopés tenant). Les domaines optionnels
-// ne sont câblés que si leur reader est fourni (sinon l'outil reste indisponible côté registry).
+/*
+ * Construit les handlers de lecture mappés aux readers migrés (scopés tenant). Les domaines optionnels
+ * ne sont câblés que si leur reader est fourni (sinon l'outil reste indisponible côté registry).
+ */
 export function buildAssistantReadHandlers(deps: AssistantReadDeps): Record<string, ReadToolHandler> {
   const handlers: Record<string, ReadToolHandler> = {
     chercher_client: async (args, ctx: TenantContext) => {

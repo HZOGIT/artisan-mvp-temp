@@ -2,8 +2,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisRepository } from "../../devis/application/devis-repository";
 import type { IClientRepository } from "../../clients/application/client-repository";
 
-// Devis acceptés du tenant, enrichis du nom client (parité legacy `listDevisAcceptes`). Sert de base
-// à la création d'une commande fournisseur. ⚠️ Cross-domaine : devis (filtre `accepte`) + clients (nom).
+/*
+ * Devis acceptés du tenant, enrichis du nom client (parité legacy `listDevisAcceptes`). Sert de base
+ * à la création d'une commande fournisseur. ⚠️ Cross-domaine : devis (filtre `accepte`) + clients (nom).
+ */
 export interface DevisAccepte {
   readonly id: number;
   readonly numero: string;

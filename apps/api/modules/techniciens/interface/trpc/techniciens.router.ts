@@ -35,10 +35,12 @@ const updateSchema = z.object({
   notes: z.string().max(5000).nullish(),
 });
 
-// Routeur tRPC du domaine techniciens. Transport mince : valide les inputs (zod), délègue
-// aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400). Repository injecté (DI) → testable. `getAll` alias de
-// `list` (parité legacy). `getLinkableUsers` (lecture users du tenant) = étape ultérieure.
+/*
+ * Routeur tRPC du domaine techniciens. Transport mince : valide les inputs (zod), délègue
+ * aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400). Repository injecté (DI) → testable. `getAll` alias de
+ * `list` (parité legacy). `getLinkableUsers` (lecture users du tenant) = étape ultérieure.
+ */
 export function createTechniciensRouter(repo: ITechnicienRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listTechniciens(repo, ctx.tenant)),
@@ -110,7 +112,7 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
         return enregistrerPosition(repo, ctx.tenant, technicienId, data);
       }),
 
-    // ── Habilitations / certifications BTP (OPE-162, données salarié — anti-IDOR ownership) ──
+    // ── Habilitations / certifications BTP (données salarié — anti-IDOR ownership) ────────────
     getHabilitations: protectedProcedure
       .input(z.object({ technicienId: z.number().int() }))
       .query(({ ctx, input }) => listHabilitations(repo, ctx.tenant, input.technicienId)),

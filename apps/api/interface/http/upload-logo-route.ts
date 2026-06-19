@@ -8,9 +8,11 @@ export interface UploadLogoDeps extends CookieAuthDeps {
   readonly writer: ArtisanLogoWriter;
 }
 
-// Routes HORS-tRPC `/api/upload-logo` (POST = uploade le logo en base64 ; DELETE = l'efface). Auth par
-// cookie JWT (même session que tRPC). Le multipart est encapsulé (scope `app.register`) → n'impacte
-// pas le parser JSON tRPC. Le logo est stocké en data-URL base64 dans `artisans.logo` (parité legacy).
+/*
+ * Routes HORS-tRPC `/api/upload-logo` (POST = uploade le logo en base64 ; DELETE = l'efface). Auth par
+ * cookie JWT (même session que tRPC). Le multipart est encapsulé (scope `app.register`) → n'impacte
+ * pas le parser JSON tRPC. Le logo est stocké en data-URL base64 dans `artisans.logo` (parité legacy).
+ */
 export function registerUploadLogoRoute(app: FastifyInstance, deps: UploadLogoDeps): void {
   app.register(async (instance) => {
     instance.register(multipart, { limits: { fileSize: MAX_LOGO_BYTES, files: 1 } });

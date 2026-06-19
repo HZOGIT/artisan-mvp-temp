@@ -4,8 +4,10 @@ import type { IVitrinePublicReader } from "./vitrine-public-reader";
 import { computeAvisStats, resoudreServices, safeHtml } from "../domain/vitrine";
 import type { DemandeContact } from "../../demandes-contact/domain/demande-contact";
 
-// ── getBySlug (public) ────────────────────────────────────────────────────────
-// Assemble la page vitrine publique d'un artisan résolu par slug (404 si inconnu ou vitrine inactive).
+/*
+ * ── getBySlug (public) ────────────────────────────────────────────────────────
+ * Assemble la page vitrine publique d'un artisan résolu par slug (404 si inconnu ou vitrine inactive).
+ */
 export async function getBySlug(reader: IVitrinePublicReader, slug: string): Promise<unknown> {
   const artisan = await reader.getArtisanBySlug(slug);
   if (!artisan) throw new NotFoundError("Page vitrine non trouvee");
@@ -60,10 +62,12 @@ export interface SubmitContactDeps {
   readonly leads: LeadRepo;
 }
 
-// Formulaire de contact public d'une vitrine (parité legacy `submitContact`). Résout l'artisan par
-// slug (+ email requis) → 404 ; vitrine inactive → 404 (pas de contact sur une page éteinte) ;
-// anti-flood par IP (5/15 min) → 429. Envoie l'email à l'artisan, crée une notification in-app et
-// persiste le lead (best-effort). L'IP est fournie par l'appelant (en-tête probant).
+/*
+ * Formulaire de contact public d'une vitrine (parité legacy `submitContact`). Résout l'artisan par
+ * slug (+ email requis) → 404 ; vitrine inactive → 404 (pas de contact sur une page éteinte) ;
+ * anti-flood par IP (5/15 min) → 429. Envoie l'email à l'artisan, crée une notification in-app et
+ * persiste le lead (best-effort). L'IP est fournie par l'appelant (en-tête probant).
+ */
 export async function submitContact(deps: SubmitContactDeps, input: SubmitContactInput, clientIp: string): Promise<{ success: true }> {
   const artisan = await deps.reader.getArtisanBySlug(input.slug);
   if (!artisan || !artisan.email) throw new NotFoundError("Artisan non trouve");
@@ -113,15 +117,19 @@ export async function submitContact(deps: SubmitContactDeps, input: SubmitContac
   return { success: true };
 }
 
-// ── Gestion des leads (ADMIN, protégé) ────────────────────────────────────────
-// Délègue au domaine migré `demandesContact` (leads) + au repo `clients` pour la conversion. Parité
-// legacy (statut posé en direct + ownership scopé tenant) plutôt que la machine à états de
-// `demandesContact` (la vitrine est la surface historique de ces opérations).
+/*
+ * ── Gestion des leads (ADMIN, protégé) ────────────────────────────────────────
+ * Délègue au domaine migré `demandesContact` (leads) + au repo `clients` pour la conversion. Parité
+ * legacy (statut posé en direct + ownership scopé tenant) plutôt que la machine à états de
+ * `demandesContact` (la vitrine est la surface historique de ces opérations).
+ */
 export type LeadStatut = "nouveau" | "contacte" | "converti" | "perdu";
 
 export interface LeadRepo {
-  // OPE-505 : typé `DemandeContact[]` (le repo `demandes-contact` renvoie déjà ce DTO) — le front
-  // dérive donc `RouterOutputs["vitrine"]["getDemandesContact"]` sans assertion.
+  /*
+   * typé `DemandeContact[]` (le repo `demandes-contact` renvoie déjà ce DTO) — le front
+   * dérive donc `RouterOutputs["vitrine"]["getDemandesContact"]` sans assertion.
+   */
   list(ctx: TenantContext): Promise<DemandeContact[]>;
   getById(ctx: TenantContext, id: number): Promise<{ id: number; clientId: number | null; nom: string; email: string | null; telephone: string | null } | null>;
   setStatut(ctx: TenantContext, id: number, statut: LeadStatut, clientId?: number | null): Promise<unknown>;
@@ -147,8 +155,10 @@ export async function updateDemandeContactStatut(deps: LeadsAdminDeps, ctx: Tena
   return { success: true };
 }
 
-// Convertit un lead en client : crée le client (nom/email/téléphone du lead) puis lie + passe converti.
-// 404 si lead hors tenant ; 409 si déjà converti (parité legacy BAD_REQUEST → ConflictError).
+/*
+ * Convertit un lead en client : crée le client (nom/email/téléphone du lead) puis lie + passe converti.
+ * 404 si lead hors tenant ; 409 si déjà converti (parité legacy BAD_REQUEST → ConflictError).
+ */
 export async function convertirDemandeEnClient(deps: LeadsAdminDeps, ctx: TenantContext, id: number): Promise<{ success: true; clientId: number }> {
   const demande = await deps.leads.getById(ctx, id);
   if (!demande) throw new NotFoundError("Demande non trouvée");

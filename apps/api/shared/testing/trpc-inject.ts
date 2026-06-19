@@ -1,11 +1,13 @@
 import superjson from "superjson";
 
-// Helper d'injection HTTP pour les tests e2e tRPC du new-stack. ⚠️ Le serveur utilise le data
-// transformer **superjson** (comme le client/legacy) : l'input doit être sérialisé (`{json,meta}`)
-// et la réponse `result.data` désérialisée. Ce helper encapsule ces deux étapes et renvoie un objet
-// compatible avec l'API `LightMyRequestResponse` minimale utilisée par les tests : `statusCode`,
-// `body`, et `json()` qui rend l'enveloppe tRPC AVEC `result.data` déjà désérialisé (les call sites
-// `res.json().result.data.X` restent inchangés).
+/*
+ * Helper d'injection HTTP pour les tests e2e tRPC du new-stack. ⚠️ Le serveur utilise le data
+ * transformer **superjson** (comme le client/legacy) : l'input doit être sérialisé (`{json,meta}`)
+ * et la réponse `result.data` désérialisée. Ce helper encapsule ces deux étapes et renvoie un objet
+ * compatible avec l'API `LightMyRequestResponse` minimale utilisée par les tests : `statusCode`,
+ * `body`, et `json()` qui rend l'enveloppe tRPC AVEC `result.data` déjà désérialisé (les call sites
+ * `res.json().result.data.X` restent inchangés).
+ */
 
 interface AppLike {
   inject(opts: { method: string; url: string; headers: Record<string, string>; payload?: string }): Promise<{

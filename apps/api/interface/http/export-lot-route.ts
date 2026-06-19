@@ -13,10 +13,12 @@ function parseDate(v: unknown): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-// Routes HORS-tRPC d'export en LOT (auth cookie JWT) : `GET /api/comptabilite/export-facturx-lot`
-// (ZIP des XML CII de la période) + `GET /api/comptabilite/export-pdf-lot` (ZIP des PDF facture).
-// 404 si aucune facture sur la période (parité legacy). ⚠️ MONTÉES mais NON routées tant qu'absentes
-// de MIGRATED_ROUTES.
+/*
+ * Routes HORS-tRPC d'export en LOT (auth cookie JWT) : `GET /api/comptabilite/export-facturx-lot`
+ * (ZIP des XML CII de la période) + `GET /api/comptabilite/export-pdf-lot` (ZIP des PDF facture).
+ * 404 si aucune facture sur la période (parité legacy). ⚠️ MONTÉES mais NON routées tant qu'absentes
+ * de MIGRATED_ROUTES.
+ */
 export function registerExportLotRoutes(app: FastifyInstance, deps: ExportLotRouteDeps): void {
   app.get("/api/comptabilite/export-facturx-lot", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

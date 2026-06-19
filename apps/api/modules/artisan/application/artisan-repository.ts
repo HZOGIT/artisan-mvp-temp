@@ -1,8 +1,10 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { ArtisanProfile, UpdateArtisanProfileInput } from "../domain/artisan";
 
-// Port du repository « profil artisan ». Toujours scopé au tenant courant (`ctx.artisanId`) : le
-// profil EST le tenant (table d'identité `artisans`, hors RLS). Aucune opération cross-tenant.
+/*
+ * Port du repository « profil artisan ». Toujours scopé au tenant courant (`ctx.artisanId`) : le
+ * profil EST le tenant (table d'identité `artisans`, hors RLS). Aucune opération cross-tenant.
+ */
 export interface IArtisanRepository {
   // Profil du tenant courant ; null si introuvable (ne devrait pas arriver pour un tenant résolu).
   getProfile(ctx: TenantContext): Promise<ArtisanProfile | null>;

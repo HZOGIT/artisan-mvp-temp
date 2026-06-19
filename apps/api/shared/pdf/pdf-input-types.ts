@@ -1,10 +1,12 @@
-// Types d'ENTRÉE des générateurs PDF (internalisés depuis le legacy `server/_core/pdfGenerator.ts`).
-// Le générateur jsPDF est repris VERBATIM (déjà correct au runtime avec les objets domaine migrés
-// passés via `PdfPort.render`). Ces types ne servent qu'à documenter la SURFACE consommée — les champs
-// sont volontairement larges (`any`) : le générateur coerce tout (`Number(...)`, `new Date(...)`,
-// formatage) et l'adapter (`js-pdf-adapter.ts`) caste l'entrée. La sécurité de type utile est portée en
-// amont par les domaines migrés (Devis/Facture/Commande/Client/…), pas ici.
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/*
+ * Types d'ENTRÉE des générateurs PDF (internalisés depuis le legacy `server/_core/pdfGenerator.ts`).
+ * Le générateur jsPDF est repris VERBATIM (déjà correct au runtime avec les objets domaine migrés
+ * passés via `PdfPort.render`). Ces types ne servent qu'à documenter la SURFACE consommée — les champs
+ * sont volontairement larges (`any`) : le générateur coerce tout (`Number(...)`, `new Date(...)`,
+ * formatage) et l'adapter (`js-pdf-adapter.ts`) caste l'entrée. La sécurité de type utile est portée en
+ * amont par les domaines migrés (Devis/Facture/Commande/Client/…), pas ici.
+ */
+ 
 
 export interface DevisLigne {
   designation?: any;

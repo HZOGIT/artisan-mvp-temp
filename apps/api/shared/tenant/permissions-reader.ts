@@ -2,9 +2,11 @@ import { and, eq } from "drizzle-orm";
 import { permissionsUtilisateur } from "../../../../drizzle/schema.pg";
 import type { DbClient } from "../db";
 
-// Lecture des permissions d'un utilisateur (table `permissions_utilisateur`, HORS RLS tenant — clé par
-// `userId`). Sert au seam d'autorisation par permission (`permissionProcedure`) : parité legacy
-// `getUserPermissions` (permissions où `autorise = true`). DÉCOUPLÉ du tenant (comme le rôle).
+/*
+ * Lecture des permissions d'un utilisateur (table `permissions_utilisateur`, HORS RLS tenant — clé par
+ * `userId`). Sert au seam d'autorisation par permission (`permissionProcedure`) : parité legacy
+ * `getUserPermissions` (permissions où `autorise = true`). DÉCOUPLÉ du tenant (comme le rôle).
+ */
 export interface PermissionsReader {
   getPermissions(userId: number): Promise<string[]>;
 }

@@ -28,9 +28,11 @@ function toCategorie(r: CategorieRow): CategorieDepense {
   };
 }
 
-// Violation de contrainte unique PostgreSQL (uq_cat_artisan_nom) → ConflictError métier.
-// ⚠️ Drizzle enveloppe l'erreur pg (« Failed query: … ») : le code `23505` est porté par la chaîne
-// de `cause`. On remonte les causes pour le détecter.
+/*
+ * Violation de contrainte unique PostgreSQL (uq_cat_artisan_nom) → ConflictError métier.
+ * ⚠️ Drizzle enveloppe l'erreur pg (« Failed query: … ») : le code `23505` est porté par la chaîne
+ * de `cause`. On remonte les causes pour le détecter.
+ */
 function estViolationUnique(err: unknown): boolean {
   let e: unknown = err;
   for (let i = 0; e != null && i < 5; i++) {
@@ -60,9 +62,11 @@ function toSet(input: UpdateCategorieInput): Partial<CategorieInsert> {
   return set;
 }
 
-// Implémentation Drizzle du repository categories-depenses. Double cloisonnement RLS + filtre
-// `artisan_id` sur `categories_depenses`. `artisan_id` forcé à la création. ⚠️ Contrainte DB UNIQUE
-// (artisan_id, nom) → les violations (PG 23505) sont traduites en ConflictError.
+/*
+ * Implémentation Drizzle du repository categories-depenses. Double cloisonnement RLS + filtre
+ * `artisan_id` sur `categories_depenses`. `artisan_id` forcé à la création. ⚠️ Contrainte DB UNIQUE
+ * (artisan_id, nom) → les violations (PG 23505) sont traduites en ConflictError.
+ */
 export class CategorieDepenseRepositoryDrizzle implements ICategorieDepenseRepository {
   constructor(private readonly db: DbClient) {}
 

@@ -18,9 +18,11 @@ import type {
   AddDocumentInput,
 } from "../domain/chantier";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant et les valeurs par défaut PG (statut planifie, priorite normale, avancement 0,
-// budgetRealise "0.00"). Aucune fuite cross-tenant ; `update` ne touche pas `clientId`.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant et les valeurs par défaut PG (statut planifie, priorite normale, avancement 0,
+ * budgetRealise "0.00"). Aucune fuite cross-tenant ; `update` ne touche pas `clientId`.
+ */
 export class FakeChantierRepository implements IChantierRepository {
   private store: Chantier[] = [];
   private seq = 0;
@@ -330,8 +332,10 @@ export class FakeChantierRepository implements IChantierRepository {
     return this.documents.length < before;
   }
 
-  // ── Statistiques ──────────────────────────────────────────────────────────────────────────────
-  // Aide de test : somme TTC des dépenses rattachées à un chantier (clé `${artisanId}:${chantierId}`).
+  /*
+   * ── Statistiques ──────────────────────────────────────────────────────────────────────────────
+   * Aide de test : somme TTC des dépenses rattachées à un chantier (clé `${artisanId}:${chantierId}`).
+   */
   private depensesTtc = new Map<string, string>();
 
   // Aide de test : déclare le total TTC des dépenses d'un chantier (pour `sumDepensesChantier`).

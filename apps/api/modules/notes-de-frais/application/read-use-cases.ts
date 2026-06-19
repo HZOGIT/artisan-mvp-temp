@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { INoteDeFraisRepository } from "./note-de-frais-repository";
 import type { NoteDeFrais, NoteDeFraisDetail, NoteDeFraisListItem } from "../domain/note-de-frais";
 
-// Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
-// `TenantContext` (le repo l'applique). `getNoteDeFrais` sur une ressource d'un autre tenant
-// → le repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+/*
+ * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
+ * `TenantContext` (le repo l'applique). `getNoteDeFrais` sur une ressource d'un autre tenant
+ * → le repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+ */
 
 export function listNotesDeFrais(repo: INoteDeFraisRepository, ctx: TenantContext): Promise<NoteDeFrais[]> {
   return repo.list(ctx);
@@ -21,14 +23,16 @@ export async function getNoteDeFrais(
   return note;
 }
 
-// OPE-490 — liste enrichie du compteur de dépenses liées (consommée par le routeur `listNotesFrais`).
+// Liste enrichie du compteur de dépenses liées par note.
 export async function listNotesDeFraisAvecCompte(repo: INoteDeFraisRepository, ctx: TenantContext): Promise<NoteDeFraisListItem[]> {
   const [notes, counts] = await Promise.all([repo.list(ctx), repo.countDepensesByNote(ctx)]);
   return notes.map((n) => ({ ...n, nbDepenses: counts.get(n.id) ?? 0 }));
 }
 
-// OPE-490 — détail enrichi des dépenses liées. ⚠️ Parité `getNoteFraisById` : renvoie `null` si la
-// note n'appartient pas au tenant (PAS 404 — ne pas révéler l'existence cross-tenant).
+/*
+ * Détail enrichi des dépenses liées. ⚠️ Parité `getNoteFraisById` : renvoie `null` si la
+ * note n'appartient pas au tenant (PAS 404 — ne pas révéler l'existence cross-tenant).
+ */
 export async function getNoteFraisDetail(repo: INoteDeFraisRepository, ctx: TenantContext, id: number): Promise<NoteDeFraisDetail | null> {
   const note = await repo.getById(ctx, id);
   if (!note) return null;

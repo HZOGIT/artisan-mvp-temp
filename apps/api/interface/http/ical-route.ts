@@ -12,9 +12,11 @@ export interface IcalRouteDeps {
   readonly rateLimiter: RateLimiterPort;
 }
 
-// Route PUBLIQUE hors tRPC `/api/calendar/:token.ics` (abonnement iCal des interventions). Le jeton
-// `icalToken` EST la capacité (pas de cookie tenant). Parité legacy : rate-limit IP, 404 si jeton
-// inconnu, réponse `text/calendar`. Lecture seule, scopée à l'artisan résolu par le jeton.
+/*
+ * Route PUBLIQUE hors tRPC `/api/calendar/:token.ics` (abonnement iCal des interventions). Le jeton
+ * `icalToken` EST la capacité (pas de cookie tenant). Parité legacy : rate-limit IP, 404 si jeton
+ * inconnu, réponse `text/calendar`. Lecture seule, scopée à l'artisan résolu par le jeton.
+ */
 export function registerIcalRoute(app: FastifyInstance, deps: IcalRouteDeps): void {
   app.get("/api/calendar/:token.ics", async (req, reply) => {
     const ip = extractClientIp((req.headers ?? {}) as Record<string, unknown>, req.ip ?? null);

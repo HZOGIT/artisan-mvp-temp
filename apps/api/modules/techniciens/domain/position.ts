@@ -1,6 +1,8 @@
-// Position GPS d'un technicien. La table `positions_techniciens` n'a PAS d'artisanId →
-// l'isolation passe par l'appartenance du technicien au tenant (anti-IDOR géoloc).
-// Coordonnées en string (numeric PG) pour préserver la précision.
+/*
+ * Position GPS d'un technicien. La table `positions_techniciens` n'a PAS d'artisanId →
+ * l'isolation passe par l'appartenance du technicien au tenant (anti-IDOR géoloc).
+ * Coordonnées en string (numeric PG) pour préserver la précision.
+ */
 
 export interface Position {
   readonly id: number;

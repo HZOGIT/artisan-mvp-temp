@@ -1,6 +1,8 @@
-// Effets des évènements PAIEMENT/FACTURE du webhook Stripe (`checkout.session.completed`,
-// `payment_intent.payment_failed`). Le `tokenPaiement` EST la capacité (résolu sous public-token RLS),
-// puis les effets (paiement/facture/notif) repassent sous le tenant résolu (`withTenant`).
+/*
+ * Effets des évènements PAIEMENT/FACTURE du webhook Stripe (`checkout.session.completed`,
+ * `payment_intent.payment_failed`). Le `tokenPaiement` EST la capacité (résolu sous public-token RLS),
+ * puis les effets (paiement/facture/notif) repassent sous le tenant résolu (`withTenant`).
+ */
 
 export interface PaiementResolu {
   readonly paiementId: number;

@@ -5,9 +5,11 @@ import type { Commande, CreateCommandeInput, UpdateCommandeInput } from "../doma
 
 const MAX_LIGNES = 500; // anti-DoS (boucle d'INSERT)
 
-// Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible : les totaux sont
-// calculés côté repo (jamais via les inputs) ; `modifierCommande` ne touche que les
-// métadonnées (la modification des lignes/quantités/statuts = transitions, étape 7).
+/*
+ * Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine sensible : les totaux sont
+ * calculés côté repo (jamais via les inputs) ; `modifierCommande` ne touche que les
+ * métadonnées (la modification des lignes/quantités/statuts = transitions, étape 7).
+ */
 
 export async function creerCommande(
   repo: ICommandeRepository,
@@ -27,8 +29,10 @@ export async function creerCommande(
   return commande;
 }
 
-// Modifie uniquement les métadonnées (reference/notes/adresse/dateLivraison) — pas les
-// totaux ni les lignes (préservés serveur).
+/*
+ * Modifie uniquement les métadonnées (reference/notes/adresse/dateLivraison) — pas les
+ * totaux ni les lignes (préservés serveur).
+ */
 export async function modifierCommande(
   repo: ICommandeRepository,
   ctx: TenantContext,

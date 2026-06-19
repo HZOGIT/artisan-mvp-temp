@@ -42,8 +42,10 @@ export class FakeSignatureRepository implements ISignatureRepository {
   }
 }
 
-// Reader de contexte fake : on enregistre le contexte par (artisanId, devisId). Renvoie `null` si le
-// devis n'a pas été semé pour ce tenant → simule l'anti-IDOR du parent.
+/*
+ * Reader de contexte fake : on enregistre le contexte par (artisanId, devisId). Renvoie `null` si le
+ * devis n'a pas été semé pour ce tenant → simule l'anti-IDOR du parent.
+ */
 export class FakeSignatureContextReader implements SignatureDevisContextReader {
   private byKey = new Map<string, SignatureDevisContext>();
 

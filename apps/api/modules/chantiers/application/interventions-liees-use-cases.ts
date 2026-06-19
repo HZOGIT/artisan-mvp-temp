@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "./chantier-repository";
 import type { ChantierInterventionLien, AssocierInterventionInput } from "../domain/chantier";
 
-// Use-cases « interventions rattachées à un chantier » (table `interventions_chantier`, SANS
-// artisanId → scopée via le chantier parent). ⚠️ `associerIntervention` exige un anti-IDOR DOUBLE :
-// le chantier ET l'intervention doivent appartenir au tenant (sinon on pourrait rattacher
-// l'intervention d'un autre tenant à son propre chantier).
+/*
+ * Use-cases « interventions rattachées à un chantier » (table `interventions_chantier`, SANS
+ * artisanId → scopée via le chantier parent). ⚠️ `associerIntervention` exige un anti-IDOR DOUBLE :
+ * le chantier ET l'intervention doivent appartenir au tenant (sinon on pourrait rattacher
+ * l'intervention d'un autre tenant à son propre chantier).
+ */
 
 // Liens d'un chantier possédé (404 sinon), triés par ordre.
 export async function getInterventionsLiees(
@@ -26,8 +28,10 @@ export async function getAllInterventionsLiees(
   return repo.listAllInterventionsLiens(ctx);
 }
 
-// Associe une intervention à un chantier. Anti-IDOR DOUBLE : chantier possédé (404) ET intervention
-// possédée (404). Idempotent (l'adapter renvoie le lien existant le cas échéant).
+/*
+ * Associe une intervention à un chantier. Anti-IDOR DOUBLE : chantier possédé (404) ET intervention
+ * possédée (404). Idempotent (l'adapter renvoie le lien existant le cas échéant).
+ */
 export async function associerInterventionChantier(
   repo: IChantierRepository,
   ctx: TenantContext,

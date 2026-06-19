@@ -5,8 +5,10 @@ import type { IBudgetCategorieRepository } from "../../budgets-categories/applic
 import { listCategories } from "../../categories-depenses/application/read-use-cases";
 import { budgetsParMois } from "../../budgets-categories/application/read-use-cases";
 
-// Vue « budgets réalisés » d'un mois (parité legacy `trpc.depenses.getBudgets`). Montants en NUMBER
-// comme le legacy (consommés par le dashboard front).
+/*
+ * Vue « budgets réalisés » d'un mois (parité legacy `trpc.depenses.getBudgets`). Montants en NUMBER
+ * comme le legacy (consommés par le dashboard front).
+ */
 export interface BudgetRealise {
   readonly categorie: string;
   readonly couleur: string;
@@ -17,10 +19,12 @@ export interface BudgetRealise {
   readonly pct: number;
 }
 
-// Read DÉRIVÉ : pour CHAQUE catégorie de l'artisan, croise le budget du mois (budgets-categories) avec
-// le réalisé (SUM des dépenses TTC du mois agrégé par catégorie) → écart + pourcentage. Le réalisé
-// n'est PAS le champ stocké `depenseReelle` : il est recalculé depuis les dépenses (cf.
-// `calculerBudgetsRealises`). Les 3 sources sont croisées par le NOM de catégorie.
+/*
+ * Read DÉRIVÉ : pour CHAQUE catégorie de l'artisan, croise le budget du mois (budgets-categories) avec
+ * le réalisé (SUM des dépenses TTC du mois agrégé par catégorie) → écart + pourcentage. Le réalisé
+ * n'est PAS le champ stocké `depenseReelle` : il est recalculé depuis les dépenses (cf.
+ * `calculerBudgetsRealises`). Les 3 sources sont croisées par le NOM de catégorie.
+ */
 export async function budgetsRealises(
   categorieRepo: ICategorieDepenseRepository,
   budgetRepo: IBudgetCategorieRepository,

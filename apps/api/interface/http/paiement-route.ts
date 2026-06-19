@@ -14,9 +14,11 @@ export interface PaiementRouteDeps {
   readonly appUrl: string;
 }
 
-// Route PUBLIQUE par token de portail `GET /api/paiement/status/:factureId?token=…` : statut de
-// paiement d'une facture (vue portail client). Le token EST la capacité (pas de cookie). Anti-IDOR :
-// la facture doit appartenir au client de l'accès portail. Parité legacy.
+/*
+ * Route PUBLIQUE par token de portail `GET /api/paiement/status/:factureId?token=…` : statut de
+ * paiement d'une facture (vue portail client). Le token EST la capacité (pas de cookie). Anti-IDOR :
+ * la facture doit appartenir au client de l'accès portail. Parité legacy.
+ */
 export function registerPaiementRoute(app: FastifyInstance, deps: PaiementRouteDeps): void {
   app.get("/api/paiement/status/:factureId", async (req, reply) => {
     const token = (req.query as { token?: string } | undefined)?.token;
@@ -50,10 +52,12 @@ export function registerPaiementRoute(app: FastifyInstance, deps: PaiementRouteD
     const body = (req.body ?? {}) as { factureId?: unknown; token?: unknown };
     const factureId = typeof body.factureId === "number" ? body.factureId : parseInt(String(body.factureId ?? ""), 10);
     const token = typeof body.token === "string" ? body.token : undefined;
-    // Origin PUBLIC reconstruit derrière le proxy. ⚠️ Derrière le dispatcher Pages, l'en-tête `host`
-    // vaut l'hôte INTERNE du new-stack (staging-backend.operioz.com) → une redirection Stripe bâtie
-    // dessus renverrait l'utilisateur vers le BACKEND (404 sur /portail/*). On privilégie donc
-    // `x-forwarded-host` (hôte public d'origine, posé par le dispatcher) puis `host`, sinon APP_URL.
+    /*
+     * Origin PUBLIC reconstruit derrière le proxy. ⚠️ Derrière le dispatcher Pages, l'en-tête `host`
+     * vaut l'hôte INTERNE du new-stack (staging-backend.operioz.com) → une redirection Stripe bâtie
+     * dessus renverrait l'utilisateur vers le BACKEND (404 sur /portail/*). On privilégie donc
+     * `x-forwarded-host` (hôte public d'origine, posé par le dispatcher) puis `host`, sinon APP_URL.
+     */
     const headers = (req.headers ?? {}) as Record<string, string | undefined>;
     const proto = headers["x-forwarded-proto"]?.split(",")[0]?.trim();
     const host = headers["x-forwarded-host"]?.split(",")[0]?.trim() || headers["host"];

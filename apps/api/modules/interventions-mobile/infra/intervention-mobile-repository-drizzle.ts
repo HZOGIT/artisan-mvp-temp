@@ -22,10 +22,12 @@ function toMobile(r: Row): InterventionMobile {
   };
 }
 
-// Repository Drizzle des données mobiles d'intervention. Table `interventions_mobile` SOUS RLS
-// (artisanId via `app.tenant`) → toutes les requêtes via `withTenant` ; `artisanId` posé explicitement
-// à l'insertion (withCheck RLS). Scopage tenant garanti (anti-IDOR : la ligne mobile suit l'intervention
-// du tenant, dont l'ownership est vérifié en amont par le use-case).
+/*
+ * Repository Drizzle des données mobiles d'intervention. Table `interventions_mobile` SOUS RLS
+ * (artisanId via `app.tenant`) → toutes les requêtes via `withTenant` ; `artisanId` posé explicitement
+ * à l'insertion (withCheck RLS). Scopage tenant garanti (anti-IDOR : la ligne mobile suit l'intervention
+ * du tenant, dont l'ownership est vérifié en amont par le use-case).
+ */
 export class InterventionMobileRepositoryDrizzle implements IInterventionMobileRepository {
   constructor(private readonly db: DbClient) {}
 

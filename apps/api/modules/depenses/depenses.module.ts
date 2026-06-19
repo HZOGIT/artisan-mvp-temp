@@ -8,10 +8,12 @@ import type { FecReader } from "./application/fec-reader";
 import type { VisionPort, RateLimiterPort } from "../../shared/ports";
 import { createDepensesRouter } from "./interface/trpc/depenses.router";
 
-// Wiring DI du module depenses : assemble le routeur tRPC à partir des repositories injectés.
-// `categorieRepository`/`budgetRepository` : le client appelle catégories et budgets de dépense via
-// `trpc.depenses.*Categorie` / `trpc.depenses.setBudget` (parité legacy) → composés dans ce routeur en
-// déléguant aux domaines categories-depenses / budgets-categories.
+/*
+ * Wiring DI du module depenses : assemble le routeur tRPC à partir des repositories injectés.
+ * `categorieRepository`/`budgetRepository` : le client appelle catégories et budgets de dépense via
+ * `trpc.depenses.*Categorie` / `trpc.depenses.setBudget` (parité legacy) → composés dans ce routeur en
+ * déléguant aux domaines categories-depenses / budgets-categories.
+ */
 export interface DepensesModuleDeps {
   readonly repository: IDepenseRepository;
   readonly categorieRepository: ICategorieDepenseRepository;
@@ -20,8 +22,10 @@ export interface DepensesModuleDeps {
   readonly noteRepository: INoteDeFraisRepository;
   readonly transactionRepository: ITransactionBancaireRepository;
   readonly fecReader: FecReader;
-  // Seam OCR (analyserJustificatif) : modèle vision + rate-limiter IA. Optionnel : sans lui, la
-  // procédure renvoie une dégradation `{success:false}`.
+  /*
+   * Seam OCR (analyserJustificatif) : modèle vision + rate-limiter IA. Optionnel : sans lui, la
+   * procédure renvoie une dégradation `{success:false}`.
+   */
   readonly ocr?: { readonly vision: VisionPort; readonly rateLimiter: RateLimiterPort };
 }
 

@@ -48,12 +48,14 @@ const norm = (s: unknown): string =>
 
 const SYSTEM = "Tu es un assistant pour artisans du bâtiment en France. Tu déduis des matériaux/fournitures à commander à partir des lignes d'un devis. Tu réponds UNIQUEMENT en JSON pur (pas de markdown).";
 
-// Propose les lignes de commande fournisseur déduites d'un devis accepté, via l'IA (parité legacy
-// `commandesFournisseurs.genererDepuisDevisIA`). ⚠️ Lecture seule — RIEN n'est persisté. Invariants :
-//  - rate-limit IA AVANT tout (anti-coût, 429) ;
-//  - devis du tenant (404) et **statut `accepte`** (400) ;
-//  - exclut la main d'œuvre, ajuste selon le stock, matche `articleId` sur les articles artisan ;
-//  - parse défensif du JSON (sinon proposition vide) ; erreurs IA assainies (pas de fuite).
+/*
+ * Propose les lignes de commande fournisseur déduites d'un devis accepté, via l'IA (parité legacy
+ * `commandesFournisseurs.genererDepuisDevisIA`). ⚠️ Lecture seule — RIEN n'est persisté. Invariants :
+ *  - rate-limit IA AVANT tout (anti-coût, 429) ;
+ *  - devis du tenant (404) et **statut `accepte`** (400) ;
+ *  - exclut la main d'œuvre, ajuste selon le stock, matche `articleId` sur les articles artisan ;
+ *  - parse défensif du JSON (sinon proposition vide) ; erreurs IA assainies (pas de fuite).
+ */
 export async function genererCommandeDepuisDevisIA(
   deps: CommandeIaDeps,
   ctx: TenantContext,

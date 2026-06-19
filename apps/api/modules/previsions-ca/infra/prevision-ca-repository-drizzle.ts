@@ -51,8 +51,10 @@ function toPrevision(r: PrevisionRow): PrevisionCA {
   };
 }
 
-// Mappe les champs camelCase de l'input vers les colonnes (seuls les champs fournis). ⚠️ Jamais
-// mois/annee (période immuable = identité de la prévision).
+/*
+ * Mappe les champs camelCase de l'input vers les colonnes (seuls les champs fournis). ⚠️ Jamais
+ * mois/annee (période immuable = identité de la prévision).
+ */
 function toSet(input: UpdatePrevisionInput): Partial<PrevisionInsert> {
   const set: Partial<PrevisionInsert> = {};
   if (input.caPrevisionnel !== undefined) set.caPrevisionnel = input.caPrevisionnel;
@@ -64,9 +66,11 @@ function toSet(input: UpdatePrevisionInput): Partial<PrevisionInsert> {
   return set;
 }
 
-// Implémentation Drizzle du repository previsions-ca. Double cloisonnement RLS + filtre `artisanId`
-// sur `previsions_ca`. `artisanId` forcé à la création. Colonnes camelCase (pas de snake_case). Pas de
-// contrainte d'unicité. L'update ne touche que les montants/méthode/confiance (mois/annee immuables).
+/*
+ * Implémentation Drizzle du repository previsions-ca. Double cloisonnement RLS + filtre `artisanId`
+ * sur `previsions_ca`. `artisanId` forcé à la création. Colonnes camelCase (pas de snake_case). Pas de
+ * contrainte d'unicité. L'update ne touche que les montants/méthode/confiance (mois/annee immuables).
+ */
 export class PrevisionCARepositoryDrizzle implements IPrevisionCARepository {
   constructor(private readonly db: DbClient) {}
 

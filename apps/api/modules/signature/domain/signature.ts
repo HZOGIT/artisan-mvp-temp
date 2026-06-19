@@ -1,13 +1,17 @@
-// Domaine SIGNATURE (signature électronique de devis). SENSIBLE : valeur probante (IP/UA capturés,
-// horodatage), immutabilité post-signature et anti-rejeu du token. `signatures_devis` n'a PAS
-// d'artisanId → HORS RLS : l'anti-IDOR passe par l'appartenance du DEVIS parent au tenant (vérifiée
-// par le use-case via une lecture RLS du devis avant tout accès à la signature).
+/*
+ * Domaine SIGNATURE (signature électronique de devis). SENSIBLE : valeur probante (IP/UA capturés,
+ * horodatage), immutabilité post-signature et anti-rejeu du token. `signatures_devis` n'a PAS
+ * d'artisanId → HORS RLS : l'anti-IDOR passe par l'appartenance du DEVIS parent au tenant (vérifiée
+ * par le use-case via une lecture RLS du devis avant tout accès à la signature).
+ */
 import { randomUUID } from "crypto";
 
 export type SignatureStatut = "en_attente" | "accepte" | "refuse";
 
-// Reflet (lecture) d'une ligne `signatures_devis`. `signatureData` (image base64) lourde → exposée
-// telle quelle au portail de signature, mais pas nécessaire pour les vues artisan.
+/*
+ * Reflet (lecture) d'une ligne `signatures_devis`. `signatureData` (image base64) lourde → exposée
+ * telle quelle au portail de signature, mais pas nécessaire pour les vues artisan.
+ */
 export interface Signature {
   readonly id: number;
   readonly devisId: number;
@@ -31,8 +35,10 @@ export interface NewSignature {
   readonly expiresAt: Date;
 }
 
-// Jeton de signature : 64 caractères hex (parité legacy = 2× UUID sans tirets, tronqué). C'est la
-// **capacité** d'accès au portail public → imprévisible (RNG crypto). Borne colonne `token` = 64.
+/*
+ * Jeton de signature : 64 caractères hex (parité legacy = 2× UUID sans tirets, tronqué). C'est la
+ * **capacité** d'accès au portail public → imprévisible (RNG crypto). Borne colonne `token` = 64.
+ */
 export function generateSignatureToken(): string {
   return (randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "")).slice(0, 64);
 }

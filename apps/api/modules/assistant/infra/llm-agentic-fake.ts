@@ -16,9 +16,11 @@ export interface ScriptedTurn {
   readonly calls?: readonly AgenticFunctionCall[];
 }
 
-// Fake du port agentique : rejoue un script de tours (n-ième appel à `streamTurn` = n-ième tour ;
-// script épuisé → tour vide, donc fin de boucle). Capture les `messages` reçus à chaque tour pour
-// vérifier la réinjection (model + tool) sans réseau.
+/*
+ * Fake du port agentique : rejoue un script de tours (n-ième appel à `streamTurn` = n-ième tour ;
+ * script épuisé → tour vide, donc fin de boucle). Capture les `messages` reçus à chaque tour pour
+ * vérifier la réinjection (model + tool) sans réseau.
+ */
 export class FakeLlmAgenticPort implements LlmAgenticPort {
   public readonly turnInputs: AgenticTurnInput[] = [];
   private callCount = 0;

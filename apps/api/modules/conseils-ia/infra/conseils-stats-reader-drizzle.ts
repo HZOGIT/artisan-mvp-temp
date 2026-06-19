@@ -6,8 +6,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ConseilsStats } from "../domain/conseils";
 import type { ConseilsStatsReader } from "../application/conseils-stats-reader";
 
-// Stats minimales du tenant pour le prompt des conseils IA, sous RLS (withTenant) + filtre artisanId
-// explicite. Agrégats SQL (count/sum) — lecture seule. Sémantique parité dashboard.
+/*
+ * Stats minimales du tenant pour le prompt des conseils IA, sous RLS (withTenant) + filtre artisanId
+ * explicite. Agrégats SQL (count/sum) — lecture seule. Sémantique parité dashboard.
+ */
 export class ConseilsStatsReaderDrizzle implements ConseilsStatsReader {
   constructor(private readonly db: DbClient) {}
 

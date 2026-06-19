@@ -31,9 +31,11 @@ function toDate(v: string | null | undefined): Date | null | undefined {
   return new Date(v);
 }
 
-// Bornes alignées sur les tables `factures`/`factures_lignes` (defense-in-depth). ⚠️ Le client NE
-// fournit PAS `numero` (généré serveur), `statut` (workflow), totaux ni `montantPaye` (dérivés/
-// paiement) → intégrité financière (numérotation maîtrisée + pas de total/paiement falsifiable).
+/*
+ * Bornes alignées sur les tables `factures`/`factures_lignes` (defense-in-depth). ⚠️ Le client NE
+ * fournit PAS `numero` (généré serveur), `statut` (workflow), totaux ni `montantPaye` (dérivés/
+ * paiement) → intégrité financière (numérotation maîtrisée + pas de total/paiement falsifiable).
+ */
 const createSchema = z.object({
   clientId: z.number().int(),
   devisId: z.number().int().nullish(),
@@ -101,9 +103,11 @@ const avoirInputSchema = z.object({
     .max(500),
 });
 
-// Routeur tRPC du domaine factures. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
-// laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
+/*
+ * Routeur tRPC du domaine factures. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-émission),
+ * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
+ */
 export function createFacturesRouter(repo: IFactureRepository, devisReader: IDevisReader, compta: ComptaPort, mailing: FactureMailingDeps) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listFactures(repo, ctx.tenant)),
@@ -117,8 +121,10 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => listLignesFacture(repo, ctx.tenant, input.factureId)),
 
-    // Avoirs émis sur une facture (parité client `trpc.factures.getAvoirsByFacture`). Lecture seule,
-    // scopée tenant (→ [] hors tenant, comme le legacy).
+    /*
+     * Avoirs émis sur une facture (parité client `trpc.factures.getAvoirsByFacture`). Lecture seule,
+     * scopée tenant (→ [] hors tenant, comme le legacy).
+     */
     getAvoirsByFacture: protectedProcedure
       .input(z.object({ factureId: z.number().int() }))
       .query(({ ctx, input }) => getAvoirsFacture(repo, ctx.tenant, input.factureId)),
@@ -167,8 +173,10 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         return { success: true };
       }),
 
-    // Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide).
-    // ⚠️ Le passage à `payee` se fait via le paiement (étape ultérieure), pas ici.
+    /*
+     * Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide).
+     * ⚠️ Le passage à `payee` se fait via le paiement (étape ultérieure), pas ici.
+     */
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(({ ctx, input }) => changerStatutFacture(repo, ctx.tenant, input.id, "envoyee", compta)),
@@ -207,16 +215,20 @@ export function createFacturesRouter(repo: IFactureRepository, devisReader: IDev
         ),
       ),
 
-    // Marquer payée (parité client `trpc.factures.markAsPaid`) : écrase montantPaye + force `payee` +
-    // génère les écritures FEC (vente + encaissement) via le ComptaPort. ⚠️ sémantique legacy (non cumulatif).
+    /*
+     * Marquer payée (parité client `trpc.factures.markAsPaid`) : écrase montantPaye + force `payee` +
+     * génère les écritures FEC (vente + encaissement) via le ComptaPort. ⚠️ sémantique legacy (non cumulatif).
+     */
     markAsPaid: protectedProcedure
       .input(z.object({ id: z.number().int(), montantPaye: decimal, datePaiement: z.string() }))
       .mutation(({ ctx, input }) =>
         marquerFacturePayee(repo, ctx.tenant, input.id, { montantPaye: input.montantPaye, datePaiement: input.datePaiement }, compta),
       ),
 
-    // Envoi de la facture par email (PDF en pièce jointe) — parité client `trpc.factures.sendByEmail`.
-    // ownership 404 / client.email 400 / rate-limit 429 ; passe `envoyee` si brouillon/validee (sans FEC).
+    /*
+     * Envoi de la facture par email (PDF en pièce jointe) — parité client `trpc.factures.sendByEmail`.
+     * ownership 404 / client.email 400 / rate-limit 429 ; passe `envoyee` si brouillon/validee (sans FEC).
+     */
     sendByEmail: protectedProcedure
       .input(
         z.object({

@@ -4,13 +4,15 @@ import type { IRdvRepository } from "./rdv-repository";
 import type { IInterventionRepository } from "../../interventions/application/intervention-repository";
 import type { Rdv } from "../domain/rdv";
 
-// Confirmation d'un RDV en ligne (parité client/legacy `rdv.confirm`). ⚠️ Ce n'est PAS un simple
-// changement de statut : le legacy **crée une intervention planifiée** liée au RDV puis passe le
-// statut à `confirme` avec le lien `interventionId`. Cross-domaine : compose le repo `interventions`.
-//
-// Garde : seul un RDV `en_attente` peut être confirmé (legacy → BAD_REQUEST/400 → ValidationError).
-// Anti-IDOR : RDV hors tenant → NotFoundError/404. L'email de confirmation au client est un effet de
-// bord notification ajouté dans un slice dédié (composition clients + EmailPort).
+/*
+ * Confirmation d'un RDV en ligne (parité client/legacy `rdv.confirm`). ⚠️ Ce n'est PAS un simple
+ * changement de statut : le legacy **crée une intervention planifiée** liée au RDV puis passe le
+ * statut à `confirme` avec le lien `interventionId`. Cross-domaine : compose le repo `interventions`.
+ * 
+ * Garde : seul un RDV `en_attente` peut être confirmé (legacy → BAD_REQUEST/400 → ValidationError).
+ * Anti-IDOR : RDV hors tenant → NotFoundError/404. L'email de confirmation au client est un effet de
+ * bord notification ajouté dans un slice dédié (composition clients + EmailPort).
+ */
 export async function confirmerRdvAvecIntervention(
   rdvRepo: IRdvRepository,
   interventionRepo: IInterventionRepository,

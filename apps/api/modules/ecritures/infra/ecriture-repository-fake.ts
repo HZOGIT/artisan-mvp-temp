@@ -2,9 +2,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IEcritureRepository } from "../application/ecriture-repository";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant (artisanId forcé), les défauts PG (debit/credit "0.00", pointage false) et l'idempotence
-// `deleteByFacture`.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant (artisanId forcé), les défauts PG (debit/credit "0.00", pointage false) et l'idempotence
+ * `deleteByFacture`.
+ */
 export class FakeEcritureRepository implements IEcritureRepository {
   private store: EcritureComptable[] = [];
   private seq = 0;

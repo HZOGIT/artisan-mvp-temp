@@ -17,9 +17,11 @@ export interface UtilisateurDeps {
 
 const ROLE_FR: Record<string, string> = { artisan: "Artisan", secretaire: "Secrétaire", technicien: "Technicien" };
 
-// Protection du PROPRIÉTAIRE : son compte (role/actif/permissions) est immuable via la gestion des
-// utilisateurs. Sans cette garde, un collaborateur disposant de `utilisateurs.gerer` pourrait
-// désactiver/rétrograder l'owner (`artisans.userId`) → lockout/prise de contrôle du compte.
+/*
+ * Protection du PROPRIÉTAIRE : son compte (role/actif/permissions) est immuable via la gestion des
+ * utilisateurs. Sans cette garde, un collaborateur disposant de `utilisateurs.gerer` pourrait
+ * désactiver/rétrograder l'owner (`artisans.userId`) → lockout/prise de contrôle du compte.
+ */
 async function assertNotOwner(deps: UtilisateurDeps, ctx: TenantContext, userId: number): Promise<void> {
   const ownerUserId = await deps.repo.getOwnerUserId(ctx);
   if (ownerUserId !== null && userId === ownerUserId) {
@@ -36,8 +38,10 @@ export function listUtilisateurs(deps: UtilisateurDeps, ctx: TenantContext): Pro
   return deps.repo.list(ctx);
 }
 
-// Invite un collaborateur : email unique (409) → MDP temp haché (bcrypt) → création → seed des
-// permissions du rôle (best-effort) → email d'invitation (best-effort). Parité legacy `invite`.
+/*
+ * Invite un collaborateur : email unique (409) → MDP temp haché (bcrypt) → création → seed des
+ * permissions du rôle (best-effort) → email d'invitation (best-effort). Parité legacy `invite`.
+ */
 export async function inviterUtilisateur(deps: UtilisateurDeps, ctx: TenantContext, input: InviteInput): Promise<{ id: number; email: string | null; role: string }> {
   if (await deps.repo.emailExists(input.email)) {
     throw new ConflictError("Cet email est déjà utilisé");

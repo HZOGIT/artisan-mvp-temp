@@ -3,10 +3,12 @@ import type { IClientRepository } from "./client-repository";
 import type { CreateClientInput } from "../domain/client";
 import { creerClient } from "./write-use-cases";
 
-// Import en masse de clients (parité legacy `clients.importFromExcel`). Les lignes sont déjà
-// parsées côté client (pas de binaire Excel ici). Best-effort **par ligne** : une ligne invalide
-// (ex. nom vide → ValidationError) est ignorée (`skipped`), les autres sont créées (`imported`) —
-// l'import ne s'interrompt jamais. Chaque création est scopée tenant (artisanId forcé par le repo).
+/*
+ * Import en masse de clients (parité legacy `clients.importFromExcel`). Les lignes sont déjà
+ * parsées côté client (pas de binaire Excel ici). Best-effort **par ligne** : une ligne invalide
+ * (ex. nom vide → ValidationError) est ignorée (`skipped`), les autres sont créées (`imported`) —
+ * l'import ne s'interrompt jamais. Chaque création est scopée tenant (artisanId forcé par le repo).
+ */
 export interface ImportClientsResult {
   readonly imported: number;
   readonly skipped: number;

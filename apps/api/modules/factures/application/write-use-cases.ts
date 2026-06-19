@@ -15,13 +15,15 @@ import type {
   UpdateFactureLigneInput,
 } from "../domain/facture";
 
-// Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine financier CRITIQUE (pièce légale) :
-//  - **numero généré côté serveur** (`nextNumero`, jamais fourni par le client) ;
-//  - **anti-IDOR-FK** : `clientId` (et `devisId` si fourni) DOIVENT appartenir au tenant ;
-//  - **totaux dérivés des lignes** côté repo (jamais fournis par le client) ;
-//  - **immutabilité post-émission** : seule une facture `brouillon` est éditable — toute facture
-//    `validee`/`envoyee`/`payee`/`en_retard`/`annulee` est un document fiscal **verrouillé**
-//    (parité legacy « Document fiscal verrouillé — émettez un avoir pour corriger ») → Conflict.
+/*
+ * Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine financier CRITIQUE (pièce légale) :
+ *  - **numero généré côté serveur** (`nextNumero`, jamais fourni par le client) ;
+ *  - **anti-IDOR-FK** : `clientId` (et `devisId` si fourni) DOIVENT appartenir au tenant ;
+ *  - **totaux dérivés des lignes** côté repo (jamais fournis par le client) ;
+ *  - **immutabilité post-émission** : seule une facture `brouillon` est éditable — toute facture
+ *    `validee`/`envoyee`/`payee`/`en_retard`/`annulee` est un document fiscal **verrouillé**
+ *    (parité legacy « Document fiscal verrouillé — émettez un avoir pour corriger ») → Conflict.
+ */
 
 // Entrée de création : pas de numero (généré serveur).
 export type CreerFactureInput = Omit<CreateFactureInput, "numero">;
@@ -109,11 +111,13 @@ export async function modifierLigneFacture(
   return updated;
 }
 
-// Machine à états légale des factures (parité legacy `facturesRouter.update`) :
-//  brouillon → envoyee ; envoyee → payee | en_retard ; en_retard → payee.
-//  `payee`/`annulee` sont **terminaux**. `validee` n'a aucune transition (statut hérité de
-//  l'enum, non utilisé par le flux legacy). ⚠️ Le passage à `payee` est piloté par le use-case
-//  de **paiement** (enregistre montantPaye/datePaiement) — pas par une transition « nue ».
+/*
+ * Machine à états légale des factures (parité legacy `facturesRouter.update`) :
+ *  brouillon → envoyee ; envoyee → payee | en_retard ; en_retard → payee.
+ *  `payee`/`annulee` sont **terminaux**. `validee` n'a aucune transition (statut hérité de
+ *  l'enum, non utilisé par le flux legacy). ⚠️ Le passage à `payee` est piloté par le use-case
+ *  de **paiement** (enregistre montantPaye/datePaiement) — pas par une transition « nue ».
+ */
 const TRANSITIONS: Record<FactureStatut, readonly FactureStatut[]> = {
   brouillon: ["envoyee"],
   envoyee: ["payee", "en_retard"],
@@ -123,19 +127,23 @@ const TRANSITIONS: Record<FactureStatut, readonly FactureStatut[]> = {
   validee: [],
 };
 
-// Entrée d'enregistrement d'un paiement. `montant` = montant de CE paiement (cumulé au déjà
-// payé). `date`/`mode` optionnels.
+/*
+ * Entrée d'enregistrement d'un paiement. `montant` = montant de CE paiement (cumulé au déjà
+ * payé). `date`/`mode` optionnels.
+ */
 export type EnregistrerPaiementInput = { readonly montant: string; readonly date?: Date | null; readonly mode?: string | null };
 
 const EPS = 0.005; // tolérance de comparaison au centime
 
-// Enregistre un paiement (partiel ou soldant). ⚠️ Invariants financiers :
-//  - la facture doit être émise (`envoyee`/`en_retard`) → sinon Conflict (pas de paiement d'un
-//    brouillon/annulée/déjà soldée) ;
-//  - montant > 0 ; **anti-sur-paiement** : montantPaye cumulé ≤ totalTTC → sinon Validation ;
-//  - passage à `payee` UNIQUEMENT si soldée (cumul == totalTTC) ; sinon le statut est conservé.
-//  ⚠️ Durcissement vs legacy `markAsPaid` (qui écrasait montantPaye et passait `payee`
-//  inconditionnellement, même partiel) — voir finding.
+/*
+ * Enregistre un paiement (partiel ou soldant). ⚠️ Invariants financiers :
+ *  - la facture doit être émise (`envoyee`/`en_retard`) → sinon Conflict (pas de paiement d'un
+ *    brouillon/annulée/déjà soldée) ;
+ *  - montant > 0 ; **anti-sur-paiement** : montantPaye cumulé ≤ totalTTC → sinon Validation ;
+ *  - passage à `payee` UNIQUEMENT si soldée (cumul == totalTTC) ; sinon le statut est conservé.
+ *  ⚠️ Durcissement vs legacy `markAsPaid` (qui écrasait montantPaye et passait `payee`
+ *  inconditionnellement, même partiel) — voir finding.
+ */
 export async function enregistrerPaiementFacture(
   repo: IFactureRepository,
   ctx: TenantContext,
@@ -160,8 +168,10 @@ export async function enregistrerPaiementFacture(
     statut: soldee ? "payee" : facture.statut,
   });
   if (!updated) throw new NotFoundError("Facture introuvable");
-  // À la solde (passage `payee`) : génère les écritures FEC (vente + encaissement) via le port
-  // compta (no-op tant que le domaine compta n'est pas porté — seam d'effet de bord).
+  /*
+   * À la solde (passage `payee`) : génère les écritures FEC (vente + encaissement) via le port
+   * compta (no-op tant que le domaine compta n'est pas porté — seam d'effet de bord).
+   */
   if (soldee) {
     await compta.genererEcrituresVente(ctx, id);
     await compta.genererEcrituresEncaissement(ctx, id);
@@ -169,17 +179,21 @@ export async function enregistrerPaiementFacture(
   return updated;
 }
 
-// Entrée de `marquerFacturePayee` (parité legacy `markAsPaid`). `montantPaye` = montant **absolu**
-// (écrasé, PAS cumulé — sémantique legacy) ; `datePaiement` = ISO string (validée ici).
+/*
+ * Entrée de `marquerFacturePayee` (parité legacy `markAsPaid`). `montantPaye` = montant **absolu**
+ * (écrasé, PAS cumulé — sémantique legacy) ; `datePaiement` = ISO string (validée ici).
+ */
 export type MarquerPayeeInput = { readonly montantPaye: string; readonly datePaiement: string };
 
-// Marque une facture comme **payée** (parité legacy `markAsPaid`). ⚠️ Sémantique LEGACY (différente de
-// `enregistrerPaiementFacture`) : **écrase** `montantPaye`, force `statut=payee` (la facture émise est
-// soldée par cette action — le client n'appelle markAsPaid que sur une facture émise), puis génère les
-// **écritures FEC** (vente + encaissement) via le `ComptaPort`. L'invariant **Σ débit = Σ crédit** est
-// garanti par les use-cases de génération (domaine ecritures). Date invalide → ValidationError (400) AVANT
-// toute écriture (parité legacy : pas d'écriture sur une date NaN). Hors tenant → NotFoundError (404).
-// Génération d'écritures **best-effort** (try/catch — un échec compta ne casse pas le paiement, parité legacy).
+/*
+ * Marque une facture comme **payée** (parité legacy `markAsPaid`). ⚠️ Sémantique LEGACY (différente de
+ * `enregistrerPaiementFacture`) : **écrase** `montantPaye`, force `statut=payee` (la facture émise est
+ * soldée par cette action — le client n'appelle markAsPaid que sur une facture émise), puis génère les
+ * **écritures FEC** (vente + encaissement) via le `ComptaPort`. L'invariant **Σ débit = Σ crédit** est
+ * garanti par les use-cases de génération (domaine ecritures). Date invalide → ValidationError (400) AVANT
+ * toute écriture (parité legacy : pas d'écriture sur une date NaN). Hors tenant → NotFoundError (404).
+ * Génération d'écritures **best-effort** (try/catch — un échec compta ne casse pas le paiement, parité legacy).
+ */
 export async function marquerFacturePayee(
   repo: IFactureRepository,
   ctx: TenantContext,
@@ -220,12 +234,14 @@ export type CreerAvoirInput = {
   readonly notes?: string | null;
 };
 
-// Émet un avoir sur une facture d'origine (parité legacy `createAvoir`). ⚠️ Invariants :
-//  - la facture d'origine doit appartenir au tenant (anti-IDOR-FK) et **ne pas être brouillon**
-//    (on supprime/modifie un brouillon, on ne l'avoir pas) → Conflict ;
-//  - au moins une ligne valide ; montants de l'avoir **négatifs** (note de crédit) ;
-//  - **anti-sur-avoir** : le cumul des avoirs (déjà émis + nouveau, en valeur absolue) ne peut
-//    dépasser le total TTC de la facture d'origine → Validation/Conflict.
+/*
+ * Émet un avoir sur une facture d'origine (parité legacy `createAvoir`). ⚠️ Invariants :
+ *  - la facture d'origine doit appartenir au tenant (anti-IDOR-FK) et **ne pas être brouillon**
+ *    (on supprime/modifie un brouillon, on ne l'avoir pas) → Conflict ;
+ *  - au moins une ligne valide ; montants de l'avoir **négatifs** (note de crédit) ;
+ *  - **anti-sur-avoir** : le cumul des avoirs (déjà émis + nouveau, en valeur absolue) ne peut
+ *    dépasser le total TTC de la facture d'origine → Validation/Conflict.
+ */
 export async function creerAvoir(
   repo: IFactureRepository,
   ctx: TenantContext,
@@ -282,10 +298,12 @@ export async function creerAvoir(
     lignes,
   });
   if (!avoir) throw new NotFoundError("Facture d'origine introuvable");
-  // L'avoir est émis (`validee`) : on génère immédiatement ses écritures de vente (journal VE,
-  // TVA INVERSÉE — `genererEcrituresVente` gère `isAvoir`) pour que la note de crédit RÉDUISE la
-  // TVA collectée / le grand livre / la balance. Idempotent (purge+réinsertion). Best-effort : un
-  // échec d'écriture ne casse pas l'émission du document avoir.
+  /*
+   * L'avoir est émis (`validee`) : on génère immédiatement ses écritures de vente (journal VE,
+   * TVA INVERSÉE — `genererEcrituresVente` gère `isAvoir`) pour que la note de crédit RÉDUISE la
+   * TVA collectée / le grand livre / la balance. Idempotent (purge+réinsertion). Best-effort : un
+   * échec d'écriture ne casse pas l'émission du document avoir.
+   */
   try {
     await compta.genererEcrituresVente(ctx, avoir.id);
   } catch {
@@ -294,11 +312,13 @@ export async function creerAvoir(
   return avoir;
 }
 
-// Convertit un devis ACCEPTÉ en facture (parité legacy `createFactureFromDevis`, **durci**).
-// ⚠️ Invariants : devis du tenant (anti-IDOR-FK → NotFound) ; **devis `accepte`** sinon Conflict
-// (on ne facture qu'un devis accepté — le legacy ne le vérifiait pas) ; **anti-doublon** : un
-// devis déjà facturé → Conflict (le legacy autorisait des conversions multiples). Lignes copiées
-// (montants du devis), totaux recalculés des lignes côté infra, statut facture `brouillon`.
+/*
+ * Convertit un devis ACCEPTÉ en facture (parité legacy `createFactureFromDevis`, **durci**).
+ * ⚠️ Invariants : devis du tenant (anti-IDOR-FK → NotFound) ; **devis `accepte`** sinon Conflict
+ * (on ne facture qu'un devis accepté — le legacy ne le vérifiait pas) ; **anti-doublon** : un
+ * devis déjà facturé → Conflict (le legacy autorisait des conversions multiples). Lignes copiées
+ * (montants du devis), totaux recalculés des lignes côté infra, statut facture `brouillon`.
+ */
 export async function convertirDevisEnFacture(
   factureRepo: IFactureRepository,
   devisReader: IDevisReader,

@@ -1,17 +1,21 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { CreateRdvInput, Rdv, RdvStatut, UpdateRdvInput } from "../domain/rdv";
 
-// Options d'une transition de statut : `motifRefus` (refus) et `interventionId` (confirmation, lien
-// vers l'intervention planifiée créée). Champ absent = inchangé.
+/*
+ * Options d'une transition de statut : `motifRefus` (refus) et `interventionId` (confirmation, lien
+ * vers l'intervention planifiée créée). Champ absent = inchangé.
+ */
 export interface SetStatutOptions {
   readonly motifRefus?: string | null;
   readonly interventionId?: number | null;
 }
 
-// Port du repository rdv-en-ligne. Chaque méthode exige le TenantContext (scope tenant + RLS).
-// `rdv_en_ligne` possède un `artisanId` → double cloisonnement RLS + filtre. `clientId` est validé
-// via `ownsClient` (anti-IDOR-FK, cf. devis). Les transitions de statut passent par `setStatut`
-// (piloté par les use-cases confirmer/refuser/annuler), pas par `update`.
+/*
+ * Port du repository rdv-en-ligne. Chaque méthode exige le TenantContext (scope tenant + RLS).
+ * `rdv_en_ligne` possède un `artisanId` → double cloisonnement RLS + filtre. `clientId` est validé
+ * via `ownsClient` (anti-IDOR-FK, cf. devis). Les transitions de statut passent par `setStatut`
+ * (piloté par les use-cases confirmer/refuser/annuler), pas par `update`.
+ */
 export interface IRdvRepository {
   list(ctx: TenantContext): Promise<Rdv[]>;
   // null si le RDV n'appartient pas au tenant.

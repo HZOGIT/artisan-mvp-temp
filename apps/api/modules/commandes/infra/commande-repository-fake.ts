@@ -23,8 +23,10 @@ function calculerTotaux(lignes: readonly CreateLigneInput[]): { totalHT: number;
   return { totalHT, totalTVA, lignesHT };
 }
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
-// scoping tenant + l'ownership fournisseur (anti-IDOR-FK) + le calcul serveur des totaux.
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
+ * scoping tenant + l'ownership fournisseur (anti-IDOR-FK) + le calcul serveur des totaux.
+ */
 export class FakeCommandeRepository implements ICommandeRepository {
   private store: Commande[] = [];
   private lignesStore: LigneCommande[] = [];

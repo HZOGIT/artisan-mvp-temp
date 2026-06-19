@@ -22,10 +22,12 @@ function toModeleEmail(r: ModeleEmailRow): ModeleEmail {
   };
 }
 
-// Implémentation Drizzle du repository modeles-email. Double cloisonnement RLS + filtre `artisanId`
-// sur `modeles_email`. `artisanId` est forcé au tenant à la création. ⚠️ La règle « un seul
-// isDefault par (artisanId, type) » est portée par le write use-case (4/9), pas par le repo : le
-// repo écrit fidèlement ce qu'on lui donne.
+/*
+ * Implémentation Drizzle du repository modeles-email. Double cloisonnement RLS + filtre `artisanId`
+ * sur `modeles_email`. `artisanId` est forcé au tenant à la création. ⚠️ La règle « un seul
+ * isDefault par (artisanId, type) » est portée par le write use-case (4/9), pas par le repo : le
+ * repo écrit fidèlement ce qu'on lui donne.
+ */
 export class ModeleEmailRepositoryDrizzle implements IModeleEmailRepository {
   constructor(private readonly db: DbClient) {}
 

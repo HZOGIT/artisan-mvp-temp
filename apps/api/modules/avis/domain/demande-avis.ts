@@ -1,5 +1,7 @@
-// Types de domaine du workflow « demande d'avis » (envoi d'un lien d'avis au client
-// après une intervention) — découplés du schéma Drizzle.
+/*
+ * Types de domaine du workflow « demande d'avis » (envoi d'un lien d'avis au client
+ * après une intervention) — découplés du schéma Drizzle.
+ */
 
 export type StatutDemandeAvis = "envoyee" | "ouverte" | "completee" | "expiree";
 

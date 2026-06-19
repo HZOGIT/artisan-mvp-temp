@@ -1,7 +1,9 @@
-// Port Stripe (billing). Les use-cases en dépendent (interface), jamais du SDK. L'adapter concret
-// (`StripeAdapter`) instancie le SDK via un import variable-de-chemin (hors typecheck src), avec la
-// clé `STRIPE_SECRET_KEY` du legacy. ⚠️ Toute opération est un effet de bord facturable → tests via
-// `FakeStripePort` (aucun réseau).
+/*
+ * Port Stripe (billing). Les use-cases en dépendent (interface), jamais du SDK. L'adapter concret
+ * (`StripeAdapter`) instancie le SDK via un import variable-de-chemin (hors typecheck src), avec la
+ * clé `STRIPE_SECRET_KEY` du legacy. ⚠️ Toute opération est un effet de bord facturable → tests via
+ * `FakeStripePort` (aucun réseau).
+ */
 
 export interface StripeLineItem {
   readonly price: string;
@@ -24,16 +26,20 @@ export interface CreateCheckoutParams {
   readonly metadata: Record<string, string>;
 }
 
-// Évènement webhook Stripe (forme minimale exploitée par les use-cases). `data.object` = la
-// ressource (subscription/checkout.session/invoice…) selon `type`.
+/*
+ * Évènement webhook Stripe (forme minimale exploitée par les use-cases). `data.object` = la
+ * ressource (subscription/checkout.session/invoice…) selon `type`.
+ */
 export interface StripeWebhookEvent {
   readonly id: string;
   readonly type: string;
   readonly data: { readonly object: Record<string, unknown> };
 }
 
-// Paiement d'une facture par un CLIENT (Checkout mode `payment`, ≠ subscription). Le webhook
-// `checkout.session.completed` (déjà porté) lit `metadata.token_paiement`/`facture_id` pour solder.
+/*
+ * Paiement d'une facture par un CLIENT (Checkout mode `payment`, ≠ subscription). Le webhook
+ * `checkout.session.completed` (déjà porté) lit `metadata.token_paiement`/`facture_id` pour solder.
+ */
 export interface CreateInvoiceCheckoutParams {
   readonly factureId: number;
   readonly numeroFacture: string;
@@ -49,9 +55,11 @@ export interface CreateInvoiceCheckoutParams {
 }
 
 export interface StripePort {
-  // Vérifie la signature d'un webhook (HMAC `STRIPE_WEBHOOK_SECRET`) et renvoie l'évènement.
-  // ⚠️ **fail-closed** : LÈVE une exception si la signature est invalide → l'appelant rejette (400).
-  // Ne JAMAIS appeler avec un secret vide (un attaquant forgerait une signature à clé vide, OPE-79).
+  /*
+   * Vérifie la signature d'un webhook (HMAC `STRIPE_WEBHOOK_SECRET`) et renvoie l'évènement.
+   * ⚠️ **fail-closed** : LÈVE une exception si la signature est invalide → l'appelant rejette (400).
+   * ⚠️ Ne JAMAIS appeler avec un secret vide (un attaquant forgerait une signature à clé vide).
+   */
   constructEvent(rawBody: Buffer, signature: string, secret: string): Promise<StripeWebhookEvent>;
   // Crée un Customer Stripe (à la 1re souscription). Renvoie son id.
   createCustomer(params: CreateCustomerParams): Promise<{ id: string }>;

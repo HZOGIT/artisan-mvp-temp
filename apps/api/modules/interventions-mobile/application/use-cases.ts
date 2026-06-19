@@ -45,9 +45,11 @@ export interface EndInterventionInput {
   readonly signatureClient?: string;
 }
 
-// Interventions du jour (parité legacy). Data-minimisation RGPD : un utilisateur de rôle `technicien`
-// LIÉ à une fiche ne voit que SES interventions assignées (sinon vue complète, behavior-preserving).
-// Enrichit chaque intervention de son client + de ses données mobiles (lecture en lot, anti N+1).
+/*
+ * Interventions du jour (parité legacy). Data-minimisation RGPD : un utilisateur de rôle `technicien`
+ * LIÉ à une fiche ne voit que SES interventions assignées (sinon vue complète, behavior-preserving).
+ * Enrichit chaque intervention de son client + de ses données mobiles (lecture en lot, anti N+1).
+ */
 export async function getTodayInterventions(deps: InterventionsMobileDeps, ctx: TenantContext, now: Date = new Date()): Promise<unknown[]> {
   const { debut, fin } = bornesDuJour(now);
   let interventions = await deps.interventions.listJour(ctx, debut, fin);
@@ -68,8 +70,10 @@ export async function getTodayInterventions(deps: InterventionsMobileDeps, ctx: 
   );
 }
 
-// Démarre une intervention (arrivée sur site) : ownership via getById scopé tenant (null → NotFound,
-// anti-IDOR sans oracle) ; statut → `en_cours` ; upsert des données mobiles (heure d'arrivée + géoloc).
+/*
+ * Démarre une intervention (arrivée sur site) : ownership via getById scopé tenant (null → NotFound,
+ * anti-IDOR sans oracle) ; statut → `en_cours` ; upsert des données mobiles (heure d'arrivée + géoloc).
+ */
 export async function startIntervention(deps: InterventionsMobileDeps, ctx: TenantContext, input: StartInterventionInput, now: Date = new Date()): Promise<InterventionMobile> {
   const intervention = await deps.interventions.getById(ctx, input.interventionId);
   if (!intervention) throw new NotFoundError("Intervention non trouvée");
@@ -85,8 +89,10 @@ export async function startIntervention(deps: InterventionsMobileDeps, ctx: Tena
   return deps.mobile.createArrivee(ctx, { interventionId: input.interventionId, heureArrivee: now, latitude, longitude });
 }
 
-// Termine une intervention : ownership scopé tenant ; statut → `terminee` ; si des données mobiles
-// existent, enregistre l'heure de départ + notes + signature client (date de signature si fournie).
+/*
+ * Termine une intervention : ownership scopé tenant ; statut → `terminee` ; si des données mobiles
+ * existent, enregistre l'heure de départ + notes + signature client (date de signature si fournie).
+ */
 export async function endIntervention(deps: InterventionsMobileDeps, ctx: TenantContext, input: EndInterventionInput, now: Date = new Date()): Promise<{ success: true }> {
   const intervention = await deps.interventions.getById(ctx, input.interventionId);
   if (!intervention) throw new NotFoundError("Intervention non trouvée");

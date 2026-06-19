@@ -5,9 +5,11 @@ import type { RateLimiterPort } from "../../../shared/ports/rate-limiter";
 import type { ArtisanReader, ClientReader } from "./contact-readers";
 import type { IFactureRepository } from "./facture-repository";
 
-// Relance d'une facture impayée par email (parité fonctionnelle du legacy `execEnvoyerRelance`) :
-// rappel + jours de retard, **sans PDF**, **sans changement de statut**. Tout est injecté (interfaces)
-// → testable sans infra. Porté dans le new-stack (le legacy `server/` est voué à la suppression).
+/*
+ * Relance d'une facture impayée par email (parité fonctionnelle du legacy `execEnvoyerRelance`) :
+ * rappel + jours de retard, **sans PDF**, **sans changement de statut**. Tout est injecté (interfaces)
+ * → testable sans infra. Porté dans le new-stack (le legacy `server/` est voué à la suppression).
+ */
 
 export interface RelanceMailingDeps {
   readonly artisanReader: ArtisanReader;
@@ -40,8 +42,10 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Sujet + corps HTML du rappel (pur, testable) — parité du template legacy `buildRelanceEmailBody`
-// (en-tête rouge, n° facture, montant TTC, jours de retard). `customMessage` éventuel ajouté (échappé).
+/*
+ * Sujet + corps HTML du rappel (pur, testable) — parité du template legacy `buildRelanceEmailBody`
+ * (en-tête rouge, n° facture, montant TTC, jours de retard). `customMessage` éventuel ajouté (échappé).
+ */
 export function buildRelanceEmail(params: {
   artisanName: string;
   clientName: string;
@@ -100,8 +104,10 @@ export function joursDeRetard(dateEcheance: Date | null | undefined, now: number
   return Math.max(0, Math.floor((now - new Date(dateEcheance).getTime()) / 86400000));
 }
 
-// Envoie une relance pour une facture impayée : ownership 404, email client requis 400, rate-limit
-// 429 ; email rappel SANS PDF ; **aucun changement de statut** (parité legacy).
+/*
+ * Envoie une relance pour une facture impayée : ownership 404, email client requis 400, rate-limit
+ * 429 ; email rappel SANS PDF ; **aucun changement de statut** (parité legacy).
+ */
 export async function envoyerRelanceFacture(
   repo: IFactureRepository,
   deps: RelanceMailingDeps,

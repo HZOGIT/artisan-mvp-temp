@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IAvisRepository } from "./avis-repository";
 import type { Avis, AvisEnrichi, AvisStats } from "../domain/avis";
 
-// Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
-// par le `TenantContext` (le repo l'applique). `getAvis` sur une ressource d'un autre
-// tenant → le repo renvoie null → on lève NotFoundError (ne révèle pas l'existence).
+/*
+ * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté
+ * par le `TenantContext` (le repo l'applique). `getAvis` sur une ressource d'un autre
+ * tenant → le repo renvoie null → on lève NotFoundError (ne révèle pas l'existence).
+ */
 
 export function listAvis(repo: IAvisRepository, ctx: TenantContext): Promise<Avis[]> {
   return repo.list(ctx);

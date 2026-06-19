@@ -1,6 +1,8 @@
-// Transaction bancaire importée d'un relevé (table `transactions_bancaires`, RLS sur artisan_id).
-// `montant` numeric PG en string ; `type_transaction` = debit|credit. Une transaction peut être
-// liée à une dépense (`depenseId`) après conversion, ou marquée `ignoree`.
+/*
+ * Transaction bancaire importée d'un relevé (table `transactions_bancaires`, RLS sur artisan_id).
+ * `montant` numeric PG en string ; `type_transaction` = debit|credit. Une transaction peut être
+ * liée à une dépense (`depenseId`) après conversion, ou marquée `ignoree`.
+ */
 export type TransactionType = "debit" | "credit";
 
 export interface TransactionBancaire {

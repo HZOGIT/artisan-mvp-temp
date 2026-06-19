@@ -30,9 +30,11 @@ function toNoteDeFrais(r: NoteRow): NoteDeFrais {
   };
 }
 
-// Implémentation Drizzle du repository notes-de-frais. Double cloisonnement RLS + filtre
-// `artisan_id` (snake_case). ⚠️ `update` ne touche que les métadonnées (`UpdateNoteDeFraisInput`
-// exclut statut/dates workflow/commentaire) → le workflow d'approbation est porté ailleurs.
+/*
+ * Implémentation Drizzle du repository notes-de-frais. Double cloisonnement RLS + filtre
+ * `artisan_id` (snake_case). ⚠️ `update` ne touche que les métadonnées (`UpdateNoteDeFraisInput`
+ * exclut statut/dates workflow/commentaire) → le workflow d'approbation est porté ailleurs.
+ */
 export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
   nextNumero(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
@@ -46,8 +48,10 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
     });
   }
 
-  // OPE-490 — dépenses liées à une note (détails), scopé tenant. Note du tenant requise (anti-IDOR :
-  // [] sinon). Join `notes_frais_depenses ⋈ depenses` (même pattern que le recalcul de montant).
+  /*
+   * Dépenses liées à une note (détails), scopé tenant. ⚠️ Note du tenant requise (anti-IDOR :
+   * [] sinon). Join `notes_frais_depenses ⋈ depenses` (même pattern que le recalcul de montant).
+   */
   getDepensesForNote(ctx: TenantContext, noteId: number): Promise<NoteFraisDepense[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const [note] = await tx.select({ id: notesDeFrais.id }).from(notesDeFrais).where(and(eq(notesDeFrais.id, noteId), eq(notesDeFrais.artisan_id, ctx.artisanId))).limit(1);
@@ -76,8 +80,10 @@ export class NoteDeFraisRepositoryDrizzle implements INoteDeFraisRepository {
     });
   }
 
-  // OPE-490 — compteur de dépenses liées par note (tenant) : Map noteId → count. Join via les notes
-  // du tenant (scope l'agrégat au tenant sans exposer les liens d'autrui).
+  /*
+   * Compteur de dépenses liées par note (tenant) : Map noteId → count. Join via les notes
+   * du tenant (scope l'agrégat au tenant sans exposer les liens d'autrui).
+   */
   countDepensesByNote(ctx: TenantContext): Promise<Map<number, number>> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx

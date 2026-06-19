@@ -16,9 +16,11 @@ function parseDate(v: unknown): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-// Route HORS-tRPC `GET /api/comptabilite/fec` (export FEC opposable, auth cookie JWT). Réutilise le
-// générateur FEC PUR déjà porté (`buildFec`, invariant Σdébit=Σcrédit). Renvoie un fichier texte
-// téléchargeable (BOM UTF-8 pour les outils comptables DGFiP) + en-têtes de conformité.
+/*
+ * Route HORS-tRPC `GET /api/comptabilite/fec` (export FEC opposable, auth cookie JWT). Réutilise le
+ * générateur FEC PUR déjà porté (`buildFec`, invariant Σdébit=Σcrédit). Renvoie un fichier texte
+ * téléchargeable (BOM UTF-8 pour les outils comptables DGFiP) + en-têtes de conformité.
+ */
 export function registerComptabiliteExportRoute(app: FastifyInstance, deps: ComptaExportDeps): void {
   app.get("/api/comptabilite/fec", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

@@ -3,9 +3,11 @@ import type { IConfigRelancesRepository } from "../application/config-relances-r
 import { defaultConfigRelances } from "../domain/config-relances";
 import type { ConfigRelancesAuto, UpdateConfigRelancesInput } from "../domain/config-relances";
 
-// Implémentation in-memory du repository config-relances (tests sans DB). Reproduit les invariants
-// du repo Drizzle : singleton par artisanId, défauts si absent (jamais null), upsert qui fusionne les
-// champs config fournis, `artisanId` forcé au tenant.
+/*
+ * Implémentation in-memory du repository config-relances (tests sans DB). Reproduit les invariants
+ * du repo Drizzle : singleton par artisanId, défauts si absent (jamais null), upsert qui fusionne les
+ * champs config fournis, `artisanId` forcé au tenant.
+ */
 export class FakeConfigRelancesRepository implements IConfigRelancesRepository {
   private readonly store = new Map<number, ConfigRelancesAuto>();
 

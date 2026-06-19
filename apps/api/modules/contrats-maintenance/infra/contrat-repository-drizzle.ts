@@ -64,10 +64,12 @@ function toContrat(r: ContratRow): Contrat {
   };
 }
 
-// Implémentation Drizzle du repository contrats-maintenance. Double cloisonnement RLS + filtre
-// `artisanId` sur `contrats_maintenance`. `artisanId` forcé et `statut="actif"` posé à la création ;
-// `reference` générée serveur (jamais fournie par le client). Les transitions de statut passent par
-// `setStatut` ; `update` ne touche que les métadonnées. `clientId` validé via `ownsClient`.
+/*
+ * Implémentation Drizzle du repository contrats-maintenance. Double cloisonnement RLS + filtre
+ * `artisanId` sur `contrats_maintenance`. `artisanId` forcé et `statut="actif"` posé à la création ;
+ * `reference` générée serveur (jamais fournie par le client). Les transitions de statut passent par
+ * `setStatut` ; `update` ne touche que les métadonnées. `clientId` validé via `ownsClient`.
+ */
 export class ContratRepositoryDrizzle implements IContratRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -182,8 +184,10 @@ export class ContratRepositoryDrizzle implements IContratRepository {
 
   nextReference(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Génération serveur scopée tenant : borne sur MAX(reference) des contrats de l'artisan
-      // (pas de compteur en base ; suffixe numérique `-(\d+)` incrémenté).
+      /*
+       * Génération serveur scopée tenant : borne sur MAX(reference) des contrats de l'artisan
+       * (pas de compteur en base ; suffixe numérique `-(\d+)` incrémenté).
+       */
       const [maxRow] = await tx
         .select({ maxRef: sql<string | null>`max(${contratsMaintenance.reference})` })
         .from(contratsMaintenance)
@@ -196,8 +200,10 @@ export class ContratRepositoryDrizzle implements IContratRepository {
 
   listAFacturer(ctx: TenantContext): Promise<ContratAFacturerRow[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Parité legacy `getContratsAFacturer` : actifs, prochainFacturation ≤ fin de journée, du plus
-      // ancien au plus récent. Jointure client (left) pour le nom (scopée tenant par le filtre artisanId).
+      /*
+       * Parité legacy `getContratsAFacturer` : actifs, prochainFacturation ≤ fin de journée, du plus
+       * ancien au plus récent. Jointure client (left) pour le nom (scopée tenant par le filtre artisanId).
+       */
       const endOfToday = new Date();
       endOfToday.setHours(23, 59, 59, 999);
       const rows = await tx

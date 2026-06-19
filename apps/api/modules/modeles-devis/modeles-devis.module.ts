@@ -1,8 +1,10 @@
 import type { IModeleDevisRepository } from "./application/modele-devis-repository";
 import { createModelesDevisRouter } from "./interface/trpc/modeles-devis.router";
 
-// Wiring DI du module modeles-devis : assemble le routeur tRPC (CRUD agrégat) à partir du
-// repository injecté.
+/*
+ * Wiring DI du module modeles-devis : assemble le routeur tRPC (CRUD agrégat) à partir du
+ * repository injecté.
+ */
 export interface ModelesDevisModuleDeps {
   readonly repository: IModeleDevisRepository;
 }

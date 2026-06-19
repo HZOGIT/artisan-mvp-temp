@@ -48,10 +48,12 @@ function toLigne(l: Record<string, unknown>): LigneDevisIa {
   };
 }
 
-// Génère des lignes de devis à partir d'une description de chantier (parité legacy
-// `devis.genererLignesIA`). ⚠️ **Lecture seule, RIEN n'est persisté.** Invariants : rate-limit IA
-// (429) ; parse JSON **défensif** (proposition vide si non parsable) ; erreurs IA assainies (pas de
-// fuite de clé). Renvoie `{objet, dureeEstimee, lignes, notes, conseilsArtisan}`.
+/*
+ * Génère des lignes de devis à partir d'une description de chantier (parité legacy
+ * `devis.genererLignesIA`). ⚠️ **Lecture seule, RIEN n'est persisté.** Invariants : rate-limit IA
+ * (429) ; parse JSON **défensif** (proposition vide si non parsable) ; erreurs IA assainies (pas de
+ * fuite de clé). Renvoie `{objet, dureeEstimee, lignes, notes, conseilsArtisan}`.
+ */
 export async function genererLignesDevisIA(
   deps: DevisIaDeps,
   ctx: TenantContext,

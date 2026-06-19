@@ -3,17 +3,21 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "./chantier-repository";
 import type { Chantier, ChantierPhase, ChantierStatistiques } from "../domain/chantier";
 
-// Use-cases « statistiques de chantier » (lecture seule) + recalcul d'avancement. L'agrégat est
-// calculé par une fonction PURE (`computeStatistiques`) — testable sans I/O. Parité legacy
-// `getStatistiquesChantier` / `calculerAvancementChantier` (server/db.ts).
+/*
+ * Use-cases « statistiques de chantier » (lecture seule) + recalcul d'avancement. L'agrégat est
+ * calculé par une fonction PURE (`computeStatistiques`) — testable sans I/O. Parité legacy
+ * `getStatistiquesChantier` / `calculerAvancementChantier` (server/db.ts).
+ */
 
 function num(s: string | null | undefined): number {
   const n = parseFloat(String(s ?? "0"));
   return Number.isFinite(n) ? n : 0;
 }
 
-// Agrégat pur : combine le chantier, ses phases, le nombre d'interventions/documents liés et le
-// coût réel (somme des dépenses TTC) en statistiques. `coutReel`>0 prime sur `budgetRealise` manuel.
+/*
+ * Agrégat pur : combine le chantier, ses phases, le nombre d'interventions/documents liés et le
+ * coût réel (somme des dépenses TTC) en statistiques. `coutReel`>0 prime sur `budgetRealise` manuel.
+ */
 export function computeStatistiques(
   chantier: Chantier,
   phases: readonly ChantierPhase[],
@@ -58,8 +62,10 @@ export async function getStatistiquesChantier(
   return computeStatistiques(chantier, phases, liens.length, documents.length, coutReel);
 }
 
-// Recalcule l'avancement d'un chantier possédé (404 sinon) = moyenne des avancements de ses phases
-// (0 si aucune phase, sans écriture — parité legacy). Persiste le résultat (MAJ `chantiers.avancement`).
+/*
+ * Recalcule l'avancement d'un chantier possédé (404 sinon) = moyenne des avancements de ses phases
+ * (0 si aucune phase, sans écriture — parité legacy). Persiste le résultat (MAJ `chantiers.avancement`).
+ */
 export async function calculerAvancementChantier(
   repo: IChantierRepository,
   ctx: TenantContext,

@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IBudgetCategorieRepository } from "../application/budget-categorie-repository";
 import type { BudgetCategorie, CreateBudgetInput, UpdateBudgetInput } from "../domain/budget-categorie";
 
-// Implémentation in-memory du repository budgets-categories (tests sans DB). Reproduit les invariants
-// du repo Drizzle : scope par artisanId, artisanId forcé, défauts montants "0", unicité (artisanId,
-// categorie, mois) → ConflictError, update qui ne touche que les montants.
+/*
+ * Implémentation in-memory du repository budgets-categories (tests sans DB). Reproduit les invariants
+ * du repo Drizzle : scope par artisanId, artisanId forcé, défauts montants "0", unicité (artisanId,
+ * categorie, mois) → ConflictError, update qui ne touche que les montants.
+ */
 export class FakeBudgetCategorieRepository implements IBudgetCategorieRepository {
   private readonly store: BudgetCategorie[] = [];
   private seq = 0;

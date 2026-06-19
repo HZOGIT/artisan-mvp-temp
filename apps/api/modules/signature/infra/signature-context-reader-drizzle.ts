@@ -10,10 +10,12 @@ import type {
   SignatureNotificationType,
 } from "../application/signature-repository";
 
-// Lecture du contexte d'un devis (devis + client + artisan) pour composer le lien de signature, SOUS
-// LE TENANT (RLS). `devis` et `clients` sont scopés par RLS/artisanId ; `artisans` (identité, HORS
-// RLS) est filtré explicitement par `ctx.artisanId`. Renvoie `null` si le devis n'appartient pas au
-// tenant → anti-IDOR du parent (la signature reste inaccessible).
+/*
+ * Lecture du contexte d'un devis (devis + client + artisan) pour composer le lien de signature, SOUS
+ * LE TENANT (RLS). `devis` et `clients` sont scopés par RLS/artisanId ; `artisans` (identité, HORS
+ * RLS) est filtré explicitement par `ctx.artisanId`. Renvoie `null` si le devis n'appartient pas au
+ * tenant → anti-IDOR du parent (la signature reste inaccessible).
+ */
 export class SignatureContextReaderDrizzle implements SignatureDevisContextReader {
   constructor(private readonly db: DbClient) {}
 

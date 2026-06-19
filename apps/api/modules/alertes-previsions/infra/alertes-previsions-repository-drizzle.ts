@@ -44,8 +44,10 @@ const CONFIG_COLS = new Set<keyof SaveAlerteConfigInput>([
   "emailDestination", "telephoneDestination", "frequenceVerification", "actif",
 ]);
 
-// Repository Drizzle alertes-prévisions. Tables SOUS RLS (artisanId via `app.tenant`) → toutes les
-// requêtes passent par `withTenant` (double cloisonnement RLS + filtre explicite `artisanId`).
+/*
+ * Repository Drizzle alertes-prévisions. Tables SOUS RLS (artisanId via `app.tenant`) → toutes les
+ * requêtes passent par `withTenant` (double cloisonnement RLS + filtre explicite `artisanId`).
+ */
 export class AlertesPrevisionsRepositoryDrizzle implements IAlertesPrevisionsRepository {
   constructor(private readonly db: DbClient) {}
 

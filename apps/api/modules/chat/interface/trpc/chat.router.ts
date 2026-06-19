@@ -14,8 +14,10 @@ import {
 
 const convIdInput = z.object({ conversationId: z.number().int() });
 
-// Routeur tRPC du domaine chat (messagerie support artisan↔client). Toutes `protectedProcedure`,
-// request/response. Ownership → ForbiddenError (mappé 403) ; notification email best-effort.
+/*
+ * Routeur tRPC du domaine chat (messagerie support artisan↔client). Toutes `protectedProcedure`,
+ * request/response. Ownership → ForbiddenError (mappé 403) ; notification email best-effort.
+ */
 export function createChatRouter(deps: ChatDeps) {
   return router({
     getConversations: protectedProcedure.query(({ ctx }) => getConversations(deps, ctx.tenant!)),

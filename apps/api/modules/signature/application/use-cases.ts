@@ -23,9 +23,11 @@ export interface SignatureDeps {
   readonly maintenant?: () => Date;
 }
 
-// `signature.getSignatureByDevis` (parité legacy) : signature d'un devis DU TENANT. Anti-IDOR via le
-// devis parent — on lit d'abord le devis sous RLS ; s'il n'appartient pas au tenant → `null` (jamais
-// la signature d'un autre artisan). Lecture seule.
+/*
+ * `signature.getSignatureByDevis` (parité legacy) : signature d'un devis DU TENANT. Anti-IDOR via le
+ * devis parent — on lit d'abord le devis sous RLS ; s'il n'appartient pas au tenant → `null` (jamais
+ * la signature d'un autre artisan). Lecture seule.
+ */
 export async function getSignatureByDevis(
   deps: SignatureDeps,
   ctx: TenantContext,
@@ -36,11 +38,13 @@ export async function getSignatureByDevis(
   return deps.repo.getByDevisId(devisId);
 }
 
-// `signature.createSignatureLink` (parité legacy) : génère (ou renvoie, idempotent) le lien de
-// signature d'un devis du tenant, puis envoie l'email au client + crée une notification.
-// - Anti-IDOR : le devis doit appartenir au tenant (lecture RLS) sinon 404.
-// - Idempotent : si une signature existe déjà pour ce devis, on la renvoie sans rien recréer/renvoyer.
-// - Email/notification best-effort : l'email ne doit pas faire échouer la création du lien.
+/*
+ * `signature.createSignatureLink` (parité legacy) : génère (ou renvoie, idempotent) le lien de
+ * signature d'un devis du tenant, puis envoie l'email au client + crée une notification.
+ * - Anti-IDOR : le devis doit appartenir au tenant (lecture RLS) sinon 404.
+ * - Idempotent : si une signature existe déjà pour ce devis, on la renvoie sans rien recréer/renvoyer.
+ * - Email/notification best-effort : l'email ne doit pas faire échouer la création du lien.
+ */
 export async function createSignatureLink(
   deps: SignatureDeps,
   ctx: TenantContext,

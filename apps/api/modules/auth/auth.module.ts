@@ -5,8 +5,10 @@ import type { EmailPort } from "../../shared/ports/email";
 import type { PasswordHasher } from "../../shared/ports/password-hasher";
 import type { RateLimiterPort } from "../../shared/ports/rate-limiter";
 
-// Wiring DI du module `auth`. ⚠️ `jwtSecret` DOIT être le même que le legacy (cookie inter-opérable).
-// `tokenTtl` par défaut 7 j. `email`/`resetRateLimiter`/`appUrl` servent le flow reset (forgotPassword).
+/*
+ * Wiring DI du module `auth`. ⚠️ `jwtSecret` DOIT être le même que le legacy (cookie inter-opérable).
+ * `tokenTtl` par défaut 7 j. `email`/`resetRateLimiter`/`appUrl` servent le flow reset (forgotPassword).
+ */
 export interface AuthModuleDeps {
   readonly repository: IAuthRepository;
   readonly hasher: PasswordHasher;

@@ -10,10 +10,12 @@ import type {
 } from "../domain/devis";
 import { calculerMontantsLigne, calculerTotaux } from "../application/montants";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant, la numérotation (préfixe "DEV" + compteur), le recalcul des totaux côté serveur et le
-// scoping des lignes via le devis parent (devis_lignes SANS artisanId). ⚠️ `update` ne touche
-// que les métadonnées (clientId/numero/statut/totaux réservés).
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant, la numérotation (préfixe "DEV" + compteur), le recalcul des totaux côté serveur et le
+ * scoping des lignes via le devis parent (devis_lignes SANS artisanId). ⚠️ `update` ne touche
+ * que les métadonnées (clientId/numero/statut/totaux réservés).
+ */
 export class FakeDevisRepository implements IDevisRepository {
   private devisStore: Devis[] = [];
   private lignesStore: DevisLigne[] = [];
@@ -28,8 +30,10 @@ export class FakeDevisRepository implements IDevisRepository {
     this.ownedClients.add(`${artisanId}:${clientId}`);
   }
 
-  // Aide de test : force le statut d'un devis (le statut n'est pas modifiable via l'interface
-  // publique — il sera piloté par le workflow en 7/9). Sert à tester l'immutabilité post-acceptation.
+  /*
+   * Aide de test : force le statut d'un devis (le statut n'est pas modifiable via l'interface
+   * publique — il sera piloté par le workflow en 7/9). Sert à tester l'immutabilité post-acceptation.
+   */
   setStatutForTest(id: number, statut: Devis["statut"]): void {
     this.devisStore = this.devisStore.map((d) => (d.id === id ? { ...d, statut } : d));
   }

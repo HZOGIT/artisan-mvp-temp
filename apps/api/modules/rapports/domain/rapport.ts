@@ -1,6 +1,8 @@
-// Rapports personnalisables (table `rapports_personnalises`, sous RLS via `artisanId`). L'exécution
-// (`executerRapport`) sélectionne, selon le `type`, toutes les lignes de l'entité scopée tenant et
-// journalise l'exécution (table `executions_rapports`, sous RLS).
+/*
+ * Rapports personnalisables (table `rapports_personnalises`, sous RLS via `artisanId`). L'exécution
+ * (`executerRapport`) sélectionne, selon le `type`, toutes les lignes de l'entité scopée tenant et
+ * journalise l'exécution (table `executions_rapports`, sous RLS).
+ */
 export type RapportType = "ventes" | "clients" | "interventions" | "stocks" | "fournisseurs" | "techniciens" | "financier";
 export type RapportFormat = "tableau" | "graphique" | "liste";
 export type RapportGraphiqueType = "bar" | "line" | "pie" | "doughnut";

@@ -1,6 +1,8 @@
-// Option (« variante ») d'un devis : une proposition alternative attachée à un devis parent (table
-// `devis_options`, SANS artisanId → hors RLS). L'isolation multi-tenant est portée par l'appartenance
-// du DEVIS parent (lui sous RLS + filtre artisanId). Montants stockés tels quels (chaînes numeric).
+/*
+ * Option (« variante ») d'un devis : une proposition alternative attachée à un devis parent (table
+ * `devis_options`, SANS artisanId → hors RLS). L'isolation multi-tenant est portée par l'appartenance
+ * du DEVIS parent (lui sous RLS + filtre artisanId). Montants stockés tels quels (chaînes numeric).
+ */
 export interface DevisOption {
   readonly id: number;
   readonly devisId: number;

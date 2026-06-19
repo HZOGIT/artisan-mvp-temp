@@ -91,10 +91,12 @@ function toBadgeTech(r: BadgeTechRow): BadgeTechnicien {
   };
 }
 
-// Implémentation Drizzle du repository badges. Double cloisonnement sur `badges`
-// (RLS rôle app + app.tenant via withTenant) ET filtre explicite `artisanId`.
-// `badges_techniciens` n'a pas d'artisanId → on vérifie l'appartenance du technicien
-// ET du badge au tenant avant tout accès (ressource hors tenant → []/null) : anti-IDOR.
+/*
+ * Implémentation Drizzle du repository badges. Double cloisonnement sur `badges`
+ * (RLS rôle app + app.tenant via withTenant) ET filtre explicite `artisanId`.
+ * `badges_techniciens` n'a pas d'artisanId → on vérifie l'appartenance du technicien
+ * ET du badge au tenant avant tout accès (ressource hors tenant → []/null) : anti-IDOR.
+ */
 export class BadgeRepositoryDrizzle implements IBadgeRepository {
   constructor(
     private readonly db: DbClient,
@@ -147,8 +149,10 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Vérifie l'appartenance AVANT de toucher les attributions (badges_techniciens
-      // n'a pas d'artisanId → on ne doit pas supprimer celles d'un autre tenant).
+      /*
+       * Vérifie l'appartenance AVANT de toucher les attributions (badges_techniciens
+       * n'a pas d'artisanId → on ne doit pas supprimer celles d'un autre tenant).
+       */
       if (!(await this.ownsBadge(tx, ctx, id))) return false;
       await tx.delete(badgesTechniciens).where(eq(badgesTechniciens.badgeId, id));
       const deleted = await tx
@@ -232,9 +236,11 @@ export class BadgeRepositoryDrizzle implements IBadgeRepository {
     return withTenant(this.db, ctx, async (tx) => {
       const { debut, fin } = bornesPeriode(periode, this.maintenant());
 
-      // Agrège par technicien : nb interventions terminées + CA des factures payées
-      // rattachées. Condition `statut='payee'` dans le ON (préserve la sémantique LEFT JOIN).
-      // Tout scopé tenant (interventions.artisanId = ctx.artisanId, RLS sur les 3 tables).
+      /*
+       * Agrège par technicien : nb interventions terminées + CA des factures payées
+       * rattachées. Condition `statut='payee'` dans le ON (préserve la sémantique LEFT JOIN).
+       * Tout scopé tenant (interventions.artisanId = ctx.artisanId, RLS sur les 3 tables).
+       */
       const rows = await tx
         .select({
           technicienId: interventions.technicienId,

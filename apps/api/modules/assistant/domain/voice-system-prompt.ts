@@ -5,10 +5,12 @@ export interface VoiceHistoryMessage {
   readonly transcript: string;
 }
 
-// Instruction système de la session vocale Live (parité legacy `/api/voice/token`) : prompt métier de
-// base + historique récent + liste des outils appelables + RÈGLES STRICTES (appeler réellement les
-// fonctions, ne rien inventer). PUR. Le setup Live déclare AUSSI les outils (`function_declarations`) ;
-// les lister dans le prompt empêche le modèle de « réciter » un appel au lieu de l'exécuter.
+/*
+ * Instruction système de la session vocale Live (parité legacy `/api/voice/token`) : prompt métier de
+ * base + historique récent + liste des outils appelables + RÈGLES STRICTES (appeler réellement les
+ * fonctions, ne rien inventer). PUR. Le setup Live déclare AUSSI les outils (`function_declarations`) ;
+ * les lister dans le prompt empêche le modèle de « réciter » un appel au lieu de l'exécuter.
+ */
 export function buildVoiceSystemInstruction(input: { baseSystem: string; history: readonly VoiceHistoryMessage[]; tools: readonly ToolSchema[] }): string {
   let text = input.baseSystem;
 

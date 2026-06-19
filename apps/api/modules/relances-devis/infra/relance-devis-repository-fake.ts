@@ -2,9 +2,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRelanceDevisRepository } from "../application/relance-devis-repository";
 import type { CreateRelanceInput, RelanceDevis } from "../domain/relance-devis";
 
-// Implémentation in-memory du repository relances-devis (tests sans DB). Reproduit les invariants du
-// repo Drizzle : scope par artisanId, artisanId forcé, statut défaut "envoye", pas d'update
-// (immuabilité), ownsDevis via un Set de devisIds seedable.
+/*
+ * Implémentation in-memory du repository relances-devis (tests sans DB). Reproduit les invariants du
+ * repo Drizzle : scope par artisanId, artisanId forcé, statut défaut "envoye", pas d'update
+ * (immuabilité), ownsDevis via un Set de devisIds seedable.
+ */
 export class FakeRelanceDevisRepository implements IRelanceDevisRepository {
   private readonly store: RelanceDevis[] = [];
   private seq = 0;

@@ -2,8 +2,10 @@
 
 export type PeriodeClassement = "semaine" | "mois" | "trimestre" | "annee";
 
-// Une ligne de classement (technicien classé sur une période). Montants en string
-// (numeric PG) pour préserver la précision. Scopé tenant (artisanId + RLS).
+/*
+ * Une ligne de classement (technicien classé sur une période). Montants en string
+ * (numeric PG) pour préserver la précision. Scopé tenant (artisanId + RLS).
+ */
 export interface ClassementEntry {
   readonly id: number;
   readonly technicienId: number;

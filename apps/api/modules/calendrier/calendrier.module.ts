@@ -2,8 +2,10 @@ import type { IIcalFeedRepository, TokenGenerator } from "./application/ical-fee
 import { randomHexToken } from "./infra/token-generator";
 import { createCalendrierRouter } from "./interface/trpc/calendrier.router";
 
-// Wiring DI du module « calendrier » (jeton de flux iCal). `genererToken` injectable (défaut : jeton
-// hex aléatoire) pour des tests déterministes.
+/*
+ * Wiring DI du module « calendrier » (jeton de flux iCal). `genererToken` injectable (défaut : jeton
+ * hex aléatoire) pour des tests déterministes.
+ */
 export interface CalendrierModuleDeps {
   readonly repository: IIcalFeedRepository;
   readonly genererToken?: TokenGenerator;

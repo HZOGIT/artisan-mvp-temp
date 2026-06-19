@@ -1,8 +1,10 @@
 import type { SupportDeps } from "./application/use-cases";
 import { createSupportRouter } from "./interface/trpc/support.router";
 
-// Wiring DI du module « support » (formulaire de contact → email). Sans table : dépend de l'EmailPort,
-// d'un rate-limiter (anti-flood) et de la boîte support destinataire.
+/*
+ * Wiring DI du module « support » (formulaire de contact → email). Sans table : dépend de l'EmailPort,
+ * d'un rate-limiter (anti-flood) et de la boîte support destinataire.
+ */
 export interface SupportModuleDeps extends SupportDeps {}
 
 export interface SupportModule {

@@ -2,9 +2,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IModeleEmailRepository } from "../application/modele-email-repository";
 import type { CreateModeleEmailInput, ModeleEmail, TypeModeleEmail, UpdateModeleEmailInput } from "../domain/modele-email";
 
-// Implémentation in-memory du repository modeles-email (tests sans DB). Reproduit les invariants du
-// repo Drizzle : scope par artisanId, artisanId forcé à la création, isDefault défaut false, id
-// séquentiel. La règle « un seul isDefault par (artisanId, type) » reste portée par le use-case.
+/*
+ * Implémentation in-memory du repository modeles-email (tests sans DB). Reproduit les invariants du
+ * repo Drizzle : scope par artisanId, artisanId forcé à la création, isDefault défaut false, id
+ * séquentiel. La règle « un seul isDefault par (artisanId, type) » reste portée par le use-case.
+ */
 export class FakeModeleEmailRepository implements IModeleEmailRepository {
   private readonly store: ModeleEmail[] = [];
   private seq = 0;

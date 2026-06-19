@@ -25,11 +25,13 @@ export interface DevisForSignature extends SignatureDevisView {
   readonly signature: Signature;
 }
 
-// `signature.getDevisForSignature` (parité legacy, PUBLIC par token) : affiche le devis à signer.
-// - token inconnu → 404 (anti-oracle : message uniforme « invalide ou expiré »).
-// - **lien expiré ET toujours en_attente → 400** (un devis déjà signé/refusé reste consultable).
-// - read-receipt `markDevisVu` best-effort (1ʳᵉ consultation), n'altère jamais la réponse.
-// Les sous-ressources (client/artisan/lignes/options) sont lues SOUS LE TENANT résolu via le token.
+/*
+ * `signature.getDevisForSignature` (parité legacy, PUBLIC par token) : affiche le devis à signer.
+ * - token inconnu → 404 (anti-oracle : message uniforme « invalide ou expiré »).
+ * - **lien expiré ET toujours en_attente → 400** (un devis déjà signé/refusé reste consultable).
+ * - read-receipt `markDevisVu` best-effort (1ʳᵉ consultation), n'altère jamais la réponse.
+ * Les sous-ressources (client/artisan/lignes/options) sont lues SOUS LE TENANT résolu via le token.
+ */
 export async function getDevisForSignature(
   deps: SignaturePublicDeps,
   token: string,
@@ -64,10 +66,12 @@ function tenantOf(artisanId: number): TenantContext {
   return { artisanId, userId: 0 };
 }
 
-// `signature.selectDevisOption` (PUBLIC) : le client choisit une option/variante AVANT de signer.
-// - token inconnu → 404 ; **déjà signé (`signedAt`) → 400** ; expiré → 400.
-// - l'option doit appartenir AU devis de la signature (sinon 404, anti-IDOR).
-// - anti-flood : rate-limit par signature (`sig:<id>`).
+/*
+ * `signature.selectDevisOption` (PUBLIC) : le client choisit une option/variante AVANT de signer.
+ * - token inconnu → 404 ; **déjà signé (`signedAt`) → 400** ; expiré → 400.
+ * - l'option doit appartenir AU devis de la signature (sinon 404, anti-IDOR).
+ * - anti-flood : rate-limit par signature (`sig:<id>`).
+ */
 export async function selectDevisOption(
   deps: SignaturePublicDeps,
   input: { token: string; optionId: number },
@@ -90,11 +94,13 @@ export async function selectDevisOption(
   return { success: true, optionId: input.optionId };
 }
 
-// `signature.signDevis` (PUBLIC) : le client signe le devis.
-// - token inconnu → 404 ; **statut ≠ `en_attente` → 400** (immutabilité/anti-rejeu) ; expiré → 400.
-// - capture IP probante + UA (résolus au routeur depuis ctx) ; signatures_devis→accepte ET devis→accepte
-//   en transaction sous le tenant (garde SQL `statut='en_attente'`).
-// - notification + email artisan best-effort (ne casse pas la signature).
+/*
+ * `signature.signDevis` (PUBLIC) : le client signe le devis.
+ * - token inconnu → 404 ; **statut ≠ `en_attente` → 400** (immutabilité/anti-rejeu) ; expiré → 400.
+ * - capture IP probante + UA (résolus au routeur depuis ctx) ; signatures_devis→accepte ET devis→accepte
+ *   en transaction sous le tenant (garde SQL `statut='en_attente'`).
+ * - notification + email artisan best-effort (ne casse pas la signature).
+ */
 export async function signDevis(
   deps: SignaturePublicDeps,
   input: {
@@ -187,8 +193,10 @@ export async function refuseDevis(
   return { success: true, signature };
 }
 
-// Notifie l'artisan (notification + email) après sign/refuse — **best-effort** : un échec (vue
-// introuvable, email KO) n'altère jamais le résultat de la mutation déjà persistée.
+/*
+ * Notifie l'artisan (notification + email) après sign/refuse — **best-effort** : un échec (vue
+ * introuvable, email KO) n'altère jamais le résultat de la mutation déjà persistée.
+ */
 async function notifyArtisanBestEffort(
   deps: SignaturePublicDeps,
   ctx: TenantContext,

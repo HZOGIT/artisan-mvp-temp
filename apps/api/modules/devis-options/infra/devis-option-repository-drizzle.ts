@@ -26,11 +26,13 @@ function toOption(r: Row): DevisOption {
   };
 }
 
-// Implémentation Drizzle des options de devis. Les tables `devis_options`/`devis_options_lignes` n'ont
-// PAS d'artisanId (hors RLS) : chaque opération vérifie d'abord l'appartenance du DEVIS parent (sous
-// RLS + filtre explicite `artisanId`) DANS la même transaction `withTenant`. Pas de propriété du devis
-// ⇒ sentinel null/false (le use-case lève NotFoundError). Anti-IDOR identique au legacy
-// `assertDevisOwner`/`assertOptionOwner`, mais renforcé par la RLS de la transaction.
+/*
+ * Implémentation Drizzle des options de devis. Les tables `devis_options`/`devis_options_lignes` n'ont
+ * PAS d'artisanId (hors RLS) : chaque opération vérifie d'abord l'appartenance du DEVIS parent (sous
+ * RLS + filtre explicite `artisanId`) DANS la même transaction `withTenant`. Pas de propriété du devis
+ * ⇒ sentinel null/false (le use-case lève NotFoundError). Anti-IDOR identique au legacy
+ * `assertDevisOwner`/`assertOptionOwner`, mais renforcé par la RLS de la transaction.
+ */
 export class DevisOptionRepositoryDrizzle implements IDevisOptionRepository {
   constructor(private readonly db: DbClient) {}
 

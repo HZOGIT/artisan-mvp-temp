@@ -13,8 +13,10 @@ import type {
   CreateKilometrageInput,
 } from "../domain/vehicule";
 
-// Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
-// les opérations sur une ressource hors tenant (repo → null/false) lèvent NotFoundError.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
+ * les opérations sur une ressource hors tenant (repo → null/false) lèvent NotFoundError.
+ */
 
 export async function createVehicule(
   repo: IVehiculeRepository,

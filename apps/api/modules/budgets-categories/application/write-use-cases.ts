@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IBudgetCategorieRepository } from "./budget-categorie-repository";
 import type { BudgetCategorie, CreateBudgetInput, UpdateBudgetInput } from "../domain/budget-categorie";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier. ⚠️ L'unicité
-// (artisan_id, categorie, mois) est garantie par la contrainte DB et remonte du repo sous forme de
-// `ConflictError` (on la laisse propager — formatter TRPC → 409). `categorie`/`mois` sont la clé
-// d'unicité immuable : l'update ne touche que les montants. Le scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier. ⚠️ L'unicité
+ * (artisan_id, categorie, mois) est garantie par la contrainte DB et remonte du repo sous forme de
+ * `ConflictError` (on la laisse propager — formatter TRPC → 409). `categorie`/`mois` sont la clé
+ * d'unicité immuable : l'update ne touche que les montants. Le scoping tenant est porté par le repo.
+ */
 
 const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/; // "YYYY-MM"
 const DECIMAL_2 = /^\d+(\.\d{1,2})?$/; // montant ≥ 0, 2 décimales max
@@ -46,9 +48,11 @@ export async function supprimerBudget(repo: IBudgetCategorieRepository, ctx: Ten
   if (!ok) throw new NotFoundError("Budget introuvable");
 }
 
-// Copie les budgets d'un mois source vers un mois cible (upsert par catégorie). Parité legacy
-// `copierBudgetsMois`. Idempotent : une catégorie déjà budgétée dans le mois cible est mise à jour
-// (pas dupliquée — contrainte d'unicité (artisan,categorie,mois)). Scopé tenant par le repo.
+/*
+ * Copie les budgets d'un mois source vers un mois cible (upsert par catégorie). Parité legacy
+ * `copierBudgetsMois`. Idempotent : une catégorie déjà budgétée dans le mois cible est mise à jour
+ * (pas dupliquée — contrainte d'unicité (artisan,categorie,mois)). Scopé tenant par le repo.
+ */
 export async function copierBudgetsMois(
   repo: IBudgetCategorieRepository,
   ctx: TenantContext,

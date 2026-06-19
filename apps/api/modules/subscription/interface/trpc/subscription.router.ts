@@ -10,8 +10,10 @@ const checkoutInput = z.object({
   extraUsers: z.number().int().min(0).max(50).default(0),
 });
 
-// Routeur tRPC abonnement (complet). `getCurrent` (lecture) + checkout/portal/cancel/reactivate (effets
-// Stripe via StripePort). `createCheckout` reçoit l'email du tenant depuis les claims du cookie.
+/*
+ * Routeur tRPC abonnement (complet). `getCurrent` (lecture) + checkout/portal/cancel/reactivate (effets
+ * Stripe via StripePort). `createCheckout` reçoit l'email du tenant depuis les claims du cookie.
+ */
 export function createSubscriptionRouter(repo: ISubscriptionRepository, effectDeps: SubscriptionEffectDeps) {
   return router({
     getCurrent: protectedProcedure.query(({ ctx }) => getCurrent(repo, ctx.tenant)),

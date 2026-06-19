@@ -1,6 +1,8 @@
-// Domaine « dashboard » : agrégats de lecture (accueil). Toutes les fonctions sont PURES et prennent
-// `now` en paramètre (déterminisme des tests). Les formes de sortie répliquent EXACTEMENT le legacy
-// (`server/db.ts` get*), quirks compris — voir findings pour les incohérences legacy connues.
+/*
+ * Domaine « dashboard » : agrégats de lecture (accueil). Toutes les fonctions sont PURES et prennent
+ * `now` en paramètre (déterminisme des tests). Les formes de sortie répliquent EXACTEMENT le legacy
+ * (`server/db.ts` get*), quirks compris — voir findings pour les incohérences legacy connues.
+ */
 
 // ── Lignes brutes (projections minimales scopées tenant) ─────────────────────────────────────────
 export interface DashFacture {
@@ -102,8 +104,10 @@ const num = (v: unknown): number => parseFloat(String(v ?? "0")) || 0;
 const monthKey = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 const FACTURE_PAYEE = "payee";
 
-// getDashboardStats (parité : agrégations SQL legacy répliquées en mémoire). caMonth/caYear utilisent
-// COALESCE(datePaiement, createdAt) ; facturesImpayees = statut NOT IN (payee, annulee, brouillon).
+/*
+ * getDashboardStats (parité : agrégations SQL legacy répliquées en mémoire). caMonth/caYear utilisent
+ * COALESCE(datePaiement, createdAt) ; facturesImpayees = statut NOT IN (payee, annulee, brouillon).
+ */
 export function computeStats(factures: readonly DashFacture[], devis: readonly DashDevis[], totalClients: number, interventions: readonly DashIntervention[], now: Date): DashboardStats {
   const m = now.getMonth();
   const y = now.getFullYear();
@@ -142,8 +146,10 @@ export function computeStats(factures: readonly DashFacture[], devis: readonly D
   };
 }
 
-// getRecentActivity : prend les `limit` plus récents de chaque type (listes déjà triées createdAt desc),
-// fusionne, trie par date desc, tronque à `limit`.
+/*
+ * getRecentActivity : prend les `limit` plus récents de chaque type (listes déjà triées createdAt desc),
+ * fusionne, trie par date desc, tronque à `limit`.
+ */
 export function computeRecentActivity(devis: readonly DashDevis[], factures: readonly DashFacture[], interventions: readonly DashIntervention[], clients: readonly DashClient[], limit: number): RecentActivityItem[] {
   const out: RecentActivityItem[] = [];
   for (const d of devis.slice(0, limit)) out.push({ type: "devis", titre: `Devis ${d.numero} créé`, date: new Date(d.createdAt), id: d.id });
@@ -154,8 +160,10 @@ export function computeRecentActivity(devis: readonly DashDevis[], factures: rea
   return out.slice(0, limit);
 }
 
-// getMonthlyCAStats : CA des factures PAYÉES bucketé par mois (dateFacture), sur `months` mois, du plus
-// ancien au plus récent.
+/*
+ * getMonthlyCAStats : CA des factures PAYÉES bucketé par mois (dateFacture), sur `months` mois, du plus
+ * ancien au plus récent.
+ */
 export function computeMonthlyCA(facturesPayees: readonly DashFacture[], months: number, now: Date): MonthlyCAPoint[] {
   const stats: MonthlyCAPoint[] = [];
   for (let i = 0; i < months; i++) {
@@ -190,8 +198,10 @@ export function computeYearlyComparison(facturesPayees: readonly DashFacture[], 
   return { thisYear, lastYear };
 }
 
-// getConversionRate : % de devis « accepte » (arrondi). ⚠️ Parité legacy : renvoie un NOMBRE BRUT (le
-// front lit `.rate`/`.devisAcceptes` → undefined ; quirk legacy préservé, voir finding).
+/*
+ * getConversionRate : % de devis « accepte » (arrondi). ⚠️ Parité legacy : renvoie un NOMBRE BRUT (le
+ * front lit `.rate`/`.devisAcceptes` → undefined ; quirk legacy préservé, voir finding).
+ */
 export function computeConversionRate(devis: readonly DashDevis[]): number {
   if (devis.length === 0) return 0;
   const acceptes = devis.filter((d) => d.statut === "accepte").length;
@@ -238,8 +248,10 @@ export function computeObjectifs(objectifs: { objectifCA: string | null; objecti
   };
 }
 
-// getAlerts : factures impayées > 30j (danger), devis envoyés sans réponse > 7j (warning),
-// interventions dans les 48h (info). `now` injecté.
+/*
+ * getAlerts : factures impayées > 30j (danger), devis envoyés sans réponse > 7j (warning),
+ * interventions dans les 48h (info). `now` injecté.
+ */
 export function computeAlerts(factures: readonly DashFacture[], devis: readonly DashDevis[], interventions: readonly DashIntervention[], now: Date): DashAlert[] {
   const alerts: DashAlert[] = [];
   const days = (ref: Date) => Math.floor((now.getTime() - new Date(ref).getTime()) / 86400000);

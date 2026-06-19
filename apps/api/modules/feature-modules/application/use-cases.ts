@@ -31,8 +31,10 @@ export async function getOnboardingStatus(repo: IModulesRepository, ctx: TenantC
   return (await repo.getOnboardingStatus(ctx)) ?? DEFAULT_ONBOARDING;
 }
 
-// Active/désactive un module : module connu (sinon 404), et activation interdite si le plan du tenant
-// est insuffisant (403 — parité legacy « Passez au plan supérieur »).
+/*
+ * Active/désactive un module : module connu (sinon 404), et activation interdite si le plan du tenant
+ * est insuffisant (403 — parité legacy « Passez au plan supérieur »).
+ */
 export async function toggleModule(repo: IModulesRepository, ctx: TenantContext, slug: string, actif: boolean): Promise<{ success: true }> {
   const module = await repo.getBySlug(slug);
   if (!module) throw new NotFoundError("Module inconnu");
@@ -46,8 +48,10 @@ export async function toggleModule(repo: IModulesRepository, ctx: TenantContext,
   return { success: true };
 }
 
-// Termine l'onboarding : enregistre completed/metier/plan, puis applique la sélection de modules
-// (chaque module accessible au plan est activé/désactivé selon `moduleSlugs`) ou les défauts.
+/*
+ * Termine l'onboarding : enregistre completed/metier/plan, puis applique la sélection de modules
+ * (chaque module accessible au plan est activé/désactivé selon `moduleSlugs`) ou les défauts.
+ */
 export async function completeOnboarding(repo: IModulesRepository, ctx: TenantContext, input: CompleteOnboardingInput): Promise<{ success: true }> {
   await repo.updateOnboarding(ctx, { onboardingCompleted: true, metier: input.metier, plan: input.plan });
   if (input.moduleSlugs) {

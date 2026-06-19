@@ -4,14 +4,18 @@ import { isValidIban, normalizeSlug } from "../../../shared/validation/iban";
 import type { IArtisanRepository } from "./artisan-repository";
 import type { ArtisanProfile, UpdateArtisanProfileInput } from "../domain/artisan";
 
-// Profil du tenant courant. null possible si l'artisan n'a pas encore de profil (parité legacy :
-// renvoie l'enregistrement ou null, PAS une 404).
+/*
+ * Profil du tenant courant. null possible si l'artisan n'a pas encore de profil (parité legacy :
+ * renvoie l'enregistrement ou null, PAS une 404).
+ */
 export function getProfile(repo: IArtisanRepository, ctx: TenantContext): Promise<ArtisanProfile | null> {
   return repo.getProfile(ctx);
 }
 
-// Met à jour le profil du tenant : valide l'IBAN (clé MOD-97), normalise le `slug` + vérifie son
-// unicité (ConflictError), puis applique. Parité legacy `artisan.updateProfile`.
+/*
+ * Met à jour le profil du tenant : valide l'IBAN (clé MOD-97), normalise le `slug` + vérifie son
+ * unicité (ConflictError), puis applique. Parité legacy `artisan.updateProfile`.
+ */
 export async function updateProfile(repo: IArtisanRepository, ctx: TenantContext, input: UpdateArtisanProfileInput): Promise<ArtisanProfile> {
   if (input.iban !== undefined && input.iban !== null && !isValidIban(input.iban)) {
     throw new ValidationError("IBAN invalide (format ou clé de contrôle)");

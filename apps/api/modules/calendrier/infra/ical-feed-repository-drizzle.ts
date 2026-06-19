@@ -4,8 +4,10 @@ import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type { IIcalFeedRepository } from "../application/ical-feed-repository";
 
-// ⚠️ `artisans` = table d'IDENTITÉ (hors RLS tenant) : scope par `id = ctx.artisanId` (jamais un
-// userId arbitraire). app_tenant a SELECT/UPDATE sur cette table.
+/*
+ * ⚠️ `artisans` = table d'IDENTITÉ (hors RLS tenant) : scope par `id = ctx.artisanId` (jamais un
+ * userId arbitraire). app_tenant a SELECT/UPDATE sur cette table.
+ */
 export class IcalFeedRepositoryDrizzle implements IIcalFeedRepository {
   constructor(private readonly db: DbClient) {}
 

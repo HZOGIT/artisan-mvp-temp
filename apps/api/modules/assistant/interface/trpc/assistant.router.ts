@@ -10,9 +10,11 @@ import {
   predictionTresorerie,
 } from "../../application/generator-use-cases";
 
-// Routeur tRPC du domaine assistant (6 procs appelées par le client). Toutes `protectedProcedure`,
-// request/response (PAS de SSE). 2 lectures (threads/messages) + 4 générateurs IA. Transport mince :
-// délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors.
+/*
+ * Routeur tRPC du domaine assistant (6 procs appelées par le client). Toutes `protectedProcedure`,
+ * request/response (PAS de SSE). 2 lectures (threads/messages) + 4 générateurs IA. Transport mince :
+ * délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors.
+ */
 export function createAssistantRouter(threadsRepo: IAssistantThreadsRepository, generators: AssistantGeneratorDeps) {
   return router({
     // ── Lectures (historique conversations) ──────────────────────────────────────────────────────

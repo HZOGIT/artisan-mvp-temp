@@ -1,8 +1,10 @@
 import type { BibliothequeArticle } from "./bibliotheque-reader";
 
-// Écritures du catalogue PARTAGÉ (`bibliotheque_articles`). ⚠️ Réservé au staff Operioz
-// (`adminProcedure`) : la bibliothèque est servie à TOUS les tenants → une écriture par un artisan
-// polluerait le catalogue commun. Aucun scope tenant (table sans `artisanId`).
+/*
+ * Écritures du catalogue PARTAGÉ (`bibliotheque_articles`). ⚠️ Réservé au staff Operioz
+ * (`adminProcedure`) : la bibliothèque est servie à TOUS les tenants → une écriture par un artisan
+ * polluerait le catalogue commun. Aucun scope tenant (table sans `artisanId`).
+ */
 
 export interface CreateBibliothequeInput {
   readonly nom: string;

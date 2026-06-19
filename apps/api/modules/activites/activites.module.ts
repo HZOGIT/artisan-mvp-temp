@@ -1,8 +1,10 @@
 import type { IActiviteRepository } from "./application/activite-repository";
 import { createActivitesRouter } from "./interface/trpc/activites.router";
 
-// Wiring DI du module « activités » (suivi commercial) : assemble le routeur tRPC à partir du
-// repository injecté.
+/*
+ * Wiring DI du module « activités » (suivi commercial) : assemble le routeur tRPC à partir du
+ * repository injecté.
+ */
 export interface ActivitesModuleDeps {
   readonly repository: IActiviteRepository;
 }

@@ -4,8 +4,10 @@ import type { IFournisseurRepository } from "../../fournisseurs/application/four
 import type { Commande } from "../domain/commande";
 import type { Fournisseur } from "../../fournisseurs/domain/fournisseur";
 
-// Performance d'un fournisseur (parité legacy `getPerformancesFournisseurs`). Stats dérivées des
-// commandes du tenant, regroupées par fournisseur. Montants en NUMBER (calcul JS, parité legacy).
+/*
+ * Performance d'un fournisseur (parité legacy `getPerformancesFournisseurs`). Stats dérivées des
+ * commandes du tenant, regroupées par fournisseur. Montants en NUMBER (calcul JS, parité legacy).
+ */
 export interface PerformanceFournisseur {
   readonly fournisseur: { id: number; nom: string; contact: string | null; email: string | null; telephone: string | null };
   readonly totalCommandes: number;
@@ -18,8 +20,10 @@ export interface PerformanceFournisseur {
 
 const JOUR_MS = 86_400_000;
 
-// Calcul PUR (testable sans DB) : pour chaque fournisseur, agrège ses commandes « réelles »
-// (hors brouillon). Réplique fidèlement la logique legacy.
+/*
+ * Calcul PUR (testable sans DB) : pour chaque fournisseur, agrège ses commandes « réelles »
+ * (hors brouillon). Réplique fidèlement la logique legacy.
+ */
 export function calculerPerformancesFournisseurs(
   commandes: readonly Commande[],
   fournisseurs: readonly Fournisseur[],

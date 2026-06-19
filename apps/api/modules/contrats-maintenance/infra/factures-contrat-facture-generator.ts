@@ -7,10 +7,12 @@ import type {
   FactureGenereeRef,
 } from "../application/contrat-facture-generator";
 
-// Adapter du port `ContratFactureGenerator` branché sur le **domaine factures** : réutilise les
-// use-cases factures (`creerFacture` → numéro serveur + anti-IDOR client ; `ajouterLigneFacture` →
-// totaux dérivés) puis passe la facture en `envoyee` via `setStatut` **sans** déclencher le
-// ComptaPort (≠ `changerStatutFacture`) → aucune écriture FEC générée (parité legacy).
+/*
+ * Adapter du port `ContratFactureGenerator` branché sur le **domaine factures** : réutilise les
+ * use-cases factures (`creerFacture` → numéro serveur + anti-IDOR client ; `ajouterLigneFacture` →
+ * totaux dérivés) puis passe la facture en `envoyee` via `setStatut` **sans** déclencher le
+ * ComptaPort (≠ `changerStatutFacture`) → aucune écriture FEC générée (parité legacy).
+ */
 export class FacturesContratFactureGenerator implements ContratFactureGenerator {
   constructor(private readonly factureRepo: IFactureRepository) {}
 

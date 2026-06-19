@@ -19,8 +19,10 @@ export interface ClientPortalAdminDeps {
   readonly genToken?: () => string;
 }
 
-// Génère un lien d'accès au portail pour un client du tenant et l'envoie par email. Ownership scopé
-// tenant (404 anti-IDOR), email requis (400), anti-abus par artisan (429). Token UUID, validité 90 j.
+/*
+ * Génère un lien d'accès au portail pour un client du tenant et l'envoie par email. Ownership scopé
+ * tenant (404 anti-IDOR), email requis (400), anti-abus par artisan (429). Token UUID, validité 90 j.
+ */
 export async function generateAccess(deps: ClientPortalAdminDeps, ctx: TenantContext, clientId: number, origin: string, now: Date = new Date()): Promise<{ url: string; token: string }> {
   const client = await deps.clients.getById(ctx, clientId);
   if (!client) throw new NotFoundError("Client introuvable");
@@ -59,8 +61,10 @@ export interface VerifyAccessResult {
   readonly artisan: ArtisanPortalInfo | null;
 }
 
-// Vérifie un token portail : invalide/expiré → {valid:false}. Sinon rafraîchit le dernier accès et
-// renvoie l'identité client + artisan (capacité = token, pas de cookie).
+/*
+ * Vérifie un token portail : invalide/expiré → {valid:false}. Sinon rafraîchit le dernier accès et
+ * renvoie l'identité client + artisan (capacité = token, pas de cookie).
+ */
 export async function verifyAccess(deps: { access: IPortalAccessRepository }, token: string, now: Date = new Date()): Promise<VerifyAccessResult> {
   const access = await deps.access.resolveByToken(token, now);
   if (!access) return { valid: false, client: null, artisan: null };

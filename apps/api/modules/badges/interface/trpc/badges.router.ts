@@ -6,8 +6,10 @@ import { creerBadge, modifierBadge, supprimerBadge, attribuerBadge, calculerClas
 
 const categorie = z.enum(["interventions", "avis", "ca", "anciennete", "special"]);
 
-// Bornes alignées sur la table `badges` (code 50, nom 100, icone 50, couleur 20)
-// — defense-in-depth contre une entrée surdimensionnée.
+/*
+ * Bornes alignées sur la table `badges` (code 50, nom 100, icone 50, couleur 20)
+ * — defense-in-depth contre une entrée surdimensionnée.
+ */
 const createSchema = z.object({
   code: z.string().min(1).max(50),
   nom: z.string().min(1).max(100),
@@ -33,10 +35,12 @@ const updateSchema = z.object({
   actif: z.boolean().optional(),
 });
 
-// Routeur tRPC du domaine badges. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant + anti-IDOR portés par le repo via ctx.tenant), laisse remonter
-// les Domain errors (NotFound→404, Validation→400). Repository injecté (DI) → testable.
-// La logique dérivée (verifierBadges / classement) est traitée à une étape ultérieure.
+/*
+ * Routeur tRPC du domaine badges. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant + anti-IDOR portés par le repo via ctx.tenant), laisse remonter
+ * les Domain errors (NotFound→404, Validation→400). Repository injecté (DI) → testable.
+ * La logique dérivée (verifierBadges / classement) est traitée à une étape ultérieure.
+ */
 export function createBadgesRouter(repo: IBadgeRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listBadges(repo, ctx.tenant)),
@@ -60,8 +64,10 @@ export function createBadgesRouter(repo: IBadgeRepository) {
       .input(z.object({ technicienId: z.number().int() }))
       .query(({ ctx, input }) => listBadgesDuTechnicien(repo, ctx.tenant, input.technicienId)),
 
-    // Objectifs mensuels d'un technicien (parité client). ⚠️ données salarié : le repo applique
-    // l'anti-IDOR (technicien hors tenant → []). Tri par mois ASC (parité legacy).
+    /*
+     * Objectifs mensuels d'un technicien (parité client). ⚠️ données salarié : le repo applique
+     * l'anti-IDOR (technicien hors tenant → []). Tri par mois ASC (parité legacy).
+     */
     getObjectifsTechnicien: protectedProcedure
       .input(z.object({ technicienId: z.number().int(), annee: z.number().int() }))
       .query(({ ctx, input }) => listObjectifsDuTechnicien(repo, ctx.tenant, input.technicienId, input.annee)),

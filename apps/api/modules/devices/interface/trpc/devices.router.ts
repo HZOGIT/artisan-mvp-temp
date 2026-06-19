@@ -3,9 +3,11 @@ import { router, protectedProcedure } from "../../../../interface/trpc/trpc";
 import type { IDeviceRepository } from "../../application/device-repository";
 import { listDevices, revokeDevice, revokeOtherDevices } from "../../application/use-cases";
 
-// Routeur tRPC `devices` (appareils/sessions de l'utilisateur courant). Transport mince : délègue aux
-// use-cases scopés par `ctx.tenant.userId`. `revokeAll` dérive l'empreinte de l'appareil courant du
-// `ctx.userAgent` (parité legacy). Protégé : chacun ne gère QUE ses propres appareils.
+/*
+ * Routeur tRPC `devices` (appareils/sessions de l'utilisateur courant). Transport mince : délègue aux
+ * use-cases scopés par `ctx.tenant.userId`. `revokeAll` dérive l'empreinte de l'appareil courant du
+ * `ctx.userAgent` (parité legacy). Protégé : chacun ne gère QUE ses propres appareils.
+ */
 export function createDevicesRouter(repo: IDeviceRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listDevices(repo, ctx.tenant)),

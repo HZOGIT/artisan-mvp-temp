@@ -2,8 +2,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IArticleRepository } from "../application/article-repository";
 import type { Article, CreateArticleInput, UpdateArticleInput } from "../domain/article";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant (artisanId forcé) et les défauts PG (unite "unité", tauxTVA "20.00").
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant (artisanId forcé) et les défauts PG (unite "unité", tauxTVA "20.00").
+ */
 export class FakeArticleRepository implements IArticleRepository {
   private store: Article[] = [];
   private seq = 0;

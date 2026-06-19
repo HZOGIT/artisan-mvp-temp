@@ -4,9 +4,11 @@ import { clearAuthCookie, setAuthCookie } from "../../../../interface/http/auth-
 import type { AuthDeps } from "../../application/use-cases";
 import { deleteAccount, forgotPassword, me, resetPassword, signin, signup, updateEmail, updatePassword } from "../../application/use-cases";
 
-// Routeur tRPC `auth` (slice session : me/signin/logout — publics). Le cookie `token` est posé/effacé
-// via `ctx.res` (Fastify). signup/updateEmail/updatePassword/forgotPassword/resetPassword/deleteAccount
-// viennent dans des firings ultérieurs avant l'activation du domaine.
+/*
+ * Routeur tRPC `auth` (slice session : me/signin/logout — publics). Le cookie `token` est posé/effacé
+ * via `ctx.res` (Fastify). signup/updateEmail/updatePassword/forgotPassword/resetPassword/deleteAccount
+ * viennent dans des firings ultérieurs avant l'activation du domaine.
+ */
 export function createAuthRouter(deps: AuthDeps) {
   return router({
     // Utilisateur courant (null si non authentifié / inactif). Public (pas d'exigence de tenant).

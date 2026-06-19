@@ -21,9 +21,11 @@ const saveSyncConfigSchema = z.object({
   heureSync: z.string().optional(), notifierErreurs: z.boolean().optional(), notifierSucces: z.boolean().optional(),
 });
 
-// Routeur tRPC `integrationsComptables` (exports/sync vers logiciels comptables tiers). Tous protégés.
-// ⚠️ Lecture seule des données financières (FEC réutilisé, aucune écriture mutée). Repo injecté + un
-// fournisseur de contenu FEC (`fec`) branché sur le générateur du domaine comptabilité.
+/*
+ * Routeur tRPC `integrationsComptables` (exports/sync vers logiciels comptables tiers). Tous protégés.
+ * ⚠️ Lecture seule des données financières (FEC réutilisé, aucune écriture mutée). Repo injecté + un
+ * fournisseur de contenu FEC (`fec`) branché sur le générateur du domaine comptabilité.
+ */
 export function createIntegrationsComptablesRouter(repo: IIntegrationsComptablesRepository, fec: { getFecContent(ctx: import("../../../../shared/tenant").TenantContext, period: { dateDebut: Date; dateFin: Date }): Promise<string> }) {
   return router({
     getConfig: protectedProcedure.query(({ ctx }) => getConfig(repo, ctx.tenant)),

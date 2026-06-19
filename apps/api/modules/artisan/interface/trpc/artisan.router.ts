@@ -6,8 +6,10 @@ import { getProfile, updateProfile } from "../../application/use-cases";
 const specialiteEnum = z.enum(["plomberie", "electricite", "chauffage", "multi-services"]);
 const formeJuridiqueEnum = z.enum(["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"]);
 
-// Bornes alignées sur le legacy `artisan.updateProfile` (defense-in-depth + DoS/stockage). `logo` =
-// data-URI base64 (vecteur volumineux) borné à ~3 Mo. IBAN/slug/metier traités au use-case.
+/*
+ * Bornes alignées sur le legacy `artisan.updateProfile` (defense-in-depth + DoS/stockage). `logo` =
+ * data-URI base64 (vecteur volumineux) borné à ~3 Mo. IBAN/slug/metier traités au use-case.
+ */
 const updateSchema = z.object({
   siret: z.string().max(20).optional(),
   nomEntreprise: z.string().max(200).optional(),
@@ -30,8 +32,10 @@ const updateSchema = z.object({
   metier: z.string().max(50).optional(),
 });
 
-// Routeur tRPC du profil artisan (entreprise du tenant). Transport mince ; le profil est toujours
-// celui du tenant courant (`ctx.tenant`). Domain errors → 404/400/409.
+/*
+ * Routeur tRPC du profil artisan (entreprise du tenant). Transport mince ; le profil est toujours
+ * celui du tenant courant (`ctx.tenant`). Domain errors → 404/400/409.
+ */
 export function createArtisanRouter(repo: IArtisanRepository) {
   return router({
     getProfile: protectedProcedure.query(({ ctx }) => getProfile(repo, ctx.tenant)),

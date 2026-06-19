@@ -22,8 +22,10 @@ function toArticle(r: Row): BibliothequeArticle {
   };
 }
 
-// `bibliotheque_articles` est PARTAGÉE (pas d'`artisanId`, RLS OFF) → lecture directe sous le rôle
-// app_tenant sans GUC tenant (toutes les lignes visibles). Aucune écriture.
+/*
+ * `bibliotheque_articles` est PARTAGÉE (pas d'`artisanId`, RLS OFF) → lecture directe sous le rôle
+ * app_tenant sans GUC tenant (toutes les lignes visibles). Aucune écriture.
+ */
 export class BibliothequeReaderDrizzle implements BibliothequeReader {
   constructor(private readonly db: DbClient) {}
 

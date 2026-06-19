@@ -1,5 +1,7 @@
-// Données « terrain » d'une intervention saisies depuis l'app mobile technicien (parité legacy
-// `interventions_mobile`) : heures d'arrivée/départ, géoloc, notes, signature client. Table SOUS RLS.
+/*
+ * Données « terrain » d'une intervention saisies depuis l'app mobile technicien (parité legacy
+ * `interventions_mobile`) : heures d'arrivée/départ, géoloc, notes, signature client. Table SOUS RLS.
+ */
 export interface InterventionMobile {
   readonly id: number;
   readonly interventionId: number;
@@ -12,8 +14,10 @@ export interface InterventionMobile {
   readonly signatureDate: Date | null;
 }
 
-// Bornes [début de journée, début du lendemain) pour « les interventions du jour » (parité legacy :
-// `date >= today(00:00) && date < tomorrow(00:00)`). PUR.
+/*
+ * Bornes [début de journée, début du lendemain) pour « les interventions du jour » (parité legacy :
+ * `date >= today(00:00) && date < tomorrow(00:00)`). PUR.
+ */
 export function bornesDuJour(now: Date): { debut: Date; fin: Date } {
   const debut = new Date(now);
   debut.setHours(0, 0, 0, 0);

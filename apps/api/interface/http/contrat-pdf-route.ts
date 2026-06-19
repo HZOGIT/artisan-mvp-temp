@@ -5,9 +5,11 @@ import { authArtisanFromCookie, type CookieAuthDeps } from "./cookie-auth";
 
 export interface ContratPdfRouteDeps extends CookieAuthDeps, ContratPdfDeps {}
 
-// Route HORS-tRPC `GET /api/contrats/:id/pdf` : télécharge le PDF d'un contrat de maintenance (auth
-// cookie JWT). 404 anti-IDOR si le contrat n'appartient pas au tenant. ⚠️ MONTÉ mais NON routé tant
-// qu'absent de MIGRATED_ROUTES.
+/*
+ * Route HORS-tRPC `GET /api/contrats/:id/pdf` : télécharge le PDF d'un contrat de maintenance (auth
+ * cookie JWT). 404 anti-IDOR si le contrat n'appartient pas au tenant. ⚠️ MONTÉ mais NON routé tant
+ * qu'absent de MIGRATED_ROUTES.
+ */
 export function registerContratPdfRoute(app: FastifyInstance, deps: ContratPdfRouteDeps): void {
   app.get("/api/contrats/:id/pdf", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

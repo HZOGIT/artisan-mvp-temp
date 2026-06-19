@@ -24,9 +24,11 @@ export async function getCurrent(reader: ISubscriptionReader, ctx: TenantContext
   return computeCurrentSubscription(await reader.getSubscription(ctx), now());
 }
 
-// Crée une session Stripe Checkout (souscription). Récupère/crée le Customer Stripe (persisté), construit
-// les line items (principal + utilisateurs supplémentaires), session en essai 30 j. Price ID manquant
-// pour le couple plan/intervalle → 400 (parité legacy PRECONDITION_FAILED). `email` = email du tenant.
+/*
+ * Crée une session Stripe Checkout (souscription). Récupère/crée le Customer Stripe (persisté), construit
+ * les line items (principal + utilisateurs supplémentaires), session en essai 30 j. Price ID manquant
+ * pour le couple plan/intervalle → 400 (parité legacy PRECONDITION_FAILED). `email` = email du tenant.
+ */
 export async function createCheckout(deps: SubscriptionEffectDeps, ctx: TenantContext, email: string | undefined, input: CheckoutInput): Promise<{ url: string | null }> {
   const mainPriceId = deps.prices[input.plan]?.[input.interval];
   if (!mainPriceId) {
@@ -65,8 +67,10 @@ export async function createPortal(deps: SubscriptionEffectDeps, ctx: TenantCont
   return { url: session.url };
 }
 
-// Annule l'abonnement en fin de période (convention Stripe `cancel_at_period_end`). Aucun abonnement
-// Stripe → 404 (parité legacy). Effet Stripe PUIS miroir en base.
+/*
+ * Annule l'abonnement en fin de période (convention Stripe `cancel_at_period_end`). Aucun abonnement
+ * Stripe → 404 (parité legacy). Effet Stripe PUIS miroir en base.
+ */
 export async function cancelSubscription(deps: SubscriptionEffectDeps, ctx: TenantContext): Promise<{ success: true }> {
   const sub = await deps.repo.getSubscription(ctx);
   if (!sub?.stripeSubscriptionId) throw new NotFoundError("Aucun abonnement actif");

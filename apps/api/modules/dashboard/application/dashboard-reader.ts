@@ -1,8 +1,10 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { DashClient, DashDevis, DashFacture, DashIntervention, UpcomingInterventionItem } from "../domain/dashboard";
 
-// Port de lecture du dashboard : lots bruts scopés tenant (triés createdAt desc) + objectifs +
-// interventions à venir jointes au client. Lecture seule (RLS + filtre `artisanId`).
+/*
+ * Port de lecture du dashboard : lots bruts scopés tenant (triés createdAt desc) + objectifs +
+ * interventions à venir jointes au client. Lecture seule (RLS + filtre `artisanId`).
+ */
 export interface IDashboardReader {
   listFactures(ctx: TenantContext): Promise<DashFacture[]>;
   listDevis(ctx: TenantContext): Promise<DashDevis[]>;

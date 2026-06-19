@@ -18,9 +18,11 @@ const createSchema = z.object({
   recommandee: z.boolean().optional(),
 });
 
-// Routeur tRPC des options (« variantes ») de devis. Surface appelée par le client : getByDevisId,
-// create, delete, select, convertirEnDevis. Transport mince ; anti-IDOR via l'appartenance du devis
-// parent (dans le repository). Domain errors → 404.
+/*
+ * Routeur tRPC des options (« variantes ») de devis. Surface appelée par le client : getByDevisId,
+ * create, delete, select, convertirEnDevis. Transport mince ; anti-IDOR via l'appartenance du devis
+ * parent (dans le repository). Domain errors → 404.
+ */
 export function createDevisOptionsRouter(repo: IDevisOptionRepository) {
   return router({
     getByDevisId: protectedProcedure

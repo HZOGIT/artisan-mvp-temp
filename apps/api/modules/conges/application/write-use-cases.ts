@@ -4,9 +4,11 @@ import type { ICongeRepository } from "./conge-repository";
 import type { Conge, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 import { calculerJoursConge, typeAffecteSolde } from "./solde";
 
-// Décompte (signe +) ou recrédit (signe −) du solde pour un congé conge_paye/rtt. Sans effet
-// pour les autres types. Imputé sur l'année de dateDebut (parité legacy, anti-corruption
-// inter-exercices). `signe` = +1 (approbation : on prend des jours) / −1 (annulation : on rend).
+/*
+ * Décompte (signe +) ou recrédit (signe −) du solde pour un congé conge_paye/rtt. Sans effet
+ * pour les autres types. Imputé sur l'année de dateDebut (parité legacy, anti-corruption
+ * inter-exercices). `signe` = +1 (approbation : on prend des jours) / −1 (annulation : on rend).
+ */
 async function ajusterSoldePourConge(
   repo: ICongeRepository,
   ctx: TenantContext,
@@ -18,9 +20,11 @@ async function ajusterSoldePourConge(
   await repo.ajusterSolde(ctx, { technicienId: conge.technicienId, type: conge.type, annee, deltaJours: signe * jours });
 }
 
-// Use-cases d'écriture — purs, repository injecté. Validation des dates + ⚠️ **garde
-// anti-IDOR-FK** : une demande ne peut viser qu'un technicien (demandeur) du tenant.
-// Le workflow d'approbation (statut/validePar/solde) est porté séparément.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation des dates + ⚠️ **garde
+ * anti-IDOR-FK** : une demande ne peut viser qu'un technicien (demandeur) du tenant.
+ * Le workflow d'approbation (statut/validePar/solde) est porté séparément.
+ */
 
 function assertDatesCoherentes(dateDebut?: string, dateFin?: string): void {
   // Dates au format ISO `YYYY-MM-DD` → comparaison lexicographique = chronologique.
@@ -59,9 +63,11 @@ export async function supprimerConge(repo: ICongeRepository, ctx: TenantContext,
   if (!ok) throw new NotFoundError("Demande de congé introuvable");
 }
 
-// --- Workflow d'approbation (transitions de statut). ⚠️ L'intégration du SOLDE (décompte
-// idempotent + recrédit) est portée séparément ; ici, les gardes de transition + la garde
-// **anti self-approbation**. ---
+/*
+ * --- Workflow d'approbation (transitions de statut). ⚠️ L'intégration du SOLDE (décompte
+ * idempotent + recrédit) est portée séparément ; ici, les gardes de transition + la garde
+ * **anti self-approbation**. ---
+ */
 
 async function chargerCongeDuTenant(repo: ICongeRepository, ctx: TenantContext, id: number): Promise<Conge> {
   const conge = await repo.getById(ctx, id);
@@ -69,9 +75,11 @@ async function chargerCongeDuTenant(repo: ICongeRepository, ctx: TenantContext, 
   return conge;
 }
 
-// ⚠️ Anti self-approbation : l'utilisateur courant ne doit pas être le demandeur. On compare
-// la fiche technicien liée à l'utilisateur au `technicienId` de la demande. Un approbateur non
-// lié à une fiche (owner/secrétaire) peut toujours valider (findTechnicienIdForUser → null).
+/*
+ * ⚠️ Anti self-approbation : l'utilisateur courant ne doit pas être le demandeur. On compare
+ * la fiche technicien liée à l'utilisateur au `technicienId` de la demande. Un approbateur non
+ * lié à une fiche (owner/secrétaire) peut toujours valider (findTechnicienIdForUser → null).
+ */
 async function assertPasSelfApprobation(repo: ICongeRepository, ctx: TenantContext, conge: Conge): Promise<void> {
   const approbateurTech = await repo.findTechnicienIdForUser(ctx);
   if (approbateurTech !== null && approbateurTech === conge.technicienId) {
@@ -89,8 +97,10 @@ export async function approuverConge(
   if (conge.statut === "approuve") return conge; // idempotent (pas de re-décompte de solde)
   if (conge.statut !== "en_attente") throw new ConflictError("Cette demande a déjà été traitée");
   await assertPasSelfApprobation(repo, ctx, conge);
-  // Décompte du solde UNIQUEMENT à la transition en_attente→approuve (idempotence garantie
-  // par le garde ci-dessus).
+  /*
+   * Décompte du solde UNIQUEMENT à la transition en_attente→approuve (idempotence garantie
+   * par le garde ci-dessus).
+   */
   await ajusterSoldePourConge(repo, ctx, conge, 1);
   const updated = await repo.setStatut(ctx, id, "approuve", ctx.userId, commentaire);
   if (!updated) throw new NotFoundError("Demande de congé introuvable");
@@ -106,8 +116,10 @@ export async function refuserConge(
   const conge = await chargerCongeDuTenant(repo, ctx, id);
   if (conge.statut === "refuse") return conge; // idempotent
   if (conge.statut !== "en_attente") throw new ConflictError("Cette demande a déjà été traitée");
-  // Refuser sa propre demande = se la refuser à soi-même : sans risque, mais on garde la
-  // symétrie de la décision en bloquant aussi le self (cohérence du workflow d'approbation).
+  /*
+   * Refuser sa propre demande = se la refuser à soi-même : sans risque, mais on garde la
+   * symétrie de la décision en bloquant aussi le self (cohérence du workflow d'approbation).
+   */
   await assertPasSelfApprobation(repo, ctx, conge);
   const updated = await repo.setStatut(ctx, id, "refuse", ctx.userId, commentaire);
   if (!updated) throw new NotFoundError("Demande de congé introuvable");

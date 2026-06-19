@@ -19,11 +19,13 @@ import type {
   SignatureLigneRow,
 } from "../application/signature-public-reader";
 
-// Lecture PUBLIQUE par token (portail de signature, sans cookie tenant).
-// 1) `resolveByToken` : sous `withPublicToken`, lit la signature (`signatures_devis` HORS RLS) jointe
-//    au devis rattaché (policy `public_token_select` sur `devis`) → résout l'`artisanId`.
-// 2) `getDevisView` / `markDevisVu` : sous le tenant résolu (`withTenant`) — pas d'écriture/lecture
-//    tenant hors scope. Aucune fuite cross-tenant (le token ne donne accès qu'à SON devis).
+/*
+ * Lecture PUBLIQUE par token (portail de signature, sans cookie tenant).
+ * 1) `resolveByToken` : sous `withPublicToken`, lit la signature (`signatures_devis` HORS RLS) jointe
+ *    au devis rattaché (policy `public_token_select` sur `devis`) → résout l'`artisanId`.
+ * 2) `getDevisView` / `markDevisVu` : sous le tenant résolu (`withTenant`) — pas d'écriture/lecture
+ *    tenant hors scope. Aucune fuite cross-tenant (le token ne donne accès qu'à SON devis).
+ */
 export class SignaturePublicReaderDrizzle implements SignaturePublicReader {
   constructor(private readonly db: DbClient) {}
 

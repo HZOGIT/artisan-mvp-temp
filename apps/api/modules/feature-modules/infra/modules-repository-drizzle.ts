@@ -22,10 +22,12 @@ function toCatalogue(r: CatRow): ModuleCatalogue {
   };
 }
 
-// Implémentation Drizzle des modules. Le catalogue `modules` est GLOBAL (aucune colonne tenant, hors
-// RLS) ; `artisan_modules` porte `artisan_id` (sous RLS) → les activations passent par `withTenant`
-// (double cloisonnement RLS + filtre explicite). L'onboarding vit sur `artisans` (table d'identité hors
-// RLS) → scope par `id = ctx.artisanId` (jamais un userId arbitraire).
+/*
+ * Implémentation Drizzle des modules. Le catalogue `modules` est GLOBAL (aucune colonne tenant, hors
+ * RLS) ; `artisan_modules` porte `artisan_id` (sous RLS) → les activations passent par `withTenant`
+ * (double cloisonnement RLS + filtre explicite). L'onboarding vit sur `artisans` (table d'identité hors
+ * RLS) → scope par `id = ctx.artisanId` (jamais un userId arbitraire).
+ */
 export class ModulesRepositoryDrizzle implements IModulesRepository {
   constructor(private readonly db: DbClient) {}
 

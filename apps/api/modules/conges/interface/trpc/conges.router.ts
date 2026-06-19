@@ -15,8 +15,10 @@ const typeEnum = z.enum(["conge_paye", "rtt", "maladie", "sans_solde", "formatio
 // Date PG `date` au format ISO `YYYY-MM-DD`.
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format AAAA-MM-JJ attendu)");
 
-// ⚠️ `statut`/`validePar`/`dateValidation` ABSENTS de create/update : ils ne changent que via
-// le workflow d'approbation (anti self-approbation + solde), étape ultérieure.
+/*
+ * ⚠️ `statut`/`validePar`/`dateValidation` ABSENTS de create/update : ils ne changent que via
+ * le workflow d'approbation (anti self-approbation + solde), étape ultérieure.
+ */
 const createSchema = z.object({
   technicienId: z.number().int(),
   type: typeEnum,
@@ -36,9 +38,11 @@ const updateSchema = z.object({
   motif: z.string().max(2000).nullish(),
 });
 
-// Routeur tRPC du domaine conges (RH). Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400). Repo injecté (DI).
+/*
+ * Routeur tRPC du domaine conges (RH). Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400). Repo injecté (DI).
+ */
 export function createCongesRouter(repo: ICongeRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listConges(repo, ctx.tenant)),

@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IPrevisionCARepository } from "./prevision-ca-repository";
 import type { CreatePrevisionInput, PrevisionCA, UpdatePrevisionInput } from "../domain/prevision-ca";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier. Pas de contrainte d'unicité sur
-// ce domaine. `ecart`/`ecartPourcentage` restent des champs libres validés (pas de recalcul serveur
-// imposé — le legacy les fournit déjà calculés). Le scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier. Pas de contrainte d'unicité sur
+ * ce domaine. `ecart`/`ecartPourcentage` restent des champs libres validés (pas de recalcul serveur
+ * imposé — le legacy les fournit déjà calculés). Le scoping tenant est porté par le repo.
+ */
 
 const DECIMAL_POSITIF = /^\d+(\.\d{1,2})?$/; // montant ≥ 0, 2 décimales max
 const DECIMAL_SIGNE = /^-?\d+(\.\d{1,2})?$/; // écart pouvant être négatif

@@ -2,9 +2,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ICongeRepository, AjustementSolde } from "../application/conge-repository";
 import type { Conge, CongeStatut, CreateCongeInput, UpdateCongeInput } from "../domain/conge";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
-// tenant et les valeurs par défaut PG (`statut` → en_attente, demi-journées → false). ⚠️
-// `update` ne touche pas statut/validePar/dateValidation (réservés au workflow d'approbation).
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le scoping
+ * tenant et les valeurs par défaut PG (`statut` → en_attente, demi-journées → false). ⚠️
+ * `update` ne touche pas statut/validePar/dateValidation (réservés au workflow d'approbation).
+ */
 export class FakeCongeRepository implements ICongeRepository {
   private store: Conge[] = [];
   private seq = 0;

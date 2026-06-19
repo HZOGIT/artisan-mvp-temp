@@ -19,8 +19,10 @@ export function generateFacturXML(
   const totalTVA = parseFloat(facture.totalTVA?.toString() || "0");
   const totalTTC = parseFloat(facture.totalTTC?.toString() || "0");
 
-  // Aggregate TVA per distinct rate from lines (EN 16931 : one block per rate).
-  // Lines of type section/note carry no price and are excluded.
+  /*
+   * Aggregate TVA per distinct rate from lines (EN 16931 : one block per rate).
+   * Lines of type section/note carry no price and are excluded.
+   */
   const tvaByRate = new Map<number, { baseHT: number; montantTVA: number }>();
   for (const l of facture.lignes) {
     const type = (l as any).type ?? "produit";

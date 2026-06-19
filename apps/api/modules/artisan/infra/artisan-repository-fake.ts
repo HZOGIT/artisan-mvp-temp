@@ -2,8 +2,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IArtisanRepository } from "../application/artisan-repository";
 import type { ArtisanProfile, UpdateArtisanProfileInput } from "../domain/artisan";
 
-// Double in-memory du repository « profil artisan » (tests sans DB). Le profil est scopé par
-// `id = ctx.artisanId`. `seed` injecte un profil ; `isSlugAvailable` exclut le sien.
+/*
+ * Double in-memory du repository « profil artisan » (tests sans DB). Le profil est scopé par
+ * `id = ctx.artisanId`. `seed` injecte un profil ; `isSlugAvailable` exclut le sien.
+ */
 export class FakeArtisanRepository implements IArtisanRepository {
   private profiles: ArtisanProfile[] = [];
 

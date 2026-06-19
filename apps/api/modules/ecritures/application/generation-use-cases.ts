@@ -4,13 +4,15 @@ import type { IFactureReader } from "./facture-reader";
 import type { EcritureComptable, CreateEcritureInput } from "../domain/ecriture";
 import { COMPTE_CLIENT, COMPTE_VENTES, COMPTE_BANQUE, compteTvaCollectee } from "./comptes";
 
-// Génération des écritures comptables de VENTE d'une facture (parité legacy
-// `genererEcrituresFacture`). ⚠️ CŒUR FEC — invariant **Σ débit = Σ crédit** par pièce.
-//  - Facture : 411 Clients (TTC) **débit** / 706 Ventes (HT) **crédit** / 445 TVA collectée
-//    (ventilée par taux) **crédit**.
-//  - Avoir (note de crédit) : **sens inversé** (411 crédit / 706+445 débit), montants en
-//    **valeur absolue** (jamais de débit/crédit négatif).
-//  - **Idempotence** : on purge les écritures de la facture avant de réinsérer la pièce.
+/*
+ * Génération des écritures comptables de VENTE d'une facture (parité legacy
+ * `genererEcrituresFacture`). ⚠️ CŒUR FEC — invariant **Σ débit = Σ crédit** par pièce.
+ *  - Facture : 411 Clients (TTC) **débit** / 706 Ventes (HT) **crédit** / 445 TVA collectée
+ *    (ventilée par taux) **crédit**.
+ *  - Avoir (note de crédit) : **sens inversé** (411 crédit / 706+445 débit), montants en
+ *    **valeur absolue** (jamais de débit/crédit négatif).
+ *  - **Idempotence** : on purge les écritures de la facture avant de réinsérer la pièce.
+ */
 
 interface LigneVentilee {
   readonly compte: string;
@@ -18,8 +20,10 @@ interface LigneVentilee {
   readonly montant: number; // valeur absolue, > 0
 }
 
-// Ventile la TVA par taux depuis les lignes ; repli sur le total (445711) si lignes vides ou
-// incohérentes avec le total (tolérance 0,02). Montants en valeur absolue (avoir = lignes < 0).
+/*
+ * Ventile la TVA par taux depuis les lignes ; repli sur le total (445711) si lignes vides ou
+ * incohérentes avec le total (tolérance 0,02). Montants en valeur absolue (avoir = lignes < 0).
+ */
 function ventilerTva(lignes: readonly { tauxTVA: string; montantTVA: string }[], totalTVA: number): LigneVentilee[] {
   if (totalTVA <= 0) return [];
   const parCompte = new Map<string, LigneVentilee>();
@@ -54,8 +58,10 @@ export async function genererEcrituresVente(
   const dateEcriture = facture.dateFacture;
   const libelle = `${isAvoir ? "Avoir" : "Facture"} ${pieceRef}`;
 
-  // Sens des comptes : un compte « naturellement débit » (411) est débité pour une facture,
-  // crédité pour un avoir ; inverse pour les comptes « naturellement crédit » (706/445).
+  /*
+   * Sens des comptes : un compte « naturellement débit » (411) est débité pour une facture,
+   * crédité pour un avoir ; inverse pour les comptes « naturellement crédit » (706/445).
+   */
   const fmt = (n: number) => n.toFixed(2);
   const debitFacture = (montant: number): Pick<CreateEcritureInput, "debit" | "credit"> =>
     isAvoir ? { credit: fmt(montant) } : { debit: fmt(montant) };
@@ -77,11 +83,13 @@ export async function genererEcrituresVente(
   return ecritureRepo.createMany(ctx, lignes);
 }
 
-// Génération des écritures d'ENCAISSEMENT au règlement (parité legacy
-// `genererEcrituresEncaissement`). Journal **BQ** : **512 Banque débit** / **411 Clients crédit**
-// (TTC réglé), lettrées entre elles. Ne génère que si la facture est **payée** et TTC > 0 (un
-// avoir [TTC ≤ 0] n'a pas d'encaissement). **Idempotence sélective** : purge les écritures BQ de
-// la facture avant insert, sans toucher la pièce de vente (VE).
+/*
+ * Génération des écritures d'ENCAISSEMENT au règlement (parité legacy
+ * `genererEcrituresEncaissement`). Journal **BQ** : **512 Banque débit** / **411 Clients crédit**
+ * (TTC réglé), lettrées entre elles. Ne génère que si la facture est **payée** et TTC > 0 (un
+ * avoir [TTC ≤ 0] n'a pas d'encaissement). **Idempotence sélective** : purge les écritures BQ de
+ * la facture avant insert, sans toucher la pièce de vente (VE).
+ */
 export async function genererEcrituresEncaissement(
   ecritureRepo: IEcritureRepository,
   factureReader: IFactureReader,

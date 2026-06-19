@@ -9,8 +9,10 @@ interface SeedIntervention extends InterventionRef {
   readonly artisanId: number;
 }
 
-// Double in-memory du repository demande d'avis (tests use-cases sans DB). Reproduit le
-// scoping tenant : une ressource d'un autre artisan est invisible (null).
+/*
+ * Double in-memory du repository demande d'avis (tests use-cases sans DB). Reproduit le
+ * scoping tenant : une ressource d'un autre artisan est invisible (null).
+ */
 export class FakeDemandeAvisRepository implements IDemandeAvisRepository {
   readonly demandes: DemandeAvis[] = [];
   private clientsStore: SeedClient[] = [];

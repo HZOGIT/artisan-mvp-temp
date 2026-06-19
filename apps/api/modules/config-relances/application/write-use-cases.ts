@@ -3,12 +3,14 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IConfigRelancesRepository } from "./config-relances-repository";
 import type { ConfigRelancesAuto, UpdateConfigRelancesInput } from "../domain/config-relances";
 
-// Use-case d'écriture — pur, repository injecté. Valide la config avant `upsert` (singleton).
-// Le scoping tenant est porté par le repo.
-//
-// ⚠️ `modeleEmailId` : réf. lâche vers `modeles_email` (pas de FK au schéma). L'ownership (que le
-// modèle appartienne au tenant) n'est PAS vérifié ici — à durcir via un IModeleEmailReader quand le
-// besoin se concrétise (finding tracé dans le projet « Refonte — findings & dette repérés »).
+/*
+ * Use-case d'écriture — pur, repository injecté. Valide la config avant `upsert` (singleton).
+ * Le scoping tenant est porté par le repo.
+ * 
+ * ⚠️ `modeleEmailId` : réf. lâche vers `modeles_email` (pas de FK au schéma). L'ownership (que le
+ * modèle appartienne au tenant) n'est PAS vérifié ici — à durcir via un IModeleEmailReader quand le
+ * besoin se concrétise (finding tracé dans le projet « Refonte — findings & dette repérés »).
+ */
 
 const HEURE = /^([01]\d|2[0-3]):[0-5]\d$/;
 

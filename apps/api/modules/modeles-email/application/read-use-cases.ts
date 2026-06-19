@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IModeleEmailRepository } from "./modele-email-repository";
 import type { ModeleEmail, TypeModeleEmail } from "../domain/modele-email";
 
-// Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
-// `TenantContext` (le repo l'applique). `getModeleEmail` sur une ressource d'un autre tenant → le
-// repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+/*
+ * Use-cases de lecture — purs, le repository est injecté. Le scoping tenant est porté par le
+ * `TenantContext` (le repo l'applique). `getModeleEmail` sur une ressource d'un autre tenant → le
+ * repo renvoie null → NotFoundError (ne révèle pas l'existence cross-tenant).
+ */
 
 export function listModelesEmail(repo: IModeleEmailRepository, ctx: TenantContext): Promise<ModeleEmail[]> {
   return repo.list(ctx);

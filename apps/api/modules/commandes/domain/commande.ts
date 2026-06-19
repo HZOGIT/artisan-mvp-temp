@@ -1,6 +1,8 @@
-// Types de domaine du module commandes fournisseurs — découplés du schéma Drizzle.
-// ⚠️ Domaine sensible (montants, réception stock) : invariants à préserver (totaux,
-// quantité reçue ≤ commandée, scoping tenant).
+/*
+ * Types de domaine du module commandes fournisseurs — découplés du schéma Drizzle.
+ * ⚠️ Domaine sensible (montants, réception stock) : invariants à préserver (totaux,
+ * quantité reçue ≤ commandée, scoping tenant).
+ */
 
 export type CommandeStatut =
   | "brouillon"

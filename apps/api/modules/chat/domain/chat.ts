@@ -1,7 +1,9 @@
-// Domaine CHAT (messagerie SUPPORT artisan↔client, in-app + notification email). Request/response,
-// PAS de SSE (≠ assistant IA). `conversations`/`messages` (≠ `ai_threads`/`ai_messages`).
-// `conversations` porte artisanId (RLS) ; `messages` n'en a pas → scopé via la conversation parente
-// (anti-IDOR). Parité legacy `chatRouter`.
+/*
+ * Domaine CHAT (messagerie SUPPORT artisan↔client, in-app + notification email). Request/response,
+ * PAS de SSE (≠ assistant IA). `conversations`/`messages` (≠ `ai_threads`/`ai_messages`).
+ * `conversations` porte artisanId (RLS) ; `messages` n'en a pas → scopé via la conversation parente
+ * (anti-IDOR). Parité legacy `chatRouter`.
+ */
 
 export type ConversationStatut = "ouverte" | "fermee" | "archivee";
 export type MessageAuteur = "artisan" | "client";
@@ -58,8 +60,10 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Email « nouveau message » envoyé au client (gabarit fidèle au legacy `chatRouter.sendMessage`).
-// `contenu` tronqué à 300 caractères (+ « … » au-delà). `portalLink` = lien portail si disponible.
+/*
+ * Email « nouveau message » envoyé au client (gabarit fidèle au legacy `chatRouter.sendMessage`).
+ * `contenu` tronqué à 300 caractères (+ « … » au-delà). `portalLink` = lien portail si disponible.
+ */
 export function buildNewMessageEmail(input: {
   clientName: string;
   artisanName: string;

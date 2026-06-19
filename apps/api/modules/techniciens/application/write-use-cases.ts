@@ -6,11 +6,15 @@ import type { Disponibilite, SetDisponibiliteInput } from "../domain/disponibili
 import type { Position, EnregistrerPositionInput } from "../domain/position";
 import type { HabilitationTechnicien, AjouterHabilitationInput } from "../domain/habilitation";
 
-// Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
-// une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
+ * une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
+ */
 
-// Normalise une date ISO `YYYY-MM-DD` : renvoie la chaîne si valide, sinon null (parité legacy
-// `addHabilitation` qui ignore les dates invalides plutôt que d'insérer une valeur NaN).
+/*
+ * Normalise une date ISO `YYYY-MM-DD` : renvoie la chaîne si valide, sinon null (parité legacy
+ * `addHabilitation` qui ignore les dates invalides plutôt que d'insérer une valeur NaN).
+ */
 function normaliserDate(s?: string | null): string | null {
   if (!s) return null;
   const d = new Date(s);
@@ -44,8 +48,10 @@ export async function supprimerTechnicien(repo: ITechnicienRepository, ctx: Tena
   if (!ok) throw new NotFoundError("Technicien introuvable");
 }
 
-// Définit une disponibilité (anti-IDOR : le repo renvoie null si le technicien n'est pas
-// du tenant → NotFoundError). Valide le jour de semaine (0..6) et l'ordre des heures.
+/*
+ * Définit une disponibilité (anti-IDOR : le repo renvoie null si le technicien n'est pas
+ * du tenant → NotFoundError). Valide le jour de semaine (0..6) et l'ordre des heures.
+ */
 export async function definirDisponibilite(
   repo: ITechnicienRepository,
   ctx: TenantContext,
@@ -63,8 +69,10 @@ export async function definirDisponibilite(
   return dispo;
 }
 
-// Enregistre une position GPS (anti-IDOR : null si technicien hors tenant → NotFound).
-// Valide la plage des coordonnées (latitude -90..90, longitude -180..180).
+/*
+ * Enregistre une position GPS (anti-IDOR : null si technicien hors tenant → NotFound).
+ * Valide la plage des coordonnées (latitude -90..90, longitude -180..180).
+ */
 export async function enregistrerPosition(
   repo: ITechnicienRepository,
   ctx: TenantContext,
@@ -80,8 +88,10 @@ export async function enregistrerPosition(
   return position;
 }
 
-// Ajoute une habilitation BTP (anti-IDOR : null si technicien hors tenant → NotFound). `type` requis ;
-// dates invalides ignorées (→ null). Parité legacy `addHabilitation`.
+/*
+ * Ajoute une habilitation BTP (anti-IDOR : null si technicien hors tenant → NotFound). `type` requis ;
+ * dates invalides ignorées (→ null). Parité legacy `addHabilitation`.
+ */
 export async function ajouterHabilitation(
   repo: ITechnicienRepository,
   ctx: TenantContext,
@@ -100,8 +110,10 @@ export async function ajouterHabilitation(
   return habilitation;
 }
 
-// Supprime une habilitation (scopée au technicien owné) — NotFound si technicien hors tenant
-// ou habilitation introuvable. Parité legacy `deleteHabilitation`.
+/*
+ * Supprime une habilitation (scopée au technicien owné) — NotFound si technicien hors tenant
+ * ou habilitation introuvable. Parité legacy `deleteHabilitation`.
+ */
 export async function supprimerHabilitation(
   repo: ITechnicienRepository,
   ctx: TenantContext,

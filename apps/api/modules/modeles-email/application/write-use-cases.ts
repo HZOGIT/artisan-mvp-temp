@@ -4,8 +4,10 @@ import type { IModeleEmailRepository } from "./modele-email-repository";
 import { TYPES_MODELE_EMAIL } from "../domain/modele-email";
 import type { CreateModeleEmailInput, ModeleEmail, TypeModeleEmail, UpdateModeleEmailInput } from "../domain/modele-email";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier + ⚠️ INVARIANT « un seul
-// modèle isDefault par (artisanId, type) ». Le scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier + ⚠️ INVARIANT « un seul
+ * modèle isDefault par (artisanId, type) ». Le scoping tenant est porté par le repo.
+ */
 
 function assertNonVide(valeur: string | undefined, libelle: string): void {
   if (valeur !== undefined && !valeur.trim()) throw new ValidationError(`${libelle} est requis`);
@@ -17,8 +19,10 @@ function assertType(type: TypeModeleEmail | undefined): void {
   }
 }
 
-// Retombe (isDefault=false) tous les modèles du `type` du tenant SAUF celui d'`exclureId` — afin de
-// garantir au plus un défaut par (artisanId, type). Lecture + update ciblés via le repo (scopé).
+/*
+ * Retombe (isDefault=false) tous les modèles du `type` du tenant SAUF celui d'`exclureId` — afin de
+ * garantir au plus un défaut par (artisanId, type). Lecture + update ciblés via le repo (scopé).
+ */
 async function retomberAutresDefauts(
   repo: IModeleEmailRepository,
   ctx: TenantContext,
@@ -60,8 +64,10 @@ export async function modifierModeleEmail(
   assertType(input.type);
   const updated = await repo.update(ctx, id, input);
   if (!updated) throw new NotFoundError("Modèle d'email introuvable");
-  // Si le modèle est (devenu) défaut, garantir l'unicité sur SON type courant (qui peut avoir
-  // changé via l'update) ; on ne retombe jamais le modèle courant lui-même.
+  /*
+   * Si le modèle est (devenu) défaut, garantir l'unicité sur SON type courant (qui peut avoir
+   * changé via l'update) ; on ne retombe jamais le modèle courant lui-même.
+   */
   if (updated.isDefault) await retomberAutresDefauts(repo, ctx, updated.type, updated.id);
   return updated;
 }

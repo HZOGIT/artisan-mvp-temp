@@ -14,9 +14,11 @@ export interface InsertHistoriqueData {
   readonly message: string;
 }
 
-// Port du repository alertes-prévisions. Tables `config_alertes_previsions` /
-// `historique_alertes_previsions` SOUS RLS (artisanId via app.tenant) — l'impl Drizzle scope via
-// `withTenant`. `previsions_ca` + `factures` (RLS aussi) servent au calcul de l'écart.
+/*
+ * Port du repository alertes-prévisions. Tables `config_alertes_previsions` /
+ * `historique_alertes_previsions` SOUS RLS (artisanId via app.tenant) — l'impl Drizzle scope via
+ * `withTenant`. `previsions_ca` + `factures` (RLS aussi) servent au calcul de l'écart.
+ */
 export interface IAlertesPrevisionsRepository {
   getConfig(ctx: TenantContext): Promise<AlerteConfig | null>;
   upsertConfig(ctx: TenantContext, patch: SaveAlerteConfigInput): Promise<AlerteConfig | null>;

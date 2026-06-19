@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IInterventionRepository } from "./intervention-repository";
 import type { EquipeMembre, EquipeMembreArtisan } from "../domain/intervention";
 
-// Use-cases « équipe d'intervention » (sous-ressource `interventions_techniciens`). Purs (repo
-// injecté). ⚠️ Anti-IDOR (parité legacy OPE-111) : tout accès est borné par l'intervention parente
-// possédée (→ NotFound sinon) ; à l'ajout, le **technicien** doit aussi appartenir au tenant
-// (→ Forbidden sinon, parité « Technicien non autorisé »). `artisanId` forcé serveur par le repo.
+/*
+ * Use-cases « équipe d'intervention » (sous-ressource `interventions_techniciens`). Purs (repo
+ * injecté). ⚠️ Anti-IDOR (parité legacy) : tout accès est borné par l'intervention parente
+ * possédée (→ NotFound sinon) ; à l'ajout, le **technicien** doit aussi appartenir au tenant
+ * (→ Forbidden sinon, parité « Technicien non autorisé »). `artisanId` forcé serveur par le repo.
+ */
 
 // Membres d'équipe d'une intervention (ownership de l'intervention requis → 404 sinon).
 export async function getEquipeIntervention(
@@ -39,8 +41,10 @@ export async function retirerMembreEquipe(repo: IInterventionRepository, ctx: Te
   await repo.removeMembreEquipe(ctx, id);
 }
 
-// ── Couleurs calendrier (préférence d'affichage par artisan) ──────────────────────────────────
-// Carte `{ interventionId: couleur }` des interventions du tenant (parité legacy `getCouleursCalendrier`).
+/*
+ * ── Couleurs calendrier (préférence d'affichage par artisan) ──────────────────────────────────
+ * Carte `{ interventionId: couleur }` des interventions du tenant (parité legacy `getCouleursCalendrier`).
+ */
 export async function getCouleursCalendrier(repo: IInterventionRepository, ctx: TenantContext): Promise<Record<number, string>> {
   const rows = await repo.listCouleurs(ctx);
   const map: Record<number, string> = {};
@@ -48,8 +52,10 @@ export async function getCouleursCalendrier(repo: IInterventionRepository, ctx: 
   return map;
 }
 
-// Définit la couleur d'affichage d'une intervention (upsert scopé tenant). Métadonnée d'affichage
-// (clé `couleurs_interventions` par [artisanId, interventionId]) — pas de fuite cross-tenant.
+/*
+ * Définit la couleur d'affichage d'une intervention (upsert scopé tenant). Métadonnée d'affichage
+ * (clé `couleurs_interventions` par [artisanId, interventionId]) — pas de fuite cross-tenant.
+ */
 export async function definirCouleurIntervention(
   repo: IInterventionRepository,
   ctx: TenantContext,

@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IModeleDevisRepository } from "./modele-devis-repository";
 import type { ModeleDevis, ModeleDevisLigne } from "../domain/modele-devis";
 
-// Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
-// `getModeleDevis` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+/*
+ * Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
+ * `getModeleDevis` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+ */
 
 // Liste « légère » (en-têtes sans lignes) ; le détail (lignes) passe par getModeleDevis.
 export function listModelesDevis(repo: IModeleDevisRepository, ctx: TenantContext): Promise<ModeleDevis[]> {
@@ -17,8 +19,10 @@ export async function getModeleDevis(repo: IModeleDevisRepository, ctx: TenantCo
   return modele;
 }
 
-// Détail `{ modele, lignes }` (parité legacy `devis.getModeleWithLignes`) — l'agrégat porte déjà
-// ses lignes ; on expose la forme attendue par le client. 404 hors tenant.
+/*
+ * Détail `{ modele, lignes }` (parité legacy `devis.getModeleWithLignes`) — l'agrégat porte déjà
+ * ses lignes ; on expose la forme attendue par le client. 404 hors tenant.
+ */
 export async function getModeleDevisAvecLignes(
   repo: IModeleDevisRepository,
   ctx: TenantContext,

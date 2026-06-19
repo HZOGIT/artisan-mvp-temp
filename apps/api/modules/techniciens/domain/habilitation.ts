@@ -1,6 +1,8 @@
-// Habilitation / certification BTP d'un technicien (OPE-162) — données salarié sensibles.
-// L'isolation passe par l'appartenance du technicien (et l'artisanId de la ligne) au tenant.
-// `date*` = colonnes `date` PG → string (YYYY-MM-DD) | null ; `createdAt` = timestamp.
+/*
+ * Habilitation / certification BTP d'un technicien — données salarié sensibles.
+ * L'isolation passe par l'appartenance du technicien (et l'artisanId de la ligne) au tenant.
+ * `date*` = colonnes `date` PG → string (YYYY-MM-DD) | null ; `createdAt` = timestamp.
+ */
 export interface HabilitationTechnicien {
   readonly id: number;
   readonly technicienId: number;

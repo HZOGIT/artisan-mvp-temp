@@ -4,8 +4,10 @@ import type { IBadgeRepository } from "./badge-repository";
 import type { Badge, BadgeTechnicien, CreateBadgeInput, UpdateBadgeInput } from "../domain/badge";
 import type { ClassementEntry, PeriodeClassement } from "../domain/classement";
 
-// Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
-// une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
+ * une opération sur une ressource hors tenant (repo → null/false) lève NotFoundError.
+ */
 
 export async function creerBadge(repo: IBadgeRepository, ctx: TenantContext, input: CreateBadgeInput): Promise<Badge> {
   if (!input.code?.trim()) throw new ValidationError("Code du badge requis");
@@ -29,9 +31,11 @@ export async function supprimerBadge(repo: IBadgeRepository, ctx: TenantContext,
   if (!ok) throw new NotFoundError("Badge introuvable");
 }
 
-// Attribue un badge à un technicien. Anti-IDOR : le repo renvoie null si le technicien
-// OU le badge n'appartient pas au tenant → NotFoundError (uniforme, pas d'oracle).
-// Idempotent (le repo renvoie l'attribution existante le cas échéant).
+/*
+ * Attribue un badge à un technicien. Anti-IDOR : le repo renvoie null si le technicien
+ * OU le badge n'appartient pas au tenant → NotFoundError (uniforme, pas d'oracle).
+ * Idempotent (le repo renvoie l'attribution existante le cas échéant).
+ */
 export async function attribuerBadge(
   repo: IBadgeRepository,
   ctx: TenantContext,
@@ -53,8 +57,10 @@ export function calculerClassement(
   return repo.recalculerClassement(ctx, periode);
 }
 
-// Vérifie les seuils et attribue les badges atteints au technicien. Anti-IDOR : le repo
-// renvoie null si le technicien n'appartient pas au tenant → NotFoundError.
+/*
+ * Vérifie les seuils et attribue les badges atteints au technicien. Anti-IDOR : le repo
+ * renvoie null si le technicien n'appartient pas au tenant → NotFoundError.
+ */
 export async function verifierBadges(
   repo: IBadgeRepository,
   ctx: TenantContext,

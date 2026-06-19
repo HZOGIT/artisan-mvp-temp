@@ -55,10 +55,12 @@ function defaultMotif(type: MouvementType): string {
   return type === "entree" ? "Ajout manuel" : type === "sortie" ? "Retrait manuel" : "Ajustement";
 }
 
-// Implémentation Drizzle du repository stocks. Double cloisonnement RLS + filtre artisanId
-// sur `stocks`. ⚠️ `update` ne touche que les métadonnées (jamais `quantiteEnStock` :
-// la quantité ne change que via un mouvement tracé). delete = cascade `mouvements_stock`
-// (table SANS artisanId, scopée via le stock) après vérification d'ownership.
+/*
+ * Implémentation Drizzle du repository stocks. Double cloisonnement RLS + filtre artisanId
+ * sur `stocks`. ⚠️ `update` ne touche que les métadonnées (jamais `quantiteEnStock` :
+ * la quantité ne change que via un mouvement tracé). delete = cascade `mouvements_stock`
+ * (table SANS artisanId, scopée via le stock) après vérification d'ownership.
+ */
 export class StockRepositoryDrizzle implements IStockRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -96,8 +98,10 @@ export class StockRepositoryDrizzle implements IStockRepository {
 
   update(ctx: TenantContext, id: number, input: UpdateStockInput): Promise<Stock | null> {
     return withTenant(this.db, ctx, async (tx) => {
-      // `input` (UpdateStockInput) ne contient pas `quantiteEnStock` → la quantité reste
-      // intacte ; seul un mouvement tracé l'ajuste (étape ultérieure).
+      /*
+       * `input` (UpdateStockInput) ne contient pas `quantiteEnStock` → la quantité reste
+       * intacte ; seul un mouvement tracé l'ajuste (étape ultérieure).
+       */
       const [row] = await tx
         .update(stocks)
         .set({ ...input, updatedAt: new Date() })
@@ -109,8 +113,10 @@ export class StockRepositoryDrizzle implements IStockRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Vérifie l'appartenance AVANT de purger les mouvements (mouvements_stock n'a pas
-      // d'artisanId → on ne doit pas supprimer ceux d'un autre tenant). Atomique.
+      /*
+       * Vérifie l'appartenance AVANT de purger les mouvements (mouvements_stock n'a pas
+       * d'artisanId → on ne doit pas supprimer ceux d'un autre tenant). Atomique.
+       */
       const [owned] = await tx
         .select({ id: stocks.id })
         .from(stocks)
@@ -129,9 +135,11 @@ export class StockRepositoryDrizzle implements IStockRepository {
 
   adjustQuantity(ctx: TenantContext, stockId: number, input: AdjustStockInput): Promise<AdjustStockResult> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Ownership AVANT toute écriture : `mouvements_stock` n'a pas d'artisanId, on ne doit
-      // jamais l'ajuster pour un stock hors tenant. Lecture + maj + log dans la MÊME
-      // transaction (atomicité : pas de mouvement sans maj de quantité, ni l'inverse).
+      /*
+       * Ownership AVANT toute écriture : `mouvements_stock` n'a pas d'artisanId, on ne doit
+       * jamais l'ajuster pour un stock hors tenant. Lecture + maj + log dans la MÊME
+       * transaction (atomicité : pas de mouvement sans maj de quantité, ni l'inverse).
+       */
       const [stock] = await tx
         .select()
         .from(stocks)

@@ -3,12 +3,14 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDemandeContactRepository } from "./demande-contact-repository";
 import type { DemandeContact, DemandeContactStatut } from "../domain/demande-contact";
 
-// État machine des demandes de contact (CRM). Transitions autorisées par statut :
-//  - nouveau  → contacte | converti | perdu
-//  - contacte → converti | perdu
-//  - converti / perdu → ∅ (terminaux)
-// Toute transition hors de cette table est refusée (ConflictError). La conversion (→converti) peut
-// lier un `clientId` du tenant (anti-IDOR via `ownsClient`).
+/*
+ * État machine des demandes de contact (CRM). Transitions autorisées par statut :
+ *  - nouveau  → contacte | converti | perdu
+ *  - contacte → converti | perdu
+ *  - converti / perdu → ∅ (terminaux)
+ * Toute transition hors de cette table est refusée (ConflictError). La conversion (→converti) peut
+ * lier un `clientId` du tenant (anti-IDOR via `ownsClient`).
+ */
 const TRANSITIONS: Record<DemandeContactStatut, readonly DemandeContactStatut[]> = {
   nouveau: ["contacte", "converti", "perdu"],
   contacte: ["converti", "perdu"],
@@ -20,8 +22,10 @@ export function peutTransitionner(from: DemandeContactStatut, to: DemandeContact
   return TRANSITIONS[from].includes(to);
 }
 
-// Applique une transition après vérification de l'ownership (scopé tenant) et de la légalité de la
-// transition. `clientId` optionnel transmis (conversion) — son ownership est vérifié en amont.
+/*
+ * Applique une transition après vérification de l'ownership (scopé tenant) et de la légalité de la
+ * transition. `clientId` optionnel transmis (conversion) — son ownership est vérifié en amont.
+ */
 async function appliquerTransition(
   repo: IDemandeContactRepository,
   ctx: TenantContext,

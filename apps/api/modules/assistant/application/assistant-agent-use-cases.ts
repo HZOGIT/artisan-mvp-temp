@@ -14,11 +14,13 @@ import type {
 } from "./agentic-port";
 import type { AssistantThreadWriter } from "./assistant-thread-writer";
 
-// Boucle AGENTIQUE de l'assistant (parité legacy `/api/assistant/stream` mode outils). Le modèle peut
-// appeler des outils (function-calling) sur ≤ MAX_TURNS tours : à chaque tour on STREAME le texte, on
-// exécute les outils demandés (registry → use-cases migrés), on réinjecte les résultats, et on
-// recommence jusqu'à ce que le modèle réponde sans outil. NON routé tant que la parité agentique
-// n'est pas complète (sinon régression). La boucle est PURE/testable via un `FakeLlmAgenticPort`.
+/*
+ * Boucle AGENTIQUE de l'assistant (parité legacy `/api/assistant/stream` mode outils). Le modèle peut
+ * appeler des outils (function-calling) sur ≤ MAX_TURNS tours : à chaque tour on STREAME le texte, on
+ * exécute les outils demandés (registry → use-cases migrés), on réinjecte les résultats, et on
+ * recommence jusqu'à ce que le modèle réponde sans outil. NON routé tant que la parité agentique
+ * n'est pas complète (sinon régression). La boucle est PURE/testable via un `FakeLlmAgenticPort`.
+ */
 
 // Plafond de tours (parité legacy MAX_TURNS=10) : borne dure anti-boucle infinie.
 export const MAX_AGENT_TURNS = 10;
@@ -53,8 +55,10 @@ export type AssistantAgentEvent =
   | { readonly invalidate: readonly string[] }
   | { readonly navigate: string; readonly filtre?: string; readonly message?: string };
 
-// Contenu NEUTRE des messages construits par le use-case (le contenu des messages `model` ISSUS du
-// port reste OPAQUE — round-trip pour préserver le thoughtSignature Gemini 3.x).
+/*
+ * Contenu NEUTRE des messages construits par le use-case (le contenu des messages `model` ISSUS du
+ * port reste OPAQUE — round-trip pour préserver le thoughtSignature Gemini 3.x).
+ */
 export type SeededMessageContent =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "tool-results"; readonly results: readonly AgenticToolResultPart[] };
@@ -66,8 +70,10 @@ export const toolMessage = (results: readonly AgenticToolResultPart[]): AgenticM
   content: { kind: "tool-results", results } satisfies SeededMessageContent,
 });
 
-// Réponse d'outil renvoyée au modèle : l'enveloppe `ToolResult` complète (`{ok,data}` / `{ok,error}`),
-// à parité legacy (`functionResponse.response = result`).
+/*
+ * Réponse d'outil renvoyée au modèle : l'enveloppe `ToolResult` complète (`{ok,data}` / `{ok,error}`),
+ * à parité legacy (`functionResponse.response = result`).
+ */
 function toResultPart(call: AgenticFunctionCall, res: { ok: true; data: unknown } | { ok: false; error: string }): AgenticToolResultPart {
   return { id: call.id, name: call.name, response: res };
 }

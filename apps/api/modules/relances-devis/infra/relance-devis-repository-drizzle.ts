@@ -21,9 +21,11 @@ function toRelance(r: RelanceRow): RelanceDevis {
   };
 }
 
-// Implémentation Drizzle du repository relances-devis (journal append-only). Double cloisonnement
-// RLS + filtre `artisanId` sur `relances_devis`. `artisanId` forcé à la création ; pas d'update
-// (immuabilité). `devisId` validé via `ownsDevis` (anti-IDOR-FK sur la table `devis`).
+/*
+ * Implémentation Drizzle du repository relances-devis (journal append-only). Double cloisonnement
+ * RLS + filtre `artisanId` sur `relances_devis`. `artisanId` forcé à la création ; pas d'update
+ * (immuabilité). `devisId` validé via `ownsDevis` (anti-IDOR-FK sur la table `devis`).
+ */
 export class RelanceDevisRepositoryDrizzle implements IRelanceDevisRepository {
   constructor(private readonly db: DbClient) {}
 

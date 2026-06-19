@@ -3,13 +3,15 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRdvRepository } from "./rdv-repository";
 import type { Rdv, RdvStatut } from "../domain/rdv";
 
-// État machine des RDV en ligne (cœur semi-sensible). Transitions autorisées par statut courant :
-//  - en_attente → confirme | refuse | annule
-//  - confirme   → annule (on peut annuler un RDV confirmé)
-//  - refuse     → ∅ (terminal)
-//  - annule     → ∅ (terminal)
-// Toute transition hors de cette table est refusée (ConflictError : le RDV est dans un état
-// incompatible). `refuse` exige un `motifRefus`.
+/*
+ * État machine des RDV en ligne (cœur semi-sensible). Transitions autorisées par statut courant :
+ *  - en_attente → confirme | refuse | annule
+ *  - confirme   → annule (on peut annuler un RDV confirmé)
+ *  - refuse     → ∅ (terminal)
+ *  - annule     → ∅ (terminal)
+ * Toute transition hors de cette table est refusée (ConflictError : le RDV est dans un état
+ * incompatible). `refuse` exige un `motifRefus`.
+ */
 const TRANSITIONS: Record<RdvStatut, readonly RdvStatut[]> = {
   en_attente: ["confirme", "refuse", "annule"],
   confirme: ["annule"],
@@ -21,8 +23,10 @@ export function peutTransitionner(from: RdvStatut, to: RdvStatut): boolean {
   return TRANSITIONS[from].includes(to);
 }
 
-// Applique une transition de statut après vérification de l'ownership (scopé tenant) et de la
-// légalité de la transition. `motifRefus` n'est transmis que lorsqu'il est pertinent (refus).
+/*
+ * Applique une transition de statut après vérification de l'ownership (scopé tenant) et de la
+ * légalité de la transition. `motifRefus` n'est transmis que lorsqu'il est pertinent (refus).
+ */
 async function appliquerTransition(
   repo: IRdvRepository,
   ctx: TenantContext,

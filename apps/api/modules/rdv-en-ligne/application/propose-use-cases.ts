@@ -6,12 +6,14 @@ import type { Rdv } from "../domain/rdv";
 const MAX_FUTUR_MS = 2 * 365 * 24 * 60 * 60 * 1000; // +2 ans (parité legacy)
 const MOTIF_AUTRE_CRENEAU = "Creneau non disponible — un autre creneau a ete propose";
 
-// Proposition d'un autre créneau (parité client/legacy `rdv.proposeAutreCreneau`). Refuse le RDV
-// initial et **crée un NOUVEAU RDV** au créneau proposé (mêmes client/titre/description/durée/urgence).
-// ⚠️ La date est validée AVANT toute mutation (sinon on refuserait l'ancien puis on planterait sur la
-// création → état incohérent). Bornes (parité legacy) : date invalide / passé (< début du jour) /
-// > +2 ans → ValidationError (400). Anti-IDOR : RDV hors tenant → NotFoundError (404). L'email de
-// notification au client est ajouté dans le slice email dédié.
+/*
+ * Proposition d'un autre créneau (parité client/legacy `rdv.proposeAutreCreneau`). Refuse le RDV
+ * initial et **crée un NOUVEAU RDV** au créneau proposé (mêmes client/titre/description/durée/urgence).
+ * ⚠️ La date est validée AVANT toute mutation (sinon on refuserait l'ancien puis on planterait sur la
+ * création → état incohérent). Bornes (parité legacy) : date invalide / passé (< début du jour) /
+ * > +2 ans → ValidationError (400). Anti-IDOR : RDV hors tenant → NotFoundError (404). L'email de
+ * notification au client est ajouté dans le slice email dédié.
+ */
 export async function proposerAutreCreneau(
   rdvRepo: IRdvRepository,
   ctx: TenantContext,

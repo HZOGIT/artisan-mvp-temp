@@ -1,5 +1,7 @@
-// Validation IBAN (format + clé de contrôle MOD-97). Pur. Porté du legacy `isValidIban`.
-// Vide/absent → considéré valide (champ optionnel).
+/*
+ * Validation IBAN (format + clé de contrôle MOD-97). Pur. Porté du legacy `isValidIban`.
+ * Vide/absent → considéré valide (champ optionnel).
+ */
 export function isValidIban(value: string | null | undefined): boolean {
   if (!value) return true;
   const s = value.replace(/\s+/g, "").toUpperCase();

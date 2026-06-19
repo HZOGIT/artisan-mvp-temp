@@ -30,9 +30,11 @@ function safeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-// Structure une demande client (texte libre) via l'IA pour l'artisan (parité legacy `soumettreDemandeIA`).
-// Rate-limit IA côté artisan → 429 (mutation). **Dégradation propre** : LLM KO / JSON non parsable →
-// objet structuré par défaut (titre tronqué + texte brut). Notif + email artisan best-effort.
+/*
+ * Structure une demande client (texte libre) via l'IA pour l'artisan (parité legacy `soumettreDemandeIA`).
+ * Rate-limit IA côté artisan → 429 (mutation). **Dégradation propre** : LLM KO / JSON non parsable →
+ * objet structuré par défaut (titre tronqué + texte brut). Notif + email artisan best-effort.
+ */
 export async function soumettreDemandeIA(deps: SoumettreDemandeIADeps, token: string, description: string): Promise<{ success: true; structured: DemandeIAStructured }> {
   const access = await deps.access.resolveByToken(token, new Date());
   if (!access) throw new UnauthorizedError("Accès non autorisé");

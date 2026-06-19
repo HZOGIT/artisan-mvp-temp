@@ -58,11 +58,13 @@ function toLigne(r: LigneRow): DevisLigne {
   };
 }
 
-// Implémentation Drizzle du repository devis. Double cloisonnement RLS + filtre `artisanId` sur
-// `devis`. Les `devis_lignes` (SANS artisanId) sont scopées via l'appartenance du devis parent
-// au tenant. ⚠️ Domaine financier : numérotation maîtrisée serveur (`nextNumero`, parité legacy
-// `getNextDevisNumber` — préfixe + compteur `parametres_artisan`), totaux TOUJOURS dérivés des
-// lignes (jamais fournis par le client), cascade lignes au delete.
+/*
+ * Implémentation Drizzle du repository devis. Double cloisonnement RLS + filtre `artisanId` sur
+ * `devis`. Les `devis_lignes` (SANS artisanId) sont scopées via l'appartenance du devis parent
+ * au tenant. ⚠️ Domaine financier : numérotation maîtrisée serveur (`nextNumero`, parité legacy
+ * `getNextDevisNumber` — préfixe + compteur `parametres_artisan`), totaux TOUJOURS dérivés des
+ * lignes (jamais fournis par le client), cascade lignes au delete.
+ */
 export class DevisRepositoryDrizzle implements IDevisRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -166,8 +168,10 @@ export class DevisRepositoryDrizzle implements IDevisRepository {
 
   nextNumero(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Parité legacy `getNextDevisNumber` : préfixe + compteur persistés dans
-      // `parametres_artisan`, borné par MAX(numero) en base (anti-doublon), compteur réavancé.
+      /*
+       * Parité legacy `getNextDevisNumber` : préfixe + compteur persistés dans
+       * `parametres_artisan`, borné par MAX(numero) en base (anti-doublon), compteur réavancé.
+       */
       const [params] = await tx
         .select({ prefixe: parametresArtisan.prefixeDevis, compteur: parametresArtisan.compteurDevis })
         .from(parametresArtisan)

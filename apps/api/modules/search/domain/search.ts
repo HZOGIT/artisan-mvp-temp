@@ -1,5 +1,7 @@
-// Recherche globale : entrées cross-domaine (client/devis/facture/intervention/fournisseur) projetées
-// vers une forme uniforme {id, type, title, subtitle, url} pour la palette de recherche du front.
+/*
+ * Recherche globale : entrées cross-domaine (client/devis/facture/intervention/fournisseur) projetées
+ * vers une forme uniforme {id, type, title, subtitle, url} pour la palette de recherche du front.
+ */
 export interface SearchResult {
   readonly id: number;
   readonly type: "client" | "devis" | "facture" | "intervention" | "fournisseur";
@@ -29,8 +31,10 @@ export function fmtDate(d: Date | string | null | undefined): string {
   return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
 }
 
-// Construit la liste de résultats uniformes à partir des lignes brutes. Ordre = clients, devis,
-// factures, interventions, fournisseurs (parité legacy). Fonction PURE.
+/*
+ * Construit la liste de résultats uniformes à partir des lignes brutes. Ordre = clients, devis,
+ * factures, interventions, fournisseurs (parité legacy). Fonction PURE.
+ */
 export function buildSearchResults(m: SearchMatches): SearchResult[] {
   const out: SearchResult[] = [];
   for (const r of m.clients) out.push({ id: r.id, type: "client", title: `${r.prenom || ""} ${r.nom}`.trim(), subtitle: r.email || r.telephone || r.ville || "", url: `/clients/${r.id}` });

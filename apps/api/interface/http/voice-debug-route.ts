@@ -16,9 +16,11 @@ export function sanitizeLogLine(v: unknown): string {
     .slice(0, 500);
 }
 
-// Route HORS-tRPC `POST /api/voice/debug` (parité legacy) : télémétrie d'erreur fire-and-forget envoyée
-// par `navigator.sendBeacon` côté client (PUBLIC, sans auth). Anti-flood par IP (throttle silencieux →
-// {ok:true}). Loggue `events[]` (max 20) ou `msg`, sanitisés. Renvoie TOUJOURS {ok:true} (best-effort).
+/*
+ * Route HORS-tRPC `POST /api/voice/debug` (parité legacy) : télémétrie d'erreur fire-and-forget envoyée
+ * par `navigator.sendBeacon` côté client (PUBLIC, sans auth). Anti-flood par IP (throttle silencieux →
+ * {ok:true}). Loggue `events[]` (max 20) ou `msg`, sanitisés. Renvoie TOUJOURS {ok:true} (best-effort).
+ */
 export function registerVoiceDebugRoute(app: FastifyInstance, deps: VoiceDebugDeps): void {
   const log = deps.log ?? ((line: string) => console.log(line));
   app.post("/api/voice/debug", async (req, reply) => {

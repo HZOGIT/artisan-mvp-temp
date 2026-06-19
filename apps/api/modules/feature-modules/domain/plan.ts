@@ -10,8 +10,10 @@ export function isPlanInsuffisant(planModule: string, planArtisan: string | null
   return m > a;
 }
 
-// Enrichit le catalogue avec l'état du tenant : `actif` (présent dans les slugs actifs) et `locked`
-// (plan insuffisant). Fonction pure — testable sans DB.
+/*
+ * Enrichit le catalogue avec l'état du tenant : `actif` (présent dans les slugs actifs) et `locked`
+ * (plan insuffisant). Fonction pure — testable sans DB.
+ */
 export function enrichirModules(
   catalogue: readonly ModuleCatalogue[],
   slugsActifs: readonly string[],

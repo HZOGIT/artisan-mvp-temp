@@ -5,8 +5,10 @@ import { withTenant } from "../db";
 import type { TenantContext } from "../tenant";
 import type { ArtisanReader, ArtisanInfo, ClientReader, ClientInfo } from "./contact-readers";
 
-// Lecture de l'artisan émetteur (tenant courant) — ligne brute `artisans` (transmise au générateur
-// PDF legacy) ; scopée par `ctx.artisanId` (RLS).
+/*
+ * Lecture de l'artisan émetteur (tenant courant) — ligne brute `artisans` (transmise au générateur
+ * PDF legacy) ; scopée par `ctx.artisanId` (RLS).
+ */
 export class ArtisanReaderDrizzle implements ArtisanReader {
   constructor(private readonly db: DbClient) {}
 
@@ -18,8 +20,10 @@ export class ArtisanReaderDrizzle implements ArtisanReader {
   }
 }
 
-// Lecture d'un client du tenant (destinataire). Anti-IDOR : filtre `clients.artisanId = ctx.artisanId`
-// (+ RLS) → null si le client n'appartient pas au tenant.
+/*
+ * Lecture d'un client du tenant (destinataire). Anti-IDOR : filtre `clients.artisanId = ctx.artisanId`
+ * (+ RLS) → null si le client n'appartient pas au tenant.
+ */
 export class ClientReaderDrizzle implements ClientReader {
   constructor(private readonly db: DbClient) {}
 

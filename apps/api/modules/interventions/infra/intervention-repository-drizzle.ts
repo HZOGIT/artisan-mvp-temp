@@ -35,10 +35,12 @@ function toIntervention(r: InterventionRow): Intervention {
   };
 }
 
-// Implémentation Drizzle du repository interventions. Double cloisonnement RLS + filtre
-// `artisanId`. ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))` →
-// aucune fuite cross-tenant. `create` insère les FK fournies (clientId/technicienId/…) SANS
-// vérifier leur ownership : la garde anti-IDOR-FK est portée par le use-case d'écriture (4/9).
+/*
+ * Implémentation Drizzle du repository interventions. Double cloisonnement RLS + filtre
+ * `artisanId`. ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))` →
+ * aucune fuite cross-tenant. `create` insère les FK fournies (clientId/technicienId/…) SANS
+ * vérifier leur ownership : la garde anti-IDOR-FK est portée par le use-case d'écriture (4/9).
+ */
 export class InterventionRepositoryDrizzle implements IInterventionRepository {
   constructor(private readonly db: DbClient) {}
 

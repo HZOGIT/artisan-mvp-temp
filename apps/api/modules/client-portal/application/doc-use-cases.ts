@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IPortalAccessRepository } from "./portal-access-repository";
 import type { IPortalDocsReader, PortalContrat, PortalDevis, PortalFacture, PortalIntervention } from "./portal-docs-reader";
 
-// Lectures de documents du portail (PUBLIC par token). Chaque proc résout l'accès par token (401 si
-// invalide/expiré) puis lit les documents du client résolu, scopés tenant + filtrés par clientId.
+/*
+ * Lectures de documents du portail (PUBLIC par token). Chaque proc résout l'accès par token (401 si
+ * invalide/expiré) puis lit les documents du client résolu, scopés tenant + filtrés par clientId.
+ */
 export interface PortalDocsDeps {
   readonly access: Pick<IPortalAccessRepository, "resolveByToken">;
   readonly docs: IPortalDocsReader;

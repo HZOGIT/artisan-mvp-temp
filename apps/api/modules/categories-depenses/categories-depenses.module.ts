@@ -1,8 +1,10 @@
 import type { ICategorieDepenseRepository } from "./application/categorie-depense-repository";
 import { createCategoriesDepensesRouter } from "./interface/trpc/categories-depenses.router";
 
-// Wiring DI du module categories-depenses : assemble le routeur tRPC (CRUD catalogue) à partir du
-// repository injecté.
+/*
+ * Wiring DI du module categories-depenses : assemble le routeur tRPC (CRUD catalogue) à partir du
+ * repository injecté.
+ */
 export interface CategoriesDepensesModuleDeps {
   readonly repository: ICategorieDepenseRepository;
 }

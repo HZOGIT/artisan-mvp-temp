@@ -37,8 +37,10 @@ function toProfile(r: Row): ArtisanProfile {
   };
 }
 
-// ⚠️ `artisans` est la table d'IDENTITÉ (hors RLS tenant) : le scope est porté par `id = ctx.artisanId`
-// (jamais par un `userId` arbitraire). app_tenant a les droits SELECT/UPDATE sur cette table.
+/*
+ * ⚠️ `artisans` est la table d'IDENTITÉ (hors RLS tenant) : le scope est porté par `id = ctx.artisanId`
+ * (jamais par un `userId` arbitraire). app_tenant a les droits SELECT/UPDATE sur cette table.
+ */
 export class ArtisanRepositoryDrizzle implements IArtisanRepository {
   constructor(private readonly db: DbClient) {}
 

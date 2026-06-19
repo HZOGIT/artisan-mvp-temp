@@ -32,8 +32,10 @@ function toMessage(r: typeof aiMessages.$inferSelect): AiMessage {
   };
 }
 
-// Lecture threads/messages assistant sous RLS (withTenant) + filtre artisanId explicite. `ai_messages`
-// (sans artisanId) n'est lu qu'après vérif d'appartenance du thread parent (anti-IDOR cross-tenant).
+/*
+ * Lecture threads/messages assistant sous RLS (withTenant) + filtre artisanId explicite. `ai_messages`
+ * (sans artisanId) n'est lu qu'après vérif d'appartenance du thread parent (anti-IDOR cross-tenant).
+ */
 export class AssistantThreadsRepositoryDrizzle implements IAssistantThreadsRepository {
   constructor(private readonly db: DbClient) {}
 

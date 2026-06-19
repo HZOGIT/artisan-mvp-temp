@@ -1,8 +1,10 @@
 import type { IParametresRepository } from "./application/parametres-repository";
 import { createParametresRouter } from "./interface/trpc/parametres.router";
 
-// Wiring DI du module parametres : assemble le routeur tRPC (get/update) à partir du repository
-// injecté (configuration artisan, singleton par tenant).
+/*
+ * Wiring DI du module parametres : assemble le routeur tRPC (get/update) à partir du repository
+ * injecté (configuration artisan, singleton par tenant).
+ */
 export interface ParametresModuleDeps {
   readonly repository: IParametresRepository;
 }

@@ -7,9 +7,11 @@ import type {
   PublicArticleRow,
 } from "../application/public-article-search";
 
-// Recherche dans le catalogue public `bibliotheque_articles` (parité legacy `searchBibliothequeArticles`)
-// : visible=true, ILIKE nom/description/categorie, filtres optionnels métier/catégorie/sous-catégorie,
-// tri par nom, **limite 10**. Aucun scope tenant (catalogue global) → pas de RLS.
+/*
+ * Recherche dans le catalogue public `bibliotheque_articles` (parité legacy `searchBibliothequeArticles`)
+ * : visible=true, ILIKE nom/description/categorie, filtres optionnels métier/catégorie/sous-catégorie,
+ * tri par nom, **limite 10**. Aucun scope tenant (catalogue global) → pas de RLS.
+ */
 export class PublicArticleSearchReaderDrizzle implements PublicArticleSearchReader {
   constructor(private readonly db: DbClient) {}
 

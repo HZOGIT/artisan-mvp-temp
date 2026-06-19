@@ -11,9 +11,11 @@ export interface ArticlesSearchDeps {
 
 const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
 
-// Route PUBLIQUE hors tRPC `GET /api/articles/search` : autocomplete du catalogue de référence
-// (`bibliotheque_articles`, global). Aucune auth (catalogue public) ; rate-limit IP (anti-scraping).
-// `q` < 2 caractères → `[]` (parité legacy). Filtres optionnels métier/catégorie/sous-catégorie.
+/*
+ * Route PUBLIQUE hors tRPC `GET /api/articles/search` : autocomplete du catalogue de référence
+ * (`bibliotheque_articles`, global). Aucune auth (catalogue public) ; rate-limit IP (anti-scraping).
+ * `q` < 2 caractères → `[]` (parité legacy). Filtres optionnels métier/catégorie/sous-catégorie.
+ */
 export function registerArticlesSearchRoute(app: FastifyInstance, deps: ArticlesSearchDeps): void {
   app.get("/api/articles/search", async (req, reply) => {
     const ip = extractClientIp((req.headers ?? {}) as Record<string, unknown>, req.ip ?? null);

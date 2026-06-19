@@ -79,11 +79,13 @@ function toLigne(r: LigneRow): FactureLigne {
   };
 }
 
-// Implémentation Drizzle du repository factures. Double cloisonnement RLS + filtre `artisanId`
-// sur `factures`. Les `factures_lignes` (SANS artisanId) sont scopées via la facture parente du
-// tenant. ⚠️ Domaine financier CRITIQUE : numérotation maîtrisée serveur (`nextNumero`, parité
-// legacy `getNextFactureNumber`), totaux TOUJOURS dérivés des lignes (jamais fournis par le
-// client), cascade lignes au delete. (Immutabilité post-émission portée par les use-cases.)
+/*
+ * Implémentation Drizzle du repository factures. Double cloisonnement RLS + filtre `artisanId`
+ * sur `factures`. Les `factures_lignes` (SANS artisanId) sont scopées via la facture parente du
+ * tenant. ⚠️ Domaine financier CRITIQUE : numérotation maîtrisée serveur (`nextNumero`, parité
+ * legacy `getNextFactureNumber`), totaux TOUJOURS dérivés des lignes (jamais fournis par le
+ * client), cascade lignes au delete. (Immutabilité post-émission portée par les use-cases.)
+ */
 export class FactureRepositoryDrizzle implements IFactureRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -198,8 +200,10 @@ export class FactureRepositoryDrizzle implements IFactureRepository {
 
   nextNumero(ctx: TenantContext): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Parité legacy `getNextFactureNumber` : préfixe + compteur persistés dans
-      // `parametres_artisan`, bornés par MAX(numero) en base (anti-doublon), compteur réavancé.
+      /*
+       * Parité legacy `getNextFactureNumber` : préfixe + compteur persistés dans
+       * `parametres_artisan`, bornés par MAX(numero) en base (anti-doublon), compteur réavancé.
+       */
       const [params] = await tx
         .select({ prefixe: parametresArtisan.prefixeFacture, compteur: parametresArtisan.compteurFacture })
         .from(parametresArtisan)

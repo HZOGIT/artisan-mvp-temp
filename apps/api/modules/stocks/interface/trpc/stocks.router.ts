@@ -37,8 +37,10 @@ const createSchema = z.object({
   fournisseur: z.string().max(255).nullish(),
 });
 
-// ⚠️ `quantiteEnStock` ABSENT du schéma d'update : la quantité ne change que via un
-// mouvement tracé (invariant d'audit).
+/*
+ * ⚠️ `quantiteEnStock` ABSENT du schéma d'update : la quantité ne change que via un
+ * mouvement tracé (invariant d'audit).
+ */
 const updateSchema = z.object({
   reference: z.string().min(1).max(50).optional(),
   designation: z.string().min(1).max(500).optional(),
@@ -49,10 +51,12 @@ const updateSchema = z.object({
   fournisseur: z.string().max(255).nullish(),
 });
 
-// Routeur tRPC du domaine stocks. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400). Repositories injectés (DI) → `repo` (stocks) + `notificationRepo`
-// (composé pour generateAlerts, qui crée des notifications « Stock bas »).
+/*
+ * Routeur tRPC du domaine stocks. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400). Repositories injectés (DI) → `repo` (stocks) + `notificationRepo`
+ * (composé pour generateAlerts, qui crée des notifications « Stock bas »).
+ */
 export function createStocksRouter(
   repo: IStockRepository,
   notificationRepo: INotificationRepository,
@@ -111,12 +115,16 @@ export function createStocksRouter(
     // Quantités en commande (non reçues) par stock (parité client trpc.stocks.getEntrant).
     getEntrant: protectedProcedure.query(({ ctx }) => listStockEntrant(repo, ctx.tenant)),
 
-    // Génère une notification « Stock bas » par stock sous le seuil (parité client + legacy).
-    // Cross-domaine : compose le repo notifications. Renvoie { alertsCreated }.
+    /*
+     * Génère une notification « Stock bas » par stock sous le seuil (parité client + legacy).
+     * Cross-domaine : compose le repo notifications. Renvoie { alertsCreated }.
+     */
     generateAlerts: protectedProcedure.mutation(({ ctx }) => genererAlertesStock(repo, notificationRepo, ctx.tenant)),
 
-    // Rapport de réapprovisionnement groupé par fournisseur (parité client trpc.stocks.getRapportCommande).
-    // Cross-domaine : compose le repo fournisseurs (associations article↔fournisseur + fiches).
+    /*
+     * Rapport de réapprovisionnement groupé par fournisseur (parité client trpc.stocks.getRapportCommande).
+     * Cross-domaine : compose le repo fournisseurs (associations article↔fournisseur + fiches).
+     */
     getRapportCommande: protectedProcedure.query(({ ctx }) => genererRapportCommande(repo, fournisseurRepo, ctx.tenant)),
   });
 }

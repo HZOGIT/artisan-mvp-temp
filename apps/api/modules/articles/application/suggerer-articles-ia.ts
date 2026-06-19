@@ -5,16 +5,20 @@ import type { ArtisanReader } from "../../../shared/readers/contact-readers";
 import { getContexteMetier } from "../../../shared/ia/contexte-metier";
 import { sanitizeIaError } from "../../../shared/ia/sanitize-ia-error";
 
-// Dépendances de la suggestion IA d'articles (lecture seule, NON persistée — le client ajoute la
-// proposition au formulaire). Parité legacy `articles.suggererArticlesIA`.
+/*
+ * Dépendances de la suggestion IA d'articles (lecture seule, NON persistée — le client ajoute la
+ * proposition au formulaire). Parité legacy `articles.suggererArticlesIA`.
+ */
 export interface ArticlesIaDeps {
   readonly llm: LlmPort;
   readonly rateLimiter: RateLimiterPort;
   readonly artisanReader: ArtisanReader;
 }
 
-// Article PROPOSÉ par l'IA (catalogue suggéré quand l'artisan cherche une prestation absente de sa
-// bibliothèque). Champs coercés défensivement (sortie LLM non fiable).
+/*
+ * Article PROPOSÉ par l'IA (catalogue suggéré quand l'artisan cherche une prestation absente de sa
+ * bibliothèque). Champs coercés défensivement (sortie LLM non fiable).
+ */
 export interface ArticleSuggere {
   readonly designation: string;
   readonly reference: string;
@@ -33,9 +37,11 @@ function rateLimitKey(artisanId: number): string {
   return `ia:${artisanId}`;
 }
 
-// Propose ~5 articles réalistes (prix marché FR) adaptés au métier de l'artisan, via l'IA.
-// ⚠️ Parité legacy STRICTE : **aucune exception** — rate-limit atteint, erreur provider ou JSON non
-// parsable ⇒ renvoie `[]` (dégradation silencieuse). Aucune persistance.
+/*
+ * Propose ~5 articles réalistes (prix marché FR) adaptés au métier de l'artisan, via l'IA.
+ * ⚠️ Parité legacy STRICTE : **aucune exception** — rate-limit atteint, erreur provider ou JSON non
+ * parsable ⇒ renvoie `[]` (dégradation silencieuse). Aucune persistance.
+ */
 export async function suggererArticlesIA(
   deps: ArticlesIaDeps,
   ctx: TenantContext,

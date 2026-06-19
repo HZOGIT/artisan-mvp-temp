@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IModeleDevisRepository } from "./modele-devis-repository";
 import type { CreateModeleDevisInput, CreateModeleDevisLigneInput, ModeleDevis, ModeleDevisLigne, UpdateModeleDevisInput } from "../domain/modele-devis";
 
-// Use-cases d'écriture — purs, repository injecté. Validation métier (en-tête + lignes) + ⚠️
-// INVARIANT « un seul modèle isDefault par artisan » (sans dimension type, ≠ modeles-email). Le
-// scoping tenant est porté par le repo.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Validation métier (en-tête + lignes) + ⚠️
+ * INVARIANT « un seul modèle isDefault par artisan » (sans dimension type, ≠ modeles-email). Le
+ * scoping tenant est porté par le repo.
+ */
 
 function assertMontantPositif(valeur: string | undefined, libelle: string): void {
   if (valeur === undefined) return;
@@ -32,9 +34,11 @@ function assertLignes(lignes: readonly CreateModeleDevisLigneInput[] | undefined
   for (const l of lignes) assertLigne(l);
 }
 
-// Retombe (isDefault=false) tous les modèles du tenant SAUF `exclureId`, afin de garantir au plus un
-// défaut par artisan. ⚠️ On ne passe QUE `{isDefault:false}` à l'update (jamais `lignes`) pour ne pas
-// remplacer/effacer les lignes des autres modèles.
+/*
+ * Retombe (isDefault=false) tous les modèles du tenant SAUF `exclureId`, afin de garantir au plus un
+ * défaut par artisan. ⚠️ On ne passe QUE `{isDefault:false}` à l'update (jamais `lignes`) pour ne pas
+ * remplacer/effacer les lignes des autres modèles.
+ */
 async function retomberAutresDefauts(repo: IModeleDevisRepository, ctx: TenantContext, exclureId: number): Promise<void> {
   const tous = await repo.list(ctx);
   for (const m of tous) {
@@ -75,8 +79,10 @@ export async function supprimerModeleDevis(repo: IModeleDevisRepository, ctx: Te
   if (!ok) throw new NotFoundError("Modèle de devis introuvable");
 }
 
-// Ajoute UNE ligne à un modèle (parité legacy `devis.addLigneToModele`) : valide la ligne, délègue au
-// repo (insertion scopée via le parent) — 404 si le modèle n'appartient pas au tenant (anti-IDOR).
+/*
+ * Ajoute UNE ligne à un modèle (parité legacy `devis.addLigneToModele`) : valide la ligne, délègue au
+ * repo (insertion scopée via le parent) — 404 si le modèle n'appartient pas au tenant (anti-IDOR).
+ */
 export async function ajouterLigneModeleDevis(
   repo: IModeleDevisRepository,
   ctx: TenantContext,

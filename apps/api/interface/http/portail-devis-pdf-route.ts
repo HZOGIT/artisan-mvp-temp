@@ -8,9 +8,11 @@ export interface PortailDevisPdfRouteDeps extends PortalDevisPdfDeps {
   readonly rateLimiter: RateLimiterPort;
 }
 
-// Route HORS-tRPC PUBLIQUE `GET /api/portail/:token/devis/:id/pdf` : PDF d'un devis depuis le portail
-// client (le token EST la capacité, pas de cookie). Rate-limit IP (anti-DoS PDF). 403 token invalide,
-// 404 devis hors clientId. ⚠️ MONTÉ mais NON routé tant qu'absent de MIGRATED_ROUTES.
+/*
+ * Route HORS-tRPC PUBLIQUE `GET /api/portail/:token/devis/:id/pdf` : PDF d'un devis depuis le portail
+ * client (le token EST la capacité, pas de cookie). Rate-limit IP (anti-DoS PDF). 403 token invalide,
+ * 404 devis hors clientId. ⚠️ MONTÉ mais NON routé tant qu'absent de MIGRATED_ROUTES.
+ */
 export function registerPortailDevisPdfRoute(app: FastifyInstance, deps: PortailDevisPdfRouteDeps): void {
   app.get("/api/portail/:token/devis/:id/pdf", async (req, reply) => {
     const ip = extractClientIp((req.headers ?? {}) as Record<string, unknown>, req.ip ?? null);

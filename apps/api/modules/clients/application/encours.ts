@@ -1,13 +1,15 @@
-// Calcul de l'encours client (reste dû des factures émises non soldées) — PUR, testable
-// sans DB. ⚠️ Domaine sensible (montants) : parité stricte avec le legacy.
-//
-// Règles (parité legacy) :
-// - seules les factures `envoyee`/`en_retard` comptent (pas brouillon/validee = pas encore
-//   une créance ; pas payee/annulee = soldée/sans effet) ;
-// - reste dû d'une facture = `totalTTC − montantPaye`, ignoré si ≤ 0 ;
-// - les avoirs (`typeDocument='avoir'`, totalTTC négatif) NON annulés/brouillon réduisent
-//   l'encours (crédit = somme des valeurs absolues), déduit globalement (planché à 0) ;
-// - part « échue » = factures `en_retard` OU `dateEcheance < now`, bornée au net dû.
+/*
+ * Calcul de l'encours client (reste dû des factures émises non soldées) — PUR, testable
+ * sans DB. ⚠️ Domaine sensible (montants) : parité stricte avec le legacy.
+ * 
+ * Règles (parité legacy) :
+ * - seules les factures `envoyee`/`en_retard` comptent (pas brouillon/validee = pas encore
+ *   une créance ; pas payee/annulee = soldée/sans effet) ;
+ * - reste dû d'une facture = `totalTTC − montantPaye`, ignoré si ≤ 0 ;
+ * - les avoirs (`typeDocument='avoir'`, totalTTC négatif) NON annulés/brouillon réduisent
+ *   l'encours (crédit = somme des valeurs absolues), déduit globalement (planché à 0) ;
+ * - part « échue » = factures `en_retard` OU `dateEcheance < now`, bornée au net dû.
+ */
 
 export interface FactureEncoursLigne {
   readonly clientId: number;
@@ -53,8 +55,10 @@ export function calculerEncours(rows: readonly FactureEncoursLigne[], now: numbe
   return { encoursTotal: encoursTotal.toFixed(2), echu: echu.toFixed(2), nbFacturesImpayees: nb };
 }
 
-// Encours de tous les clients du tenant (agrégat par clientId). Ne retourne que les clients
-// réellement débiteurs (encoursTotal > 0), comme le legacy.
+/*
+ * Encours de tous les clients du tenant (agrégat par clientId). Ne retourne que les clients
+ * réellement débiteurs (encoursTotal > 0), comme le legacy.
+ */
 export function calculerEncoursParClient(
   rows: readonly FactureEncoursLigne[],
   now: number,

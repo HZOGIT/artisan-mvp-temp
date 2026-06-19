@@ -37,10 +37,12 @@ export interface GenererExportDeps {
   readonly fec: { getFecContent(ctx: TenantContext, period: { dateDebut: Date; dateFin: Date }): Promise<string> };
 }
 
-// Génère un export comptable (FEC opposable réutilisé du domaine compta, ou IIF QuickBooks porté pur).
-// Crée l'enregistrement d'export, génère le contenu (LECTURE SEULE — aucune écriture mutée), met à jour
-// le statut. Formats `qbo`/`csv` non encore implémentés : un contenu vide est marqué `erreur` (jamais
-// `termine`) et l'appel LÈVE → l'UI signale l'échec au lieu de livrer un fichier vide silencieusement.
+/*
+ * Génère un export comptable (FEC opposable réutilisé du domaine compta, ou IIF QuickBooks porté pur).
+ * Crée l'enregistrement d'export, génère le contenu (LECTURE SEULE — aucune écriture mutée), met à jour
+ * le statut. Formats `qbo`/`csv` non encore implémentés : un contenu vide est marqué `erreur` (jamais
+ * `termine`) et l'appel LÈVE → l'UI signale l'échec au lieu de livrer un fichier vide silencieusement.
+ */
 export async function genererExport(deps: GenererExportDeps, ctx: TenantContext, input: GenererExportInput): Promise<{ id: number; contenu: string }> {
   const dateDebut = new Date(input.dateDebut);
   const dateFin = new Date(input.dateFin);
@@ -61,9 +63,11 @@ export async function genererExport(deps: GenererExportDeps, ctx: TenantContext,
     contenu = buildIIF(factures);
   }
 
-  // Garde anti-échec silencieux : un format non implémenté (`csv`/`qbo`) ou une période sans contenu ne
-  // doit JAMAIS produire un export `termine` vide (le comptable téléchargerait un fichier vide en croyant
-  // l'export réussi). On marque l'export en erreur et on lève — l'échec devient visible.
+  /*
+   * Garde anti-échec silencieux : un format non implémenté (`csv`/`qbo`) ou une période sans contenu ne
+   * doit JAMAIS produire un export `termine` vide (le comptable téléchargerait un fichier vide en croyant
+   * l'export réussi). On marque l'export en erreur et on lève — l'échec devient visible.
+   */
   if (!contenu.trim()) {
     await deps.repo.updateExport(ctx, exportRecord.id, { statut: "erreur", erreur: `Aucun contenu à exporter pour le format « ${input.formatExport} »` });
     throw new ValidationError(`L'export au format « ${input.formatExport} » n'a produit aucun contenu (format non disponible ou période sans écriture).`);
@@ -85,17 +89,21 @@ export interface PendingItemsResult {
   readonly items: PendingItem[];
 }
 
-// Items en attente de synchro. ⚠️ On renvoie l'OBJET attendu par le client (`facturesEnAttente`/
-// `paiementsEnAttente`/`erreurs`/`items`) — corrige le legacy qui renvoyait un tableau nu (le client
-// lisait `.facturesEnAttente`/`.items` → toujours 0/aucun item, bug latent). Comportement intentionnel.
+/*
+ * Items en attente de synchro. ⚠️ On renvoie l'OBJET attendu par le client (`facturesEnAttente`/
+ * `paiementsEnAttente`/`erreurs`/`items`) — corrige le legacy qui renvoyait un tableau nu (le client
+ * lisait `.facturesEnAttente`/`.items` → toujours 0/aucun item, bug latent). Comportement intentionnel.
+ */
 export async function getPendingItems(repo: IIntegrationsComptablesRepository, ctx: TenantContext): Promise<PendingItemsResult> {
   const items = await repo.listPendingItems(ctx);
   return { facturesEnAttente: items.length, paiementsEnAttente: 0, erreurs: 0, items };
 }
 
-// Synchronisation manuelle (parité legacy `lancerSync`) : config requise ; sinon, crée 1 export
-// `termine` couvrant [début du mois courant, aujourd'hui] avec le logiciel/format de la config pour
-// les items en attente, et met à jour `derniereSync`. Aucune écriture comptable mutée.
+/*
+ * Synchronisation manuelle (parité legacy `lancerSync`) : config requise ; sinon, crée 1 export
+ * `termine` couvrant [début du mois courant, aujourd'hui] avec le logiciel/format de la config pour
+ * les items en attente, et met à jour `derniereSync`. Aucune écriture comptable mutée.
+ */
 export async function lancerSync(repo: IIntegrationsComptablesRepository, ctx: TenantContext, now: Date = new Date()): Promise<{ success: boolean; nbItems: number; message: string }> {
   const config = await repo.getConfig(ctx);
   if (!config) return { success: false, nbItems: 0, message: "Configuration absente" };
@@ -114,8 +122,10 @@ export async function lancerSync(repo: IIntegrationsComptablesRepository, ctx: T
   return { success: true, nbItems: items.length, message: `${items.length} ecritures synchronisees` };
 }
 
-// Re-marque un export en erreur comme terminé (scopé tenant). NB : version SAINE — le legacy avait un
-// bug de passage d'argument (artisanId utilisé comme exportId) ; ici on cible bien l'export `exportId`.
+/*
+ * Re-marque un export en erreur comme terminé (scopé tenant). NB : version SAINE — le legacy avait un
+ * bug de passage d'argument (artisanId utilisé comme exportId) ; ici on cible bien l'export `exportId`.
+ */
 export async function retrySync(repo: IIntegrationsComptablesRepository, ctx: TenantContext, exportId: number): Promise<{ success: true }> {
   await repo.updateExport(ctx, exportId, { statut: "termine", erreur: null });
   return { success: true };

@@ -1,8 +1,12 @@
-// Port d'envoi d'email. Les use-cases en dépendent (interface), jamais d'une impl
-// concrète. `send` résout en cas de succès, rejette (throw) sinon.
+/*
+ * Port d'envoi d'email. Les use-cases en dépendent (interface), jamais d'une impl
+ * concrète. `send` résout en cas de succès, rejette (throw) sinon.
+ */
 
-// Pièce jointe (ex. PDF facture/devis/bon de commande). `content` = binaire ; l'adapter
-// se charge de l'encodage (base64) requis par le transport.
+/*
+ * Pièce jointe (ex. PDF facture/devis/bon de commande). `content` = binaire ; l'adapter
+ * se charge de l'encodage (base64) requis par le transport.
+ */
 export interface EmailAttachment {
   readonly filename: string;
   readonly content: Buffer;

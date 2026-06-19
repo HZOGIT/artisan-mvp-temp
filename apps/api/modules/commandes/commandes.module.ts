@@ -6,10 +6,12 @@ import type { CommandeMailingDeps } from "./application/envoyer-commande-email";
 import type { CommandeIaDeps } from "./application/generer-depuis-devis-ia";
 import { createCommandesRouter } from "./interface/trpc/commandes.router";
 
-// Wiring DI du module commandes : assemble le routeur tRPC à partir du repository injecté. Repos
-// composés : `fournisseurRepository` (getPerformances = commandes × fournisseurs) ;
-// `devisRepository` + `clientRepository` (listDevisAcceptes = devis acceptés enrichis du nom client) ;
-// `mailing` (envoi du bon de commande par email : artisan reader + PdfPort + EmailPort + rate-limiter).
+/*
+ * Wiring DI du module commandes : assemble le routeur tRPC à partir du repository injecté. Repos
+ * composés : `fournisseurRepository` (getPerformances = commandes × fournisseurs) ;
+ * `devisRepository` + `clientRepository` (listDevisAcceptes = devis acceptés enrichis du nom client) ;
+ * `mailing` (envoi du bon de commande par email : artisan reader + PdfPort + EmailPort + rate-limiter).
+ */
 export interface CommandesModuleDeps {
   readonly repository: ICommandeRepository;
   readonly fournisseurRepository: IFournisseurRepository;

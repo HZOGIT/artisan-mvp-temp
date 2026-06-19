@@ -30,9 +30,11 @@ function toSet(input: UpdateRegleInput): Partial<RegleInsert> {
   return set;
 }
 
-// Implémentation Drizzle du repository regles-categorisation. Double cloisonnement RLS + filtre
-// `artisan_id` sur `regles_categorisation`. `artisan_id` forcé à la création. Pas de contrainte
-// d'unicité sur ce domaine (plusieurs règles peuvent partager motif/catégorie).
+/*
+ * Implémentation Drizzle du repository regles-categorisation. Double cloisonnement RLS + filtre
+ * `artisan_id` sur `regles_categorisation`. `artisan_id` forcé à la création. Pas de contrainte
+ * d'unicité sur ce domaine (plusieurs règles peuvent partager motif/catégorie).
+ */
 export class RegleCategorisationRepositoryDrizzle implements IRegleCategorisationRepository {
   constructor(private readonly db: DbClient) {}
 

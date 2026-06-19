@@ -4,8 +4,10 @@ import type { ModuleCatalogue, OnboardingStatus } from "../domain/module";
 
 type MutableOnboarding = { -readonly [K in keyof OnboardingStatus]: OnboardingStatus[K] };
 
-// Fake in-memory déterministe (aucun réseau). Catalogue global injecté ; activations + onboarding par
-// tenant. Reproduit le fallback « modules actifs par défaut » quand le tenant n'a aucune préférence.
+/*
+ * Fake in-memory déterministe (aucun réseau). Catalogue global injecté ; activations + onboarding par
+ * tenant. Reproduit le fallback « modules actifs par défaut » quand le tenant n'a aucune préférence.
+ */
 export class FakeModulesRepository implements IModulesRepository {
   private readonly catalogue: ModuleCatalogue[];
   // artisanId → (slug → actif)

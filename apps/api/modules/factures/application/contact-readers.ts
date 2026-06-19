@@ -1,11 +1,13 @@
 import type { TenantContext } from "../../../shared/tenant";
 
-// Lectures « contact » nécessaires à l'envoi d'une facture par email et à la génération du PDF
-// (émetteur = artisan courant ; destinataire = client de la facture). Ports dédiés au module
-// factures (clean-archi) : le use-case dépend de ces interfaces, pas du schéma Drizzle ni des
-// modules clients/parametres. Les objets exposent les champs typés utiles (email/nom…) + une
-// signature d'index : la **ligne brute** est transmise telle quelle au générateur PDF legacy
-// (qui lit d'autres champs : adresse, logo, TVA…), sans coupler le domaine à ces détails.
+/*
+ * Lectures « contact » nécessaires à l'envoi d'une facture par email et à la génération du PDF
+ * (émetteur = artisan courant ; destinataire = client de la facture). Ports dédiés au module
+ * factures (clean-archi) : le use-case dépend de ces interfaces, pas du schéma Drizzle ni des
+ * modules clients/parametres. Les objets exposent les champs typés utiles (email/nom…) + une
+ * signature d'index : la **ligne brute** est transmise telle quelle au générateur PDF legacy
+ * (qui lit d'autres champs : adresse, logo, TVA…), sans coupler le domaine à ces détails.
+ */
 
 export interface ArtisanInfo {
   readonly id: number;

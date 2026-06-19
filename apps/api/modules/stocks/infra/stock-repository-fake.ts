@@ -9,14 +9,18 @@ import type {
   StockEntrant,
 } from "../domain/stock";
 
-// Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
-// scoping tenant. ⚠️ `update` ne touche pas `quantiteEnStock` (invariant d'audit) ;
-// seul `adjustQuantity` change la quantité (via un mouvement tracé).
+/*
+ * Double in-memory du repository pour les tests de use-cases (sans DB). Reproduit le
+ * scoping tenant. ⚠️ `update` ne touche pas `quantiteEnStock` (invariant d'audit) ;
+ * seul `adjustQuantity` change la quantité (via un mouvement tracé).
+ */
 export class FakeStockRepository implements IStockRepository {
   private store: Stock[] = [];
   private mouvements: MouvementStock[] = [];
-  // Entrant simulé par tenant (les commandes fournisseurs ne sont pas modélisées dans ce fake) :
-  // clé `${artisanId}` → liste {stockId, entrant}. Alimenté par seedEntrant (aide de test).
+  /*
+   * Entrant simulé par tenant (les commandes fournisseurs ne sont pas modélisées dans ce fake) :
+   * clé `${artisanId}` → liste {stockId, entrant}. Alimenté par seedEntrant (aide de test).
+   */
   private entrants = new Map<number, StockEntrant[]>();
   private seq = 0;
   private mvSeq = 0;

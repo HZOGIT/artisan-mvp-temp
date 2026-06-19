@@ -147,10 +147,12 @@ function toChantier(r: ChantierRow): Chantier {
   };
 }
 
-// Implémentation Drizzle du repository chantiers. Double cloisonnement RLS + filtre `artisanId`.
-// ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))` → aucune fuite
-// cross-tenant. `create` insère le `clientId` fourni SANS vérifier son ownership : la garde
-// anti-IDOR-FK est portée par le use-case d'écriture (4/9). `update` ne touche pas `clientId`.
+/*
+ * Implémentation Drizzle du repository chantiers. Double cloisonnement RLS + filtre `artisanId`.
+ * ⚠️ Toute requête by-id porte `and(eq(id), eq(artisanId, ctx.artisanId))` → aucune fuite
+ * cross-tenant. `create` insère le `clientId` fourni SANS vérifier son ownership : la garde
+ * anti-IDOR-FK est portée par le use-case d'écriture (4/9). `update` ne touche pas `clientId`.
+ */
 export class ChantierRepositoryDrizzle implements IChantierRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -199,11 +201,13 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Vérifie l'appartenance AVANT de purger les sous-ressources (tables enfants scopées via
-      // le chantier, sans artisanId propre pour certaines) → on ne supprime pas celles d'un
-      // autre tenant. Cascade atomique = parité legacy deleteChantier (évite des lignes
-      // orphelines pointant un chantierId supprimé). Le périmètre fonctionnel de ces
-      // sous-ressources (CRUD phases/pointages/documents/suivi/associations) reste à migrer.
+      /*
+       * Vérifie l'appartenance AVANT de purger les sous-ressources (tables enfants scopées via
+       * le chantier, sans artisanId propre pour certaines) → on ne supprime pas celles d'un
+       * autre tenant. Cascade atomique = parité legacy deleteChantier (évite des lignes
+       * orphelines pointant un chantierId supprimé). Le périmètre fonctionnel de ces
+       * sous-ressources (CRUD phases/pointages/documents/suivi/associations) reste à migrer.
+       */
       const [owned] = await tx
         .select({ id: chantiers.id })
         .from(chantiers)
@@ -297,8 +301,10 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
     });
   }
 
-  // ⚠️ `suivi_chantier` n'a PAS d'artisanId : ces méthodes ne sont PAS scopées tenant au niveau SQL —
-  // l'ownership (via le chantier parent) est garanti par le use-case AVANT l'appel (anti-IDOR).
+  /*
+   * ⚠️ `suivi_chantier` n'a PAS d'artisanId : ces méthodes ne sont PAS scopées tenant au niveau SQL —
+   * l'ownership (via le chantier parent) est garanti par le use-case AVANT l'appel (anti-IDOR).
+   */
   listSuivi(ctx: TenantContext, chantierId: number): Promise<ChantierSuivi[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
@@ -362,8 +368,10 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
     });
   }
 
-  // ⚠️ `phases_chantier` n'a PAS d'artisanId : pas de scoping tenant au SQL — l'ownership (via le
-  // chantier parent) est garanti par le use-case AVANT l'appel (anti-IDOR).
+  /*
+   * ⚠️ `phases_chantier` n'a PAS d'artisanId : pas de scoping tenant au SQL — l'ownership (via le
+   * chantier parent) est garanti par le use-case AVANT l'appel (anti-IDOR).
+   */
   listPhases(ctx: TenantContext, chantierId: number): Promise<ChantierPhase[]> {
     return withTenant(this.db, ctx, async (tx) => {
       const rows = await tx
@@ -411,8 +419,10 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
       if (input.dateFinReelle !== undefined) set.dateFinReelle = input.dateFinReelle;
       if (input.coutReel !== undefined) set.coutReel = input.coutReel;
       if (input.heuresPrevues !== undefined) set.heuresPrevues = input.heuresPrevues;
-      // `phases_chantier` n'a pas d'`updatedAt` → si rien à modifier, renvoyer la phase telle quelle
-      // (évite un `SET` vide invalide).
+      /*
+       * `phases_chantier` n'a pas d'`updatedAt` → si rien à modifier, renvoyer la phase telle quelle
+       * (évite un `SET` vide invalide).
+       */
       if (Object.keys(set).length === 0) {
         const [cur] = await tx.select().from(phasesChantier).where(eq(phasesChantier.id, id)).limit(1);
         return cur ? toPhase(cur) : null;
@@ -429,9 +439,11 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
     });
   }
 
-  // ── Interventions liées (`interventions_chantier`, SANS artisanId) ────────────────────────────
-  // `interventions` est scopée RLS/tenant (artisanId) → ce SELECT ne voit que les interventions du
-  // tenant (anti-IDOR-FK : interdit d'associer l'intervention d'un autre tenant).
+  /*
+   * ── Interventions liées (`interventions_chantier`, SANS artisanId) ────────────────────────────
+   * `interventions` est scopée RLS/tenant (artisanId) → ce SELECT ne voit que les interventions du
+   * tenant (anti-IDOR-FK : interdit d'associer l'intervention d'un autre tenant).
+   */
   ownsIntervention(ctx: TenantContext, interventionId: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
       const [row] = await tx
@@ -552,8 +564,10 @@ export class ChantierRepositoryDrizzle implements IChantierRepository {
     });
   }
 
-  // `depenses` a `artisan_id` (RLS) → ce SELECT ne voit que les dépenses du tenant ; on borne aussi
-  // sur `chantier_id` (sous-ressource du chantier déjà vérifié par le use-case).
+  /*
+   * `depenses` a `artisan_id` (RLS) → ce SELECT ne voit que les dépenses du tenant ; on borne aussi
+   * sur `chantier_id` (sous-ressource du chantier déjà vérifié par le use-case).
+   */
   sumDepensesChantier(ctx: TenantContext, chantierId: number): Promise<string> {
     return withTenant(this.db, ctx, async (tx) => {
       const [agg] = await tx

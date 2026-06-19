@@ -19,9 +19,11 @@ export interface DevisNonSigneItem {
   readonly joursDepuisEnvoi: number | null;
 }
 
-// Devis non signés de ≥ `joursMinimum` jours (parité legacy `devis.getDevisNonSignes`), enrichis du
-// client et de la signature (lien envoyé). Lecture scopée tenant (`listNonSignes`) ; la signature est
-// lue par devisId pour des devis déjà possédés (anti-IDOR par le parent).
+/*
+ * Devis non signés de ≥ `joursMinimum` jours (parité legacy `devis.getDevisNonSignes`), enrichis du
+ * client et de la signature (lien envoyé). Lecture scopée tenant (`listNonSignes`) ; la signature est
+ * lue par devisId pour des devis déjà possédés (anti-IDOR par le parent).
+ */
 export async function getDevisNonSignes(
   deps: DevisNonSignesDeps,
   ctx: TenantContext,

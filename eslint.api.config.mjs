@@ -12,9 +12,10 @@ export default tseslint.config(
       parser: tseslint.parser,
     },
     rules: {
-      // Convention commentaires : WHY uniquement, pas de tickets dans le code.
-      "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX", "OPE-"], location: "anywhere" }],
-      "spaced-comment": ["error", "always", { exceptions: ["─", "=", "-"], markers: ["⚠️", "!"] }],
+      // Convention commentaires : JSDoc uniquement (pas de //). Tickets OPE-XXX OK dans les JSDoc.
+      "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
+      "no-inline-comments": "error",
+      "multiline-comment-style": ["error", "starred-block"],
       // Console : interdit sauf désactivation explicite (les no-console intentionnels ont déjà eslint-disable-next-line).
       "no-console": ["warn", { allow: ["warn", "error"] }],
     },

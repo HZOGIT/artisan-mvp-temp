@@ -1,6 +1,8 @@
-// Erreurs de domaine partagées. Les use-cases les lèvent ; les adapters (tRPC/HTTP)
-// les traduisent en codes de transport. Un accès à une ressource d'un autre tenant
-// doit se traduire par NotFoundError (on ne révèle pas l'existence) ou ForbiddenError.
+/*
+ * Erreurs de domaine partagées. Les use-cases les lèvent ; les adapters (tRPC/HTTP)
+ * les traduisent en codes de transport. Un accès à une ressource d'un autre tenant
+ * doit se traduire par NotFoundError (on ne révèle pas l'existence) ou ForbiddenError.
+ */
 
 export class NotFoundError extends Error {
   readonly code = "NOT_FOUND" as const;
@@ -34,8 +36,10 @@ export class ValidationError extends Error {
   }
 }
 
-// Authentification échouée/absente (identifiants invalides, session requise). Traduite en
-// UNAUTHORIZED côté transport. ⚠️ Distinct de ForbiddenError (authentifié mais droits insuffisants).
+/*
+ * Authentification échouée/absente (identifiants invalides, session requise). Traduite en
+ * UNAUTHORIZED côté transport. ⚠️ Distinct de ForbiddenError (authentifié mais droits insuffisants).
+ */
 export class UnauthorizedError extends Error {
   readonly code = "UNAUTHORIZED" as const;
   constructor(message = "Authentification requise") {

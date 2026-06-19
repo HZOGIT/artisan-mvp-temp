@@ -6,9 +6,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { CreateAccessData, IPortalAccessRepository } from "../application/portal-access-repository";
 import type { ArtisanPortalInfo, ClientPortalInfo, PortalAccessRef, PortalAccessStatus } from "../domain/portal-access";
 
-// Repository d'accès au portail. `resolveByToken` lit `client_portal_access` sous la policy public-token
-// RLS (token ACTIF + non expiré). Les écritures/lectures tenant repassent par `withTenant(artisanId)`.
-// `artisans` est HORS RLS (lecture directe par id).
+/*
+ * Repository d'accès au portail. `resolveByToken` lit `client_portal_access` sous la policy public-token
+ * RLS (token ACTIF + non expiré). Les écritures/lectures tenant repassent par `withTenant(artisanId)`.
+ * `artisans` est HORS RLS (lecture directe par id).
+ */
 export class PortalAccessRepositoryDrizzle implements IPortalAccessRepository {
   constructor(private readonly db: DbClient) {}
 

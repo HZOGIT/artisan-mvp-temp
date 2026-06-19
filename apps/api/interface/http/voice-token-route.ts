@@ -7,9 +7,11 @@ export interface VoiceTokenRouteDeps extends CookieAuthDeps, VoiceTokenDeps {
   readonly rateLimiter: RateLimiterPort;
 }
 
-// Route HORS-tRPC `POST /api/voice/token` : mint d'un token éphémère pour la session vocale Live (auth
-// cookie JWT + rate-limit IA). Renvoie `{token, wsUrl, model, expiresAt, threadId}`. Erreur provider →
-// 502 (parité legacy). ⚠️ MONTÉ mais NON routé (legacy sert encore).
+/*
+ * Route HORS-tRPC `POST /api/voice/token` : mint d'un token éphémère pour la session vocale Live (auth
+ * cookie JWT + rate-limit IA). Renvoie `{token, wsUrl, model, expiresAt, threadId}`. Erreur provider →
+ * 502 (parité legacy). ⚠️ MONTÉ mais NON routé (legacy sert encore).
+ */
 export function registerVoiceTokenRoute(app: FastifyInstance, deps: VoiceTokenRouteDeps): void {
   app.post("/api/voice/token", async (req, reply) => {
     const auth = await authArtisanFromCookie(req, deps);

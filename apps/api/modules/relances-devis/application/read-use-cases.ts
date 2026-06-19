@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRelanceDevisRepository } from "./relance-devis-repository";
 import type { RelanceDevis } from "../domain/relance-devis";
 
-// Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
-// `getRelance` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+/*
+ * Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
+ * `getRelance` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+ */
 
 export function listRelances(repo: IRelanceDevisRepository, ctx: TenantContext): Promise<RelanceDevis[]> {
   return repo.list(ctx);

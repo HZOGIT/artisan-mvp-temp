@@ -12,8 +12,10 @@ type ParametresInsert = typeof parametresArtisan.$inferInsert;
 
 const D = defaultParametres(0); // socle de défauts (artisanId remplacé au mapping)
 
-// Mappe une ligne PG → domaine. Les colonnes nullable avec DEFAULT (prefixes, compteurs, couleurs…)
-// peuvent être null en base si insérées hors défaut ; on retombe sur les défauts du domaine.
+/*
+ * Mappe une ligne PG → domaine. Les colonnes nullable avec DEFAULT (prefixes, compteurs, couleurs…)
+ * peuvent être null en base si insérées hors défaut ; on retombe sur les défauts du domaine.
+ */
 function toParametres(r: ParametresRow): ParametresArtisan {
   return {
     artisanId: r.artisanId,
@@ -39,8 +41,10 @@ function toParametres(r: ParametresRow): ParametresArtisan {
   };
 }
 
-// Ne retient que les champs config réellement fournis (les autres restent inchangés). ⚠️ AUCUN
-// compteur ici — ils sont pilotés par la numérotation des documents et inviolables via la config.
+/*
+ * Ne retient que les champs config réellement fournis (les autres restent inchangés). ⚠️ AUCUN
+ * compteur ici — ils sont pilotés par la numérotation des documents et inviolables via la config.
+ */
 function toConfigSet(input: UpdateParametresInput): Partial<ParametresInsert> {
   const set: Partial<ParametresInsert> = {};
   if (input.prefixeDevis !== undefined) set.prefixeDevis = input.prefixeDevis;
@@ -62,8 +66,10 @@ function toConfigSet(input: UpdateParametresInput): Partial<ParametresInsert> {
   return set;
 }
 
-// Implémentation Drizzle du repository parametres (configuration artisan, singleton par tenant).
-// Double cloisonnement RLS + filtre `artisanId` sur `parametres_artisan` (artisanId UNIQUE).
+/*
+ * Implémentation Drizzle du repository parametres (configuration artisan, singleton par tenant).
+ * Double cloisonnement RLS + filtre `artisanId` sur `parametres_artisan` (artisanId UNIQUE).
+ */
 export class ParametresRepositoryDrizzle implements IParametresRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -81,10 +87,12 @@ export class ParametresRepositoryDrizzle implements IParametresRepository {
   upsert(ctx: TenantContext, input: UpdateParametresInput): Promise<ParametresArtisan> {
     return withTenant(this.db, ctx, async (tx) => {
       const set = toConfigSet(input);
-      // Singleton idempotent : crée la ligne du tenant si absente, sinon met à jour les seuls champs
-      // config fournis. `artisanId` forcé au tenant ; compteurs jamais touchés (prennent les DEFAULT
-      // à la création, restent inchangés ensuite). Input vide → garantit juste l'existence de la
-      // ligne (DO NOTHING, pas de SET vide). On relit pour renvoyer l'état canonique.
+      /*
+       * Singleton idempotent : crée la ligne du tenant si absente, sinon met à jour les seuls champs
+       * config fournis. `artisanId` forcé au tenant ; compteurs jamais touchés (prennent les DEFAULT
+       * à la création, restent inchangés ensuite). Input vide → garantit juste l'existence de la
+       * ligne (DO NOTHING, pas de SET vide). On relit pour renvoyer l'état canonique.
+       */
       const ins = tx.insert(parametresArtisan).values({ artisanId: ctx.artisanId, ...set });
       await (Object.keys(set).length === 0
         ? ins.onConflictDoNothing({ target: parametresArtisan.artisanId })

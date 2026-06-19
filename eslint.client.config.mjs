@@ -66,9 +66,10 @@ export default tseslint.config({
   rules: {
     "local/kebab-filename": "error",
     "local/no-trpc-in-ui": "error",
-    // Convention commentaires : WHY uniquement, pas de tickets dans le code.
-    "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX", "OPE-"], location: "anywhere" }],
-    "spaced-comment": ["error", "always", { exceptions: ["─", "=", "-"], markers: ["⚠️", "!"] }],
+    // Convention commentaires : JSDoc uniquement (pas de //). Tickets OPE-XXX OK dans les JSDoc.
+    "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
+    "no-inline-comments": "error",
+    "multiline-comment-style": ["error", "starred-block"],
     // Frontière strangler + pas de REST : le neuf passe par les coutures partagées.
     "no-restricted-imports": [
       "error",

@@ -1,6 +1,8 @@
-// Types de domaine du module vehicules — découplés du schéma Drizzle (le mapping
-// est fait dans l'adapter infra). Les *Input de création n'incluent JAMAIS artisanId :
-// il est forcé depuis le TenantContext (anti-injection cross-tenant).
+/*
+ * Types de domaine du module vehicules — découplés du schéma Drizzle (le mapping
+ * est fait dans l'adapter infra). Les *Input de création n'incluent JAMAIS artisanId :
+ * il est forcé depuis le TenantContext (anti-injection cross-tenant).
+ */
 
 export type TypeCarburant = "essence" | "diesel" | "electrique" | "hybride" | "gpl";
 export type StatutVehicule = "actif" | "en_maintenance" | "hors_service" | "vendu";

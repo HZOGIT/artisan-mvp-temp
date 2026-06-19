@@ -15,11 +15,13 @@ const idInput = z.object({ id: z.number().int() });
 const repondreSchema = z.object({ avisId: z.number().int(), reponse: z.string().min(1).max(5000) });
 const modererSchema = z.object({ avisId: z.number().int(), statut: z.enum(["publie", "masque"]) });
 
-// Routeur tRPC du domaine avis. Transport mince : valide les inputs (zod), délègue aux
-// use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400, TooManyRequests→429) au middleware. Repository et
-// dépendances du workflow demande d'avis injectés (DI) → testable.
-// `getAll` = alias de `list` (parité legacy).
+/*
+ * Routeur tRPC du domaine avis. Transport mince : valide les inputs (zod), délègue aux
+ * use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400, TooManyRequests→429) au middleware. Repository et
+ * dépendances du workflow demande d'avis injectés (DI) → testable.
+ * `getAll` = alias de `list` (parité legacy).
+ */
 export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvisDeps, publicDeps: AvisPublicDeps) {
   return router({
     // Parité legacy : list/getAll renvoient l'avis enrichi (client + intervention).
@@ -49,8 +51,10 @@ export function createAvisRouter(repo: IAvisRepository, demandeDeps: DemandeAvis
       .input(z.object({ clientId: z.number().int() }))
       .mutation(({ ctx, input }) => envoyerDemandeAvisParClient(demandeDeps, ctx.tenant, input.clientId)),
 
-    // ── Surface PUBLIQUE (portail client par token — pas de cookie tenant) ────────────────────────
-    // Infos d'une demande d'avis (page publique). Anti-oracle : token inconnu → 404 uniforme.
+    /*
+     * ── Surface PUBLIQUE (portail client par token — pas de cookie tenant) ────────────────────────
+     * Infos d'une demande d'avis (page publique). Anti-oracle : token inconnu → 404 uniforme.
+     */
     getDemandeInfo: publicProcedure
       .input(z.object({ token: z.string().min(1).max(64) }))
       .query(({ input }) => getInfoDemandeAvis(publicDeps, input.token)),

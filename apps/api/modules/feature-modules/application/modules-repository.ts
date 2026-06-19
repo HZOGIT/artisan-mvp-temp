@@ -8,9 +8,11 @@ export interface UpdateOnboardingInput {
   readonly plan?: string;
 }
 
-// Port du repository « modules ». Le catalogue (`listCatalogue`/`getBySlug`) est GLOBAL (hors tenant) ;
-// les activations (`getSlugsActifs`/`setModule`/`initDefaults`) sont scopées au tenant (table
-// `artisan_modules` sous RLS) ; l'onboarding est porté par la table d'identité `artisans` (scope par id).
+/*
+ * Port du repository « modules ». Le catalogue (`listCatalogue`/`getBySlug`) est GLOBAL (hors tenant) ;
+ * les activations (`getSlugsActifs`/`setModule`/`initDefaults`) sont scopées au tenant (table
+ * `artisan_modules` sous RLS) ; l'onboarding est porté par la table d'identité `artisans` (scope par id).
+ */
 export interface IModulesRepository {
   // Catalogue global trié par `ordre`.
   listCatalogue(): Promise<ModuleCatalogue[]>;

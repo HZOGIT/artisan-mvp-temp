@@ -1,7 +1,9 @@
-// Réglages éditables de la vitrine publique (colonnes `vitrine*` de `parametres_artisan`). Séparés du
-// reader public (`getBySlug`) : ici c'est la surface ADMIN (lecture + écriture par l'artisan, scopée
-// tenant) qui manquait au new-stack (finding OPE-504). Le front Paramètres `/v2` consomme ces deux
-// procédures pour la section « Ma page vitrine ».
+/*
+ * Réglages éditables de la vitrine publique (colonnes `vitrine*` de `parametres_artisan`). Séparés du
+ * reader public (`getBySlug`) : ici c'est la surface ADMIN (lecture + écriture par l'artisan, scopée
+ * tenant) qui manquait au new-stack. Le front Paramètres `/v2` consomme ces deux
+ * procédures pour la section « Ma page vitrine ».
+ */
 
 export interface VitrineSettings {
   readonly vitrineActive: boolean;

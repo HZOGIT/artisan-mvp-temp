@@ -27,9 +27,11 @@ const FEC_HEADER = [
 // Montant FEC : 2 décimales, virgule décimale (format FR).
 const fec = (val: string | number | null | undefined): string => (Number(val ?? 0) || 0).toFixed(2).replace(".", ",");
 
-// Génère le contenu FEC achats (PUR). ⚠️ Invariant comptable : chaque dépense produit 3 lignes —
-// Achats (HT, débit) + TVA déductible (TVA, débit) + Fournisseurs (TTC, crédit) — donc, par
-// construction, **débit (HT+TVA) = crédit (TTC)** dès lors que `TTC = HT + TVA`.
+/*
+ * Génère le contenu FEC achats (PUR). ⚠️ Invariant comptable : chaque dépense produit 3 lignes —
+ * Achats (HT, débit) + TVA déductible (TVA, débit) + Fournisseurs (TTC, crédit) — donc, par
+ * construction, **débit (HT+TVA) = crédit (TTC)** dès lors que `TTC = HT + TVA`.
+ */
 export function genererFecAchats(depenses: readonly FecDepense[], config: ConfigComptable): string {
   const lines = [FEC_HEADER];
   let num = 1;
@@ -44,8 +46,10 @@ export function genererFecAchats(depenses: readonly FecDepense[], config: Config
   return lines.join("\n");
 }
 
-// Use-case `exportFecAchats` : lit les dépenses déductibles de la période + la config comptable, puis
-// génère le FEC (texte). Lecture seule, scopé tenant.
+/*
+ * Use-case `exportFecAchats` : lit les dépenses déductibles de la période + la config comptable, puis
+ * génère le FEC (texte). Lecture seule, scopé tenant.
+ */
 export async function exportFecAchats(reader: FecReader, ctx: TenantContext, dateDebut: string, dateFin: string): Promise<{ contenu: string }> {
   const [depenses, config] = await Promise.all([reader.listDepensesDeductibles(ctx, dateDebut, dateFin), reader.getConfigComptable(ctx)]);
   return { contenu: genererFecAchats(depenses, config) };

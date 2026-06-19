@@ -22,8 +22,10 @@ const periodiciteEnum = z.enum(["mensuel", "trimestriel", "semestriel", "annuel"
 const interventionStatutEnum = z.enum(["planifiee", "en_cours", "effectuee", "annulee"]);
 // `dateDebut`/`dateFin` arrivent en string ISO (transport JSON) ; `z.coerce.date()` → Date.
 
-// Bornes alignées sur la table `contrats_maintenance` (defense-in-depth). ⚠️ Le client NE fournit
-// PAS `reference` (générée serveur) ni `statut` (état machine → transitions dédiées en 7/9).
+/*
+ * Bornes alignées sur la table `contrats_maintenance` (defense-in-depth). ⚠️ Le client NE fournit
+ * PAS `reference` (générée serveur) ni `statut` (état machine → transitions dédiées en 7/9).
+ */
 const createSchema = z.object({
   clientId: z.number().int(),
   titre: z.string().min(1).max(255),
@@ -55,10 +57,12 @@ const updateSchema = z.object({
   notes: z.string().max(5000).nullish(),
 });
 
-// Routeur tRPC du domaine contrats-maintenance. Transport mince : valide les inputs (zod), délègue
-// aux use-cases (scoping tenant via ctx.tenant + anti-IDOR clientId + référence serveur au use-case),
-// laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions
-// de statut (suspendre/reactiver/terminer/annuler) seront exposées en 7/9. Repo injecté.
+/*
+ * Routeur tRPC du domaine contrats-maintenance. Transport mince : valide les inputs (zod), délègue
+ * aux use-cases (scoping tenant via ctx.tenant + anti-IDOR clientId + référence serveur au use-case),
+ * laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409). ⚠️ Les transitions
+ * de statut (suspendre/reactiver/terminer/annuler) seront exposées en 7/9. Repo injecté.
+ */
 export function createContratsMaintenanceRouter(repo: IContratRepository, factureGen: ContratFactureGenerator) {
   return router({
     list: voir.query(({ ctx }) => listContrats(repo, ctx.tenant)),

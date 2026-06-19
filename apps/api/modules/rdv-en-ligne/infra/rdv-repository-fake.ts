@@ -2,9 +2,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRdvRepository, SetStatutOptions } from "../application/rdv-repository";
 import type { CreateRdvInput, Rdv, RdvStatut, UpdateRdvInput } from "../domain/rdv";
 
-// Implémentation in-memory du repository rdv-en-ligne (tests sans DB). Reproduit les invariants du
-// repo Drizzle : scope par artisanId, artisanId forcé, statut="en_attente" à la création, update qui
-// ne touche pas le statut, setStatut pour les transitions, ownsClient via un Set seedable.
+/*
+ * Implémentation in-memory du repository rdv-en-ligne (tests sans DB). Reproduit les invariants du
+ * repo Drizzle : scope par artisanId, artisanId forcé, statut="en_attente" à la création, update qui
+ * ne touche pas le statut, setStatut pour les transitions, ownsClient via un Set seedable.
+ */
 export class FakeRdvRepository implements IRdvRepository {
   private readonly store: Rdv[] = [];
   private seq = 0;

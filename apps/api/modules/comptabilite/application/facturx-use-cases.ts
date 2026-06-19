@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
 import { generateFacturXML } from "../../../shared/pdf/facturx";
 
-// Factur-X (facturation électronique EN 16931) pour UNE facture (parité legacy `/api/comptabilite/
-// facturx-xml/:id` et `facturx/:id`). Facture possédée (404 anti-IDOR via repo migré) + lignes + client
-// + profil artisan. Le XML CII est produit par le générateur INTERNALISÉ (verbatim → invariants TVA/
-// montants préservés). Le « PDF Factur-X » legacy = le PDF facture standard (filename suffixé).
+/*
+ * Factur-X (facturation électronique EN 16931) pour UNE facture (parité legacy `/api/comptabilite/
+ * facturx-xml/:id` et `facturx/:id`). Facture possédée (404 anti-IDOR via repo migré) + lignes + client
+ * + profil artisan. Le XML CII est produit par le générateur INTERNALISÉ (verbatim → invariants TVA/
+ * montants préservés). Le « PDF Factur-X » legacy = le PDF facture standard (filename suffixé).
+ */
 export interface FacturxReaderDeps {
   readonly factureReader: {
     getById(ctx: TenantContext, id: number): Promise<{ clientId: number; numero: string } | null>;

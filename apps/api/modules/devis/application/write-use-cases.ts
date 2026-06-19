@@ -11,19 +11,23 @@ import type {
   UpdateDevisLigneInput,
 } from "../domain/devis";
 
-// Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine financier SENSIBLE :
-//  - **numero généré côté serveur** (`nextNumero`, jamais fourni par le client) ;
-//  - **anti-IDOR-FK** : le `clientId` rattaché DOIT appartenir au tenant, sinon NotFound ;
-//  - **totaux dérivés des lignes** côté repo (jamais fournis par le client) ;
-//  - **immutabilité post-acceptation** : un devis `accepte` (engagement commercial) ne peut plus
-//    être modifié/supprimé, ni voir ses lignes changer → `ConflictError`. ⚠️ Durcissement : le
-//    legacy ne gardait RIEN (statut librement modifiable, cf. audit immutabilité post-signature).
+/*
+ * Use-cases d'écriture — purs, repository injecté. ⚠️ Domaine financier SENSIBLE :
+ *  - **numero généré côté serveur** (`nextNumero`, jamais fourni par le client) ;
+ *  - **anti-IDOR-FK** : le `clientId` rattaché DOIT appartenir au tenant, sinon NotFound ;
+ *  - **totaux dérivés des lignes** côté repo (jamais fournis par le client) ;
+ *  - **immutabilité post-acceptation** : un devis `accepte` (engagement commercial) ne peut plus
+ *    être modifié/supprimé, ni voir ses lignes changer → `ConflictError`. ⚠️ Durcissement : le
+ *    legacy ne gardait RIEN (statut librement modifiable, cf. audit immutabilité post-signature).
+ */
 
 // Entrée de création : pas de numero (généré serveur).
 export type CreerDevisInput = Omit<CreateDevisInput, "numero">;
 
-// Un devis accepté est figé (toute écriture → Conflict). Les autres états restent éditables
-// (brouillon/envoye : travail en cours ; refuse/expire : ré-édition tolérée comme le legacy).
+/*
+ * Un devis accepté est figé (toute écriture → Conflict). Les autres états restent éditables
+ * (brouillon/envoye : travail en cours ; refuse/expire : ré-édition tolérée comme le legacy).
+ */
 function assertModifiable(devis: Devis): void {
   if (devis.statut === "accepte") {
     throw new ConflictError("Un devis accepté ne peut plus être modifié");
@@ -106,9 +110,11 @@ export async function modifierLigneDevis(
   return updated;
 }
 
-// Machine à états des devis (durcissement : le legacy laissait le statut libre).
-//  brouillon → envoye ; envoye → accepte | refuse | expire. Les états accepte/refuse/expire
-//  sont **terminaux** (plus de transition). Idempotence : repasser au même statut est un no-op.
+/*
+ * Machine à états des devis (durcissement : le legacy laissait le statut libre).
+ *  brouillon → envoye ; envoye → accepte | refuse | expire. Les états accepte/refuse/expire
+ *  sont **terminaux** (plus de transition). Idempotence : repasser au même statut est un no-op.
+ */
 const TRANSITIONS: Record<DevisStatut, readonly DevisStatut[]> = {
   brouillon: ["envoye"],
   envoye: ["accepte", "refuse", "expire"],
@@ -147,10 +153,12 @@ export async function supprimerLigneDevis(
   if (!ok) throw new NotFoundError("Ligne introuvable");
 }
 
-// Duplique un devis (parité legacy `devis.duplicate`) : nouveau devis **brouillon**, numéro généré
-// serveur, objet suffixé « (copie) », validité +30 j, lignes copiées (totaux recalculés par le repo
-// à chaque `addLigne`). ⚠️ Scopé tenant (404 hors tenant) ; le client de l'origine est réutilisé
-// (déjà possédé) — pas de nouvelle vérification d'ownership FK.
+/*
+ * Duplique un devis (parité legacy `devis.duplicate`) : nouveau devis **brouillon**, numéro généré
+ * serveur, objet suffixé « (copie) », validité +30 j, lignes copiées (totaux recalculés par le repo
+ * à chaque `addLigne`). ⚠️ Scopé tenant (404 hors tenant) ; le client de l'origine est réutilisé
+ * (déjà possédé) — pas de nouvelle vérification d'ownership FK.
+ */
 export async function dupliquerDevis(
   repo: IDevisRepository,
   ctx: TenantContext,

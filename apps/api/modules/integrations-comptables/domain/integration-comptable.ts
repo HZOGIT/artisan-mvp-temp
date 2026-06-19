@@ -1,6 +1,8 @@
-// Intégrations comptables : configuration d'export vers un logiciel tiers (Sage/QuickBooks/Ciel/EBP)
-// + historique des exports + génération du contenu (FEC réutilisé du domaine comptabilité ; IIF porté).
-// ⚠️ Lecture seule des données financières : on n'altère JAMAIS les écritures (parité legacy).
+/*
+ * Intégrations comptables : configuration d'export vers un logiciel tiers (Sage/QuickBooks/Ciel/EBP)
+ * + historique des exports + génération du contenu (FEC réutilisé du domaine comptabilité ; IIF porté).
+ * ⚠️ Lecture seule des données financières : on n'altère JAMAIS les écritures (parité legacy).
+ */
 
 export type LogicielComptable = "sage" | "quickbooks" | "ciel" | "ebp" | "autre";
 export type FormatExport = "fec" | "iif" | "qbo" | "csv";
@@ -91,9 +93,11 @@ export interface FactureIIF {
   readonly clientPrenom: string | null;
 }
 
-// Génère l'export IIF (Intuit Interchange Format pour QuickBooks). PUR, parité legacy `genererExportIIF` :
-// sections !TRNS/!SPL/!ENDTRNS, 1 transaction INVOICE par facture (TTC au débit Accounts Receivable,
-// HT + TVA au crédit, signes négatifs côté SPL).
+/*
+ * Génère l'export IIF (Intuit Interchange Format pour QuickBooks). PUR, parité legacy `genererExportIIF` :
+ * sections !TRNS/!SPL/!ENDTRNS, 1 transaction INVOICE par facture (TTC au débit Accounts Receivable,
+ * HT + TVA au crédit, signes négatifs côté SPL).
+ */
 export function buildIIF(factures: readonly FactureIIF[]): string {
   const lines: string[] = [];
   lines.push("!TRNS\tTRNSID\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO");

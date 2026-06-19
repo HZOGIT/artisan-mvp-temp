@@ -38,8 +38,10 @@ function toConfigSet(input: UpdateConfigRelancesInput): Partial<ConfigInsert> {
   return set;
 }
 
-// Implémentation Drizzle du repository config-relances (singleton par tenant). Double cloisonnement
-// RLS + filtre `artisanId` sur `config_relances_auto` (artisanId UNIQUE).
+/*
+ * Implémentation Drizzle du repository config-relances (singleton par tenant). Double cloisonnement
+ * RLS + filtre `artisanId` sur `config_relances_auto` (artisanId UNIQUE).
+ */
 export class ConfigRelancesRepositoryDrizzle implements IConfigRelancesRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -57,8 +59,10 @@ export class ConfigRelancesRepositoryDrizzle implements IConfigRelancesRepositor
   upsert(ctx: TenantContext, input: UpdateConfigRelancesInput): Promise<ConfigRelancesAuto> {
     return withTenant(this.db, ctx, async (tx) => {
       const set = toConfigSet(input);
-      // Singleton idempotent : crée la ligne du tenant si absente, sinon met à jour les seuls champs
-      // config fournis. `artisanId` forcé au tenant. Input vide → garantit l'existence (DO NOTHING).
+      /*
+       * Singleton idempotent : crée la ligne du tenant si absente, sinon met à jour les seuls champs
+       * config fournis. `artisanId` forcé au tenant. Input vide → garantit l'existence (DO NOTHING).
+       */
       const ins = tx.insert(configRelancesAuto).values({ artisanId: ctx.artisanId, ...set });
       await (Object.keys(set).length === 0
         ? ins.onConflictDoNothing({ target: configRelancesAuto.artisanId })

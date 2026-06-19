@@ -86,10 +86,12 @@ function toTechnicien(r: TechnicienRow): Technicien {
   };
 }
 
-// Implémentation Drizzle du repository techniciens. Double cloisonnement : RLS (rôle app
-// + app.tenant via withTenant) ET filtre explicite `artisanId`. La suppression purge les
-// sous-ressources rattachées au technicien (positions/disponibilités/badges/objectifs/
-// classement) — certaines n'ont pas d'artisanId, d'où la vérification d'ownership d'abord.
+/*
+ * Implémentation Drizzle du repository techniciens. Double cloisonnement : RLS (rôle app
+ * + app.tenant via withTenant) ET filtre explicite `artisanId`. La suppression purge les
+ * sous-ressources rattachées au technicien (positions/disponibilités/badges/objectifs/
+ * classement) — certaines n'ont pas d'artisanId, d'où la vérification d'ownership d'abord.
+ */
 export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
   constructor(private readonly db: DbClient) {}
 
@@ -138,8 +140,10 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
 
   delete(ctx: TenantContext, id: number): Promise<boolean> {
     return withTenant(this.db, ctx, async (tx) => {
-      // Vérifie l'appartenance AVANT de toucher les sous-ressources (certaines n'ont pas
-      // d'artisanId → on ne doit pas supprimer celles d'un autre tenant). Atomique.
+      /*
+       * Vérifie l'appartenance AVANT de toucher les sous-ressources (certaines n'ont pas
+       * d'artisanId → on ne doit pas supprimer celles d'un autre tenant). Atomique.
+       */
       const [owned] = await tx
         .select({ id: techniciens.id })
         .from(techniciens)
@@ -253,8 +257,10 @@ export class TechnicienRepositoryDrizzle implements ITechnicienRepository {
 
   getUsersLiables(ctx: TenantContext): Promise<UtilisateurLiable[]> {
     return withTenant(this.db, ctx, async (tx) => {
-      // `users`/`artisans` hors RLS tenant → filtre artisanId EXPLICITE.
-      // Liables = le propriétaire (artisans.userId) + les collaborateurs (users.artisanId).
+      /*
+       * `users`/`artisans` hors RLS tenant → filtre artisanId EXPLICITE.
+       * Liables = le propriétaire (artisans.userId) + les collaborateurs (users.artisanId).
+       */
       const [art] = await tx
         .select({ userId: artisans.userId })
         .from(artisans)

@@ -6,8 +6,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { TresorerieReader } from "../application/tresorerie-reader";
 import type { TresorerieData } from "../domain/prevision-ca";
 
-// Charge les données de trésorerie du tenant (scopées RLS sur `factures.artisanId`/`depenses.artisan_id`
-// + filtres explicites). Lecture seule. Le calcul (bucketing hebdo) est fait par le use-case pur.
+/*
+ * Charge les données de trésorerie du tenant (scopées RLS sur `factures.artisanId`/`depenses.artisan_id`
+ * + filtres explicites). Lecture seule. Le calcul (bucketing hebdo) est fait par le use-case pur.
+ */
 export class TresorerieReaderDrizzle implements TresorerieReader {
   constructor(private readonly db: DbClient) {}
 

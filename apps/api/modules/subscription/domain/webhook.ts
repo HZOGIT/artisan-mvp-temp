@@ -1,5 +1,7 @@
-// Logique PURE du webhook abonnement Stripe (parité legacy `webhookHandler`). Mapping plan→limites,
-// résolution plan/statut depuis l'évènement, construction des champs d'upsert. Aucun effet de bord.
+/*
+ * Logique PURE du webhook abonnement Stripe (parité legacy `webhookHandler`). Mapping plan→limites,
+ * résolution plan/statut depuis l'évènement, construction des champs d'upsert. Aucun effet de bord.
+ */
 
 export interface PlanLimits {
   readonly maxUsers: number;

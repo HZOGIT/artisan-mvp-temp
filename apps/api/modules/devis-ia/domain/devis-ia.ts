@@ -1,7 +1,9 @@
-// Devis IA : analyse de photos de chantier (Vision) → résultats détectés → suggestions d'articles →
-// génération d'un devis. Slice A = CRUD/lecture (analyses, photos, suggestions) ; l'IA (analyserPhotos
-// Vision + genererDevis LLM) = slice B. Anti-IDOR : `analyses_photos_chantier` porte `artisanId` (RLS) ;
-// les tables filles (photos/résultats/suggestions/devis généré) sont scopées via l'analyse parente.
+/*
+ * Devis IA : analyse de photos de chantier (Vision) → résultats détectés → suggestions d'articles →
+ * génération d'un devis. Slice A = CRUD/lecture (analyses, photos, suggestions) ; l'IA (analyserPhotos
+ * Vision + genererDevis LLM) = slice B. Anti-IDOR : `analyses_photos_chantier` porte `artisanId` (RLS) ;
+ * les tables filles (photos/résultats/suggestions/devis généré) sont scopées via l'analyse parente.
+ */
 
 export interface Analyse {
   readonly id: number;
@@ -103,9 +105,11 @@ export interface DevisIATotals {
   readonly totalTTC: number;
 }
 
-// Construit les lignes + totaux d'un devis à partir des suggestions SÉLECTIONNÉES (parité legacy
-// `creerDevisDepuisAnalyseIA`). TVA fixe 20 %. `suggestionIds` optionnel restreint le sous-ensemble.
-// Renvoie null si aucune ligne (rien à générer). PUR (totaux dérivés des lignes → cohérents).
+/*
+ * Construit les lignes + totaux d'un devis à partir des suggestions SÉLECTIONNÉES (parité legacy
+ * `creerDevisDepuisAnalyseIA`). TVA fixe 20 %. `suggestionIds` optionnel restreint le sous-ensemble.
+ * Renvoie null si aucune ligne (rien à générer). PUR (totaux dérivés des lignes → cohérents).
+ */
 export function genererLignesDevis(suggestions: readonly Suggestion[], suggestionIds?: readonly number[]): DevisIATotals | null {
   const idSet = suggestionIds ? new Set(suggestionIds) : null;
   const lignes: LigneDevisIA[] = [];

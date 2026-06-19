@@ -1,6 +1,8 @@
-// Abonnement SaaS (table `subscriptions`, HORS RLS — clé `artisan_id`). Billing Stripe (essai 14 j puis
-// plans Essentiel/Pro/Entreprise). Ce module commence par la LECTURE (`getCurrent`) ; les effets Stripe
-// (checkout/portal/cancel/reactivate) + le webhook signé viennent ensuite.
+/*
+ * Abonnement SaaS (table `subscriptions`, HORS RLS — clé `artisan_id`). Billing Stripe (essai 14 j puis
+ * plans Essentiel/Pro/Entreprise). Ce module commence par la LECTURE (`getCurrent`) ; les effets Stripe
+ * (checkout/portal/cancel/reactivate) + le webhook signé viennent ensuite.
+ */
 
 // Ligne brute d'abonnement (camelCase ; mappée depuis les colonnes snake_case par le reader).
 export interface SubscriptionRow {
@@ -38,8 +40,10 @@ export interface CurrentSubscription {
 export type SubscriptionPlan = "essentiel" | "pro" | "entreprise";
 export type SubscriptionInterval = "month" | "year";
 
-// Price IDs Stripe par plan/intervalle (depuis l'env legacy `STRIPE_PRICE_*`). `extra` = price IDs des
-// utilisateurs supplémentaires (plans pro/entreprise uniquement).
+/*
+ * Price IDs Stripe par plan/intervalle (depuis l'env legacy `STRIPE_PRICE_*`). `extra` = price IDs des
+ * utilisateurs supplémentaires (plans pro/entreprise uniquement).
+ */
 export interface PlanPriceIds {
   readonly month?: string;
   readonly year?: string;
@@ -59,9 +63,11 @@ export function extraPriceId(prices: SubscriptionPrices, plan: SubscriptionPlan,
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Calcule l'état d'abonnement courant (parité legacy `subscription.getCurrent`, branche « artisan
-// présent »). PURE. `isTrialing` = statut trialing ET essai dans le futur ; `trialDaysLeft` = jours
-// restants (arrondi sup, plancher 0). Défauts (aucune ligne) : trial/trialing, quotas 1/3/2.
+/*
+ * Calcule l'état d'abonnement courant (parité legacy `subscription.getCurrent`, branche « artisan
+ * présent »). PURE. `isTrialing` = statut trialing ET essai dans le futur ; `trialDaysLeft` = jours
+ * restants (arrondi sup, plancher 0). Défauts (aucune ligne) : trial/trialing, quotas 1/3/2.
+ */
 export function computeCurrentSubscription(sub: SubscriptionRow | null, now: Date): CurrentSubscription {
   const trialEndsAt = sub?.trialEndsAt ?? null;
   const isTrialing = sub?.status === "trialing" && trialEndsAt !== null && trialEndsAt > now;

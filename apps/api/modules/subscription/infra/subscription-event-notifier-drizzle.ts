@@ -6,9 +6,11 @@ import type { EmailPort } from "../../../shared/ports/email";
 import type { SignatureNotificationType } from "../../signature/application/signature-repository";
 import type { SubscriptionEventNotifier } from "../application/subscription-event-notifier";
 
-// Notifs/emails abonnement (webhook). `notifyArtisan` insère sous le tenant (RLS) ; `emailArtisanOwner`
-// résout `artisans.userId → users.email` (tables identité HORS RLS) puis envoie via l'EmailPort. Les
-// deux sont appelés en best-effort par le use-case (jamais bloquant).
+/*
+ * Notifs/emails abonnement (webhook). `notifyArtisan` insère sous le tenant (RLS) ; `emailArtisanOwner`
+ * résout `artisans.userId → users.email` (tables identité HORS RLS) puis envoie via l'EmailPort. Les
+ * deux sont appelés en best-effort par le use-case (jamais bloquant).
+ */
 export class SubscriptionEventNotifierDrizzle implements SubscriptionEventNotifier {
   constructor(
     private readonly db: DbClient,

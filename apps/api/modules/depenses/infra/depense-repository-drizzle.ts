@@ -104,9 +104,11 @@ function toUpdateSet(input: UpdateDepenseInput): Partial<typeof depenses.$inferI
   return set;
 }
 
-// Implémentation Drizzle du repository depenses. Double cloisonnement RLS + filtre `artisan_id`
-// (snake_case). ⚠️ `update` ne touche que les métadonnées (`UpdateDepenseInput` exclut
-// statut/rembourse/dateRemboursement) → le workflow de remboursement est porté ailleurs.
+/*
+ * Implémentation Drizzle du repository depenses. Double cloisonnement RLS + filtre `artisan_id`
+ * (snake_case). ⚠️ `update` ne touche que les métadonnées (`UpdateDepenseInput` exclut
+ * statut/rembourse/dateRemboursement) → le workflow de remboursement est porté ailleurs.
+ */
 export class DepenseRepositoryDrizzle implements IDepenseRepository {
   constructor(private readonly db: DbClient) {}
 

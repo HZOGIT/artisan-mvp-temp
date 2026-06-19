@@ -7,11 +7,13 @@ export interface GenererRappelsResult {
   readonly rappelsCreated: number;
 }
 
-// Génère des notifications de rappel pour les factures impayées en retard du tenant
-// (parité legacy generateOverdueReminders). Lecture seule sur les factures ; les
-// notifications sont créées scopées tenant. **Idempotent** : un rappel n'est pas recréé
-// si une notification active (non archivée) pointe déjà vers la même facture (`lien`).
-// `maintenant` injectable pour des tests déterministes.
+/*
+ * Génère des notifications de rappel pour les factures impayées en retard du tenant
+ * (parité legacy generateOverdueReminders). Lecture seule sur les factures ; les
+ * notifications sont créées scopées tenant. **Idempotent** : un rappel n'est pas recréé
+ * si une notification active (non archivée) pointe déjà vers la même facture (`lien`).
+ * `maintenant` injectable pour des tests déterministes.
+ */
 export async function genererRappelsFacturesEnRetard(
   repo: INotificationRepository,
   ctx: TenantContext,

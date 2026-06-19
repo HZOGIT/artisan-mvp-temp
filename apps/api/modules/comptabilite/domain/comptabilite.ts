@@ -1,7 +1,9 @@
-// Domaine comptabilité (LECTURE) : agrégats à partir des écritures comptables (`ecritures_comptables`,
-// sous RLS). Fonctions PURES (parité legacy `db.getGrandLivre`/`getBalance`/`getRapportTVA`).
-// ⚠️ Invariants financiers : pas d'arrondi destructif (sommes en centimes par `parseFloat`), comptes
-// TVA reconnus par préfixe (44571x collectée / 44566x déductible).
+/*
+ * Domaine comptabilité (LECTURE) : agrégats à partir des écritures comptables (`ecritures_comptables`,
+ * sous RLS). Fonctions PURES (parité legacy `db.getGrandLivre`/`getBalance`/`getRapportTVA`).
+ * ⚠️ Invariants financiers : pas d'arrondi destructif (sommes en centimes par `parseFloat`), comptes
+ * TVA reconnus par préfixe (44571x collectée / 44566x déductible).
+ */
 
 export interface Ecriture {
   readonly id: number;
@@ -52,8 +54,10 @@ export interface DeclarationTVADetail {
 const num = (v: unknown): number => parseFloat(String(v ?? "0")) || 0;
 const round2 = (v: number): number => Math.round(v * 100) / 100;
 
-// Grand livre : groupé par compte (ordre d'apparition = tri numeroCompte/date en amont), avec totaux
-// et solde (débit − crédit). Parité legacy `getGrandLivre`.
+/*
+ * Grand livre : groupé par compte (ordre d'apparition = tri numeroCompte/date en amont), avec totaux
+ * et solde (débit − crédit). Parité legacy `getGrandLivre`.
+ */
 export function computeGrandLivre(ecritures: readonly Ecriture[]): CompteGrandLivre[] {
   const comptes = new Map<string, { numeroCompte: string; libelleCompte: string; ecritures: Ecriture[]; totalDebit: number; totalCredit: number; solde: number }>();
   for (const e of ecritures) {
@@ -88,10 +92,12 @@ export function computeBalance(ecritures: readonly Ecriture[]): LigneBalance[] {
   return Array.from(comptes.values()).sort((a, b) => a.numeroCompte.localeCompare(b.numeroCompte));
 }
 
-// Rapport TVA simplifié depuis les écritures : collectée = SOLDE des comptes 44571x (crédit − débit),
-// déductible = SOLDE des comptes 44566x (débit − crédit). ⚠️ On NETTE débit/crédit : un AVOIR génère
-// une écriture INVERSE (TVA collectée au débit) qui DOIT réduire la TVA collectée — sinon la note de
-// crédit ne diminue jamais la TVA déclarée (sur-déclaration).
+/*
+ * Rapport TVA simplifié depuis les écritures : collectée = SOLDE des comptes 44571x (crédit − débit),
+ * déductible = SOLDE des comptes 44566x (débit − crédit). ⚠️ On NETTE débit/crédit : un AVOIR génère
+ * une écriture INVERSE (TVA collectée au débit) qui DOIT réduire la TVA collectée — sinon la note de
+ * crédit ne diminue jamais la TVA déclarée (sur-déclaration).
+ */
 export function computeRapportTVA(ecritures: readonly Ecriture[]): RapportTVA {
   let tvaCollectee = 0;
   let tvaDeductible = 0;
@@ -102,8 +108,10 @@ export function computeRapportTVA(ecritures: readonly Ecriture[]): RapportTVA {
   return { tvaCollectee, tvaDeductible, tvaNette: tvaCollectee - tvaDeductible };
 }
 
-// Assemble la déclaration TVA détaillée (CA3) à partir des bases/TVA par taux (factures) + TVA
-// déductible (dépenses). Arrondis à 2 décimales (parité legacy `getDeclarationTVADetail`).
+/*
+ * Assemble la déclaration TVA détaillée (CA3) à partir des bases/TVA par taux (factures) + TVA
+ * déductible (dépenses). Arrondis à 2 décimales (parité legacy `getDeclarationTVADetail`).
+ */
 export function assembleDeclarationTVA(parTauxBrut: ReadonlyArray<{ taux: number; baseHT: number; tvaCollectee: number }>, tvaDeductible: number): DeclarationTVADetail {
   const parTaux = parTauxBrut.map((t) => ({ taux: t.taux, baseHT: round2(t.baseHT), tvaCollectee: round2(t.tvaCollectee) }));
   const tvaCollectee = round2(parTaux.reduce((s, t) => s + t.tvaCollectee, 0));

@@ -1,8 +1,10 @@
 import type { INotificationRepository } from "./application/notification-repository";
 import { createNotificationsRouter } from "./interface/trpc/notifications.router";
 
-// Wiring DI du module notifications : assemble le routeur tRPC à partir du repository
-// injecté. Découple `app.ts`/`createAppRouter` des détails d'instanciation.
+/*
+ * Wiring DI du module notifications : assemble le routeur tRPC à partir du repository
+ * injecté. Découple `app.ts`/`createAppRouter` des détails d'instanciation.
+ */
 export interface NotificationsModuleDeps {
   readonly repository: INotificationRepository;
 }

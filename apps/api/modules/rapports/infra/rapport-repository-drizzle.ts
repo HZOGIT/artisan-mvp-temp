@@ -28,8 +28,10 @@ function toRapport(r: Row): RapportPersonnalise {
   };
 }
 
-// Implémentation Drizzle des rapports. Tables `rapports_personnalises`/`executions_rapports` sous RLS
-// (filtre explicite `artisanId` en plus). `runReport` lit l'entité ciblée, elle aussi scopée tenant.
+/*
+ * Implémentation Drizzle des rapports. Tables `rapports_personnalises`/`executions_rapports` sous RLS
+ * (filtre explicite `artisanId` en plus). `runReport` lit l'entité ciblée, elle aussi scopée tenant.
+ */
 export class RapportRepositoryDrizzle implements IRapportRepository {
   constructor(private readonly db: DbClient) {}
 

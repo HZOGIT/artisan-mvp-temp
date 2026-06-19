@@ -1,5 +1,7 @@
-// Vue lecture seule d'une facture en retard de paiement, utilisée pour générer des
-// rappels. Domaine sensible (facturation) : aucune écriture sur les factures.
+/*
+ * Vue lecture seule d'une facture en retard de paiement, utilisée pour générer des
+ * rappels. Domaine sensible (facturation) : aucune écriture sur les factures.
+ */
 export interface FactureEnRetard {
   readonly id: number;
   readonly numero: string;

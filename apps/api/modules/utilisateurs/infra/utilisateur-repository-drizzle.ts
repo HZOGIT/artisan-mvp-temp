@@ -5,9 +5,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IUtilisateurRepository } from "../application/utilisateur-repository";
 import type { CollaborateurRole, UtilisateurListItem } from "../domain/utilisateur";
 
-// ⚠️ `users` et `permissions_utilisateur` sont HORS RLS (denylist) → AUCUN `withTenant` ne les protège ;
-// l'isolation est portée par un filtre EXPLICITE `artisanId` (et l'appartenance via `artisans.userId`
-// pour l'owner). Toute requête d'écriture vérifie l'appartenance AVANT d'agir (anti-IDOR cross-tenant).
+/*
+ * ⚠️ `users` et `permissions_utilisateur` sont HORS RLS (denylist) → AUCUN `withTenant` ne les protège ;
+ * l'isolation est portée par un filtre EXPLICITE `artisanId` (et l'appartenance via `artisans.userId`
+ * pour l'owner). Toute requête d'écriture vérifie l'appartenance AVANT d'agir (anti-IDOR cross-tenant).
+ */
 export class UtilisateurRepositoryDrizzle implements IUtilisateurRepository {
   constructor(private readonly db: DbClient) {}
 

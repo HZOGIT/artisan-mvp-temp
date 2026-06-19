@@ -24,8 +24,10 @@ import { getSuggestionsTechniciens } from "../../application/suggestions-technic
 import type { ICongeRepository } from "../../../conges/application/conge-repository";
 import type { ITechnicienRepository } from "../../../techniciens/application/technicien-repository";
 
-// Dates reçues en string ISO (sélecteur front) → `Date`, avec rejet propre des dates
-// invalides (parité legacy : `new Date("garbage")` ne doit pas finir en timestamp NOT NULL).
+/*
+ * Dates reçues en string ISO (sélecteur front) → `Date`, avec rejet propre des dates
+ * invalides (parité legacy : `new Date("garbage")` ne doit pas finir en timestamp NOT NULL).
+ */
 function toDate(value: string, champ: string): Date {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) throw new ValidationError(`${champ} invalide`);
@@ -62,9 +64,11 @@ const updateSchema = z.object({
   factureId: z.number().int().nullish(),
 });
 
-// Routeur tRPC du domaine interventions. Transport mince : valide les inputs (zod), convertit
-// les dates, délègue aux use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse
-// remonter les Domain errors (NotFound→404, Validation→400). Repo injecté (DI).
+/*
+ * Routeur tRPC du domaine interventions. Transport mince : valide les inputs (zod), convertit
+ * les dates, délègue aux use-cases (scoping tenant + anti-IDOR-FK via ctx.tenant), laisse
+ * remonter les Domain errors (NotFound→404, Validation→400). Repo injecté (DI).
+ */
 export function createInterventionsRouter(repo: IInterventionRepository, congeRepo: ICongeRepository, technicienRepo: ITechnicienRepository) {
   return router({
     list: voir.query(({ ctx }) => listInterventions(repo, ctx.tenant)),
@@ -133,14 +137,18 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
         return { success: true };
       }),
 
-    // Affecte un technicien à une intervention (404 intervention / 403 technicien hors tenant) +
-    // renvoie les conflits NON bloquants (double-booking + congés approuvés).
+    /*
+     * Affecte un technicien à une intervention (404 intervention / 403 technicien hors tenant) +
+     * renvoie les conflits NON bloquants (double-booking + congés approuvés).
+     */
     assignerTechnicien: gerer
       .input(z.object({ interventionId: z.number().int(), technicienId: z.number().int() }))
       .mutation(({ ctx, input }) => assignerTechnicien(repo, congeRepo, ctx.tenant, input.interventionId, input.technicienId)),
 
-    // Suggestions de techniciens pour une intervention géolocalisée (proximité + disponibilité).
-    // ⚠️ GÉO/RGPD : positions techniciens scopées tenant (jamais cross-tenant).
+    /*
+     * Suggestions de techniciens pour une intervention géolocalisée (proximité + disponibilité).
+     * ⚠️ GÉO/RGPD : positions techniciens scopées tenant (jamais cross-tenant).
+     */
     getSuggestionsTechniciens: voir
       .input(z.object({ latitude: z.number(), longitude: z.number(), dateIntervention: z.coerce.date() }))
       .query(({ ctx, input }) => getSuggestionsTechniciens(repo, technicienRepo, ctx.tenant, input)),

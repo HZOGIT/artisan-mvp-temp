@@ -4,8 +4,10 @@ import type { Activite, ActiviteEntiteType, CreateActiviteInput } from "../domai
 
 type MutableActivite = { -readonly [K in keyof Activite]: Activite[K] };
 
-// Fake in-memory déterministe (aucun réseau) pour les tests d'use-case. Scoping tenant + appartenance
-// des entités rattachées (`registerEntite`) reproduits fidèlement.
+/*
+ * Fake in-memory déterministe (aucun réseau) pour les tests d'use-case. Scoping tenant + appartenance
+ * des entités rattachées (`registerEntite`) reproduits fidèlement.
+ */
 export class FakeActiviteRepository implements IActiviteRepository {
   private seq = 0;
   private activites: MutableActivite[] = [];

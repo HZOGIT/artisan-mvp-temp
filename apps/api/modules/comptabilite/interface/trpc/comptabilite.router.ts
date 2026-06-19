@@ -3,8 +3,10 @@ import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 import type { IComptabiliteReader } from "../../application/comptabilite-reader";
 import * as uc from "../../application/use-cases";
 
-// Toutes les procédures sont gardées par `comptabilite.voir` (admin bypasse), parité legacy
-// `comptaVoirProcedure`. Lectures seules (FEC/TVA/grand-livre/balance/journal). Période par défaut = mois courant.
+/*
+ * Toutes les procédures sont gardées par `comptabilite.voir` (admin bypasse), parité legacy
+ * `comptaVoirProcedure`. Lectures seules (FEC/TVA/grand-livre/balance/journal). Période par défaut = mois courant.
+ */
 const gate = permissionProcedure("comptabilite.voir");
 const rangeInput = z.object({ dateDebut: z.date().optional(), dateFin: z.date().optional() }).optional();
 

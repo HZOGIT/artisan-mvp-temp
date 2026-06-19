@@ -1,7 +1,9 @@
 import type { AuthCredentials, AuthUser } from "../domain/auth";
 
-// Port du repository `auth` (table `users`, HORS RLS → accès par id/email, jamais scopé tenant : un
-// utilisateur s'authentifie AVANT d'avoir un tenant résolu). Lecture/écriture minimale d'auth.
+/*
+ * Port du repository `auth` (table `users`, HORS RLS → accès par id/email, jamais scopé tenant : un
+ * utilisateur s'authentifie AVANT d'avoir un tenant résolu). Lecture/écriture minimale d'auth.
+ */
 export interface IAuthRepository {
   // Identifiants (avec hash) pour la vérification du mot de passe au login ; null si email inconnu.
   findCredentials(email: string): Promise<AuthCredentials | null>;
@@ -27,7 +29,9 @@ export interface IAuthRepository {
   softDelete(userId: number, neutralizedEmail: string): Promise<void>;
   // Crée un utilisateur (signup) : email + hash + name, loginMethod 'email'. Renvoie l'identité.
   createUser(data: { email: string; passwordHash: string; name?: string | null }): Promise<{ id: number; email: string | null }>;
-  // Provisionne le compte propriétaire (idempotent, parité `bootstrapArtisanAccount`) : artisan + lien
-  // `users.artisanId` + abonnement d'essai 14 j (si absent) + permissions owner = toutes (si absentes).
+  /*
+   * Provisionne le compte propriétaire (idempotent, parité `bootstrapArtisanAccount`) : artisan + lien
+   * `users.artisanId` + abonnement d'essai 14 j (si absent) + permissions owner = toutes (si absentes).
+   */
   bootstrapAccount(userId: number): Promise<void>;
 }

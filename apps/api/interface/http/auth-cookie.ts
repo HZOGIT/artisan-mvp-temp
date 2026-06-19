@@ -1,7 +1,9 @@
 import type { FastifyReply } from "fastify";
 
-// Gestion du cookie d'authentification `token` (httpOnly), parité legacy `setAuthCookie`/`clearAuthCookie`.
-// Nécessite `@fastify/cookie` enregistré (cf. buildApp). `secure` actif en production uniquement (HTTPS).
+/*
+ * Gestion du cookie d'authentification `token` (httpOnly), parité legacy `setAuthCookie`/`clearAuthCookie`.
+ * Nécessite `@fastify/cookie` enregistré (cf. buildApp). `secure` actif en production uniquement (HTTPS).
+ */
 export const AUTH_COOKIE_NAME = "token";
 export const AUTH_COOKIE_MAX_AGE_S = 7 * 24 * 60 * 60; // 7 jours (cohérent avec l'expiration du JWT)
 

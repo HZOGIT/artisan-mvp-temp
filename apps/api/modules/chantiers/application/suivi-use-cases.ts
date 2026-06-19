@@ -3,10 +3,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IChantierRepository } from "./chantier-repository";
 import type { ChantierSuivi, CreateSuiviInput, UpdateSuiviInput } from "../domain/chantier";
 
-// Use-cases « suivi de chantier » (avancement/jalons). ⚠️ `suivi_chantier` n'a **pas d'artisanId**
-// (ni RLS) → toute opération **DOIT** vérifier l'ownership du **chantier parent** avant d'agir
-// (anti-IDOR). Pour update/delete (entrée = `id` du suivi seul), on lit d'abord le suivi (non scopé)
-// pour récupérer son `chantierId`, puis on vérifie que ce chantier appartient au tenant.
+/*
+ * Use-cases « suivi de chantier » (avancement/jalons). ⚠️ `suivi_chantier` n'a **pas d'artisanId**
+ * (ni RLS) → toute opération **DOIT** vérifier l'ownership du **chantier parent** avant d'agir
+ * (anti-IDOR). Pour update/delete (entrée = `id` du suivi seul), on lit d'abord le suivi (non scopé)
+ * pour récupérer son `chantierId`, puis on vérifie que ce chantier appartient au tenant.
+ */
 
 // Normalise/valide une date optionnelle (YYYY-MM-DD). undefined → undefined ; null → null.
 function normDate(s: string | null | undefined, champ: string): string | null | undefined {
@@ -34,8 +36,10 @@ export async function creerSuivi(repo: IChantierRepository, ctx: TenantContext, 
   });
 }
 
-// Met à jour une étape de suivi (par id). Anti-IDOR : le suivi doit exister (404) ET son chantier
-// parent appartenir au tenant (404 sinon — la table suivi n'est pas scopée tenant).
+/*
+ * Met à jour une étape de suivi (par id). Anti-IDOR : le suivi doit exister (404) ET son chantier
+ * parent appartenir au tenant (404 sinon — la table suivi n'est pas scopée tenant).
+ */
 export async function modifierSuivi(
   repo: IChantierRepository,
   ctx: TenantContext,

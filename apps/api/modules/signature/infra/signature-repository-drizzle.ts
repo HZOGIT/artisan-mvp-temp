@@ -23,8 +23,10 @@ function toDomain(r: typeof signaturesDevis.$inferSelect): Signature {
   };
 }
 
-// Persistance `signatures_devis` (HORS RLS — pas d'artisanId). L'anti-IDOR est garanti EN AMONT par
-// le use-case (lecture RLS du devis parent). Aucune écriture tenant non scopée ici.
+/*
+ * Persistance `signatures_devis` (HORS RLS — pas d'artisanId). L'anti-IDOR est garanti EN AMONT par
+ * le use-case (lecture RLS du devis parent). Aucune écriture tenant non scopée ici.
+ */
 export class SignatureRepositoryDrizzle implements ISignatureRepository {
   constructor(private readonly db: DbClient) {}
 

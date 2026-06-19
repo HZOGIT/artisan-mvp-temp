@@ -10,8 +10,10 @@ import {
   toggleModule,
 } from "../../application/use-cases";
 
-// Routeur tRPC des modules (catalogue + activation par artisan + onboarding). Surface client :
-// list/getMine/getOnboardingStatus/toggle/completeOnboarding/skipOnboarding. Domain errors → 404/403.
+/*
+ * Routeur tRPC des modules (catalogue + activation par artisan + onboarding). Surface client :
+ * list/getMine/getOnboardingStatus/toggle/completeOnboarding/skipOnboarding. Domain errors → 404/403.
+ */
 export function createModulesRouter(repo: IModulesRepository) {
   return router({
     list: protectedProcedure.query(({ ctx }) => listModules(repo, ctx.tenant)),

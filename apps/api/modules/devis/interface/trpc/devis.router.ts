@@ -30,16 +30,20 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (format A
 const decimal = z.string().regex(/^\d+(\.\d{1,2})?$/, "Montant décimal invalide");
 const ligneTypeEnum = z.enum(["produit", "section", "note"]);
 
-// `dateValidite` arrive en string ISO (transport) ; le domaine attend une `Date | null`.
-// `undefined` = champ non fourni (laissé tel quel), `null` = effacement explicite.
+/*
+ * `dateValidite` arrive en string ISO (transport) ; le domaine attend une `Date | null`.
+ * `undefined` = champ non fourni (laissé tel quel), `null` = effacement explicite.
+ */
 function toDate(v: string | null | undefined): Date | null | undefined {
   if (v === undefined || v === null) return v;
   return new Date(v);
 }
 
-// Bornes alignées sur les tables `devis`/`devis_lignes` (defense-in-depth). ⚠️ Le client NE
-// fournit PAS `numero` (généré serveur), `statut` (workflow), ni les totaux (dérivés des lignes)
-// → intégrité financière (numérotation maîtrisée + pas de total falsifiable).
+/*
+ * Bornes alignées sur les tables `devis`/`devis_lignes` (defense-in-depth). ⚠️ Le client NE
+ * fournit PAS `numero` (généré serveur), `statut` (workflow), ni les totaux (dérivés des lignes)
+ * → intégrité financière (numérotation maîtrisée + pas de total falsifiable).
+ */
 const createSchema = z.object({
   clientId: z.number().int(),
   objet: z.string().max(500).nullish(),
@@ -49,8 +53,10 @@ const createSchema = z.object({
   dateValidite: isoDate.nullish(),
 });
 
-// ⚠️ clientId / numero / statut / totaux ABSENTS : client immuable, numérotation maîtrisée,
-// transitions de statut = workflow, totaux dérivés des lignes.
+/*
+ * ⚠️ clientId / numero / statut / totaux ABSENTS : client immuable, numérotation maîtrisée,
+ * transitions de statut = workflow, totaux dérivés des lignes.
+ */
 const updateSchema = z.object({
   objet: z.string().max(500).nullish(),
   referenceClient: z.string().max(100).nullish(),
@@ -83,9 +89,11 @@ const ligneUpdateSchema = z.object({
   type: ligneTypeEnum.optional(),
 });
 
-// Routeur tRPC du domaine devis. Transport mince : valide les inputs (zod), délègue aux use-cases
-// (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-acceptation via
-// ctx.tenant), laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
+/*
+ * Routeur tRPC du domaine devis. Transport mince : valide les inputs (zod), délègue aux use-cases
+ * (scoping tenant + numérotation serveur + anti-IDOR-FK + immutabilité post-acceptation via
+ * ctx.tenant), laisse remonter les Domain errors (NotFound→404, Validation→400, Conflict→409).
+ */
 export function createDevisRouter(
   repo: IDevisRepository,
   mailing: DevisMailingDeps,
@@ -231,8 +239,10 @@ export function createDevisRouter(
       .input(z.object({ description: z.string().min(5).max(5000), surface: z.number().optional(), budget: z.number().optional() }))
       .mutation(({ ctx, input }) => genererLignesDevisIA(ia, ctx.tenant, input)),
 
-    // Convertit un devis accepté en facture brouillon (cross-domaine) — parité `convertToFacture`.
-    // 404 devis hors tenant ; Conflict si non accepté ou déjà converti (invariants factures).
+    /*
+     * Convertit un devis accepté en facture brouillon (cross-domaine) — parité `convertToFacture`.
+     * 404 devis hors tenant ; Conflict si non accepté ou déjà converti (invariants factures).
+     */
     convertToFacture: facturesCreer
       .input(z.object({ devisId: z.number().int() }))
       .mutation(({ ctx, input }) => converter.convertir(ctx.tenant, input.devisId)),
@@ -242,8 +252,10 @@ export function createDevisRouter(
       .input(z.object({ devisId: z.number().int() }))
       .mutation(({ ctx, input }) => dupliquerDevis(repo, ctx.tenant, input.devisId)),
 
-    // Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.
-    // ownership 404 / client.email 400 / rate-limit 429 ; passe `envoye` si brouillon.
+    /*
+     * Envoi du devis par email (PDF en PJ) — parité client `trpc.devis.sendByEmail`.
+     * ownership 404 / client.email 400 / rate-limit 429 ; passe `envoye` si brouillon.
+     */
     sendByEmail: devisCreer
       .input(
         z.object({

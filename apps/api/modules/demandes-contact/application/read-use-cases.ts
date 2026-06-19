@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDemandeContactRepository } from "./demande-contact-repository";
 import type { DemandeContact, DemandeContactStatut } from "../domain/demande-contact";
 
-// Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
-// `getDemande` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+/*
+ * Use-cases de lecture — purs, repository injecté. Le scoping tenant est porté par le repo.
+ * `getDemande` sur une ressource d'un autre tenant → repo renvoie null → NotFoundError.
+ */
 
 export function listDemandes(repo: IDemandeContactRepository, ctx: TenantContext): Promise<DemandeContact[]> {
   return repo.list(ctx);

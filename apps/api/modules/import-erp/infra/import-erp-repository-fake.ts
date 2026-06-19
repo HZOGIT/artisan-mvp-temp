@@ -2,8 +2,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IImportErpRepository, ImportClientData, ImportDevisData, ImportFactureData } from "../application/import-erp-repository";
 import type { ClientRef } from "../domain/import";
 
-// Fake en mémoire de l'import ERP. Permet d'injecter des clients existants (dedup/lookup) et de capturer
-// les entités créées ; `failOn` simule une erreur d'insertion (pour la branche errors++ par ligne).
+/*
+ * Fake en mémoire de l'import ERP. Permet d'injecter des clients existants (dedup/lookup) et de capturer
+ * les entités créées ; `failOn` simule une erreur d'insertion (pour la branche errors++ par ligne).
+ */
 export class ImportErpRepositoryFake implements IImportErpRepository {
   readonly createdClients: ImportClientData[] = [];
   readonly createdDevis: ImportDevisData[] = [];

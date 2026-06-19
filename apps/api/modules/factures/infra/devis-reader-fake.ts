@@ -1,8 +1,10 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { IDevisReader, DevisReadModel, DevisLigneReadModel } from "../application/devis-reader";
 
-// Double in-memory du lecteur de devis (pour tester la conversion devis→facture sans DB).
-// Scopé tenant : un devis/des lignes d'un autre tenant → null/[].
+/*
+ * Double in-memory du lecteur de devis (pour tester la conversion devis→facture sans DB).
+ * Scopé tenant : un devis/des lignes d'un autre tenant → null/[].
+ */
 export class FakeDevisReader implements IDevisReader {
   private store = new Map<number, DevisReadModel>();
   private lignes = new Map<number, DevisLigneReadModel[]>();

@@ -1,12 +1,16 @@
-// Adapters branchant les ports sur l'implémentation existante (legacy). L'import est
-// résolu via une variable (type `string`, non littéral) → TypeScript ne tire PAS le
-// graphe legacy dans le typecheck de src/** (gate propre), tout en câblant au runtime.
+/*
+ * Adapters branchant les ports sur l'implémentation existante (legacy). L'import est
+ * résolu via une variable (type `string`, non littéral) → TypeScript ne tire PAS le
+ * graphe legacy dans le typecheck de src/** (gate propre), tout en câblant au runtime.
+ */
 import type { LlmPort, LlmCompleteOptions } from "./llm";
 import type { VisionPort, VisionRequest, VisionMultiRequest } from "./vision";
 
-// Adapter LLM sur Google GenAI (Gemini). Import via variable-de-chemin (string non-littéral) → le
-// SDK n'est PAS tiré dans le typecheck de src/** ; on type structurellement ce qu'on utilise. La clé
-// vient de l'env (`GEMINI_API_KEY`), jamais committée. Modèle par défaut `gemini-2.5-flash`.
+/*
+ * Adapter LLM sur Google GenAI (Gemini). Import via variable-de-chemin (string non-littéral) → le
+ * SDK n'est PAS tiré dans le typecheck de src/** ; on type structurellement ce qu'on utilise. La clé
+ * vient de l'env (`GEMINI_API_KEY`), jamais committée. Modèle par défaut `gemini-2.5-flash`.
+ */
 type GenAiClient = {
   models: {
     generateContent(req: unknown): Promise<{ text?: string }>;
@@ -25,8 +29,10 @@ export class GeminiLlmAdapter implements LlmPort {
 
   private request(prompt: string, opts?: LlmCompleteOptions) {
     return {
-      // Modèle le plus récent/capable par défaut (Gemini 3 Pro) ; surchargé par l'env
-      // `GEMINI_TEXT_MODEL` (staging) ou par `opts.model` au cas par cas.
+      /*
+       * Modèle le plus récent/capable par défaut (Gemini 3 Pro) ; surchargé par l'env
+       * `GEMINI_TEXT_MODEL` (staging) ou par `opts.model` au cas par cas.
+       */
       model: opts?.model ?? process.env.GEMINI_TEXT_MODEL ?? "gemini-3-pro-preview",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
@@ -52,8 +58,10 @@ export class GeminiLlmAdapter implements LlmPort {
   }
 }
 
-// Adapter vision sur Gemini : image transmise en `inlineData` (mimeType + base64) + prompt texte.
-// Même import variable-de-chemin que GeminiLlmAdapter (graphe SDK hors typecheck src).
+/*
+ * Adapter vision sur Gemini : image transmise en `inlineData` (mimeType + base64) + prompt texte.
+ * Même import variable-de-chemin que GeminiLlmAdapter (graphe SDK hors typecheck src).
+ */
 export class GeminiVisionAdapter implements VisionPort {
   async analyzeImage(req: VisionRequest): Promise<string> {
     const mod = (await import(GENAI_MODULE)) as GenAiModule;

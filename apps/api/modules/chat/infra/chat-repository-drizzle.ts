@@ -36,9 +36,11 @@ function toMessage(r: typeof messages.$inferSelect): Message {
   };
 }
 
-// Repo chat sous RLS (withTenant) + filtre artisanId. `messages` (sans artisanId) n'est touché
-// qu'après preuve d'ownership de la conversation (côté use-case). Reproduit fidèlement les effets
-// legacy (compteurs non-lus, aperçu du dernier message, getOrCreate conversation ouverte).
+/*
+ * Repo chat sous RLS (withTenant) + filtre artisanId. `messages` (sans artisanId) n'est touché
+ * qu'après preuve d'ownership de la conversation (côté use-case). Reproduit fidèlement les effets
+ * legacy (compteurs non-lus, aperçu du dernier message, getOrCreate conversation ouverte).
+ */
 export class ChatRepositoryDrizzle implements IChatRepository {
   constructor(private readonly db: DbClient) {}
 

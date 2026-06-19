@@ -25,10 +25,12 @@ function toPosition(r: PosRow): PositionPoint {
   };
 }
 
-// Lecteur Drizzle des positions. `techniciens` est sous RLS (filtre explicite `artisanId` en plus) →
-// on ne voit QUE ses propres techniciens ; `positions_techniciens` n'a pas d'artisanId, on ne la lit
-// donc QUE pour les `technicienId` possédés (anti-IDOR via le parent). Dernière position par technicien
-// (timestamp décroissant). Lecture seule.
+/*
+ * Lecteur Drizzle des positions. `techniciens` est sous RLS (filtre explicite `artisanId` en plus) →
+ * on ne voit QUE ses propres techniciens ; `positions_techniciens` n'a pas d'artisanId, on ne la lit
+ * donc QUE pour les `technicienId` possédés (anti-IDOR via le parent). Dernière position par technicien
+ * (timestamp décroissant). Lecture seule.
+ */
 export class TechnicienPositionReaderDrizzle implements ITechnicienPositionReader {
   constructor(private readonly db: DbClient) {}
 

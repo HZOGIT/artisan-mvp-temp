@@ -3,9 +3,11 @@ import type { IInterventionRepository } from "../interventions/application/inter
 import type { IClientRepository } from "../clients/application/client-repository";
 import { createRdvEnLigneRouter } from "./interface/trpc/rdv-en-ligne.router";
 
-// Wiring DI du module rdv-en-ligne : assemble le routeur tRPC à partir du repository injecté. Repos
-// composés : `interventionRepository` (`confirm` crée une intervention) + `clientRepository`
-// (`list` enrichit chaque RDV de son client — le client UI lit `rdv.client`).
+/*
+ * Wiring DI du module rdv-en-ligne : assemble le routeur tRPC à partir du repository injecté. Repos
+ * composés : `interventionRepository` (`confirm` crée une intervention) + `clientRepository`
+ * (`list` enrichit chaque RDV de son client — le client UI lit `rdv.client`).
+ */
 export interface RdvEnLigneModuleDeps {
   readonly repository: IRdvRepository;
   readonly interventionRepository: IInterventionRepository;

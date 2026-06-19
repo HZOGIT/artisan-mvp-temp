@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IRdvRepository } from "./rdv-repository";
 import type { CreateRdvInput, Rdv, UpdateRdvInput } from "../domain/rdv";
 
-// Use-cases d'écriture (création / métadonnées / suppression) — purs, repository injecté.
-// ⚠️ Les transitions de statut (confirmer/refuser/annuler) sont des use-cases dédiés (7/9) : elles
-// ne passent pas par `modifierRdv`. Validation métier + anti-IDOR-FK sur `clientId`.
+/*
+ * Use-cases d'écriture (création / métadonnées / suppression) — purs, repository injecté.
+ * ⚠️ Les transitions de statut (confirmer/refuser/annuler) sont des use-cases dédiés (7/9) : elles
+ * ne passent pas par `modifierRdv`. Validation métier + anti-IDOR-FK sur `clientId`.
+ */
 
 function assertDuree(dureeEstimee: number | undefined): void {
   if (dureeEstimee === undefined) return;

@@ -2,10 +2,12 @@ import { ForbiddenError, NotFoundError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PdfPort } from "../../../shared/ports/pdf";
 
-// PDF d'un devis depuis le PORTAIL CLIENT (parité legacy `/api/portail/:token/devis/:id/pdf`). PUBLIC :
-// le token (`client_portal_access`) EST la capacité (pas de cookie). On résout l'accès (clientId+artisanId)
-// sous RLS public-token, puis on lit le devis SOUS LE TENANT résolu — le devis DOIT relever du clientId
-// de l'accès (anti-IDOR). CGV de l'artisan ajoutées en fin de PDF (parité OPE-127).
+/*
+ * PDF d'un devis depuis le PORTAIL CLIENT (parité legacy `/api/portail/:token/devis/:id/pdf`). PUBLIC :
+ * le token (`client_portal_access`) EST la capacité (pas de cookie). On résout l'accès (clientId+artisanId)
+ * sous RLS public-token, puis on lit le devis SOUS LE TENANT résolu — le devis DOIT relever du clientId
+ * de l'accès (anti-IDOR). CGV de l'artisan ajoutées en fin de PDF.
+ */
 export interface PortalAccessResolver {
   resolveAccessByToken(token: string, now: Date): Promise<{ clientId: number; artisanId: number } | null>;
 }

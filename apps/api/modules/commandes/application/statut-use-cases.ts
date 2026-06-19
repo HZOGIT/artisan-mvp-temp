@@ -3,8 +3,10 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { ICommandeRepository, ReceptionLigne } from "./commande-repository";
 import type { Commande, CommandeStatut, CommandeStatutFacturation } from "../domain/commande";
 
-// Use-cases dérivés (transitions de statut + retard) — purs, repository injecté. Scopés
-// tenant ; une opération sur une commande hors tenant lève NotFoundError.
+/*
+ * Use-cases dérivés (transitions de statut + retard) — purs, repository injecté. Scopés
+ * tenant ; une opération sur une commande hors tenant lève NotFoundError.
+ */
 
 export async function changerStatutCommande(
   repo: ICommandeRepository,
@@ -23,9 +25,11 @@ export function listerCommandesEnRetard(repo: ICommandeRepository, ctx: TenantCo
   return repo.listEnRetard(ctx);
 }
 
-// Enregistre la réception d'une commande. ⚠️ Domaine sensible : invariant
-// `quantiteRecue ≤ quantité commandée` validé ici (rejet, ValidationError) ; le repo
-// recalcule le statut. Une commande hors tenant → NotFoundError (anti-IDOR).
+/*
+ * Enregistre la réception d'une commande. ⚠️ Domaine sensible : invariant
+ * `quantiteRecue ≤ quantité commandée` validé ici (rejet, ValidationError) ; le repo
+ * recalcule le statut. Une commande hors tenant → NotFoundError (anti-IDOR).
+ */
 export async function recevoirCommande(
   repo: ICommandeRepository,
   ctx: TenantContext,
@@ -52,8 +56,10 @@ export async function recevoirCommande(
   return updated;
 }
 
-// Définit le statut de facturation (+ lien dépense optionnel, posé seulement si la dépense
-// appartient au tenant — anti-IDOR-FK). Commande hors tenant → NotFoundError.
+/*
+ * Définit le statut de facturation (+ lien dépense optionnel, posé seulement si la dépense
+ * appartient au tenant — anti-IDOR-FK). Commande hors tenant → NotFoundError.
+ */
 export async function definirStatutFacturation(
   repo: ICommandeRepository,
   ctx: TenantContext,

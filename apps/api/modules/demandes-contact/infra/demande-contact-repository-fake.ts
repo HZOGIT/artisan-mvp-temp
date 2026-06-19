@@ -2,10 +2,12 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IDemandeContactRepository } from "../application/demande-contact-repository";
 import type { CreateDemandeInput, DemandeContact, DemandeContactStatut, UpdateDemandeInput } from "../domain/demande-contact";
 
-// Implémentation in-memory du repository demandes-contact (tests sans DB). Reproduit les invariants
-// du repo Drizzle : scope par artisanId, artisanId forcé, statut="nouveau" + clientId null à la
-// création, update qui ne touche pas statut/clientId, setStatut pour les transitions (+ clientId à la
-// conversion), ownsClient via Set seedable.
+/*
+ * Implémentation in-memory du repository demandes-contact (tests sans DB). Reproduit les invariants
+ * du repo Drizzle : scope par artisanId, artisanId forcé, statut="nouveau" + clientId null à la
+ * création, update qui ne touche pas statut/clientId, setStatut pour les transitions (+ clientId à la
+ * conversion), ownsClient via Set seedable.
+ */
 export class FakeDemandeContactRepository implements IDemandeContactRepository {
   private readonly store: DemandeContact[] = [];
   private seq = 0;

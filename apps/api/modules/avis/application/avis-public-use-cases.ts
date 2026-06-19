@@ -2,8 +2,10 @@ import { NotFoundError, ValidationError } from "../../../shared/errors";
 import type { TenantContext } from "../../../shared/tenant";
 import type { PublicDemandeAvisReader } from "./public-demande-reader";
 
-// ── Ports tenant-scopés des effets publics (résolus APRÈS la demande via withTenant(artisanId)) ──
-// Contexte d'affichage de la demande (noms artisan/client/intervention) — lu sous le tenant résolu.
+/*
+ * ── Ports tenant-scopés des effets publics (résolus APRÈS la demande via withTenant(artisanId)) ──
+ * Contexte d'affichage de la demande (noms artisan/client/intervention) — lu sous le tenant résolu.
+ */
 export interface DemandeAvisContext {
   readonly artisanNomEntreprise: string | null;
   readonly clientNom: string | null;
@@ -14,8 +16,10 @@ export interface PublicDemandeContextReader {
   getContext(ctx: TenantContext, clientId: number, interventionId: number): Promise<DemandeAvisContext>;
 }
 
-// Écriture de la soumission publique : insère l'avis (publie) + marque la demande completee + notifie
-// l'artisan, le tout sous le tenant résolu (RLS) — transaction unique.
+/*
+ * Écriture de la soumission publique : insère l'avis (publie) + marque la demande completee + notifie
+ * l'artisan, le tout sous le tenant résolu (RLS) — transaction unique.
+ */
 export interface SoumettreAvisData {
   readonly demandeId: number;
   readonly clientId: number;
@@ -45,9 +49,11 @@ export interface DemandeAvisInfo {
   readonly isCompleted: boolean;
 }
 
-// Page publique : infos d'une demande d'avis par token (parité legacy `avis.getDemandeInfo`). Le
-// token EST la capacité (lecture via `withPublicToken`) ; **anti-oracle** : token inconnu → 404
-// uniforme. Les noms sont lus sous le tenant résolu (`withTenant(artisanId)`).
+/*
+ * Page publique : infos d'une demande d'avis par token (parité legacy `avis.getDemandeInfo`). Le
+ * token EST la capacité (lecture via `withPublicToken`) ; **anti-oracle** : token inconnu → 404
+ * uniforme. Les noms sont lus sous le tenant résolu (`withTenant(artisanId)`).
+ */
 export async function getInfoDemandeAvis(deps: AvisPublicDeps, token: string): Promise<DemandeAvisInfo> {
   const demande = await deps.reader.getByToken(token);
   if (!demande) throw new NotFoundError("Demande d'avis introuvable");
@@ -64,9 +70,11 @@ export async function getInfoDemandeAvis(deps: AvisPublicDeps, token: string): P
   };
 }
 
-// Soumission publique d'un avis (parité legacy `avis.submitAvis`) : token → demande ; **400** si déjà
-// complétée ou expirée ; sinon crée l'avis (publie) + marque la demande + notifie l'artisan (sous le
-// tenant résolu). `note` 1–5 (borné au routeur). Anti-oracle : token inconnu → 404 uniforme.
+/*
+ * Soumission publique d'un avis (parité legacy `avis.submitAvis`) : token → demande ; **400** si déjà
+ * complétée ou expirée ; sinon crée l'avis (publie) + marque la demande + notifie l'artisan (sous le
+ * tenant résolu). `note` 1–5 (borné au routeur). Anti-oracle : token inconnu → 404 uniforme.
+ */
 export async function soumettreAvisPublic(
   deps: AvisPublicDeps,
   input: { token: string; note: number; commentaire?: string },

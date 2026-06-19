@@ -7,9 +7,11 @@ export interface AssistantPromptStats {
   readonly facturesImpayeesTotal: number;
 }
 
-// Construit le prompt système de MonAssistant (parité legacy `buildSystemPrompt`, structure : contexte
-// métier en tête + rôle + données du tenant + contexte de page). PUR. ⚠️ Le mode AGENTIQUE (outils
-// function-calling de l'assistant legacy) n'est PAS encore porté → assistant en lecture/conseil.
+/*
+ * Construit le prompt système de MonAssistant (parité legacy `buildSystemPrompt`, structure : contexte
+ * métier en tête + rôle + données du tenant + contexte de page). PUR. ⚠️ Le mode AGENTIQUE (outils
+ * function-calling de l'assistant legacy) n'est PAS encore porté → assistant en lecture/conseil.
+ */
 export function buildAssistantSystemPrompt(input: {
   artisanName: string | null;
   metier: string | null;
@@ -29,8 +31,10 @@ Tu as accès aux données suivantes :
 Détecte la langue de l'interlocuteur et réponds toujours dans cette même langue. Sois concis et actionnable.`;
 }
 
-// Assemble le prompt utilisateur : un court historique (≤10 derniers tours) + le nouveau message.
-// (Approximation du multi-tour Gemini ; le chat-stream natif multi-tours sera porté avec les outils.)
+/*
+ * Assemble le prompt utilisateur : un court historique (≤10 derniers tours) + le nouveau message.
+ * (Approximation du multi-tour Gemini ; le chat-stream natif multi-tours sera porté avec les outils.)
+ */
 export function buildUserPrompt(history: readonly { role: string; content: string }[], message: string): string {
   const recent = history.slice(-10).filter((h) => h.role && h.content);
   if (recent.length === 0) return message;

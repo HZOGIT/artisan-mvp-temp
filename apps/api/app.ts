@@ -250,8 +250,10 @@ import { ResendEmailAdapter, SlidingWindowRateLimiter, GeminiLlmAdapter, GeminiV
 import { JsPdfAdapter } from "./shared/pdf/js-pdf-adapter";
 
 export interface AppDeps extends ContextDeps {
-  // Repos injectables (tests). Par défaut, repos Drizzle sur le client par défaut
-  // (APP_DATABASE_URL → rôle app non-superuser soumis à la RLS).
+  /*
+   * Repos injectables (tests). Par défaut, repos Drizzle sur le client par défaut
+   * (APP_DATABASE_URL → rôle app non-superuser soumis à la RLS).
+   */
   readonly vehiculeRepo?: IVehiculeRepository;
   readonly avisRepo?: IAvisRepository;
   // Dépendances du workflow demande d'avis (injectables en test : email/rate-limiter fakes).
@@ -322,11 +324,13 @@ export interface AppDeps extends ContextDeps {
 
 // Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc.
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
-  // ⚠️ maxParamLength : le client tRPC (`httpBatchLink`) concatène N procédures dans le segment
-  // d'URL `/api/trpc/p1,p2,…,pN`. Le défaut find-my-way (100 car.) rejette tout batch un peu long
-  // (≥ ~4 procédures) en 404 « route not found » AVANT d'atteindre le handler tRPC → le client
-  // reçoit un 404 sur tout le lot (dashboard widgets sans données, portail `valid` undefined →
-  // « expiré »). On relève la limite pour couvrir les gros batchs (≈150 procédures).
+  /*
+   * ⚠️ maxParamLength : le client tRPC (`httpBatchLink`) concatène N procédures dans le segment
+   * d'URL `/api/trpc/p1,p2,…,pN`. Le défaut find-my-way (100 car.) rejette tout batch un peu long
+   * (≥ ~4 procédures) en 404 « route not found » AVANT d'atteindre le handler tRPC → le client
+   * reçoit un 404 sur tout le lot (dashboard widgets sans données, portail `valid` undefined →
+   * « expiré »). On relève la limite pour couvrir les gros batchs (≈150 procédures).
+   */
   const app = Fastify({ logger: false, maxParamLength: 5000 });
 
   app.register(cookie);
@@ -342,8 +346,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(),
       lienBaseUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     },
-    // Surface PUBLIQUE par token (portail d'avis) : lecture demande par token (policy RLS publique),
-    // contexte (noms) + écriture (avis/demande/notif) sous le tenant résolu.
+    /*
+     * Surface PUBLIQUE par token (portail d'avis) : lecture demande par token (policy RLS publique),
+     * contexte (noms) + écriture (avis/demande/notif) sous le tenant résolu.
+     */
     public: {
       reader: new PublicDemandeAvisReaderDrizzle(getDbHandle().db),
       contextReader: new PublicDemandeContextReaderDrizzle(getDbHandle().db),
@@ -353,31 +359,41 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const badges = createBadgesModule({
     repository: deps.badgeRepo ?? new BadgeRepositoryDrizzle(getDbHandle().db),
   });
-  // Repo techniciens partagé : module techniciens + composé par interventions (getSuggestionsTechniciens :
-  // positions GPS + dispo, scopé tenant). Hoisté avant interventions.
+  /*
+   * Repo techniciens partagé : module techniciens + composé par interventions (getSuggestionsTechniciens :
+   * positions GPS + dispo, scopé tenant). Hoisté avant interventions.
+   */
   const technicienRepo = deps.technicienRepo ?? new TechnicienRepositoryDrizzle(getDbHandle().db);
   const techniciens = createTechniciensModule({
     repository: technicienRepo,
   });
-  // Repo notifications partagé : utilisé par le module notifications ET composé par stocks
-  // (generateAlerts crée des notifications « Stock bas »). Une seule instance pour cohérence.
+  /*
+   * Repo notifications partagé : utilisé par le module notifications ET composé par stocks
+   * (generateAlerts crée des notifications « Stock bas »). Une seule instance pour cohérence.
+   */
   const notificationRepo = deps.notificationRepo ?? new NotificationRepositoryDrizzle(getDbHandle().db);
   const notifications = createNotificationsModule({
     repository: notificationRepo,
   });
-  // Repos partagés hoistés (évite les TDZ entre modules qui se composent mutuellement) :
-  //  - fournisseurs : module fournisseurs + composé par stocks (getRapportCommande) ET commandes (getPerformances)
-  //  - clients : module clients + composé par rdv (list enrichi) ET commandes (listDevisAcceptes)
-  //  - devis : module devis + composé par commandes (listDevisAcceptes = devis acceptés)
+  /*
+   * Repos partagés hoistés (évite les TDZ entre modules qui se composent mutuellement) :
+   *  - fournisseurs : module fournisseurs + composé par stocks (getRapportCommande) ET commandes (getPerformances)
+   *  - clients : module clients + composé par rdv (list enrichi) ET commandes (listDevisAcceptes)
+   *  - devis : module devis + composé par commandes (listDevisAcceptes = devis acceptés)
+   */
   const fournisseurRepo = deps.fournisseurRepo ?? new FournisseurRepositoryDrizzle(getDbHandle().db);
   const clientRepo = deps.clientRepo ?? new ClientRepositoryDrizzle(getDbHandle().db);
   const devisRepo = deps.devisRepo ?? new DevisRepositoryDrizzle(getDbHandle().db);
-  // Repos stock/articles hoistés : modules dédiés + composés par commandes (genererDepuisDevisIA :
-  // ajustement stock + matching articleId).
+  /*
+   * Repos stock/articles hoistés : modules dédiés + composés par commandes (genererDepuisDevisIA :
+   * ajustement stock + matching articleId).
+   */
   const stockRepo = deps.stockRepo ?? new StockRepositoryDrizzle(getDbHandle().db);
   const articleRepo = deps.articleRepo ?? new ArticleRepositoryDrizzle(getDbHandle().db);
-  // Repo factures partagé : module factures + composé par contrats (generateFacture) ET devis
-  // (convertToFacture). Hoisté pour éviter le TDZ (devis se compose avant le module factures).
+  /*
+   * Repo factures partagé : module factures + composé par contrats (generateFacture) ET devis
+   * (convertToFacture). Hoisté pour éviter le TDZ (devis se compose avant le module factures).
+   */
   const factureRepo = deps.factureRepo ?? new FactureRepositoryDrizzle(getDbHandle().db);
   // Repo modèles de devis partagé : module modelesDevis + composé par devis (getModeles/…).
   const modeleDevisRepo = deps.modeleDevisRepo ?? new ModeleDevisRepositoryDrizzle(getDbHandle().db);
@@ -392,8 +408,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     fournisseurRepository: fournisseurRepo,
     devisRepository: devisRepo,
     clientRepository: clientRepo,
-    // Envoi du bon de commande par email (PDF en PJ) : artisan reader + PdfPort/EmailPort legacy +
-    // rate-limiter anti-abus (20 / 15 min). email/rate-limiter injectables en test.
+    /*
+     * Envoi du bon de commande par email (PDF en PJ) : artisan reader + PdfPort/EmailPort legacy +
+     * rate-limiter anti-abus (20 / 15 min). email/rate-limiter injectables en test.
+     */
     mailing: {
       repo: commandeRepo,
       fournisseurRepo,
@@ -402,8 +420,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: deps.emailPort ?? new ResendEmailAdapter(),
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
-    // Proposition IA de lignes de commande depuis un devis accepté (lecture seule) : devis + stock +
-    // articles + LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan).
+    /*
+     * Proposition IA de lignes de commande depuis un devis accepté (lecture seule) : devis + stock +
+     * articles + LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan).
+     */
     ia: {
       devisRepo,
       stockRepo,
@@ -420,11 +440,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const clients = createClientsModule({
     repository: clientRepo,
   });
-  // Repo interventions partagé : module interventions ET composé par rdv (`confirm` crée une
-  // intervention planifiée liée au RDV).
+  /*
+   * Repo interventions partagé : module interventions ET composé par rdv (`confirm` crée une
+   * intervention planifiée liée au RDV).
+   */
   const interventionRepo = deps.interventionRepo ?? new InterventionRepositoryDrizzle(getDbHandle().db);
-  // Repo congés partagé : module conges + composé par interventions (assignerTechnicien : détection de
-  // conflits d'agenda — congés approuvés du technicien). Hoisté avant interventions (évite le TDZ).
+  /*
+   * Repo congés partagé : module conges + composé par interventions (assignerTechnicien : détection de
+   * conflits d'agenda — congés approuvés du technicien). Hoisté avant interventions (évite le TDZ).
+   */
   const congeRepo = deps.congeRepo ?? new CongeRepositoryDrizzle(getDbHandle().db);
   const interventions = createInterventionsModule({
     repository: interventionRepo,
@@ -434,8 +458,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const conges = createCongesModule({
     repository: congeRepo,
   });
-  // Repos partagés (catégories/budgets/règles de dépense + notes de frais) : les domaines dédiés ET le
-  // routeur depenses (parité client `trpc.depenses.*`) consomment les mêmes instances.
+  /*
+   * Repos partagés (catégories/budgets/règles de dépense + notes de frais) : les domaines dédiés ET le
+   * routeur depenses (parité client `trpc.depenses.*`) consomment les mêmes instances.
+   */
   const categorieDepenseRepo = deps.categorieDepenseRepo ?? new CategorieDepenseRepositoryDrizzle(getDbHandle().db);
   const budgetCategorieRepo = deps.budgetCategorieRepo ?? new BudgetCategorieRepositoryDrizzle(getDbHandle().db);
   const regleCategorisationRepo = deps.regleCategorisationRepo ?? new RegleCategorisationRepositoryDrizzle(getDbHandle().db);
@@ -461,8 +487,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const devis = createDevisModule({
     repository: devisRepo,
-    // Envoi du devis par email (PDF en PJ) + getById enrichi : readers contact partagés +
-    // PdfPort/EmailPort legacy + rate-limiter anti-abus (20 / 15 min). email/rate-limiter injectables.
+    /*
+     * Envoi du devis par email (PDF en PJ) + getById enrichi : readers contact partagés +
+     * PdfPort/EmailPort legacy + rate-limiter anti-abus (20 / 15 min). email/rate-limiter injectables.
+     */
     mailing: {
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new SharedClientReaderDrizzle(getDbHandle().db),
@@ -472,8 +500,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db),
       appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     },
-    // convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
-    // `factureRepo` (hoisté) + lecteur devis vu factures.
+    /*
+     * convertToFacture : délègue au domaine factures (devis accepté → facture brouillon). Partage
+     * `factureRepo` (hoisté) + lecteur devis vu factures.
+     */
     converter: new FacturesDevisToFactureConverter(factureRepo, new DevisReaderDrizzle(getDbHandle().db)),
     // Modèles de devis exposés sous `devis.*` : repo partagé avec le module modelesDevis.
     modeleRepository: modeleDevisRepo,
@@ -484,8 +514,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     // genererLignesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan).
     ia: { llm: deps.llm ?? new GeminiLlmAdapter(), rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000) },
   });
-  // Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
-  // (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.
+  /*
+   * Génération FEC réelle : l'adapter ecritures implémente le seam `ComptaPort` des factures
+   * (remplace le NoopComptaPort). Injectable en test ; par défaut branché sur Drizzle.
+   */
   const compta =
     deps.compta ??
     new ComptaEcrituresAdapter(new EcritureRepositoryDrizzle(getDbHandle().db), new FactureReaderDrizzle(getDbHandle().db));
@@ -493,8 +525,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     repository: factureRepo,
     devisReader: deps.devisReader ?? new DevisReaderDrizzle(getDbHandle().db),
     compta,
-    // Envoi par email (PDF en PJ) : lecture artisan/client scopée + PdfPort/EmailPort legacy +
-    // rate-limiter anti-abus (20 / 15 min, parité legacy). email/rate-limiter injectables en test.
+    /*
+     * Envoi par email (PDF en PJ) : lecture artisan/client scopée + PdfPort/EmailPort legacy +
+     * rate-limiter anti-abus (20 / 15 min, parité legacy). email/rate-limiter injectables en test.
+     */
     mailing: {
       artisanReader: new ArtisanReaderDrizzle(getDbHandle().db),
       clientReader: new ClientReaderDrizzle(getDbHandle().db),
@@ -503,15 +537,19 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(20, 15 * 60 * 1000),
     },
   });
-  // Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est
-  // l'effet de bord du workflow facture (via le ComptaPort ci-dessus).
+  /*
+   * Domaine compta/écritures — lecture seule (balance/grand-livre/FEC). La génération est
+   * l'effet de bord du workflow facture (via le ComptaPort ci-dessus).
+   */
   const ecritures = createEcrituresModule({
     repository: deps.ecritureRepo ?? new EcritureRepositoryDrizzle(getDbHandle().db),
   });
   const articles = createArticlesModule({
     repository: articleRepo,
-    // suggererArticlesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan) +
-    // lecture du métier de l'artisan (contexte spécialisé). Injectables en test (FakeLlmPort).
+    /*
+     * suggererArticlesIA : LlmPort (Gemini) + rate-limiter IA dédié (budget horaire par artisan) +
+     * lecture du métier de l'artisan (contexte spécialisé). Injectables en test (FakeLlmPort).
+     */
     ia: {
       llm: deps.llm ?? new GeminiLlmAdapter(),
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
@@ -547,8 +585,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   });
   const contratsMaintenance = createContratsMaintenanceModule({
     repository: deps.contratRepo ?? new ContratRepositoryDrizzle(getDbHandle().db),
-    // generateFacture : réutilise le domaine factures (numéro serveur + totaux dérivés), facture émise
-    // SANS écritures FEC (parité legacy). Partage l'instance `factureRepo` du module factures.
+    /*
+     * generateFacture : réutilise le domaine factures (numéro serveur + totaux dérivés), facture émise
+     * SANS écritures FEC (parité legacy). Partage l'instance `factureRepo` du module factures.
+     */
     factureGenerator: new FacturesContratFactureGenerator(factureRepo),
   });
   const demandeContactRepo = deps.demandeContactRepo ?? new DemandeContactRepositoryDrizzle(getDbHandle().db);
@@ -599,20 +639,26 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const rapports = createRapportsModule({
     repository: deps.rapportRepo ?? new RapportRepositoryDrizzle(getDbHandle().db),
   });
-  // Gestion utilisateurs (SENSIBLE, gate `utilisateurs.gerer`) : repo HORS RLS scopé artisanId +
-  // hasher bcrypt (parité hash legacy) + EmailPort legacy (invitation).
+  /*
+   * Gestion utilisateurs (SENSIBLE, gate `utilisateurs.gerer`) : repo HORS RLS scopé artisanId +
+   * hasher bcrypt (parité hash legacy) + EmailPort legacy (invitation).
+   */
   const utilisateurs = createUtilisateursModule({
     repository: deps.utilisateurRepo ?? new UtilisateurRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
     email: deps.emailPort ?? new ResendEmailAdapter(),
   });
-  // Comptabilité (SENSIBLE, gate `comptabilite.voir`) — LECTURES (grand-livre/balance/journal/TVA).
-  // ⚠️ Montée mais PAS encore activée (DEFAULT_ENABLED) : il manque `getFecPreview` (générateur FEC) →
-  // le trafic comptabilité reste sur le legacy tant que la parité FEC n'est pas livrée+prouvée.
+  /*
+   * Comptabilité (SENSIBLE, gate `comptabilite.voir`) — LECTURES (grand-livre/balance/journal/TVA).
+   * ⚠️ Montée mais PAS encore activée (DEFAULT_ENABLED) : il manque `getFecPreview` (générateur FEC) →
+   * le trafic comptabilité reste sur le legacy tant que la parité FEC n'est pas livrée+prouvée.
+   */
   const comptabiliteReader = deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db);
   const comptabilite = createComptabiliteModule({ reader: comptabiliteReader });
-  // Auth (SENSIBLE — lockout possible) : JWT émis avec le MÊME secret que le legacy (cookie inter-
-  // opérable) ; bcrypt + EmailPort + rate-limiter reset + APP_URL de confiance pour le lien de reset.
+  /*
+   * Auth (SENSIBLE — lockout possible) : JWT émis avec le MÊME secret que le legacy (cookie inter-
+   * opérable) ; bcrypt + EmailPort + rate-limiter reset + APP_URL de confiance pour le lien de reset.
+   */
   const auth = createAuthModule({
     repository: deps.authRepo ?? new AuthRepositoryDrizzle(getDbHandle().db),
     hasher: new BcryptPasswordHasher(),
@@ -621,19 +667,23 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
-  // Abonnement (SENSIBLE/billing) — slice LECTURE `getCurrent` (table subscriptions HORS RLS, scope
-  // explicite). MONTÉ mais PAS activé : il manque les effets Stripe (checkout/portal/cancel/reactivate)
-  // + le webhook → le trafic abonnement reste sur le legacy jusqu'à parité complète.
+  /*
+   * Abonnement (SENSIBLE/billing) — slice LECTURE `getCurrent` (table subscriptions HORS RLS, scope
+   * explicite). MONTÉ mais PAS activé : il manque les effets Stripe (checkout/portal/cancel/reactivate)
+   * + le webhook → le trafic abonnement reste sur le legacy jusqu'à parité complète.
+   */
   const subscription = createSubscriptionModule({
     repository: deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db),
     stripe: deps.stripePort ?? new StripeAdapter(),
     prices: pricesFromEnv(),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
-  // Signature électronique de devis (SENSIBLE) — surface ARTISAN protégée + surface PUBLIQUE par
-  // token (portail de signature, RLS public-token sur `devis`). `signatures_devis` est HORS RLS :
-  // l'anti-IDOR passe par l'appartenance du devis parent (lue sous RLS). Immutabilité post-signature
-  // garantie par la garde SQL `statut='en_attente'` dans les writers.
+  /*
+   * Signature électronique de devis (SENSIBLE) — surface ARTISAN protégée + surface PUBLIQUE par
+   * token (portail de signature, RLS public-token sur `devis`). `signatures_devis` est HORS RLS :
+   * l'anti-IDOR passe par l'appartenance du devis parent (lue sous RLS). Immutabilité post-signature
+   * garantie par la garde SQL `statut='en_attente'` dans les writers.
+   */
   const signatureDb = getDbHandle().db;
   const signatureEmail = deps.emailPort ?? new ResendEmailAdapter();
   const signatureNotifications = new SignatureNotificationWriterDrizzle(signatureDb);
@@ -653,17 +703,21 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       email: signatureEmail,
     },
   });
-  // Conseils IA (tableau de bord) — 1ère slice du chantier assistant/IA. Lecture seule, NON
-  // persistée ; dégradation silencieuse (rate-limit/erreur provider/JSON KO → {conseils:[]}).
-  // Procédure RACINE `conseilsIA` (request/response, PAS de SSE). LlmPort Gemini (variable-path).
+  /*
+   * Conseils IA (tableau de bord) — 1ère slice du chantier assistant/IA. Lecture seule, NON
+   * persistée ; dégradation silencieuse (rate-limit/erreur provider/JSON KO → {conseils:[]}).
+   * Procédure RACINE `conseilsIA` (request/response, PAS de SSE). LlmPort Gemini (variable-path).
+   */
   const conseilsIa = createConseilsIaModule({
     llm: deps.llm ?? new GeminiLlmAdapter(),
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
     statsReader: new ConseilsStatsReaderDrizzle(getDbHandle().db),
   });
-  // Assistant IA (lectures threads/messages + 4 générateurs IA request/response). Réutilise le seam
-  // LlmPort (Gemini) + rate-limiter IA partagé (30/h par artisan, parité legacy checkRateLimit).
+  /*
+   * Assistant IA (lectures threads/messages + 4 générateurs IA request/response). Réutilise le seam
+   * LlmPort (Gemini) + rate-limiter IA partagé (30/h par artisan, parité legacy checkRateLimit).
+   */
   const assistant = createAssistantModule({
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
     generators: {
@@ -673,8 +727,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       dataReader: new AssistantDataReaderDrizzle(getDbHandle().db),
     },
   });
-  // Chat support artisan↔client (request/response). Notifier email best-effort (rate-limit anti-spam
-  // 20/15 min, parité legacy checkDocumentEmailRate) + lien portail si accès actif.
+  /*
+   * Chat support artisan↔client (request/response). Notifier email best-effort (rate-limit anti-spam
+   * 20/15 min, parité legacy checkDocumentEmailRate) + lien portail si accès actif.
+   */
   const chatDb = getDbHandle().db;
   const chatRepo = new ChatRepositoryDrizzle(chatDb);
   const chat = createChatModule({
@@ -686,8 +742,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
     ),
   });
-  // Module `support` (formulaire de contact → email à la boîte support). Sans table : EmailPort legacy
-  // + rate-limiter anti-flood (5 / 15 min, parité legacy) + boîte support (env SUPPORT_EMAIL).
+  /*
+   * Module `support` (formulaire de contact → email à la boîte support). Sans table : EmailPort legacy
+   * + rate-limiter anti-flood (5 / 15 min, parité legacy) + boîte support (env SUPPORT_EMAIL).
+   */
   const support = createSupportModule({
     email: deps.emailPort ?? new ResendEmailAdapter(),
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
@@ -699,17 +757,21 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const alertesPrevisions = createAlertesPrevisionsModule({ repo: new AlertesPrevisionsRepositoryDrizzle(getDbHandle().db) });
   // Module `importErp` (import de reprise de données : clients/devis/factures légers). Tables SOUS RLS.
   const importErp = createImportErpModule({ repo: new ImportErpRepositoryDrizzle(getDbHandle().db) });
-  // Module `interventionsMobile` (app mobile technicien). Compose les repos migrés interventions/clients/
-  // techniciens + le repo dédié `interventions_mobile` (SOUS RLS). RGPD : data-min par rôle technicien.
+  /*
+   * Module `interventionsMobile` (app mobile technicien). Compose les repos migrés interventions/clients/
+   * techniciens + le repo dédié `interventions_mobile` (SOUS RLS). RGPD : data-min par rôle technicien.
+   */
   const interventionsMobile = createInterventionsMobileModule({
     interventions: interventionRepo,
     clients: clientRepo,
     techniciens: technicienRepo,
     mobile: new InterventionMobileRepositoryDrizzle(getDbHandle().db),
   });
-  // Module `vitrine` (site public de l'artisan). Public par slug : reader dédié (artisans HORS RLS +
-  // lectures scopées) + anti-flood IP + EmailPort + notifications + persistance lead. Admin : leads
-  // (délégation `demandesContact` + `clients` pour la conversion).
+  /*
+   * Module `vitrine` (site public de l'artisan). Public par slug : reader dédié (artisans HORS RLS +
+   * lectures scopées) + anti-flood IP + EmailPort + notifications + persistance lead. Admin : leads
+   * (délégation `demandesContact` + `clients` pour la conversion).
+   */
   const vitrine = createVitrineModule({
     reader: new VitrinePublicReaderDrizzle(getDbHandle().db),
     settings: new VitrineSettingsRepositoryDrizzle(getDbHandle().db),
@@ -719,9 +781,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     leads: demandeContactRepo,
     clients: clientRepo,
   });
-  // Module `clientPortal` (espace client). Admin par cookie artisan + public par TOKEN (capacité, sans
-  // cookie). Compose : accès portail (RLS public-token) + readers docs/planning dédiés + repo chat migré
-  // + clients/notifications migrés + EmailPort + LlmPort (soumettreDemandeIA) + ArtisanReader.
+  /*
+   * Module `clientPortal` (espace client). Admin par cookie artisan + public par TOKEN (capacité, sans
+   * cookie). Compose : accès portail (RLS public-token) + readers docs/planning dédiés + repo chat migré
+   * + clients/notifications migrés + EmailPort + LlmPort (soumettreDemandeIA) + ArtisanReader.
+   */
   const portalAccessRepo = new PortalAccessRepositoryDrizzle(getDbHandle().db);
   const clientPortal = createClientPortalModule({
     defaultOrigin: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
@@ -737,14 +801,18 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(5, 15 * 60 * 1000),
     llm: deps.llm ?? new GeminiLlmAdapter(),
   });
-  // Module `integrationsComptables` (exports/sync vers logiciels tiers). FEC réutilise le générateur du
-  // domaine comptabilité (Σdébit=Σcrédit, lecture seule). Tables SOUS RLS.
+  /*
+   * Module `integrationsComptables` (exports/sync vers logiciels tiers). FEC réutilise le générateur du
+   * domaine comptabilité (Σdébit=Σcrédit, lecture seule). Tables SOUS RLS.
+   */
   const integrationsComptables = createIntegrationsComptablesModule({
     repo: new IntegrationsComptablesRepositoryDrizzle(getDbHandle().db),
     fec: { getFecContent: async (ctx, period) => (await getFecExport(comptabiliteReader, ctx, period)).content },
   });
-  // Module `devisIA` (analyse photos chantier → suggestions → devis). Vision multimodal + bibliothèque
-  // (match articles) + métier (ArtisanReader) + rate-limit IA. Tables SOUS RLS (anti-IDOR par l'analyse).
+  /*
+   * Module `devisIA` (analyse photos chantier → suggestions → devis). Vision multimodal + bibliothèque
+   * (match articles) + métier (ArtisanReader) + rate-limit IA. Tables SOUS RLS (anti-IDOR par l'analyse).
+   */
   const devisIA = createDevisIAModule({
     repo: new DevisIARepositoryDrizzle(getDbHandle().db),
     vision: deps.ocrVision ?? new GeminiVisionAdapter(),
@@ -758,9 +826,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     prefix: "/api/trpc",
     trpcOptions: {
       router: appRouter,
-      // ⚠️ Sans resolver, `tenant` reste null → toute procédure protégée renvoie 401. En production
-      // (déploiement réel), on câble par défaut le DrizzleTenantResolver (lit `artisans`/`users`, hors
-      // RLS) pour que l'auth par cookie `token` résolve l'artisanId. Les tests injectent leur resolver.
+      /*
+       * ⚠️ Sans resolver, `tenant` reste null → toute procédure protégée renvoie 401. En production
+       * (déploiement réel), on câble par défaut le DrizzleTenantResolver (lit `artisans`/`users`, hors
+       * RLS) pour que l'auth par cookie `token` résolve l'artisanId. Les tests injectent leur resolver.
+       */
       createContext: makeCreateContext({
         jwtSecret: deps.jwtSecret,
         resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -772,17 +842,21 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     },
   });
 
-  // §4 HORS-tRPC : route publique d'abonnement iCal (`/api/calendar/:token.ics`). Le jeton EST la
-  // capacité (pas de cookie). Rate-limit IP (60/min, parité legacy). Servie par le new-stack dès que
-  // le dispatcher edge route ce chemin (sinon legacy).
+  /*
+   * §4 HORS-tRPC : route publique d'abonnement iCal (`/api/calendar/:token.ics`). Le jeton EST la
+   * capacité (pas de cookie). Rate-limit IP (60/min, parité legacy). Servie par le new-stack dès que
+   * le dispatcher edge route ce chemin (sinon legacy).
+   */
   registerIcalRoute(app, {
     reader: new IcalPublicReaderDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
-  // §4 HORS-tRPC : webhook Stripe SIGNÉ (`/api/stripe/webhook`, raw body). Vérif signature fail-closed
-  // (secret absent/invalide → refus) → sync `subscriptions`. NON routé vers le new-stack tant que tous
-  // les events legacy (checkout.session/invoice/…) ne sont pas portés (sinon webhooks perdus).
+  /*
+   * §4 HORS-tRPC : webhook Stripe SIGNÉ (`/api/stripe/webhook`, raw body). Vérif signature fail-closed
+   * (secret absent/invalide → refus) → sync `subscriptions`. NON routé vers le new-stack tant que tous
+   * les events legacy (checkout.session/invoice/…) ne sont pas portés (sinon webhooks perdus).
+   */
   registerStripeWebhookRoute(app, {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
@@ -792,16 +866,20 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
 
-  // §4 HORS-tRPC : upload/suppression du logo artisan (`/api/upload-logo`, auth cookie JWT). Stocké
-  // en data-URL base64 dans `artisans.logo` (parité legacy ; pas de StoragePort).
+  /*
+   * §4 HORS-tRPC : upload/suppression du logo artisan (`/api/upload-logo`, auth cookie JWT). Stocké
+   * en data-URL base64 dans `artisans.logo` (parité legacy ; pas de StoragePort).
+   */
   registerUploadLogoRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     writer: new ArtisanLogoWriterDrizzle(getDbHandle().db),
   });
 
-  // §4 HORS-tRPC : export FEC opposable (`/api/comptabilite/fec`, auth cookie JWT). Réutilise le
-  // générateur FEC PUR déjà porté (buildFec, Σdébit=Σcrédit) — fichier texte téléchargeable.
+  /*
+   * §4 HORS-tRPC : export FEC opposable (`/api/comptabilite/fec`, auth cookie JWT). Réutilise le
+   * générateur FEC PUR déjà porté (buildFec, Σdébit=Σcrédit) — fichier texte téléchargeable.
+   */
   registerComptabiliteExportRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -824,9 +902,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
   });
 
-  // §4 HORS-tRPC : chat assistant en STREAMING SSE — mode AGENTIQUE (function-calling, 12 lectures +
-  // 11 écritures mappées aux use-cases migrés). MONTÉ mais PAS routé (absent de MIGRATED_ROUTES) : le
-  // legacy sert encore l'agentique tant que la parité n'est pas validée → AUCUNE régression.
+  /*
+   * §4 HORS-tRPC : chat assistant en STREAMING SSE — mode AGENTIQUE (function-calling, 12 lectures +
+   * 11 écritures mappées aux use-cases migrés). MONTÉ mais PAS routé (absent de MIGRATED_ROUTES) : le
+   * legacy sert encore l'agentique tant que la parité n'est pas validée → AUCUNE régression.
+   */
   const agentEmail = deps.emailPort ?? new ResendEmailAdapter();
   const agentRegistry = buildAssistantAgentRegistry(
     {
@@ -860,8 +940,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
   });
 
-  // §4 HORS-tRPC : exécution d'UN outil de la session vocale Live (`POST /api/voice/tool`). Réutilise
-  // le MÊME registry agentique. Auth cookie + rate-limit IA. MONTÉ mais PAS routé (legacy sert encore).
+  /*
+   * §4 HORS-tRPC : exécution d'UN outil de la session vocale Live (`POST /api/voice/tool`). Réutilise
+   * le MÊME registry agentique. Auth cookie + rate-limit IA. MONTÉ mais PAS routé (legacy sert encore).
+   */
   registerVoiceToolRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -869,8 +951,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
   });
 
-  // §4 HORS-tRPC : mint d'un token éphémère pour la session vocale Live (`POST /api/voice/token`). Setup
-  // Live déclare les MÊMES outils que le registry agentique. MONTÉ mais PAS routé (legacy sert encore).
+  /*
+   * §4 HORS-tRPC : mint d'un token éphémère pour la session vocale Live (`POST /api/voice/token`). Setup
+   * Live déclare les MÊMES outils que le registry agentique. MONTÉ mais PAS routé (legacy sert encore).
+   */
   registerVoiceTokenRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -883,9 +967,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
   });
 
-  // §4 HORS-tRPC : PDF d'un bon de commande fournisseur (`/api/commandes-fournisseurs/:id/pdf`, auth
-  // cookie). Générateur jsPDF INTERNALISÉ (`JsPdfAdapter`). MONTÉ mais PAS routé tant qu'absent de
-  // MIGRATED_ROUTES (1re des 8 routes PDF download — établit la recette).
+  /*
+   * §4 HORS-tRPC : PDF d'un bon de commande fournisseur (`/api/commandes-fournisseurs/:id/pdf`, auth
+   * cookie). Générateur jsPDF INTERNALISÉ (`JsPdfAdapter`). MONTÉ mais PAS routé tant qu'absent de
+   * MIGRATED_ROUTES (1re des 8 routes PDF download — établit la recette).
+   */
   registerCommandePdfRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -895,8 +981,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  // §4 HORS-tRPC : PDF d'un contrat de maintenance (`/api/contrats/:id/pdf`, auth cookie). MONTÉ mais
-  // PAS routé tant qu'absent de MIGRATED_ROUTES (2e des 8 routes PDF download).
+  /*
+   * §4 HORS-tRPC : PDF d'un contrat de maintenance (`/api/contrats/:id/pdf`, auth cookie). MONTÉ mais
+   * PAS routé tant qu'absent de MIGRATED_ROUTES (2e des 8 routes PDF download).
+   */
   registerContratPdfRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -906,8 +994,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  // §4 HORS-tRPC : bon d'intervention en PDF (`/api/interventions/:id/bon-pdf`, auth cookie). MONTÉ mais
-  // PAS routé tant qu'absent de MIGRATED_ROUTES (3e des 8 routes PDF download).
+  /*
+   * §4 HORS-tRPC : bon d'intervention en PDF (`/api/interventions/:id/bon-pdf`, auth cookie). MONTÉ mais
+   * PAS routé tant qu'absent de MIGRATED_ROUTES (3e des 8 routes PDF download).
+   */
   registerInterventionPdfRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -918,8 +1008,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  // §4 HORS-tRPC PUBLIQUE : PDF d'un devis depuis le portail client (`/api/portail/:token/devis/:id/pdf`,
-  // token = capacité, rate-limit IP). MONTÉ mais PAS routé tant qu'absent de MIGRATED_ROUTES.
+  /*
+   * §4 HORS-tRPC PUBLIQUE : PDF d'un devis depuis le portail client (`/api/portail/:token/devis/:id/pdf`,
+   * token = capacité, rate-limit IP). MONTÉ mais PAS routé tant qu'absent de MIGRATED_ROUTES.
+   */
   registerPortailDevisPdfRoute(app, {
     accessReader: new PortalPaymentReaderDrizzle(getDbHandle().db),
     devisReader: devisRepo,
@@ -932,8 +1024,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
-  // §4 HORS-tRPC PUBLIQUE : PDF d'une facture depuis le portail client (`/api/portail/:token/factures/:id/pdf`,
-  // token = capacité, rate-limit IP). MONTÉ mais PAS routé tant qu'absent de MIGRATED_ROUTES.
+  /*
+   * §4 HORS-tRPC PUBLIQUE : PDF d'une facture depuis le portail client (`/api/portail/:token/factures/:id/pdf`,
+   * token = capacité, rate-limit IP). MONTÉ mais PAS routé tant qu'absent de MIGRATED_ROUTES.
+   */
   registerPortailFacturePdfRoute(app, {
     accessReader: new PortalPaymentReaderDrizzle(getDbHandle().db),
     factureReader: factureRepo,
@@ -946,8 +1040,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
-  // §4 HORS-tRPC : Factur-X (XML CII + PDF facture) d'une facture (`/api/comptabilite/facturx-xml/:id`
-  // + `/api/comptabilite/facturx/:id`, auth cookie). MONTÉES mais PAS routées tant qu'absentes de MIGRATED_ROUTES.
+  /*
+   * §4 HORS-tRPC : Factur-X (XML CII + PDF facture) d'une facture (`/api/comptabilite/facturx-xml/:id`
+   * + `/api/comptabilite/facturx/:id`, auth cookie). MONTÉES mais PAS routées tant qu'absentes de MIGRATED_ROUTES.
+   */
   registerFacturxRoutes(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -957,9 +1053,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  // §4 HORS-tRPC : exports en LOT (ZIP par période) — `/api/comptabilite/export-pdf-lot` (PDF facture)
-  // + `/api/comptabilite/export-facturx-lot` (XML CII), auth cookie. MONTÉES mais PAS routées tant
-  // qu'absentes de MIGRATED_ROUTES.
+  /*
+   * §4 HORS-tRPC : exports en LOT (ZIP par période) — `/api/comptabilite/export-pdf-lot` (PDF facture)
+   * + `/api/comptabilite/export-facturx-lot` (XML CII), auth cookie. MONTÉES mais PAS routées tant
+   * qu'absentes de MIGRATED_ROUTES.
+   */
   registerExportLotRoutes(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -970,8 +1068,10 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  // §4 HORS-tRPC : polices Roboto (regular/bold) servies en statique pour les PDF générés côté client
-  // (`/api/fonts/:name`, PUBLIC, cache immutable). MONTÉE mais PAS routée tant qu'absente de MIGRATED_ROUTES.
+  /*
+   * §4 HORS-tRPC : polices Roboto (regular/bold) servies en statique pour les PDF générés côté client
+   * (`/api/fonts/:name`, PUBLIC, cache immutable). MONTÉE mais PAS routée tant qu'absente de MIGRATED_ROUTES.
+   */
   registerFontsRoute(app);
 
   // §4 HORS-tRPC : télémétrie d'erreur fire-and-forget (`/api/voice/debug`, PUBLIC, sendBeacon).

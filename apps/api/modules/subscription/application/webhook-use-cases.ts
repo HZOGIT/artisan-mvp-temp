@@ -25,19 +25,23 @@ export interface WebhookResult {
   readonly body: Record<string, unknown>;
 }
 
-// Évènements abonnement gérés à ce stade (slice A). Les évènements paiement/facture (checkout.session,
-// invoice.*, payment_intent.*) sont à porter avant de router le webhook vers le new-stack (slice B).
+/*
+ * Évènements abonnement gérés à ce stade (slice A). Les évènements paiement/facture (checkout.session,
+ * invoice.*, payment_intent.*) sont à porter avant de router le webhook vers le new-stack (slice B).
+ */
 const SUBSCRIPTION_UPSERT = new Set(["customer.subscription.created", "customer.subscription.updated"]);
 
-// `POST /api/stripe/webhook` (parité legacy) : vérif signature **fail-closed** puis sync `subscriptions`.
-// - pas de signature → 400 ; secret non configuré → **500 (refus, jamais vérifier à vide)** ; signature
-//   invalide → 400 ; event de test (`evt_test_`) → 200 {verified} ; sinon dispatch + 200 {received}.
+/*
+ * `POST /api/stripe/webhook` (parité legacy) : vérif signature **fail-closed** puis sync `subscriptions`.
+ * - pas de signature → 400 ; secret non configuré → **500 (refus, jamais vérifier à vide)** ; signature
+ *   invalide → 400 ; event de test (`evt_test_`) → 200 {verified} ; sinon dispatch + 200 {received}.
+ */
 export async function processStripeWebhook(
   deps: StripeWebhookDeps,
   input: { rawBody: Buffer; signature: string | undefined },
 ): Promise<WebhookResult> {
   if (!input.signature) return { http: 400, body: { error: "Missing signature" } };
-  // OPE-79 fail-closed : sans secret, ne JAMAIS vérifier à clé vide (signature forgeable).
+  // ⚠️ fail-closed : sans secret, ne JAMAIS vérifier à clé vide (signature forgeable).
   if (!deps.webhookSecret) return { http: 500, body: { error: "Webhook not configured" } };
 
   let event;
@@ -91,9 +95,11 @@ async function handleDeleted(deps: StripeWebhookDeps, sub: Record<string, unknow
   await deps.writer.applyDeleted(artisanId, deletedUpsertFields());
 }
 
-// `checkout.session.completed` (parité legacy) : paiement par token → facture payée + notification.
-// Métadonnées requises (token_paiement + facture_id) sinon skip. Le paiement est résolu par token
-// (capacité), l'artisanId/factureId viennent du paiement (source de vérité, pas du metadata).
+/*
+ * `checkout.session.completed` (parité legacy) : paiement par token → facture payée + notification.
+ * Métadonnées requises (token_paiement + facture_id) sinon skip. Le paiement est résolu par token
+ * (capacité), l'artisanId/factureId viennent du paiement (source de vérité, pas du metadata).
+ */
 async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<string, unknown>): Promise<void> {
   const metadata = (session.metadata ?? {}) as Record<string, unknown>;
   const token = metadata.token_paiement ? String(metadata.token_paiement) : null;
@@ -127,8 +133,10 @@ async function bestEffort(fn: () => Promise<void>): Promise<void> {
   }
 }
 
-// `invoice.payment_succeeded` (parité legacy) : SEULEMENT pour une facture d'abonnement. Recharge la
-// subscription Stripe (period dates à jour) → status active + period. Email best-effort.
+/*
+ * `invoice.payment_succeeded` (parité legacy) : SEULEMENT pour une facture d'abonnement. Recharge la
+ * subscription Stripe (period dates à jour) → status active + period. Email best-effort.
+ */
 async function handleInvoicePaid(deps: StripeWebhookDeps, invoice: Record<string, unknown>): Promise<void> {
   const subscriptionId = invoice.subscription ? String(invoice.subscription) : null;
   const customerId = invoice.customer ? String(invoice.customer) : null;

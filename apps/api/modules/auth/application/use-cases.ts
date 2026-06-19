@@ -27,8 +27,10 @@ export interface AuthDeps {
 const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 const defaultResetToken = (): string => randomBytes(32).toString("hex");
 
-// Utilisateur courant (depuis les claims du cookie) + permissions. Renvoie null si non authentifié,
-// utilisateur introuvable, ou **désactivé** (parité legacy `getUserFromRequest` : bloque les inactifs).
+/*
+ * Utilisateur courant (depuis les claims du cookie) + permissions. Renvoie null si non authentifié,
+ * utilisateur introuvable, ou **désactivé** (parité legacy `getUserFromRequest` : bloque les inactifs).
+ */
 export async function me(repo: IAuthRepository, claims: TokenClaims | null, permissions: readonly string[]): Promise<AuthMe | null> {
   if (!claims) return null;
   const user = await repo.getById(claims.userId);
@@ -36,8 +38,10 @@ export async function me(repo: IAuthRepository, claims: TokenClaims | null, perm
   return { ...user, permissions: [...permissions] };
 }
 
-// Authentifie email+mot de passe (bcrypt), met à jour lastSignedIn, et renvoie l'utilisateur + un JWT
-// signé (à poser en cookie par l'interface). Identifiants invalides / sans mot de passe → 401.
+/*
+ * Authentifie email+mot de passe (bcrypt), met à jour lastSignedIn, et renvoie l'utilisateur + un JWT
+ * signé (à poser en cookie par l'interface). Identifiants invalides / sans mot de passe → 401.
+ */
 export async function signin(deps: AuthDeps, input: { email: string; password: string }): Promise<{ user: AuthUser; token: string }> {
   const cred = await deps.repo.findCredentials(input.email);
   if (!cred || !cred.password) {
@@ -53,8 +57,10 @@ export async function signin(deps: AuthDeps, input: { email: string; password: s
   return { user, token };
 }
 
-// Inscription : email unique (409) → hash bcrypt → création user → **bootstrap** (artisan + essai +
-// permissions owner) → JWT + (cookie posé par l'interface). Email de bienvenue best-effort. Parité legacy.
+/*
+ * Inscription : email unique (409) → hash bcrypt → création user → **bootstrap** (artisan + essai +
+ * permissions owner) → JWT + (cookie posé par l'interface). Email de bienvenue best-effort. Parité legacy.
+ */
 export async function signup(deps: AuthDeps, input: { email: string; password: string; name?: string }): Promise<{ user: AuthUser; token: string }> {
   if ((await deps.repo.findIdByEmail(input.email)) !== null) {
     throw new ConflictError("Email already in use");
@@ -98,8 +104,10 @@ export async function updatePassword(deps: AuthDeps, userId: number, currentPass
   return { success: true };
 }
 
-// Demande de reset : génère un jeton (envoyé par email), stocke son HASH SHA-256 + expiry 1h. RÉPONSE
-// TOUJOURS `{success:true}` (anti-énumération : ne révèle JAMAIS si l'email existe). Anti-flood best-effort.
+/*
+ * Demande de reset : génère un jeton (envoyé par email), stocke son HASH SHA-256 + expiry 1h. RÉPONSE
+ * TOUJOURS `{success:true}` (anti-énumération : ne révèle JAMAIS si l'email existe). Anti-flood best-effort.
+ */
 export async function forgotPassword(deps: AuthDeps, email: string): Promise<{ success: true }> {
   const key = email.toLowerCase().trim();
   // Au-delà du seuil, on renvoie le même success sans rien faire (réponse constante préservée).
@@ -126,8 +134,10 @@ export async function forgotPassword(deps: AuthDeps, email: string): Promise<{ s
   return { success: true };
 }
 
-// Applique un nouveau mot de passe à partir d'un jeton valide (hash recherché + non expiré), puis
-// invalide le jeton. Jeton invalide/expiré → 400 (parité legacy).
+/*
+ * Applique un nouveau mot de passe à partir d'un jeton valide (hash recherché + non expiré), puis
+ * invalide le jeton. Jeton invalide/expiré → 400 (parité legacy).
+ */
 export async function resetPassword(deps: AuthDeps, token: string, newPassword: string): Promise<{ success: true }> {
   const user = await deps.repo.findByValidResetToken(sha256(token));
   if (!user) {

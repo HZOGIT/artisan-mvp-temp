@@ -1,8 +1,10 @@
 import type { PasswordHasher } from "./password-hasher";
 
-// Impl bcrypt du PasswordHasher (parité legacy `server/_core/auth.ts` : genSalt(10) + hash). L'import
-// est résolu via une variable (non littérale) → bcryptjs n'entre pas dans le typecheck de src/**,
-// tout en étant câblé au runtime (esbuild le bundle).
+/*
+ * Impl bcrypt du PasswordHasher (parité legacy `server/_core/auth.ts` : genSalt(10) + hash). L'import
+ * est résolu via une variable (non littérale) → bcryptjs n'entre pas dans le typecheck de src/**,
+ * tout en étant câblé au runtime (esbuild le bundle).
+ */
 const BCRYPT_MODULE = "bcryptjs";
 type BcryptModule = {
   genSalt: (rounds: number) => Promise<string>;

@@ -1,8 +1,10 @@
-// Domaine de l'import ERP (parité legacy `importErp`). Import « léger » par lot : des lignes CSV/Excel
-// (déjà parsées côté client en objets) + un mapping {colonneCSV → champ Operioz}. On crée des
-// clients/devis/factures « légers » (montant TTC brut, sans lignes ni ventilation TVA — c'est un import
-// de reprise de données, pas une émission). Numéro généré serveur. Idempotence best-effort (dedup email
-// pour les clients ; lookup client par nom pour devis/factures).
+/*
+ * Domaine de l'import ERP (parité legacy `importErp`). Import « léger » par lot : des lignes CSV/Excel
+ * (déjà parsées côté client en objets) + un mapping {colonneCSV → champ Operioz}. On crée des
+ * clients/devis/factures « légers » (montant TTC brut, sans lignes ni ventilation TVA — c'est un import
+ * de reprise de données, pas une émission). Numéro généré serveur. Idempotence best-effort (dedup email
+ * pour les clients ; lookup client par nom pour devis/factures).
+ */
 
 export type ImportRow = Record<string, unknown>;
 export type ImportMapping = Record<string, string>;
@@ -19,8 +21,10 @@ export function emptyResult(): ImportResult {
   return { imported: 0, errors: 0, duplicates: 0, errorDetails: [] };
 }
 
-// Récupère la valeur d'un champ Operioz dans une ligne via le mapping (parité legacy `pickField`).
-// Cherche la colonne CSV qui pointe vers `field`, lit la valeur, la trim ; undefined si absente/vide.
+/*
+ * Récupère la valeur d'un champ Operioz dans une ligne via le mapping (parité legacy `pickField`).
+ * Cherche la colonne CSV qui pointe vers `field`, lit la valeur, la trim ; undefined si absente/vide.
+ */
 export function pickField(row: ImportRow, mapping: ImportMapping, field: string): string | undefined {
   const csvCol = Object.keys(mapping).find((k) => mapping[k] === field);
   if (!csvCol) return undefined;
@@ -37,8 +41,10 @@ export interface ClientRef {
   readonly email: string | null;
 }
 
-// Trouve un client par nom complet (parité legacy `findClientByName`) : compare "prenom nom",
-// "nom prenom" et le nom seul, en normalisé (minuscule + trim). undefined si aucun match.
+/*
+ * Trouve un client par nom complet (parité legacy `findClientByName`) : compare "prenom nom",
+ * "nom prenom" et le nom seul, en normalisé (minuscule + trim). undefined si aucun match.
+ */
 export function findClientByName(clients: readonly ClientRef[], full: string): ClientRef | undefined {
   const norm = full.toLowerCase().trim();
   return clients.find((c) => {

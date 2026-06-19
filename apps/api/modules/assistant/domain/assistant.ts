@@ -1,7 +1,9 @@
-// Domaine ASSISTANT IA — fil de conversation persistant (threads + messages). Lecture seule ici
-// (historique affiché dans le panneau assistant). `ai_threads` porte `artisanId` (RLS) ;
-// `ai_messages` n'en a pas → scopé via l'appartenance du THREAD parent (anti-IDOR). Parité legacy
-// `assistant.getThreads`/`getMessages`. Les générateurs IA (chat/generateDevis/…) = slices suivantes.
+/*
+ * Domaine ASSISTANT IA — fil de conversation persistant (threads + messages). Lecture seule ici
+ * (historique affiché dans le panneau assistant). `ai_threads` porte `artisanId` (RLS) ;
+ * `ai_messages` n'en a pas → scopé via l'appartenance du THREAD parent (anti-IDOR). Parité legacy
+ * `assistant.getThreads`/`getMessages`. Les générateurs IA (chat/generateDevis/…) = slices suivantes.
+ */
 
 export interface AiThread {
   readonly id: number;
@@ -25,8 +27,10 @@ export interface AiMessage {
   readonly createdAt: Date;
 }
 
-// Bornes legacy : liste des threads (20 par défaut, max 100) ; messages d'un thread (100 par défaut,
-// max 500). Centralisées ici pour rester fidèles au comportement legacy.
+/*
+ * Bornes legacy : liste des threads (20 par défaut, max 100) ; messages d'un thread (100 par défaut,
+ * max 500). Centralisées ici pour rester fidèles au comportement legacy.
+ */
 export const THREADS_LIMIT_DEFAUT = 20;
 export const THREADS_LIMIT_MAX = 100;
 export const MESSAGES_LIMIT_DEFAUT = 100;

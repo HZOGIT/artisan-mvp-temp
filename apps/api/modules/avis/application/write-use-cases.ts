@@ -3,9 +3,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { IAvisRepository } from "./avis-repository";
 import type { Avis, StatutAvis } from "../domain/avis";
 
-// Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
-// une opération sur l'avis d'un autre artisan (repo → null) lève NotFoundError
-// (ne révèle pas l'existence cross-tenant). Modération limitée au tenant propriétaire.
+/*
+ * Use-cases d'écriture — purs, repository injecté. Le tenant est porté par le ctx ;
+ * une opération sur l'avis d'un autre artisan (repo → null) lève NotFoundError
+ * (ne révèle pas l'existence cross-tenant). Modération limitée au tenant propriétaire.
+ */
 
 const STATUTS_VALIDES: readonly StatutAvis[] = ["en_attente", "publie", "masque"];
 

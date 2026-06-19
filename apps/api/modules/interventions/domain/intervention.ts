@@ -1,7 +1,9 @@
-// Types de domaine du module interventions (cœur métier terrain) — découplés du schéma
-// Drizzle. ⚠️ Domaine sensible : machine à états du statut (pas de transition arbitraire),
-// FK scopées tenant (clientId/technicienId/devisId/factureId = anti-IDOR-FK), isolation
-// cross-tenant. Le détail des transitions est porté aux étapes ultérieures.
+/*
+ * Types de domaine du module interventions (cœur métier terrain) — découplés du schéma
+ * Drizzle. ⚠️ Domaine sensible : machine à états du statut (pas de transition arbitraire),
+ * FK scopées tenant (clientId/technicienId/devisId/factureId = anti-IDOR-FK), isolation
+ * cross-tenant. Le détail des transitions est porté aux étapes ultérieures.
+ */
 
 export type InterventionStatut = "planifiee" | "en_cours" | "terminee" | "annulee";
 
@@ -42,8 +44,10 @@ export interface UpdateInterventionInput {
   readonly description?: string | null;
   readonly dateDebut?: Date;
   readonly dateFin?: Date | null;
-  // ⚠️ Le statut n'est pas un champ libre d'update : les transitions seront contrôlées par
-  // une machine à états (étape ultérieure). Présent ici pour la complétude du modèle.
+  /*
+   * ⚠️ Le statut n'est pas un champ libre d'update : les transitions seront contrôlées par
+   * une machine à états (étape ultérieure). Présent ici pour la complétude du modèle.
+   */
   readonly statut?: InterventionStatut;
   readonly adresse?: string | null;
   readonly notes?: string | null;
@@ -52,10 +56,12 @@ export interface UpdateInterventionInput {
   readonly technicienId?: number | null;
 }
 
-// ── Équipe d'intervention (sous-ressource `interventions_techniciens`) ────────────────────────
-// Plusieurs intervenants par intervention (le « responsable » reste `intervention.technicienId` ;
-// l'équipe gère les intervenants supplémentaires). La table porte un `artisanId` (double
-// cloisonnement) ; l'accès est TOUJOURS borné par l'intervention parente du tenant (anti-IDOR).
+/*
+ * ── Équipe d'intervention (sous-ressource `interventions_techniciens`) ────────────────────────
+ * Plusieurs intervenants par intervention (le « responsable » reste `intervention.technicienId` ;
+ * l'équipe gère les intervenants supplémentaires). La table porte un `artisanId` (double
+ * cloisonnement) ; l'accès est TOUJOURS borné par l'intervention parente du tenant (anti-IDOR).
+ */
 export interface EquipeMembre {
   readonly id: number; // id de la liaison
   readonly technicienId: number;

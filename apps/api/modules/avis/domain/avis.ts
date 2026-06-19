@@ -31,8 +31,10 @@ export interface AvisInterventionResume {
   readonly dateDebut: Date;
 }
 
-// Avis enrichi du client et (optionnellement) de l'intervention liés — tous deux
-// scopés au même tenant que l'avis (jointures sous RLS + filtre artisanId).
+/*
+ * Avis enrichi du client et (optionnellement) de l'intervention liés — tous deux
+ * scopés au même tenant que l'avis (jointures sous RLS + filtre artisanId).
+ */
 export interface AvisEnrichi extends Avis {
   readonly client: AvisClientResume | null;
   readonly intervention: AvisInterventionResume | null;

@@ -6,9 +6,11 @@ import type { TenantContext } from "../../../shared/tenant";
 import type { FacturesCAReader } from "../application/factures-ca-reader";
 import type { CAParMois } from "../domain/prevision-ca";
 
-// Agrège le CA réalisé (factures PAYÉES) par mois/année — scopé tenant (RLS sur `factures.artisanId`
-// + filtre explicite). Le groupage est fait en SQL (moins de données rapatriées que le legacy JS).
-// Date de référence = `dateFacture` (fallback `createdAt`), comme le legacy.
+/*
+ * Agrège le CA réalisé (factures PAYÉES) par mois/année — scopé tenant (RLS sur `factures.artisanId`
+ * + filtre explicite). Le groupage est fait en SQL (moins de données rapatriées que le legacy JS).
+ * Date de référence = `dateFacture` (fallback `createdAt`), comme le legacy.
+ */
 export class FacturesCAReaderDrizzle implements FacturesCAReader {
   constructor(private readonly db: DbClient) {}
 

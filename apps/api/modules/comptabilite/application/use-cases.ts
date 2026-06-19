@@ -38,16 +38,20 @@ export async function getDeclarationTVADetail(reader: IComptabiliteReader, ctx: 
   return assembleDeclarationTVA(brut.parTaux, brut.tvaDeductible);
 }
 
-// Aperçu FEC (15 premières lignes + conformité) : génère le FEC complet (PUR) puis projette. Lecture
-// seule ; l'invariant Σdébit=Σcrédit est porté par `buildFec` (vérifiable via `conformite.equilibre`).
+/*
+ * Aperçu FEC (15 premières lignes + conformité) : génère le FEC complet (PUR) puis projette. Lecture
+ * seule ; l'invariant Σdébit=Σcrédit est porté par `buildFec` (vérifiable via `conformite.equilibre`).
+ */
 export async function getFecPreview(reader: IComptabiliteReader, ctx: TenantContext, input?: { dateDebut?: Date; dateFin?: Date }, now: Clock = () => new Date()): Promise<FecPreview> {
   const p = resolvePeriode(input, now());
   const [fecData, config, siret] = await Promise.all([reader.fecInput(ctx, p), reader.fecConfig(ctx), reader.siret(ctx)]);
   return fecPreview(buildFec(fecData, config), siret);
 }
 
-// Période FEC par défaut = ANNÉE fiscale courante (1er janvier → maintenant, fin de journée) — parité
-// legacy `/api/comptabilite/fec` (≠ resolvePeriode mensuel).
+/*
+ * Période FEC par défaut = ANNÉE fiscale courante (1er janvier → maintenant, fin de journée) — parité
+ * legacy `/api/comptabilite/fec` (≠ resolvePeriode mensuel).
+ */
 function resolvePeriodeFec(input: { dateDebut?: Date; dateFin?: Date } | undefined, now: Date): Periode {
   const dateFin = input?.dateFin ? new Date(input.dateFin) : new Date(now);
   dateFin.setHours(23, 59, 59, 999);
@@ -60,8 +64,10 @@ export interface FecExport {
   readonly fileName: string;
 }
 
-// Export FEC fichier (parité legacy `/api/comptabilite/fec`) : génère le FEC complet (PUR, invariant
-// Σdébit=Σcrédit via `conformite.equilibre`) + le nom de fichier réglementaire. Lecture seule.
+/*
+ * Export FEC fichier (parité legacy `/api/comptabilite/fec`) : génère le FEC complet (PUR, invariant
+ * Σdébit=Σcrédit via `conformite.equilibre`) + le nom de fichier réglementaire. Lecture seule.
+ */
 export async function getFecExport(reader: IComptabiliteReader, ctx: TenantContext, input?: { dateDebut?: Date; dateFin?: Date }, now: Clock = () => new Date()): Promise<FecExport> {
   const p = resolvePeriodeFec(input, now());
   const [fecData, config, siret] = await Promise.all([reader.fecInput(ctx, p), reader.fecConfig(ctx), reader.siret(ctx)]);
@@ -74,8 +80,10 @@ export interface CsvExport {
   readonly fileName: string;
 }
 
-// Export CSV des factures de la période (parité legacy `/api/comptabilite/export-csv`). Lecture seule ;
-// même période par défaut que le FEC (année fiscale). Anti-injection CSV porté par `buildFacturesCsv`.
+/*
+ * Export CSV des factures de la période (parité legacy `/api/comptabilite/export-csv`). Lecture seule ;
+ * même période par défaut que le FEC (année fiscale). Anti-injection CSV porté par `buildFacturesCsv`.
+ */
 export async function getFacturesCsvExport(reader: FacturesCsvReader, ctx: TenantContext, input?: { dateDebut?: Date; dateFin?: Date }, now: Clock = () => new Date()): Promise<CsvExport> {
   const p = resolvePeriodeFec(input, now());
   const rows = await reader.listFacturesPeriode(ctx, p);

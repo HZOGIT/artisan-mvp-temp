@@ -1,10 +1,12 @@
 import type { TenantContext } from "../../../shared/tenant";
 import type { CollaborateurRole, UtilisateurListItem } from "../domain/utilisateur";
 
-// Port du repository « utilisateurs ». ⚠️ Tables `users`/`permissions_utilisateur` HORS RLS → CHAQUE
-// méthode scope explicitement par `ctx.artisanId` (jamais cross-tenant). Deux notions d'appartenance :
-// - « strict » = `users.artisanId === ctx.artisanId` (collaborateur ; l'OWNER en est exclu — parité legacy) ;
-// - « gérable » = strict OU `users.id === artisan.userId` (inclut l'OWNER ; parité `getPermissions`).
+/*
+ * Port du repository « utilisateurs ». ⚠️ Tables `users`/`permissions_utilisateur` HORS RLS → CHAQUE
+ * méthode scope explicitement par `ctx.artisanId` (jamais cross-tenant). Deux notions d'appartenance :
+ * - « strict » = `users.artisanId === ctx.artisanId` (collaborateur ; l'OWNER en est exclu — parité legacy) ;
+ * - « gérable » = strict OU `users.id === artisan.userId` (inclut l'OWNER ; parité `getPermissions`).
+ */
 export interface IUtilisateurRepository {
   // Utilisateurs du tenant : OWNER (`artisans.userId`) ∪ `users.artisanId = ctx.artisanId`.
   list(ctx: TenantContext): Promise<UtilisateurListItem[]>;
@@ -24,7 +26,9 @@ export interface IUtilisateurRepository {
   setPermissions(ctx: TenantContext, userId: number, permissions: string[]): Promise<boolean>;
   // Raison sociale du tenant (pour l'email d'invitation).
   getNomEntreprise(ctx: TenantContext): Promise<string | null>;
-  // userId du PROPRIÉTAIRE (`artisans.userId`) du tenant — pour interdire qu'un collaborateur
-  // (avec `utilisateurs.gerer`) ne désactive/rétrograde le compte owner (lockout). `null` si introuvable.
+  /*
+   * userId du PROPRIÉTAIRE (`artisans.userId`) du tenant — pour interdire qu'un collaborateur
+   * (avec `utilisateurs.gerer`) ne désactive/rétrograde le compte owner (lockout). `null` si introuvable.
+   */
   getOwnerUserId(ctx: TenantContext): Promise<number | null>;
 }

@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { router, permissionProcedure } from "../../../../interface/trpc/trpc";
 
-// Procédures gatées par permission (parité legacy) : lecture = `clients.voir`, écriture = `clients.gerer`.
-// Le propriétaire reçoit ALL_PERMISSIONS au provisioning ; un collaborateur sans la permission → 403.
+/*
+ * Procédures gatées par permission (parité legacy) : lecture = `clients.voir`, écriture = `clients.gerer`.
+ * Le propriétaire reçoit ALL_PERMISSIONS au provisioning ; un collaborateur sans la permission → 403.
+ */
 const voir = permissionProcedure("clients.voir");
 const gerer = permissionProcedure("clients.gerer");
 import type { IClientRepository } from "../../application/client-repository";
@@ -16,9 +18,11 @@ import {
 import { creerClient, modifierClient, supprimerClient } from "../../application/write-use-cases";
 import { importerClients } from "../../application/import-use-cases";
 
-// Bornes alignées sur `ClientInputSchema` (shared/validation.ts) — defense-in-depth côté
-// transport. Le format e-mail (et le « nom requis ») sont aussi validés au use-case
-// (indépendant du transport) ; ici on borne surtout les longueurs colonnes PG.
+/*
+ * Bornes alignées sur `ClientInputSchema` (shared/validation.ts) — defense-in-depth côté
+ * transport. Le format e-mail (et le « nom requis ») sont aussi validés au use-case
+ * (indépendant du transport) ; ici on borne surtout les longueurs colonnes PG.
+ */
 const createSchema = z.object({
   nom: z.string().min(1).max(100),
   prenom: z.string().max(100).nullish(),
@@ -58,9 +62,11 @@ const updateSchema = z.object({
   notes: z.string().nullish(),
 });
 
-// Routeur tRPC du domaine clients (CRM/PII). Transport mince : valide les inputs (zod),
-// délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
-// (NotFound→404, Validation→400, Conflict→409 pour une suppression refusée). Repo injecté (DI).
+/*
+ * Routeur tRPC du domaine clients (CRM/PII). Transport mince : valide les inputs (zod),
+ * délègue aux use-cases (scoping tenant via ctx.tenant), laisse remonter les Domain errors
+ * (NotFound→404, Validation→400, Conflict→409 pour une suppression refusée). Repo injecté (DI).
+ */
 export function createClientsRouter(repo: IClientRepository) {
   return router({
     list: voir.query(({ ctx }) => listClients(repo, ctx.tenant)),
@@ -98,8 +104,10 @@ export function createClientsRouter(repo: IClientRepository) {
         return { success: true };
       }),
 
-    // Import en masse (parité client `trpc.clients.importFromExcel`). Lignes déjà parsées côté
-    // client (max 5000). Best-effort par ligne → { imported, skipped }. Bornes defense-in-depth.
+    /*
+     * Import en masse (parité client `trpc.clients.importFromExcel`). Lignes déjà parsées côté
+     * client (max 5000). Best-effort par ligne → { imported, skipped }. Bornes defense-in-depth.
+     */
     importFromExcel: gerer
       .input(
         z.object({

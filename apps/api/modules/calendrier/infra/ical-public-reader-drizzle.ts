@@ -7,9 +7,11 @@ import type { IcalPublicReader, IcalFeedData } from "../application/ical-public-
 
 const clientNom = (prenom: string | null, nom: string | null): string => `${prenom ?? ""} ${nom ?? ""}`.trim();
 
-// Résout l'artisan par `icalToken` (table identité, HORS RLS → lecture directe), puis lit ses
-// interventions SOUS LE TENANT résolu (`withTenant`/RLS) depuis `since`, enrichies du client.
-// Le jeton EST la capacité — aucun accès cross-tenant (les interventions sont scopées artisanId).
+/*
+ * Résout l'artisan par `icalToken` (table identité, HORS RLS → lecture directe), puis lit ses
+ * interventions SOUS LE TENANT résolu (`withTenant`/RLS) depuis `since`, enrichies du client.
+ * Le jeton EST la capacité — aucun accès cross-tenant (les interventions sont scopées artisanId).
+ */
 export class IcalPublicReaderDrizzle implements IcalPublicReader {
   constructor(private readonly db: DbClient) {}
 
