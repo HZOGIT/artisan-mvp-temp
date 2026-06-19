@@ -141,7 +141,14 @@ export function createDepensesRouter(
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerDepense(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerDepense(repo, ctx.tenant, input);
+        ctx.log.info(
+          { event: "depense_creee", depenseId: result.id, montantHt: Number(input.montantHt), categorie: input.categorie, chantierId: input.chantierId ?? null, recurrente: input.recurrente ?? false },
+          "Dépense enregistrée",
+        );
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -154,6 +161,7 @@ export function createDepensesRouter(
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerDepense(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "depense_supprimee", depenseId: input.id }, "Dépense supprimée");
         return { success: true };
       }),
 
