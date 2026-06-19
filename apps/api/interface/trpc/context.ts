@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply, FastifyBaseLogger } from "fastify";
 import { verifyAuthToken, type TokenClaims, type TenantContext, type TenantResolver, type UserRoleReader, type PermissionsReader } from "../../shared/tenant";
 import { extractClientIp, extractUserAgent } from "../http/client-ip";
+import { maskEmail } from "../../shared/mask-email";
 
 /*
  * Contexte tRPC du nouveau stack. Construit à partir de la requête Fastify :
@@ -40,20 +41,6 @@ export interface ContextDeps {
   readonly resolver?: TenantResolver;
   readonly roleReader?: UserRoleReader;
   readonly permissionsReader?: PermissionsReader;
-}
-
-/** `info@gmail.com` → `i**o@g**l.com` — premier + étoiles + dernier char de chaque partie. */
-function maskEmail(email: string): string {
-  const at = email.indexOf("@");
-  if (at < 0) return "***";
-  const local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  const dot = domain.lastIndexOf(".");
-  const domainName = dot > 0 ? domain.slice(0, dot) : domain;
-  const tld = dot > 0 ? domain.slice(dot) : "";
-  const mask = (s: string): string =>
-    s.length <= 2 ? `${s[0] ?? ""}*` : `${s[0]}${"*".repeat(s.length - 2)}${s[s.length - 1]}`;
-  return `${mask(local)}@${mask(domainName)}${tld}`;
 }
 
 export function makeCreateContext(deps: ContextDeps = {}) {

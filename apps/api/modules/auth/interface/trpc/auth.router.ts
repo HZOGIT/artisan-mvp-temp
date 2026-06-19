@@ -3,6 +3,7 @@ import { router, publicProcedure, protectedProcedure } from "../../../../interfa
 import { clearAuthCookie, setAuthCookie } from "../../../../interface/http/auth-cookie";
 import type { AuthDeps } from "../../application/use-cases";
 import { deleteAccount, forgotPassword, me, resetPassword, signin, signup, updateEmail, updatePassword } from "../../application/use-cases";
+import { maskEmail } from "../../../../shared/mask-email";
 
 /*
  * Routeur tRPC `auth` (slice session : me/signin/logout — publics). Le cookie `token` est posé/effacé
@@ -20,6 +21,7 @@ export function createAuthRouter(deps: AuthDeps) {
       .mutation(async ({ ctx, input }) => {
         const { user, token } = await signin(deps, input);
         if (ctx.res) setAuthCookie(ctx.res, token);
+        ctx.log.info({ event: "auth_login", userEmail: maskEmail(input.email), userId: user.id }, "Connexion réussie");
         return { success: true as const, user };
       }),
 
@@ -29,29 +31,39 @@ export function createAuthRouter(deps: AuthDeps) {
       .mutation(async ({ ctx, input }) => {
         const { user, token } = await signup(deps, input);
         if (ctx.res) setAuthCookie(ctx.res, token);
+        ctx.log.info({ event: "auth_signup", userEmail: maskEmail(input.email), userId: user.id }, "Inscription réussie");
         return { success: true as const, user };
       }),
 
     /** Logout : efface le cookie d'auth. */
     logout: publicProcedure.mutation(({ ctx }) => {
       if (ctx.res) clearAuthCookie(ctx.res);
+      ctx.log.info({ event: "auth_logout" }, "Déconnexion");
       return { success: true as const };
     }),
 
     /** ── Self-service (utilisateur authentifié) ─────────────────────────────────────────────────── */
     updateEmail: protectedProcedure
       .input(z.object({ newEmail: z.string().email() }))
-      .mutation(({ ctx, input }) => updateEmail(deps, ctx.tenant.userId, input.newEmail)),
+      .mutation(async ({ ctx, input }) => {
+        const r = await updateEmail(deps, ctx.tenant.userId, input.newEmail);
+        ctx.log.info({ event: "auth_update_email" }, "Email mis à jour");
+        return r;
+      }),
 
     updatePassword: protectedProcedure
       .input(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(6) }))
-      .mutation(({ ctx, input }) => updatePassword(deps, ctx.tenant.userId, input.currentPassword, input.newPassword)),
+      .mutation(async ({ ctx, input }) => {
+        const r = await updatePassword(deps, ctx.tenant.userId, input.currentPassword, input.newPassword);
+        ctx.log.info({ event: "auth_update_password" }, "Mot de passe mis à jour");
+        return r;
+      }),
 
     deleteAccount: protectedProcedure
       .input(z.object({ confirmation: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const r = await deleteAccount(deps, ctx.tenant.userId, input.confirmation);
-        /** déconnecte après suppression */
+        ctx.log.warn({ event: "auth_delete_account" }, "Compte supprimé");
         if (ctx.res) clearAuthCookie(ctx.res);
         return r;
       }),
@@ -59,10 +71,18 @@ export function createAuthRouter(deps: AuthDeps) {
     /** ── Reset mot de passe (public, anti-énumération) ──────────────────────────────────────────── */
     forgotPassword: publicProcedure
       .input(z.object({ email: z.string().email() }))
-      .mutation(({ input }) => forgotPassword(deps, input.email)),
+      .mutation(async ({ ctx, input }) => {
+        const r = await forgotPassword(deps, input.email);
+        ctx.log.info({ event: "auth_forgot_password" }, "Réinitialisation mot de passe demandée");
+        return r;
+      }),
 
     resetPassword: publicProcedure
       .input(z.object({ token: z.string().min(1), newPassword: z.string().min(6) }))
-      .mutation(({ input }) => resetPassword(deps, input.token, input.newPassword)),
+      .mutation(async ({ ctx, input }) => {
+        const r = await resetPassword(deps, input.token, input.newPassword);
+        ctx.log.info({ event: "auth_reset_password" }, "Mot de passe réinitialisé");
+        return r;
+      }),
   });
 }
