@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useLocation } from "@/shared/router/navigation";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/shared/ui/button";
@@ -14,10 +13,6 @@ export default function PaiementSuccesPage() {
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
   const token = params.get("token");
-
-  useEffect(() => {
-    console.log("Payment success - Session:", sessionId, "Token:", token);
-  }, [sessionId, token]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center p-4">
