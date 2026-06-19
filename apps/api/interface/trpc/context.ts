@@ -61,6 +61,10 @@ export function makeCreateContext(deps: ContextDeps = {}) {
     const headers = (opts.req.headers ?? {}) as Record<string, unknown>;
     const clientIp = extractClientIp(headers, opts.req.ip ?? null);
     const userAgent = extractUserAgent(headers);
-    return { claims, tenant, role, permissions, res: opts.res, log: opts.req.log, clientIp, userAgent };
+    /** Bind userId + artisanId so every ctx.log call porte l'identité sans la passer manuellement. */
+    const log = claims
+      ? opts.req.log.child({ userId: claims.userId, ...(tenant ? { artisanId: tenant.artisanId } : {}) })
+      : opts.req.log;
+    return { claims, tenant, role, permissions, res: opts.res, log, clientIp, userAgent };
   };
 }
