@@ -459,3 +459,9 @@ subscription/domain (subscriptionEmail, extraPriceId) · rdv-en-ligne/read (list
 - `2026-06-18 10:19:45Z` **[front-v2]** Dashboard 18/18 widgets re-portés ✅ (~55%) — OPE-403 — Bloc dashboard TERMINÉ: 18 widgets + components/dashboard/ supprimé. Dashboard validé 0 erreur. Reste 6 standalone + wouter + @/lib/trpc. ETA ~8 itér.
 - `2026-06-18 11:58:45Z` **[front-v2]** Modern 100% sans wouter ✅ (~90%) — OPE-403 — Shim navigation validé, 26 fichiers modern migrés de wouter. Nav OK (0 régression, 0 erreur). Reste App.tsx routeur d'entrée. ETA ~2 itér.
 - `2026-06-18 12:15:06Z` **[front-v2]** wouter éliminé ✅ — routage 100% modern, sweep 153/0 — OPE-403 — wouter retiré (0 import). App.tsx = dispatch impératif shim. Validé: redirections, login, nav, sweep 153/0, 0 erreur. Reste: dep package.json + doc.
+- `2026-06-19 07:49:02Z` **[billing-p0]** Billing Phase 0 — iter 1/5 ✅ — schéma v2 : 9 tables Drizzle commitées (6fad058b) — pnpm check OK
+- `2026-06-19 07:56:00Z` **[billing-p0]** Billing Phase 0 — iter 2/5 ✅ — migrations 0005 (auto) + 0006 (custom extras) + règle drizzle-kit dans CLAUDE.md (f075749b)
+- `2026-06-19 07:57:39Z` **[billing-p0]** Billing Phase 0 — iter 3/5 ✅ — domain types plan/cycle/subscription-maison (5a894e14)
+- `2026-06-19 07:59:18Z` **[billing-p0]** Billing Phase 0 — iter 4/5 ✅ — BillingPort + FakeBillingPort + retrievePaymentIntent (f3612657)
+- `2026-06-19 07:59:56Z` **[billing-p0]** Billing Phase 0 — TERMINÉ ✅ (5/5) — 4 commits, 9 tables Drizzle, 2 migrations, domain types, BillingPort — bilan posté sur OPE-308
+- `2026-06-19 08:11:51Z` **[billing-p1]** Billing Phase 1 ✅ — IBillingRepository + use cases (SetupIntent/confirmPM) + tRPC router /billing.* + wiring app.ts (0344fc4d)

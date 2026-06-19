@@ -76,7 +76,9 @@
       "Bash(__NEW_LINE_2c3a87681ce55d1b__ echo \"\")",
       "Bash(__NEW_LINE_8a13d4f24db50689__ echo \"\")",
       "Bash(__NEW_LINE_4ccc6a0b28f25752__ echo \"=== 2.1 dashboard.getStats ===\")",
-      "Bash(DATABASE_URL=\"mysql://root:KreQrjvAkJHYglzfyEFAioeZFTPsaswy@nozomi.proxy.rlwy.net:12684/railway\" node:*)"
+      "Bash(DATABASE_URL=\"mysql://root:KreQrjvAkJHYglzfyEFAioeZFTPsaswy@nozomi.proxy.rlwy.net:12684/railway\" node:*)",
+      "Bash(ls -la pnpm-workspace.yaml)",
+      "Bash(cat pnpm-workspace.yaml)"
     ]
   }
 }
