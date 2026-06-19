@@ -11,7 +11,6 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "gen:api": "openapi-typescript openapi/operioz.openapi.json -o apps/web/src/shared/api/schema.d.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
@@ -123,7 +122,6 @@
     "esbuild": "^0.25.0",
     "eslint": "^10.5.0",
     "eslint-plugin-i18next": "^6.1.4",
-    "openapi-typescript": "^7.13.0",
     "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",

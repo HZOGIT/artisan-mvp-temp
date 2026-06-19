@@ -152,7 +152,6 @@ import { registerPaiementRoute } from "./interface/http/paiement-route";
 import { PortalPaymentReaderDrizzle } from "./modules/paiement/infra/portal-payment-reader-drizzle";
 import { PortalPaymentWriterDrizzle } from "./modules/paiement/infra/portal-payment-writer-drizzle";
 import { registerArticlesSearchRoute } from "./interface/http/articles-search-route";
-import { registerClientsRestRoute } from "./interface/http/rest/clients-rest-route";
 import { PublicArticleSearchReaderDrizzle } from "./modules/articles/infra/public-article-search-drizzle";
 import { registerAssistantAgentRoute } from "./interface/http/assistant-agent-route";
 import { registerVoiceToolRoute } from "./interface/http/voice-tool-route";
@@ -823,14 +822,6 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   registerArticlesSearchRoute(app, {
     reader: new PublicArticleSearchReaderDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
-  });
-
-  // PoC OPE-366 (façade REST clients, front moderne via openapi-typescript) : auth cookie JWT + tenant
-  // résolu, repo Drizzle partagé. Mêmes use-cases que le routeur tRPC `clients` (aucune logique dupliquée).
-  registerClientsRestRoute(app, {
-    jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
-    resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
-    repo: clientRepo,
   });
 
   // §4 HORS-tRPC : chat assistant en STREAMING SSE — mode AGENTIQUE (function-calling, 12 lectures +
