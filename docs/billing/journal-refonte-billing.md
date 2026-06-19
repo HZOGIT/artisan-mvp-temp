@@ -73,6 +73,18 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 8 — 2026-06-19
+**Source :** recherche web sur edge cases billing/Stripe (dunning, expiry, boundary conditions)
+**Cible :** L1 use-cases + domaine — chemins non couverts identifiés par la recherche
+**Cas ajoutés (5) :**
+- `setDefaultPaymentMethod` avec sub → `payment_method_id` mis à jour (chemin `if(sub)` jamais testé)
+- `setDefaultPaymentMethod` sans sub → guard `if(sub)` = no-op (subscription reste null)
+- `setDefaultPaymentMethod` trace événement `payment_method.set_default` avec `last4` (jamais testé)
+- `isDue` `nextRetryAt` exactement égal à `now` → true (borne `>=`, pas strictement `>`)
+- `nextCycleAmount` `past_due` → montant du plan (scheduler doit retenter, pas 0)
+**Résultat :** 58/58 ✅ (L1 26 tests + domaine 32 tests, sans DB)
+**Total billing :** 81 tests (76 → 81)
+
 ### Itération 7 — 2026-06-19 — BOUCLE TERMINÉE
 **Aucun nouveau test ajouté.** Tous les cas testables sans Phase 2 ni billingPort override sont couverts.
 **Bilan final : 76 tests, 4 fichiers, tous verts.**

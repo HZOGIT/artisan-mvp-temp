@@ -122,6 +122,11 @@ describe("isDue", () => {
   it("false si failed sans nextRetryAt (abandon définitif)", () => {
     expect(isDue(baseCycle({ status: "failed", nextRetryAt: null }), new Date())).toBe(false);
   });
+
+  it("true si nextRetryAt EXACTEMENT égal à now (borne >=, pas strictement >)", () => {
+    const exactlyNow = new Date("2026-06-01T12:00:00.000Z");
+    expect(isDue(baseCycle({ status: "failed", nextRetryAt: exactlyNow }), exactlyNow)).toBe(true);
+  });
 });
 
 describe("nextRetryAt — plan de dunning J+0/J+1/J+3/J+7", () => {
@@ -218,5 +223,9 @@ describe("nextCycleAmount", () => {
     const yearly = nextCycleAmount(baseSub(), pro, "yearly");
     const monthly12 = nextCycleAmount(baseSub(), pro, "monthly") * 12;
     expect(yearly).toBeLessThanOrEqual(monthly12);
+  });
+
+  it("montant du plan si past_due (paiement en retard — scheduler doit retenter, pas annuler)", () => {
+    expect(nextCycleAmount(baseSub({ status: "past_due" }), pro, "monthly")).toBe(pro.amountCentsByInterval.monthly);
   });
 });

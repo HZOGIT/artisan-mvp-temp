@@ -165,6 +165,50 @@ describe("setDefaultPaymentMethod", () => {
     const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_x", stripeCustomerId: "cus_test", setAsDefault: false, consentedAt: new Date() });
     await expect(setDefaultPaymentMethod(deps, B, pm.id)).rejects.toBeInstanceOf(NotFoundError);
   });
+
+  it("met à jour subscription.payment_method_id quand une sub existe", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_sub_link", stripeCustomerId: "cus_test",
+      setAsDefault: false, consentedAt: new Date(),
+    });
+
+    await setDefaultPaymentMethod(deps, A, pm.id);
+
+    expect((await deps.repo.findSubscription(A))?.payment_method_id).toBe(pm.id);
+  });
+
+  it("sans subscription → payment_method_id ignoré (guard if(sub))", async () => {
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_no_sub", stripeCustomerId: "cus_test",
+      setAsDefault: false, consentedAt: new Date(),
+    });
+
+    await setDefaultPaymentMethod(deps, A, pm.id);
+
+    expect(await deps.repo.findSubscription(A)).toBeNull();
+  });
+
+  it("trace un événement payment_method.set_default avec last4", async () => {
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_evt", stripeCustomerId: "cus_test",
+      setAsDefault: false, consentedAt: new Date(),
+    });
+
+    await setDefaultPaymentMethod(deps, A, pm.id);
+
+    const ev = deps.repo.events.find(e => e.event_type === "payment_method.set_default");
+    expect(ev).toBeDefined();
+    expect(ev?.entity_id).toBe(pm.id);
+    expect(ev?.payload).toMatchObject({ last4: pm.last4 });
+  });
 });
 
 // ── getBillingInfo ────────────────────────────────────────────────────────────
