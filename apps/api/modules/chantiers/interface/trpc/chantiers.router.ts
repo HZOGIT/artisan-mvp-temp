@@ -78,19 +78,29 @@ export function createChantiersRouter(repo: IChantierRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerChantier(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerChantier(repo, ctx.tenant, input);
+        ctx.log.info({ event: "chantier_created", chantierId: result.id, clientId: input.clientId ?? null, statut: input.statut ?? "planifie" }, "Chantier créé");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierChantier(repo, ctx.tenant, id, data);
+        const result = await modifierChantier(repo, ctx.tenant, id, data);
+        if (data.statut) {
+          const level = data.statut === "annule" ? "warn" : "info";
+          ctx.log[level]({ event: "chantier_statut_changed", chantierId: id, newStatut: data.statut }, `Chantier statut → ${data.statut}`);
+        }
+        return result;
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerChantier(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "chantier_deleted", chantierId: input.id }, "Chantier supprimé");
         return { success: true };
       }),
 
