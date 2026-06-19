@@ -1234,5 +1234,5 @@ deploy-pages si bundle change + vérif navigateur + ntfy. Ordre safe→risqué :
 - [x] LOT B (a5b85220) : shared/ → packages/contract (@shared alias front, 2 fichiers backend, Dockerfile). Smoke + sweep 61/0 OK.
 - [x] LOT C (76b48133) : src/ → apps/api (1287 fic, codemod, drizzle/contract/functions +1 ../, configs+AppRouter). Smoke + sweep 61/0 OK.
 - [x] LOT D (0c04e06a) : client/ → apps/web (codemod, vite root/aliases/index.html, AppRouter +1 ../, fix latent @shared vitest). vite build + vitest.client 457 + sweep 61/0 OK.
-- [~] LOT E : functions/ → infra/edge BLOQUÉ — wrangler auto-détecte functions/ au CWD du deploy (pas de wrangler.toml override), proxy [[path]].js load-bearing. Décision : functions/ RESTE à la racine (convention Pages). Cleanup séparé possible : dispatch.mjs MORT (proxy ne l'importe pas) + REST PoC (openapi/clients-rest-route/migrated-*) inutilisés.
+- [x] LOT E (d3e20280) option A : functions/api/[[path]].js proxy gardé racine (convention Pages) ; jeté le mort : PoC REST (clients-rest-route/openapi/gen:api), dispatch.mjs, migrated-routes, edge-dispatch.test, STAGING_NEW_STACK. Gardé MIGRATED_DOMAINS (garde-fou). Smoke OK.
 - Mutations sweep clients.update : sélecteur carte périmé PRÉ-EXISTANT (OPE-421), pas le reorg (composant juste déplacé R100).
