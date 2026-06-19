@@ -13,6 +13,6 @@ export default tseslint.config({
     "no-warning-comments": ["error", { terms: ["TODO", "FIXME", "HACK", "XXX"], location: "anywhere" }],
     "local/comments-jsdoc-only": "error",
     "multiline-comment-style": ["error", "starred-block"],
-    "no-console": ["warn", { allow: ["warn", "error"] }],
+    "no-console": ["error", { allow: ["warn", "error"] }],
   },
 });
