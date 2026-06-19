@@ -97,6 +97,21 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     expect(data.paymentMethods).toEqual([]);
   });
 
+  it("getBillingInfo shape complète : recentInvoices présent dans la réponse HTTP", async () => {
+    // recentInvoices n'était jamais vérifié à L3 — seuls subscription et paymentMethods l'étaient.
+    // Ce test garantit que la sérialisation superjson inclut bien le champ dans la réponse.
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "GET", "billing.getBillingInfo", undefined, tok);
+    expect(res.statusCode).toBe(200);
+    const data = res.json().result.data as {
+      subscription: unknown;
+      paymentMethods: unknown[];
+      recentInvoices: unknown[];
+    };
+    expect(Array.isArray(data.recentInvoices)).toBe(true);
+    expect(data.recentInvoices).toHaveLength(0);
+  });
+
   it("validations Zod → 400 (schémas respectés avant d'atteindre le use-case)", async () => {
     const tok = await jwt(UID);
     // paymentMethodId doit être entier positif strict (> 0)

@@ -73,6 +73,14 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 17 — 2026-06-19
+**Cible :** L2 (1 test) + L3 (1 test) — ordering et shape HTTP non assertés
+**Cas ajoutés (2) :**
+- L2 : `findInvoicesByArtisan` ORDER BY `created_at` DESC explicitement vérifié — le test existant se nommait "triées par date desc" mais n'assertait que `artisan_id` et `length` ; insert avec `created_at = NOW()-2 days` pour garantir une facture positionnée en dernier (note : `status='draft'` requis — contrainte `chk_number_finalized`)
+- L3 : `getBillingInfo` shape complète → `recentInvoices` présent dans la réponse HTTP — ni `recentInvoices` ni `plan` n'étaient vérifiés au niveau HTTP ; test détecterait une régression de sérialisation superjson
+**Résultat :** L2 23/23 ✅ · L3 9/9 ✅
+**Total billing :** 102 tests (100 → 102)
+
 ### Itération 16 — 2026-06-19
 **Cible :** L1 (2 tests) + Domaine (1 test) — shape incomplète des résultats
 **Cas ajoutés (3) :**

@@ -348,6 +348,27 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(limited.length).toBe(1);
   });
 
+  it("findInvoicesByArtisan : triées par created_at DESC — la plus récente d'abord", async () => {
+    // Les tests précédents ont déjà inséré des factures pour A via NOW().
+    // On insère une facture explicitement datée d'il y a 2 jours pour garantir qu'elle apparaît APRÈS.
+    await admin.query(
+      `insert into billing_invoices
+         (artisan_id, type, status, subtotal_cents, tax_cents, total_cents, currency, created_at)
+       values ($1, 'subscription', 'draft', 500, 0, 500, 'eur', NOW() - INTERVAL '2 days')`,
+      [A],
+    );
+    const invoices = await repo.findInvoicesByArtisan(ctx(A));
+    // Toutes les factures de A doivent être triées DESC : chaque date >= celle qui suit
+    for (let i = 0; i < invoices.length - 1; i++) {
+      const curr = new Date(invoices[i]!.created_at).getTime();
+      const next = new Date(invoices[i + 1]!.created_at).getTime();
+      expect(curr).toBeGreaterThanOrEqual(next);
+    }
+    // La plus ancienne (500 cts insérée il y a 2 jours) est en dernier
+    const oldest = invoices.at(-1)!;
+    expect(oldest.total_cents).toBe(500);
+  });
+
   // ── Stripe customer ID ────────────────────────────────────────────────────
 
   it("findStripeCustomerId : retourne le customer ID du PM le plus récent (saveStripeCustomerId est no-op)", async () => {
