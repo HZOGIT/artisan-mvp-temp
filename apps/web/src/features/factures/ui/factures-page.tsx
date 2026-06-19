@@ -24,7 +24,7 @@ import { Badge } from "@/shared/ui/badge";
 import { StatutBadge } from "@/shared/ui/statut-badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { exportToCsv, csvDateSuffix } from "@/shared/lib/csvExport";
+import { exportToCsv, csvDateSuffix } from "@/shared/lib/csv-export";
 
 /*
  * Page Factures du FRONT NEUF (`/factures`) — clean-archi : présentation pure. Les données/mutations

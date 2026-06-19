@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/shared/ui/dialog";
 import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
-import { useIsMobile } from "@/shared/hooks/useMobile";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useChat } from "../application/use-chat";
 import { CHAT_FILTERS, filterConversations, clientLabel, formatChatDate, type ChatFilter } from "../domain/chat";
 

@@ -1,8 +1,8 @@
-import type { VoiceSession, VoiceSessionConfig, VoiceState } from '@/shared/voice/domain/VoiceSession';
-import { WebAudioCapture } from './WebAudioCapture';
-import { WebAudioOutput } from './WebAudioOutput';
-import { vlog } from './voiceDebug';
-import { closeSharedAudioContext } from './sharedAudioContext';
+import type { VoiceSession, VoiceSessionConfig, VoiceState } from '@/shared/voice/domain/voice-session';
+import { WebAudioCapture } from './web-audio-capture';
+import { WebAudioOutput } from './web-audio-output';
+import { vlog } from './voice-debug';
+import { closeSharedAudioContext } from './shared-audio-context';
 import { BACKEND_URL } from '@/shared/backend-url';
 
 export class GeminiLiveVoiceSession implements VoiceSession {

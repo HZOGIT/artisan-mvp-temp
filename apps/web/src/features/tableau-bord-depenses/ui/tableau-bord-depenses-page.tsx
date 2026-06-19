@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Badge } from "@/shared/ui/badge";
-import { generateRapportDepensesPDF } from "@/shared/lib/generateRapportDepensesPDF";
+import { generateRapportDepensesPDF } from "@/shared/lib/generate-rapport-depenses-pdf";
 import { useTableauBordDepenses } from "../application/use-tableau-bord-depenses";
 import { eur, donutData, barData, alertesBudget, totalBudget, pctBudget, projection } from "../domain/tableau-bord-depenses";
 

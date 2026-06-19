@@ -93,6 +93,7 @@ function BreadcrumbEllipsis({
       {...props}
     >
       <MoreHorizontal className="size-4" />
+      {/* eslint-disable-next-line i18next/no-literal-string */}
       <span className="sr-only">More</span>
     </span>
   );

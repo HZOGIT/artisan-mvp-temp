@@ -18,7 +18,7 @@ import {
 } from "../domain/signature";
 import { Loader2, Check, Building2, User, Pen, AlertCircle, Download, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { generateDevisPDF } from "@/shared/lib/pdfGenerator";
+import { generateDevisPDF } from "@/shared/lib/pdf-generator";
 
 /*
  * Page PUBLIQUE de signature de devis du FRONT NEUF (`/signature/:token`) — clean-archi : présentation

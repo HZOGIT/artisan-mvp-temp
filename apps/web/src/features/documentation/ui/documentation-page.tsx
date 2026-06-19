@@ -5,7 +5,7 @@ import { Input } from "@/shared/ui/input";
 import { Button } from "@/shared/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/shared/ui/accordion";
 import { Search, Download, LayoutDashboard, Users, FileText, Receipt, Wrench, ShoppingCart, Package, Sparkles, Globe, Lightbulb, CheckCircle, ArrowRight, BookOpen } from "lucide-react";
-import { generateGuidePDF } from "@/shared/lib/generateGuidePDF";
+import { generateGuidePDF } from "@/shared/lib/generate-guide-pdf";
 import { DOC_SECTIONS, filterSections } from "../domain/documentation-content";
 
 /*

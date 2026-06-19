@@ -1,6 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import commonFr from "./common/fr.json";
+import errorBoundaryFr from "./error-boundary/fr.json";
 import clientsFr from "@/features/clients/i18n/fr.json";
 import notificationsFr from "@/features/notifications/i18n/fr.json";
 import techniciensFr from "@/features/techniciens/i18n/fr.json";
@@ -95,6 +96,7 @@ import vitrinePublicFr from "@/features/vitrine-public/i18n/fr.json";
 const resources = {
   fr: {
     common: commonFr,
+    errorBoundary: errorBoundaryFr,
     clients: clientsFr,
     notifications: notificationsFr,
     techniciens: techniciensFr,

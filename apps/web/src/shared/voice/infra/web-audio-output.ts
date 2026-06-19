@@ -1,5 +1,5 @@
-import type { AudioOutput } from '@/shared/voice/domain/AudioOutput';
-import { resumeSharedAudioContext } from './sharedAudioContext';
+import type { AudioOutput } from '@/shared/voice/domain/audio-output';
+import { resumeSharedAudioContext } from './shared-audio-context';
 
 /** native-audio Live models output 24 kHz PCM16 */
 const MODEL_RATE = 24000;

@@ -11,7 +11,7 @@ import { Plus, Search, Phone, Mail, MapPin, MoreHorizontal, Pencil, Trash2, Down
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { toast } from "sonner";
 import { matchSearch } from "@/shared/lib/normalize";
-import { exportToCsv, csvDateSuffix } from "@/shared/lib/csvExport";
+import { exportToCsv, csvDateSuffix } from "@/shared/lib/csv-export";
 
 /*
  * Page Clients du FRONT NEUF (`/clients`) — clean-archi : la couche UI (présentation) consomme le

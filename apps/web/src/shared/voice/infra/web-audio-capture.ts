@@ -1,6 +1,6 @@
-import type { AudioCapture, AudioCaptureConfig } from '@/shared/voice/domain/AudioCapture';
-import { vlog } from './voiceDebug';
-import { resumeSharedAudioContext } from './sharedAudioContext';
+import type { AudioCapture, AudioCaptureConfig } from '@/shared/voice/domain/audio-capture';
+import { vlog } from './voice-debug';
+import { resumeSharedAudioContext } from './shared-audio-context';
 
 export class WebAudioCapture implements AudioCapture {
   private _ctx: AudioContext | null = null;

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { VoiceState } from '@/shared/voice/domain/VoiceSession';
-import { GeminiLiveVoiceSession } from '@/shared/voice/infra/GeminiLiveVoiceSession';
-import { vlog } from '@/shared/voice/infra/voiceDebug';
+import type { VoiceState } from '@/shared/voice/domain/voice-session';
+import { GeminiLiveVoiceSession } from '@/shared/voice/infra/gemini-live-voice-session';
+import { vlog } from '@/shared/voice/infra/voice-debug';
 import { BACKEND_URL } from '@/shared/backend-url';
 
 export interface UseVoiceSessionOptions {

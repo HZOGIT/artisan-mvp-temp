@@ -77,6 +77,7 @@ function PaginationPrevious({
       {...props}
     >
       <ChevronLeftIcon />
+      {/* eslint-disable-next-line i18next/no-literal-string */}
       <span className="hidden sm:block">Previous</span>
     </PaginationLink>
   );
@@ -93,6 +94,7 @@ function PaginationNext({
       className={cn("gap-1 px-2.5 sm:pr-2.5", className)}
       {...props}
     >
+      {/* eslint-disable-next-line i18next/no-literal-string */}
       <span className="hidden sm:block">Next</span>
       <ChevronRightIcon />
     </PaginationLink>
@@ -111,6 +113,7 @@ function PaginationEllipsis({
       {...props}
     >
       <MoreHorizontalIcon className="size-4" />
+      {/* eslint-disable-next-line i18next/no-literal-string */}
       <span className="sr-only">More pages</span>
     </span>
   );

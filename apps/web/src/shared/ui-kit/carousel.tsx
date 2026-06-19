@@ -194,6 +194,7 @@ function CarouselPrevious({
       {...props}
     >
       <ArrowLeft />
+      {/* eslint-disable-next-line i18next/no-literal-string */}
       <span className="sr-only">Previous slide</span>
     </Button>
   );
@@ -224,6 +225,7 @@ function CarouselNext({
       {...props}
     >
       <ArrowRight />
+      {/* eslint-disable-next-line i18next/no-literal-string */}
       <span className="sr-only">Next slide</span>
     </Button>
   );
