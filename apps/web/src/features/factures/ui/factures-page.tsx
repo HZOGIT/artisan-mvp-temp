@@ -73,14 +73,27 @@ export default function FacturesPage() {
       return;
     }
     createMutation.mutate(
-      { clientId: parseInt(selectedClientId), ...formData },
+      {
+        clientId: parseInt(selectedClientId),
+        ...formData,
+        dateEcheance: formData.dateEcheance || null,
+      },
       {
         onSuccess: (data) => {
           setIsCreateDialogOpen(false);
           toast.success(t("toastCreated"));
           setLocation(`/factures/${data.id}`);
         },
-        onError: () => toast.error(t("toastCreateError")),
+        onError: (error) => {
+          let msg = t("toastCreateError");
+          try {
+            const issues = JSON.parse(error.message) as { path: string[]; message: string }[];
+            if (Array.isArray(issues) && issues.length > 0) {
+              msg = issues.map((i) => i.message).join(" — ");
+            }
+          } catch { /* message non-JSON */ }
+          toast.error(msg);
+        },
       },
     );
   };
