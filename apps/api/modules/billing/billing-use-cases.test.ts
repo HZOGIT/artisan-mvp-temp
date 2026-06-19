@@ -43,6 +43,14 @@ describe("createSetupIntent", () => {
     expect(result.stripeCustomerId).toBe("cus_test");
   });
 
+  it("retourne setupIntentId non vide — requis par Stripe Elements pour confirmer le SetupIntent", async () => {
+    // Le front passe setupIntentId à stripe.confirmSetup(). S'il est absent,
+    // Stripe Elements ne peut pas finaliser le flux d'enregistrement de carte.
+    const deps = makeDeps();
+    const result = await createSetupIntent(deps, A);
+    expect(result.setupIntentId).toBeTruthy();
+  });
+
   it("réutilise le customer existant sans en recréer un", async () => {
     const deps = makeDeps();
     deps.repo.customerIds.set(A.artisanId, "cus_existing");
@@ -57,6 +65,18 @@ describe("createSetupIntent", () => {
     expect(deps.repo.events).toHaveLength(1);
     expect(deps.repo.events[0]!.event_type).toBe("setup_intent.created");
     expect(deps.repo.events[0]!.actor).toBe(`user:${A.userId}`);
+  });
+
+  it("payload de l'événement contient setupIntentId et stripeCustomerId (recovery zombie + audit)", async () => {
+    // En cas de zombie cycle (setup perdu entre createSetupIntent et confirmPaymentMethod),
+    // le scheduler Phase 2 retrouvera le setupIntentId dans le log d'événements pour réconcilier.
+    const deps = makeDeps();
+    const result = await createSetupIntent(deps, A);
+    const ev = deps.repo.events.find(e => e.event_type === "setup_intent.created");
+    expect(ev?.payload).toMatchObject({
+      setupIntentId: result.setupIntentId,
+      stripeCustomerId: result.stripeCustomerId,
+    });
   });
 });
 

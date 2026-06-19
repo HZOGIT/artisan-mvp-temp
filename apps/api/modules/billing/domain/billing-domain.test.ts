@@ -25,6 +25,18 @@ describe("plan — fonctions pures", () => {
     expect(p.maxUsers).toBeLessThan(e.maxUsers);
   });
 
+  it("planLimits retourne maxDevicesPerUser et maxConcurrentSessions (shape complète)", () => {
+    // planLimits retourne 3 champs, pas seulement maxUsers — vérifier la shape complète
+    // protège contre la suppression accidentelle d'un champ utilisé par le middleware d'auth.
+    const s = planLimits("starter");
+    expect(s.maxDevicesPerUser).toBeGreaterThan(0);
+    expect(s.maxConcurrentSessions).toBeGreaterThan(0);
+    // enterprise a au moins autant d'appareils et sessions que starter
+    const e = planLimits("enterprise");
+    expect(e.maxDevicesPerUser).toBeGreaterThanOrEqual(s.maxDevicesPerUser);
+    expect(e.maxConcurrentSessions).toBeGreaterThanOrEqual(s.maxConcurrentSessions);
+  });
+
   it("amountCentsByInterval : yearly < monthly × 12 (remise annuelle)", () => {
     for (const plan of Object.values(PLANS)) {
       const monthly12 = plan.amountCentsByInterval.monthly * 12;

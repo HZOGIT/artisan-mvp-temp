@@ -73,6 +73,15 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 16 — 2026-06-19
+**Cible :** L1 (2 tests) + Domaine (1 test) — shape incomplète des résultats
+**Cas ajoutés (3) :**
+- L1 : `createSetupIntent` retourne `setupIntentId` non vide — requis par Stripe Elements pour `stripe.confirmSetup()` ; le champ existait dans le type mais n'était jamais vérifié (seulement `clientSecret`)
+- L1 : payload événement `setup_intent.created` contient `setupIntentId` + `stripeCustomerId` — recovery zombie Phase 2 : le scheduler retrouvera le setupIntentId dans les événements pour réconcilier un flow interrompu
+- Domaine : `planLimits` retourne `maxDevicesPerUser` et `maxConcurrentSessions` (shape complète) — seul `maxUsers` était vérifié ; les 2 autres champs sont utilisés par le middleware d'auth sessions/appareils
+**Résultat :** L1 35/35 ✅ · Domaine 35/35 ✅
+**Total billing :** 100 tests (97 → 100)
+
 ### Itération 15 — 2026-06-19
 **Cible :** Domaine (2 cas) + L2 (1 cas)
 **Cas ajoutés (3) :**
