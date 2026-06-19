@@ -13,7 +13,6 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "pnpm run db:generate && pnpm run db:migrate",
     "lint:web": "eslint -c eslint.client.config.mjs apps/web/src",
     "lint:api": "eslint -c eslint.api.config.mjs apps/api"
   },
