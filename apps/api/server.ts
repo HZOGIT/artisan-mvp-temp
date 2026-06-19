@@ -1,3 +1,4 @@
+import v8 from "node:v8";
 import { buildApp } from "./app";
 import { getDbHandle } from "./shared/db/client";
 import { provisionDatabase, assertAppRoleExistsAndRestricted } from "./shared/db/provision-database";
@@ -14,6 +15,7 @@ async function main(): Promise<void> {
 
   await app.listen({ port, host });
 
+  const startMem = process.memoryUsage();
   app.log.info(
     {
       event: "server_start",
@@ -21,11 +23,28 @@ async function main(): Promise<void> {
       host,
       env: process.env.NODE_ENV,
       betterstack: !!process.env.BETTERSTACK_TOKEN,
+      heapUsedMb: Math.round(startMem.heapUsed / 1024 / 1024),
+      rssMb: Math.round(startMem.rss / 1024 / 1024),
     },
     "Serveur démarré",
   );
 
+  /** Check mémoire toutes les 5 min — warn si heap > 80% de la limite JVM. */
+  const memInterval = setInterval(() => {
+    const stats = v8.getHeapStatistics();
+    const heapUsedMb = Math.round(stats.used_heap_size / 1024 / 1024);
+    const heapLimitMb = Math.round(stats.heap_size_limit / 1024 / 1024);
+    const heapPercent = Math.round((stats.used_heap_size / stats.heap_size_limit) * 100);
+    if (heapPercent >= 80) {
+      app.log.warn(
+        { event: "memory_high", heapUsedMb, heapLimitMb, heapPercent },
+        `Heap élevé : ${heapUsedMb}MB / ${heapLimitMb}MB (${heapPercent}%)`,
+      );
+    }
+  }, 5 * 60 * 1000).unref();
+
   const shutdown = async (signal: string): Promise<void> => {
+    clearInterval(memInterval);
     app.log.info({ event: "server_shutdown", signal }, "Arrêt du serveur");
     await app.close();
     process.exit(0);
