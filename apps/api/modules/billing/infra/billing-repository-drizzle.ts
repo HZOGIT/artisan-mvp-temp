@@ -1,13 +1,14 @@
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and, isNull, or, lte, lt, inArray } from "drizzle-orm";
 import {
   billingPaymentMethods,
   billingSubscriptions,
   billingCycles,
+  billingChargeAttempts,
   billingInvoices,
   billingEvents,
   subscriptions,
 } from "../../../../../drizzle/schema.pg";
-import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent } from "../../../../../drizzle/schema.pg";
+import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
 import type { DbClient } from "../../../shared/db";
 import type { TenantContext } from "../../../shared/tenant";
 import type {
@@ -15,6 +16,10 @@ import type {
   SavePaymentMethodParams,
   SaveSubscriptionParams,
   CreateCycleParams,
+  UpdateCycleStatusParams,
+  CreateChargeAttemptParams,
+  UpdateChargeAttemptParams,
+  SubscriptionWithDueCycle,
   AppendEventParams,
 } from "../application/billing-repository";
 
@@ -179,6 +184,88 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row!;
   }
 
+
+  async updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void> {
+    const set: Record<string, unknown> = { status: params.status, updated_at: new Date() };
+    if (params.chargingStartedAt !== undefined) set["charging_started_at"] = params.chargingStartedAt;
+    if (params.paidAt !== undefined) set["paid_at"] = params.paidAt;
+    if (params.failedAt !== undefined) set["failed_at"] = params.failedAt;
+    if (params.nextRetryAt !== undefined) set["next_retry_at"] = params.nextRetryAt;
+    if (params.attemptCount !== undefined) set["attempt_count"] = params.attemptCount;
+    await this.db.update(billingCycles).set(set).where(eq(billingCycles.id, cycleId));
+  }
+
+  async findSubscriptionsWithDueCycles(now: Date): Promise<SubscriptionWithDueCycle[]> {
+    const dueCycles = await this.db
+      .select()
+      .from(billingCycles)
+      .where(
+        or(
+          eq(billingCycles.status, "pending"),
+          and(eq(billingCycles.status, "failed"), lte(billingCycles.next_retry_at, now)),
+        ),
+      );
+    if (dueCycles.length === 0) return [];
+
+    const subIds = Array.from(new Set(dueCycles.map(c => c.subscription_id)));
+    const subs = await this.db
+      .select()
+      .from(billingSubscriptions)
+      .where(and(inArray(billingSubscriptions.id, subIds), inArray(billingSubscriptions.status, ["active", "past_due"])));
+
+    const artisanIds = Array.from(new Set(subs.map(s => s.artisan_id)));
+    const pms = await this.db
+      .select()
+      .from(billingPaymentMethods)
+      .where(and(inArray(billingPaymentMethods.artisan_id, artisanIds), eq(billingPaymentMethods.is_default, true), isNull(billingPaymentMethods.revoked_at)));
+
+    const result: SubscriptionWithDueCycle[] = [];
+    for (const sub of subs) {
+      const cycle = dueCycles.find(c => c.subscription_id === sub.id);
+      const pm = pms.find(p => p.artisan_id === sub.artisan_id);
+      if (cycle && pm) result.push({ subscription: sub, cycle, paymentMethod: pm });
+    }
+    return result;
+  }
+
+  async findZombieCycles(now: Date): Promise<BillingCycle[]> {
+    const threshold = new Date(now.getTime() - 15 * 60 * 1000);
+    return this.db
+      .select()
+      .from(billingCycles)
+      .where(and(eq(billingCycles.status, "charging"), lt(billingCycles.charging_started_at, threshold)));
+  }
+
+  async createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt> {
+    const [row] = await this.db
+      .insert(billingChargeAttempts)
+      .values({
+        cycle_id: params.cycleId,
+        attempt_no: params.attemptNo,
+        idempotency_key: params.idempotencyKey,
+        status: "initiated",
+      })
+      .returning();
+    return row!;
+  }
+
+  async updateChargeAttempt(id: number, params: UpdateChargeAttemptParams): Promise<void> {
+    const set: Record<string, unknown> = { status: params.status, updated_at: new Date() };
+    if (params.stripePaymentIntentId !== undefined) set["stripe_payment_intent_id"] = params.stripePaymentIntentId;
+    if (params.failureCode !== undefined) set["failure_code"] = params.failureCode;
+    if (params.failureMessage !== undefined) set["failure_message"] = params.failureMessage;
+    await this.db.update(billingChargeAttempts).set(set).where(eq(billingChargeAttempts.id, id));
+  }
+
+  async findChargeAttemptByPaymentIntentId(paymentIntentId: string): Promise<BillingChargeAttempt | null> {
+    const [row] = await this.db
+      .select()
+      .from(billingChargeAttempts)
+      .where(eq(billingChargeAttempts.stripe_payment_intent_id, paymentIntentId))
+      .orderBy(desc(billingChargeAttempts.created_at))
+      .limit(1);
+    return row ?? null;
+  }
 
   async findInvoicesByArtisan(ctx: TenantContext, limit = 24): Promise<BillingInvoice[]> {
     return this.db

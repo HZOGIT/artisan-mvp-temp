@@ -147,6 +147,8 @@ import { ChatClientNotifierDrizzle } from "./modules/chat/infra/chat-client-noti
 import { registerIcalRoute } from "./interface/http/ical-route";
 import { IcalPublicReaderDrizzle } from "./modules/calendrier/infra/ical-public-reader-drizzle";
 import { registerStripeWebhookRoute } from "./interface/http/stripe-webhook-route";
+import { registerBillingSchedulerRoute } from "./interface/http/billing-scheduler-route";
+import { handleBillingWebhookEvent } from "./modules/billing/interface/http/billing-webhook-handler";
 import { SubscriptionWebhookWriterDrizzle } from "./modules/subscription/infra/subscription-webhook-writer-drizzle";
 import { WebhookPaymentWriterDrizzle } from "./modules/subscription/infra/webhook-payment-writer-drizzle";
 import { SubscriptionEventNotifierDrizzle } from "./modules/subscription/infra/subscription-event-notifier-drizzle";
@@ -948,6 +950,15 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     notifier: new SubscriptionEventNotifierDrizzle(getDbHandle().db, emailAdapter),
     webhookSecret: deps.stripeWebhookSecret ?? process.env.STRIPE_WEBHOOK_SECRET ?? "",
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
+    onBillingWebhookEvent: (eventType, piId, fc, fm) =>
+      handleBillingWebhookEvent({ repo: billingRepo }, eventType, piId, fc, fm),
+  });
+
+  /** Scheduler billing maison — `POST /internal/billing/tick` sécurisé par x-scheduler-secret. */
+  registerBillingSchedulerRoute(app, {
+    repo: billingRepo,
+    billing: new BillingAdapter(),
+    secret: process.env.SCHEDULER_SECRET ?? "",
   });
 
   /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */

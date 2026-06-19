@@ -19,6 +19,7 @@ export interface StripeWebhookDeps {
   readonly webhookSecret: string;
   readonly appUrl: string;
   readonly log?: AppLogger;
+  readonly onBillingWebhookEvent?: (eventType: string, paymentIntentId: string, failureCode?: string | null, failureMessage?: string | null) => Promise<void>;
 }
 
 /** Résultat HTTP du traitement (le routeur le mappe en réponse Fastify). `body` est sérialisé JSON. */
@@ -66,6 +67,18 @@ export async function processStripeWebhook(
       await handleCheckoutCompleted(deps, event.data.object);
     } else if (event.type === "payment_intent.payment_failed") {
       await handlePaymentFailed(deps, event.data.object);
+      if (deps.onBillingWebhookEvent) {
+        const pi = event.data.object as Record<string, unknown>;
+        const piId = typeof pi["id"] === "string" ? pi["id"] : "";
+        const lec = pi["last_payment_error"] as Record<string, unknown> | undefined;
+        await deps.onBillingWebhookEvent(event.type, piId, lec?.["code"] as string ?? null, lec?.["message"] as string ?? null).catch(() => {});
+      }
+    } else if (event.type === "payment_intent.succeeded") {
+      if (deps.onBillingWebhookEvent) {
+        const pi = event.data.object as Record<string, unknown>;
+        const piId = typeof pi["id"] === "string" ? pi["id"] : "";
+        await deps.onBillingWebhookEvent(event.type, piId).catch(() => {});
+      }
     } else if (event.type === "invoice.payment_succeeded") {
       await handleInvoicePaid(deps, event.data.object);
     } else if (event.type === "invoice.payment_failed") {

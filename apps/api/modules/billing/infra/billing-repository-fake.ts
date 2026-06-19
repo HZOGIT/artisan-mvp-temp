@@ -3,6 +3,10 @@ import type {
   SavePaymentMethodParams,
   SaveSubscriptionParams,
   CreateCycleParams,
+  UpdateCycleStatusParams,
+  CreateChargeAttemptParams,
+  UpdateChargeAttemptParams,
+  SubscriptionWithDueCycle,
   AppendEventParams,
 } from "../application/billing-repository";
 import type {
@@ -11,8 +15,10 @@ import type {
   BillingCycle,
   BillingInvoice,
   BillingEvent,
+  BillingChargeAttempt,
 } from "../../../../../drizzle/schema.pg";
 import type { TenantContext } from "../../../shared/tenant";
+import { isDue, isZombie } from "../domain/billing-cycle";
 
 type PM = BillingPaymentMethod;
 type Sub = BillingSubscription;
@@ -25,6 +31,7 @@ export class FakeBillingRepository implements IBillingRepository {
   public pms: PM[] = [];
   public subs: Sub[] = [];
   public cycles: Cycle[] = [];
+  public chargeAttempts: BillingChargeAttempt[] = [];
   public invoices: BillingInvoice[] = [];
   public events: BillingEvent[] = [];
   public customerIds: Map<number, string> = new Map();
@@ -158,6 +165,70 @@ export class FakeBillingRepository implements IBillingRepository {
     return cycle;
   }
 
+  async updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void> {
+    this.cycles = this.cycles.map(c => {
+      if (c.id !== cycleId) return c;
+      return {
+        ...c,
+        status: params.status,
+        charging_started_at: params.chargingStartedAt !== undefined ? params.chargingStartedAt : c.charging_started_at,
+        paid_at: params.paidAt !== undefined ? params.paidAt : c.paid_at,
+        failed_at: params.failedAt !== undefined ? params.failedAt : c.failed_at,
+        next_retry_at: params.nextRetryAt !== undefined ? params.nextRetryAt : c.next_retry_at,
+        attempt_count: params.attemptCount !== undefined ? params.attemptCount : c.attempt_count,
+        updated_at: this.now(),
+      };
+    });
+  }
+
+  async findSubscriptionsWithDueCycles(now: Date): Promise<SubscriptionWithDueCycle[]> {
+    const result: SubscriptionWithDueCycle[] = [];
+    for (const sub of this.subs) {
+      if (sub.status !== "active" && sub.status !== "past_due") continue;
+      const cycle = this.cycles.find(c => c.subscription_id === sub.id && isDue(c as never, now));
+      if (!cycle) continue;
+      const pm = this.pms.find(p => p.artisan_id === sub.artisan_id && p.is_default && !p.revoked_at);
+      if (!pm) continue;
+      result.push({ subscription: sub, cycle, paymentMethod: pm });
+    }
+    return result;
+  }
+
+  async findZombieCycles(now: Date): Promise<Cycle[]> {
+    return this.cycles.filter(c => isZombie(c as never, now));
+  }
+
+  async createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt> {
+    const attempt: BillingChargeAttempt = {
+      id: nextId(),
+      cycle_id: params.cycleId,
+      attempt_no: params.attemptNo,
+      idempotency_key: params.idempotencyKey,
+      stripe_payment_intent_id: null,
+      status: "initiated",
+      failure_code: null,
+      failure_message: null,
+      created_at: this.now(),
+      updated_at: this.now(),
+    };
+    this.chargeAttempts.push(attempt);
+    return attempt;
+  }
+
+  async updateChargeAttempt(id: number, params: UpdateChargeAttemptParams): Promise<void> {
+    this.chargeAttempts = this.chargeAttempts.map(a => {
+      if (a.id !== id) return a;
+      return {
+        ...a,
+        status: params.status,
+        stripe_payment_intent_id: params.stripePaymentIntentId !== undefined ? params.stripePaymentIntentId : a.stripe_payment_intent_id,
+        failure_code: params.failureCode !== undefined ? params.failureCode : a.failure_code,
+        failure_message: params.failureMessage !== undefined ? params.failureMessage : a.failure_message,
+        updated_at: this.now(),
+      };
+    });
+  }
+
   async findInvoicesByArtisan(ctx: TenantContext, limit = 12): Promise<BillingInvoice[]> {
     return this.invoices.filter(i => i.artisan_id === ctx.artisanId).slice(0, limit);
   }
@@ -174,6 +245,10 @@ export class FakeBillingRepository implements IBillingRepository {
     };
     this.events.push(ev);
     return ev;
+  }
+
+  async findChargeAttemptByPaymentIntentId(paymentIntentId: string): Promise<BillingChargeAttempt | null> {
+    return this.chargeAttempts.findLast(a => a.stripe_payment_intent_id === paymentIntentId) ?? null;
   }
 
   async findStripeCustomerId(artisanId: number): Promise<string | null> {

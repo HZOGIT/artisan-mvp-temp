@@ -1,5 +1,5 @@
 import type { TenantContext } from "../../../shared/tenant";
-import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent } from "../../../../../drizzle/schema.pg";
+import type { BillingPaymentMethod, BillingSubscription, BillingCycle, BillingInvoice, BillingEvent, BillingChargeAttempt } from "../../../../../drizzle/schema.pg";
 
 export interface SavePaymentMethodParams {
   readonly artisanId: number;
@@ -31,6 +31,34 @@ export interface CreateCycleParams {
   readonly currency: string;
 }
 
+export interface UpdateCycleStatusParams {
+  readonly status: string;
+  readonly chargingStartedAt?: Date;
+  readonly paidAt?: Date | null;
+  readonly failedAt?: Date | null;
+  readonly nextRetryAt?: Date | null;
+  readonly attemptCount?: number;
+}
+
+export interface CreateChargeAttemptParams {
+  readonly cycleId: number;
+  readonly attemptNo: number;
+  readonly idempotencyKey: string;
+}
+
+export interface UpdateChargeAttemptParams {
+  readonly stripePaymentIntentId?: string;
+  readonly status: string;
+  readonly failureCode?: string | null;
+  readonly failureMessage?: string | null;
+}
+
+export interface SubscriptionWithDueCycle {
+  readonly subscription: BillingSubscription;
+  readonly cycle: BillingCycle;
+  readonly paymentMethod: BillingPaymentMethod;
+}
+
 export interface AppendEventParams {
   readonly entityType: string;
   readonly entityId: number;
@@ -59,6 +87,14 @@ export interface IBillingRepository {
   /** Cycles */
   findPendingCycle(subscriptionId: number): Promise<BillingCycle | null>;
   createCycle(params: CreateCycleParams): Promise<BillingCycle>;
+  updateCycleStatus(cycleId: number, params: UpdateCycleStatusParams): Promise<void>;
+  findSubscriptionsWithDueCycles(now: Date): Promise<SubscriptionWithDueCycle[]>;
+  findZombieCycles(now: Date): Promise<BillingCycle[]>;
+
+  /** Tentatives de prélèvement */
+  createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt>;
+  updateChargeAttempt(id: number, params: UpdateChargeAttemptParams): Promise<void>;
+  findChargeAttemptByPaymentIntentId(paymentIntentId: string): Promise<BillingChargeAttempt | null>;
 
   /** Factures */
   findInvoicesByArtisan(ctx: TenantContext, limit?: number): Promise<BillingInvoice[]>;
