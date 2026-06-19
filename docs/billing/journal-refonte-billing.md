@@ -73,6 +73,20 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 7 — 2026-06-19 — BOUCLE TERMINÉE
+**Aucun nouveau test ajouté.** Tous les cas testables sans Phase 2 ni billingPort override sont couverts.
+**Bilan final : 76 tests, 4 fichiers, tous verts.**
+| Couche | Fichier | Tests |
+|--------|---------|-------|
+| Domaine | `billing-domain.test.ts` | 30 |
+| L1 use-cases | `billing-use-cases.test.ts` | 23 |
+| L2 Drizzle | `billing-repository-drizzle.test.ts` | 15 |
+| L3 router | `billing.router.test.ts` | 8 |
+**Cas restants (bloqués) :**
+- `createSetupIntent 200` L3 — nécessite `billingPort` override dans `AppDeps` (`app.ts` hors scope cron) ou clé Stripe test. L1 couvre déjà la logique métier via `FakeBillingPort`.
+- `confirmPaymentMethod 200` L3 — même blocage.
+**Prochaine itération utile :** Phase 2 scheduler (chargeOffSession idempotency, dunning retry, zombie recovery) quand les fichiers seront créés.
+
 ### Itération 6 — 2026-06-19
 **Cible :** L3 — validations Zod (schéma Zod vérifié avant d'atteindre le use-case)
 **Motivation :** Pattern présent dans 8+ autres router tests du projet, absent du billing.
