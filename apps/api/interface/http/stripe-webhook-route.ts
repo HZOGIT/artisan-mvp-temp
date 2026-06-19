@@ -15,6 +15,9 @@ export function registerStripeWebhookRoute(app: FastifyInstance, deps: StripeWeb
       const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(typeof req.body === "string" ? req.body : "");
       const signature = req.headers["stripe-signature"] as string | undefined;
       const result = await processStripeWebhook(deps, { rawBody, signature });
+      if (result.http >= 400) {
+        req.log.error({ event: "stripe_webhook_error", status: result.http, body: result.body }, "Stripe webhook failed");
+      }
       return reply.code(result.http).send(result.body);
     });
   });

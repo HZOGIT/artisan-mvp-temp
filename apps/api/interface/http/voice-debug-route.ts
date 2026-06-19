@@ -22,7 +22,7 @@ export function sanitizeLogLine(v: unknown): string {
  * {ok:true}). Loggue `events[]` (max 20) ou `msg`, sanitisés. Renvoie TOUJOURS {ok:true} (best-effort).
  */
 export function registerVoiceDebugRoute(app: FastifyInstance, deps: VoiceDebugDeps): void {
-  const log = deps.log ?? ((line: string) => console.log(line));
+  const log = deps.log ?? ((line: string) => console.warn(line));
   app.post("/api/voice/debug", async (req, reply) => {
     try {
       const ip = extractClientIp((req.headers ?? {}) as Record<string, unknown>, req.ip ?? null);

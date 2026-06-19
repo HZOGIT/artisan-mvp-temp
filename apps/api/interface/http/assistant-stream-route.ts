@@ -33,7 +33,11 @@ export function registerAssistantStreamRoute(app: FastifyInstance, deps: Assista
       first = await gen.next();
     } catch (e) {
       if (e instanceof ValidationError) return reply.code(400).send({ error: e.message });
-      if (e instanceof TooManyRequestsError) return reply.code(429).send({ error: e.message });
+      if (e instanceof TooManyRequestsError) {
+        req.log.warn({ event: "ia_rate_limit", artisanId: auth.artisanId }, "IA rate limit hit");
+        return reply.code(429).send({ error: e.message });
+      }
+      req.log.error({ event: "assistant_stream_error", error: e instanceof Error ? e.message : String(e) }, "Assistant stream failed");
       return reply.code(500).send({ error: "Erreur serveur" });
     }
 

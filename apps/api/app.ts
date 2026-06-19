@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
@@ -323,7 +324,7 @@ export interface AppDeps extends ContextDeps {
   readonly tresorerieReader?: TresorerieReader;
 }
 
-/** Construit l'instance Fastify du nouveau stack : /health + tRPC monté sur /api/trpc. */
+/** Construit l'instance Fastify : /health + tRPC monté sur /api/trpc. */
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
   /*
    * ⚠️ maxParamLength : le client tRPC (`httpBatchLink`) concatène N procédures dans le segment
@@ -332,7 +333,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * reçoit un 404 sur tout le lot (dashboard widgets sans données, portail `valid` undefined →
    * « expiré »). On relève la limite pour couvrir les gros batchs (≈150 procédures).
    */
-  const app = Fastify({ logger: false, maxParamLength: 5000 });
+  const app = Fastify({ maxParamLength: 5000, logger: buildFastifyLoggerConfig() });
 
   app.register(cookie);
   app.register(cors, {
@@ -654,11 +655,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     hasher: new BcryptPasswordHasher(),
     email: deps.emailPort ?? new ResendEmailAdapter(),
   });
-  /*
-   * Comptabilité (SENSIBLE, gate `comptabilite.voir`) — LECTURES (grand-livre/balance/journal/TVA).
-   * ⚠️ Montée mais PAS encore activée (DEFAULT_ENABLED) : il manque `getFecPreview` (générateur FEC) →
-   * le trafic comptabilité reste sur le legacy tant que la parité FEC n'est pas livrée+prouvée.
-   */
+  /** Comptabilité (SENSIBLE, gate `comptabilite.voir`) — lectures grand-livre/balance/journal/TVA. */
   const comptabiliteReader = deps.comptabiliteReader ?? new ComptabiliteReaderDrizzle(getDbHandle().db);
   const comptabilite = createComptabiliteModule({ reader: comptabiliteReader });
   /*
@@ -673,11 +670,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     resetRateLimiter: deps.rateLimiter ?? new SlidingWindowRateLimiter(5, 60 * 60 * 1000),
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
-  /*
-   * Abonnement (SENSIBLE/billing) — slice LECTURE `getCurrent` (table subscriptions HORS RLS, scope
-   * explicite). MONTÉ mais PAS activé : il manque les effets Stripe (checkout/portal/cancel/reactivate)
-   * + le webhook → le trafic abonnement reste sur le legacy jusqu'à parité complète.
-   */
+  /** Abonnement (SENSIBLE/billing) — checkout, portal, webhooks Stripe. Table subscriptions HORS RLS, scope explicite. */
   const subscription = createSubscriptionModule({
     repository: deps.subscriptionRepo ?? new SubscriptionReaderDrizzle(getDbHandle().db),
     stripe: deps.stripePort ?? new StripeAdapter(),
@@ -848,21 +841,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     },
   });
 
-  /*
-   * §4 HORS-tRPC : route publique d'abonnement iCal (`/api/calendar/:token.ics`). Le jeton EST la
-   * capacité (pas de cookie). Rate-limit IP (60/min, parité legacy). Servie par le new-stack dès que
-   * le dispatcher edge route ce chemin (sinon legacy).
-   */
+  /** Route publique iCal `/api/calendar/:token.ics` — le jeton EST la capacité, rate-limit IP 60/min. */
   registerIcalRoute(app, {
     reader: new IcalPublicReaderDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(60, 60 * 1000),
   });
 
-  /*
-   * §4 HORS-tRPC : webhook Stripe SIGNÉ (`/api/stripe/webhook`, raw body). Vérif signature fail-closed
-   * (secret absent/invalide → refus) → sync `subscriptions`. NON routé vers le new-stack tant que tous
-   * les events legacy (checkout.session/invoice/…) ne sont pas portés (sinon webhooks perdus).
-   */
+  /** Webhook Stripe SIGNÉ `/api/stripe/webhook` — vérif signature fail-closed → sync `subscriptions`. */
   registerStripeWebhookRoute(app, {
     stripe: deps.stripePort ?? new StripeAdapter(),
     writer: new SubscriptionWebhookWriterDrizzle(getDbHandle().db),
@@ -872,20 +857,14 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
 
-  /*
-   * §4 HORS-tRPC : upload/suppression du logo artisan (`/api/upload-logo`, auth cookie JWT). Stocké
-   * en data-URL base64 dans `artisans.logo` (parité legacy ; pas de StoragePort).
-   */
+  /** Upload/suppression du logo artisan `/api/upload-logo` (auth cookie JWT). Stocké en data-URL base64. */
   registerUploadLogoRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
     writer: new ArtisanLogoWriterDrizzle(getDbHandle().db),
   });
 
-  /*
-   * §4 HORS-tRPC : export FEC opposable (`/api/comptabilite/fec`, auth cookie JWT). Réutilise le
-   * générateur FEC PUR déjà porté (buildFec, Σdébit=Σcrédit) — fichier texte téléchargeable.
-   */
+  /** Export FEC opposable `/api/comptabilite/fec` (auth cookie JWT) — Σdébit=Σcrédit, téléchargeable. */
   registerComptabiliteExportRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -893,7 +872,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     csvReader: new FacturesCsvReaderDrizzle(getDbHandle().db),
   });
 
-  /** §4 HORS-tRPC : statut de paiement + ouverture d'un Checkout (portail client, public par token). */
+  /** Statut de paiement + Checkout Stripe — portail client, public par token. */
   registerPaiementRoute(app, {
     reader: new PortalPaymentReaderDrizzle(getDbHandle().db),
     writer: new PortalPaymentWriterDrizzle(getDbHandle().db),
@@ -902,17 +881,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com",
   });
 
-  /** §4 HORS-tRPC : recherche publique du catalogue de référence (`/api/articles/search`, sans auth). */
+  /** Recherche publique du catalogue de référence `/api/articles/search` (sans auth). */
   registerArticlesSearchRoute(app, {
     reader: new PublicArticleSearchReaderDrizzle(getDbHandle().db),
     rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
   });
 
-  /*
-   * §4 HORS-tRPC : chat assistant en STREAMING SSE — mode AGENTIQUE (function-calling, 12 lectures +
-   * 11 écritures mappées aux use-cases migrés). MONTÉ mais PAS routé (absent de MIGRATED_ROUTES) : le
-   * legacy sert encore l'agentique tant que la parité n'est pas validée → AUCUNE régression.
-   */
+  /** Assistant agentique SSE `/api/assistant/agent` — function-calling, auth cookie + rate-limit IA. */
   const agentEmail = deps.emailPort ?? new ResendEmailAdapter();
   const agentRegistry = buildAssistantAgentRegistry(
     {
@@ -946,10 +921,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
   });
 
-  /*
-   * §4 HORS-tRPC : exécution d'UN outil de la session vocale Live (`POST /api/voice/tool`). Réutilise
-   * le MÊME registry agentique. Auth cookie + rate-limit IA. MONTÉ mais PAS routé (legacy sert encore).
-   */
+  /** Outil unitaire de la session vocale Live `POST /api/voice/tool` — réutilise le registry agentique. */
   registerVoiceToolRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -957,10 +929,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
   });
 
-  /*
-   * §4 HORS-tRPC : mint d'un token éphémère pour la session vocale Live (`POST /api/voice/token`). Setup
-   * Live déclare les MÊMES outils que le registry agentique. MONTÉ mais PAS routé (legacy sert encore).
-   */
+  /** Token éphémère Gemini Live `POST /api/voice/token` — auth cookie, déclare les mêmes outils que le registry agentique. */
   registerVoiceTokenRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -973,11 +942,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
   });
 
-  /*
-   * §4 HORS-tRPC : PDF d'un bon de commande fournisseur (`/api/commandes-fournisseurs/:id/pdf`, auth
-   * cookie). Générateur jsPDF INTERNALISÉ (`JsPdfAdapter`). MONTÉ mais PAS routé tant qu'absent de
-   * MIGRATED_ROUTES (1re des 8 routes PDF download — établit la recette).
-   */
+  /** PDF bon de commande fournisseur `/api/commandes-fournisseurs/:id/pdf` (auth cookie, jsPDF). */
   registerCommandePdfRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -987,10 +952,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  /*
-   * §4 HORS-tRPC : PDF d'un contrat de maintenance (`/api/contrats/:id/pdf`, auth cookie). MONTÉ mais
-   * PAS routé tant qu'absent de MIGRATED_ROUTES (2e des 8 routes PDF download).
-   */
+  /** PDF contrat de maintenance `/api/contrats/:id/pdf` (auth cookie, jsPDF). */
   registerContratPdfRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -1000,10 +962,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  /*
-   * §4 HORS-tRPC : bon d'intervention en PDF (`/api/interventions/:id/bon-pdf`, auth cookie). MONTÉ mais
-   * PAS routé tant qu'absent de MIGRATED_ROUTES (3e des 8 routes PDF download).
-   */
+  /** PDF bon d'intervention `/api/interventions/:id/bon-pdf` (auth cookie, jsPDF). */
   registerInterventionPdfRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
@@ -1014,10 +973,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     pdf: new JsPdfAdapter(),
   });
 
-  /*
-   * §4 HORS-tRPC PUBLIQUE : PDF d'un devis depuis le portail client (`/api/portail/:token/devis/:id/pdf`,
-   * token = capacité, rate-limit IP). MONTÉ mais PAS routé tant qu'absent de MIGRATED_ROUTES.
-   */
+  /** PDF devis portail client `/api/portail/:token/devis/:id/pdf` — token = capacité, rate-limit IP. */
   registerPortailDevisPdfRoute(app, {
     accessReader: new PortalPaymentReaderDrizzle(getDbHandle().db),
     devisReader: devisRepo,

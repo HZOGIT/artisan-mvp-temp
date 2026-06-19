@@ -19,7 +19,7 @@ export class ResendEmailAdapter implements EmailPort {
     const { to, subject, body } = message;
     if (!to || !subject || !body) throw new Error("Paramètres d'email manquants");
     if (!EMAIL_RE.test(to)) throw new Error("Adresse email invalide");
-    if (!resend) { console.log(`[Email][SIM] → ${to} | ${subject}`); return; }
+    if (!resend) { console.warn(`[Email][SIM] → ${to} | ${subject}`); return; }
     const options: Parameters<typeof resend.emails.send>[0] = {
       from: EMAIL_FROM,
       replyTo: "support@operioz.com",

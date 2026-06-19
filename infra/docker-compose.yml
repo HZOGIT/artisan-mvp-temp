@@ -46,6 +46,7 @@ services:
       # Rôle applicatif non-superuser → soumis aux policies RLS (isolation tenant).
       APP_DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
       DATABASE_URL: postgres://app_tenant:app_tenant_pw@postgres:5432/artisan_mvp
+      BETTERSTACK_TOKEN: ${BETTERSTACK_TOKEN:-}
     # JWT_SECRET (mêmes cookies que le legacy) + autres secrets via .env.staging.
     env_file:
       - ../.env.staging

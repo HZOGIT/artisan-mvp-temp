@@ -12,3 +12,5 @@ export * from "./stripe-adapter";
 export * from "./fakes";
 export * from "./adapters";
 export * from "../email/resend-email-adapter";
+export * from "./logger";
+export * from "./logger-fastify";
