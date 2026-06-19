@@ -11,6 +11,8 @@ import {
   setDefaultPaymentMethod,
   getBillingInfo,
   changePlan,
+  cancelAtPeriodEnd,
+  reactivateSubscription,
   NotFoundError,
   InvalidPlanError,
 } from "./application/billing-use-cases";
@@ -650,6 +652,103 @@ describe("changePlan", () => {
   });
 });
 
+
+describe("cancelAtPeriodEnd", () => {
+  it("sub active avec current_period_end → cancel_at = current_period_end", async () => {
+    const deps = makeDeps();
+    const periodEnd = new Date("2026-07-19T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: periodEnd,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await cancelAtPeriodEnd(deps, A);
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.cancel_at?.toISOString()).toBe(periodEnd.toISOString());
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.cancel_scheduled");
+    expect(ev).toBeDefined();
+  });
+
+  it("sub sans current_period_end → cancel_at ≈ now()", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    const before = Date.now();
+    await cancelAtPeriodEnd(deps, A);
+    const after = Date.now();
+
+    const sub = await deps.repo.findSubscription(A);
+    const cancelTs = sub?.cancel_at?.getTime() ?? 0;
+    expect(cancelTs).toBeGreaterThanOrEqual(before - 1000);
+    expect(cancelTs).toBeLessThanOrEqual(after + 1000);
+  });
+
+  it("cancel_at déjà positionné → no-op (aucun event émis)", async () => {
+    const deps = makeDeps();
+    const alreadySet = new Date("2026-07-01T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: alreadySet,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.updateCancelAt(A, alreadySet);
+
+    await cancelAtPeriodEnd(deps, A);
+
+    const events = deps.repo.events.filter(e => e.event_type === "subscription.cancel_scheduled");
+    expect(events).toHaveLength(0);
+  });
+
+  it("aucune subscription → NotFoundError", async () => {
+    const deps = makeDeps();
+    await expect(cancelAtPeriodEnd(deps, A)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("reactivateSubscription", () => {
+  it("sub avec cancel_at → cancel_at = null + event reactivated", async () => {
+    const deps = makeDeps();
+    const cancelAt = new Date("2026-07-19T00:00:00Z");
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: cancelAt,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await deps.repo.updateCancelAt(A, cancelAt);
+
+    await reactivateSubscription(deps, A);
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.cancel_at).toBeNull();
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.reactivated");
+    expect(ev).toBeDefined();
+  });
+
+  it("cancel_at déjà null → no-op (aucun event émis)", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await reactivateSubscription(deps, A);
+
+    const events = deps.repo.events.filter(e => e.event_type === "subscription.reactivated");
+    expect(events).toHaveLength(0);
+  });
+
+  it("aucune subscription → NotFoundError", async () => {
+    const deps = makeDeps();
+    await expect(reactivateSubscription(deps, A)).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
 
 describe("changements de plan — nextCycleAmount", () => {
   it("upgrade starter→pro : le montant du prochain cycle augmente", async () => {
