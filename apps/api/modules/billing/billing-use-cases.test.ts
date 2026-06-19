@@ -10,7 +10,9 @@ import {
   revokePaymentMethod,
   setDefaultPaymentMethod,
   getBillingInfo,
+  changePlan,
   NotFoundError,
+  InvalidPlanError,
 } from "./application/billing-use-cases";
 import type { TenantContext } from "../../shared/tenant";
 
@@ -596,6 +598,66 @@ describe("getBillingInfo — factures récentes", () => {
     }
     const info = await getBillingInfo(deps, A);
     expect(info.recentInvoices.length).toBeLessThanOrEqual(12);
+  });
+});
+
+// ── changePlan use-case ───────────────────────────────────────────────────────
+
+describe("changePlan", () => {
+  it("upgrade starter→pro : subscription.plan_id mis à jour + event subscription.plan_changed émis", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await changePlan(deps, A, "pro");
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.plan_id).toBe("pro");
+
+    const ev = deps.repo.events.find(e => e.event_type === "subscription.plan_changed");
+    expect(ev).toBeDefined();
+    expect(ev!.payload).toMatchObject({ from: "starter", to: "pro" });
+  });
+
+  it("downgrade pro→starter : plan_id mis à jour", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await changePlan(deps, A, "starter");
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.plan_id).toBe("starter");
+  });
+
+  it("même plan → no-op (aucun event émis)", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "pro", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    await changePlan(deps, A, "pro");
+
+    const changed = deps.repo.events.filter(e => e.event_type === "subscription.plan_changed");
+    expect(changed).toHaveLength(0);
+  });
+
+  it("plan inconnu → InvalidPlanError", async () => {
+    const deps = makeDeps();
+    await expect(changePlan(deps, A, "unknown_plan")).rejects.toBeInstanceOf(InvalidPlanError);
+  });
+
+  it("aucune subscription → NotFoundError", async () => {
+    const deps = makeDeps();
+    await expect(changePlan(deps, A, "pro")).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 

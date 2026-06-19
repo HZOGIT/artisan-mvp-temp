@@ -31,9 +31,15 @@ export function registerComptabiliteExportRoute(app: FastifyInstance, deps: Comp
     let exp;
     try {
       exp = await getFecExport(deps.reader, { artisanId: auth.artisanId, userId: auth.userId }, { dateDebut: parseDate(q.dateDebut), dateFin: parseDate(q.dateFin) });
-    } catch {
+    } catch (e) {
+      req.log.error({ event: "fec_export_error", artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération FEC");
       return reply.code(500).send({ error: "Erreur lors de la génération du FEC" });
     }
+    /** FEC = document légal DGFiP ; equilibre=false = Σdébit≠Σcrédit → échec contrôle fiscal. */
+    req.log[exp.conformite.equilibre ? "info" : "warn"](
+      { event: "fec_export_generated", artisanId: auth.artisanId, nbLignes: exp.conformite.nbLignes, equilibre: exp.conformite.equilibre },
+      exp.conformite.equilibre ? "FEC généré (équilibré)" : "FEC généré NON-ÉQUILIBRÉ — Σdébit ≠ Σcrédit",
+    );
 
     return reply
       .header("X-FEC-Equilibre", exp.conformite.equilibre ? "1" : "0")
@@ -56,9 +62,11 @@ export function registerComptabiliteExportRoute(app: FastifyInstance, deps: Comp
     let exp;
     try {
       exp = await getFacturesCsvExport(deps.csvReader, { artisanId: auth.artisanId, userId: auth.userId }, { dateDebut: parseDate(q.dateDebut), dateFin: parseDate(q.dateFin) });
-    } catch {
+    } catch (e) {
+      req.log.error({ event: "factures_csv_export_error", artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur export CSV factures");
       return reply.code(500).send({ error: "Erreur lors de l'export CSV" });
     }
+    req.log.info({ event: "factures_csv_export_generated", artisanId: auth.artisanId }, "Export CSV factures généré");
 
     return reply
       .header("Content-Type", "text/csv; charset=utf-8")

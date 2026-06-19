@@ -19,9 +19,11 @@ export function registerFacturxRoutes(app: FastifyInstance, deps: FacturxRouteDe
     if (!Number.isInteger(id) || id <= 0) return reply.code(400).send({ error: "id invalide" });
     try {
       const { xml, filename } = await getFacturxXml(deps, { artisanId: auth.artisanId, userId: auth.userId }, id);
+      req.log.info({ event: "facturx_xml_generated", factureId: id, artisanId: auth.artisanId }, "Factur-X XML généré");
       return reply.header("Content-Type", "application/xml; charset=utf-8").header("Content-Disposition", `attachment; filename="${filename}"`).send(xml);
     } catch (e) {
       if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
+      req.log.error({ event: "facturx_xml_error", factureId: id, artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération Factur-X XML");
       return reply.code(500).send({ error: "Erreur lors de la génération du XML Factur-X" });
     }
   });
@@ -34,9 +36,11 @@ export function registerFacturxRoutes(app: FastifyInstance, deps: FacturxRouteDe
     if (!Number.isInteger(id) || id <= 0) return reply.code(400).send({ error: "id invalide" });
     try {
       const { buffer, filename } = await getFacturxPdf(deps, { artisanId: auth.artisanId, userId: auth.userId }, id);
+      req.log.info({ event: "facturx_pdf_generated", factureId: id, artisanId: auth.artisanId }, "Factur-X PDF généré");
       return reply.header("Content-Type", "application/pdf").header("Content-Disposition", `attachment; filename="${filename}"`).send(buffer);
     } catch (e) {
       if (e instanceof NotFoundError) return reply.code(404).send({ error: e.message });
+      req.log.error({ event: "facturx_pdf_error", factureId: id, artisanId: auth.artisanId, err: e instanceof Error ? e : new Error(String(e)) }, "Erreur génération Factur-X PDF");
       return reply.code(500).send({ error: "Erreur lors de la génération Factur-X" });
     }
   });

@@ -50,12 +50,12 @@ const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
  * { procedure } comme champ indexé dans BetterStack — filtrable sans chercher dans le message.
  */
 const logProcedureTiming = t.middleware(async ({ next, path, ctx }) => {
-  const log = ctx.log.child({ procedure: path });
+  const log = ctx.log?.child({ procedure: path }) ?? ctx.log;
   const t0 = Date.now();
   const result = await next({ ctx: { ...ctx, log } });
   const duration = Date.now() - t0;
   if (duration > 500) {
-    log.warn({ event: "trpc_slow_procedure", duration }, `Procédure lente: ${path} (${duration}ms)`);
+    log?.warn({ event: "trpc_slow_procedure", duration }, `Procédure lente: ${path} (${duration}ms)`);
   }
   return result;
 });

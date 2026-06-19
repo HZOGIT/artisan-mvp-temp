@@ -73,6 +73,17 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 28 — 2026-06-19
+**Cible :** L1 — `changePlan` use-case — 5 cas nouveaux (aucun test n'existait pour ce use-case)
+**Cas ajoutés (5) :**
+- L1 : upgrade starter→pro → `sub.plan_id='pro'` + event `subscription.plan_changed {from,to}` émis
+- L1 : downgrade pro→starter → `sub.plan_id='starter'` mis à jour
+- L1 : même plan → no-op (aucun event `plan_changed` émis) — protège contre des charges Stripe inutiles si le scheduler appelle `changePlan` deux fois
+- L1 : plan inconnu (`"unknown_plan"`) → `InvalidPlanError` (gateway gate — le router tRPC mappe vers BAD_REQUEST)
+- L1 : pas de subscription existante → `NotFoundError` (ne crée pas de sub à la volée)
+**Résultat :** L1 44/44 ✅
+**Total billing :** 119 tests (114 → 119)
+
 ### Itération 27 — 2026-06-19
 **Cible :** L1 — `revokePaymentMethod` sur PM liée à la sub — invariant jamais documenté
 **Cas ajoutés (1) :**

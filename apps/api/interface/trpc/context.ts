@@ -66,14 +66,14 @@ export function makeCreateContext(deps: ContextDeps = {}) {
      * Child logger avec userId + email masqué + artisanId bindés — tous les ctx.log et req.log
      * (onResponse inclus) porteront l'identité automatiquement sans la passer manuellement.
      */
-    const log = claims
+    const log = (claims && opts.req.log != null
       ? opts.req.log.child({
           userId: claims.userId,
           userEmail: maskEmail(claims.email),
           ...(tenant ? { artisanId: tenant.artisanId } : {}),
         })
-      : opts.req.log;
-    if (log !== opts.req.log) {
+      : opts.req.log) as FastifyBaseLogger;
+    if (log != null && log !== opts.req.log) {
       (opts.req as unknown as { log: FastifyBaseLogger }).log = log;
     }
     return { claims, tenant, role, permissions, res: opts.res, log, clientIp, userAgent };
