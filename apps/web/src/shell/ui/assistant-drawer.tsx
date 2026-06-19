@@ -6,9 +6,11 @@ import { Sparkles, X, Maximize2 } from "lucide-react";
 import AssistantPage from "@/features/assistant/ui/assistant-page";
 import { PANEL_WIDTH_CLASS, PANEL_SIZE_OPTIONS, type AssistantPanelSize } from "../domain/assistant-panel";
 
-// Drawer latéral MonAssistant du SHELL modern. Réutilise la page assistant modern en mode `embedded` (qui porte
-// déjà tout le chat + streaming). Présentation pure : taille (sm/md/lg) + ouverture/fermeture INJECTÉES par props
-// (état + persistance dans le mount). Desktop = colonne non-modale (pas d'overlay) ; mobile = plein écran + overlay.
+/*
+ * Drawer latéral MonAssistant du SHELL modern. Réutilise la page assistant modern en mode `embedded` (qui porte
+ * déjà tout le chat + streaming). Présentation pure : taille (sm/md/lg) + ouverture/fermeture INJECTÉES par props
+ * (état + persistance dans le mount). Desktop = colonne non-modale (pas d'overlay) ; mobile = plein écran + overlay.
+ */
 interface AssistantDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -20,7 +22,7 @@ export function AssistantDrawer({ open, onClose, panelSize, onPanelSizeChange }:
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();
 
-  // ESC ferme le panneau (port du comportement legacy).
+  /** ESC ferme le panneau (port du comportement legacy). */
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };

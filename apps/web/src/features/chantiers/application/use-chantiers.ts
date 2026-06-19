@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Chantier, Client, Phase, Pointage, InterventionCh, SuiviEtape, Activite, Technicien } from "../domain/chantiers";
 
-// Couche APPLICATION — chantiers : liste + détail (+ sous-ressources gated sur la sélection) + toutes les
-// mutations (CRUD chantier, suivi, pointages, rappels CRM). SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — chantiers : liste + détail (+ sous-ressources gated sur la sélection) + toutes les
+ * mutations (CRUD chantier, suivi, pointages, rappels CRM). SEULE couche important tRPC.
+ */
 export function useChantiers(selectedChantier: number | null) {
   const utils = trpc.useUtils();
   const byId = selectedChantier ? { chantierId: selectedChantier } : skipToken;

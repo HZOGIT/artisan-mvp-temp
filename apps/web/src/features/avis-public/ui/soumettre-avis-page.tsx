@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sha
 import { useAvisPublic } from "../application/use-avis-public";
 import { noteLabelKey, formatDate } from "../domain/avis-public";
 
-// Page `/avis/:token` — migration clean-archi de `pages/SoumettreAvis.tsx` (publique). Markup à l'identique.
+/** Page `/avis/:token` — migration clean-archi de `pages/SoumettreAvis.tsx` (publique). Markup à l'identique. */
 function CenteredCard({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">

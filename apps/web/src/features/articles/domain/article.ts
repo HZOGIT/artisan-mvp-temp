@@ -1,8 +1,10 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 import { matchSearch } from "@/shared/lib/normalize";
 
-// Couche DOMAINE de la feature `articles` (bibliothèque) (clean-archi) : types dérivés des sorties du
-// routeur tRPC + règles PURES testables sans réseau ni i18n (recherche, marge, parsing CSV d'import).
+/*
+ * Couche DOMAINE de la feature `articles` (bibliothèque) (clean-archi) : types dérivés des sorties du
+ * routeur tRPC + règles PURES testables sans réseau ni i18n (recherche, marge, parsing CSV d'import).
+ */
 
 export type BiblioArticle = RouterOutputs["articles"]["getBibliotheque"][number];
 export type ImportRow = RouterInputs["articles"]["importBibliothequeArticles"][number];
@@ -19,7 +21,7 @@ export interface ArticleFilters {
   metierFilter: string;
 }
 
-// Filtrage PUR (recherche nom/description/sous-catégorie + filtres catégorie & métier).
+/** Filtrage PUR (recherche nom/description/sous-catégorie + filtres catégorie & métier). */
 export function filterArticles(list: readonly BiblioArticle[], f: ArticleFilters): BiblioArticle[] {
   return list.filter((article) => {
     const matchesSearch =
@@ -33,7 +35,7 @@ export function filterArticles(list: readonly BiblioArticle[], f: ArticleFilters
   });
 }
 
-// Valeurs distinctes (catégories / métiers présents) — pour peupler les filtres. PUR.
+/** Valeurs distinctes (catégories / métiers présents) — pour peupler les filtres. PUR. */
 export function distinctCategories(list: readonly BiblioArticle[]): string[] {
   return Array.from(new Set(list.map((a) => a.categorie).filter((v): v is string => !!v)));
 }
@@ -47,7 +49,7 @@ export interface Marge {
   positive: boolean;
 }
 
-// Marge indicative PURE (null si prix de vente <= 0 ou valeurs non numériques). Mêmes règles que le legacy.
+/** Marge indicative PURE (null si prix de vente <= 0 ou valeurs non numériques). Mêmes règles que le legacy. */
 export function computeMarge(prixBase: unknown, prixRevient: unknown): Marge | null {
   const pv = toNum(prixBase);
   const pr = toNum(prixRevient);
@@ -56,10 +58,12 @@ export function computeMarge(prixBase: unknown, prixRevient: unknown): Marge | n
   return { montant, pct: Math.round((montant / pv) * 100), positive: montant >= 0 };
 }
 
-// Découpe PURE d'une ligne CSV en champs, en gérant les guillemets et les échappements `""` (donc les
-// virgules à l'intérieur d'un champ entre guillemets). Produit EXACTEMENT N champs (1 par colonne).
-// (Le legacy utilisait un `match` global qui intercalait des chaînes vides → indices valeurs décalés
-// vs en-tête `split(",")` → mapping de colonnes cassé à l'import. Corrigé ici.)
+/*
+ * Découpe PURE d'une ligne CSV en champs, en gérant les guillemets et les échappements `""` (donc les
+ * virgules à l'intérieur d'un champ entre guillemets). Produit EXACTEMENT N champs (1 par colonne).
+ * (Le legacy utilisait un `match` global qui intercalait des chaînes vides → indices valeurs décalés
+ * vs en-tête `split(",")` → mapping de colonnes cassé à l'import. Corrigé ici.)
+ */
 export function splitCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -83,8 +87,10 @@ export function splitCsvLine(line: string): string[] {
   return out.map((v) => v.trim());
 }
 
-// Parsing PUR d'un CSV d'import (texte → lignes typées). Détecte les colonnes par mots-clés d'en-tête
-// (même découpe pour en-tête ET valeurs → indices alignés), applique les valeurs par défaut.
+/*
+ * Parsing PUR d'un CSV d'import (texte → lignes typées). Détecte les colonnes par mots-clés d'en-tête
+ * (même découpe pour en-tête ET valeurs → indices alignés), applique les valeurs par défaut.
+ */
 export function parseImportCsv(text: string): ImportRow[] {
   const lines = text.split("\n").filter((line) => line.trim());
   if (lines.length < 2) return [];

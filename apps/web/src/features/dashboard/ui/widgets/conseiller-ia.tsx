@@ -5,7 +5,7 @@ import { Sparkles, RefreshCw, ChevronRight } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { useConseilsIA } from "../../application/use-conseils-ia";
 
-// Conseiller IA du dashboard (priorités du jour). Re-port de components/ConseillerIAWidget (clean-archi, i18n).
+/** Conseiller IA du dashboard (priorités du jour). Re-port de components/ConseillerIAWidget (clean-archi, i18n). */
 const CACHE_KEY = "operioz:conseils_ia";
 const CACHE_TTL = 4 * 60 * 60 * 1000;
 type Conseil = { icone?: string; titre: string; message: string; actionLabel?: string; actionLien?: string };

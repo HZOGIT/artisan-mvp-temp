@@ -3,7 +3,7 @@ import { TrendingDown, AlertTriangle, ArrowDownRight, ArrowUpRight } from "lucid
 import { useTresoreriePrevisionnelle } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Trésorerie prévisionnelle 8 semaines (flux net + alerte découvert). Re-port de widgets/TresoreriePrevisionnelle.
+/** Trésorerie prévisionnelle 8 semaines (flux net + alerte découvert). Re-port de widgets/TresoreriePrevisionnelle. */
 const eur = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
 export function TresoreriePrevisionnelleWidget() {

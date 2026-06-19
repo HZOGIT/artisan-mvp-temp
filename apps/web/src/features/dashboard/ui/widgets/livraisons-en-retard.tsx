@@ -4,7 +4,7 @@ import { PackageCheck, TruckIcon, AlertTriangle } from "lucide-react";
 import { useLivraisonsEnRetard } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Commandes fournisseurs en retard de livraison (lecture seule). Re-port de widgets/LivraisonsEnRetard.
+/** Commandes fournisseurs en retard de livraison (lecture seule). Re-port de widgets/LivraisonsEnRetard. */
 const STATUT_LABELS: Record<string, string> = { envoyee: "Envoyée", confirmee: "Confirmée", partiellement_livree: "Partielle" };
 
 export function LivraisonsEnRetardWidget() {

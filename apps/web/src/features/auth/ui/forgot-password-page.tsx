@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { AuthShell } from "./auth-shell";
 import { useAuthForms } from "../application/use-auth-forms";
 
-// Page `/forgot-password` — migration clean-archi de `pages/ForgotPassword.tsx`. Markup à l'identique.
+/** Page `/forgot-password` — migration clean-archi de `pages/ForgotPassword.tsx`. Markup à l'identique. */
 export default function ForgotPasswordPage() {
   const { t } = useTranslation("auth");
   const [email, setEmail] = useState("");
@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) { toast.error(t("errEmailRequis")); return; }
-    // Réponse volontairement identique que l'email existe ou non (succès comme erreur → écran confirmé).
+    /** Réponse volontairement identique que l'email existe ou non (succès comme erreur → écran confirmé). */
     forgotPassword.mutate({ email }, { onSuccess: () => setSubmitted(true), onError: () => setSubmitted(true) });
   };
 

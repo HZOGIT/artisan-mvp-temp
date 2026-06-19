@@ -4,7 +4,7 @@ import { TrendingUp } from "lucide-react";
 import { useMonthlyCA } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Graphe CA mensuel (6 mois). Re-port de widgets/RevenueChart (clean-archi, i18n, typé).
+/** Graphe CA mensuel (6 mois). Re-port de widgets/RevenueChart (clean-archi, i18n, typé). */
 const formatEUR = (v: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 const monthLabel = (yyyymm: string): string => {
   if (!yyyymm || yyyymm.length < 7) return yyyymm;

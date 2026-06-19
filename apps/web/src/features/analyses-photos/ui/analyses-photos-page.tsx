@@ -22,8 +22,10 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-// Page `analyses-photos` — migration clean-archi de `pages/AnalysesPhotos.tsx`. Markup à l'identique.
-// Workflow IA orchestré ici (createAnalyse→addPhoto→analyserPhotos), agrégats/assainissement en domain.
+/*
+ * Page `analyses-photos` — migration clean-archi de `pages/AnalysesPhotos.tsx`. Markup à l'identique.
+ * Workflow IA orchestré ici (createAnalyse→addPhoto→analyserPhotos), agrégats/assainissement en domain.
+ */
 export default function AnalysesPhotosPage() {
   const { t } = useTranslation("analysesPhotos");
   const [titre, setTitre] = useState("");
@@ -259,7 +261,7 @@ export default function AnalysesPhotosPage() {
   );
 }
 
-// Sous-composant : preview locale d'un File (lit en data URL pour l'aperçu).
+/** Sous-composant : preview locale d'un File (lit en data URL pour l'aperçu). */
 function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
   const { t } = useTranslation("analysesPhotos");
   const [src, setSrc] = useState("");

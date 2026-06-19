@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Wrench, ArrowRight } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 
-// Coque commune des pages d'auth publiques : en-tête (logo + lien retour) + carte centrée. Markup legacy.
+/** Coque commune des pages d'auth publiques : en-tête (logo + lien retour) + carte centrée. Markup legacy. */
 export function AuthShell({ backHref, backLabel, children }: { backHref: string; backLabel: string; children: React.ReactNode }) {
   const { t } = useTranslation("auth");
   return (

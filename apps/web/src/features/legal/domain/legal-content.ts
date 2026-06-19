@@ -1,6 +1,8 @@
-// Couche DOMAIN de la feature `legal` (pages statiques mentions/CGU/CGV/confidentialité). Le contenu est
-// du HTML statique et de confiance (aucune entrée utilisateur) → stocké en consts (rendu via
-// `dangerouslySetInnerHTML`, hors règle i18next sur les littéraux JSX). Markup à l'identique du legacy.
+/*
+ * Couche DOMAIN de la feature `legal` (pages statiques mentions/CGU/CGV/confidentialité). Le contenu est
+ * du HTML statique et de confiance (aucune entrée utilisateur) → stocké en consts (rendu via
+ * `dangerouslySetInnerHTML`, hors règle i18next sur les littéraux JSX). Markup à l'identique du legacy.
+ */
 
 export type LegalDoc = { title: string; lastUpdated: string; html: string };
 

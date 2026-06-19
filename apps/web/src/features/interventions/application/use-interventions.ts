@@ -6,10 +6,12 @@ import type {
   Technicien,
 } from "../domain/intervention";
 
-// Couche APPLICATION de la feature `interventions` (clean-archi) : SEULE couche important tRPC.
-// `useInterventions` couvre la liste + référentiels (clients, techniciens, équipes agrégées) et le CRUD ;
-// `useEquipe` isole l'équipe d'UNE intervention (query dépendante de l'état UI) + ses mutations.
-// L'UI attache ses effets (toast/fermeture de dialogue/reset) via le `onSuccess` par appel.
+/*
+ * Couche APPLICATION de la feature `interventions` (clean-archi) : SEULE couche important tRPC.
+ * `useInterventions` couvre la liste + référentiels (clients, techniciens, équipes agrégées) et le CRUD ;
+ * `useEquipe` isole l'équipe d'UNE intervention (query dépendante de l'état UI) + ses mutations.
+ * L'UI attache ses effets (toast/fermeture de dialogue/reset) via le `onSuccess` par appel.
+ */
 export function useInterventions() {
   const utils = trpc.useUtils();
   const interventionsQ = trpc.interventions.list.useQuery();
@@ -39,7 +41,7 @@ export function useInterventions() {
   };
 }
 
-// Équipe d'UNE intervention (query dépendante : ouverte uniquement quand le dialogue d'édition l'est).
+/** Équipe d'UNE intervention (query dépendante : ouverte uniquement quand le dialogue d'édition l'est). */
 export function useEquipe(interventionId: number, enabled: boolean) {
   const utils = trpc.useUtils();
   const equipeQ = trpc.interventions.getEquipe.useQuery(

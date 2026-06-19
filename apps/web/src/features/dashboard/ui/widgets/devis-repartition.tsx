@@ -4,7 +4,7 @@ import { FileText } from "lucide-react";
 import { useDevisStats } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Répartition des devis par statut (camembert). Re-port de widgets/DevisRepartition (clean-archi, i18n, typé).
+/** Répartition des devis par statut (camembert). Re-port de widgets/DevisRepartition (clean-archi, i18n, typé). */
 const STATUT_LABEL: Record<string, string> = { brouillon: "Brouillon", envoye: "Envoyé", accepte: "Accepté", refuse: "Refusé", expire: "Expiré" };
 const STATUT_COLOR: Record<string, string> = { brouillon: "#94a3b8", envoye: "#3b82f6", accepte: "#10b981", refuse: "#ef4444", expire: "#f59e0b" };
 interface Slice { name: string; value: number; color: string; pct: number }

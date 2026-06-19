@@ -1,8 +1,10 @@
 import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 
-// Couche APPLICATION — éditeur de devis : devis (getById, riche) + artisan/paramètres (PDF) + activités CRM +
-// signature + variantes + transitions/actions. SEULE couche important tRPC ; effets en UI via options.
+/*
+ * Couche APPLICATION — éditeur de devis : devis (getById, riche) + artisan/paramètres (PDF) + activités CRM +
+ * signature + variantes + transitions/actions. SEULE couche important tRPC ; effets en UI via options.
+ */
 export function useDevisDetail(id: number) {
   const utils = trpc.useUtils();
   const enabled = id > 0;
@@ -22,22 +24,22 @@ export function useDevisDetail(id: number) {
     signature: signatureQ.data,
     variantes: variantesQ.data ?? [], refetchVariantes: variantesQ.refetch,
     inv,
-    // transitions de statut (machine à états dédiée)
+    /** transitions de statut (machine à états dédiée) */
     envoyer: trpc.devis.envoyer.useMutation(),
     accepter: trpc.devis.accepter.useMutation(),
     refuser: trpc.devis.refuser.useMutation(),
-    // actions
+    /** actions */
     deleteLigne: trpc.devis.deleteLigne.useMutation({ onSuccess: inv }),
     convertToFacture: trpc.devis.convertToFacture.useMutation(),
     sendByEmail: trpc.devis.sendByEmail.useMutation(),
     duplicate: trpc.devis.duplicate.useMutation(),
-    // CRM
+    /** CRM */
     createRappel: trpc.activites.create.useMutation(),
     toggleRappel: trpc.activites.toggleFait.useMutation(),
     deleteRappel: trpc.activites.delete.useMutation(),
-    // signature
+    /** signature */
     requestSignature: trpc.signature.createSignatureLink.useMutation(),
-    // variantes
+    /** variantes */
     createVariante: trpc.devisOptions.create.useMutation(),
     selectVariante: trpc.devisOptions.select.useMutation(),
     deleteVariante: trpc.devisOptions.delete.useMutation(),

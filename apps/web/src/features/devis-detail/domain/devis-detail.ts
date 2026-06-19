@@ -1,7 +1,9 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `devis-detail` (éditeur de devis : statut, lignes, variantes, signature, email,
-// rappels CRM, PDF). Types dérivés du routeur, catalogues + agrégats/mappings PURS testables. 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `devis-detail` (éditeur de devis : statut, lignes, variantes, signature, email,
+ * rappels CRM, PDF). Types dérivés du routeur, catalogues + agrégats/mappings PURS testables. 0 React/tRPC.
+ */
 
 export type Devis = NonNullable<RouterOutputs["devis"]["getById"]>;
 export type Ligne = Devis["lignes"][number];
@@ -28,7 +30,7 @@ export function formatCurrency(amount: string | number | null | undefined): stri
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number.isFinite(num) ? num : 0);
 }
 
-// Rappels CRM rattachés à CE devis, triés par échéance. PUR.
+/** Rappels CRM rattachés à CE devis, triés par échéance. PUR. */
 export function activitesForDevis(activites: readonly Activite[], devisId: number): Activite[] {
   return activites
     .filter((a) => a.entiteType === "devis" && a.entiteId === devisId)
@@ -36,14 +38,14 @@ export function activitesForDevis(activites: readonly Activite[], devisId: numbe
     .sort((a, b) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime());
 }
 
-// Nombre de rappels non faits. PUR.
+/** Nombre de rappels non faits. PUR. */
 export function pendingCount(activites: readonly Activite[]): number {
   return activites.filter((a) => !a.fait).length;
 }
 
 export type PdfLigne = { designation: string; description: string | null; quantite: number; unite: string | null; prixUnitaire: number; tauxTva: number; type: string | null };
 
-// Mappe les lignes du devis pour le générateur PDF. PUR.
+/** Mappe les lignes du devis pour le générateur PDF. PUR. */
 export function pdfLignes(lignes: readonly Ligne[]): PdfLigne[] {
   return lignes.map((l) => ({
     designation: l.designation, description: l.description, quantite: parseFloat(String(l.quantite)) || 1,
@@ -51,7 +53,7 @@ export function pdfLignes(lignes: readonly Ligne[]): PdfLigne[] {
   }));
 }
 
-// Mutation de transition de statut cible (ou null si non disponible). PUR.
+/** Mutation de transition de statut cible (ou null si non disponible). PUR. */
 export function statutTransition(target: string): "envoyer" | "accepter" | "refuser" | null {
   if (target === "envoye") return "envoyer";
   if (target === "accepte") return "accepter";

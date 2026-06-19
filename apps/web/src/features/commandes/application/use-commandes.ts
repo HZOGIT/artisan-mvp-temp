@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { Commande, CommandeFournisseur } from "../domain/commande";
 
-// Couche APPLICATION de la feature `commandes` (clean-archi) : SEULE couche important tRPC.
-// Encapsule les queries (commandes + fournisseurs pour le filtre) et les mutations (delete / sendEmail)
-// avec invalidation, expose des données TYPÉES + des actions. L'UI attache ses effets (toast) via le
-// `onSuccess` par appel de `.mutate()`.
+/*
+ * Couche APPLICATION de la feature `commandes` (clean-archi) : SEULE couche important tRPC.
+ * Encapsule les queries (commandes + fournisseurs pour le filtre) et les mutations (delete / sendEmail)
+ * avec invalidation, expose des données TYPÉES + des actions. L'UI attache ses effets (toast) via le
+ * `onSuccess` par appel de `.mutate()`.
+ */
 export function useCommandes() {
   const utils = trpc.useUtils();
   const commandesQ = trpc.commandesFournisseurs.list.useQuery();

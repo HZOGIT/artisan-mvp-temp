@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { Devis, DevisClient } from "../domain/devis";
 
-// Couche APPLICATION de la feature `devis` (clean-archi) : SEULE couche important tRPC.
-// Encapsule les queries (liste devis + clients) et les mutations (delete / convertToFacture) avec
-// invalidation, expose des données TYPÉES + des actions. L'UI ne connaît plus le transport ; elle
-// attache ses effets (toast/navigation/confirm) via le `onSuccess` par appel de `.mutate()`.
+/*
+ * Couche APPLICATION de la feature `devis` (clean-archi) : SEULE couche important tRPC.
+ * Encapsule les queries (liste devis + clients) et les mutations (delete / convertToFacture) avec
+ * invalidation, expose des données TYPÉES + des actions. L'UI ne connaît plus le transport ; elle
+ * attache ses effets (toast/navigation/confirm) via le `onSuccess` par appel de `.mutate()`.
+ */
 export function useDevis() {
   const utils = trpc.useUtils();
   const devisQ = trpc.devis.list.useQuery();

@@ -1,9 +1,11 @@
 import type { RouterOutputs } from "@/shared/trpc";
 import { matchSearch } from "@/shared/lib/normalize";
 
-// Couche DOMAINE de la feature `factures` (clean-archi) : types dérivés des sorties du routeur tRPC
-// (source de vérité serveur) + règles PURES testables sans réseau ni i18n. L'UI/l'application en
-// dépendent ; aucune connaissance du transport ici.
+/*
+ * Couche DOMAINE de la feature `factures` (clean-archi) : types dérivés des sorties du routeur tRPC
+ * (source de vérité serveur) + règles PURES testables sans réseau ni i18n. L'UI/l'application en
+ * dépendent ; aucune connaissance du transport ici.
+ */
 
 export type Facture = RouterOutputs["factures"]["list"][number];
 export type FactureClient = RouterOutputs["clients"]["list"][number];
@@ -11,7 +13,7 @@ export type EncoursClient = RouterOutputs["clients"]["getEncours"];
 
 export type TypeFilter = "tous" | "facture" | "avoir";
 
-// Parse tolérant : montants stockés en `string` (numeric PG) → number, jamais NaN.
+/** Parse tolérant : montants stockés en `string` (numeric PG) → number, jamais NaN. */
 const num = (v: unknown): number => {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : 0;
   return Number.isFinite(n) ? n : 0;
@@ -19,7 +21,7 @@ const num = (v: unknown): number => {
 
 export const isBrouillon = (statut: string | null | undefined): boolean => statut === "brouillon";
 
-// Libellé « Nom Prénom » d'un client (tolère prénom absent / client introuvable).
+/** Libellé « Nom Prénom » d'un client (tolère prénom absent / client introuvable). */
 export function clientLabel(c: Pick<FactureClient, "nom" | "prenom"> | undefined): string {
   if (!c) return "";
   return `${c.nom ?? ""} ${c.prenom ?? ""}`.trim();
@@ -29,11 +31,11 @@ export interface FactureFilters {
   typeFilter: TypeFilter;
   statusFilter: string;
   searchQuery: string;
-  // Résolveur de nom client (l'index Map vit côté application/UI) — garde le domaine pur.
+  /** Résolveur de nom client (l'index Map vit côté application/UI) — garde le domaine pur. */
   resolveClientName: (clientId: number | null) => string;
 }
 
-// Filtrage PUR (type document + statut piloté par l'URL + recherche texte). Mêmes règles que le legacy.
+/** Filtrage PUR (type document + statut piloté par l'URL + recherche texte). Mêmes règles que le legacy. */
 export function filterFactures(factures: readonly Facture[], f: FactureFilters): Facture[] {
   return factures.filter((facture) => {
     if (f.typeFilter !== "tous") {
@@ -66,8 +68,10 @@ export interface EncoursSummary {
   impayeesCount: number;
 }
 
-// Synthèse PURE de l'encours (à encaisser / en retard / nb impayées), avoirs déduits du total impayé.
-// Reproduit exactement le calcul à la volée du legacy.
+/*
+ * Synthèse PURE de l'encours (à encaisser / en retard / nb impayées), avoirs déduits du total impayé.
+ * Reproduit exactement le calcul à la volée du legacy.
+ */
 export function computeEncoursSummary(factures: readonly Facture[]): EncoursSummary {
   const reelles = factures.filter((f) => f.typeDocument !== "avoir");
   if (reelles.length === 0) {

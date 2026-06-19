@@ -1,20 +1,24 @@
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `assistant` (chat IA streaming + actions rapides + voix/dictée). Le flux SSE
-// `/api/assistant/stream` n'est PAS tRPC → on type/parse ses événements à la main (avec gardes runtime,
-// 0 `any`). Constructeurs markdown des actions rapides = purs et testables.
+/*
+ * Couche DOMAIN de la feature `assistant` (chat IA streaming + actions rapides + voix/dictée). Le flux SSE
+ * `/api/assistant/stream` n'est PAS tRPC → on type/parse ses événements à la main (avec gardes runtime,
+ * 0 `any`). Constructeurs markdown des actions rapides = purs et testables.
+ */
 
 export type Message = { role: "user" | "assistant"; content: string };
 
 export type Devis = RouterOutputs["devis"]["list"][number];
 
-// Le backend type `generateDevis.lignes` et `suggestRelances` en `unknown` → on déclare la forme connue
-// ici et l'application caste à la frontière (assertion typée, pas de `any`).
+/*
+ * Le backend type `generateDevis.lignes` et `suggestRelances` en `unknown` → on déclare la forme connue
+ * ici et l'application caste à la frontière (assertion typée, pas de `any`).
+ */
 export type DevisLigne = { designation: string; quantite: number; unite: string; prixUnitaireHT: number; tauxTVA: number };
 export type RelanceItem = { numero: string; objet?: string | null; email?: { sujet: string; corps: string } | null };
 export type Relances = RelanceItem[] | { suggestions: string } | string;
 
-// Événement décodé d'une trame SSE de l'assistant.
+/** Événement décodé d'une trame SSE de l'assistant. */
 export type StreamEvent = {
   content?: string;
   threadId?: number;
@@ -26,7 +30,7 @@ export type StreamEvent = {
   toolEnd?: { name: string; ok: boolean; error?: string };
 };
 
-// Parse une charge utile `data:` (déjà privée du préfixe). `"done"` pour [DONE], `null` si JSON invalide. PUR.
+/** Parse une charge utile `data:` (déjà privée du préfixe). `"done"` pour [DONE], `null` si JSON invalide. PUR. */
 export function parseStreamData(data: string): StreamEvent | "done" | null {
   if (data === "[DONE]") return "done";
   let p: Record<string, unknown>;
@@ -49,28 +53,28 @@ export function parseStreamData(data: string): StreamEvent | "done" | null {
   return ev;
 }
 
-// Découpe un flux SSE accumulé en (lignes complètes, reste tamponné). PUR.
+/** Découpe un flux SSE accumulé en (lignes complètes, reste tamponné). PUR. */
 export function splitSseBuffer(buffer: string): { lines: string[]; rest: string } {
   const parts = buffer.split("\n");
   return { rest: parts.pop() || "", lines: parts };
 }
 
-// Extrait la charge utile d'une ligne SSE `data: …`, sinon null. PUR.
+/** Extrait la charge utile d'une ligne SSE `data: …`, sinon null. PUR. */
 export function sseDataLine(line: string): string | null {
   return line.startsWith("data: ") ? line.slice(6) : null;
 }
 
-// Historique transmis au backend : N derniers messages (rôle + contenu). PUR.
+/** Historique transmis au backend : N derniers messages (rôle + contenu). PUR. */
 export function sliceHistory(messages: readonly Message[], n = 10): Message[] {
   return messages.slice(-n).map((m) => ({ role: m.role, content: m.content }));
 }
 
-// URL de navigation déclenchée par un outil de l'assistant (avec filtre optionnel). PUR.
+/** URL de navigation déclenchée par un outil de l'assistant (avec filtre optionnel). PUR. */
 export function navigateTarget(navigate: string, filtre?: string): string {
   return filtre ? `${navigate}?filtre=${encodeURIComponent(filtre)}` : navigate;
 }
 
-// Markdown d'un devis suggéré (tableau des lignes + total HT). PUR.
+/** Markdown d'un devis suggéré (tableau des lignes + total HT). PUR. */
 export function buildDevisMarkdown(description: string, lignes: readonly DevisLigne[]): string {
   let content = `**Devis suggéré pour : ${description}**\n\n`;
   content += `| Désignation | Qté | Unité | Prix HT | TVA |\n|---|---|---|---|---|\n`;
@@ -82,7 +86,7 @@ export function buildDevisMarkdown(description: string, lignes: readonly DevisLi
   return content;
 }
 
-// Markdown des suggestions de relance (gère tableau / {suggestions} / chaîne). PUR.
+/** Markdown des suggestions de relance (gère tableau / {suggestions} / chaîne). PUR. */
 export function buildRelancesMarkdown(relances: Relances): string {
   if (Array.isArray(relances)) {
     if (relances.length === 0) return "**Suggestions de relance**\n\nAucun devis en attente de relance.";

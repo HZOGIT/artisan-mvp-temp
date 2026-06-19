@@ -3,9 +3,11 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { XCircle, ArrowLeft, RefreshCw } from "lucide-react";
 
-// Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/paiement/annule`) — PORT CONFORME de
-// `pages/PaiementAnnule.tsx`. Montée hors auth (cf. public-router). i18n namespace `paiement`.
-// (Le legacy importe `useLocation` mais ne l'utilise pas — supprimé ici.)
+/*
+ * Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/paiement/annule`) — PORT CONFORME de
+ * `pages/PaiementAnnule.tsx`. Montée hors auth (cf. public-router). i18n namespace `paiement`.
+ * (Le legacy importe `useLocation` mais ne l'utilise pas — supprimé ici.)
+ */
 export default function PaiementAnnulePage() {
   const { t } = useTranslation("paiement");
 

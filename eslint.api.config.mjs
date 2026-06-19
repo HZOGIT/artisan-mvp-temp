@@ -26,7 +26,9 @@ const commentsJsdocOnly = {
             const before = startLine.substring(0, comment.loc.start.column).trim();
             const endLine = lines[comment.loc.end.line - 1] ?? "";
             const after = endLine.substring(comment.loc.end.column).trim();
-            if (before !== "" || after !== "") {
+            // JSX brace-comment and empty-catch pattern — intentional, not a TS inline comment
+            const isJsxLike = before.endsWith("{") && after.startsWith("}");
+            if ((before !== "" || after !== "") && !isJsxLike) {
               context.report({ loc: comment.loc, message: "Commentaire inline non-JSDoc : utiliser /** … */ à la place." });
             }
           }

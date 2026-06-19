@@ -17,8 +17,10 @@ import { buildEditedMap, newSuggestion, lineTotal, calculateTotal, selectedCount
 
 const STATUT_ICON: Record<string, typeof Clock> = { en_attente: Clock, en_cours: RefreshCw, termine: CheckCircle2, erreur: AlertCircle };
 
-// Page `devis-ia` — migration clean-archi de `pages/DevisIA.tsx`. Markup à l'identique. État éditable des
-// suggestions + agrégats (total HT/TTC) en domain (purs, testés) ; tRPC encapsulé dans `use-devis-ia`.
+/*
+ * Page `devis-ia` — migration clean-archi de `pages/DevisIA.tsx`. Markup à l'identique. État éditable des
+ * suggestions + agrégats (total HT/TTC) en domain (purs, testés) ; tRPC encapsulé dans `use-devis-ia`.
+ */
 export default function DevisIAPage() {
   const { t } = useTranslation("devisIa");
   const [isDialogOpen, setIsDialogOpen] = useState(false);

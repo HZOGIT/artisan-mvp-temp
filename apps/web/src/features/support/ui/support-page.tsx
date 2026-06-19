@@ -13,10 +13,12 @@ import { Mail, BookOpen, Sparkles, Send, MessageCircle, Loader2 } from "lucide-r
 import { Link } from "@/shared/router/navigation";
 import { toast } from "sonner";
 
-// Page Centre d'aide / Support du FRONT NEUF (`/support`) — MIGRATION clean-archi de `pages/Support.tsx`
-// (legacy chaînes EN DUR + FAQ inline → i18n namespace `support`, FAQ via `returnObjects`). Mutation via
-// `useSupport` (couche application, seule à importer tRPC) ; validation via le domaine (pure & testée).
-// Présentation pure, 0 `any`.
+/*
+ * Page Centre d'aide / Support du FRONT NEUF (`/support`) — MIGRATION clean-archi de `pages/Support.tsx`
+ * (legacy chaînes EN DUR + FAQ inline → i18n namespace `support`, FAQ via `returnObjects`). Mutation via
+ * `useSupport` (couche application, seule à importer tRPC) ; validation via le domaine (pure & testée).
+ * Présentation pure, 0 `any`.
+ */
 
 const SUJET_LABEL: Record<Sujet, string> = {
   technique: "sujetTechnique",
@@ -47,7 +49,7 @@ export default function SupportPage() {
       onSuccess: () => {
         toast.success(t("toastSent"));
         setFormData({ nom: "", email: "", sujet: "technique", message: "" });
-      }, // reset
+      },
       onError: (e) => toast.error(e.message || t("toastError")),
     });
   };

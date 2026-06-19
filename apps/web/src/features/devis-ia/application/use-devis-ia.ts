@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Analyse, Client } from "../domain/devis-ia";
 
-// Couche APPLICATION — éditeur devis IA : liste + clients + détail (gated) + les 6 mutations (créer
-// analyse, ajouter photo, analyser, MAJ suggestion, générer devis). SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — éditeur devis IA : liste + clients + détail (gated) + les 6 mutations (créer
+ * analyse, ajouter photo, analyser, MAJ suggestion, générer devis). SEULE couche important tRPC.
+ */
 export function useDevisIA(selectedAnalyse: number | null) {
   const utils = trpc.useUtils();
   const listQ = trpc.devisIA.list.useQuery();

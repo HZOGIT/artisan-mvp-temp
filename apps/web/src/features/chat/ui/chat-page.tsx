@@ -16,8 +16,10 @@ import { useIsMobile } from "@/shared/hooks/useMobile";
 import { useChat } from "../application/use-chat";
 import { CHAT_FILTERS, filterConversations, clientLabel, formatChatDate, type ChatFilter } from "../domain/chat";
 
-// Page `chat` (messagerie artisan ↔ client) — migration clean-archi de `pages/Chat.tsx`. Markup/classes
-// Tailwind conservés à l'identique (parité visuelle). tRPC encapsulé dans `use-chat`, règles pures en domain.
+/*
+ * Page `chat` (messagerie artisan ↔ client) — migration clean-archi de `pages/Chat.tsx`. Markup/classes
+ * Tailwind conservés à l'identique (parité visuelle). tRPC encapsulé dans `use-chat`, règles pures en domain.
+ */
 export default function ChatPage() {
   const { t } = useTranslation("chat");
   const isMobile = useIsMobile();

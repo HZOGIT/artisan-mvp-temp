@@ -11,8 +11,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useProfil, useAccountSettings } from "../application/use-profil";
 import { defaultProfilForm, formFromArtisan, buildUpdatePayload, passwordStrength, validateEmailChange, validatePasswordChange, SOCIETE_FORMES, FORME_OPTIONS, METIERS_IA, type ProfilForm, type Specialite, type FormeJuridique } from "../domain/profil";
 
-// Page `/profil` — migration clean-archi de `pages/Profil.tsx`. Markup à l'identique. Mapping form↔profil
-// + validations en domain (pur, testé) ; l'objet profil expose désormais TOUS les champs (les casts legacy ont été supprimés).
+/*
+ * Page `/profil` — migration clean-archi de `pages/Profil.tsx`. Markup à l'identique. Mapping form↔profil
+ * + validations en domain (pur, testé) ; l'objet profil expose désormais TOUS les champs (les casts legacy ont été supprimés).
+ */
 export default function ProfilPage() {
   const { t } = useTranslation("profil");
   const { artisan, isLoading, updateProfile } = useProfil();
@@ -139,7 +141,7 @@ export default function ProfilPage() {
   );
 }
 
-// 3 cartes : email, mot de passe, zone de danger. Hors du form principal (handlers dédiés).
+/** 3 cartes : email, mot de passe, zone de danger. Hors du form principal (handlers dédiés). */
 function AccountSettings() {
   const { t } = useTranslation("profil");
   const { currentEmail, updateEmail, updatePassword, deleteAccount } = useAccountSettings();

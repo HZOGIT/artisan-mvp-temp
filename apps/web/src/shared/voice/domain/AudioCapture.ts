@@ -1,4 +1,4 @@
-// Port — no Web Audio API types here.
+/** Port — no Web Audio API types here. */
 export interface AudioCaptureConfig {
   sampleRate: 16000;
   channelCount: 1;

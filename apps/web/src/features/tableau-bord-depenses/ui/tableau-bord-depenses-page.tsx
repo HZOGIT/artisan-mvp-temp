@@ -13,8 +13,10 @@ import { generateRapportDepensesPDF } from "@/shared/lib/generateRapportDepenses
 import { useTableauBordDepenses } from "../application/use-tableau-bord-depenses";
 import { eur, donutData, barData, alertesBudget, totalBudget, pctBudget, projection } from "../domain/tableau-bord-depenses";
 
-// Page `tableau-bord-depenses` — migration clean-archi de `pages/TableauBordDepenses.tsx`. Markup à
-// l'identique (recharts conservé). tRPC encapsulé dans `use-tableau-bord-depenses`, dérivations en domain.
+/*
+ * Page `tableau-bord-depenses` — migration clean-archi de `pages/TableauBordDepenses.tsx`. Markup à
+ * l'identique (recharts conservé). tRPC encapsulé dans `use-tableau-bord-depenses`, dérivations en domain.
+ */
 const fmtTooltip = (v: number | string) => eur(v);
 
 export default function TableauBordDepensesPage() {

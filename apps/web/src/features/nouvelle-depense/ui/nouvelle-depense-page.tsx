@@ -24,8 +24,10 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-// Page `nouvelle-depense` — migration clean-archi de `pages/NouvelleDepense.tsx`. Markup à l'identique
-// (sauf fréquence « hebdomadaire » retirée : non supportée par le backend, cf. finding). Logique pure en domain.
+/*
+ * Page `nouvelle-depense` — migration clean-archi de `pages/NouvelleDepense.tsx`. Markup à l'identique
+ * (sauf fréquence « hebdomadaire » retirée : non supportée par le backend, cf. finding). Logique pure en domain.
+ */
 export default function NouvelleDepensePage() {
   const { t } = useTranslation("nouvelleDepense");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,7 +39,7 @@ export default function NouvelleDepensePage() {
   const { ht, tva, ttc } = montants(form.montantHt, form.tauxTva);
   const occ = prochaineOccurrence(form.dateDepense, form.recurrente, form.frequenceRecurrence);
 
-  // OPE-99 — détection NON bloquante de doublons (debouncée).
+  /** OPE-99 — détection NON bloquante de doublons (debouncée). */
   const [doublonKey, setDoublonKey] = useState({ montantTtc: 0, dateDepense: "", fournisseur: "" });
   useEffect(() => {
     const id = setTimeout(() => setDoublonKey({ montantTtc: ttc, dateDepense: form.dateDepense, fournisseur: form.fournisseur }), 500);

@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useClassement, useTechnicienDetail } from "../application/use-classement";
 import { PERIODES, eur, initials, technicienName, buildRanking, splitPodium, objectifPct, type Periode, type ClassementRow } from "../domain/classement";
 
-// Page `classement` (gamification) — migration clean-archi de `pages/Classement.tsx`. Markup/classes
-// Tailwind + animations framer-motion conservés à l'identique (parité). tRPC encapsulé dans `use-classement`.
+/*
+ * Page `classement` (gamification) — migration clean-archi de `pages/Classement.tsx`. Markup/classes
+ * Tailwind + animations framer-motion conservés à l'identique (parité). tRPC encapsulé dans `use-classement`.
+ */
 export default function ClassementPage() {
   const { t } = useTranslation("classement");
   const [periode, setPeriode] = useState<Periode>("mois");
@@ -241,8 +243,10 @@ export default function ClassementPage() {
   );
 }
 
-// ----------------------------------------------------------------------------
-// Sous-composants
+/*
+ * ----------------------------------------------------------------------------
+ * Sous-composants
+ */
 
 function PodiumStep({ rank, data, heightClass, bgClass, medal, delay, highlight }: {
   rank: number; data: ClassementRow; heightClass: string; bgClass: string; medal: string; delay: number; highlight?: boolean;

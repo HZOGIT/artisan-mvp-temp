@@ -11,10 +11,12 @@ import { Badge } from "@/shared/ui/badge";
 import { Wand2, Plus, Trash2, ArrowRight, Info } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Règles de catégorisation auto du FRONT NEUF (`/regles-depenses`) — MIGRATION clean-archi de
-// `pages/ReglesDepenses.tsx` (legacy en chaînes EN DUR → i18n namespace `reglesDepenses`). Données &
-// mutations via `useRegles` (couche application, seule à importer tRPC) ; normalisation/validation/index
-// catégories via le domaine (fonctions pures testées). Présentation pure, 0 `any`.
+/*
+ * Page Règles de catégorisation auto du FRONT NEUF (`/regles-depenses`) — MIGRATION clean-archi de
+ * `pages/ReglesDepenses.tsx` (legacy en chaînes EN DUR → i18n namespace `reglesDepenses`). Données &
+ * mutations via `useRegles` (couche application, seule à importer tRPC) ; normalisation/validation/index
+ * catégories via le domaine (fonctions pures testées). Présentation pure, 0 `any`.
+ */
 
 export default function ReglesDepensesPage() {
   const { t } = useTranslation("reglesDepenses");

@@ -10,8 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { usePrevisions } from "../application/use-previsions";
 import { MOIS_LABELS, METHODES, num, totalPrevisionnel, totalRealise, confianceMoyenne, ecartPct, confianceClass, type Methode } from "../domain/previsions";
 
-// Page `previsions` (prévisions de CA) — migration clean-archi de `pages/Previsions.tsx`. Markup à
-// l'identique (Chart.js conservé). tRPC encapsulé dans `use-previsions`, agrégats purs en domain.
+/*
+ * Page `previsions` (prévisions de CA) — migration clean-archi de `pages/Previsions.tsx`. Markup à
+ * l'identique (Chart.js conservé). tRPC encapsulé dans `use-previsions`, agrégats purs en domain.
+ */
 export default function PrevisionsPage() {
   const { t } = useTranslation("previsions");
   const [annee, setAnnee] = useState(new Date().getFullYear());

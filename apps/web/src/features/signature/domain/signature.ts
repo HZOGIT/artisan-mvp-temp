@@ -1,7 +1,9 @@
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAINE de la feature `signature` (portail public de signature de devis) (clean-archi) : types
-// dérivés des sorties du routeur tRPC + règles PURES testables sans réseau ni i18n.
+/*
+ * Couche DOMAINE de la feature `signature` (portail public de signature de devis) (clean-archi) : types
+ * dérivés des sorties du routeur tRPC + règles PURES testables sans réseau ni i18n.
+ */
 
 export type SignatureData = NonNullable<RouterOutputs["signature"]["getDevisForSignature"]>;
 export type SignatureDevis = SignatureData["devis"];
@@ -13,7 +15,7 @@ const toNum = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-// Le devis a-t-il déjà été traité (accepté ou refusé) ? PUR.
+/** Le devis a-t-il déjà été traité (accepté ou refusé) ? PUR. */
 export function isSignatureProcessed(statut: string | null | undefined): boolean {
   return statut === "accepte" || statut === "refuse";
 }
@@ -26,12 +28,12 @@ export interface SignatureFormState {
   token: string | undefined;
 }
 
-// Le formulaire de signature est-il complet/valide ? PUR (mêmes conditions que le legacy).
+/** Le formulaire de signature est-il complet/valide ? PUR (mêmes conditions que le legacy). */
 export function canSubmitSignature(s: SignatureFormState): boolean {
   return s.hasSignature && !!s.signataireName && !!s.signataireEmail && !!s.token && s.accepted;
 }
 
-// Ligne au format attendu par le générateur PDF legacy (montants en number). PUR.
+/** Ligne au format attendu par le générateur PDF legacy (montants en number). PUR. */
 export interface PdfLigne {
   designation: string;
   description: string | null | undefined;
@@ -41,7 +43,7 @@ export interface PdfLigne {
   tauxTva: number;
 }
 
-// Transformation PURE des lignes de devis → lignes PDF (parse des montants, valeurs par défaut legacy).
+/** Transformation PURE des lignes de devis → lignes PDF (parse des montants, valeurs par défaut legacy). */
 export function buildPdfLignes(lignes: readonly SignatureLigne[]): PdfLigne[] {
   return lignes.map((ligne) => ({
     designation: ligne.designation,

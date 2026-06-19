@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { BiblioArticle } from "../domain/article";
 
-// Couche APPLICATION de la feature `articles` (bibliothèque) (clean-archi) : SEULE couche important
-// tRPC. Encapsule la query (bibliothèque) et les mutations (create/update/delete/import) avec
-// invalidation, expose des données TYPÉES + des actions. L'UI attache ses effets (toast / fermeture de
-// dialogue / reset) via le `onSuccess` par appel de `.mutate()`.
+/*
+ * Couche APPLICATION de la feature `articles` (bibliothèque) (clean-archi) : SEULE couche important
+ * tRPC. Encapsule la query (bibliothèque) et les mutations (create/update/delete/import) avec
+ * invalidation, expose des données TYPÉES + des actions. L'UI attache ses effets (toast / fermeture de
+ * dialogue / reset) via le `onSuccess` par appel de `.mutate()`.
+ */
 export function useArticles() {
   const utils = trpc.useUtils();
   const articlesQ = trpc.articles.getBibliotheque.useQuery({});

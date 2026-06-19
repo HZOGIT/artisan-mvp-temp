@@ -2,7 +2,7 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Fournisseur, ArtisanArticle, DevisAccepte, BiblioArticle } from "../domain/commande-form";
 
-// Recherche bibliothèque via le REST public `/api/articles/search` (effet). Renvoie [] sur échec.
+/** Recherche bibliothèque via le REST public `/api/articles/search` (effet). Renvoie [] sur échec. */
 export async function searchBiblioRest(query: string): Promise<BiblioArticle[]> {
   try {
     const res = await fetch(`/api/articles/search?q=${encodeURIComponent(query)}`, { credentials: "include" });
@@ -13,8 +13,10 @@ export async function searchBiblioRest(query: string): Promise<BiblioArticle[]> 
   }
 }
 
-// Couche APPLICATION — formulaire de commande : fournisseurs + articles artisan + devis acceptés (IA, gated) +
-// commande/lignes existantes (édition) + create/update/sendEmail + génération IA. SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — formulaire de commande : fournisseurs + articles artisan + devis acceptés (IA, gated) +
+ * commande/lignes existantes (édition) + create/update/sendEmail + génération IA. SEULE couche important tRPC.
+ */
 export function useCommandeForm(commandeId: number, iaSectionOpen: boolean) {
   const utils = trpc.useUtils();
   const isEdit = commandeId > 0;

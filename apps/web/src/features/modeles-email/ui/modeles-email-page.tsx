@@ -16,8 +16,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { useModelesEmail } from "../application/use-modeles-email";
 import { EMAIL_TYPES, VARIABLES_DISPONIBLES, VARIABLES_RACCOURCIS, typeBadgeColor, filterByType, renderPreview, type Modele, type ModeleForm, type EmailType } from "../domain/modeles-email";
 
-// Page `modeles-email` (modèles d'emails) — migration clean-archi de `pages/ModelesEmail.tsx`.
-// Markup/classes Tailwind conservés à l'identique (parité). tRPC encapsulé dans `use-modeles-email`.
+/*
+ * Page `modeles-email` (modèles d'emails) — migration clean-archi de `pages/ModelesEmail.tsx`.
+ * Markup/classes Tailwind conservés à l'identique (parité). tRPC encapsulé dans `use-modeles-email`.
+ */
 const EMPTY_FORM: ModeleForm = { nom: "", type: "relance_devis", sujet: "", contenu: "", isDefault: false };
 
 export default function ModelesEmailPage() {

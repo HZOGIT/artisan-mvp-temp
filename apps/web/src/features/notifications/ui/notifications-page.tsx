@@ -14,10 +14,12 @@ import {
 import { toast } from "sonner";
 import { useLocation } from "@/shared/router/navigation";
 
-// Page Notifications du FRONT NEUF (`/notifications`) — clean-archi : présentation pure. Données &
-// mutations via `useNotifications` (couche application, seule à importer tRPC) ; le calcul de date
-// relative vient du domaine (`relativeDateDescriptor`, pur & testé). Parité visuelle stricte :
-// JSX/Tailwind à l'identique. Libellés via i18n (namespace `notifications`).
+/*
+ * Page Notifications du FRONT NEUF (`/notifications`) — clean-archi : présentation pure. Données &
+ * mutations via `useNotifications` (couche application, seule à importer tRPC) ; le calcul de date
+ * relative vient du domaine (`relativeDateDescriptor`, pur & testé). Parité visuelle stricte :
+ * JSX/Tailwind à l'identique. Libellés via i18n (namespace `notifications`).
+ */
 
 const typeIcon: Record<string, LucideIcon> = {
   succes: CheckCircle,
@@ -35,7 +37,7 @@ const typeColor: Record<string, string> = {
   erreur: "text-red-500",
 };
 
-// Présentation : mappe le descripteur PUR du domaine vers les libellés i18n (et le format de repli).
+/** Présentation : mappe le descripteur PUR du domaine vers les libellés i18n (et le format de repli). */
 function formatRelativeDate(date: string | Date, t: TFunction<"notifications">) {
   const r = relativeDateDescriptor(date);
   switch (r.kind) {

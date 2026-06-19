@@ -12,11 +12,13 @@ import { DashboardLayoutMount } from "../../shell/ui/dashboard-layout-mount";
 import NotFoundPage from "../../features/not-found/ui/not-found-page";
 import OnboardingPage from "../../features/onboarding/ui/onboarding-page";
 
-// Socle de routage du FRONT NEUF (refonte strangler-fig). TanStack Router prend la main sur tout le
-// sous-arbre d'URL racine (cf. `basepath: "/"`). wouter a été retiré.
-// Le routeur est rendu DANS l'arbre React existant (cf. ModernRouterMount), donc il partage déjà les
-// providers du legacy : QueryClient + tRPC (@trpc/react-query) + session/auth + DashboardLayout.
-// Routage par CODE (pas de codegen file-based) pour rester explicite et sans plugin de build.
+/*
+ * Socle de routage du FRONT NEUF (refonte strangler-fig). TanStack Router prend la main sur tout le
+ * sous-arbre d'URL racine (cf. `basepath: "/"`). wouter a été retiré.
+ * Le routeur est rendu DANS l'arbre React existant (cf. ModernRouterMount), donc il partage déjà les
+ * providers du legacy : QueryClient + tRPC (@trpc/react-query) + session/auth + DashboardLayout.
+ * Routage par CODE (pas de codegen file-based) pour rester explicite et sans plugin de build.
+ */
 
 function RouterPending() {
   const { t } = useTranslation("common");
@@ -36,164 +38,168 @@ function RouterNotFound() {
   return <NotFoundPage />;
 }
 
-// Racine NUE (un seul routeur unifié, OPE-403/F1) : porte l'<Outlet/> commun. Trois zones d'enfants :
-// (1) `appShellRoute` — layout pathless qui rend le SHELL modern (sidebar/topbar/chrome) → routes AUTHENTIFIÉES ;
-// (2) routes PUBLIQUES (paiement/signature/portail/auth/légales/home) montées DIRECTEMENT (hors shell) ;
-// (3) `/onboarding` plein écran (hors shell) + redirection racine `/`→`/home`.
+/*
+ * Racine NUE (un seul routeur unifié, OPE-403/F1) : porte l'<Outlet/> commun. Trois zones d'enfants :
+ * (1) `appShellRoute` — layout pathless qui rend le SHELL modern (sidebar/topbar/chrome) → routes AUTHENTIFIÉES ;
+ * (2) routes PUBLIQUES (paiement/signature/portail/auth/légales/home) montées DIRECTEMENT (hors shell) ;
+ * (3) `/onboarding` plein écran (hors shell) + redirection racine `/`→`/home`.
+ */
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
   notFoundComponent: RouterNotFound,
 });
 
-// Redirection de confort : `/` → `/home` (vitrine publique).
+/** Redirection de confort : `/` → `/home` (vitrine publique). */
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   beforeLoad: () => { throw redirect({ to: "/home" }); },
 });
 
-// Onboarding plein écran (authentifié mais SANS shell) — port du comportement App.tsx (eager, pas de chrome).
+/** Onboarding plein écran (authentifié mais SANS shell) — port du comportement App.tsx (eager, pas de chrome). */
 const onboardingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/onboarding",
   component: OnboardingPage,
 });
 
-// Layout pathless du SHELL modern : rend DashboardLayoutMount (chrome + gate onboarding) autour de l'<Outlet/>.
-// Toutes les routes authentifiées en sont enfants → la chrome persiste entre navigations.
+/*
+ * Layout pathless du SHELL modern : rend DashboardLayoutMount (chrome + gate onboarding) autour de l'<Outlet/>.
+ * Toutes les routes authentifiées en sont enfants → la chrome persiste entre navigations.
+ */
 const appShellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "app-shell",
   component: DashboardLayoutMount,
 });
 
-// Liste Clients du front neuf — port conforme de `pages/Clients.tsx` (parité visuelle).
+/** Liste Clients du front neuf — port conforme de `pages/Clients.tsx` (parité visuelle). */
 const clientsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/clients",
   component: lazyRouteComponent(() => import("../../features/clients/ui/clients-list-page")),
 });
 
-// Détail client — port conforme de `pages/ClientDetail.tsx` (param de route typé `$id`).
+/** Détail client — port conforme de `pages/ClientDetail.tsx` (param de route typé `$id`). */
 const clientDetailRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/clients/$id",
   component: lazyRouteComponent(() => import("../../features/clients/ui/client-detail-page")),
 });
 
-// Notifications du front neuf — port conforme de `pages/Notifications.tsx`.
+/** Notifications du front neuf — port conforme de `pages/Notifications.tsx`. */
 const notificationsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/notifications",
   component: lazyRouteComponent(() => import("../../features/notifications/ui/notifications-page")),
 });
 
-// Techniciens du front neuf — port conforme de `pages/Techniciens.tsx`.
+/** Techniciens du front neuf — port conforme de `pages/Techniciens.tsx`. */
 const techniciensRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/techniciens",
   component: lazyRouteComponent(() => import("../../features/techniciens/ui/techniciens-page")),
 });
 
-// Fournisseurs du front neuf — port conforme de `pages/Fournisseurs.tsx`.
+/** Fournisseurs du front neuf — port conforme de `pages/Fournisseurs.tsx`. */
 const fournisseursRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/fournisseurs",
   component: lazyRouteComponent(() => import("../../features/fournisseurs/ui/fournisseurs-page")),
 });
 
-// Articles (bibliothèque) du front neuf — port conforme de `pages/Articles.tsx`.
+/** Articles (bibliothèque) du front neuf — port conforme de `pages/Articles.tsx`. */
 const articlesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/articles",
   component: lazyRouteComponent(() => import("../../features/articles/ui/articles-page")),
 });
 
-// Devis du front neuf — port conforme de `pages/Devis.tsx`.
+/** Devis du front neuf — port conforme de `pages/Devis.tsx`. */
 const devisRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/devis",
   component: lazyRouteComponent(() => import("../../features/devis/ui/devis-page")),
 });
 
-// Factures du front neuf — port conforme de `pages/Factures.tsx`.
+/** Factures du front neuf — port conforme de `pages/Factures.tsx`. */
 const facturesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/factures",
   component: lazyRouteComponent(() => import("../../features/factures/ui/factures-page")),
 });
 
-// Interventions du front neuf — port conforme de `pages/Interventions.tsx`.
+/** Interventions du front neuf — port conforme de `pages/Interventions.tsx`. */
 const interventionsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/interventions",
   component: lazyRouteComponent(() => import("../../features/interventions/ui/interventions-page")),
 });
 
-// Commandes fournisseurs du front neuf — port conforme de `pages/CommandesFournisseurs.tsx`.
+/** Commandes fournisseurs du front neuf — port conforme de `pages/CommandesFournisseurs.tsx`. */
 const commandesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/commandes",
   component: lazyRouteComponent(() => import("../../features/commandes/ui/commandes-page")),
 });
 
-// Stocks du front neuf — port conforme de `pages/Stocks.tsx`.
+/** Stocks du front neuf — port conforme de `pages/Stocks.tsx`. */
 const stocksRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/stocks",
   component: lazyRouteComponent(() => import("../../features/stocks/ui/stocks-page")),
 });
 
-// Dépenses du front neuf — port conforme de `pages/Depenses.tsx`.
+/** Dépenses du front neuf — port conforme de `pages/Depenses.tsx`. */
 const depensesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/depenses",
   component: lazyRouteComponent(() => import("../../features/depenses/ui/depenses-page")),
 });
 
-// Comptabilité du front neuf — port conforme de `pages/Comptabilite.tsx`.
+/** Comptabilité du front neuf — port conforme de `pages/Comptabilite.tsx`. */
 const comptabiliteRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/comptabilite",
   component: lazyRouteComponent(() => import("../../features/comptabilite/ui/comptabilite-page")),
 });
 
-// Gestion du Portail Client du front neuf — migration clean-archi de `pages/PortailGestion.tsx`.
+/** Gestion du Portail Client du front neuf — migration clean-archi de `pages/PortailGestion.tsx`. */
 const portailGestionRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/portail-gestion",
   component: lazyRouteComponent(() => import("../../features/portail-gestion/ui/portail-gestion-page")),
 });
 
-// Budgets de dépenses du front neuf — migration clean-archi de `pages/BudgetsDepenses.tsx`.
+/** Budgets de dépenses du front neuf — migration clean-archi de `pages/BudgetsDepenses.tsx`. */
 const budgetsDepensesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/budgets-depenses",
   component: lazyRouteComponent(() => import("../../features/budgets-depenses/ui/budgets-depenses-page")),
 });
 
-// Règles de catégorisation des dépenses — migration clean-archi de `pages/ReglesDepenses.tsx`.
+/** Règles de catégorisation des dépenses — migration clean-archi de `pages/ReglesDepenses.tsx`. */
 const reglesDepensesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/regles-depenses",
   component: lazyRouteComponent(() => import("../../features/regles-depenses/ui/regles-depenses-page")),
 });
 
-// Historique des emails — migration clean-archi de `pages/HistoriqueEmails.tsx`.
+/** Historique des emails — migration clean-archi de `pages/HistoriqueEmails.tsx`. */
 const historiqueEmailsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/historique-emails",
   component: lazyRouteComponent(() => import("../../features/historique-emails/ui/historique-emails-page")),
 });
 
-// Centre d'aide / Support — migration clean-archi de `pages/Support.tsx`.
+/** Centre d'aide / Support — migration clean-archi de `pages/Support.tsx`. */
 const supportRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/support",
   component: lazyRouteComponent(() => import("../../features/support/ui/support-page")),
 });
 
-// Avis clients — migration clean-archi de `pages/Avis.tsx`.
+/** Avis clients — migration clean-archi de `pages/Avis.tsx`. */
 const avisRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/avis",
@@ -383,96 +389,100 @@ const factureDetailRoute = createRoute({ getParentRoute: () => appShellRoute, pa
 const commandeNouvelleRoute = createRoute({ getParentRoute: () => appShellRoute, path: "/commandes/nouvelle", component: lazyRouteComponent(() => import("../../features/commande-form/ui/commande-form-page")) });
 const commandeModifierRoute = createRoute({ getParentRoute: () => appShellRoute, path: "/commandes/$id/modifier", component: lazyRouteComponent(() => import("../../features/commande-form/ui/commande-form-page")) });
 
-// Flotte (vue d'ensemble du parc) — migration clean-archi de `pages/Flotte.tsx`.
+/** Flotte (vue d'ensemble du parc) — migration clean-archi de `pages/Flotte.tsx`. */
 const flotteRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/flotte",
   component: lazyRouteComponent(() => import("../../features/flotte/ui/flotte-page")),
 });
 
-// Statistiques Devis — migration clean-archi de `pages/StatistiquesDevis.tsx`.
+/** Statistiques Devis — migration clean-archi de `pages/StatistiquesDevis.tsx`. */
 const statistiquesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/statistiques",
   component: lazyRouteComponent(() => import("../../features/statistiques-devis/ui/statistiques-devis-page")),
 });
 
-// Mes modules — migration clean-archi de `pages/Modules.tsx`.
+/** Mes modules — migration clean-archi de `pages/Modules.tsx`. */
 const modulesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/modules",
   component: lazyRouteComponent(() => import("../../features/modules/ui/modules-page")),
 });
 
-// Gestion des congés — migration clean-archi de `pages/Conges.tsx`.
+/** Gestion des congés — migration clean-archi de `pages/Conges.tsx`. */
 const congesRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/conges",
   component: lazyRouteComponent(() => import("../../features/conges/ui/conges-page")),
 });
 
-// Contrats de maintenance — migration clean-archi de `pages/Contrats.tsx`.
+/** Contrats de maintenance — migration clean-archi de `pages/Contrats.tsx`. */
 const contratsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/contrats",
   component: lazyRouteComponent(() => import("../../features/contrats/ui/contrats-page")),
 });
 
-// Relances de devis — migration clean-archi de `pages/RelancesDevis.tsx`.
+/** Relances de devis — migration clean-archi de `pages/RelancesDevis.tsx`. */
 const relancesDevisRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/relances",
   component: lazyRouteComponent(() => import("../../features/relances-devis/ui/relances-devis-page")),
 });
 
-// Calendrier des interventions — migration clean-archi de `pages/Calendrier.tsx`.
+/** Calendrier des interventions — migration clean-archi de `pages/Calendrier.tsx`. */
 const calendrierRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/calendrier",
   component: lazyRouteComponent(() => import("../../features/calendrier/ui/calendrier-page")),
 });
 
-// Gestion des utilisateurs — migration clean-archi de `pages/Utilisateurs.tsx`.
+/** Gestion des utilisateurs — migration clean-archi de `pages/Utilisateurs.tsx`. */
 const utilisateursRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/utilisateurs",
   component: lazyRouteComponent(() => import("../../features/utilisateurs/ui/utilisateurs-page")),
 });
 
-// Variantes de devis (placeholder explicatif) — migration clean-archi de `pages/DevisOptions.tsx`.
+/** Variantes de devis (placeholder explicatif) — migration clean-archi de `pages/DevisOptions.tsx`. */
 const devisOptionsRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/devis-options",
   component: lazyRouteComponent(() => import("../../features/devis-options/ui/devis-options-page")),
 });
 
-// Paramètres — migration clean-archi de `pages/Parametres.tsx` (onglet général + abonnement réutilisé).
-// La sous-section « réglages vitrine » est omise (pas d'endpoint backend — finding OPE-504).
+/*
+ * Paramètres — migration clean-archi de `pages/Parametres.tsx` (onglet général + abonnement réutilisé).
+ * La sous-section « réglages vitrine » est omise (pas d'endpoint backend — finding OPE-504).
+ */
 const parametresRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/parametres",
   component: lazyRouteComponent(() => import("../../features/parametres/ui/parametres-page")),
 });
 
-// Tableau de bord — migration clean-archi de `pages/Dashboard.tsx` (thin-shell réutilisant les widgets).
+/** Tableau de bord — migration clean-archi de `pages/Dashboard.tsx` (thin-shell réutilisant les widgets). */
 const dashboardRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/dashboard",
   component: lazyRouteComponent(() => import("../../features/dashboard/ui/dashboard-page")),
 });
 
-// Notes de frais — migration clean-archi de `pages/NotesFrais.tsx` (débloquée par OPE-490 backend).
+/** Notes de frais — migration clean-archi de `pages/NotesFrais.tsx` (débloquée par OPE-490 backend). */
 const notesFraisRoute = createRoute({
   getParentRoute: () => appShellRoute,
   path: "/notes-de-frais",
   component: lazyRouteComponent(() => import("../../features/notes-frais/ui/notes-frais-page")),
 });
 
-// ============================================================================
-// Routes PUBLIQUES (hors auth/shell) — fusionnées depuis l'ancien public-router.tsx (OPE-403/F1).
-// Montées directement sous la racine NUE (pas de chrome). Paiement/signature/portail/avis/vitrine par
-// token/slug, pages auth (visiteur déconnecté), pages légales, home (vitrine).
-// ============================================================================
+/*
+ * ============================================================================
+ * Routes PUBLIQUES (hors auth/shell) — fusionnées depuis l'ancien public-router.tsx (OPE-403/F1).
+ * Montées directement sous la racine NUE (pas de chrome). Paiement/signature/portail/avis/vitrine par
+ * token/slug, pages auth (visiteur déconnecté), pages légales, home (vitrine).
+ * ============================================================================
+ */
 const paiementSuccesRoute = createRoute({ getParentRoute: () => rootRoute, path: "/paiement/succes", component: lazyRouteComponent(() => import("../../features/paiement/ui/paiement-succes-page")) });
 const paiementAnnuleRoute = createRoute({ getParentRoute: () => rootRoute, path: "/paiement/annule", component: lazyRouteComponent(() => import("../../features/paiement/ui/paiement-annule-page")) });
 const signatureRoute = createRoute({ getParentRoute: () => rootRoute, path: "/signature/$token", component: lazyRouteComponent(() => import("../../features/signature/ui/signature-devis-page")) });
@@ -495,7 +505,7 @@ const cguRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cgu", co
 const cgvRoute = createRoute({ getParentRoute: () => rootRoute, path: "/cgv", component: lazyRouteComponent(() => import("../../features/legal/ui/cgv-page")) });
 const confidentialiteRoute = createRoute({ getParentRoute: () => rootRoute, path: "/confidentialite", component: lazyRouteComponent(() => import("../../features/legal/ui/confidentialite-page")) });
 
-// Arbre AUTHENTIFIÉ : toutes les pages sous le shell (chrome persistante).
+/** Arbre AUTHENTIFIÉ : toutes les pages sous le shell (chrome persistante). */
 const appShellTree = appShellRoute.addChildren([clientsRoute, clientDetailRoute, notificationsRoute, techniciensRoute, fournisseursRoute, articlesRoute, devisRoute, facturesRoute, interventionsRoute, commandesRoute, stocksRoute, depensesRoute, comptabiliteRoute, portailGestionRoute, budgetsDepensesRoute, reglesDepensesRoute, historiqueEmailsRoute, supportRoute, avisRoute, flotteRoute, statistiquesRoute, modulesRoute, congesRoute, contratsRoute, relancesDevisRoute, calendrierRoute, utilisateursRoute, devisOptionsRoute, parametresRoute, dashboardRoute, notesFraisRoute, chatRoute, badgesRoute, classementRoute, modelesEmailRoute, modelesTransactionnelsRoute, assistantConversationsRoute, vehiculesRoute, rapportCommandeRoute, rapportsRoute, documentationRoute, maVitrineRoute, rdvEnLigneRoute, alertesPrevisionsRoute, previsionsRoute, performancesFournisseursRoute, tableauBordDepensesRoute, importReleveRoute, syncComptableRoute, geolocalisationRoute, planificationRoute, nouvelleDepenseRoute, integrationsComptablesRoute, analysesPhotosRoute, importRoute, devisIaRoute, chantiersRoute, assistantRoute, calendrierChantiersRoute, clientsNouveauRoute, clientsImportRoute, mobileRoute, commandeDetailRoute, contratDetailRoute, profilRoute, devisLigneRoute, devisNouveauRoute, devisDetailRoute, factureDetailRoute, commandeNouvelleRoute, commandeModifierRoute]);
 
 const routeTree = rootRoute.addChildren([
@@ -512,7 +522,7 @@ export const modernRouter = createRouter({
   defaultErrorComponent: RouterError,
 });
 
-// Type-safety du routeur neuf (liens/navigation typés) sans polluer le legacy.
+/** Type-safety du routeur neuf (liens/navigation typés) sans polluer le legacy. */
 declare module "@tanstack/react-router" {
   interface Register {
     router: typeof modernRouter;

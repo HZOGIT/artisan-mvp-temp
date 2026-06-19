@@ -1,9 +1,11 @@
 import { trpc } from "@/shared/trpc";
 import type { Categorie, Regle } from "../domain/regle";
 
-// Couche APPLICATION de la feature `regles-depenses` (clean-archi) : SEULE couche important tRPC.
-// Charge les règles + les catégories (pour le sélecteur/couleurs) et expose les mutations (création /
-// suppression) avec invalidation. L'UI attache ses effets (toast / reset de formulaire) par appel.
+/*
+ * Couche APPLICATION de la feature `regles-depenses` (clean-archi) : SEULE couche important tRPC.
+ * Charge les règles + les catégories (pour le sélecteur/couleurs) et expose les mutations (création /
+ * suppression) avec invalidation. L'UI attache ses effets (toast / reset de formulaire) par appel.
+ */
 export function useRegles() {
   const utils = trpc.useUtils();
   const reglesQ = trpc.depenses.getRegles.useQuery();

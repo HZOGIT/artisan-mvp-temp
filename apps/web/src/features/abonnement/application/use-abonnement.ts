@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { Subscription, Device } from "../domain/abonnement";
 
-// Couche APPLICATION de la feature `abonnement` (clean-archi) : SEULE couche important tRPC.
-// Port moderne d'`AbonnementSection` : abonnement courant + appareils + mutations Stripe (checkout/
-// portal/cancel/reactivate) et appareils (revoke/revokeAll). Les redirections Stripe + toasts sont
-// attachés par l'UI via `mutate(vars, { onSuccess, onError })`.
+/*
+ * Couche APPLICATION de la feature `abonnement` (clean-archi) : SEULE couche important tRPC.
+ * Port moderne d'`AbonnementSection` : abonnement courant + appareils + mutations Stripe (checkout/
+ * portal/cancel/reactivate) et appareils (revoke/revokeAll). Les redirections Stripe + toasts sont
+ * attachés par l'UI via `mutate(vars, { onSuccess, onError })`.
+ */
 export function useAbonnement() {
   const utils = trpc.useUtils();
   const subQ = trpc.subscription.getCurrent.useQuery();

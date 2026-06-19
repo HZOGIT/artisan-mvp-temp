@@ -14,8 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useIntegrationsComptables } from "../application/use-integrations-comptables";
 import { DEFAULT_CONFIG_FORM, DEFAULT_SYNC_CONFIG, defaultExportForm, syncConfigFromConfig, statutVariant, pendingTotal, exportFilename, LOGICIELS, FORMATS, FREQUENCES, type Logiciel, type FormatExport, type FrequenceSync } from "../domain/integrations-comptables";
 
-// Page `integrations-comptables` — migration clean-archi de `pages/IntegrationsComptables.tsx`. Markup à
-// l'identique (journal unifié sur le vrai contrat : détail = nombreEcritures, cf. finding). 0 `any`.
+/*
+ * Page `integrations-comptables` — migration clean-archi de `pages/IntegrationsComptables.tsx`. Markup à
+ * l'identique (journal unifié sur le vrai contrat : détail = nombreEcritures, cf. finding). 0 `any`.
+ */
 const STATUT_ICON: Record<string, typeof CheckCircle2> = { en_cours: RefreshCw, termine: CheckCircle2, succes: CheckCircle2, erreur: AlertCircle, en_attente: Clock };
 
 export default function IntegrationsComptablesPage() {

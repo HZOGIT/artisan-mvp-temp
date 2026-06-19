@@ -2,17 +2,19 @@ import jsPDF from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import { formatCurrency, type CommandeFournisseur, type RapportCommande, type Artisan } from "../domain/rapport-commande";
 
-// Génération PDF (couche présentation/export, hors domaine car effet de bord `doc.save`). Utilise la forme
-// FONCTION typée `autoTable(doc, opts)` de jspdf-autotable (pas l'augmentation de prototype non typée),
-// d'où aucun cast permissif. Les libellés du document sont des chaînes de gabarit (artefact d'export).
+/*
+ * Génération PDF (couche présentation/export, hors domaine car effet de bord `doc.save`). Utilise la forme
+ * FONCTION typée `autoTable(doc, opts)` de jspdf-autotable (pas l'augmentation de prototype non typée),
+ * d'où aucun cast permissif. Les libellés du document sont des chaînes de gabarit (artefact d'export).
+ */
 
-// jspdf-autotable pose `lastAutoTable` sur l'instance ; on la lit via un type explicite (pas de cast large).
+/** jspdf-autotable pose `lastAutoTable` sur l'instance ; on la lit via un type explicite (pas de cast large). */
 type DocWithLastAutoTable = jsPDF & { lastAutoTable?: { finalY: number } };
 function lastFinalY(doc: jsPDF, fallback: number): number {
   return (doc as DocWithLastAutoTable).lastAutoTable?.finalY ?? fallback;
 }
 
-// Bon de commande d'UN fournisseur.
+/** Bon de commande d'UN fournisseur. */
 export function exportBonCommande(commande: CommandeFournisseur, artisan: Artisan | undefined): void {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -79,7 +81,7 @@ export function exportBonCommande(commande: CommandeFournisseur, artisan: Artisa
   doc.save(`bon-commande-${fournisseurNom.toLowerCase().replace(/\s+/g, "-")}-${new Date().toISOString().split("T")[0]}.pdf`);
 }
 
-// Rapport global (un fournisseur par page + page de résumé).
+/** Rapport global (un fournisseur par page + page de résumé). */
 export function exportRapportGlobal(rapport: RapportCommande): void {
   if (rapport.length === 0) return;
   const doc = new jsPDF();

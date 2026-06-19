@@ -1,7 +1,9 @@
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `calendrier-chantiers` (planning interventions : mois/semaine/jour, drag&drop
-// de replanification/réaffectation, couleurs, export). Transformations + logique calendaire PURES testables.
+/*
+ * Couche DOMAIN de la feature `calendrier-chantiers` (planning interventions : mois/semaine/jour, drag&drop
+ * de replanification/réaffectation, couleurs, export). Transformations + logique calendaire PURES testables.
+ */
 
 export type InterventionRow = RouterOutputs["interventions"]["list"][number];
 export type Chantier = RouterOutputs["chantiers"]["list"][number];
@@ -12,7 +14,7 @@ export type AssignResult = RouterOutputs["interventions"]["assignerTechnicien"];
 export type ViewMode = "month" | "week" | "day";
 export type ColorMode = "chantier" | "technicien" | "statut";
 
-// Intervention « enrichie » affichée dans le calendrier.
+/** Intervention « enrichie » affichée dans le calendrier. */
 export type CalendarIntervention = {
   id: number; chantierId: number; chantierNom: string; technicienId: number | null; technicienNom: string | null;
   dateDebut: string; dateFin: string | null; statut: string; description: string | null; adresse: string | null;
@@ -33,7 +35,7 @@ export function technicienNom(t: Technicien | undefined): string | null {
   return t ? `${t.prenom || ""} ${t.nom}`.trim() : null;
 }
 
-// Enrichit les interventions avec chantier (via le lien) + technicien. PUR.
+/** Enrichit les interventions avec chantier (via le lien) + technicien. PUR. */
 export function transformInterventions(rows: readonly InterventionRow[], chantiers: readonly Chantier[], techniciens: readonly Technicien[], liens: readonly InterventionChantierLien[]): CalendarIntervention[] {
   const chantierMap = new Map(chantiers.map((c) => [c.id, c]));
   const techMap = new Map(techniciens.map((t) => [t.id, t]));
@@ -51,12 +53,12 @@ export function transformInterventions(rows: readonly InterventionRow[], chantie
   });
 }
 
-// Filtre par chantier/technicien sélectionnés. PUR.
+/** Filtre par chantier/technicien sélectionnés. PUR. */
 export function filterInterventions(list: readonly CalendarIntervention[], chantierId: number | null, technicienId: number | null): CalendarIntervention[] {
   return list.filter((i) => (!chantierId || i.chantierId === chantierId) && (!technicienId || i.technicienId === technicienId));
 }
 
-// Couleur (classe Tailwind) d'une intervention selon le mode + couleurs personnalisées. PUR.
+/** Couleur (classe Tailwind) d'une intervention selon le mode + couleurs personnalisées. PUR. */
 export function interventionColor(i: CalendarIntervention, customColors: Record<number, string>, mode: ColorMode): string {
   if (customColors[i.id]) return customColors[i.id];
   if (mode === "technicien") return i.technicienId ? COLORS[i.technicienId % COLORS.length].class : COLORS[0].class;
@@ -64,7 +66,7 @@ export function interventionColor(i: CalendarIntervention, customColors: Record<
   return COLORS[i.chantierId % COLORS.length].class;
 }
 
-// Interventions actives un jour donné (chevauchement [début, fin]). PUR.
+/** Interventions actives un jour donné (chevauchement [début, fin]). PUR. */
 export function interventionsForDay(list: readonly CalendarIntervention[], date: Date): CalendarIntervention[] {
   const dateStr = date.toISOString().split("T")[0];
   return list.filter((i) => {
@@ -74,7 +76,7 @@ export function interventionsForDay(list: readonly CalendarIntervention[], date:
   });
 }
 
-// Grille de 42 cases (6 semaines) du mois, lundi en tête. PUR.
+/** Grille de 42 cases (6 semaines) du mois, lundi en tête. PUR. */
 export function daysInMonth(currentDate: Date): { date: Date; isCurrentMonth: boolean }[] {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -89,7 +91,7 @@ export function daysInMonth(currentDate: Date): { date: Date; isCurrentMonth: bo
   return days;
 }
 
-// 7 jours de la semaine courante (lundi → dimanche). PUR.
+/** 7 jours de la semaine courante (lundi → dimanche). PUR. */
 export function daysInWeek(currentDate: Date): Date[] {
   const d = new Date(currentDate);
   const day = d.getDay();
@@ -97,7 +99,7 @@ export function daysInWeek(currentDate: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i));
 }
 
-// Nouvelle date de début après un drop (décalage en jours). null si même jour. PUR.
+/** Nouvelle date de début après un drop (décalage en jours). null si même jour. PUR. */
 export function rescheduledDate(dateDebut: string, targetDate: Date): Date | null {
   const original = new Date(dateDebut);
   const diffDays = Math.floor((targetDate.getTime() - original.getTime()) / 86400000);
@@ -107,7 +109,7 @@ export function rescheduledDate(dateDebut: string, targetDate: Date): Date | nul
   return next;
 }
 
-// Variante shadcn + libellé i18n d'un statut. PUR.
+/** Variante shadcn + libellé i18n d'un statut. PUR. */
 export function statutVariant(statut: string): "default" | "secondary" | "destructive" | "outline" {
   if (statut === "en_cours") return "default";
   if (statut === "terminee") return "outline";
@@ -115,13 +117,13 @@ export function statutVariant(statut: string): "default" | "secondary" | "destru
   return "secondary";
 }
 
-// Comptes de conflits d'une réassignation. PUR.
+/** Comptes de conflits d'une réassignation. PUR. */
 export function conflictCounts(data: AssignResult): { nbInter: number; nbConge: number } {
   const c = data.conflits;
   return { nbInter: c?.interventions?.length ?? 0, nbConge: c?.conges?.length ?? 0 };
 }
 
-// CSV du calendrier (séparateur ;). PUR.
+/** CSV du calendrier (séparateur ;). PUR. */
 export function buildCsv(list: readonly CalendarIntervention[]): string {
   const header = ["Titre", "Date début", "Date fin", "Technicien", "Adresse", "Statut"].join(";");
   const rows = list.map((i) => [

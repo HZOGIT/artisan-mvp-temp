@@ -23,10 +23,12 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Page Devis du FRONT NEUF (`/devis`) — clean-archi : présentation pure. Données/mutations via
-// `useDevis` (couche application, seule à importer tRPC) ; filtrage/décompte via le domaine
-// (`../domain/devis`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à l'identique
-// (table native `data-table`). Couleurs de filtres conservées (classes Tailwind) ; libellés via i18n.
+/*
+ * Page Devis du FRONT NEUF (`/devis`) — clean-archi : présentation pure. Données/mutations via
+ * `useDevis` (couche application, seule à importer tRPC) ; filtrage/décompte via le domaine
+ * (`../domain/devis`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à l'identique
+ * (table native `data-table`). Couleurs de filtres conservées (classes Tailwind) ; libellés via i18n.
+ */
 
 const statusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -42,7 +44,7 @@ export default function DevisPage() {
   const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  // Lecture du filtre ?filtre= défini par MonAssistant (naviguer_vers).
+  /** Lecture du filtre ?filtre= défini par MonAssistant (naviguer_vers). */
   useEffect(() => {
     const params = new URLSearchParams(search);
     const f = params.get("filtre");
@@ -87,7 +89,7 @@ export default function DevisPage() {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
   };
 
-  // Export PDF
+  /** Export PDF */
   const exportToPDF = () => {
     if (!filteredDevis || filteredDevis.length === 0) {
       toast.error(t("toastNothingToExport"));
@@ -141,7 +143,7 @@ export default function DevisPage() {
     toast.success(t("toastPdfDownloaded"));
   };
 
-  // Export Excel
+  /** Export Excel */
   const exportToExcel = () => {
     if (!filteredDevis || filteredDevis.length === 0) {
       toast.error(t("toastNothingToExport"));
@@ -180,7 +182,7 @@ export default function DevisPage() {
     toast.success(t("toastExcelDownloaded"));
   };
 
-  // Index client pour la résolution de nom (l'index vit côté UI ; le filtrage est délégué au domaine).
+  /** Index client pour la résolution de nom (l'index vit côté UI ; le filtrage est délégué au domaine). */
   const clientsMap = new Map<number, DevisClient>(clients.map((c) => [c.id, c]));
   const resolveClientName = (clientId: number | null) =>
     clientLabel(clientId == null ? undefined : clientsMap.get(clientId));

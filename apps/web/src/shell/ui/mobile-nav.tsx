@@ -7,9 +7,11 @@ import type { NavGroup, GroupId } from "../domain/nav";
 import { MOBILE_PRIMARY } from "../domain/nav";
 import { RAIL_COLORS } from "../domain/rail-colors";
 
-// UI SHELL modern — navigation MOBILE (barre du bas + drawer « Plus » à groupes repliables). PORT FIDÈLE de
-// DashboardLayout, PILOTÉ PAR PROPS (0 dépendance legacy/tRPC). État (ouvert, groupes dépliés) + nav fournis par
-// le parent ; badges contextuels injectés via `itemBadge`. Validé visuellement au câblage final.
+/*
+ * UI SHELL modern — navigation MOBILE (barre du bas + drawer « Plus » à groupes repliables). PORT FIDÈLE de
+ * DashboardLayout, PILOTÉ PAR PROPS (0 dépendance legacy/tRPC). État (ouvert, groupes dépliés) + nav fournis par
+ * le parent ; badges contextuels injectés via `itemBadge`. Validé visuellement au câblage final.
+ */
 
 export interface MobileNavProps {
   groups: NavGroup[];

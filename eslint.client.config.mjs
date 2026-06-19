@@ -33,7 +33,9 @@ const commentsJsdocOnly = {
             const before = startLine.substring(0, comment.loc.start.column).trim();
             const endLine = lines[comment.loc.end.line - 1] ?? "";
             const after = endLine.substring(comment.loc.end.column).trim();
-            if (before !== "" || after !== "") {
+            // JSX brace-comment and empty-catch pattern — intentional, not a TS inline comment
+            const isJsxLike = before.endsWith("{") && after.startsWith("}");
+            if ((before !== "" || after !== "") && !isJsxLike) {
               context.report({ loc: comment.loc, message: "Commentaire inline non-JSDoc : utiliser /** … */ à la place." });
             }
           }
@@ -131,4 +133,8 @@ export default tseslint.config({
 {
   files: ["apps/web/src/features/_demo/**"],
   rules: { "i18next/no-literal-string": "off" },
+},
+{
+  files: ["apps/web/src/**/*.test.ts", "apps/web/src/**/*.test.tsx", "apps/web/src/**/*.spec.ts", "apps/web/src/**/*.spec.tsx"],
+  rules: { "local/comments-jsdoc-only": "off", "multiline-comment-style": "off" },
 });

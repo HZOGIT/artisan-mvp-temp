@@ -127,13 +127,13 @@ export function useSpeechRecognition(
         if (r.isFinal) final += text;
         else interim += text;
       }
-      // Cumulative transcript (interim + finalized so far)
+      /** Cumulative transcript (interim + finalized so far) */
       const combined = (final + interim).trim();
       setTranscript(combined);
       if (final) {
         setFinalTranscript((prev) => (prev + final).trim());
       }
-      // L'artisan parle → on relance le compteur de silence.
+      /** L'artisan parle → on relance le compteur de silence. */
       armSilenceTimer();
     };
 
@@ -149,7 +149,8 @@ export function useSpeechRecognition(
       } else if (code === "network") {
         msg = "Erreur réseau (la reconnaissance vocale nécessite Internet).";
       } else if (code === "aborted") {
-        msg = ""; // arrêt manuel, pas une erreur user-facing
+        /** arrêt manuel, pas une erreur user-facing */
+        msg = "";
       }
       if (msg) setError(msg);
     };
@@ -195,7 +196,7 @@ export function useSpeechRecognition(
     setFinalTranscript("");
   }, []);
 
-  // Cleanup on unmount
+  /** Cleanup on unmount */
   useEffect(() => {
     return () => {
       clearSilenceTimer();

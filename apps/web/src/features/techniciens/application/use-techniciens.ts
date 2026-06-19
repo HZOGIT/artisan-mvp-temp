@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { LinkableUser, Technicien } from "../domain/technicien";
 
-// Couche APPLICATION de la feature `techniciens` (clean-archi) : SEULE couche important tRPC.
-// `useTechniciens` couvre la liste + comptes liables + le CRUD ; `useTechnicienDetail` isole les
-// données du technicien sélectionné (stats + habilitations, queries dépendantes) + leurs mutations.
-// L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+/*
+ * Couche APPLICATION de la feature `techniciens` (clean-archi) : SEULE couche important tRPC.
+ * `useTechniciens` couvre la liste + comptes liables + le CRUD ; `useTechnicienDetail` isole les
+ * données du technicien sélectionné (stats + habilitations, queries dépendantes) + leurs mutations.
+ * L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+ */
 export function useTechniciens() {
   const utils = trpc.useUtils();
   const techniciensQ = trpc.techniciens.getAll.useQuery();
@@ -21,7 +23,7 @@ export function useTechniciens() {
   return { techniciens, linkableUsers, create, update, remove };
 }
 
-// Détail du technicien sélectionné (stats + habilitations) — queries dépendantes de l'état UI.
+/** Détail du technicien sélectionné (stats + habilitations) — queries dépendantes de l'état UI. */
 export function useTechnicienDetail(technicienId: number | null) {
   const utils = trpc.useUtils();
   const enabled = technicienId != null;

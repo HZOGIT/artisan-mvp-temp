@@ -11,8 +11,10 @@ import { notifTypeMeta } from "../domain/notif-style";
 
 type Notif = RouterOutputs["notifications"]["list"][number];
 
-// Cloche de notifications de la top bar du SHELL modern. PORT FIDÈLE de DashboardLayout (compteur non-lus +
-// popover liste + marquer lu/tout lu + lien). Self-contained (tRPC modern + wouter pour la nav).
+/*
+ * Cloche de notifications de la top bar du SHELL modern. PORT FIDÈLE de DashboardLayout (compteur non-lus +
+ * popover liste + marquer lu/tout lu + lien). Self-contained (tRPC modern + wouter pour la nav).
+ */
 export function NotificationBell() {
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();

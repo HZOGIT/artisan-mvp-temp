@@ -19,7 +19,7 @@ interface Intervention {
     nom: string;
     prenom?: string | null;
   } | null;
-  // OPE-111 — équipe (intervenants additionnels), optionnel.
+  /** OPE-111 — équipe (intervenants additionnels), optionnel. */
   equipe?: { technicienId: number; nom?: string | null; prenom?: string | null }[];
 }
 
@@ -47,7 +47,8 @@ const statusLabels: Record<string, string> = {
 
 type ViewMode = "month" | "week";
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7h - 20h
+/** 7h - 20h */
+const HOURS = Array.from({ length: 14 }, (_, i) => i + 7);
 
 export default function Calendar({ interventions, onDateClick, onInterventionClick, onAddClick, onInterventionDrop }: CalendarProps) {
   const { t } = useTranslation("calendrier");
@@ -57,7 +58,7 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const weekGridRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to current hour (or 8h) when week view activates or currentDate changes
+  /** Scroll to current hour (or 8h) when week view activates or currentDate changes */
   useEffect(() => {
     if (viewMode === "week" && weekGridRef.current) {
       const now = new Date();
@@ -69,14 +70,14 @@ export default function Calendar({ interventions, onDateClick, onInterventionCli
     }
   }, [viewMode, currentDate]);
 
-  // Month view data
+  /** Month view data */
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const monthDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
-  // Week view data
+  /** Week view data */
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: addDays(weekStart, 6) });
 
@@ -413,7 +414,7 @@ function WeekView({
   weekGridRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useTranslation("calendrier");
-  // Build a map: "yyyy-MM-dd-HH" -> interventions that start in that hour
+  /** Build a map: "yyyy-MM-dd-HH" -> interventions that start in that hour */
   const interventionsBySlot = useMemo(() => {
     const map = new Map<string, Intervention[]>();
     weekDays.forEach((day) => {

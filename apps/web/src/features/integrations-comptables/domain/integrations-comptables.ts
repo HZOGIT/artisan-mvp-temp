@@ -1,11 +1,13 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `integrations-comptables` (config export/sync vers logiciels comptables).
-// Types dérivés du routeur, formulaires typés, mapping config→formulaire et helpers purs testables.
-//
-// ⚠️ Comme pour le dashboard sync : `getSyncLogs` ET `getExports` renvoient `ExportComptableRow` (sans
-// `type`/`facturesSyncees`) ; `lancerSync` renvoie `{success,nbItems,message}`. Le legacy lisait des
-// champs inexistants (masqué par `any`) → on s'aligne sur le vrai contrat (détail = nombreEcritures).
+/*
+ * Couche DOMAIN de la feature `integrations-comptables` (config export/sync vers logiciels comptables).
+ * Types dérivés du routeur, formulaires typés, mapping config→formulaire et helpers purs testables.
+ * 
+ * ⚠️ Comme pour le dashboard sync : `getSyncLogs` ET `getExports` renvoient `ExportComptableRow` (sans
+ * `type`/`facturesSyncees`) ; `lancerSync` renvoie `{success,nbItems,message}`. Le legacy lisait des
+ * champs inexistants (masqué par `any`) → on s'aligne sur le vrai contrat (détail = nombreEcritures).
+ */
 
 export type Config = RouterOutputs["integrationsComptables"]["getConfig"];
 export type SyncRow = RouterOutputs["integrationsComptables"]["getExports"][number];
@@ -49,7 +51,7 @@ export const DEFAULT_SYNC_CONFIG: SyncConfigForm = {
   heureSync: "02:00", notifierErreurs: true, notifierSucces: false,
 };
 
-// Hydrate le formulaire de synchronisation depuis la config sauvegardée. PUR.
+/** Hydrate le formulaire de synchronisation depuis la config sauvegardée. PUR. */
 export function syncConfigFromConfig(config: Config): SyncConfigForm {
   if (!config) return DEFAULT_SYNC_CONFIG;
   const freq = config.frequenceSync;
@@ -63,7 +65,7 @@ export function syncConfigFromConfig(config: Config): SyncConfigForm {
   };
 }
 
-// Variante shadcn d'un statut (libellé via i18n `statut.<statut>`). PUR.
+/** Variante shadcn d'un statut (libellé via i18n `statut.<statut>`). PUR. */
 export function statutVariant(statut: string): "default" | "secondary" | "destructive" {
   switch (statut) {
     case "termine": case "succes": return "default";
@@ -72,12 +74,12 @@ export function statutVariant(statut: string): "default" | "secondary" | "destru
   }
 }
 
-// Total d'éléments en attente (factures + paiements + erreurs). PUR.
+/** Total d'éléments en attente (factures + paiements + erreurs). PUR. */
 export function pendingTotal(pending: PendingItems | undefined): number {
   return (pending?.facturesEnAttente || 0) + (pending?.paiementsEnAttente || 0) + (pending?.erreurs || 0);
 }
 
-// Nom de fichier d'export téléchargé. PUR.
+/** Nom de fichier d'export téléchargé. PUR. */
 export function exportFilename(logiciel: string, format: string, date: Date = new Date()): string {
   return `export_${logiciel}_${format}_${date.toISOString().split("T")[0]}.txt`;
 }

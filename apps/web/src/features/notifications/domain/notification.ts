@@ -1,13 +1,17 @@
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAINE de la feature `notifications` (clean-archi) : types dérivés des sorties du routeur
-// tRPC + règles PURES testables sans réseau ni i18n.
+/*
+ * Couche DOMAINE de la feature `notifications` (clean-archi) : types dérivés des sorties du routeur
+ * tRPC + règles PURES testables sans réseau ni i18n.
+ */
 
 export type Notification = RouterOutputs["notifications"]["list"][number];
 export type NotifFilter = "toutes" | "nonlues";
 
-// Descripteur PUR de date relative (l'UI choisit la clé i18n / le format de repli). `now` injectable
-// pour des tests déterministes. Reproduit exactement les seuils du legacy.
+/*
+ * Descripteur PUR de date relative (l'UI choisit la clé i18n / le format de repli). `now` injectable
+ * pour des tests déterministes. Reproduit exactement les seuils du legacy.
+ */
 export type RelativeDate =
   | { kind: "instant" }
   | { kind: "minutes"; n: number }

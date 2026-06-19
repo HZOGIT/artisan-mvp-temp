@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Ligne, Fournisseur, Depense } from "../domain/commande-detail";
 
-// Couche APPLICATION — détail commande fournisseur : commande (getById) + lignes (getLignes, séparé) +
-// fournisseurs + dépenses + mutations (statut/suppression/email/facturation/réception). SEULE couche tRPC.
+/*
+ * Couche APPLICATION — détail commande fournisseur : commande (getById) + lignes (getLignes, séparé) +
+ * fournisseurs + dépenses + mutations (statut/suppression/email/facturation/réception). SEULE couche tRPC.
+ */
 export function useCommandeDetail(id: number) {
   const utils = trpc.useUtils();
   const enabled = id > 0;

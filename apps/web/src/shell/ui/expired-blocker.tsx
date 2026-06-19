@@ -6,9 +6,11 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { trpc } from "@/shared/trpc";
 
-// Écran de blocage du SHELL modern (abonnement expiré). PORT FIDÈLE d'ExpiredBlocker : rendu À LA PLACE des
-// children quand `accountBlockState().isBlocked` et que la route n'est pas tolérée (cf. layout/câblage).
-// Renouvellement → abonnement ; portail Stripe ; auto-reload si le sub redevient actif.
+/*
+ * Écran de blocage du SHELL modern (abonnement expiré). PORT FIDÈLE d'ExpiredBlocker : rendu À LA PLACE des
+ * children quand `accountBlockState().isBlocked` et que la route n'est pas tolérée (cf. layout/câblage).
+ * Renouvellement → abonnement ; portail Stripe ; auto-reload si le sub redevient actif.
+ */
 export function ExpiredBlocker({ onExportData }: { onExportData?: () => void }) {
   const { t } = useTranslation("shell");
   const [, setLocation] = useLocation();

@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { Notification } from "../domain/notification";
 
-// Couche APPLICATION de la feature `notifications` (clean-archi) : SEULE couche important tRPC.
-// Encapsule les queries (liste filtrée + compteur non-lues) et les mutations (markAsRead /
-// markAllAsRead / delete) avec invalidation, expose des données TYPÉES + des actions. L'UI attache ses
-// effets (toast / navigation) via le `onSuccess` par appel de `.mutate()`.
+/*
+ * Couche APPLICATION de la feature `notifications` (clean-archi) : SEULE couche important tRPC.
+ * Encapsule les queries (liste filtrée + compteur non-lues) et les mutations (markAsRead /
+ * markAllAsRead / delete) avec invalidation, expose des données TYPÉES + des actions. L'UI attache ses
+ * effets (toast / navigation) via le `onSuccess` par appel de `.mutate()`.
+ */
 export function useNotifications(nonLuesUniquement: boolean) {
   const utils = trpc.useUtils();
   const listQ = trpc.notifications.list.useQuery({ nonLuesUniquement, limit: 100 });

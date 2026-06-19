@@ -19,8 +19,10 @@ import { defaultChantierForm, statutVariant, prioriteColor, techNom, mainOeuvreS
 const STATUT_ICON: Record<string, typeof Clock> = { planifie: Clock, en_cours: AlertCircle, en_pause: PauseCircle, termine: CheckCircle2, annule: XCircle };
 const STATUT_KEY: Record<string, string> = { planifie: "statutPlanifie", en_cours: "statutEnCours", en_pause: "statutEnPause", termine: "statutTermine", annule: "statutAnnule", a_faire: "statutAFaire" };
 
-// Page `chantiers` — migration clean-archi de `pages/Chantiers.tsx`. Markup à l'identique. Agrégats
-// (main-d'œuvre, rappels) + règles (badges) en domain (purs, testés) ; tRPC encapsulé dans `use-chantiers`.
+/*
+ * Page `chantiers` — migration clean-archi de `pages/Chantiers.tsx`. Markup à l'identique. Agrégats
+ * (main-d'œuvre, rappels) + règles (badges) en domain (purs, testés) ; tRPC encapsulé dans `use-chantiers`.
+ */
 export default function ChantiersPage() {
   const { t } = useTranslation("chantiers");
   const [isDialogOpen, setIsDialogOpen] = useState(false);

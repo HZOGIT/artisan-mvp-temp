@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Vehicule, Technicien, FlotteStats, AssuranceExpirant, EntretienAVenir } from "../domain/vehicules";
 
-// Couche APPLICATION — flotte : liste + techniciens + stats + alertes (assurances/entretiens) + création
-// + suppression. SEULE couche important tRPC ; effets (toast, fermeture dialog) en UI via options.
+/*
+ * Couche APPLICATION — flotte : liste + techniciens + stats + alertes (assurances/entretiens) + création
+ * + suppression. SEULE couche important tRPC ; effets (toast, fermeture dialog) en UI via options.
+ */
 export function useVehicules() {
   const vehiculesQ = trpc.vehicules.list.useQuery();
   const techniciensQ = trpc.techniciens.getAll.useQuery();

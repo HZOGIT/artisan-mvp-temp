@@ -34,8 +34,10 @@ function Stepper({ current, labels }: { current: number; labels: string[] }) {
   );
 }
 
-// Page `import` — migration clean-archi de `pages/Import.tsx`. Markup + framer-motion à l'identique. Parser
-// CSV + auto-mapping + catalogues en domain (purs, testés). tRPC encapsulé dans `use-import`.
+/*
+ * Page `import` — migration clean-archi de `pages/Import.tsx`. Markup + framer-motion à l'identique. Parser
+ * CSV + auto-mapping + catalogues en domain (purs, testés). tRPC encapsulé dans `use-import`.
+ */
 export default function ImportPage() {
   const { t } = useTranslation("import");
   const { lancer, isImporting } = useImport();

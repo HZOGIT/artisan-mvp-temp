@@ -8,11 +8,13 @@ import type {
   PortalStatus,
 } from "../domain/client";
 
-// Couche APPLICATION de la vue DÉTAIL client (clean-archi) : SEULE couche important tRPC pour cette
-// vue. Encapsule toutes les queries (client + devis/factures/interventions + portail + activités) et
-// les mutations (portail, activités), gère l'invalidation, et expose des données TYPÉES + des actions.
-// L'UI (`client-detail-page.tsx`) ne connaît plus le transport — elle ajoute ses toasts via le
-// `onSuccess` par appel de `.mutate()` (l'invalidation, elle, vit ici).
+/*
+ * Couche APPLICATION de la vue DÉTAIL client (clean-archi) : SEULE couche important tRPC pour cette
+ * vue. Encapsule toutes les queries (client + devis/factures/interventions + portail + activités) et
+ * les mutations (portail, activités), gère l'invalidation, et expose des données TYPÉES + des actions.
+ * L'UI (`client-detail-page.tsx`) ne connaît plus le transport — elle ajoute ses toasts via le
+ * `onSuccess` par appel de `.mutate()` (l'invalidation, elle, vit ici).
+ */
 export function useClientDetail(clientId: number) {
   const utils = trpc.useUtils();
   const enabled = clientId > 0;

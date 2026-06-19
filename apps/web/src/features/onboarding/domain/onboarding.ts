@@ -1,7 +1,9 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `onboarding` (wizard post-signup : métier → modules). Catalogues + logique de
-// recommandation/payload PURS testables. 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `onboarding` (wizard post-signup : métier → modules). Catalogues + logique de
+ * recommandation/payload PURS testables. 0 React/tRPC.
+ */
 
 export type Module = RouterOutputs["modules"]["list"][number];
 export type CompleteOnboardingInput = RouterInputs["modules"]["completeOnboarding"];
@@ -31,24 +33,24 @@ export const MODULES_PAR_METIER: Record<string, string[]> = {
   autre: ["devis", "factures", "clients", "interventions", "relances"],
 };
 
-// Slugs recommandés pour un métier, restreints aux modules réellement disponibles. PUR.
+/** Slugs recommandés pour un métier, restreints aux modules réellement disponibles. PUR. */
 export function recommendedSlugs(metierKey: string, modules: readonly Module[]): Set<string> {
   const recos = MODULES_PAR_METIER[metierKey] || MODULES_PAR_METIER.autre;
   return new Set(recos.filter((slug) => modules.some((m) => m.slug === slug)));
 }
 
-// Métier final (texte libre si « autre »). PUR.
+/** Métier final (texte libre si « autre »). PUR. */
 export function metierFinal(metierKey: string | null, metierAutre: string): string {
   if (metierKey === "autre") return metierAutre.trim() || "autre";
   return metierKey || "";
 }
 
-// Payload de finalisation. PUR.
+/** Payload de finalisation. PUR. */
 export function buildCompletePayload(metier: string, slugs: ReadonlySet<string>): CompleteOnboardingInput {
   return { metier: metier || undefined, moduleSlugs: Array.from(slugs) };
 }
 
-// Bascule un slug dans l'ensemble sélectionné (immutable). PUR.
+/** Bascule un slug dans l'ensemble sélectionné (immutable). PUR. */
 export function toggleSlug(slugs: ReadonlySet<string>, slug: string, on: boolean): Set<string> {
   const next = new Set(slugs);
   if (on) next.add(slug); else next.delete(slug);

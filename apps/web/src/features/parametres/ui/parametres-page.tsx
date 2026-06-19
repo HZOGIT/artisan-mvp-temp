@@ -42,12 +42,12 @@ export default function ParametresPage() {
     if (artisan) setLogoPreview(artisan.logo || null);
   }, [artisan]);
 
-  // Réglages vitrine (OPE-504) : fusionnés dans le formulaire dès chargement.
+  /** Réglages vitrine (OPE-504) : fusionnés dans le formulaire dès chargement. */
   useEffect(() => {
     if (vitrineSettings) setFormData((prev) => applyVitrineToForm(prev, vitrineSettings));
   }, [vitrineSettings]);
 
-  // Toast post-checkout Stripe (?success=1 / ?canceled=1), puis on nettoie l'URL.
+  /** Toast post-checkout Stripe (?success=1 / ?canceled=1), puis on nettoie l'URL. */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "1") {

@@ -18,7 +18,7 @@ import {
   calculerJours, technicienNom, filterByStatut, TYPES_CONGE, type Conge, type StatutConge, type TypeConge,
 } from "../domain/conge";
 
-// Classes de couleur par statut (présentation pure — pas de libellé : ceux-ci passent par l'i18n).
+/** Classes de couleur par statut (présentation pure — pas de libellé : ceux-ci passent par l'i18n). */
 const STATUT_COLOR: Record<StatutConge, string> = {
   en_attente: "bg-yellow-100 text-yellow-800",
   approuve: "bg-green-100 text-green-800",

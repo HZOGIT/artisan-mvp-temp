@@ -2,7 +2,7 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { ArticleSearchResult } from "../domain/facture-detail";
 
-// Recherche d'articles via le REST public `/api/articles/search` (effet). Renvoie [] sur échec.
+/** Recherche d'articles via le REST public `/api/articles/search` (effet). Renvoie [] sur échec. */
 export async function searchArticlesRest(query: string): Promise<ArticleSearchResult[]> {
   try {
     const res = await fetch(`/api/articles/search?q=${encodeURIComponent(query)}`, { credentials: "include" });
@@ -13,8 +13,10 @@ export async function searchArticlesRest(query: string): Promise<ArticleSearchRe
   }
 }
 
-// Couche APPLICATION — éditeur de facture : facture (getById, riche) + avoirs + audit + artisan/paramètres (PDF)
-// + activités CRM + transitions/paiement/avoir/lignes/email. SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — éditeur de facture : facture (getById, riche) + avoirs + audit + artisan/paramètres (PDF)
+ * + activités CRM + transitions/paiement/avoir/lignes/email. SEULE couche important tRPC.
+ */
 export function useFactureDetail(id: number) {
   const utils = trpc.useUtils();
   const enabled = id > 0;

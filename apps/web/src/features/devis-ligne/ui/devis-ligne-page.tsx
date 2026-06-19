@@ -15,8 +15,10 @@ import { ScrollArea } from "@/shared/ui/scroll-area";
 import { useDevisLigne } from "../application/use-devis-ligne";
 import { defaultLigneForm, formatCurrency, articleDesignation, articlePrix, articleRef, filterArticles, groupByCategorie, lineTotals, formFromArticle, formFromSuggestion, buildAddLignePayload, type LigneForm, type LigneType } from "../domain/devis-ligne";
 
-// Page `/devis/:id/ligne/nouvelle` — migration clean-archi de `pages/DevisLigneEdit.tsx`. Markup à
-// l'identique. Unification d'articles + totaux en domain (corrige les champs prix/réf snake_case legacy).
+/*
+ * Page `/devis/:id/ligne/nouvelle` — migration clean-archi de `pages/DevisLigneEdit.tsx`. Markup à
+ * l'identique. Unification d'articles + totaux en domain (corrige les champs prix/réf snake_case legacy).
+ */
 export default function DevisLignePage() {
   const { t } = useTranslation("devisLigne");
   const { id: idParam } = useParams({ strict: false }) as { id?: string };

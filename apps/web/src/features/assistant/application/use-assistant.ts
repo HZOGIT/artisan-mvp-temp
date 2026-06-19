@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import { parseStreamData, splitSseBuffer, sseDataLine, type Message, type StreamEvent, type DevisLigne, type Relances } from "../domain/assistant";
 
-// Flux SSE `/api/assistant/stream` (hors tRPC) : POST + lecture incrémentale, décodage des trames via le
-// domain, callback `onEvent` par événement. Retourne quand le flux est terminé/avorté. Effets en UI.
+/*
+ * Flux SSE `/api/assistant/stream` (hors tRPC) : POST + lecture incrémentale, décodage des trames via le
+ * domain, callback `onEvent` par événement. Retourne quand le flux est terminé/avorté. Effets en UI.
+ */
 export async function streamMessage(
   body: { message: string; history: Message[]; threadId: number | undefined },
   onEvent: (ev: StreamEvent) => void,
@@ -37,8 +39,10 @@ export async function streamMessage(
   }
 }
 
-// Couche APPLICATION — assistant : chargement d'un thread + actions rapides (devis/relances/rentabilité/
-// trésorerie) + liste devis. Le streaming chat est géré par `streamMessage` (ci-dessus).
+/*
+ * Couche APPLICATION — assistant : chargement d'un thread + actions rapides (devis/relances/rentabilité/
+ * trésorerie) + liste devis. Le streaming chat est géré par `streamMessage` (ci-dessus).
+ */
 export function useAssistant(initialThreadId: number | undefined, selectedDevisId: string) {
   const threadQuery = trpc.assistant.getMessages.useQuery(initialThreadId ? { threadId: initialThreadId } : skipToken);
   const generateDevis = trpc.assistant.generateDevis.useMutation();

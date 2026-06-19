@@ -45,9 +45,11 @@ import { CookieBanner } from "./cookie-banner";
 import { useHomeAuth } from "../application/use-home-auth";
 import { priceFor, type BillingCycle } from "../domain/home";
 
-// Page vitrine publique (`/home`, legacy `/`) — port clean-archi : routing TanStack (montée publique),
-// auth via le client tRPC neuf (`use-home-auth`), i18n react-i18next (namespace `home`). Markup/classes
-// Tailwind conservés à l'identique (parité visuelle stricte). Données 100% statiques.
+/*
+ * Page vitrine publique (`/home`, legacy `/`) — port clean-archi : routing TanStack (montée publique),
+ * auth via le client tRPC neuf (`use-home-auth`), i18n react-i18next (namespace `home`). Markup/classes
+ * Tailwind conservés à l'identique (parité visuelle stricte). Données 100% statiques.
+ */
 
 /* ───────────────────────────── KEYFRAMES (inline) ───────────────────────────── */
 const ANIMATIONS = `
@@ -163,7 +165,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      // Redirection vers l'espace authentifié (hors arbre TanStack public) → navigation pleine page.
+      /** Redirection vers l'espace authentifié (hors arbre TanStack public) → navigation pleine page. */
       window.location.replace("/dashboard");
     }
   }, [isAuthenticated, loading]);

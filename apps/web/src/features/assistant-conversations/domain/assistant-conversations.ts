@@ -1,7 +1,9 @@
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `assistant-conversations` (historique des fils MonAssistant). Type dérivé
-// du routeur, calcul du « temps relatif » PUR et STRUCTURÉ (l'UI résout les libellés via i18n). 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `assistant-conversations` (historique des fils MonAssistant). Type dérivé
+ * du routeur, calcul du « temps relatif » PUR et STRUCTURÉ (l'UI résout les libellés via i18n). 0 React/tRPC.
+ */
 
 export type AiThread = RouterOutputs["assistant"]["getThreads"][number];
 
@@ -10,7 +12,7 @@ export type RelativeTime =
   | { kind: "min" | "h" | "j"; value: number }
   | { kind: "date"; iso: string };
 
-// Temps écoulé depuis `date` sous forme structurée (i18n-friendly). PUR.
+/** Temps écoulé depuis `date` sous forme structurée (i18n-friendly). PUR. */
 export function relativeTime(date: string | Date, now: number = Date.now()): RelativeTime {
   const d = new Date(date);
   const min = Math.floor((now - d.getTime()) / 60000);

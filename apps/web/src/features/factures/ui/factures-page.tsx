@@ -26,11 +26,13 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { exportToCsv, csvDateSuffix } from "@/shared/lib/csvExport";
 
-// Page Factures du FRONT NEUF (`/factures`) — clean-archi : présentation pure. Les données/mutations
-// viennent de `useFactures`/`useClientEncours` (couche application, seule à importer tRPC) ; le filtrage
-// et la synthèse d'encours viennent du domaine (`../domain/facture`, fonctions pures testées). Parité
-// visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge). Libellés via i18n (namespace
-// `factures`) ; couleurs = classes Tailwind.
+/*
+ * Page Factures du FRONT NEUF (`/factures`) — clean-archi : présentation pure. Les données/mutations
+ * viennent de `useFactures`/`useClientEncours` (couche application, seule à importer tRPC) ; le filtrage
+ * et la synthèse d'encours viennent du domaine (`../domain/facture`, fonctions pures testées). Parité
+ * visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge). Libellés via i18n (namespace
+ * `factures`) ; couleurs = classes Tailwind.
+ */
 
 export default function FacturesPage() {
   const { t } = useTranslation("factures");
@@ -38,7 +40,7 @@ export default function FacturesPage() {
   const search = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("tous");
-  // Filtre par statut piloté par l'URL ?filtre= (set par MonAssistant via naviguer_vers).
+  /** Filtre par statut piloté par l'URL ?filtre= (set par MonAssistant via naviguer_vers). */
   const [statusFilter, setStatusFilter] = useState<string>("all");
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -60,7 +62,7 @@ export default function FacturesPage() {
   });
 
   const { factures: facturesList, clients, isLoading, create: createMutation, remove: deleteMutation } = useFactures();
-  // Encours impayé du client sélectionné dans le dialogue de création (alerte non bloquante).
+  /** Encours impayé du client sélectionné dans le dialogue de création (alerte non bloquante). */
   const selectedClientIdNum = selectedClientId ? parseInt(selectedClientId) : null;
   const encoursClient = useClientEncours(selectedClientIdNum);
 
@@ -106,7 +108,7 @@ export default function FacturesPage() {
 
   const clientsMap = new Map<number, FactureClient>(clients.map((c) => [c.id, c]));
 
-  // Filtrage délégué au domaine (pur, testé) — le résolveur de nom client garde le domaine sans Map.
+  /** Filtrage délégué au domaine (pur, testé) — le résolveur de nom client garde le domaine sans Map. */
   const filteredFactures = filterFactures(facturesList, {
     typeFilter,
     statusFilter,
@@ -116,7 +118,7 @@ export default function FacturesPage() {
 
   const activeStatusLabel = statusFilter !== "all" ? t(`statusFilter_${statusFilter}`, { defaultValue: statusFilter }) : null;
 
-  // Export CSV des factures. Exporte la sélection courante (après filtres type/statut/recherche).
+  /** Export CSV des factures. Exporte la sélection courante (après filtres type/statut/recherche). */
   const handleExportCSV = () => {
     const data = filteredFactures || [];
     if (data.length === 0) {

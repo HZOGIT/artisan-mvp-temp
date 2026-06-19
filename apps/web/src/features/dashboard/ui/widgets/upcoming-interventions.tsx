@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/button";
 import { useUpcomingInterventions } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Prochaines interventions du dashboard. Re-port de widgets/UpcomingInterventions (clean-archi, i18n).
+/** Prochaines interventions du dashboard. Re-port de widgets/UpcomingInterventions (clean-archi, i18n). */
 const STATUT_COLORS: Record<string, string> = {
   planifiee: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300", en_cours: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
   terminee: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300", annulee: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",

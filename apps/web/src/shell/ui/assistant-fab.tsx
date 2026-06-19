@@ -4,8 +4,10 @@ import { Sparkles } from "lucide-react";
 
 const SEEN_KEY = "operioz.assistant.seen";
 
-// Bouton flottant (FAB) ouvrant MonAssistant. PORT FIDÈLE d'AssistantFAB : pulse au 1er affichage tant que
-// l'utilisateur n'a pas cliqué (persisté localStorage). Masqué sur la page assistant elle-même (`hidden`).
+/*
+ * Bouton flottant (FAB) ouvrant MonAssistant. PORT FIDÈLE d'AssistantFAB : pulse au 1er affichage tant que
+ * l'utilisateur n'a pas cliqué (persisté localStorage). Masqué sur la page assistant elle-même (`hidden`).
+ */
 export function AssistantFAB({ onClick, hidden = false }: { onClick: () => void; hidden?: boolean }) {
   const { t } = useTranslation("shell");
   const [pulse, setPulse] = useState(false);

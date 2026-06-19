@@ -1,9 +1,11 @@
 import { trpc } from "@/shared/trpc";
 import type { Avis } from "../domain/avis";
 
-// Couche APPLICATION de la feature `avis` (clean-archi) : SEULE couche important tRPC.
-// Charge les avis + les stats et expose les mutations (répondre / modérer) avec invalidation de la liste.
-// L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+/*
+ * Couche APPLICATION de la feature `avis` (clean-archi) : SEULE couche important tRPC.
+ * Charge les avis + les stats et expose les mutations (répondre / modérer) avec invalidation de la liste.
+ * L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+ */
 export function useAvis() {
   const utils = trpc.useUtils();
   const avisQ = trpc.avis.getAll.useQuery();

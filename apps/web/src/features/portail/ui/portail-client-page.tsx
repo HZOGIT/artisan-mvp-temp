@@ -23,9 +23,11 @@ import { usePortailInfos } from "../application/use-portail-infos";
 import { usePortailDemande } from "../application/use-portail-demande";
 import { PORTAIL_TABS, formatCurrency, devisStatutClass, factureStatutClass, isFacturePayable, interventionStatutClass, chantierStatutClass, prochaineIntervention, groupSlotsByDay, rdvStatutClass, totalUnread, formatChatDate, EXEMPLES_DEMANDE, demandeValide, type RdvUrgence, type DemandeStructured } from "../domain/portail";
 
-// SLICE 1 (socle) du portail client `/portail/$token` : gate d'accès (chargement / lien invalide /
-// espace valide) + en-tête artisan + coquille d'onglets. Contenu des onglets = slices ultérieurs.
-// Composant additif PUBLIC, non lié au trafic réel tant que le backend n'a pas basculé les liens.
+/*
+ * SLICE 1 (socle) du portail client `/portail/$token` : gate d'accès (chargement / lien invalide /
+ * espace valide) + en-tête artisan + coquille d'onglets. Contenu des onglets = slices ultérieurs.
+ * Composant additif PUBLIC, non lié au trafic réel tant que le backend n'a pas basculé les liens.
+ */
 const TAB_ICON: Record<string, typeof FileText> = {
   demande: Sparkles, devis: FileText, factures: Receipt, interventions: Calendar,
   messages: MessageCircle, rdv: CalendarDays, chantier: HardHat, infos: User,
@@ -52,7 +54,7 @@ export default function PortailClientPage() {
   const prochaine = prochaineIntervention(interventions);
   const { creneaux, mesRdv, demanderRdv } = usePortailRdv(token || "", !!access?.valid);
 
-  // Wizard RDV (état local UI).
+  /** Wizard RDV (état local UI). */
   const [rdvStep, setRdvStep] = useState(1);
   const [rdvForm, setRdvForm] = useState<{ titre: string; description: string; urgence: RdvUrgence }>({ titre: "", description: "", urgence: "normale" });
   const [rdvSelectedSlot, setRdvSelectedSlot] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export default function PortailClientPage() {
     );
   };
 
-  // Chat (slice 5)
+  /** Chat (slice 5) */
   const [selectedChatConv, setSelectedChatConv] = useState<number | null>(null);
   const [chatMessage, setChatMessage] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -92,7 +94,7 @@ export default function PortailClientPage() {
     );
   };
 
-  // Demande IA + Mes infos (slice 6)
+  /** Demande IA + Mes infos (slice 6) */
   const { clientInfo } = usePortailInfos(token || "", !!access?.valid);
   const { soumettreDemandeIA, demanderModification } = usePortailDemande();
   const [demandeText, setDemandeText] = useState("");
@@ -114,7 +116,7 @@ export default function PortailClientPage() {
     );
   };
 
-  // Retour de paiement Stripe (?paiement=succes|annule) → toast + onglet factures, puis nettoyage URL.
+  /** Retour de paiement Stripe (?paiement=succes|annule) → toast + onglet factures, puis nettoyage URL. */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("paiement") === "succes") {

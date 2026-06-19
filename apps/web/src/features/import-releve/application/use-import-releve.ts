@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Transaction, Categorie } from "../domain/import-releve";
 
-// Couche APPLICATION — import relevé bancaire : catégories + transactions du relevé (gated) + import +
-// conversion/ignorer. SEULE couche important tRPC ; effets (toast, état importDone) en UI via options.
+/*
+ * Couche APPLICATION — import relevé bancaire : catégories + transactions du relevé (gated) + import +
+ * conversion/ignorer. SEULE couche important tRPC ; effets (toast, état importDone) en UI via options.
+ */
 export function useImportReleve(releveId: number | null) {
   const categoriesQ = trpc.depenses.getCategories.useQuery();
   const transactionsQ = trpc.depenses.getTransactionsBancaires.useQuery(releveId ? { releveId } : skipToken);

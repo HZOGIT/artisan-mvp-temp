@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { Stock, StockEntrant } from "../domain/stock";
 
-// Couche APPLICATION de la feature `stocks` (clean-archi) : SEULE couche important tRPC.
-// `useStocks` couvre la liste + stock bas + entrant + le CRUD + ajustement + génération d'alertes ;
-// `useMouvements` isole l'historique d'UNE fiche (query dépendante de l'état UI).
-// L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+/*
+ * Couche APPLICATION de la feature `stocks` (clean-archi) : SEULE couche important tRPC.
+ * `useStocks` couvre la liste + stock bas + entrant + le CRUD + ajustement + génération d'alertes ;
+ * `useMouvements` isole l'historique d'UNE fiche (query dépendante de l'état UI).
+ * L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+ */
 export function useStocks() {
   const utils = trpc.useUtils();
   const stocksQ = trpc.stocks.list.useQuery();
@@ -48,7 +50,7 @@ export function useStocks() {
   };
 }
 
-// Historique des mouvements d'UNE fiche stock (query dépendante : seulement quand le dialogue est ouvert).
+/** Historique des mouvements d'UNE fiche stock (query dépendante : seulement quand le dialogue est ouvert). */
 export function useMouvements(stockId: number, enabled: boolean) {
   const q = trpc.stocks.getMouvements.useQuery({ stockId }, { enabled: enabled && stockId > 0 });
   return { mouvements: q.data ?? [], isLoading: q.isLoading };

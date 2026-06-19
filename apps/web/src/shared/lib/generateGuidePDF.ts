@@ -1,15 +1,19 @@
 import jsPDF from "jspdf";
 
-// Charge un .ttf depuis l'API serveur et le convertit en base64 pour jsPDF.
-// (jsPDF.addFileToVFS attend un binaryString/base64, pas un ArrayBuffer.)
+/*
+ * Charge un .ttf depuis l'API serveur et le convertit en base64 pour jsPDF.
+ * (jsPDF.addFileToVFS attend un binaryString/base64, pas un ArrayBuffer.)
+ */
 async function loadFontBase64(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Police ${url} introuvable (${res.status})`);
   const buf = await res.arrayBuffer();
   const bytes = new Uint8Array(buf);
   let binary = "";
-  // Chunking pour eviter le RangeError sur String.fromCharCode.apply avec
-  // de gros fichiers (~280 KB par TTF).
+  /*
+   * Chunking pour eviter le RangeError sur String.fromCharCode.apply avec
+   * de gros fichiers (~280 KB par TTF).
+   */
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) {
     binary += String.fromCharCode.apply(
@@ -23,8 +27,10 @@ async function loadFontBase64(url: string): Promise<string> {
 export async function generateGuidePDF() {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  // Charge Roboto (regular + bold) servies par /api/fonts/. jsPDF par
-  // defaut (helvetica) ne supporte pas les accents francais.
+  /*
+   * Charge Roboto (regular + bold) servies par /api/fonts/. jsPDF par
+   * defaut (helvetica) ne supporte pas les accents francais.
+   */
   try {
     const [regB64, boldB64] = await Promise.all([
       loadFontBase64("/api/fonts/roboto-regular.ttf"),
@@ -36,8 +42,10 @@ export async function generateGuidePDF() {
     doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
     doc.setFont("Roboto", "normal");
   } catch (e) {
-    // Fallback silencieux : si les fonts ne sont pas joignables, on
-    // reste sur helvetica (accents possiblement remplaces par '?').
+    /*
+     * Fallback silencieux : si les fonts ne sont pas joignables, on
+     * reste sur helvetica (accents possiblement remplaces par '?').
+     */
     console.warn("[generateGuidePDF] fonts Roboto non chargees, fallback helvetica", e);
   }
 
@@ -126,7 +134,7 @@ export async function generateGuidePDF() {
     y += h + 4;
   }
 
-  // ========== PAGE DE COUVERTURE ==========
+  /** ========== PAGE DE COUVERTURE ========== */
   doc.setFillColor(blue[0], blue[1], blue[2]);
   doc.rect(0, 0, W, 297, "F");
 
@@ -146,7 +154,7 @@ export async function generateGuidePDF() {
   doc.setFontSize(10);
   doc.text("www.operioz.com", W / 2, 250, { align: "center" });
 
-  // ========== SOMMAIRE ==========
+  /** ========== SOMMAIRE ========== */
   addPage();
   heading1("Sommaire");
 
@@ -171,7 +179,7 @@ export async function generateGuidePDF() {
     y += 9;
   }
 
-  // ========== 1. PREMIERS PAS ==========
+  /** ========== 1. PREMIERS PAS ========== */
   addPage();
   heading1("1. Premiers pas");
 
@@ -198,7 +206,7 @@ export async function generateGuidePDF() {
   bullet("Les conditions de règlement par défaut");
   bullet("Votre taux de TVA habituel");
 
-  // ========== 2. CLIENTS ==========
+  /** ========== 2. CLIENTS ========== */
   addPage();
   heading1("2. Clients");
 
@@ -213,7 +221,7 @@ export async function generateGuidePDF() {
 
   tip("Ajoutez des notes sur chaque client pour vous souvenir des détails importants : type de logement, accès particulier, préférences...");
 
-  // ========== 3. DEVIS ==========
+  /** ========== 3. DEVIS ========== */
   addPage();
   heading1("3. Devis");
 
@@ -241,7 +249,7 @@ export async function generateGuidePDF() {
 
   tip("Envoyez vos devis rapidement après la visite. Un devis envoyé dans les 24h a beaucoup plus de chances d'être accepté.");
 
-  // ========== 4. FACTURES ==========
+  /** ========== 4. FACTURES ========== */
   addPage();
   heading1("4. Factures");
 
@@ -266,7 +274,7 @@ export async function generateGuidePDF() {
 
   tip("Activez les relances automatiques pour recevoir des alertes quand une facture dépasse sa date d'échéance.");
 
-  // ========== 5. INTERVENTIONS ==========
+  /** ========== 5. INTERVENTIONS ========== */
   addPage();
   heading1("5. Interventions");
 
@@ -284,7 +292,7 @@ export async function generateGuidePDF() {
 
   tip("Liez vos interventions à un devis ou une facture pour garder une traçabilité complète de chaque chantier.");
 
-  // ========== 6. BONS DE COMMANDE ==========
+  /** ========== 6. BONS DE COMMANDE ========== */
   addPage();
   heading1("6. Bons de commande fournisseurs");
 
@@ -308,7 +316,7 @@ export async function generateGuidePDF() {
 
   tip("Vérifiez régulièrement vos alertes de stock bas. Elles vous indiquent quand il est temps de passer commande.");
 
-  // ========== 7. STOCKS ==========
+  /** ========== 7. STOCKS ========== */
   addPage();
   heading1("7. Stocks");
 
@@ -321,7 +329,7 @@ export async function generateGuidePDF() {
 
   tip("Mettez à jour vos stocks après chaque intervention. Cela vous évitera de vous retrouver en rupture sur un chantier.");
 
-  // ========== 8. ASSISTANT IA ==========
+  /** ========== 8. ASSISTANT IA ========== */
   addPage();
   heading1("8. Assistant IA");
 
@@ -341,7 +349,7 @@ export async function generateGuidePDF() {
 
   tip("Utilisez le résumé du jour chaque matin pour organiser votre journée efficacement.");
 
-  // ========== 9. PORTAIL CLIENT ==========
+  /** ========== 9. PORTAIL CLIENT ========== */
   addPage();
   heading1("9. Portail client");
 
@@ -357,7 +365,7 @@ export async function generateGuidePDF() {
 
   tip("Parlez du portail client à vos clients. Cela vous fait gagner du temps et donne une image professionnelle et moderne de votre entreprise.");
 
-  // ========== 10. CONSEILS ==========
+  /** ========== 10. CONSEILS ========== */
   addPage();
   heading1("10. Conseils et bonnes pratiques");
 
@@ -379,7 +387,7 @@ export async function generateGuidePDF() {
   heading2("En cas de question");
   paragraph("Si vous avez une question sur l'utilisation de Operioz, utilisez l'assistant IA intégré. Il connaît toutes les fonctionnalités et peut vous guider pas à pas.");
 
-  // ========== FOOTER sur chaque page ==========
+  /** ========== FOOTER sur chaque page ========== */
   const pageCount = doc.getNumberOfPages();
   for (let i = 2; i <= pageCount; i++) {
     doc.setPage(i);

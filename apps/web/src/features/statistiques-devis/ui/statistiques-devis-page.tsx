@@ -7,10 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { TrendingUp, TrendingDown, FileText, CheckCircle, XCircle, Clock, Euro, BarChart3, AlertCircle, type LucideIcon } from "lucide-react";
 
-// Page Statistiques Devis du FRONT NEUF (`/statistiques`) — MIGRATION clean-archi de
-// `pages/StatistiquesDevis.tsx` (lecture seule ; legacy chaînes EN DUR + calcul stats inline → i18n
-// namespace `statistiquesDevis` + `computeDevisStats` PUR dans le domaine, testé). Données via
-// `useStatistiquesDevis` (couche application, seule à importer tRPC). Présentation pure, 0 `any`.
+/*
+ * Page Statistiques Devis du FRONT NEUF (`/statistiques`) — MIGRATION clean-archi de
+ * `pages/StatistiquesDevis.tsx` (lecture seule ; legacy chaînes EN DUR + calcul stats inline → i18n
+ * namespace `statistiquesDevis` + `computeDevisStats` PUR dans le domaine, testé). Données via
+ * `useStatistiquesDevis` (couche application, seule à importer tRPC). Présentation pure, 0 `any`.
+ */
 
 function toneClasses(tone: string) {
   switch (tone) {
@@ -32,7 +34,7 @@ export default function StatistiquesDevisPage() {
   const [periode, setPeriode] = useState<string>("30");
   const { devis, isLoading } = useStatistiquesDevis();
 
-  // Calcul délégué au domaine (pur, testé) — recalculé quand la liste ou la période change.
+  /** Calcul délégué au domaine (pur, testé) — recalculé quand la liste ou la période change. */
   const stats = useMemo(() => computeDevisStats(devis, periode), [devis, periode]);
 
   const formatCurrency = (amount: number) =>

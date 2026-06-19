@@ -12,8 +12,10 @@ import { Badge } from "@/shared/ui/badge";
 import { useAlertesPrevisions } from "../application/use-alertes-previsions";
 import { FREQUENCES, isAlertePositive, formatMontant, formatDateHeure, canalHasEmail, canalHasSms, type AlertesForm, type Frequence } from "../domain/alertes-previsions";
 
-// Page `alertes-previsions` (alertes écarts de CA) — migration clean-archi de `pages/AlertesPrevisions.tsx`.
-// Markup à l'identique. tRPC encapsulé dans `use-alertes-previsions`, helpers purs en domain.
+/*
+ * Page `alertes-previsions` (alertes écarts de CA) — migration clean-archi de `pages/AlertesPrevisions.tsx`.
+ * Markup à l'identique. tRPC encapsulé dans `use-alertes-previsions`, helpers purs en domain.
+ */
 const EMPTY: AlertesForm = {
   seuilAlertePositif: "10", seuilAlerteNegatif: "10", alerteEmail: true, alerteSms: false,
   emailDestination: "", telephoneDestination: "", frequenceVerification: "hebdomadaire", actif: true,

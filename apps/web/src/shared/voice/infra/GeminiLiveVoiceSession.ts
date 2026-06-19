@@ -11,18 +11,20 @@ export class GeminiLiveVoiceSession implements VoiceSession {
   private _state: VoiceState = 'idle';
   private _events: VoiceSessionConfig['events'] | null = null;
 
-  // Accumulate transcripts for the current turn
+  /** Accumulate transcripts for the current turn */
   private _userTranscript = '';
   private _assistantTranscript = '';
-  // Resolves once the server acknowledges our setup message.
+  /** Resolves once the server acknowledges our setup message. */
   private _onSetupComplete: (() => void) | null = null;
   private _sentChunks = 0;
-  // AbortController for the currently running tool call — cancelled on barge-in.
+  /** AbortController for the currently running tool call — cancelled on barge-in. */
   private _toolAbort: AbortController | null = null;
-  // When muted, we stream clean digital silence instead of the mic — this is a
-  // reliable way to force the model's end-of-turn detection so it responds.
+  /*
+   * When muted, we stream clean digital silence instead of the mic — this is a
+   * reliable way to force the model's end-of-turn detection so it responds.
+   */
   private _muted = false;
-  // 20 ms of PCM16 silence @16k = 320 samples × 2 bytes = 640 zero bytes.
+  /** 20 ms of PCM16 silence @16k = 320 samples × 2 bytes = 640 zero bytes. */
   private static readonly SILENCE_B64 = btoa('\0'.repeat(640));
   private _recvCount = 0;
 
@@ -38,17 +40,21 @@ export class GeminiLiveVoiceSession implements VoiceSession {
     this.setState('connecting');
     vlog(`start() wsUrl=${config.wsUrl.slice(0, 70)}… tokenLen=${config.token?.length ?? 0}`);
 
-    // Constrained endpoint with an ephemeral token authenticates via
-    // `access_token` (NOT `key`). The token locks the model/config, but the
-    // protocol STILL requires `setup` to be the very first message (otherwise
-    // the server closes with 1007 "setup must be the first message") — so we
-    // send an empty setup and wait for `setupComplete` before streaming audio.
+    /*
+     * Constrained endpoint with an ephemeral token authenticates via
+     * `access_token` (NOT `key`). The token locks the model/config, but the
+     * protocol STILL requires `setup` to be the very first message (otherwise
+     * the server closes with 1007 "setup must be the first message") — so we
+     * send an empty setup and wait for `setupComplete` before streaming audio.
+     */
     const url = `${config.wsUrl}?access_token=${encodeURIComponent(config.token)}`;
     this._ws = new WebSocket(url);
-    // Gemini Live sends server messages as BINARY frames. In the browser these
-    // arrive as Blob (or ArrayBuffer) — never as string. Without this the
-    // message handler dropped every frame, so there was no audio AND no
-    // transcription even though the socket connected fine.
+    /*
+     * Gemini Live sends server messages as BINARY frames. In the browser these
+     * arrive as Blob (or ArrayBuffer) — never as string. Without this the
+     * message handler dropped every frame, so there was no audio AND no
+     * transcription even though the socket connected fine.
+     */
     this._ws.binaryType = 'arraybuffer';
 
     await new Promise<void>((resolve, reject) => {
@@ -70,7 +76,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       this.setState('error');
     };
 
-    // 1) Send setup first and wait for setupComplete.
+    /** 1) Send setup first and wait for setupComplete. */
     const setupComplete = new Promise<void>((resolve, reject) => {
       this._onSetupComplete = resolve;
       setTimeout(() => { if (this._onSetupComplete) { vlog('❌ setupComplete timeout (no ack from server)'); reject(new Error('setupComplete timeout')); } }, 10000);
@@ -82,12 +88,14 @@ export class GeminiLiveVoiceSession implements VoiceSession {
     this.setState('listening');
     vlog('setupComplete ✓ → state=listening');
 
-    // 2) Prewarm playback FIRST (loads the playback worklet module + node on the
-    // shared context). Doing all addModule() calls before the capture worklet is
-    // running avoids any chance of interrupting it mid-stream.
+    /*
+     * 2) Prewarm playback FIRST (loads the playback worklet module + node on the
+     * shared context). Doing all addModule() calls before the capture worklet is
+     * running avoids any chance of interrupting it mid-stream.
+     */
     try { await this._output.resume(); vlog('output prewarmed (before capture)'); } catch (e: any) { vlog(`output prewarm failed: ${e?.message}`); }
 
-    // 3) Start audio capture — stream PCM chunks to WS
+    /** 3) Start audio capture — stream PCM chunks to WS */
     vlog('starting mic capture…');
     await this._capture.start({
       sampleRate: 16000,
@@ -96,8 +104,10 @@ export class GeminiLiveVoiceSession implements VoiceSession {
         const open = this._ws?.readyState === WebSocket.OPEN;
         if (open) {
           this._sentChunks++;
-          // When muted, replace the mic chunk with clean digital silence so the
-          // model's VAD detects end-of-turn and responds.
+          /*
+           * When muted, replace the mic chunk with clean digital silence so the
+           * model's VAD detects end-of-turn and responds.
+           */
           const data = this._muted ? GeminiLiveVoiceSession.SILENCE_B64 : base64;
           if (this._sentChunks <= 3 || this._sentChunks % 50 === 0) {
             const bytes = atob(data);
@@ -146,7 +156,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
     } catch { return; }
     if (!msg) return;
 
-    // Setup acknowledged — unblock start() so it can begin streaming audio.
+    /** Setup acknowledged — unblock start() so it can begin streaming audio. */
     if (msg.setupComplete) {
       vlog('← setupComplete');
       this._onSetupComplete?.();
@@ -154,7 +164,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       return;
     }
 
-    // The model wants to call a tool — execute it server-side and reply.
+    /** The model wants to call a tool — execute it server-side and reply. */
     if (msg.toolCall) {
       this._toolAbort?.abort();
       this._toolAbort = new AbortController();
@@ -162,7 +172,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       return;
     }
 
-    // Gemini cancelled the pending tool call (barge-in mid-execution).
+    /** Gemini cancelled the pending tool call (barge-in mid-execution). */
     if (msg.toolCallCancellation) {
       vlog(`← toolCallCancellation — aborting pending tool`);
       this._toolAbort?.abort();
@@ -174,8 +184,10 @@ export class GeminiLiveVoiceSession implements VoiceSession {
     const topKeys = Object.keys(msg).join(',');
     if (msg.serverContent) {
       const sc = msg.serverContent;
-      // Only log "interesting" messages (transcription / turn events); skip the
-      // hundreds of pure-audio modelTurn frames to avoid flooding.
+      /*
+       * Only log "interesting" messages (transcription / turn events); skip the
+       * hundreds of pure-audio modelTurn frames to avoid flooding.
+       */
       if (sc.inputTranscription?.text || sc.outputTranscription?.text || sc.interrupted || sc.turnComplete || sc.generationComplete) {
         vlog(`← msg#${this._recvCount}` +
           (sc.inputTranscription?.text ? ` IN="${sc.inputTranscription.text}"` : '') +
@@ -188,37 +200,39 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       vlog(`← msg#${this._recvCount} {${topKeys}}` + (msg.toolCall ? ' (toolCall)' : '') + (msg.goAway ? ' (goAway)' : ''));
     }
 
-    // Server content (audio + text from assistant)
+    /** Server content (audio + text from assistant) */
     const serverContent = msg.serverContent;
     if (serverContent) {
       const parts = serverContent.modelTurn?.parts || [];
       for (const part of parts) {
-        // Audio output (native-audio models stream PCM @ 24kHz)
+        /** Audio output (native-audio models stream PCM @ 24kHz) */
         const mime = part.inlineData?.mimeType || '';
         if (mime.startsWith('audio/pcm') && part.inlineData?.data) {
           this._output.enqueue(part.inlineData.data, 24000);
           if (this._state !== 'speaking') { vlog('🔊 first audio chunk → state=speaking'); this.setState('speaking'); }
         }
-        // NOTE: we intentionally IGNORE part.text here. On native-audio models
-        // it carries the model's internal THINKING (often in English) — the
-        // user-facing spoken text is delivered via outputTranscription below.
+        /*
+         * NOTE: we intentionally IGNORE part.text here. On native-audio models
+         * it carries the model's internal THINKING (often in English) — the
+         * user-facing spoken text is delivered via outputTranscription below.
+         */
       }
 
-      // Assistant text comes via outputTranscription when modality = AUDIO
+      /** Assistant text comes via outputTranscription when modality = AUDIO */
       const outputTranscript = serverContent.outputTranscription?.text;
       if (outputTranscript) {
         this._assistantTranscript += outputTranscript;
         this._events?.onAssistantDelta(outputTranscript);
       }
 
-      // User transcript (input transcription of the mic audio)
+      /** User transcript (input transcription of the mic audio) */
       const inputTranscript = serverContent.inputTranscription?.text;
       if (inputTranscript) {
         this._userTranscript += inputTranscript;
         this._events?.onUserTranscript(this._userTranscript, false);
       }
 
-      // Turn complete
+      /** Turn complete */
       if (serverContent.turnComplete) {
         this._events?.onTurnComplete(
           this._userTranscript,
@@ -231,7 +245,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       }
     }
 
-    // Interrupted (barge-in)
+    /** Interrupted (barge-in) */
     if (msg.serverContent?.interrupted) {
       this._output.clear();
       this._events?.onInterrupted();
@@ -240,8 +254,10 @@ export class GeminiLiveVoiceSession implements VoiceSession {
 
   }
 
-  // Execute each requested function on our server (DB-backed) and send the
-  // results back to Gemini so it can continue the spoken response.
+  /*
+   * Execute each requested function on our server (DB-backed) and send the
+   * results back to Gemini so it can continue the spoken response.
+   */
   private async _handleToolCall(toolCall: any, signal: AbortSignal): Promise<void> {
     const calls: any[] = toolCall?.functionCalls || [];
     if (calls.length === 0) {
@@ -302,7 +318,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
     this._output.stop();
     this._ws?.close();
     this._ws = null;
-    // Now that both capture and playback have released the shared context, close it.
+    /** Now that both capture and playback have released the shared context, close it. */
     closeSharedAudioContext();
     this.setState('idle');
   }

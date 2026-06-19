@@ -1,7 +1,9 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `modeles-email` (modèles d'emails personnalisables). Types dérivés du
-// routeur tRPC, règles pures testables (filtre, couleur de type, rendu de l'aperçu). 0 dépendance React/tRPC.
+/*
+ * Couche DOMAIN de la feature `modeles-email` (modèles d'emails personnalisables). Types dérivés du
+ * routeur tRPC, règles pures testables (filtre, couleur de type, rendu de l'aperçu). 0 dépendance React/tRPC.
+ */
 
 export type Modele = RouterOutputs["modelesEmail"]["list"][number];
 export type EmailType = RouterInputs["modelesEmail"]["create"]["type"];
@@ -14,20 +16,20 @@ export type ModeleForm = {
   isDefault: boolean;
 };
 
-// Types d'emails (parité legacy) — libellés/descriptions via i18n `type.<value>` / `typeDesc.<value>`.
+/** Types d'emails (parité legacy) — libellés/descriptions via i18n `type.<value>` / `typeDesc.<value>`. */
 export const EMAIL_TYPES: readonly EmailType[] = ["relance_devis", "envoi_devis", "envoi_facture", "rappel_paiement", "autre"];
 
-// Variables insérables dans un modèle (clés) — descriptions via i18n `variable.<key>`.
+/** Variables insérables dans un modèle (clés) — descriptions via i18n `variable.<key>`. */
 export const VARIABLES_DISPONIBLES = [
   "nom_client", "prenom_client", "email_client", "numero_devis", "numero_facture", "montant_ttc",
   "date_devis", "date_facture", "date_echeance", "lien_signature", "lien_paiement",
   "nom_entreprise", "telephone_entreprise",
 ] as const;
 
-// Variables proposées en raccourci sous le champ contenu (parité legacy).
+/** Variables proposées en raccourci sous le champ contenu (parité legacy). */
 export const VARIABLES_RACCOURCIS = ["nom_client", "numero_devis", "montant_ttc", "lien_signature"] as const;
 
-// Valeurs d'exemple pour l'aperçu (substitution des `{{variable}}`).
+/** Valeurs d'exemple pour l'aperçu (substitution des `{{variable}}`). */
 export const EXEMPLES_APERCU: Record<string, string> = {
   nom_client: "Dupont", prenom_client: "Jean", email_client: "jean.dupont@email.com",
   numero_devis: "DEV-2025-001", numero_facture: "FAC-2025-001", montant_ttc: "1 250,00 €",
@@ -36,7 +38,7 @@ export const EXEMPLES_APERCU: Record<string, string> = {
   nom_entreprise: "Mon Entreprise", telephone_entreprise: "01 23 45 67 89",
 };
 
-// Classe de pastille d'un type d'email. PUR.
+/** Classe de pastille d'un type d'email. PUR. */
 export function typeBadgeColor(type: string): string {
   switch (type) {
     case "relance_devis": return "bg-orange-100 text-orange-800";
@@ -47,12 +49,12 @@ export function typeBadgeColor(type: string): string {
   }
 }
 
-// Filtre les modèles par onglet (`all` = tous, sinon par type). PUR.
+/** Filtre les modèles par onglet (`all` = tous, sinon par type). PUR. */
 export function filterByType(modeles: readonly Modele[], tab: string): Modele[] {
   return modeles.filter((m) => tab === "all" || m.type === tab);
 }
 
-// Rend l'aperçu d'un contenu en remplaçant chaque `{{variable}}` par sa valeur d'exemple. PUR.
+/** Rend l'aperçu d'un contenu en remplaçant chaque `{{variable}}` par sa valeur d'exemple. PUR. */
 export function renderPreview(contenu: string, exemples: Record<string, string> = EXEMPLES_APERCU): string {
   let out = contenu;
   for (const [key, value] of Object.entries(exemples)) {

@@ -2,8 +2,10 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import type { LegalDoc } from "../domain/legal-content";
 
-// Coque + rendu d'une page légale statique (migration de `pages/legal/LegalLayout.tsx`). Le contenu est du
-// HTML de confiance (consts domain, aucune entrée utilisateur) → `dangerouslySetInnerHTML`. Markup identique.
+/*
+ * Coque + rendu d'une page légale statique (migration de `pages/legal/LegalLayout.tsx`). Le contenu est du
+ * HTML de confiance (consts domain, aucune entrée utilisateur) → `dangerouslySetInnerHTML`. Markup identique.
+ */
 export function LegalPage({ doc }: { doc: LegalDoc }) {
   const { t } = useTranslation("legal");
   return (

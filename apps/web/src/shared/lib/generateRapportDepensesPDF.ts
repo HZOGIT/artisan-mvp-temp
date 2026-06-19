@@ -19,7 +19,8 @@ function eurFmt(n: number | string | null | undefined) {
 }
 
 export type RapportDepensesData = {
-  mois: string; // YYYY-MM
+  /** YYYY-MM */
+  mois: string;
   artisanNom: string;
   stats: {
     totalMois: number;
@@ -37,7 +38,7 @@ export type RapportDepensesData = {
 export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  // Charger Roboto pour les accents francais.
+  /** Charger Roboto pour les accents francais. */
   try {
     const [regB64, boldB64] = await Promise.all([
       loadFontBase64("/api/fonts/roboto-regular.ttf"),
@@ -49,7 +50,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
     doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
     doc.setFont("Roboto", "normal");
   } catch {
-    // Fallback helvetica (accents possiblement remplaces par ?).
+    /** Fallback helvetica (accents possiblement remplaces par ?). */
   }
 
   const W = 210;
@@ -63,7 +64,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   const warn: [number, number, number] = [249, 115, 22];
   const danger: [number, number, number] = [239, 68, 68];
 
-  // ============ HEADER ============
+  /** ============ HEADER ============ */
   doc.setFillColor(...violet);
   doc.rect(0, 0, W, 30, "F");
   doc.setTextColor(255, 255, 255);
@@ -80,7 +81,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
 
   y = 40;
 
-  // ============ RÉSUMÉ ============
+  /** ============ RÉSUMÉ ============ */
   doc.setTextColor(...slate);
   doc.setFont("Roboto", "bold");
   doc.setFontSize(13);
@@ -118,7 +119,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
 
   y += 6;
 
-  // ============ PAR CATÉGORIE ============
+  /** ============ PAR CATÉGORIE ============ */
   doc.setFont("Roboto", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...slate);
@@ -127,7 +128,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   doc.line(margin, y, W - margin, y);
   y += 5;
 
-  // Header tableau
+  /** Header tableau */
   doc.setFont("Roboto", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...lightSlate);
@@ -163,7 +164,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
   }
   y += 4;
 
-  // ============ TOP 10 DÉPENSES ============
+  /** ============ TOP 10 DÉPENSES ============ */
   if (data.stats.topDepenses && data.stats.topDepenses.length > 0) {
     if (y > 230) {
       doc.addPage();
@@ -207,7 +208,7 @@ export async function generateRapportDepensesPDF(data: RapportDepensesData) {
     }
   }
 
-  // ============ FOOTER (sur chaque page) ============
+  /** ============ FOOTER (sur chaque page) ============ */
   const pageCount = doc.getNumberOfPages();
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p);

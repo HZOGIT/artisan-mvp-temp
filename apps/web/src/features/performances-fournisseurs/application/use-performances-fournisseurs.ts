@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Performance, Commande, Fournisseur } from "../domain/performances-fournisseurs";
 
-// Couche APPLICATION — performances fournisseurs : perfs + commandes + fournisseurs + création/transition.
-// SEULE couche important tRPC ; effets (toast, fermeture dialog) en UI via options.
+/*
+ * Couche APPLICATION — performances fournisseurs : perfs + commandes + fournisseurs + création/transition.
+ * SEULE couche important tRPC ; effets (toast, fermeture dialog) en UI via options.
+ */
 export function usePerformancesFournisseurs() {
   const perfQ = trpc.commandesFournisseurs.getPerformances.useQuery();
   const commandesQ = trpc.commandesFournisseurs.list.useQuery();

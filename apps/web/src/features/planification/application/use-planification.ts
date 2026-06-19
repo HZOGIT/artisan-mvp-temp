@@ -4,8 +4,10 @@ import type { Intervention, Suggestion } from "../domain/planification";
 
 export type Coords = { lat: number; lng: number };
 
-// Couche APPLICATION — planification : interventions + suggestions de techniciens (gated sur des coords) +
-// assignation. SEULE couche important tRPC ; effets (toast) gérés en UI via options.
+/*
+ * Couche APPLICATION — planification : interventions + suggestions de techniciens (gated sur des coords) +
+ * assignation. SEULE couche important tRPC ; effets (toast) gérés en UI via options.
+ */
 export function usePlanification(coords: Coords | null, dateIntervention: string) {
   const interventionsQ = trpc.interventions.list.useQuery();
   const suggestionsQ = trpc.interventions.getSuggestionsTechniciens.useQuery(

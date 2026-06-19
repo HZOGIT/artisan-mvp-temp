@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useImportReleve } from "../application/use-import-releve";
 import { eur, parsePreview, type Transaction, type Categorie, type ImportResult } from "../domain/import-releve";
 
-// Page `import-releve` (import CSV de relevé bancaire) — migration clean-archi de `pages/ImportReleve.tsx`.
-// Markup à l'identique. Parsing d'aperçu CSV en domain (pur), tRPC encapsulé dans `use-import-releve`.
+/*
+ * Page `import-releve` (import CSV de relevé bancaire) — migration clean-archi de `pages/ImportReleve.tsx`.
+ * Markup à l'identique. Parsing d'aperçu CSV en domain (pur), tRPC encapsulé dans `use-import-releve`.
+ */
 export default function ImportRelevePage() {
   const { t } = useTranslation("importReleve");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -44,7 +46,7 @@ export default function ImportRelevePage() {
     );
   }
 
-  // ÉTAPE 3 : transactions importées
+  /** ÉTAPE 3 : transactions importées */
   if (importDone && transactions) {
     return (
       <div className="space-y-4 max-w-5xl mx-auto">
@@ -85,7 +87,7 @@ export default function ImportRelevePage() {
     );
   }
 
-  // ÉTAPES 1 + 2 : Upload + preview
+  /** ÉTAPES 1 + 2 : Upload + preview */
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center gap-2">

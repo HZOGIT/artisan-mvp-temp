@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useVitrine } from "../application/use-vitrine";
 import { getTheme, computeInitials, clientNameShort, anneeCreation, buildJsonLd, buildContactMessage, type SpecialiteKey } from "../domain/vitrine";
 
-// Page `/vitrine/:slug` — migration clean-archi de `pages/Vitrine.tsx` (publique). Markup à l'identique.
-// Thème/helpers/JSON-LD en domain (pur, testé) ; le payload `getBySlug` (unknown backend) est casté en application.
+/*
+ * Page `/vitrine/:slug` — migration clean-archi de `pages/Vitrine.tsx` (publique). Markup à l'identique.
+ * Thème/helpers/JSON-LD en domain (pur, testé) ; le payload `getBySlug` (unknown backend) est casté en application.
+ */
 
 const SPEC_ICON: Record<SpecialiteKey, LucideIcon> = { plomberie: Wrench, electricite: Zap, chauffage: Sparkles, jardinage: HardHat, "multi-services": HardHat, autre: HardHat };
 
@@ -41,7 +43,7 @@ export default function VitrinePage() {
   const [contactSent, setContactSent] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
-  const photos: string[] = []; // non encore stockées
+  const photos: string[] = [];
 
   const theme = useMemo(() => getTheme(data?.artisan.specialite), [data]);
   const initials = useMemo(() => computeInitials(data?.artisan.nomEntreprise), [data]);

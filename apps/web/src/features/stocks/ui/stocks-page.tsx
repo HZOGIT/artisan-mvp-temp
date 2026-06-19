@@ -22,10 +22,12 @@ import {
 import { Loader2, Plus, Search, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Edit, Trash2, History, Bell } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Gestion des Stocks du FRONT NEUF (`/stocks`) — clean-archi : présentation pure. Données &
-// mutations via `useStocks`/`useMouvements` (couche application, seule à importer tRPC) ; recherche,
-// seuil d'alerte, valeur de stock et index entrant via le domaine (`../domain/stock`, fonctions pures
-// testées). Parité visuelle stricte : JSX/Tailwind à l'identique (tabs + 4 dialogs + KPIs + alertes).
+/*
+ * Page Gestion des Stocks du FRONT NEUF (`/stocks`) — clean-archi : présentation pure. Données &
+ * mutations via `useStocks`/`useMouvements` (couche application, seule à importer tRPC) ; recherche,
+ * seuil d'alerte, valeur de stock et index entrant via le domaine (`../domain/stock`, fonctions pures
+ * testées). Parité visuelle stricte : JSX/Tailwind à l'identique (tabs + 4 dialogs + KPIs + alertes).
+ */
 
 const UNITE_KEYS: { value: string; key: string }[] = [
   { value: "unité", key: "unite_unite" },
@@ -103,7 +105,7 @@ export default function StocksPage() {
     adjust: adjustMutation,
     generateAlerts: generateAlertsMutation,
   } = useStocks();
-  // Quantité entrante (commandes fournisseurs en cours) par fiche stock → stock prévisionnel.
+  /** Quantité entrante (commandes fournisseurs en cours) par fiche stock → stock prévisionnel. */
   const entrantByStock = indexEntrantByStock(stockEntrant);
   const entrantOf = (stockId: number) => entrantByStock.get(stockId) ?? 0;
   const { mouvements, isLoading: loadingMouvements } = useMouvements(
@@ -184,7 +186,7 @@ export default function StocksPage() {
       {
         ...mouvementData,
         stockId: selectedStock.id,
-        // L'input tRPC attend `quantite` en string (le legacy envoyait un number, toléré car non gaté).
+        /** L'input tRPC attend `quantite` en string (le legacy envoyait un number, toléré car non gaté). */
         quantite: String(mouvementData.quantite),
       },
       {
@@ -246,7 +248,7 @@ export default function StocksPage() {
     });
   };
 
-  // Recherche déléguée au domaine (pure, testée). `isLowStock` vient aussi du domaine.
+  /** Recherche déléguée au domaine (pure, testée). `isLowStock` vient aussi du domaine. */
   const filteredStocks = filterStocks(stocks, searchQuery);
 
   const uniteSelect = (value: string, onChange: (v: string) => void) => (

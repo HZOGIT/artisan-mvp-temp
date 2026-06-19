@@ -1,8 +1,10 @@
 import { subDays, differenceInDays } from "date-fns";
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAINE de la feature `statistiques-devis` (analyse des performances des devis) (clean-archi) :
-// types dérivés des sorties du routeur tRPC + calcul PUR des statistiques (testable sans réseau ni i18n).
+/*
+ * Couche DOMAINE de la feature `statistiques-devis` (analyse des performances des devis) (clean-archi) :
+ * types dérivés des sorties du routeur tRPC + calcul PUR des statistiques (testable sans réseau ni i18n).
+ */
 
 export type Devis = RouterOutputs["devis"]["list"][number];
 
@@ -32,9 +34,11 @@ const toNum = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-// Calcul PUR des stats devis sur une période ("7"/"30"/"90"/"365" jours ou "all") + comparaison à la
-// période précédente (évolution du taux de conversion). `now` injectable pour des tests déterministes.
-// Port fidèle de la logique legacy (`pages/StatistiquesDevis.tsx`).
+/*
+ * Calcul PUR des stats devis sur une période ("7"/"30"/"90"/"365" jours ou "all") + comparaison à la
+ * période précédente (évolution du taux de conversion). `now` injectable pour des tests déterministes.
+ * Port fidèle de la logique legacy (`pages/StatistiquesDevis.tsx`).
+ */
 export function computeDevisStats(
   devisList: readonly Devis[],
   periode: string,
@@ -82,7 +86,7 @@ export function computeDevisStats(
         )
       : 0;
 
-  // Période précédente (même durée, juste avant) pour la comparaison du taux.
+  /** Période précédente (même durée, juste avant) pour la comparaison du taux. */
   const previousDateLimit = dateLimit ? subDays(dateLimit, parseInt(periode)) : null;
   const previous = devisList.filter((d) => {
     if (!dateLimit || !previousDateLimit) return false;

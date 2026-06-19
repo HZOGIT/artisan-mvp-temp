@@ -1,6 +1,8 @@
-// Pure domain port — zero Web/DOM/WebSocket imports.
-// Web adapter: infra-web/GeminiLiveVoiceSession.ts
-// RN adapter (v2): infra-native/NativeVoiceSession.ts
+/*
+ * Pure domain port — zero Web/DOM/WebSocket imports.
+ * Web adapter: infra-web/GeminiLiveVoiceSession.ts
+ * RN adapter (v2): infra-native/NativeVoiceSession.ts
+ */
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 

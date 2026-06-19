@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 
-// Conteneur de widget du dashboard — re-port de components/dashboard/DashboardWidget (i18n, typé).
+/** Conteneur de widget du dashboard — re-port de components/dashboard/DashboardWidget (i18n, typé). */
 interface DashboardWidgetProps {
   id: string; title: string; subtitle?: string; icon?: ReactNode; actions?: ReactNode;
   removable?: boolean; onRemove?: () => void; className?: string; children: ReactNode;

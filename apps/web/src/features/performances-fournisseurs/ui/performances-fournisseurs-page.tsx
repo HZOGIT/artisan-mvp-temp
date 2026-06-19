@@ -15,8 +15,10 @@ import { Textarea } from "@/shared/ui/textarea";
 import { usePerformancesFournisseurs } from "../application/use-performances-fournisseurs";
 import { STATUTS_COMMANDE, formatCurrency, formatDate, statutClass, statutVariant, fiabiliteColor, fiabiliteLevel, globalStats, type Performance, type StatutCommande } from "../domain/performances-fournisseurs";
 
-// Page `performances-fournisseurs` — migration clean-archi de `pages/PerformancesFournisseurs.tsx`. Markup
-// à l'identique. tRPC encapsulé dans `use-performances-fournisseurs`, agrégats/règles purs en domain.
+/*
+ * Page `performances-fournisseurs` — migration clean-archi de `pages/PerformancesFournisseurs.tsx`. Markup
+ * à l'identique. tRPC encapsulé dans `use-performances-fournisseurs`, agrégats/règles purs en domain.
+ */
 function FiabiliteIcon({ taux }: { taux: number }) {
   const level = fiabiliteLevel(taux);
   if (level === "up") return <TrendingUp className="h-4 w-4 text-green-600" />;

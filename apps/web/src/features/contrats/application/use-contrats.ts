@@ -1,11 +1,13 @@
 import { trpc } from "@/shared/trpc";
 import type { Contrat, Client } from "../domain/contrat";
 
-// Couche APPLICATION de la feature `contrats` (clean-archi) : SEULE couche important tRPC.
-// Charge les contrats + la liste clients (pour résoudre les noms, le new-stack ne joint pas le
-// client) et expose les mutations CRUD + génération de facture, avec invalidation de la liste.
-// Les effets de présentation (toasts, fermeture de dialog, reset) sont attachés par l'UI au cas par
-// cas via `mutate(vars, { onSuccess, onError })`.
+/*
+ * Couche APPLICATION de la feature `contrats` (clean-archi) : SEULE couche important tRPC.
+ * Charge les contrats + la liste clients (pour résoudre les noms, le new-stack ne joint pas le
+ * client) et expose les mutations CRUD + génération de facture, avec invalidation de la liste.
+ * Les effets de présentation (toasts, fermeture de dialog, reset) sont attachés par l'UI au cas par
+ * cas via `mutate(vars, { onSuccess, onError })`.
+ */
 export function useContrats() {
   const utils = trpc.useUtils();
   const listQ = trpc.contrats.list.useQuery();

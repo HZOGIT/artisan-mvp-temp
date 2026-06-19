@@ -14,10 +14,12 @@ import { Button } from "@/shared/ui/button";
 import { Mail, RefreshCw, CheckCircle2, XCircle, FlaskConical } from "lucide-react";
 import type { TFunction } from "i18next";
 
-// Page Historique des emails du FRONT NEUF (`/historique-emails`) — MIGRATION clean-archi de
-// `pages/HistoriqueEmails.tsx` (lecture seule ; legacy chaînes EN DUR → i18n namespace `historiqueEmails`).
-// Données via `useEmails` (couche application, seule à importer tRPC) ; filtre & catégorie de statut via
-// le domaine (fonctions pures testées). Présentation pure, 0 `any` (le legacy castait `data as EmailLogRow[]`).
+/*
+ * Page Historique des emails du FRONT NEUF (`/historique-emails`) — MIGRATION clean-archi de
+ * `pages/HistoriqueEmails.tsx` (lecture seule ; legacy chaînes EN DUR → i18n namespace `historiqueEmails`).
+ * Données via `useEmails` (couche application, seule à importer tRPC) ; filtre & catégorie de statut via
+ * le domaine (fonctions pures testées). Présentation pure, 0 `any` (le legacy castait `data as EmailLogRow[]`).
+ */
 
 const FILTER_LABEL: Record<(typeof STATUT_FILTRES)[number], string> = {
   tous: "filterTous",

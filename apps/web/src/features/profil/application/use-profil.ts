@@ -1,7 +1,9 @@
 import { trpc } from "@/shared/trpc";
 
-// Couche APPLICATION — profil : profil entreprise (getProfile/updateProfile) + identifiants compte
-// (auth.me pour l'email courant + updateEmail/updatePassword/deleteAccount). SEULE couche tRPC.
+/*
+ * Couche APPLICATION — profil : profil entreprise (getProfile/updateProfile) + identifiants compte
+ * (auth.me pour l'email courant + updateEmail/updatePassword/deleteAccount). SEULE couche tRPC.
+ */
 export function useProfil() {
   const profileQ = trpc.artisan.getProfile.useQuery();
   return {

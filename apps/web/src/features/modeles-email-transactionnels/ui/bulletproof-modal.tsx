@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
-// Modale générique (overlay + pointer-down outside). Re-port de components/BulletproofModal (props-driven).
+/** Modale générique (overlay + pointer-down outside). Re-port de components/BulletproofModal (props-driven). */
 interface BulletproofModalProps {
   isOpen: boolean; onClose: () => void; title: string; description?: string;
   children: ReactNode; footer?: ReactNode; onPointerDownOutside?: (e: React.PointerEvent) => void;

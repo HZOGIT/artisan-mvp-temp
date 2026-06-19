@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { Parametres, ArtisanProfile, IcalFeed, DemandeContact, VitrineSettings } from "../domain/parametres";
 
-// Couche APPLICATION de la feature `parametres` (clean-archi) : SEULE couche important tRPC.
-// Agrège les 4 sous-domaines de l'onglet « général » : paramètres (singleton), profil artisan
-// (slug/logo), flux iCal, demandes de contact (leads vitrine) + leurs mutations. Les effets de
-// présentation (toasts) sont attachés par l'UI via `mutate(vars, { onSuccess, onError })`.
+/*
+ * Couche APPLICATION de la feature `parametres` (clean-archi) : SEULE couche important tRPC.
+ * Agrège les 4 sous-domaines de l'onglet « général » : paramètres (singleton), profil artisan
+ * (slug/logo), flux iCal, demandes de contact (leads vitrine) + leurs mutations. Les effets de
+ * présentation (toasts) sont attachés par l'UI via `mutate(vars, { onSuccess, onError })`.
+ */
 export function useParametres() {
   const utils = trpc.useUtils();
   const parametresQ = trpc.parametres.get.useQuery();
@@ -26,7 +28,7 @@ export function useParametres() {
   const parametres: Parametres | undefined = parametresQ.data;
   const artisan: ArtisanProfile | undefined = artisanQ.data;
   const icalFeed: IcalFeed | undefined = icalQ.data;
-  // OPE-505 résolu : `getDemandesContact` renvoie un DTO typé → type dérivé, plus d'assertion.
+  /** OPE-505 résolu : `getDemandesContact` renvoie un DTO typé → type dérivé, plus d'assertion. */
   const demandes: DemandeContact[] = demandesQ.data ?? [];
   const vitrineSettings: VitrineSettings | undefined = vitrineQ.data;
 

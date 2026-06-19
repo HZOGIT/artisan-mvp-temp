@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { BiblioArticle, Suggestion } from "../domain/devis-ligne";
 
-// Couche APPLICATION — ajout de ligne de devis : devis (getById) + bibliothèque + suggestions IA (gated) +
-// création article + addLigne. SEULE couche important tRPC ; effets en UI via options.
+/*
+ * Couche APPLICATION — ajout de ligne de devis : devis (getById) + bibliothèque + suggestions IA (gated) +
+ * création article + addLigne. SEULE couche important tRPC ; effets en UI via options.
+ */
 export function useDevisLigne(devisId: number, searchQuery: string, iaEnabled: boolean) {
   const utils = trpc.useUtils();
   const devisQ = trpc.devis.getById.useQuery(devisId > 0 ? { id: devisId } : skipToken);

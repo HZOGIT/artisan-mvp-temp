@@ -1,9 +1,11 @@
 import { trpc } from "@/shared/trpc";
 import { userInitial } from "../domain/nav";
 
-// Couche APPLICATION du SHELL — branche les données (utilisateur+permissions via auth.me, modules actifs via
-// modules.getMine) et l'action de déconnexion. SEULE couche important tRPC. Fournit exactement les props data
-// attendues par `DashboardLayout` (user/permissions/modulesActifs/logout).
+/*
+ * Couche APPLICATION du SHELL — branche les données (utilisateur+permissions via auth.me, modules actifs via
+ * modules.getMine) et l'action de déconnexion. SEULE couche important tRPC. Fournit exactement les props data
+ * attendues par `DashboardLayout` (user/permissions/modulesActifs/logout).
+ */
 export function useShell() {
   const meQ = trpc.auth.me.useQuery();
   const modulesQ = trpc.modules.getMine.useQuery();

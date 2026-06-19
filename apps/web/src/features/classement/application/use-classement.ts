@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import { enrichBadgesTechnicien, type Technicien, type ClassementEntry, type Objectif, type Periode } from "../domain/classement";
 
-// Couche APPLICATION — classement gamifié : techniciens + classement par période + recalcul.
-// SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — classement gamifié : techniciens + classement par période + recalcul.
+ * SEULE couche important tRPC.
+ */
 export function useClassement(periode: Periode) {
   const techniciensQ = trpc.techniciens.getAll.useQuery();
   const classementQ = trpc.badges.getClassement.useQuery({ periode });
@@ -15,8 +17,10 @@ export function useClassement(periode: Periode) {
   return { techniciens, classement, isLoading: classementQ.isLoading, calculerClassement };
 }
 
-// Détail d'un technicien (badges obtenus enrichis + objectifs de l'année), gated par sélection (`skipToken`).
-// `badges.list` fournit le nom/couleur/points (jointure domain, le new-stack ne renvoie que le lien brut).
+/*
+ * Détail d'un technicien (badges obtenus enrichis + objectifs de l'année), gated par sélection (`skipToken`).
+ * `badges.list` fournit le nom/couleur/points (jointure domain, le new-stack ne renvoie que le lien brut).
+ */
 export function useTechnicienDetail(technicienId: number | null) {
   const badgesQ = trpc.badges.getBadgesTechnicien.useQuery(
     technicienId ? { technicienId } : skipToken,

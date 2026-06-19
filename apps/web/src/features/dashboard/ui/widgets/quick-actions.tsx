@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
 import { Calendar, FileText, Receipt, type LucideIcon, Users } from "lucide-react";
 
-// Actions rapides du dashboard — re-port de components/dashboard/QuickActions (clean-archi modern, i18n).
+/** Actions rapides du dashboard — re-port de components/dashboard/QuickActions (clean-archi modern, i18n). */
 interface QuickAction { label: string; icon: LucideIcon; color: "blue" | "green" | "violet" | "orange"; onClick: () => void; }
 interface QuickActionsProps { onNewDevis?: () => void; onNewFacture?: () => void; onNewClient?: () => void; onNewIntervention?: () => void; }
 

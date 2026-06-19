@@ -1,7 +1,9 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `profil` (profil entreprise de l'artisan + identifiants compte). Types dérivés
-// du routeur, catalogues, mapping form↔profil + validations PURS testables. 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `profil` (profil entreprise de l'artisan + identifiants compte). Types dérivés
+ * du routeur, catalogues, mapping form↔profil + validations PURS testables. 0 React/tRPC.
+ */
 
 export type Artisan = NonNullable<RouterOutputs["artisan"]["getProfile"]>;
 export type UpdateProfileInput = RouterInputs["artisan"]["updateProfile"];
@@ -9,7 +11,7 @@ export type Specialite = NonNullable<UpdateProfileInput["specialite"]>;
 export type FormeJuridique = NonNullable<UpdateProfileInput["formeJuridique"]>;
 
 export const SPECIALITES: Specialite[] = ["plomberie", "electricite", "chauffage", "multi-services"];
-// Formes juridiques imposant capital social + ville RCS.
+/** Formes juridiques imposant capital social + ville RCS. */
 export const SOCIETE_FORMES: FormeJuridique[] = ["EURL", "SARL", "SAS", "SASU", "SA"];
 export const FORME_OPTIONS: { value: FormeJuridique | ""; labelKey: string }[] = [
   { value: "", labelKey: "formeNonPrecisee" }, { value: "EI", labelKey: "formeEI" }, { value: "micro", labelKey: "formeMicro" },
@@ -38,7 +40,7 @@ export function defaultProfilForm(): ProfilForm {
     formeJuridique: "", capitalSocial: "", villeRCS: "", numeroRM: "" };
 }
 
-// Remplit le formulaire depuis le profil (specialite hors-enum → "plomberie"). PUR.
+/** Remplit le formulaire depuis le profil (specialite hors-enum → "plomberie"). PUR. */
 export function formFromArtisan(a: Artisan): ProfilForm {
   const spec = a.specialite && (SPECIALITES as string[]).includes(a.specialite) ? (a.specialite as Specialite) : "plomberie";
   const forme = a.formeJuridique && isFormeJuridique(a.formeJuridique) ? a.formeJuridique : "";
@@ -55,7 +57,7 @@ function isFormeJuridique(v: string): v is FormeJuridique {
   return (["EI", "micro", "EURL", "SARL", "SAS", "SASU", "SA", "autre"] as string[]).includes(v);
 }
 
-// Payload de mise à jour (champs légaux optionnels vides → undefined). PUR.
+/** Payload de mise à jour (champs légaux optionnels vides → undefined). PUR. */
 export function buildUpdatePayload(form: ProfilForm): UpdateProfileInput {
   return {
     nomEntreprise: form.nomEntreprise, siret: form.siret, numeroTVA: form.numeroTVA, codeAPE: form.codeAPE,
@@ -66,7 +68,7 @@ export function buildUpdatePayload(form: ProfilForm): UpdateProfileInput {
   };
 }
 
-// Force du mot de passe (longueur). PUR.
+/** Force du mot de passe (longueur). PUR. */
 export function passwordStrength(pw: string): { labelKey: string; pct: number; color: string } {
   if (pw.length === 0) return { labelKey: "", pct: 0, color: "bg-muted" };
   if (pw.length < 6) return { labelKey: "pwFaible", pct: 30, color: "bg-rose-500" };
@@ -74,14 +76,14 @@ export function passwordStrength(pw: string): { labelKey: string; pct: number; c
   return { labelKey: "pwFort", pct: 100, color: "bg-emerald-500" };
 }
 
-// Validation du changement d'email → clé d'erreur i18n ou null. PUR.
+/** Validation du changement d'email → clé d'erreur i18n ou null. PUR. */
 export function validateEmailChange(newEmail: string, confirmEmail: string, currentEmail: string): string | null {
   if (newEmail !== confirmEmail) return "errEmailMismatch";
   if (currentEmail && currentEmail === newEmail.trim()) return "errEmailSame";
   return null;
 }
 
-// Validation du changement de mot de passe → clé d'erreur i18n ou null. PUR.
+/** Validation du changement de mot de passe → clé d'erreur i18n ou null. PUR. */
 export function validatePasswordChange(current: string, next: string, confirm: string): string | null {
   if (next.length < 6) return "errPwTooShort";
   if (next !== confirm) return "errPwMismatch";

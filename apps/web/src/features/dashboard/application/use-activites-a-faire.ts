@@ -1,7 +1,9 @@
 import { trpc, type RouterOutputs } from "@/shared/trpc";
 
-// Couche APPLICATION du widget « À faire » (CRM next-action). SEULE couche important tRPC : liste + mutations
-// (create/toggle/delete) avec invalidation. Toasts + i18n gérés en UI.
+/*
+ * Couche APPLICATION du widget « À faire » (CRM next-action). SEULE couche important tRPC : liste + mutations
+ * (create/toggle/delete) avec invalidation. Toasts + i18n gérés en UI.
+ */
 export type Activite = RouterOutputs["activites"]["list"][number];
 export function useActivitesAFaire() {
   const utils = trpc.useUtils();

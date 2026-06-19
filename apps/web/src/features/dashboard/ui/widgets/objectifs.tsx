@@ -4,7 +4,7 @@ import { Target } from "lucide-react";
 import { useObjectifs } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Objectifs du dashboard (CA/devis/clients). Re-port de widgets/Objectifs (clean-archi, i18n).
+/** Objectifs du dashboard (CA/devis/clients). Re-port de widgets/Objectifs (clean-archi, i18n). */
 const formatEUR = (v: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 
 function ProgressRow({ label, current, target, format, delay = 0 }: { label: string; current: number; target: number; format?: (v: number) => string; delay?: number }) {

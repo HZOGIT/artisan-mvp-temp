@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Calendar, FileText, Plus, Receipt, Search } from "lucide-react";
 
-// Bandeau de bienvenue du dashboard — re-port de components/dashboard/WelcomeBanner (i18n + pluriels react-i18next).
+/** Bandeau de bienvenue du dashboard — re-port de components/dashboard/WelcomeBanner (i18n + pluriels react-i18next). */
 interface WelcomeBannerProps {
   firstName?: string | null;
   devisEnAttente?: number;

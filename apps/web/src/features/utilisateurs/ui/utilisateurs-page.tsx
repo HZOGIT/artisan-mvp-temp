@@ -56,7 +56,7 @@ export default function UtilisateursPage() {
     if (!permDialogOpen) setPermsLoaded(false);
   }, [permDialogOpen]);
 
-  // Garde admin : redirige les non-admins vers le dashboard legacy (page non migrée).
+  /** Garde admin : redirige les non-admins vers le dashboard legacy (page non migrée). */
   useEffect(() => {
     if (currentUser && currentUser.role !== "admin") window.location.assign("/dashboard");
   }, [currentUser]);

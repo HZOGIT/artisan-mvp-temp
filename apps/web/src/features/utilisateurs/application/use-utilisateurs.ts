@@ -1,11 +1,13 @@
 import { trpc } from "@/shared/trpc";
 import type { Utilisateur, CurrentUser } from "../domain/utilisateur";
 
-// Couche APPLICATION de la feature `utilisateurs` (clean-archi) : SEULE couche important tRPC.
-// `useUtilisateurs` charge l'équipe + l'utilisateur courant (pour le garde admin / « c'est moi ») et
-// expose invite/updateRole/toggleActif. `useUtilisateurPermissions` pilote le dialog de permissions
-// (lecture conditionnelle + sauvegarde + réinitialisation selon le rôle). Effets de présentation
-// (toasts, dialogs) attachés par l'UI via `mutate(vars, { onSuccess, onError })`.
+/*
+ * Couche APPLICATION de la feature `utilisateurs` (clean-archi) : SEULE couche important tRPC.
+ * `useUtilisateurs` charge l'équipe + l'utilisateur courant (pour le garde admin / « c'est moi ») et
+ * expose invite/updateRole/toggleActif. `useUtilisateurPermissions` pilote le dialog de permissions
+ * (lecture conditionnelle + sauvegarde + réinitialisation selon le rôle). Effets de présentation
+ * (toasts, dialogs) attachés par l'UI via `mutate(vars, { onSuccess, onError })`.
+ */
 export function useUtilisateurs() {
   const utils = trpc.useUtils();
   const listQ = trpc.utilisateurs.list.useQuery();

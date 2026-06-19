@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Prevision, Comparaison, HistoriqueItem } from "../domain/previsions";
 
-// Couche APPLICATION — prévisions de CA : historique (24 mois) + prévisions (année) + comparaison + calcul.
-// SEULE couche important tRPC ; effets (toast) en UI via options.
+/*
+ * Couche APPLICATION — prévisions de CA : historique (24 mois) + prévisions (année) + comparaison + calcul.
+ * SEULE couche important tRPC ; effets (toast) en UI via options.
+ */
 export function usePrevisions(annee: number) {
   const historiqueQ = trpc.previsions.getHistorique.useQuery({ nombreMois: 24 });
   const previsionsQ = trpc.previsions.getPrevisions.useQuery({ annee });

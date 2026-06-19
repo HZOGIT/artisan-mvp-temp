@@ -19,7 +19,7 @@ import { TYPE_LABEL_KEY, PERIODICITE_LABEL_KEY, STATUT_INTERVENTION, statutContr
 
 const INTER_ICON: Record<string, typeof Calendar> = { planifiee: Calendar, en_cours: Clock, effectuee: CheckCircle, annulee: XCircle };
 
-// Page `/contrats/:id` — migration clean-archi de `pages/ContratDetail.tsx`. Markup à l'identique.
+/** Page `/contrats/:id` — migration clean-archi de `pages/ContratDetail.tsx`. Markup à l'identique. */
 export default function ContratDetailPage() {
   const { t } = useTranslation("contratDetail");
   const { id: idParam } = useParams({ strict: false }) as { id?: string };
@@ -43,8 +43,10 @@ export default function ContratDetailPage() {
   }
 
   const m = montantsContrat(contrat.montantHT, contrat.tauxTVA);
-  // ⚠️ FINDING : pas d'endpoint backend pour les factures récurrentes d'un contrat (le legacy lisait
-  // `contrat.facturesRecurrentes`, toujours undefined → onglet toujours vide). Parité = liste vide.
+  /*
+   * ⚠️ FINDING : pas d'endpoint backend pour les factures récurrentes d'un contrat (le legacy lisait
+   * `contrat.facturesRecurrentes`, toujours undefined → onglet toujours vide). Parité = liste vide.
+   */
   const factures: never[] = [];
 
   const genFacture = () => generateFacture.mutate({ contratId: contrat.id }, { onSuccess: () => { toast.success(t("toastFactureGeneree")); refetch(); }, onError: (e) => toast.error(e.message) });

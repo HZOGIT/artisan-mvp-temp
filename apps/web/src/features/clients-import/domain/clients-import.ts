@@ -1,7 +1,9 @@
 import type { RouterInputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `clients-import` (import Excel/CSV de clients). Parsing/validation des lignes
-// PURS et testables ; la lecture/écriture XLSX (effets) reste en UI. 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `clients-import` (import Excel/CSV de clients). Parsing/validation des lignes
+ * PURS et testables ; la lecture/écriture XLSX (effets) reste en UI. 0 React/tRPC.
+ */
 
 export type ImportFromExcelInput = RouterInputs["clients"]["importFromExcel"];
 export type ImportClient = ImportFromExcelInput["clients"][number];
@@ -16,7 +18,7 @@ export function isValidPhone(phone: string): boolean { return PHONE_RE.test(phon
 const str = (v: unknown): string => String(v ?? "").trim();
 const opt = (v: unknown): string | undefined => str(v) || undefined;
 
-// Mappe + valide une ligne du tableur (en-têtes FR ou techniques) → aperçu client. PUR.
+/** Mappe + valide une ligne du tableur (en-têtes FR ou techniques) → aperçu client. PUR. */
 export function rowToPreview(row: Record<string, unknown>): ClientPreview {
   const c: ClientPreview = {
     nom: str(row.nom ?? row.Nom),
@@ -35,7 +37,7 @@ export function rowToPreview(row: Record<string, unknown>): ClientPreview {
   return c;
 }
 
-// Parse un tableau de lignes → aperçus (lignes sans nom filtrées). PUR.
+/** Parse un tableau de lignes → aperçus (lignes sans nom filtrées). PUR. */
 export function parseRows(rows: readonly Record<string, unknown>[]): ClientPreview[] {
   return rows.map(rowToPreview).filter((c) => c.nom);
 }
@@ -43,13 +45,13 @@ export function parseRows(rows: readonly Record<string, unknown>[]): ClientPrevi
 export function validCount(preview: readonly ClientPreview[]): number { return preview.filter((c) => c.status === "valid").length; }
 export function errorCount(preview: readonly ClientPreview[]): number { return preview.filter((c) => c.status === "error").length; }
 
-// Payload d'import : clients valides débarrassés de status/error. PUR.
+/** Payload d'import : clients valides débarrassés de status/error. PUR. */
 export function toImportPayload(preview: readonly ClientPreview[]): ImportFromExcelInput {
   const clients = preview.filter((c) => c.status === "valid").map(({ status, error, ...client }) => client);
   return { clients };
 }
 
-// Modèle de fichier (1 ligne d'exemple). PUR.
+/** Modèle de fichier (1 ligne d'exemple). PUR. */
 export const TEMPLATE_ROW = {
   nom: "Dupont", prenom: "Jean", email: "jean.dupont@email.fr", telephone: "06 12 34 56 78",
   adresse: "25 Avenue des Champs-Élysées", codePostal: "75008", ville: "Paris", notes: "Client VIP",

@@ -8,12 +8,14 @@ type StatutMeta = {
   pulse?: boolean;
 };
 
-// Carte centrale des statuts metier de l'app. Les codes correspondent aux
-// enums MySQL (drizzle/schema.ts). Les couleurs sont alignees sur les regles
-// produit : brouillon gris, envoye bleu, accepte/payee vert, refuse rouge,
-// en_retard rouge pulsant, expire orange, etc.
+/*
+ * Carte centrale des statuts metier de l'app. Les codes correspondent aux
+ * enums MySQL (drizzle/schema.ts). Les couleurs sont alignees sur les regles
+ * produit : brouillon gris, envoye bleu, accepte/payee vert, refuse rouge,
+ * en_retard rouge pulsant, expire orange, etc.
+ */
 const STATUT_MAP: Record<string, StatutMeta> = {
-  // Devis
+  /** Devis */
   brouillon: {
     label: "Brouillon",
     className: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800/60 dark:text-gray-300 dark:border-gray-700",
@@ -54,7 +56,7 @@ const STATUT_MAP: Record<string, StatutMeta> = {
     className: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900",
     icon: Clock,
   },
-  // Factures
+  /** Factures */
   validee: {
     label: "Validée",
     className: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
@@ -86,7 +88,7 @@ const STATUT_MAP: Record<string, StatutMeta> = {
     className: "bg-zinc-100 text-zinc-600 border-zinc-200 line-through dark:bg-zinc-800/60 dark:text-zinc-400 dark:border-zinc-700",
     icon: Ban,
   },
-  // Interventions / chantiers
+  /** Interventions / chantiers */
   planifiee: {
     label: "Planifiée",
     className: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900",
@@ -120,7 +122,7 @@ const STATUT_MAP: Record<string, StatutMeta> = {
     className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
     icon: Check,
   },
-  // Commandes fournisseurs
+  /** Commandes fournisseurs */
   confirmee: {
     label: "Confirmée",
     className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
@@ -131,7 +133,7 @@ const STATUT_MAP: Record<string, StatutMeta> = {
     className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900",
     icon: Check,
   },
-  // Etats genriques
+  /** Etats genriques */
   en_attente: {
     label: "En attente",
     className: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900",
@@ -156,8 +158,10 @@ export interface StatutBadgeProps {
   size?: "sm" | "md";
   withIcon?: boolean;
   className?: string;
-  // Label personnalise si on veut surcharger (ex : "Brouillons" au pluriel
-  // dans un filtre). Par defaut on prend STATUT_MAP[statut].label.
+  /*
+   * Label personnalise si on veut surcharger (ex : "Brouillons" au pluriel
+   * dans un filtre). Par defaut on prend STATUT_MAP[statut].label.
+   */
   label?: string;
 }
 
@@ -171,8 +175,10 @@ export function StatutBadge({ statut, size = "md", withIcon = true, className, l
   const meta = STATUT_MAP[key];
 
   if (!meta) {
-    // Fallback discret pour les statuts non mappes : on affiche le code brut
-    // au lieu de planter visuellement.
+    /*
+     * Fallback discret pour les statuts non mappes : on affiche le code brut
+     * au lieu de planter visuellement.
+     */
     return (
       <span
         className={cn(
@@ -206,7 +212,7 @@ export function StatutBadge({ statut, size = "md", withIcon = true, className, l
   );
 }
 
-// Helper pour ceux qui veulent juste le label sans le badge (ex : tooltip).
+/** Helper pour ceux qui veulent juste le label sans le badge (ex : tooltip). */
 export function statutLabel(statut: string | null | undefined): string {
   if (!statut) return "—";
   const meta = STATUT_MAP[statut.toLowerCase().trim()];

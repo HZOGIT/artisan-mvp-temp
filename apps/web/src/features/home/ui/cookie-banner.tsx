@@ -4,7 +4,7 @@ import { Link } from "@/shared/router/navigation";
 import { Cookie, X } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 
-// Bandeau cookies RGPD (landing). Re-port de components/CookieBanner (i18n).
+/** Bandeau cookies RGPD (landing). Re-port de components/CookieBanner (i18n). */
 const STORAGE_KEY = "operioz:cookie-consent";
 export function CookieBanner() {
   const { t } = useTranslation("home");

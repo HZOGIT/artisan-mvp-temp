@@ -22,11 +22,13 @@ import {
 } from "../domain/comptabilite";
 import { format, startOfYear, endOfYear, startOfMonth, endOfMonth } from "date-fns";
 
-// Page Comptabilité & Exports du FRONT NEUF (`/comptabilite`) — clean-archi : présentation pure
-// (lecture seule). Les 6 rapports viennent de `useComptabilite` (couche application, seule à importer
-// tRPC) ; totaux balance & sérialisation CSV via le domaine (`../domain/comptabilite`, fonctions pures
-// testées). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`comptabilite`).
-// Les exports FEC/CSV-serveur/PDF/Factur-X passent par des endpoints REST de téléchargement (pas tRPC).
+/*
+ * Page Comptabilité & Exports du FRONT NEUF (`/comptabilite`) — clean-archi : présentation pure
+ * (lecture seule). Les 6 rapports viennent de `useComptabilite` (couche application, seule à importer
+ * tRPC) ; totaux balance & sérialisation CSV via le domaine (`../domain/comptabilite`, fonctions pures
+ * testées). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`comptabilite`).
+ * Les exports FEC/CSV-serveur/PDF/Factur-X passent par des endpoints REST de téléchargement (pas tRPC).
+ */
 
 export default function ComptabilitePage() {
   const { t } = useTranslation("comptabilite");
@@ -49,7 +51,7 @@ export default function ComptabilitePage() {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
   };
 
-  // Téléchargement CSV : sérialisation déléguée au domaine (pure, testée), déclenchement DOM côté UI.
+  /** Téléchargement CSV : sérialisation déléguée au domaine (pure, testée), déclenchement DOM côté UI. */
   const exportCSV = (rows: CsvRow[], filename: string) => {
     const csvContent = toCsv(rows);
     if (!csvContent) return;
@@ -327,8 +329,10 @@ export default function ComptabilitePage() {
                   </TableHeader>
                   <TableBody>
                     {balance.map((ligne: BalanceLine, idx: number) => {
-                      // DTO LigneBalance : numeroCompte/libelleCompte + solde net (débiteur−créditeur).
-                      // Le legacy lisait compte/libelle/solde (inexistants) → colonnes vides + 0 €. Corrigé.
+                      /*
+                       * DTO LigneBalance : numeroCompte/libelleCompte + solde net (débiteur−créditeur).
+                       * Le legacy lisait compte/libelle/solde (inexistants) → colonnes vides + 0 €. Corrigé.
+                       */
                       const solde = ligneSoldeNet(ligne);
                       return (
                         <TableRow key={idx}>

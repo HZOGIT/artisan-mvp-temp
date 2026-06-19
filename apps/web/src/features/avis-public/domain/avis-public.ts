@@ -1,7 +1,9 @@
-// Couche DOMAIN de la feature `avis-public` (dépôt d'avis client par token, page publique). Logique pure
-// (libellé de note, date) testable. 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `avis-public` (dépôt d'avis client par token, page publique). Logique pure
+ * (libellé de note, date) testable. 0 React/tRPC.
+ */
 
-// Clé i18n du libellé d'une note 1–5 (null si hors plage). PUR.
+/** Clé i18n du libellé d'une note 1–5 (null si hors plage). PUR. */
 export function noteLabelKey(note: number): string | null {
   switch (note) {
     case 1: return "note1";
@@ -13,7 +15,7 @@ export function noteLabelKey(note: number): string | null {
   }
 }
 
-// Date longue FR. PUR.
+/** Date longue FR. PUR. */
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "";
   return new Date(date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });

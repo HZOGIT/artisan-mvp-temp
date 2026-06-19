@@ -1,10 +1,12 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `parametres` (clean-archi) : types dérivés du routeur + mappers PURS
-// serveur↔formulaire + helpers (URL iCal, classe de badge lead). Aucune dépendance React/tRPC.
-// ⚠️ La sous-section « réglages vitrine » (vitrineActive/Description/Zone/Services/Experience) est
-// VOLONTAIREMENT ABSENTE : le new-stack n'a aucun endpoint write/read pour ces champs (finding OPE-504)
-// → on ne migre pas une UI sans backend. À réintégrer quand OPE-504 livre `vitrine.updateSettings`.
+/*
+ * Couche DOMAIN de la feature `parametres` (clean-archi) : types dérivés du routeur + mappers PURS
+ * serveur↔formulaire + helpers (URL iCal, classe de badge lead). Aucune dépendance React/tRPC.
+ * ⚠️ La sous-section « réglages vitrine » (vitrineActive/Description/Zone/Services/Experience) est
+ * VOLONTAIREMENT ABSENTE : le new-stack n'a aucun endpoint write/read pour ces champs (finding OPE-504)
+ * → on ne migre pas une UI sans backend. À réintégrer quand OPE-504 livre `vitrine.updateSettings`.
+ */
 
 export type Parametres = RouterOutputs["parametres"]["get"];
 export type ArtisanProfile = RouterOutputs["artisan"]["getProfile"];
@@ -12,12 +14,14 @@ export type IcalFeed = RouterOutputs["calendrier"]["getIcalFeed"];
 export type UpdateParametresInput = RouterInputs["parametres"]["update"];
 export type DemandeStatut = RouterInputs["vitrine"]["updateDemandeContactStatut"]["statut"];
 export type DelaiPaiementType = NonNullable<UpdateParametresInput["delaiPaiementType"]>;
-// Réglages vitrine (OPE-504 — endpoints backend livrés). La section « Ma page vitrine » est réintégrée.
+/** Réglages vitrine (OPE-504 — endpoints backend livrés). La section « Ma page vitrine » est réintégrée. */
 export type VitrineSettings = RouterOutputs["vitrine"]["getSettings"];
 export type UpdateVitrineSettingsInput = RouterInputs["vitrine"]["updateSettings"];
 
-// OPE-505 RÉSOLU : `vitrine.getDemandesContact` est désormais typé `DemandeContact[]` côté backend →
-// on dérive directement le type du routeur (plus d'interface locale ni d'assertion).
+/*
+ * OPE-505 RÉSOLU : `vitrine.getDemandesContact` est désormais typé `DemandeContact[]` côté backend →
+ * on dérive directement le type du routeur (plus d'interface locale ni d'assertion).
+ */
 export type DemandeContact = RouterOutputs["vitrine"]["getDemandesContact"][number];
 
 export interface ParametresForm {
@@ -33,11 +37,12 @@ export interface ParametresForm {
   slug: string;
   couleurPrincipale: string;
   couleurSecondaire: string;
-  // Section « Ma page vitrine » (réglages publics)
+  /** Section « Ma page vitrine » (réglages publics) */
   vitrineActive: boolean;
   vitrineDescription: string;
   vitrineZone: string;
-  vitrineServices: string; // textarea : un service par ligne
+  /** textarea : un service par ligne */
+  vitrineServices: string;
   vitrineExperience: string;
 }
 
@@ -61,7 +66,7 @@ export const FORM_DEFAULTS: ParametresForm = {
   vitrineExperience: "",
 };
 
-// `vitrineServices` est stocké en JSON (liste) côté serveur ; le formulaire l'affiche « un par ligne ».
+/** `vitrineServices` est stocké en JSON (liste) côté serveur ; le formulaire l'affiche « un par ligne ». */
 export function parseVitrineServices(raw: string | null): string {
   if (!raw) return "";
   try {
@@ -75,7 +80,7 @@ export function serializeVitrineServices(lines: string): string {
   return JSON.stringify(lines.split("\n").map((l) => l.trim()).filter(Boolean));
 }
 
-// Fusionne les réglages vitrine (serveur) dans l'état du formulaire (les autres champs restent).
+/** Fusionne les réglages vitrine (serveur) dans l'état du formulaire (les autres champs restent). */
 export function applyVitrineToForm(form: ParametresForm, v: VitrineSettings): ParametresForm {
   return {
     ...form,
@@ -87,7 +92,7 @@ export function applyVitrineToForm(form: ParametresForm, v: VitrineSettings): Pa
   };
 }
 
-// Mappe les champs vitrine du formulaire vers l'input de `vitrine.updateSettings`.
+/** Mappe les champs vitrine du formulaire vers l'input de `vitrine.updateSettings`. */
 export function formToVitrineInput(f: ParametresForm): UpdateVitrineSettingsInput {
   return {
     vitrineActive: f.vitrineActive,
@@ -98,10 +103,10 @@ export function formToVitrineInput(f: ParametresForm): UpdateVitrineSettingsInpu
   };
 }
 
-// Mappe les paramètres serveur (+ slug artisan) vers l'état du formulaire (parité legacy : défauts).
+/** Mappe les paramètres serveur (+ slug artisan) vers l'état du formulaire (parité legacy : défauts). */
 export function parametresToForm(p: Parametres, slug: string): ParametresForm {
   return {
-    // Champs vitrine = défauts ; ils sont fusionnés ensuite par `applyVitrineToForm` (query séparée).
+    /** Champs vitrine = défauts ; ils sont fusionnés ensuite par `applyVitrineToForm` (query séparée). */
     vitrineActive: FORM_DEFAULTS.vitrineActive,
     vitrineDescription: FORM_DEFAULTS.vitrineDescription,
     vitrineZone: FORM_DEFAULTS.vitrineZone,
@@ -122,7 +127,7 @@ export function parametresToForm(p: Parametres, slug: string): ParametresForm {
   };
 }
 
-// Mappe le formulaire vers l'input de `parametres.update` (parité legacy ; champ vide → null/0/défaut).
+/** Mappe le formulaire vers l'input de `parametres.update` (parité legacy ; champ vide → null/0/défaut). */
 export function formToUpdateInput(f: ParametresForm): UpdateParametresInput {
   return {
     prefixeDevis: f.prefixeDevis,
@@ -139,12 +144,12 @@ export function formToUpdateInput(f: ParametresForm): UpdateParametresInput {
   };
 }
 
-// URL iCal complète à partir du chemin renvoyé par le serveur, "" si pas encore généré.
+/** URL iCal complète à partir du chemin renvoyé par le serveur, "" si pas encore généré. */
 export function buildIcalUrl(path: string | undefined | null, origin: string): string {
   return path ? `${origin}${path}` : "";
 }
 
-// Classe de pastille de statut d'un lead vitrine (présentation).
+/** Classe de pastille de statut d'un lead vitrine (présentation). */
 export function demandeStatutClass(statut: string): string {
   if (statut === "converti") return "bg-green-100 text-green-700";
   if (statut === "perdu") return "bg-gray-200 text-gray-600";

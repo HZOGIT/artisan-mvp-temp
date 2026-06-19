@@ -84,12 +84,14 @@ import notFoundFr from "@/features/not-found/i18n/fr.json";
 import shellFr from "@/shell/i18n/fr.json";
 import vitrinePublicFr from "@/features/vitrine-public/i18n/fr.json";
 
-// i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
-// Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
-// (`features/<feature>/i18n/fr.json`) ; le commun vit dans `shared/i18n/common/fr.json`. On les agrège
-// ici en namespaces i18next (1 namespace = 1 module). Locale par défaut `fr`, dont les valeurs sont
-// les libellés actuels À L'IDENTIQUE (parité visuelle). `en` s'ajoutera en déposant les `en.json`
-// correspondants, sans refonte. Quand une feature est migrée, ajouter son import + son namespace ici.
+/*
+ * i18n du FRONT NEUF (react-i18next). Choix de la refonte : tout libellé utilisateur passe par `t()`.
+ * Catalogues = **un `fr.json` par module/domaine**, co-localisé avec la feature
+ * (`features/<feature>/i18n/fr.json`) ; le commun vit dans `shared/i18n/common/fr.json`. On les agrège
+ * ici en namespaces i18next (1 namespace = 1 module). Locale par défaut `fr`, dont les valeurs sont
+ * les libellés actuels À L'IDENTIQUE (parité visuelle). `en` s'ajoutera en déposant les `en.json`
+ * correspondants, sans refonte. Quand une feature est migrée, ajouter son import + son namespace ici.
+ */
 const resources = {
   fr: {
     common: commonFr,
@@ -184,12 +186,14 @@ if (!i18n.isInitialized) {
     lng: "fr",
     fallbackLng: "fr",
     defaultNS: "common",
-    // React échappe déjà le HTML → pas de double échappement par i18next.
+    /** React échappe déjà le HTML → pas de double échappement par i18next. */
     interpolation: { escapeValue: false },
     returnNull: false,
-    // Ressources bundlées (sync) → pas besoin de Suspense ; le désactiver évite que `useTranslation`
-    // suspende pendant l'init asynchrone (course → erreur React #310 « more hooks » sur les pages à
-    // hooks nombreux + early-returns, ex. ClientDetail).
+    /*
+     * Ressources bundlées (sync) → pas besoin de Suspense ; le désactiver évite que `useTranslation`
+     * suspende pendant l'init asynchrone (course → erreur React #310 « more hooks » sur les pages à
+     * hooks nombreux + early-returns, ex. ClientDetail).
+     */
     react: { useSuspense: false },
   });
 }

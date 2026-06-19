@@ -32,11 +32,13 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
-// Page Interventions du FRONT NEUF (`/interventions`) — clean-archi : présentation pure. Données &
-// mutations via `useInterventions`/`useEquipe` (couche application, seule à importer tRPC) ; filtrage,
-// indexation d'équipe, durée, adresse, statuts via le domaine (`../domain/intervention`, fonctions pures
-// testées). Parité visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge + dialogs +
-// gestion d'équipe). Libellés via i18n (namespace `interventions`).
+/*
+ * Page Interventions du FRONT NEUF (`/interventions`) — clean-archi : présentation pure. Données &
+ * mutations via `useInterventions`/`useEquipe` (couche application, seule à importer tRPC) ; filtrage,
+ * indexation d'équipe, durée, adresse, statuts via le domaine (`../domain/intervention`, fonctions pures
+ * testées). Parité visuelle stricte : JSX/Tailwind inchangés (table native + StatutBadge + dialogs +
+ * gestion d'équipe). Libellés via i18n (namespace `interventions`).
+ */
 
 export default function InterventionsPage() {
   const { t } = useTranslation("interventions");
@@ -84,7 +86,7 @@ export default function InterventionsPage() {
     remove: deleteMutation,
   } = useInterventions();
 
-  // Index PUR interventionId → membres (évite le N+1).
+  /** Index PUR interventionId → membres (évite le N+1). */
   const equipeParIntervention = groupEquipeByIntervention(equipesByArtisan);
 
   const [membreToAdd, setMembreToAdd] = useState<string>("");
@@ -178,7 +180,7 @@ export default function InterventionsPage() {
   const activeStatusLabel =
     statusFilter !== "all" ? t(`statut_${statusFilter}`, { defaultValue: statusFilter }) : null;
 
-  // Nom du membre via le domaine + fallback i18n côté présentation.
+  /** Nom du membre via le domaine + fallback i18n côté présentation. */
   const nomMembre = (m: { prenom?: string | null; nom?: string | null; technicienId: number }) =>
     membreName(m) || t("techNum", { id: m.technicienId });
 

@@ -4,7 +4,7 @@ import { Activity, Calendar, FileText, Receipt, UserPlus, type LucideIcon } from
 import { useRecentActivity } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Activité récente du dashboard. Re-port de widgets/RecentActivity (clean-archi, i18n).
+/** Activité récente du dashboard. Re-port de widgets/RecentActivity (clean-archi, i18n). */
 const TYPE_ICON: Record<string, LucideIcon> = { devis: FileText, facture: Receipt, intervention: Calendar, client: UserPlus };
 const TYPE_COLOR: Record<string, string> = {
   devis: "text-blue-500 bg-blue-100 dark:bg-blue-900/30", facture: "text-emerald-500 bg-emerald-100 dark:bg-emerald-900/30",

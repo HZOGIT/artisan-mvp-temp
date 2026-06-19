@@ -8,7 +8,7 @@ import { CheckCircle2, Circle, Plus, Trash2, AlarmClock } from "lucide-react";
 import { useActivitesAFaire, type Activite } from "../../application/use-activites-a-faire";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Widget « À faire » (CRM next-action) — re-port de widgets/ActivitesAFaire (clean-archi, i18n, typé).
+/** Widget « À faire » (CRM next-action) — re-port de widgets/ActivitesAFaire (clean-archi, i18n, typé). */
 type ActiviteType = "appel" | "email" | "rdv" | "relance" | "autre";
 const TYPE_LABEL_KEY: Record<string, string> = { appel: "aaf_typeAppel", email: "aaf_typeEmail", rdv: "aaf_typeRdv", relance: "aaf_typeRelance", autre: "aaf_typeAutre" };
 const startOfDay = (d: Date): number => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };

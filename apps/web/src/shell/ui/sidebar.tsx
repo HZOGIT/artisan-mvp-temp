@@ -9,10 +9,12 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import type { NavGroup, GroupId } from "../domain/nav";
 import { RAIL_COLORS } from "../domain/rail-colors";
 
-// UI SHELL modern — sidebar (rail desktop + panneau étendu). PORT FIDÈLE de DashboardLayout, mais PILOTÉ PAR PROPS
-// (aucune dépendance legacy/tRPC) → présentation pure (toute la logique est dans le domain testé `shell/domain/nav`).
-// Les badges contextuels (ex. RDV en attente) sont injectés via `railBadge`/`itemBadge` ; l'état (groupe ouvert/actif)
-// et la navigation sont fournis par le parent. Validé visuellement au câblage final (étape ultérieure).
+/*
+ * UI SHELL modern — sidebar (rail desktop + panneau étendu). PORT FIDÈLE de DashboardLayout, mais PILOTÉ PAR PROPS
+ * (aucune dépendance legacy/tRPC) → présentation pure (toute la logique est dans le domain testé `shell/domain/nav`).
+ * Les badges contextuels (ex. RDV en attente) sont injectés via `railBadge`/`itemBadge` ; l'état (groupe ouvert/actif)
+ * et la navigation sont fournis par le parent. Validé visuellement au câblage final (étape ultérieure).
+ */
 
 export interface SidebarProps {
   groups: NavGroup[];

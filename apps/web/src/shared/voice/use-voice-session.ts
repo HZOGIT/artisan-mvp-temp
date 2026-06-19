@@ -29,7 +29,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const sessionRef = useRef<GeminiLiveVoiceSession | null>(null);
-  // The thread voice turns are persisted to (created by /voice/token if absent).
+  /** The thread voice turns are persisted to (created by /voice/token if absent). */
   const threadIdRef = useRef<number | undefined>(options.threadId);
   const queryClient = useQueryClient();
 
@@ -54,7 +54,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
       await stopVoice();
       vlog(`=== startVoice() clicked, threadId=${options.threadId ?? 'none'} ===`);
 
-      // Fetch ephemeral token from server
+      /** Fetch ephemeral token from server */
       const res = await fetch('/api/voice/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,8 +72,10 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
       const { token, wsUrl, model, threadId } = await res.json();
       vlog(`token received (model=${model}, threadId=${threadId}) — opening Live WS`);
 
-      // Adopt the thread id (created server-side if we started without one) so
-      // voice turns persist and text/voice share the same conversation.
+      /*
+       * Adopt the thread id (created server-side if we started without one) so
+       * voice turns persist and text/voice share the same conversation.
+       */
       if (threadId) {
         threadIdRef.current = Number(threadId);
         options.onThreadId?.(Number(threadId));
@@ -91,7 +93,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
           onAssistantDelta: options.onAssistantDelta || (() => {}),
           onTurnComplete: (u, a, m) => {
             vlog(`turnComplete user="${u}" assistant="${a}"`);
-            // Persist this voice turn — the Live session never touches our server.
+            /** Persist this voice turn — the Live session never touches our server. */
             const tid = threadIdRef.current;
             if (tid && ((u && u.trim()) || (a && a.trim()))) {
               fetch('/api/voice/persist', {
@@ -124,8 +126,10 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
     }
   }, [options.threadId, options.onUserTranscript, options.onAssistantDelta, options.onTurnComplete, options.onThreadId, stopVoice]);
 
-  // Keep the persist target in sync if the thread id changes elsewhere (e.g. a
-  // text message created the thread before voice started).
+  /*
+   * Keep the persist target in sync if the thread id changes elsewhere (e.g. a
+   * text message created the thread before voice started).
+   */
   useEffect(() => {
     if (options.threadId) threadIdRef.current = options.threadId;
   }, [options.threadId]);
@@ -138,7 +142,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
     }
   }, [voiceState, startVoice, stopVoice]);
 
-  // Cleanup on unmount
+  /** Cleanup on unmount */
   useEffect(() => {
     return () => { stopVoice(); };
   }, [stopVoice]);

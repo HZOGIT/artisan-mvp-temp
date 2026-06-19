@@ -14,8 +14,10 @@ import { Progress } from "@/shared/ui/progress";
 import { useBadges } from "../application/use-badges";
 import { PERIODES, ICONES, CATEGORIES, categorieClass, rankMedal, progressPct, maxPoints, technicienLabel, type Periode, type BadgeForm } from "../domain/badges";
 
-// Page `badges` (gamification techniciens) — migration clean-archi de `pages/Badges.tsx`. Markup/classes
-// Tailwind conservés à l'identique (parité visuelle). tRPC encapsulé dans `use-badges`, règles en domain.
+/*
+ * Page `badges` (gamification techniciens) — migration clean-archi de `pages/Badges.tsx`. Markup/classes
+ * Tailwind conservés à l'identique (parité visuelle). tRPC encapsulé dans `use-badges`, règles en domain.
+ */
 function iconeOf(icone: string) {
   switch (icone) {
     case "star": return <Star className="h-6 w-6" />;

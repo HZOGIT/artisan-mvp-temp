@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Modele } from "../domain/modeles-email";
 
-// Couche APPLICATION — modèles d'emails : liste + CRUD. SEULE couche important tRPC. Les effets (toast,
-// fermeture dialog, reset form) restent en UI (passés via les options de chaque `mutate`).
+/*
+ * Couche APPLICATION — modèles d'emails : liste + CRUD. SEULE couche important tRPC. Les effets (toast,
+ * fermeture dialog, reset form) restent en UI (passés via les options de chaque `mutate`).
+ */
 export function useModelesEmail() {
   const listQ = trpc.modelesEmail.list.useQuery();
   const refetch = () => listQ.refetch();

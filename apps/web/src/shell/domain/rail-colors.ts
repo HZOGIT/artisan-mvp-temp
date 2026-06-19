@@ -1,7 +1,9 @@
 import type { NavColor } from "./nav";
 
-// Map couleur de groupe → classes Tailwind du rail de la sidebar. PORT FIDÈLE de RAIL_COLORS (DashboardLayout).
-// Inclut bien 'purple' (groupe Finance) : son absence faisait planter tout le shell (RAIL_COLORS['purple'] undefined).
+/*
+ * Map couleur de groupe → classes Tailwind du rail de la sidebar. PORT FIDÈLE de RAIL_COLORS (DashboardLayout).
+ * Inclut bien 'purple' (groupe Finance) : son absence faisait planter tout le shell (RAIL_COLORS['purple'] undefined).
+ */
 export const RAIL_COLORS: Record<NavColor, { iconActive: string; bgActive: string; ring: string; hover: string }> = {
   violet: { iconActive: "text-violet-500", bgActive: "bg-violet-100 dark:bg-violet-900/30", ring: "ring-violet-500/30", hover: "hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20" },
   blue: { iconActive: "text-blue-500", bgActive: "bg-blue-100 dark:bg-blue-900/30", ring: "ring-blue-500/30", hover: "hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20" },

@@ -4,8 +4,10 @@ import type { Categorie, Client, Doublon } from "../domain/nouvelle-depense";
 
 export type DoublonKey = { montantTtc: number; dateDepense: string; fournisseur: string };
 
-// Couche APPLICATION — nouvelle dépense : catégories + clients + scan IA (OCR) + détection de doublons
-// (gated/debouncée côté UI) + création. SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — nouvelle dépense : catégories + clients + scan IA (OCR) + détection de doublons
+ * (gated/debouncée côté UI) + création. SEULE couche important tRPC.
+ */
 export function useNouvelleDepense(doublonKey: DoublonKey) {
   const categoriesQ = trpc.depenses.getCategories.useQuery();
   const clientsQ = trpc.clients.list.useQuery();

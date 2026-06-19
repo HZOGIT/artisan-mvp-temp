@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Rapport, ResultatRapport } from "../domain/rapports";
 
-// Couche APPLICATION — rapports : liste + exécution (gated par sélection via skipToken) + CRUD + favori.
-// SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — rapports : liste + exécution (gated par sélection via skipToken) + CRUD + favori.
+ * SEULE couche important tRPC.
+ */
 export function useRapports(selectedRapport: number | null, dateDebut: string, dateFin: string) {
   const listQ = trpc.rapports.list.useQuery();
   const resultatsQ = trpc.rapports.executer.useQuery(

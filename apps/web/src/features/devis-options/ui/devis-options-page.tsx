@@ -4,10 +4,12 @@ import { Layers, FileText, ArrowRight, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 
-// Page /devis-options — port conforme du placeholder explicatif legacy `pages/DevisOptions.tsx`.
-// Présentation pure (aucune donnée tRPC) : renvoie l'utilisateur vers la gestion des variantes depuis
-// le détail d'un devis. Navigation via wouter `Link` (le routeur neuf est monté dans l'arbre wouter ;
-// la bascule strangler redirige `/devis` vers `/devis` le cas échéant).
+/*
+ * Page /devis-options — port conforme du placeholder explicatif legacy `pages/DevisOptions.tsx`.
+ * Présentation pure (aucune donnée tRPC) : renvoie l'utilisateur vers la gestion des variantes depuis
+ * le détail d'un devis. Navigation via wouter `Link` (le routeur neuf est monté dans l'arbre wouter ;
+ * la bascule strangler redirige `/devis` vers `/devis` le cas échéant).
+ */
 export default function DevisOptionsPage() {
   const { t } = useTranslation("devisOptions");
   return (

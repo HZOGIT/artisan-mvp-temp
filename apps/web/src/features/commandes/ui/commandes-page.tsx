@@ -18,10 +18,12 @@ import { Plus, Search, ShoppingCart, MoreHorizontal, Eye, Pencil, Trash2, Downlo
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-// Page Bons de commande fournisseurs du FRONT NEUF (`/commandes`) — clean-archi : présentation pure.
-// Données & mutations via `useCommandes` (couche application, seule à importer tRPC) ; filtrage via le
-// domaine (`../domain/commande`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à
-// l'identique (table native + Badge statut). Libellés via i18n (namespace `commandes`).
+/*
+ * Page Bons de commande fournisseurs du FRONT NEUF (`/commandes`) — clean-archi : présentation pure.
+ * Données & mutations via `useCommandes` (couche application, seule à importer tRPC) ; filtrage via le
+ * domaine (`../domain/commande`, fonctions pures testées). Parité visuelle stricte : JSX/Tailwind à
+ * l'identique (table native + Badge statut). Libellés via i18n (namespace `commandes`).
+ */
 
 const statusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -78,11 +80,11 @@ export default function CommandesPage() {
     }
   };
 
-  // Le nom fournisseur n'est pas dans le DTO des commandes → résolu via la liste des fournisseurs.
+  /** Le nom fournisseur n'est pas dans le DTO des commandes → résolu via la liste des fournisseurs. */
   const fournisseurNomById = new Map<number, string>(fournisseurs.map((f) => [f.id, f.nom]));
   const resolveFournisseurNom = (id: number | null) => (id == null ? "" : fournisseurNomById.get(id) ?? "");
 
-  // Filtrage délégué au domaine (pur, testé).
+  /** Filtrage délégué au domaine (pur, testé). */
   const filtered = filterCommandes(commandes, { filterStatut, filterFournisseur, searchQuery, resolveFournisseurNom });
 
   return (

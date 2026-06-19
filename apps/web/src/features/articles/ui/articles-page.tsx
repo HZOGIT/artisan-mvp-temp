@@ -22,13 +22,15 @@ import { Badge } from "@/shared/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/shared/ui/dropdown-menu";
 import { toast } from "sonner";
 
-// Page Bibliothèque d'articles du FRONT NEUF (`/articles`) — clean-archi : présentation pure. Données
-// & mutations via `useArticles` (couche application, seule à importer tRPC) ; recherche, filtres,
-// valeurs distinctes, marge et parsing CSV d'import via le domaine (`../domain/article`, fonctions pures
-// testées). Parité visuelle stricte : JSX/Tailwind à l'identique (table native `data-table`). Libellés
-// métier/catégorie/sous-catégorie/unité/TVA via i18n ; couleurs = classes Tailwind.
+/*
+ * Page Bibliothèque d'articles du FRONT NEUF (`/articles`) — clean-archi : présentation pure. Données
+ * & mutations via `useArticles` (couche application, seule à importer tRPC) ; recherche, filtres,
+ * valeurs distinctes, marge et parsing CSV d'import via le domaine (`../domain/article`, fonctions pures
+ * testées). Parité visuelle stricte : JSX/Tailwind à l'identique (table native `data-table`). Libellés
+ * métier/catégorie/sous-catégorie/unité/TVA via i18n ; couleurs = classes Tailwind.
+ */
 
-// Couleurs (classes Tailwind, pas des libellés).
+/** Couleurs (classes Tailwind, pas des libellés). */
 const categorieColors: Record<string, string> = {
   prestation: "bg-purple-100 text-purple-700",
   fourniture: "bg-blue-100 text-blue-700",
@@ -41,7 +43,7 @@ const metierColors: Record<string, string> = {
   peintre: "bg-green-100 text-green-700",
 };
 
-// Clés (l'ordre = ordre d'affichage des options ; libellés via i18n).
+/** Clés (l'ordre = ordre d'affichage des options ; libellés via i18n). */
 const METIER_KEYS = ["plombier", "electricien", "chauffagiste", "carreleur", "peintre"];
 const CATEGORIE_KEYS = ["prestation", "fourniture"];
 const UNITE_KEYS: { value: string; key: string }[] = [
@@ -133,9 +135,11 @@ export default function ArticlesPage() {
       nom: article.nom || "",
       description: article.description || "",
       unite: article.unite || "unité",
-      // Lecture = sortie getBibliotheque (camelCase) ; écriture = champs de form en snake_case
-      // (= schéma d'entrée des mutations). Le legacy lisait `prix_base`/`sous_categorie` (snake) sur
-      // la sortie camelCase → undefined (prix affiché 0 €, marge "—", recherche cassée). Corrigé ici.
+      /*
+       * Lecture = sortie getBibliotheque (camelCase) ; écriture = champs de form en snake_case
+       * (= schéma d'entrée des mutations). Le legacy lisait `prix_base`/`sous_categorie` (snake) sur
+       * la sortie camelCase → undefined (prix affiché 0 €, marge "—", recherche cassée). Corrigé ici.
+       */
       prix_base: article.prixBase?.toString() || "",
       prixRevient: article.prixRevient?.toString() || "",
       tauxTVA: article.tauxTVA?.toString() || "20",
@@ -219,7 +223,7 @@ export default function ArticlesPage() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = typeof event.target?.result === "string" ? event.target.result : "";
-      // Parsing délégué au domaine (pur, testé).
+      /** Parsing délégué au domaine (pur, testé). */
       const parsed = parseImportCsv(text);
       if (parsed.length === 0) { toast.error(t("toastCsvNoData")); return; }
       setImportPreview(parsed);
@@ -241,7 +245,7 @@ export default function ArticlesPage() {
     });
   };
 
-  // Sélections/agrégations déléguées au domaine (pures, testées).
+  /** Sélections/agrégations déléguées au domaine (pures, testées). */
   const filteredArticles = filterArticles(articles, { searchQuery, categoryFilter, metierFilter });
   const categories = distinctCategories(articles);
   const metiers = distinctMetiers(articles);

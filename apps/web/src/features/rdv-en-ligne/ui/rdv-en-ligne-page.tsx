@@ -14,8 +14,10 @@ import { useLocation } from "@/shared/router/navigation";
 import { useRdvEnLigne } from "../application/use-rdv-en-ligne";
 import { STATUT_FILTERS, statutClass, urgenceClass, clientName, filterByStatut, type RdvItem } from "../domain/rdv-en-ligne";
 
-// Page `rdv-en-ligne` (demandes de RDV) — migration clean-archi de `pages/RdvEnLigne.tsx`. Markup à
-// l'identique. tRPC encapsulé dans `use-rdv-en-ligne`, classes/règles en domain.
+/*
+ * Page `rdv-en-ligne` (demandes de RDV) — migration clean-archi de `pages/RdvEnLigne.tsx`. Markup à
+ * l'identique. tRPC encapsulé dans `use-rdv-en-ligne`, classes/règles en domain.
+ */
 export default function RdvEnLignePage() {
   const { t } = useTranslation("rdvEnLigne");
   const [, setLocation] = useLocation();

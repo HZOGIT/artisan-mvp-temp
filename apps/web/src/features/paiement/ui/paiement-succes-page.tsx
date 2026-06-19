@@ -4,8 +4,10 @@ import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { CheckCircle2, ArrowLeft, Receipt } from "lucide-react";
 
-// Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/paiement/succes`) — PORT CONFORME de
-// `pages/PaiementSucces.tsx`. Montée hors auth (cf. public-router). i18n namespace `paiement`.
+/*
+ * Page PUBLIQUE (post-Stripe) du FRONT NEUF (`/paiement/succes`) — PORT CONFORME de
+ * `pages/PaiementSucces.tsx`. Montée hors auth (cf. public-router). i18n namespace `paiement`.
+ */
 export default function PaiementSuccesPage() {
   const { t } = useTranslation("paiement");
   const [, setLocation] = useLocation();

@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 
-// Carte Leaflet (chargé via CDN global, cf. index.html — pas de package npm). Re-port de components/Map.
-// L est déclaré globalement (leaflet.d.ts). Sans dépendance legacy : init inline (remplace usePersistFn), cn → join.
+/*
+ * Carte Leaflet (chargé via CDN global, cf. index.html — pas de package npm). Re-port de components/Map.
+ * L est déclaré globalement (leaflet.d.ts). Sans dépendance legacy : init inline (remplace usePersistFn), cn → join.
+ */
 interface MapViewProps {
   className?: string;
   initialCenter?: { lat: number; lng: number };

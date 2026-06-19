@@ -13,8 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { useCommandeForm, searchBiblioRest } from "../application/use-commande-form";
 import { defaultCommandeForm, emptyLigne, formatCurrency, totals, mapArtisanArticles, mapBiblioResults, ligneFromSearchResult, mapIaLignes, ligneFromCommande, validateForm, buildCreatePayload, buildUpdatePayload, type LigneCommande, type SearchResult, type CommandeForm } from "../domain/commande-form";
 
-// Page `/commandes/nouvelle` + `/commandes/:id/modifier` — migration clean-archi de
-// `pages/CommandeFournisseurForm.tsx`. ⚠️ En édition, le backend ne met à jour QUE les métadonnées (cf. domain).
+/*
+ * Page `/commandes/nouvelle` + `/commandes/:id/modifier` — migration clean-archi de
+ * `pages/CommandeFournisseurForm.tsx`. ⚠️ En édition, le backend ne met à jour QUE les métadonnées (cf. domain).
+ */
 export default function CommandeFormPage() {
   const { t } = useTranslation("commandeForm");
   const { id: idParam } = useParams({ strict: false }) as { id?: string };
@@ -34,7 +36,7 @@ export default function CommandeFormPage() {
   const C = useCommandeForm(commandeId, iaSectionOpen);
   const { fournisseurs, artisanArticles, devisAcceptes, devisAcceptesList, commande, lignesExistantes, utils } = C;
 
-  // Chargement de la commande existante (édition).
+  /** Chargement de la commande existante (édition). */
   useEffect(() => {
     if (isEdit && commande) {
       setForm({

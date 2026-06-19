@@ -14,8 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMaVitrine } from "../application/use-ma-vitrine";
 import { parseServices, buildVitrineUrl, avisStatutClass, avisStatutIsSecondary, formatDate, type VitrineForm } from "../domain/ma-vitrine";
 
-// Page `ma-vitrine` (page publique + avis) — migration clean-archi de `pages/MaVitrine.tsx`. Markup à
-// l'identique. tRPC encapsulé dans `use-ma-vitrine`, règles pures en domain.
+/*
+ * Page `ma-vitrine` (page publique + avis) — migration clean-archi de `pages/MaVitrine.tsx`. Markup à
+ * l'identique. tRPC encapsulé dans `use-ma-vitrine`, règles pures en domain.
+ */
 const EMPTY: VitrineForm = { vitrineActive: false, vitrineDescription: "", vitrineZone: "", vitrineServices: "", vitrineExperience: "", slug: "" };
 
 function Stars({ note }: { note: number }) {

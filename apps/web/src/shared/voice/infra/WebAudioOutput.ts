@@ -1,14 +1,15 @@
 import type { AudioOutput } from '@/shared/voice/domain/AudioOutput';
 import { resumeSharedAudioContext } from './sharedAudioContext';
 
-const MODEL_RATE = 24000; // native-audio Live models output 24 kHz PCM16
+/** native-audio Live models output 24 kHz PCM16 */
+const MODEL_RATE = 24000;
 
 export class WebAudioOutput implements AudioOutput {
   private _ctx: AudioContext | null = null;
   private _node: AudioWorkletNode | null = null;
   private _playing = false;
   private _ready: Promise<void> | null = null;
-  // 24 kHz Int16 chunks that arrive before the worklet node is wired up.
+  /** 24 kHz Int16 chunks that arrive before the worklet node is wired up. */
   private _pending: Int16Array[] = [];
 
   get isPlaying() { return this._playing; }
@@ -41,8 +42,10 @@ export class WebAudioOutput implements AudioOutput {
     }
   }
 
-  // Resample 24 kHz model audio → the shared context's native rate, then hand
-  // the Int16 samples to the playback worklet (which plays 1:1 at ctx rate).
+  /*
+   * Resample 24 kHz model audio → the shared context's native rate, then hand
+   * the Int16 samples to the playback worklet (which plays 1:1 at ctx rate).
+   */
   private _pushSamples(src24k: Int16Array): void {
     if (!this._node || !this._ctx) return;
     const outRate = this._ctx.sampleRate;
@@ -50,7 +53,8 @@ export class WebAudioOutput implements AudioOutput {
     if (outRate === MODEL_RATE) {
       out = src24k;
     } else {
-      const ratio = MODEL_RATE / outRate; // e.g. 24000/48000 = 0.5
+      /** e.g. 24000/48000 = 0.5 */
+      const ratio = MODEL_RATE / outRate;
       const outLen = Math.floor(src24k.length / ratio);
       out = new Int16Array(outLen);
       for (let i = 0; i < outLen; i++) {
@@ -70,7 +74,7 @@ export class WebAudioOutput implements AudioOutput {
     const binary = atob(pcm16Base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    // base64 byte length is always even for PCM16; build a copy-safe Int16Array.
+    /** base64 byte length is always even for PCM16; build a copy-safe Int16Array. */
     const src = new Int16Array(bytes.buffer, 0, bytes.length >> 1);
 
     if (this._node && this._ctx) {
@@ -80,7 +84,7 @@ export class WebAudioOutput implements AudioOutput {
       return;
     }
 
-    // Not ready yet — buffer a copy and kick off init (which flushes _pending).
+    /** Not ready yet — buffer a copy and kick off init (which flushes _pending). */
     this._pending.push(new Int16Array(src));
     this._playing = true;
     void this.resume();
@@ -88,7 +92,7 @@ export class WebAudioOutput implements AudioOutput {
 
   stop(): void {
     this._node?.disconnect();
-    // Do NOT close the shared context here — the session owns its lifecycle.
+    /** Do NOT close the shared context here — the session owns its lifecycle. */
     this._ctx = null;
     this._node = null;
     this._ready = null;

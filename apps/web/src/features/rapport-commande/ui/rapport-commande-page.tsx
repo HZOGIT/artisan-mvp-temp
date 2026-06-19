@@ -8,8 +8,10 @@ import { useRapportCommande } from "../application/use-rapport-commande";
 import { formatCurrency, totalArticles, totalMontant, type CommandeFournisseur } from "../domain/rapport-commande";
 import { exportBonCommande, exportRapportGlobal } from "./pdf-export";
 
-// Page `rapport-commande` (articles en rupture à commander) — migration clean-archi de
-// `pages/RapportCommande.tsx`. Markup à l'identique. Export PDF dans `pdf-export.ts` (autoTable typé).
+/*
+ * Page `rapport-commande` (articles en rupture à commander) — migration clean-archi de
+ * `pages/RapportCommande.tsx`. Markup à l'identique. Export PDF dans `pdf-export.ts` (autoTable typé).
+ */
 export default function RapportCommandePage() {
   const { t } = useTranslation("rapportCommande");
   const { rapport, artisan, isLoading } = useRapportCommande();

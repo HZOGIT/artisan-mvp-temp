@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-// Cette page est rendue par App.tsx HORS du ModernRouterMount → on initialise l'i18n du front neuf ici aussi
-// (sinon `t()` renvoie les clés). Idempotent (l'init est gardé par `i18n.isInitialized`).
+/*
+ * Cette page est rendue par App.tsx HORS du ModernRouterMount → on initialise l'i18n du front neuf ici aussi
+ * (sinon `t()` renvoie les clés). Idempotent (l'init est gardé par `i18n.isInitialized`).
+ */
 import "@/shared/i18n";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -14,8 +16,10 @@ import { METIERS, recommendedSlugs, metierFinal as computeMetierFinal, buildComp
 
 const ICON_MAP: Record<string, LucideIcon> = { Bell, Calculator, Calendar, FileCheck, FileText, Globe, LayoutGrid, MapPin, MessageCircle, Package, PenTool, Receipt, ShoppingCart, Sparkles, Users, Wrench };
 
-// Page `/onboarding` (plein écran post-signup) — migration clean-archi de `pages/Onboarding.tsx`. Markup à
-// l'identique. Catalogues/recommandation/payload en domain (testés) ; navigation via window.location.
+/*
+ * Page `/onboarding` (plein écran post-signup) — migration clean-archi de `pages/Onboarding.tsx`. Markup à
+ * l'identique. Catalogues/recommandation/payload en domain (testés) ; navigation via window.location.
+ */
 export default function OnboardingPage() {
   const { t } = useTranslation("onboarding");
   const { modules, complete, skip } = useOnboarding();

@@ -17,8 +17,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { useRapports } from "../application/use-rapports";
 import { TYPE_VALUES, FORMAT_VALUES, GRAPHIQUE_VALUES, EMPTY_FORM, humanizeColumn, favoris, formatCell, deriveColonnes, type RapportForm, type RapportType, type RapportFormat, type GraphiqueType, type ResultatRapport, type ResultatLigne } from "../domain/rapports";
 
-// Page `rapports` (rapports personnalisables) — migration clean-archi de `pages/Rapports.tsx`. Markup à
-// l'identique. tRPC encapsulé dans `use-rapports`, agrégats/formatage purs en domain.
+/*
+ * Page `rapports` (rapports personnalisables) — migration clean-archi de `pages/Rapports.tsx`. Markup à
+ * l'identique. tRPC encapsulé dans `use-rapports`, agrégats/formatage purs en domain.
+ */
 const TYPE_ICON: Record<string, typeof TrendingUp> = { ventes: TrendingUp, clients: Users, interventions: Wrench, stocks: Package, techniciens: Users, financier: Calculator };
 const FORMAT_ICON: Record<string, typeof TableIcon> = { tableau: TableIcon, graphique: BarChart3, liste: FileText };
 const GRAPHIQUE_ICON: Record<string, typeof BarChart3> = { bar: BarChart3, line: LineChart, pie: PieChart, doughnut: PieChart };

@@ -5,7 +5,7 @@ import { Users } from "lucide-react";
 import { useTopClients } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Top clients par CA (barres horizontales). Re-port de widgets/TopClients (clean-archi, i18n, typé).
+/** Top clients par CA (barres horizontales). Re-port de widgets/TopClients (clean-archi, i18n, typé). */
 const formatEUR = (v: number) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 const BAR_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
 

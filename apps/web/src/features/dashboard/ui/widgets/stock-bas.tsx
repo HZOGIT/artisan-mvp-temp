@@ -4,7 +4,7 @@ import { PackageX, PackageCheck, AlertTriangle } from "lucide-react";
 import { useLowStock } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Stock à réapprovisionner (lecture seule). Re-port de widgets/StockBas (clean-archi, i18n).
+/** Stock à réapprovisionner (lecture seule). Re-port de widgets/StockBas (clean-archi, i18n). */
 export function StockBasWidget() {
   const { t } = useTranslation("dashboard");
   const { items, isLoading } = useLowStock();

@@ -1,9 +1,11 @@
 import { trpc } from "@/shared/trpc";
 import type { Module } from "../domain/module";
 
-// Couche APPLICATION de la feature `modules` (clean-archi) : SEULE couche important tRPC.
-// Charge la liste des modules et expose la mutation de bascule (active/désactive) avec invalidation
-// (liste + getMine, qui pilote la navigation/feature-flags). L'UI attache ses effets (toast) par appel.
+/*
+ * Couche APPLICATION de la feature `modules` (clean-archi) : SEULE couche important tRPC.
+ * Charge la liste des modules et expose la mutation de bascule (active/désactive) avec invalidation
+ * (liste + getMine, qui pilote la navigation/feature-flags). L'UI attache ses effets (toast) par appel.
+ */
 export function useModules() {
   const utils = trpc.useUtils();
   const listQ = trpc.modules.list.useQuery();

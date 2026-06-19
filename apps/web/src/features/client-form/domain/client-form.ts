@@ -1,7 +1,9 @@
 import type { RouterInputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `client-form` (création d'un client). Type de formulaire, défauts, validation
-// pure + construction du payload `clients.create`. 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `client-form` (création d'un client). Type de formulaire, défauts, validation
+ * pure + construction du payload `clients.create`. 0 React/tRPC.
+ */
 
 export type ClientCreateInput = RouterInputs["clients"]["create"];
 export type ClientType = "particulier" | "professionnel";
@@ -22,12 +24,12 @@ export function defaultClientForm(): ClientForm {
   };
 }
 
-// Validation : le nom est requis. Renvoie une clé i18n d'erreur, ou null. PUR.
+/** Validation : le nom est requis. Renvoie une clé i18n d'erreur, ou null. PUR. */
 export function validateClientForm(form: ClientForm): string | null {
   return form.nom.trim() ? null : "errNom";
 }
 
-// Construit le payload `clients.create` depuis le formulaire (les champs vides sont acceptés nullish). PUR.
+/** Construit le payload `clients.create` depuis le formulaire (les champs vides sont acceptés nullish). PUR. */
 export function buildCreatePayload(form: ClientForm): ClientCreateInput {
   return form;
 }

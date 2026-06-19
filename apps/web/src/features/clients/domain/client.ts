@@ -1,13 +1,15 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAINE de la feature `clients` (clean-archi) : types dérivés des sorties du routeur tRPC
-// (source de vérité serveur — zod → AppRouter) + règles PURES testables sans réseau ni i18n.
-// La couche application/ui dépend de ces types/fonctions, pas du transport.
+/*
+ * Couche DOMAINE de la feature `clients` (clean-archi) : types dérivés des sorties du routeur tRPC
+ * (source de vérité serveur — zod → AppRouter) + règles PURES testables sans réseau ni i18n.
+ * La couche application/ui dépend de ces types/fonctions, pas du transport.
+ */
 
 export type Client = RouterOutputs["clients"]["list"][number];
 export type EncoursMap = RouterOutputs["clients"]["getEncoursMap"];
 
-// Types de la vue DÉTAIL (`/clients/:id`) — dérivés des sorties serveur (0 `any`).
+/** Types de la vue DÉTAIL (`/clients/:id`) — dérivés des sorties serveur (0 `any`). */
 export type ClientDetail = NonNullable<RouterOutputs["clients"]["getById"]>;
 export type DevisRow = RouterOutputs["devis"]["list"][number];
 export type FactureRow = RouterOutputs["factures"]["list"][number];
@@ -21,7 +23,7 @@ const toNumber = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-// Filtre PUR : lignes rattachées à un client (devis/factures/interventions ont toutes `clientId`).
+/** Filtre PUR : lignes rattachées à un client (devis/factures/interventions ont toutes `clientId`). */
 export function ofClient<T extends { clientId: number | null }>(
   rows: readonly T[],
   clientId: number,
@@ -29,12 +31,12 @@ export function ofClient<T extends { clientId: number | null }>(
   return rows.filter((r) => r.clientId === clientId);
 }
 
-// Activités/rappels CRM rattachés à CE client (entité polymorphe → filtrer type + id).
+/** Activités/rappels CRM rattachés à CE client (entité polymorphe → filtrer type + id). */
 export function activitesOfClient(rows: readonly ActiviteRow[], clientId: number): ActiviteRow[] {
   return rows.filter((a) => a.entiteType === "client" && a.entiteId === clientId);
 }
 
-// Tri PUR par échéance croissante (copie, ne mute pas l'entrée).
+/** Tri PUR par échéance croissante (copie, ne mute pas l'entrée). */
 export function sortActivitesByEcheance(rows: readonly ActiviteRow[]): ActiviteRow[] {
   return rows.slice().sort((a, b) => new Date(a.echeance).getTime() - new Date(b.echeance).getTime());
 }
@@ -46,7 +48,7 @@ export interface ClientStats {
   interventionsTerminees: number;
 }
 
-// Statistiques PURES affichées en tête de la fiche client (mêmes règles que le legacy).
+/** Statistiques PURES affichées en tête de la fiche client (mêmes règles que le legacy). */
 export function computeClientStats(
   devis: readonly DevisRow[],
   factures: readonly FactureRow[],
@@ -63,7 +65,7 @@ export function computeClientStats(
   return { totalFacture, facturesImpayees, devisEnAttente, interventionsTerminees };
 }
 
-// Libellé d'affichage d'un client.
+/** Libellé d'affichage d'un client. */
 export function nomComplet(c: Pick<Client, "nom" | "prenom" | "raisonSociale">): string {
   if (c.raisonSociale) return c.raisonSociale;
   return [c.prenom, c.nom].filter(Boolean).join(" ").trim() || c.nom;
@@ -72,7 +74,7 @@ export function nomComplet(c: Pick<Client, "nom" | "prenom" | "raisonSociale">):
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 const digits = (s: unknown) => String(s ?? "").replace(/[\s.\-()+]/g, "");
 
-// Descripteur i18n d'un groupe de doublons (la couche UI formate via `t(reasonKey, reasonParams)`).
+/** Descripteur i18n d'un groupe de doublons (la couche UI formate via `t(reasonKey, reasonParams)`). */
 export type DupeReasonKey = "dupesSameEmail" | "dupesSameName";
 export interface DuplicateGroup {
   reasonKey: DupeReasonKey;
@@ -80,7 +82,7 @@ export interface DuplicateGroup {
   clients: Client[];
 }
 
-// Détection PURE de doublons potentiels (même email OU même prénom+nom, normalisés). Informatif.
+/** Détection PURE de doublons potentiels (même email OU même prénom+nom, normalisés). Informatif. */
 export function findDuplicateGroups(clients: readonly Client[]): DuplicateGroup[] {
   const push = (m: Map<string, Client[]>, k: string, c: Client) => {
     const a = m.get(k);
@@ -114,8 +116,10 @@ export interface CreateDuplicateMatch {
   reasonKey: CreateDupeReasonKey;
 }
 
-// Avertissement PUR (non bloquant) à la création : l'email/téléphone/nom saisi correspond-il à un
-// client existant ? Renvoie la clé i18n de la raison (formatée côté UI).
+/*
+ * Avertissement PUR (non bloquant) à la création : l'email/téléphone/nom saisi correspond-il à un
+ * client existant ? Renvoie la clé i18n de la raison (formatée côté UI).
+ */
 export function findCreateDuplicateMatch(
   form: { email: string; telephone: string; prenom: string; nom: string },
   clients: readonly Client[],

@@ -25,10 +25,12 @@ import {
 import { Switch } from "@/shared/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
-// Page Mes modules du FRONT NEUF (`/modules`) — MIGRATION clean-archi de `pages/Modules.tsx`
-// (activation des fonctionnalités ; legacy chaînes EN DUR + type local + cast → i18n namespace `modules`
-// + types `RouterOutputs`). Données & mutation via `useModules` (couche application, seule à importer
-// tRPC) ; filtres/compteurs/populaires via le domaine (purs, testés). Présentation pure, 0 `any`.
+/*
+ * Page Mes modules du FRONT NEUF (`/modules`) — MIGRATION clean-archi de `pages/Modules.tsx`
+ * (activation des fonctionnalités ; legacy chaînes EN DUR + type local + cast → i18n namespace `modules`
+ * + types `RouterOutputs`). Données & mutation via `useModules` (couche application, seule à importer
+ * tRPC) ; filtres/compteurs/populaires via le domaine (purs, testés). Présentation pure, 0 `any`.
+ */
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Bell, Calculator, Calendar, FileCheck, FileText, Globe, LayoutGrid,
@@ -36,7 +38,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Users, Wrench,
 };
 
-// Couleurs de marque par catégorie (présentation). Le LIBELLÉ vit en i18n (`CAT_LABEL`).
+/** Couleurs de marque par catégorie (présentation). Le LIBELLÉ vit en i18n (`CAT_LABEL`). */
 const CATEGORIE_META: Record<Categorie, { gradient: string; pillBg: string; pillBgActive: string; pillBorder: string; glow: string }> = {
   commercial: { gradient: "from-emerald-500 to-green-600", pillBg: "text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800", pillBgActive: "bg-gradient-to-r from-emerald-500 to-green-600 text-white border-transparent", pillBorder: "border-emerald-300", glow: "hover:shadow-emerald-500/20" },
   clients: { gradient: "from-orange-500 to-amber-600", pillBg: "text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800", pillBgActive: "bg-gradient-to-r from-orange-500 to-amber-600 text-white border-transparent", pillBorder: "border-orange-300", glow: "hover:shadow-orange-500/20" },

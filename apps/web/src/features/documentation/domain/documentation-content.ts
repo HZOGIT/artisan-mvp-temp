@@ -1,16 +1,18 @@
-// Couche DOMAIN de la feature `documentation` (guide d'utilisation). Catalogue de CONTENU statique (data,
-// pas du libellé d'interface → reste en domain) + recherche pure. `iconKey` (string) au lieu d'un composant
-// React pour garder le domain pur ; l'UI mappe `iconKey` → icône. 0 dépendance React/tRPC.
+/*
+ * Couche DOMAIN de la feature `documentation` (guide d'utilisation). Catalogue de CONTENU statique (data,
+ * pas du libellé d'interface → reste en domain) + recherche pure. `iconKey` (string) au lieu d'un composant
+ * React pour garder le domain pur ; l'UI mappe `iconKey` → icône. 0 dépendance React/tRPC.
+ */
 
 export type DocSubsection = { title: string; content: string[] };
 export type DocSection = { id: string; iconKey: string; title: string; color: string; subsections: DocSubsection[] };
 
-// Normalisation accents/casse pour une recherche tolérante. PUR.
+/** Normalisation accents/casse pour une recherche tolérante. PUR. */
 export function normalize(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-// Filtre les sections par requête (titre de sous-section OU ligne de contenu), sections vides retirées. PUR.
+/** Filtre les sections par requête (titre de sous-section OU ligne de contenu), sections vides retirées. PUR. */
 export function filterSections(sections: readonly DocSection[], query: string): DocSection[] {
   const q = normalize(query);
   if (!q) return sections.slice();

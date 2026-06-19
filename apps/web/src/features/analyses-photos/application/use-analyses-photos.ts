@@ -2,8 +2,10 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Analyse, Client, Intervention } from "../domain/analyses-photos";
 
-// Couche APPLICATION — analyses photos IA : clients/interventions/profil + historique + détail (gated) +
-// les 4 mutations du workflow (createAnalyse → addPhoto → analyserPhotos → genererDevis). SEULE couche tRPC.
+/*
+ * Couche APPLICATION — analyses photos IA : clients/interventions/profil + historique + détail (gated) +
+ * les 4 mutations du workflow (createAnalyse → addPhoto → analyserPhotos → genererDevis). SEULE couche tRPC.
+ */
 export function useAnalysesPhotos(analyseEnCoursId: number | null) {
   const clientsQ = trpc.clients.list.useQuery();
   const interventionsQ = trpc.interventions.list.useQuery();

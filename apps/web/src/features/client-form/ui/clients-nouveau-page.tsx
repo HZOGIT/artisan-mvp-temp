@@ -9,8 +9,10 @@ import { defaultClientForm, validateClientForm, buildCreatePayload, type ClientF
 
 const INPUT_CLASS = "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500";
 
-// Page `/clients/nouveau` — migration clean-archi de `pages/ClientsNouveauPage.tsx`. Markup à
-// l'identique (inputs natifs conservés). Validation + payload en domain ; mutation via `use-create-client`.
+/*
+ * Page `/clients/nouveau` — migration clean-archi de `pages/ClientsNouveauPage.tsx`. Markup à
+ * l'identique (inputs natifs conservés). Validation + payload en domain ; mutation via `use-create-client`.
+ */
 export default function ClientsNouveauPage() {
   const { t } = useTranslation("clientForm");
   const [form, setForm] = useState<ClientForm>(defaultClientForm);

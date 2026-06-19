@@ -1,9 +1,11 @@
 import { trpc } from "@/shared/trpc";
 import type { Client, EncoursMap } from "../domain/client";
 
-// Couche APPLICATION de la feature `clients` (clean-archi) : SEULE couche qui importe le client tRPC.
-// Encapsule les queries/mutations (liste + encours + update/delete), gère l'invalidation, et expose des
-// données TYPÉES + des actions à l'UI — qui n'a plus aucune connaissance du transport.
+/*
+ * Couche APPLICATION de la feature `clients` (clean-archi) : SEULE couche qui importe le client tRPC.
+ * Encapsule les queries/mutations (liste + encours + update/delete), gère l'invalidation, et expose des
+ * données TYPÉES + des actions à l'UI — qui n'a plus aucune connaissance du transport.
+ */
 export function useClients() {
   const utils = trpc.useUtils();
   const list = trpc.clients.list.useQuery();

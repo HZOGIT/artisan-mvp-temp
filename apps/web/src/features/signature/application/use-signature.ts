@@ -1,9 +1,11 @@
 import { trpc } from "@/shared/trpc";
 
-// Couche APPLICATION de la feature `signature` (clean-archi) : SEULE couche important tRPC.
-// Encapsule la query publique (devis à signer par token) et les mutations (signer / refuser /
-// sélectionner une option) ; invalide la vue après sélection d'option. L'UI attache ses effets (toast /
-// transition d'état accepte/refuse) via le `onSuccess`/`onError` par appel de `.mutate()`.
+/*
+ * Couche APPLICATION de la feature `signature` (clean-archi) : SEULE couche important tRPC.
+ * Encapsule la query publique (devis à signer par token) et les mutations (signer / refuser /
+ * sélectionner une option) ; invalide la vue après sélection d'option. L'UI attache ses effets (toast /
+ * transition d'état accepte/refuse) via le `onSuccess`/`onError` par appel de `.mutate()`.
+ */
 export function useSignature(token: string) {
   const utils = trpc.useUtils();
   const query = trpc.signature.getDevisForSignature.useQuery({ token }, { enabled: !!token });

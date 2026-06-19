@@ -11,8 +11,10 @@ import { Progress } from "@/shared/ui/progress";
 import { useSyncComptable } from "../application/use-sync-comptable";
 import { computeStats, computeChartData, statutVariant, typeLabelKey, type Periode, type StatutFiltre, type TypeFiltre } from "../domain/sync-comptable";
 
-// Page `tableau-bord-sync-comptable` — migration clean-archi de `pages/TableauBordSyncComptable.tsx`.
-// Markup à l'identique. Toute l'agrégation (stats/chart) vit en domain (pur, testé). 0 `any`.
+/*
+ * Page `tableau-bord-sync-comptable` — migration clean-archi de `pages/TableauBordSyncComptable.tsx`.
+ * Markup à l'identique. Toute l'agrégation (stats/chart) vit en domain (pur, testé). 0 `any`.
+ */
 const STATUT_ICON: Record<string, typeof CheckCircle2> = { en_cours: RefreshCw, termine: CheckCircle2, succes: CheckCircle2, erreur: AlertCircle, en_attente: Clock };
 
 export default function SyncComptablePage() {

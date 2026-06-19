@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { SyncRow, SyncStatus, PendingItems } from "../domain/sync-comptable";
 
-// Couche APPLICATION — tableau de bord des synchronisations comptables : statut + logs + en-attente +
-// exports + lancement de sync (avec invalidations). SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — tableau de bord des synchronisations comptables : statut + logs + en-attente +
+ * exports + lancement de sync (avec invalidations). SEULE couche important tRPC.
+ */
 export function useSyncComptable() {
   const utils = trpc.useUtils();
   const statusQ = trpc.integrationsComptables.getSyncStatus.useQuery();

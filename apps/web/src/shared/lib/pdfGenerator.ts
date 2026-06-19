@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ROBOTO_REGULAR, ROBOTO_BOLD } from "./fonts";
 
-// Register Roboto font for proper French accent support
+/** Register Roboto font for proper French accent support */
 function registerFonts(doc: jsPDF) {
   doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_REGULAR);
   doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
@@ -11,15 +11,17 @@ function registerFonts(doc: jsPDF) {
   doc.setFont("Roboto", "normal");
 }
 
-// ============================================================================
-// Header band — coloured strip with logo + title (browser-side)
-// ============================================================================
+/*
+ * ============================================================================
+ * Header band — coloured strip with logo + title (browser-side)
+ * ============================================================================
+ */
 
 type RGB = [number, number, number];
 type ImgFormat = "PNG" | "JPEG" | "WEBP";
 
-const PRIMARY: RGB = [30, 64, 175];   // #1e40af — devis & factures
-const AVOIR_RED: RGB = [220, 53, 69]; // sous-bandeau avoir
+const PRIMARY: RGB = [30, 64, 175];
+const AVOIR_RED: RGB = [220, 53, 69];
 
 const BAND_H = 40;
 const LOGO_X = 10;
@@ -27,7 +29,8 @@ const LOGO_MAX_W = 30;
 const LOGO_MAX_H = 28;
 const TITLE_X_WITH_LOGO = 50;
 const TITLE_X_NO_LOGO = 15;
-const BLOCKS_TOP_Y = 53;              // y de départ des blocs sous le bandeau
+/** y de départ des blocs sous le bandeau */
+const BLOCKS_TOP_Y = 53;
 
 function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
@@ -61,7 +64,7 @@ function getImageDimensions(data: Uint8Array, format: ImgFormat): { width: numbe
         while (m < data.length - 1 && data[m] === 0xff) m++;
         const marker = data[m];
         off = m + 1;
-        // Standalone markers (no length): SOI, EOI, RST0-7
+        /** Standalone markers (no length): SOI, EOI, RST0-7 */
         if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) continue;
         if (off + 1 >= data.length) return null;
         const segLen = u16BE(off);
@@ -125,7 +128,7 @@ function renderLogo(doc: jsPDF, logoUrl: string | null | undefined): boolean {
       }
     }
   } catch {
-    // Fall back to max box
+    /** Fall back to max box */
   }
 
   const drawY = (BAND_H - drawH) / 2;
@@ -187,7 +190,7 @@ function renderArtisanBlock(doc: jsPDF, artisan: Artisan, yStart: number): numbe
     doc.text(`SIRET: ${artisan.siret}`, 20, yPos);
     yPos += 5;
   }
-  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné).
+  /** OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM si renseigné). */
   const SOCIETES = ["EURL", "SARL", "SAS", "SASU", "SA"];
   if (artisan.formeJuridique && SOCIETES.includes(artisan.formeJuridique)) {
     const siren = artisan.siret ? String(artisan.siret).replace(/\D/g, "").slice(0, 9) : "";
@@ -206,9 +209,11 @@ function renderArtisanBlock(doc: jsPDF, artisan: Artisan, yStart: number): numbe
   return yPos;
 }
 
-// ============================================================================
-// Types
-// ============================================================================
+/*
+ * ============================================================================
+ * Types
+ * ============================================================================
+ */
 
 interface Artisan {
   nomEntreprise?: string | null;
@@ -219,7 +224,7 @@ interface Artisan {
   telephone?: string | null;
   email?: string | null;
   logo?: string | null;
-  // OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM)
+  /** OPE-151 — mentions légales émetteur (société : forme/capital/RCS ; RM) */
   formeJuridique?: string | null;
   capitalSocial?: string | null;
   villeRCS?: string | null;
@@ -233,13 +238,13 @@ interface Client {
   adresse?: string | null;
   codePostal?: string | null;
   ville?: string | null;
-  // OPE-93 — adresse de facturation distincte (fallback adresse principale)
+  /** OPE-93 — adresse de facturation distincte (fallback adresse principale) */
   adresseFacturation?: string | null;
   codePostalFacturation?: string | null;
   villeFacturation?: string | null;
   telephone?: string | null;
   email?: string | null;
-  // OPE-92 — identité B2B (rappelée sur le document si client professionnel)
+  /** OPE-92 — identité B2B (rappelée sur le document si client professionnel) */
   type?: string | null;
   raisonSociale?: string | null;
   siret?: string | null;
@@ -253,8 +258,10 @@ interface LigneDocument {
   unite?: string | null;
   prixUnitaire: number;
   tauxTva?: number | null;
-  // OPE-168 — `section` (en-tête de lot) / `note` (texte libre) rendues en pleine
-  // largeur, sans colonnes de prix, exclues des totaux. Absent/`produit` = ligne normale.
+  /*
+   * OPE-168 — `section` (en-tête de lot) / `note` (texte libre) rendues en pleine
+   * largeur, sans colonnes de prix, exclues des totaux. Absent/`produit` = ligne normale.
+   */
   type?: string | null;
 }
 
@@ -351,13 +358,13 @@ function addClientInfo(doc: jsPDF, client: Client, yStart: number): number {
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
 
-  // OPE-92 — client pro : raison sociale comme intitulé + mentions SIRET / TVA.
+  /** OPE-92 — client pro : raison sociale comme intitulé + mentions SIRET / TVA. */
   const isPro = client.type === "professionnel";
   const clientName = (isPro && client.raisonSociale) || client.entreprise || `${client.prenom || ""} ${client.nom}`.trim();
   doc.text(clientName, pageWidth - 85, yPos);
   yPos += 5;
 
-  // OPE-93 — adresse de facturation si renseignée (fallback par champ vers principale).
+  /** OPE-93 — adresse de facturation si renseignée (fallback par champ vers principale). */
   const adrFact = client.adresseFacturation || client.adresse;
   const cpFact = client.codePostalFacturation || client.codePostal;
   const villeFact = client.villeFacturation || client.ville;
@@ -421,7 +428,7 @@ function addDocumentInfo(
   doc.setFont("Roboto", "normal");
   doc.text(getStatutLabel(data.statut, type), 65, yPos);
 
-  // OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée.
+  /** OPE-158 — référence/N° de commande du client (B2B), rappelée si renseignée. */
   if (data.referenceClient) {
     yPos += 6;
     doc.setFont("Roboto", "bold");
@@ -444,9 +451,11 @@ function addDocumentInfo(
 }
 
 function addLignesTable(doc: jsPDF, lignes: LigneDocument[], yStart: number): number {
-  // OPE-168 — une ligne `section`/`note` occupe toute la largeur (titre de lot en
-  // gras / texte libre en italique) sans colonnes chiffrées ; les autres restent des
-  // lignes produit normales. autoTable accepte des cellules { content, colSpan, styles }.
+  /*
+   * OPE-168 — une ligne `section`/`note` occupe toute la largeur (titre de lot en
+   * gras / texte libre en italique) sans colonnes chiffrées ; les autres restent des
+   * lignes produit normales. autoTable accepte des cellules { content, colSpan, styles }.
+   */
   const tableData = lignes.map((ligne) => {
     if (ligne.type === "section") {
       return [
@@ -570,7 +579,7 @@ function addFooter(doc: jsPDF, conditions?: string | null, mentionsLegales?: str
 
   let footerY = pageHeight - 10;
 
-  // Mentions légales above the footer line
+  /** Mentions légales above the footer line */
   if (mentionsLegales) {
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
@@ -655,7 +664,8 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
     doc.setTextColor(255, 255, 255);
     doc.text("AVOIR — Document d'annulation", pageWidth / 2, BAND_H + 7, { align: "center" });
     doc.setTextColor(0, 0, 0);
-    blocksTopY += 10; // décale les blocs sous le sous-bandeau rouge
+    /** décale les blocs sous le sous-bandeau rouge */
+    blocksTopY += 10;
   }
 
   const yArtisanEnd = renderArtisanBlock(doc, artisan, blocksTopY);
@@ -665,11 +675,13 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
   yPos = addDocumentInfo(doc, facture, "facture", yPos);
   yPos = addLignesTable(doc, facture.lignes, yPos);
   addTotals(doc, facture.totalHT, facture.totalTVA, facture.totalTTC, yPos, facture.montantPaye);
-  // OPE-164/95 — sur une facture (pas un avoir) : conditions réelles + mentions légales.
-  // OPE-95 ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
-  // de 40 €, Art. L441-10 / D441-5 C. com.) — obligatoires et sanctionnées si absentes.
-  // Parité avec le générateur PDF serveur (portail) qui les affiche déjà : le PDF client
-  // (téléchargé/envoyé par l'artisan) les omettait → divergence corrigée.
+  /*
+   * OPE-164/95 — sur une facture (pas un avoir) : conditions réelles + mentions légales.
+   * OPE-95 ajoute les mentions de RETARD DE PAIEMENT (pénalités + indemnité forfaitaire
+   * de 40 €, Art. L441-10 / D441-5 C. com.) — obligatoires et sanctionnées si absentes.
+   * Parité avec le générateur PDF serveur (portail) qui les affiche déjà : le PDF client
+   * (téléchargé/envoyé par l'artisan) les omettait → divergence corrigée.
+   */
   const factureConditions = isAvoir
     ? facture.conditions
     : [
@@ -681,8 +693,10 @@ export function generateFacturePDF(artisan: Artisan, client: Client, facture: Fa
         .join("\n");
   addFooter(doc, factureConditions, options?.mentionsLegales);
 
-  // OPE-127 — CGV réutilisables sur une page dédiée (comme le devis). Pas sur un avoir
-  // (document d'annulation). N'apparaît que si l'artisan a renseigné ses CGV.
+  /*
+   * OPE-127 — CGV réutilisables sur une page dédiée (comme le devis). Pas sur un avoir
+   * (document d'annulation). N'apparaît que si l'artisan a renseigné ses CGV.
+   */
   if (!isAvoir && options?.cgv) {
     addCgvPage(doc, options.cgv);
   }

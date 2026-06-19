@@ -6,8 +6,10 @@ import { Building2, FileText, Loader2, Receipt, Search, Users, Wrench, type Luci
 import { trpc } from "@/shared/trpc";
 import { groupResults, flattenGroups } from "../domain/search";
 
-// Recherche globale (Ctrl+K) du SHELL modern. PORT FIDÈLE de GlobalSearch : debounce 300ms, groupage par type
-// (domain testé), navigation clavier ↑↓↵/Esc. Self-contained (search.global + wouter). Nav directe.
+/*
+ * Recherche globale (Ctrl+K) du SHELL modern. PORT FIDÈLE de GlobalSearch : debounce 300ms, groupage par type
+ * (domain testé), navigation clavier ↑↓↵/Esc. Self-contained (search.global + wouter). Nav directe.
+ */
 const TYPE_META: Record<string, { icon: LucideIcon; colorClass: string; iconBg: string }> = {
   client: { icon: Users, colorClass: "text-orange-600", iconBg: "bg-orange-100 dark:bg-orange-900/30" },
   devis: { icon: FileText, colorClass: "text-blue-600", iconBg: "bg-blue-100 dark:bg-blue-900/30" },

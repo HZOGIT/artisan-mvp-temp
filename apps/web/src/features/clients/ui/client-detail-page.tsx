@@ -22,12 +22,14 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Détail client du FRONT NEUF (`/clients/:id`) — clean-archi : la PRÉSENTATION ne connaît plus le
-// transport. Les données/mutations viennent du hook `useClientDetail` (couche application, seule à
-// importer tRPC) ; les calculs (stats, filtrage par client, tri) viennent du domaine (`../domain/client`,
-// fonctions pures testées). Parité visuelle stricte : JSX/Tailwind copiés à l'identique. Les couleurs de
-// statut restent des classes Tailwind ; seuls les LABELS passent par i18n (namespace `clients`).
-// Hooks remontés AVANT les early-returns (le legacy appelait des hooks après `if (!client) return`).
+/*
+ * Détail client du FRONT NEUF (`/clients/:id`) — clean-archi : la PRÉSENTATION ne connaît plus le
+ * transport. Les données/mutations viennent du hook `useClientDetail` (couche application, seule à
+ * importer tRPC) ; les calculs (stats, filtrage par client, tri) viennent du domaine (`../domain/client`,
+ * fonctions pures testées). Parité visuelle stricte : JSX/Tailwind copiés à l'identique. Les couleurs de
+ * statut restent des classes Tailwind ; seuls les LABELS passent par i18n (namespace `clients`).
+ * Hooks remontés AVANT les early-returns (le legacy appelait des hooks après `if (!client) return`).
+ */
 
 const devisStatusColors: Record<string, string> = {
   brouillon: "bg-gray-100 text-gray-700",
@@ -53,16 +55,18 @@ const interventionStatusColors: Record<string, string> = {
   annulee: "bg-red-100 text-red-700",
 };
 
-// Composant externe = SEULE porte de chargement (peu de hooks, stables) : on ne rend le contenu — qui
-// porte tous les autres hooks — qu'UNE FOIS le client chargé. Évite le pattern « early-return après de
-// nombreux hooks » (cause classique d'erreurs d'ordre de hooks / React #310).
+/*
+ * Composant externe = SEULE porte de chargement (peu de hooks, stables) : on ne rend le contenu — qui
+ * porte tous les autres hooks — qu'UNE FOIS le client chargé. Évite le pattern « early-return après de
+ * nombreux hooks » (cause classique d'erreurs d'ordre de hooks / React #310).
+ */
 export default function ClientDetailPage() {
   const { t } = useTranslation("clients");
   const { id } = useParams({ strict: false }) as { id?: string };
   const [, setLocation] = useLocation();
   const clientIdNum = parseInt(id || "0");
 
-  // Tous les hooks (via la couche application) AVANT les early-returns → ordre de hooks stable.
+  /** Tous les hooks (via la couche application) AVANT les early-returns → ordre de hooks stable. */
   const vm = useClientDetail(clientIdNum);
 
   if (vm.isLoading) {
@@ -121,7 +125,7 @@ function ClientDetailContent({
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(num);
   };
 
-  // Sélections/calculs délégués au domaine (fonctions pures, testées).
+  /** Sélections/calculs délégués au domaine (fonctions pures, testées). */
   const devisClient = ofClient(devis, clientIdNum);
   const facturesClient = ofClient(factures, clientIdNum);
   const interventionsClient = ofClient(interventions, clientIdNum);
@@ -129,7 +133,7 @@ function ClientDetailContent({
   const { totalFacture, facturesImpayees, devisEnAttente, interventionsTerminees } =
     computeClientStats(devisClient, facturesClient, interventionsClient);
 
-  // Effets UI (toasts/clipboard/reset) attachés par appel — la persistance/invalidation vit dans le hook.
+  /** Effets UI (toasts/clipboard/reset) attachés par appel — la persistance/invalidation vit dans le hook. */
   const handleGenerateAccess = () =>
     generateAccess.mutate(
       { clientId: clientIdNum },

@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Config, SyncRow, PendingItems, SyncStatus } from "../domain/integrations-comptables";
 
-// Couche APPLICATION — intégrations comptables : config + exports + logs + statut + en-attente, et toutes
-// les mutations (config, sync config, export, lancer/retry sync). SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — intégrations comptables : config + exports + logs + statut + en-attente, et toutes
+ * les mutations (config, sync config, export, lancer/retry sync). SEULE couche important tRPC.
+ */
 export function useIntegrationsComptables() {
   const utils = trpc.useUtils();
   const configQ = trpc.integrationsComptables.getConfig.useQuery();

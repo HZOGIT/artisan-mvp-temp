@@ -1,4 +1,4 @@
-// Skeleton générique de chargement des widgets dashboard. Re-port de components/dashboard/widgets/WidgetSkeleton.
+/** Skeleton générique de chargement des widgets dashboard. Re-port de components/dashboard/widgets/WidgetSkeleton. */
 export function WidgetSkeleton({ height = 200, lines = 0 }: { height?: number; lines?: number }) {
   return (
     <div className="space-y-3 animate-pulse" style={{ minHeight: height }}>

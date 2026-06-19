@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { ImportKind, CsvRow, Mapping, ImportResult } from "../domain/import";
 
-// Couche APPLICATION — import ERP : les 3 mutations (clients/devis/factures) + invalidation ciblée selon
-// le type importé. SEULE couche important tRPC. L'orchestration (étapes du wizard) reste en UI.
+/*
+ * Couche APPLICATION — import ERP : les 3 mutations (clients/devis/factures) + invalidation ciblée selon
+ * le type importé. SEULE couche important tRPC. L'orchestration (étapes du wizard) reste en UI.
+ */
 export function useImport() {
   const utils = trpc.useUtils();
   const importClients = trpc.importErp.importClients.useMutation();

@@ -7,9 +7,11 @@ import {
   Mail, Briefcase,
 } from "lucide-react";
 
-// Couche DOMAIN du SHELL modern (sidebar adaptative). PORT FIDÈLE de la config nav de `components/DashboardLayout`
-// (NAV_GROUPS + permissions + modules actifs). 0 React/tRPC : data + fonctions pures testables. Les libellés
-// restent des chaînes (clé de jointure avec MODULE_TO_LABELS/ALWAYS_VISIBLE_LABELS) ; l'i18n se fera en UI.
+/*
+ * Couche DOMAIN du SHELL modern (sidebar adaptative). PORT FIDÈLE de la config nav de `components/DashboardLayout`
+ * (NAV_GROUPS + permissions + modules actifs). 0 React/tRPC : data + fonctions pures testables. Les libellés
+ * restent des chaînes (clé de jointure avec MODULE_TO_LABELS/ALWAYS_VISIBLE_LABELS) ; l'i18n se fera en UI.
+ */
 
 export type GroupId = "assistant" | "dashboard" | "commercial" | "clients" | "terrain" | "gestion" | "finance" | "parametres";
 export type NavColor = "violet" | "blue" | "emerald" | "orange" | "rose" | "cyan" | "slate" | "purple";
@@ -113,7 +115,7 @@ export const pathPermissionMap: Record<string, string> = {
   "/regles-depenses": "comptabilite.voir", "/modules": "", "/onboarding": "", "/import": "",
 };
 
-// Filtre les items d'un groupe selon les permissions. Vide → show-all. PUR.
+/** Filtre les items d'un groupe selon les permissions. Vide → show-all. PUR. */
 export function filterGroupByPermissions(group: NavGroup, permissions: string[]): NavGroup {
   if (permissions.length === 0) return group;
   return { ...group, items: group.items.filter((item) => {
@@ -140,7 +142,7 @@ export const ALWAYS_VISIBLE_LABELS = new Set([
   "Tableau de bord", "Statistiques", "Mon profil", "Paramètres", "Guide d'utilisation", "Mes modules",
 ]);
 
-// Filtre les items d'un groupe selon les modules actifs. null (loading/déconnecté) → show-all. PUR.
+/** Filtre les items d'un groupe selon les modules actifs. null (loading/déconnecté) → show-all. PUR. */
 export function filterGroupByModules(group: NavGroup, modulesActifs: string[] | null): NavGroup {
   if (!modulesActifs) return group;
   const labelToModules = new Map<string, string[]>();
@@ -160,7 +162,7 @@ export function filterGroupByModules(group: NavGroup, modulesActifs: string[] | 
   }) };
 }
 
-// Contexte MonAssistant pour une route (remonte les segments parents). PUR.
+/** Contexte MonAssistant pour une route (remonte les segments parents). PUR. */
 const ASSISTANT_FALLBACK = { context: "L'artisan utilise Operioz.", prompts: ["Résume mon activité", "Quelles sont mes priorités aujourd'hui ?"] };
 export const ASSISTANT_CONTEXTS: Record<string, { context: string; prompts: string[] }> = {
   "/dashboard": { context: "L'artisan consulte son tableau de bord.", prompts: ["Résume mon activité du mois", "Quelles sont mes priorités aujourd'hui ?", "Analyse ma rentabilité"] },
@@ -183,7 +185,7 @@ export function getAssistantContextForPath(path: string): { context: string; pro
   return ASSISTANT_FALLBACK;
 }
 
-// Nav mobile primaire (barre du bas). PORT FIDÈLE.
+/** Nav mobile primaire (barre du bas). PORT FIDÈLE. */
 export const MOBILE_PRIMARY: { id: GroupId; path: string; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", path: "/dashboard", label: "Accueil", icon: LayoutDashboard },
   { id: "commercial", path: "/devis", label: "Commercial", icon: Briefcase },
@@ -191,7 +193,7 @@ export const MOBILE_PRIMARY: { id: GroupId; path: string; label: string; icon: L
   { id: "terrain", path: "/interventions", label: "Terrain", icon: Wrench },
 ];
 
-// Composition de la sidebar : permissions → modules actifs → drop des groupes vides. PUR (port lignes 763-767).
+/** Composition de la sidebar : permissions → modules actifs → drop des groupes vides. PUR (port lignes 763-767). */
 export function buildSidebarGroups(permissions: string[], modulesActifs: string[] | null): NavGroup[] {
   return NAV_GROUPS
     .map((g) => filterGroupByPermissions(g, permissions))
@@ -199,12 +201,12 @@ export function buildSidebarGroups(permissions: string[], modulesActifs: string[
     .filter((g) => g.items.length > 0);
 }
 
-// Un item est actif si l'URL courante = son path. PUR/testable. (Plus de remapping /v2 : routes directes.)
+/** Un item est actif si l'URL courante = son path. PUR/testable. (Plus de remapping /v2 : routes directes.) */
 export function isPathActive(location: string, path: string): boolean {
   return location === path;
 }
 
-// Groupe/item actif pour l'URL courante. PUR.
+/** Groupe/item actif pour l'URL courante. PUR. */
 export function resolveActiveItem(groups: NavGroup[], location: string): MenuItem | undefined {
   return groups.flatMap((g) => g.items).find((i) => isPathActive(location, i.path));
 }
@@ -212,7 +214,7 @@ export function resolveActiveGroup(groups: NavGroup[], location: string): NavGro
   return groups.find((g) => g.items.some((i) => isPathActive(location, i.path)));
 }
 
-// Date relative FR pour la cloche de notifications. PUR.
+/** Date relative FR pour la cloche de notifications. PUR. */
 export function formatRelativeDate(date: string | Date): string {
   const d = new Date(date);
   const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
@@ -226,7 +228,7 @@ export function formatRelativeDate(date: string | Date): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
-// Initiale d'avatar : 1re lettre du nom, sinon de l'email, sinon « ? ». PUR (port DashboardLayout).
+/** Initiale d'avatar : 1re lettre du nom, sinon de l'email, sinon « ? ». PUR (port DashboardLayout). */
 export function userInitial(name?: string | null, email?: string | null): string {
   return (name || email || "?").charAt(0).toUpperCase();
 }

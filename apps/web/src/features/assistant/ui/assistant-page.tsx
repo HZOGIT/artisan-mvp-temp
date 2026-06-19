@@ -18,8 +18,10 @@ import { sliceHistory, navigateTarget, buildDevisMarkdown, buildRelancesMarkdown
 
 const THREAD_LS_KEY = "operioz.assistant.thread";
 
-// Page `assistant` — migration clean-archi de `pages/Assistant.tsx`. Markup à l'identique. Flux SSE +
-// parsing/markdown en domain/application ; voix & dictée via les hooks partagés (useVoiceSession/Speech).
+/*
+ * Page `assistant` — migration clean-archi de `pages/Assistant.tsx`. Markup à l'identique. Flux SSE +
+ * parsing/markdown en domain/application ; voix & dictée via les hooks partagés (useVoiceSession/Speech).
+ */
 export default function AssistantPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t } = useTranslation("assistant");
   const isMobile = useIsMobile();
@@ -121,7 +123,7 @@ export default function AssistantPage({ embedded = false }: { embedded?: boolean
     } finally { setIsStreaming(false); abortRef.current = null; }
   }, [isStreaming, messages, threadId, queryClient, t]);
 
-  // Compte à rebours d'envoi auto après dictée
+  /** Compte à rebours d'envoi auto après dictée */
   useEffect(() => {
     if (!speech.isListening && speech.finalTranscript && !userEditedRef.current && countdown === null) { setInput(speech.finalTranscript); setCountdown(3); }
   }, [speech.isListening, speech.finalTranscript, countdown]);

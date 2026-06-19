@@ -13,10 +13,12 @@ import { toast } from "sonner";
 import { matchSearch } from "@/shared/lib/normalize";
 import { exportToCsv, csvDateSuffix } from "@/shared/lib/csvExport";
 
-// Page Clients du FRONT NEUF (`/clients`) — clean-archi : la couche UI (présentation) consomme le
-// hook `useClients()` (couche application, seule à parler à tRPC) et les fonctions PURES du domaine
-// (`findDuplicateGroups`/`findCreateDuplicateMatch`). Aucun import tRPC ici. i18n namespace `clients`,
-// primitives `@/shared/ui`. Parité visuelle stricte vs `pages/Clients.tsx`.
+/*
+ * Page Clients du FRONT NEUF (`/clients`) — clean-archi : la couche UI (présentation) consomme le
+ * hook `useClients()` (couche application, seule à parler à tRPC) et les fonctions PURES du domaine
+ * (`findDuplicateGroups`/`findCreateDuplicateMatch`). Aucun import tRPC ici. i18n namespace `clients`,
+ * primitives `@/shared/ui`. Parité visuelle stricte vs `pages/Clients.tsx`.
+ */
 
 interface ClientFormData {
   nom: string;
@@ -62,31 +64,33 @@ export default function ClientsListPage() {
   const search = useSearch();
   const { clients, encoursMap, isLoading, update, remove } = useClients();
 
-  // State pour le formulaire d'édition
+  /** State pour le formulaire d'édition */
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [formData, setFormData] = useState<ClientFormData>(initialFormData);
   const [editingClientId, setEditingClientId] = useState<number | null>(null);
 
-  // State pour la recherche. MonAssistant peut pré-remplir via ?filtre=
+  /** State pour la recherche. MonAssistant peut pré-remplir via ?filtre= */
   const [searchQuery, setSearchQuery] = useState("");
   useEffect(() => {
     const f = new URLSearchParams(search).get("filtre");
-    // Sur Clients il n'y a pas de filtre statut prédéfini : on utilise le filtre
-    // comme texte de recherche (ex: "particulier") si fourni.
+    /*
+     * Sur Clients il n'y a pas de filtre statut prédéfini : on utilise le filtre
+     * comme texte de recherche (ex: "particulier") si fourni.
+     */
     if (f) setSearchQuery(f);
   }, [search]);
 
-  // Doublons potentiels (logique PURE du domaine) — descripteurs i18n formatés au rendu via `t()`.
+  /** Doublons potentiels (logique PURE du domaine) — descripteurs i18n formatés au rendu via `t()`. */
   const [dupesDismissed, setDupesDismissed] = useState(false);
   const duplicateGroups = useMemo(() => findDuplicateGroups(clients), [clients]);
 
-  // Avertissement NON BLOQUANT de doublon à la création (logique PURE du domaine).
+  /** Avertissement NON BLOQUANT de doublon à la création (logique PURE du domaine). */
   const createDuplicateMatch = useMemo(
     () => (editingClientId ? null : findCreateDuplicateMatch(formData, clients)),
     [editingClientId, formData.email, formData.telephone, formData.nom, formData.prenom, clients],
   );
 
-  // Handler pour les changements d'input
+  /** Handler pour les changements d'input */
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -95,19 +99,19 @@ export default function ClientsListPage() {
     }));
   }, []);
 
-  // Handler pour réinitialiser le formulaire
+  /** Handler pour réinitialiser le formulaire */
   const resetForm = useCallback(() => {
     setFormData(initialFormData);
   }, []);
 
-  // Handler pour fermer la modale d'édition
+  /** Handler pour fermer la modale d'édition */
   const handleCloseEditModal = useCallback(() => {
     setIsEditModalOpen(false);
     resetForm();
     setEditingClientId(null);
   }, [resetForm]);
 
-  // Handler pour ouvrir la modale d'édition
+  /** Handler pour ouvrir la modale d'édition */
   const handleOpenEditModal = useCallback((client: Client) => {
     setFormData({
       nom: client.nom,
@@ -131,7 +135,7 @@ export default function ClientsListPage() {
     setIsEditModalOpen(true);
   }, []);
 
-  // Handler pour soumettre le formulaire d'édition
+  /** Handler pour soumettre le formulaire d'édition */
   const handleSubmitEdit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nom.trim()) {
@@ -154,7 +158,7 @@ export default function ClientsListPage() {
     }
   }, [formData, editingClientId, update, t]);
 
-  // Handler pour supprimer un client
+  /** Handler pour supprimer un client */
   const handleDelete = useCallback((clientId: number) => {
     if (confirm(t("confirmDelete"))) {
       remove.mutate(
@@ -167,24 +171,26 @@ export default function ClientsListPage() {
     }
   }, [remove, t]);
 
-  // Handler pour la recherche
+  /** Handler pour la recherche */
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   }, []);
 
-  // Filtrer les clients (recherche insensible aux accents et a la casse).
+  /** Filtrer les clients (recherche insensible aux accents et a la casse). */
   const filteredClients = clients.filter(client =>
     matchSearch(client.nom, searchQuery) ||
     matchSearch(client.prenom, searchQuery) ||
     matchSearch(client.email, searchQuery) ||
     matchSearch(client.ville, searchQuery) ||
-    // Recherche/segmentation par étiquette.
+    /** Recherche/segmentation par étiquette. */
     matchSearch(client.etiquettes, searchQuery) ||
     (client.telephone ? client.telephone.includes(searchQuery) : false)
   );
 
-  // Export CSV des clients (portabilité RGPD). Exporte la sélection courante (après filtre de
-  // recherche), sinon l'ensemble.
+  /*
+   * Export CSV des clients (portabilité RGPD). Exporte la sélection courante (après filtre de
+   * recherche), sinon l'ensemble.
+   */
   const handleExportCSV = () => {
     const data = filteredClients;
     if (!data || data.length === 0) {

@@ -142,7 +142,7 @@ export default function ContratsPage() {
   const handleGenerateFacture = (contratId: number) =>
     generateFacture.mutate({ contratId }, { onSuccess: () => toast.success(t("toastFactureGeneree")), onError: (e) => toast.error(e.message) });
 
-  // Le détail contrat n'est pas (encore) migré → navigation pleine page vers la route legacy.
+  /** Le détail contrat n'est pas (encore) migré → navigation pleine page vers la route legacy. */
   const goToDetail = (id: number) => window.location.assign(`/contrats/${id}`);
 
   return (

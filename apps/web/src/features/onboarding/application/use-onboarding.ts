@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Module } from "../domain/onboarding";
 
-// Couche APPLICATION — onboarding : modules disponibles + finalisation/saut. SEULE couche important tRPC ;
-// effets (toast, navigation, invalidations) gérés en UI via options.
+/*
+ * Couche APPLICATION — onboarding : modules disponibles + finalisation/saut. SEULE couche important tRPC ;
+ * effets (toast, navigation, invalidations) gérés en UI via options.
+ */
 export function useOnboarding() {
   const utils = trpc.useUtils();
   const modulesQ = trpc.modules.list.useQuery();

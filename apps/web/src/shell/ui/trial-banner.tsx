@@ -4,8 +4,10 @@ import { AlertTriangle, Clock } from "lucide-react";
 import { trpc } from "@/shared/trpc";
 import { trialBannerSeverity } from "../domain/subscription";
 
-// Bannière d'essai gratuit du SHELL modern (slot `banners`). PORT FIDÈLE de TrialBanner : affichée si essai ≤ 7j,
-// couleur selon l'urgence (bleu/orange/rouge). Décision en domain (`trialBannerSeverity`, testé). CTA → abonnement.
+/*
+ * Bannière d'essai gratuit du SHELL modern (slot `banners`). PORT FIDÈLE de TrialBanner : affichée si essai ≤ 7j,
+ * couleur selon l'urgence (bleu/orange/rouge). Décision en domain (`trialBannerSeverity`, testé). CTA → abonnement.
+ */
 export function TrialBanner() {
   const { t } = useTranslation("shell");
   const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });

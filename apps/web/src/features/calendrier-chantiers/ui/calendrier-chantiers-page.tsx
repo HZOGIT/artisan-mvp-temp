@@ -22,8 +22,10 @@ const STATUT_KEY: Record<string, string> = { planifiee: "statutPlanifiee", en_co
 const colorClassToName = (cls: string) => ["blue", "green", "purple", "orange", "pink", "teal", "indigo", "red", "yellow"].find((n) => cls.includes(n)) || "gray";
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch] as string));
 
-// Page `calendrier-chantiers` — migration clean-archi de `pages/CalendrierChantiers.tsx`. Markup à
-// l'identique. Calendrier/transform/couleurs en domain (purs, testés) ; tRPC via `use-calendrier-chantiers`.
+/*
+ * Page `calendrier-chantiers` — migration clean-archi de `pages/CalendrierChantiers.tsx`. Markup à
+ * l'identique. Calendrier/transform/couleurs en domain (purs, testés) ; tRPC via `use-calendrier-chantiers`.
+ */
 export default function CalendrierChantiersPage() {
   const { t } = useTranslation("calendrierChantiers");
   const { chantiers, techniciens, interventions, savedColors, setCouleur, update, assigner } = useCalendrierChantiers();
@@ -58,7 +60,7 @@ export default function CalendrierChantiersPage() {
 
   const navigate = (dir: -1 | 1) => { const d = new Date(currentDate); if (viewMode === "month") d.setMonth(d.getMonth() + dir); else d.setDate(d.getDate() + (viewMode === "week" ? 7 : 1) * dir); setCurrentDate(d); };
 
-  // Drag & drop
+  /** Drag & drop */
   const handleDragStart = (e: React.DragEvent, i: CalendarIntervention) => { setDraggedIntervention(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", i.id.toString()); };
   const handleDragOver = (e: React.DragEvent, date: Date) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverDate(date); };
   const applyDateChange = (id: number, newDate: Date) => update.mutate({ id, dateDebut: newDate.toISOString() }, { onSuccess: () => { toast.success(t("toastInterventionMaj")); setShowConfirmDialog(false); setPendingChange(null); }, onError: (e) => toast.error(t("errMaj", { msg: e.message })) });

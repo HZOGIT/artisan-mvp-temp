@@ -10,7 +10,7 @@ import { AuthShell } from "./auth-shell";
 import { useAuthForms } from "../application/use-auth-forms";
 import { validateReset, tokenFromSearch } from "../domain/auth";
 
-// Page `/reset-password` — migration clean-archi de `pages/ResetPassword.tsx`. Markup à l'identique.
+/** Page `/reset-password` — migration clean-archi de `pages/ResetPassword.tsx`. Markup à l'identique. */
 export default function ResetPasswordPage() {
   const { t } = useTranslation("auth");
   const token = tokenFromSearch(typeof window !== "undefined" ? window.location.search : "");

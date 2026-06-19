@@ -1,10 +1,12 @@
 import { trpc } from "@/shared/trpc";
 import type { Article, Fournisseur } from "../domain/fournisseur";
 
-// Couche APPLICATION de la feature `fournisseurs` (clean-archi) : SEULE couche important tRPC.
-// `useFournisseurs` couvre la liste + le référentiel articles + le CRUD ; `useFournisseurArticles`
-// isole les articles associés d'UN fournisseur (query dépendante) + association/dissociation.
-// L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+/*
+ * Couche APPLICATION de la feature `fournisseurs` (clean-archi) : SEULE couche important tRPC.
+ * `useFournisseurs` couvre la liste + le référentiel articles + le CRUD ; `useFournisseurArticles`
+ * isole les articles associés d'UN fournisseur (query dépendante) + association/dissociation.
+ * L'UI attache ses effets (toast / fermeture de dialogue / reset) via le `onSuccess` par appel.
+ */
 export function useFournisseurs() {
   const utils = trpc.useUtils();
   const fournisseursQ = trpc.fournisseurs.list.useQuery();
@@ -21,7 +23,7 @@ export function useFournisseurs() {
   return { fournisseurs, articles, isLoading: fournisseursQ.isLoading, create, update, remove };
 }
 
-// Articles associés d'UN fournisseur (query dépendante : seulement quand le dialogue est ouvert).
+/** Articles associés d'UN fournisseur (query dépendante : seulement quand le dialogue est ouvert). */
 export function useFournisseurArticles(fournisseurId: number, enabled: boolean) {
   const utils = trpc.useUtils();
   const q = trpc.fournisseurs.getFournisseurArticles.useQuery(

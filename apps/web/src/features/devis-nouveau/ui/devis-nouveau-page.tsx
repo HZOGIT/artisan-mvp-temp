@@ -9,8 +9,10 @@ import { Textarea } from "@/shared/ui/textarea";
 import { useDevisNouveau, useModeleLoader, searchArticlesRest } from "../application/use-devis-nouveau";
 import { emptyLigne, formatCurrency, totals, moveLine, ligneFromArticle, iaToLignes, iaTotals, buildCreatePayload, buildAddLignePayload, buildModeleLignePayload, type LigneDevis, type ArticleSearchResult, type IAProposition } from "../domain/devis-nouveau";
 
-// Page `/devis/nouveau` — migration clean-archi de `pages/DevisNouveauPage.tsx`. Markup à l'identique.
-// Calculs/mappings en domain (testés) ; recherche article REST + génération IA encapsulées en application.
+/*
+ * Page `/devis/nouveau` — migration clean-archi de `pages/DevisNouveauPage.tsx`. Markup à l'identique.
+ * Calculs/mappings en domain (testés) ; recherche article REST + génération IA encapsulées en application.
+ */
 export default function DevisNouveauPage() {
   const { t } = useTranslation("devisNouveau");
   const [clientId, setClientId] = useState(0);
@@ -226,7 +228,7 @@ export default function DevisNouveauPage() {
   );
 }
 
-// Section « Générer avec l'IA » : description + surface + budget → genererLignesIA → aperçu + appliquer.
+/** Section « Générer avec l'IA » : description + surface + budget → genererLignesIA → aperçu + appliquer. */
 function GenerationIASection({ onApply }: { onApply: (data: IAProposition) => void }) {
   const { t } = useTranslation("devisNouveau");
   const { genererIA } = useDevisNouveau(0);

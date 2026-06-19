@@ -10,8 +10,10 @@ import { MapView } from "@/shared/ui/map-view";
 import { useGeolocalisation } from "../application/use-geolocalisation";
 import { withPosition, techId, latLng, batterieColor, markerIconHtml, popupContentHtml, type TechWithPos, type PopupLabels } from "../domain/geolocalisation";
 
-// Page `geolocalisation` — migration clean-archi de `pages/Geolocalisation.tsx`. La carte Leaflet (MapView
-// partagé) reste impérative en UI ; les constructeurs HTML marqueur/popup vivent en domain (purs, testés).
+/*
+ * Page `geolocalisation` — migration clean-archi de `pages/Geolocalisation.tsx`. La carte Leaflet (MapView
+ * partagé) reste impérative en UI ; les constructeurs HTML marqueur/popup vivent en domain (purs, testés).
+ */
 export default function GeolocalisationPage() {
   const { t } = useTranslation("geolocalisation");
   const { allTechs, isLoading, refetch, techniciens } = useGeolocalisation();

@@ -40,10 +40,12 @@ import {
 import { Users, Plus, Pencil, Trash2, Phone, Mail, Wrench, Calendar, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Techniciens du FRONT NEUF (`/techniciens`) — clean-archi : présentation pure. Données &
-// mutations via `useTechniciens`/`useTechnicienDetail` (couche application, seule à importer tRPC) ;
-// le calcul du badge d'habilitation (échéance/expiration) vient du domaine (`../domain/technicien`,
-// pur & testé). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`techniciens`).
+/*
+ * Page Techniciens du FRONT NEUF (`/techniciens`) — clean-archi : présentation pure. Données &
+ * mutations via `useTechniciens`/`useTechnicienDetail` (couche application, seule à importer tRPC) ;
+ * le calcul du badge d'habilitation (échéance/expiration) vient du domaine (`../domain/technicien`,
+ * pur & testé). Parité visuelle stricte : JSX/Tailwind à l'identique. Libellés via i18n (`techniciens`).
+ */
 
 interface TechnicienForm {
   nom: string;
@@ -69,7 +71,7 @@ const initialForm: TechnicienForm = {
   userId: null,
 };
 
-// Valeur (hex) = donnée ; le libellé est traduit via `labelKey`.
+/** Valeur (hex) = donnée ; le libellé est traduit via `labelKey`. */
 const couleurs = [
   { value: "#3b82f6", labelKey: "couleur_bleu" },
   { value: "#10b981", labelKey: "couleur_vert" },
@@ -96,7 +98,7 @@ export default function TechniciensPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // `coutHoraire` vide -> undefined : l'input serveur est un decimal validé (rejette "").
+    /** `coutHoraire` vide -> undefined : l'input serveur est un decimal validé (rejette ""). */
     const payload = { ...form, coutHoraire: form.coutHoraire || undefined };
     const onSettled = {
       onSuccess: () => {
@@ -484,7 +486,7 @@ export default function TechniciensPage() {
                 {habilitations.length > 0 ? (
                   <div className="space-y-2">
                     {habilitations.map((h: Habilitation) => {
-                      // Badge & échéance délégués au domaine (pur, testé).
+                      /** Badge & échéance délégués au domaine (pur, testé). */
                       const badge = habilitationBadge(h);
                       const badgeLabel =
                         badge.key === "habilExpiresIn" ? t("habilExpiresIn", { n: badge.params.n }) : t(badge.key);

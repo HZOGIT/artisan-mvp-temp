@@ -1,11 +1,13 @@
 import { useSyncExternalStore, useCallback, useEffect, type AnchorHTMLAttributes, type ReactNode } from "react";
 
-// Navigation du front neuf SANS wouter : s'appuie sur l'History API + un popstate synthétique pour notifier
-// TOUS les routeurs montés (le routeur TanStack /v2 écoute `popstate`). API compatible avec l'usage wouter du
-// code modern (useLocation/useSearch/Link/Redirect) → wouter entièrement remplacé.
+/*
+ * Navigation du front neuf SANS wouter : s'appuie sur l'History API + un popstate synthétique pour notifier
+ * TOUS les routeurs montés (le routeur TanStack /v2 écoute `popstate`). API compatible avec l'usage wouter du
+ * code modern (useLocation/useSearch/Link/Redirect) → wouter entièrement remplacé.
+ */
 
 function notify() {
-  // popstate synthétique : re-route le(s) routeur(s) montés (TanStack /v2) qui écoutent popstate.
+  /** popstate synthétique : re-route le(s) routeur(s) montés (TanStack /v2) qui écoutent popstate. */
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 export function navigate(to: string, opts?: { replace?: boolean }): void {
@@ -15,7 +17,7 @@ export function navigate(to: string, opts?: { replace?: boolean }): void {
   notify();
 }
 
-// Redirection déclarative (équivalent wouter <Redirect>) : remplace l'entrée d'historique (replace) puis ne rend rien.
+/** Redirection déclarative (équivalent wouter <Redirect>) : remplace l'entrée d'historique (replace) puis ne rend rien. */
 export function Redirect({ to }: { to: string }) {
   useEffect(() => { navigate(to, { replace: true }); }, [to]);
   return null;

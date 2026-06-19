@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Home, Search } from "lucide-react";
 import { Button } from "@/shared/ui/button";
-// Rendue par App.tsx (catch-all wouter) HORS du ModernRouterMount → init i18n ici (cf. mémoire i18n hors-mount).
+/** Rendue par App.tsx (catch-all wouter) HORS du ModernRouterMount → init i18n ici (cf. mémoire i18n hors-mount). */
 import "@/shared/i18n";
 
-// Page 404 — migration clean-archi de `pages/NotFound.tsx`. Markup à l'identique. Pure présentation.
+/** Page 404 — migration clean-archi de `pages/NotFound.tsx`. Markup à l'identique. Pure présentation. */
 export default function NotFoundPage() {
   const { t } = useTranslation("notFound");
   return (

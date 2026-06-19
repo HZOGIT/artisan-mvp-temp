@@ -11,9 +11,11 @@ import { BulletproofModal } from "./bulletproof-modal";
 import { useModelesTransactionnels } from "../application/use-modeles-transactionnels";
 import { TYPE_OPTIONS, VARIABLES_DISPONIBLES, MODELES_PAR_DEFAUT, varCode, defautToCreateInput, type Modele, type ModeleForm, type EmailType, type ModeleDefaut } from "../domain/modeles-email-transactionnels";
 
-// Page `modeles-email-transactionnels` — migration clean-archi de `pages/ModelesEmailTransactionnels.tsx`.
-// Markup/classes conservés (parité) ; le sélecteur de type envoie désormais des valeurs d'enum VALIDES
-// (le legacy envoyait des valeurs hors enum → 400). tRPC encapsulé dans `use-modeles-transactionnels`.
+/*
+ * Page `modeles-email-transactionnels` — migration clean-archi de `pages/ModelesEmailTransactionnels.tsx`.
+ * Markup/classes conservés (parité) ; le sélecteur de type envoie désormais des valeurs d'enum VALIDES
+ * (le legacy envoyait des valeurs hors enum → 400). tRPC encapsulé dans `use-modeles-transactionnels`.
+ */
 const EMPTY_FORM: ModeleForm = { nom: "", sujet: "", contenu: "", type: "autre" };
 
 export default function ModelesTransactionnelsPage() {

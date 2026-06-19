@@ -2,7 +2,7 @@ import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
 import type { Client, Modele, ArticleSearchResult } from "../domain/devis-nouveau";
 
-// Recherche d'articles via le REST public `/api/articles/search` (effet — hors React/tRPC). Renvoie [] sur échec.
+/** Recherche d'articles via le REST public `/api/articles/search` (effet — hors React/tRPC). Renvoie [] sur échec. */
 export async function searchArticlesRest(query: string): Promise<ArticleSearchResult[]> {
   try {
     const res = await fetch(`/api/articles/search?q=${encodeURIComponent(query)}`, { credentials: "include" });
@@ -13,8 +13,10 @@ export async function searchArticlesRest(query: string): Promise<ArticleSearchRe
   }
 }
 
-// Couche APPLICATION — création de devis : clients + encours + modèles + create/addLigne + modèles
-// (createModele/addLigneToModele/getModeleWithLignes) + génération IA. SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — création de devis : clients + encours + modèles + create/addLigne + modèles
+ * (createModele/addLigneToModele/getModeleWithLignes) + génération IA. SEULE couche important tRPC.
+ */
 export function useDevisNouveau(clientId: number) {
   const utils = trpc.useUtils();
   const clientsQ = trpc.clients.list.useQuery();
@@ -34,7 +36,7 @@ export function useDevisNouveau(clientId: number) {
   };
 }
 
-// Charge les lignes d'un modèle (à la demande).
+/** Charge les lignes d'un modèle (à la demande). */
 export function useModeleLoader() {
   const utils = trpc.useUtils();
   return (modeleId: number) => utils.devis.getModeleWithLignes.fetch({ modeleId });

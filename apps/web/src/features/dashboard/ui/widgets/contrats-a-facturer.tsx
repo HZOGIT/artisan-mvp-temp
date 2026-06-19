@@ -4,7 +4,7 @@ import { FileText, CalendarClock, CheckCircle2 } from "lucide-react";
 import { useContratsAFacturer } from "../../application/use-dashboard-widgets";
 import { WidgetSkeleton } from "./widget-skeleton";
 
-// Contrats de maintenance à facturer (lecture seule). Re-port de widgets/ContratsAFacturer (clean-archi, i18n).
+/** Contrats de maintenance à facturer (lecture seule). Re-port de widgets/ContratsAFacturer (clean-archi, i18n). */
 const PERIODICITE_LABELS: Record<string, string> = { mensuel: "Mensuel", trimestriel: "Trimestriel", semestriel: "Semestriel", annuel: "Annuel" };
 
 export function ContratsAFacturerWidget() {

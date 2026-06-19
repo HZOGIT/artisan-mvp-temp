@@ -2,8 +2,10 @@ import { useMemo } from "react";
 import { trpc } from "@/shared/trpc";
 import { transformInterventions, type CalendarIntervention, type Chantier, type Technicien } from "../domain/calendrier-chantiers";
 
-// Couche APPLICATION — calendrier chantiers : interventions enrichies (jointes chantiers/techniciens) +
-// couleurs sauvegardées + mutations (replanifier, réassigner, couleur). SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — calendrier chantiers : interventions enrichies (jointes chantiers/techniciens) +
+ * couleurs sauvegardées + mutations (replanifier, réassigner, couleur). SEULE couche important tRPC.
+ */
 export function useCalendrierChantiers() {
   const utils = trpc.useUtils();
   const chantiersQ = trpc.chantiers.list.useQuery();

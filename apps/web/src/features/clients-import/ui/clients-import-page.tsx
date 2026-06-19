@@ -10,8 +10,10 @@ import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { useImportClients } from "../application/use-import-clients";
 import { parseRows, validCount, errorCount, toImportPayload, TEMPLATE_ROW, type ClientPreview } from "../domain/clients-import";
 
-// Page `/clients/import` — migration clean-archi de `pages/ImportClients.tsx`. Markup à l'identique.
-// Lecture/écriture XLSX (effets) en UI ; parsing/validation des lignes en domain (pur, testé).
+/*
+ * Page `/clients/import` — migration clean-archi de `pages/ImportClients.tsx`. Markup à l'identique.
+ * Lecture/écriture XLSX (effets) en UI ; parsing/validation des lignes en domain (pur, testé).
+ */
 export default function ClientsImportPage() {
   const { t } = useTranslation("clientsImport");
   const [file, setFile] = useState<File | null>(null);

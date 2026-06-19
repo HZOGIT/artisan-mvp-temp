@@ -13,9 +13,11 @@ import { Badge } from "@/shared/ui/badge";
 import { useVehicules } from "../application/use-vehicules";
 import { CARBURANTS, statutClass, statutVariant, technicienPrenom, vehiculeImmat, type TypeCarburant } from "../domain/vehicules";
 
-// Page `vehicules` (gestion de flotte) — migration clean-archi de `pages/Vehicules.tsx`. Markup/classes
-// conservés (parité). tRPC encapsulé dans `use-vehicules`. NB : la valeur "none" du sélecteur technicien
-// remplace la chaîne vide legacy (Radix Select interdit `value=""`).
+/*
+ * Page `vehicules` (gestion de flotte) — migration clean-archi de `pages/Vehicules.tsx`. Markup/classes
+ * conservés (parité). tRPC encapsulé dans `use-vehicules`. NB : la valeur "none" du sélecteur technicien
+ * remplace la chaîne vide legacy (Radix Select interdit `value=""`).
+ */
 type FormState = {
   immatriculation: string; marque: string; modele: string; annee: number;
   typeCarburant: TypeCarburant; puissanceFiscale: number | undefined;

@@ -1,7 +1,9 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `facture-detail` (éditeur de facture/avoir : statut, paiement, avoirs, lignes,
-// audit, rappels CRM, PDF). Types dérivés du routeur + logique de solde d'avoir PURE testable. 0 React/tRPC.
+/*
+ * Couche DOMAIN de la feature `facture-detail` (éditeur de facture/avoir : statut, paiement, avoirs, lignes,
+ * audit, rappels CRM, PDF). Types dérivés du routeur + logique de solde d'avoir PURE testable. 0 React/tRPC.
+ */
 
 export type Facture = NonNullable<RouterOutputs["factures"]["getById"]>;
 export type Ligne = Facture["lignes"][number];
@@ -14,7 +16,7 @@ export type AvoirInput = RouterInputs["factures"]["createAvoir"];
 export type AddLigneInput = RouterInputs["factures"]["addLigne"];
 export type RappelType = RouterInputs["activites"]["create"]["type"];
 
-// Article du REST public `/api/articles/search` (snake_case).
+/** Article du REST public `/api/articles/search` (snake_case). */
 export type ArticleSearchResult = { id: number; nom: string; description: string | null; prix_base: string; unite: string; categorie: string; tauxTVA?: string | null };
 export type AvoirLigneForm = { designation: string; quantite: string; prixUnitaireHT: string; tauxTVA: string; unite: string };
 
@@ -27,7 +29,7 @@ export const STATUS_COLORS: Record<string, string> = {
 };
 export const RAPPEL_TYPE_KEY: Record<string, string> = { appel: "rappelAppel", email: "rappelEmail", rdv: "rappelRdv", relance: "rappelRelance", autre: "rappelAutre" };
 
-// Transitions de statut autorisées par la machine à états. PUR.
+/** Transitions de statut autorisées par la machine à états. PUR. */
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   brouillon: ["envoyee"], validee: ["envoyee", "payee", "annulee"], envoyee: ["payee", "en_retard"], en_retard: ["payee"], payee: [], annulee: [],
 };
@@ -44,7 +46,7 @@ export function isAvoirDoc(facture: Facture): boolean { return facture.typeDocum
 
 export type AvoirSolde = { totalCouvert: number; soldeRestant: number; avoirTotalExistant: Avoir | undefined; bloque: boolean };
 
-// Calcule l'état de couverture d'une facture par ses avoirs. PUR.
+/** Calcule l'état de couverture d'une facture par ses avoirs. PUR. */
 export function avoirSolde(avoirs: readonly Avoir[], factureTTC: number): AvoirSolde {
   const totalCouvert = avoirs.reduce((s, a) => s + Math.abs(n(a.totalTTC)), 0);
   const avoirTotalExistant = avoirs.find((a) => Math.abs(Math.abs(n(a.totalTTC)) - factureTTC) < 0.01);
@@ -52,12 +54,12 @@ export function avoirSolde(avoirs: readonly Avoir[], factureTTC: number): AvoirS
   return { totalCouvert, soldeRestant, avoirTotalExistant, bloque: !!avoirTotalExistant || soldeRestant <= 0.01 };
 }
 
-// Montant TTC d'un avoir partiel en cours de saisie. PUR.
+/** Montant TTC d'un avoir partiel en cours de saisie. PUR. */
 export function avoirLignesMontantTTC(lignes: readonly AvoirLigneForm[]): number {
   return lignes.reduce((s, l) => s + Math.abs(n(l.quantite)) * Math.abs(n(l.prixUnitaireHT)) * (1 + n(l.tauxTVA) / 100), 0);
 }
 
-// Lignes d'un avoir total (toutes les lignes produit de la facture). PUR.
+/** Lignes d'un avoir total (toutes les lignes produit de la facture). PUR. */
 export function buildAvoirTotalLignes(lignes: readonly Ligne[]): AvoirInput["lignes"] {
   return lignes
     .filter((l) => (l.type ?? "produit") === "produit")
@@ -74,7 +76,7 @@ export function activitesForFacture(activites: readonly Activite[], factureId: n
 }
 export function pendingCount(activites: readonly Activite[]): number { return activites.filter((a) => !a.fait).length; }
 
-// Action de transition de statut (ou null si « payee » → modale paiement, ou indisponible). PUR.
+/** Action de transition de statut (ou null si « payee » → modale paiement, ou indisponible). PUR. */
 export function statutAction(target: string): "envoyer" | "marquerEnRetard" | "payer" | null {
   if (target === "envoyee") return "envoyer";
   if (target === "en_retard") return "marquerEnRetard";

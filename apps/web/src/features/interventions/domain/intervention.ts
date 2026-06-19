@@ -1,8 +1,10 @@
 import type { RouterOutputs } from "@/shared/trpc";
 import { matchSearch } from "@/shared/lib/normalize";
 
-// Couche DOMAINE de la feature `interventions` (clean-archi) : types dérivés des sorties du routeur
-// tRPC (source de vérité serveur) + règles PURES testables sans réseau ni i18n.
+/*
+ * Couche DOMAINE de la feature `interventions` (clean-archi) : types dérivés des sorties du routeur
+ * tRPC (source de vérité serveur) + règles PURES testables sans réseau ni i18n.
+ */
 
 export type Intervention = RouterOutputs["interventions"]["list"][number];
 export type InterventionClient = RouterOutputs["clients"]["list"][number];
@@ -13,7 +15,7 @@ export type EquipeByArtisanRow = RouterOutputs["interventions"]["getEquipesByArt
 export const STATUT_KEYS = ["planifiee", "en_cours", "terminee", "annulee"] as const;
 export type InterventionStatut = (typeof STATUT_KEYS)[number];
 
-// Garde/normalisation PURE : ramène une chaîne libre vers un statut géré (défaut planifiee).
+/** Garde/normalisation PURE : ramène une chaîne libre vers un statut géré (défaut planifiee). */
 export function toInterventionStatut(s: string | null | undefined): InterventionStatut {
   return (STATUT_KEYS as readonly string[]).includes(s ?? "") ? (s as InterventionStatut) : "planifiee";
 }
@@ -23,7 +25,7 @@ export interface InterventionFilters {
   searchQuery: string;
 }
 
-// Filtrage PUR (statut + recherche titre/description/adresse). Mêmes règles que le legacy.
+/** Filtrage PUR (statut + recherche titre/description/adresse). Mêmes règles que le legacy. */
 export function filterInterventions(
   list: readonly Intervention[],
   f: InterventionFilters,
@@ -39,7 +41,7 @@ export function filterInterventions(
   });
 }
 
-// Index PUR interventionId → membres d'équipe (évite le N+1, 1 requête getEquipesByArtisan).
+/** Index PUR interventionId → membres d'équipe (évite le N+1, 1 requête getEquipesByArtisan). */
 export function groupEquipeByIntervention(
   rows: readonly EquipeByArtisanRow[],
 ): Map<number, EquipeByArtisanRow[]> {
@@ -52,12 +54,12 @@ export function groupEquipeByIntervention(
   return map;
 }
 
-// Nom affichable d'un membre/technicien (sans i18n) : "Prénom Nom" ou "" si inconnu (fallback i18n côté UI).
+/** Nom affichable d'un membre/technicien (sans i18n) : "Prénom Nom" ou "" si inconnu (fallback i18n côté UI). */
 export function membreName(m: { prenom?: string | null; nom?: string | null }): string {
   return [m.prenom, m.nom].filter(Boolean).join(" ");
 }
 
-// Techniciens encore assignables (pas déjà dans l'équipe). PUR.
+/** Techniciens encore assignables (pas déjà dans l'équipe). PUR. */
 export function availableTechniciens(
   techniciens: readonly Technicien[],
   equipe: readonly EquipeMembre[],
@@ -65,7 +67,7 @@ export function availableTechniciens(
   return techniciens.filter((tech) => !equipe.some((m) => m.technicienId === tech.id));
 }
 
-// Adresse pré-remplie depuis le client choisi ("adresse, CP Ville"), nettoyée. PUR.
+/** Adresse pré-remplie depuis le client choisi ("adresse, CP Ville"), nettoyée. PUR. */
 export function buildAdresse(
   client: Pick<InterventionClient, "adresse" | "codePostal" | "ville"> | undefined,
 ): string {
@@ -73,14 +75,16 @@ export function buildAdresse(
   return `${client.adresse}, ${client.codePostal || ""} ${client.ville || ""}`.trim().replace(/,\s*$/, "");
 }
 
-// Durée réelle sur site (captée par l'app mobile arrivée→départ). FINDING : non exposée par le DTO
-// `interventions.list` du new-stack (le legacy lisait `dureeReelleMinutes`, toujours `undefined` → "-").
-// On centralise l'accès ici : le jour où le DTO l'expose, on change CETTE ligne (parité préservée = "-").
+/*
+ * Durée réelle sur site (captée par l'app mobile arrivée→départ). FINDING : non exposée par le DTO
+ * `interventions.list` du new-stack (le legacy lisait `dureeReelleMinutes`, toujours `undefined` → "-").
+ * On centralise l'accès ici : le jour où le DTO l'expose, on change CETTE ligne (parité préservée = "-").
+ */
 export function dureeReelleMinutes(_i: Intervention): number | null {
   return null;
 }
 
-// Descripteur PUR de durée (l'UI choisit la clé i18n). null = pas de durée.
+/** Descripteur PUR de durée (l'UI choisit la clé i18n). null = pas de durée. */
 export type DureeDescriptor =
   | { kind: "none" }
   | { kind: "hm"; h: number; mm: string }

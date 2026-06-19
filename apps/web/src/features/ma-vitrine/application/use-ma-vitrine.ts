@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { VitrineSettings, ArtisanProfile, Avis, ClientItem } from "../domain/ma-vitrine";
 
-// Couche APPLICATION — Ma Vitrine : paramètres vitrine + profil (slug) + avis (modération/réponse/demande)
-// + clients (sélecteur de demande d'avis). SEULE couche important tRPC ; effets en UI via options.
+/*
+ * Couche APPLICATION — Ma Vitrine : paramètres vitrine + profil (slug) + avis (modération/réponse/demande)
+ * + clients (sélecteur de demande d'avis). SEULE couche important tRPC ; effets en UI via options.
+ */
 export function useMaVitrine() {
   const parametresQ = trpc.vitrine.getSettings.useQuery();
   const artisanQ = trpc.artisan.getProfile.useQuery();

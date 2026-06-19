@@ -15,32 +15,36 @@ import { AssistantFAB } from "./assistant-fab";
 import { AssistantDrawer } from "./assistant-drawer";
 import { readPanelSize, writePanelSize, initialAssistantOpen, PANEL_MARGIN_CLASS, type AssistantPanelSize } from "../domain/assistant-panel";
 
-// Routes authentifiées accessibles MEME quand l'onboarding n'est pas terminé (gate ci-dessous).
+/** Routes authentifiées accessibles MEME quand l'onboarding n'est pas terminé (gate ci-dessous). */
 const ONBOARDING_BYPASS = new Set(["/onboarding", "/profil", "/parametres", "/assistant", "/assistant/conversations", "/notifications"]);
 
-// MOUNT du SHELL modern — composant du layout `app-shell` (routeur unifié). Branche données (useShell +
-// subscription) + remplit TOUS les slots de la chrome (recherche Ctrl+K, notifs, bannière essai, blocage
-// expiré, FAB+drawer assistant) + porte le GATE onboarding. Enveloppe l'<Outlet/> TanStack des pages auth.
+/*
+ * MOUNT du SHELL modern — composant du layout `app-shell` (routeur unifié). Branche données (useShell +
+ * subscription) + remplit TOUS les slots de la chrome (recherche Ctrl+K, notifs, bannière essai, blocage
+ * expiré, FAB+drawer assistant) + porte le GATE onboarding. Enveloppe l'<Outlet/> TanStack des pages auth.
+ */
 export function DashboardLayoutMount() {
   const { t } = useTranslation("shell");
   const [location, setLocation] = useLocation();
   const { user, permissions, modulesActifs, logout } = useShell();
   const { data: sub } = trpc.subscription.getCurrent.useQuery(undefined, { staleTime: 60 * 1000 });
-  // Gate onboarding (relocalisé d'App.tsx au shell, OPE-403/F1) : un artisan dont l'onboarding n'est pas
-  // terminé est redirigé vers /onboarding (sauf routes bypass). /onboarding est hors shell (route dédiée).
+  /*
+   * Gate onboarding (relocalisé d'App.tsx au shell, OPE-403/F1) : un artisan dont l'onboarding n'est pas
+   * terminé est redirigé vers /onboarding (sauf routes bypass). /onboarding est hors shell (route dédiée).
+   */
   const { data: onboardingStatus, isLoading: onbLoading } = trpc.modules.getOnboardingStatus.useQuery();
   useEffect(() => {
     if (onbLoading || !onboardingStatus) return;
     if (!onboardingStatus.onboardingCompleted && !ONBOARDING_BYPASS.has(location)) setLocation("/onboarding");
   }, [onboardingStatus, onbLoading, location, setLocation]);
   const [searchOpen, setSearchOpen] = useState(false);
-  // Auto-open du panneau assistant sur desktop large (port du comportement legacy).
+  /** Auto-open du panneau assistant sur desktop large (port du comportement legacy). */
   const [assistantOpen, setAssistantOpen] = useState(initialAssistantOpen);
-  // Taille du panneau (sm/md/lg) persistée en localStorage.
+  /** Taille du panneau (sm/md/lg) persistée en localStorage. */
   const [panelSize, setPanelSize] = useState<AssistantPanelSize>(readPanelSize);
   useEffect(() => { writePanelSize(panelSize); }, [panelSize]);
 
-  // Raccourci Ctrl/Cmd+K → recherche globale.
+  /** Raccourci Ctrl/Cmd+K → recherche globale. */
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearchOpen((v) => !v); }
@@ -49,8 +53,10 @@ export function DashboardLayoutMount() {
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  // Bus event 'operioz:open-assistant' : permet à la page Support (et l'action 'navigate' de l'assistant)
-  // de rouvrir le panneau IA sans prop-drilling (port du comportement legacy).
+  /*
+   * Bus event 'operioz:open-assistant' : permet à la page Support (et l'action 'navigate' de l'assistant)
+   * de rouvrir le panneau IA sans prop-drilling (port du comportement legacy).
+   */
   useEffect(() => {
     const onOpen = () => setAssistantOpen(true);
     window.addEventListener("operioz:open-assistant", onOpen);

@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Badge, ClassementEntry, Technicien, Periode } from "../domain/badges";
 
-// Couche APPLICATION — gamification : liste des badges, classement des techniciens (par période),
-// objectifs (techniciens), création de badge + recalcul du classement. SEULE couche important tRPC.
+/*
+ * Couche APPLICATION — gamification : liste des badges, classement des techniciens (par période),
+ * objectifs (techniciens), création de badge + recalcul du classement. SEULE couche important tRPC.
+ */
 export function useBadges(periode: Periode) {
   const badgesQ = trpc.badges.list.useQuery();
   const techniciensQ = trpc.techniciens.getAll.useQuery();

@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCommandeDetail } from "../application/use-commande-detail";
 import { formatCurrency, ligneTotal, receptionActive, estRecue, aDesQuantitesRecues, buildReceptionPayload, findFournisseur, depenseLabel, STATUS_LABEL_KEY, STATUS_COLORS, NEXT_STATUSES, type StatutCommande, type StatutFacturation } from "../domain/commande-detail";
 
-// Page `/commandes/:id` — migration clean-archi de `pages/CommandeFournisseurDetail.tsx`. Markup à
-// l'identique. Le new-stack getById ne renvoie ni lignes ni fournisseur → chargés séparément (cf. domain).
+/*
+ * Page `/commandes/:id` — migration clean-archi de `pages/CommandeFournisseurDetail.tsx`. Markup à
+ * l'identique. Le new-stack getById ne renvoie ni lignes ni fournisseur → chargés séparément (cf. domain).
+ */
 export default function CommandeDetailPage() {
   const { t } = useTranslation("commandeDetail");
   const { id: idParam } = useParams({ strict: false }) as { id?: string };

@@ -6,10 +6,12 @@ import { buildSidebarGroups, isPathActive, resolveActiveGroup, resolveActiveItem
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
 
-// CONTAINER du SHELL modern : assemble Sidebar (rail+panneau) + MobileNav + top bar, gère l'état de navigation
-// (groupe ouvert, drawer mobile, groupes dépliés). DÉCOUPLÉ : les données (permissions, modules actifs, user,
-// resolveV2Path, navigation) et les zones branchées tRPC/auth (recherche/notifs, bannières, assistant) sont
-// INJECTÉES par props/slots → 0 dépendance legacy. Le « mount » qui branche les données viendra plus tard.
+/*
+ * CONTAINER du SHELL modern : assemble Sidebar (rail+panneau) + MobileNav + top bar, gère l'état de navigation
+ * (groupe ouvert, drawer mobile, groupes dépliés). DÉCOUPLÉ : les données (permissions, modules actifs, user,
+ * resolveV2Path, navigation) et les zones branchées tRPC/auth (recherche/notifs, bannières, assistant) sont
+ * INJECTÉES par props/slots → 0 dépendance legacy. Le « mount » qui branche les données viendra plus tard.
+ */
 
 export interface DashboardLayoutProps {
   location: string;
@@ -43,7 +45,7 @@ export function DashboardLayout(props: DashboardLayoutProps) {
   const activeGroup = resolveActiveGroup(groups, location);
   const activeItem = resolveActiveItem(groups, location);
 
-  // À l'ouverture du drawer mobile, déplier le groupe actif (port DashboardLayout).
+  /** À l'ouverture du drawer mobile, déplier le groupe actif (port DashboardLayout). */
   useEffect(() => {
     if (mobileMoreOpen) setOpenMobileGroups(new Set(activeGroup ? [activeGroup.id] : []));
   }, [mobileMoreOpen, activeGroup]);

@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui/di
 import { Star, MessageSquare, Eye, EyeOff, Send, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
-// Page Avis clients du FRONT NEUF (`/avis`) — MIGRATION clean-archi de `pages/Avis.tsx` (legacy chaînes
-// EN DUR → i18n namespace `avis`). Données & mutations via `useAvis` (couche application, seule à importer
-// tRPC) ; catégorie de statut, % distribution, toggle modération via le domaine (pur & testé). 0 `any`.
+/*
+ * Page Avis clients du FRONT NEUF (`/avis`) — MIGRATION clean-archi de `pages/Avis.tsx` (legacy chaînes
+ * EN DUR → i18n namespace `avis`). Données & mutations via `useAvis` (couche application, seule à importer
+ * tRPC) ; catégorie de statut, % distribution, toggle modération via le domaine (pur & testé). 0 `any`.
+ */
 
 function renderStars(note: number, size: "sm" | "lg" = "sm") {
   const sizeClass = size === "lg" ? "h-6 w-6" : "h-4 w-4";
@@ -29,7 +31,7 @@ function formatDate(date: Date | string) {
   return new Date(date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 }
 
-// Notes affichées (5→1) en tuple littéral : `distribution` est typé par clés littérales 1..5.
+/** Notes affichées (5→1) en tuple littéral : `distribution` est typé par clés littérales 1..5. */
 const NOTES = [5, 4, 3, 2, 1] as const;
 
 export default function AvisPage() {

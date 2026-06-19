@@ -4,12 +4,14 @@ import { TooltipProvider } from "@/shared/ui-kit/tooltip";
 import ErrorBoundary from "./bootstrap/ErrorBoundary";
 import { ThemeProvider } from "./bootstrap/ThemeContext";
 
-// Routeur UNIFIÉ (OPE-403/F1) : un seul RouterProvider TanStack porte TOUT l'espace d'URL — pages publiques
-// (hors shell), routes authentifiées (sous le shell modern via le layout `app-shell`), onboarding plein écran
-// et la redirection racine `/`→`/home`. Plus de dispatch manuel ni de double routeur (public/auth) dans App.
+/*
+ * Routeur UNIFIÉ (OPE-403/F1) : un seul RouterProvider TanStack porte TOUT l'espace d'URL — pages publiques
+ * (hors shell), routes authentifiées (sous le shell modern via le layout `app-shell`), onboarding plein écran
+ * et la redirection racine `/`→`/home`. Plus de dispatch manuel ni de double routeur (public/auth) dans App.
+ */
 const ModernRouterMount = lazy(() => import("./shared/router/modern-router-mount"));
 
-// Skeleton de chargement pour le montage lazy du routeur.
+/** Skeleton de chargement pour le montage lazy du routeur. */
 function PageLoader() {
   return (
     <div className="flex items-center justify-center h-64 w-full">

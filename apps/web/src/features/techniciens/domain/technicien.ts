@@ -1,7 +1,9 @@
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAINE de la feature `techniciens` (clean-archi) : types dérivés des sorties du routeur tRPC
-// + règles PURES testables sans réseau ni i18n.
+/*
+ * Couche DOMAINE de la feature `techniciens` (clean-archi) : types dérivés des sorties du routeur tRPC
+ * + règles PURES testables sans réseau ni i18n.
+ */
 
 export type Technicien = RouterOutputs["techniciens"]["getAll"][number];
 export type LinkableUser = RouterOutputs["techniciens"]["getLinkableUsers"][number];
@@ -11,12 +13,12 @@ export type Habilitation = RouterOutputs["techniciens"]["getHabilitations"][numb
 export const STATUT_KEYS = ["actif", "inactif", "conge"] as const;
 export type TechnicienStatut = (typeof STATUT_KEYS)[number];
 
-// Garde/normalisation PURE du statut (défaut actif).
+/** Garde/normalisation PURE du statut (défaut actif). */
 export function toTechnicienStatut(s: string | null | undefined): TechnicienStatut {
   return (STATUT_KEYS as readonly string[]).includes(s ?? "") ? (s as TechnicienStatut) : "actif";
 }
 
-// Date d'expiration valide d'une habilitation, ou null. PUR.
+/** Date d'expiration valide d'une habilitation, ou null. PUR. */
 export function habilExpiry(h: Pick<Habilitation, "dateExpiration">): Date | null {
   if (!h.dateExpiration) return null;
   const d = new Date(h.dateExpiration);
@@ -30,8 +32,10 @@ export type HabilBadge =
   | { key: "habilExpiresIn"; params: { n: number }; variant: "secondary" }
   | { key: "habilValid"; variant: "default" };
 
-// Badge PUR d'une habilitation (l'UI mappe `key` → libellé i18n + `variant` → style). `now` injectable.
-// Mêmes seuils que le legacy : pas d'expiration / expirée (<0j) / expire bientôt (<=60j) / valide.
+/*
+ * Badge PUR d'une habilitation (l'UI mappe `key` → libellé i18n + `variant` → style). `now` injectable.
+ * Mêmes seuils que le legacy : pas d'expiration / expirée (<0j) / expire bientôt (<=60j) / valide.
+ */
 export function habilitationBadge(
   h: Pick<Habilitation, "dateExpiration">,
   now: Date = new Date(),

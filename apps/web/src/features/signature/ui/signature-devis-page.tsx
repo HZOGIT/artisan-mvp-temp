@@ -20,11 +20,13 @@ import { Loader2, Check, Building2, User, Pen, AlertCircle, Download, X, XCircle
 import { toast } from "sonner";
 import { generateDevisPDF } from "@/shared/lib/pdfGenerator";
 
-// Page PUBLIQUE de signature de devis du FRONT NEUF (`/signature/:token`) — clean-archi : présentation
-// pure. Données & mutations via `useSignature` (couche application, seule à importer tRPC) ; validation du
-// formulaire, état traité, construction des lignes PDF via le domaine (`../domain/signature`, fonctions
-// pures testées). Montée hors auth (cf. public-router). JSX/canvas copiés à l'identique ; libellés legacy
-// (sans accents) conservés pour la parité ; token de route via TanStack.
+/*
+ * Page PUBLIQUE de signature de devis du FRONT NEUF (`/signature/:token`) — clean-archi : présentation
+ * pure. Données & mutations via `useSignature` (couche application, seule à importer tRPC) ; validation du
+ * formulaire, état traité, construction des lignes PDF via le domaine (`../domain/signature`, fonctions
+ * pures testées). Montée hors auth (cf. public-router). JSX/canvas copiés à l'identique ; libellés legacy
+ * (sans accents) conservés pour la parité ; token de route via TanStack.
+ */
 
 export default function SignatureDevisPage() {
   const { t } = useTranslation("signature");
@@ -44,14 +46,14 @@ export default function SignatureDevisPage() {
   const { data, isLoading, error, sign: signMutation, refuse: refuseMutation, selectOption: selectOptionMutation } =
     useSignature(token || "");
 
-  // Pré-remplit l'email depuis les données client au chargement.
+  /** Pré-remplit l'email depuis les données client au chargement. */
   useEffect(() => {
     if (data?.client?.email && !signataireEmail) {
       setSignataireEmail(data.client.email);
     }
   }, [data]);
 
-  // Canvas setup
+  /** Canvas setup */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -173,8 +175,10 @@ export default function SignatureDevisPage() {
   const handleDownloadPDF = () => {
     if (!data) return;
     const { devis: d, artisan: a, client: c, lignes: l } = data;
-    // Lignes PDF construites par le domaine (pur, typé). `nom` garanti string (requis par le type PDF
-    // Client) ; artisan absent → objet vide (tous ses champs PDF sont optionnels).
+    /*
+     * Lignes PDF construites par le domaine (pur, typé). `nom` garanti string (requis par le type PDF
+     * Client) ; artisan absent → objet vide (tous ses champs PDF sont optionnels).
+     */
     generateDevisPDF(a ?? {}, { ...(c ?? {}), nom: c?.nom ?? "" }, {
       numero: d.numero,
       dateCreation: d.createdAt,

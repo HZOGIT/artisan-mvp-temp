@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { RdvItem, RdvStats } from "../domain/rdv-en-ligne";
 
-// Couche APPLICATION — RDV en ligne : liste (filtrée par statut) + stats + transitions (confirm/refuse/
-// proposeAutreCreneau, avec invalidations). SEULE couche important tRPC ; effets (toast, reset) en UI.
+/*
+ * Couche APPLICATION — RDV en ligne : liste (filtrée par statut) + stats + transitions (confirm/refuse/
+ * proposeAutreCreneau, avec invalidations). SEULE couche important tRPC ; effets (toast, reset) en UI.
+ */
 export function useRdvEnLigne() {
   const utils = trpc.useUtils();
   const listQ = trpc.rdv.list.useQuery();

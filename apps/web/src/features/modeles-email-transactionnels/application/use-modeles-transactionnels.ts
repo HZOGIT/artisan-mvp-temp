@@ -1,8 +1,10 @@
 import { trpc } from "@/shared/trpc";
 import type { Modele } from "../domain/modeles-email-transactionnels";
 
-// Couche APPLICATION — modèles d'emails transactionnels (source `modelesEmail`) : liste + CRUD.
-// SEULE couche important tRPC ; effets (toast, fermeture modal, reset) en UI via options de `mutate`.
+/*
+ * Couche APPLICATION — modèles d'emails transactionnels (source `modelesEmail`) : liste + CRUD.
+ * SEULE couche important tRPC ; effets (toast, fermeture modal, reset) en UI via options de `mutate`.
+ */
 export function useModelesTransactionnels() {
   const listQ = trpc.modelesEmail.list.useQuery();
   const refetch = () => listQ.refetch();

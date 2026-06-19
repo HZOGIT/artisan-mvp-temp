@@ -14,8 +14,10 @@ import { MapView } from "@/shared/ui/map-view";
 import { usePlanification, type Coords } from "../application/use-planification";
 import { interventionsNonAssignees, conflictCounts, destMarkerHtml, techMarkerHtml, techPopupHtml } from "../domain/planification";
 
-// Page `planification` — migration clean-archi de `pages/Planification.tsx`. Carte Leaflet impérative en UI ;
-// constructeurs HTML marqueurs + règles (filtre interventions, conflits) en domain (purs, testés).
+/*
+ * Page `planification` — migration clean-archi de `pages/Planification.tsx`. Carte Leaflet impérative en UI ;
+ * constructeurs HTML marqueurs + règles (filtre interventions, conflits) en domain (purs, testés).
+ */
 export default function PlanificationPage() {
   const { t } = useTranslation("planification");
   const [adresse, setAdresse] = useState("");
@@ -49,7 +51,7 @@ export default function PlanificationPage() {
 
   const handleMapReady = useCallback((map: L.Map) => { mapRef.current = map; }, []);
 
-  // Marqueurs : destination + techniciens suggérés.
+  /** Marqueurs : destination + techniciens suggérés. */
   useEffect(() => {
     if (!mapRef.current || typeof L === "undefined") return;
     markersRef.current.forEach((m) => m.remove());

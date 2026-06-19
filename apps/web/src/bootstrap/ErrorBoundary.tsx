@@ -21,11 +21,15 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
-    // Pour la prod, on logue dans la console — le stack trace n'est PAS
-    // expose a l'utilisateur final (UI user-friendly, voir render()).
+    /*
+     * Pour la prod, on logue dans la console — le stack trace n'est PAS
+     * expose a l'utilisateur final (UI user-friendly, voir render()).
+     */
     console.error("[App ErrorBoundary]", error, info);
-    // DEV: ship the crash to the server so it's visible in the logs (mobile
-    // debugging — no devtools). sendBeacon survives the unmount.
+    /*
+     * DEV: ship the crash to the server so it's visible in the logs (mobile
+     * debugging — no devtools). sendBeacon survives the unmount.
+     */
     try {
       const payload = JSON.stringify({
         events: [

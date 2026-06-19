@@ -30,10 +30,12 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
 
-// Page Dépenses du FRONT NEUF (`/depenses`) — clean-archi : présentation pure. Données & mutations
-// via `useDepenses`/`useIndemniteKm` (couche application, seule à importer tRPC) ; totaux, plage de mois,
-// indemnité km, index catégories via le domaine (`../domain/depense`, fonctions pures testées). Parité
-// visuelle stricte : JSX/Tailwind à l'identique (KPIs + filtres + liste + dialog indemnités km).
+/*
+ * Page Dépenses du FRONT NEUF (`/depenses`) — clean-archi : présentation pure. Données & mutations
+ * via `useDepenses`/`useIndemniteKm` (couche application, seule à importer tRPC) ; totaux, plage de mois,
+ * indemnité km, index catégories via le domaine (`../domain/depense`, fonctions pures testées). Parité
+ * visuelle stricte : JSX/Tailwind à l'identique (KPIs + filtres + liste + dialog indemnités km).
+ */
 
 function eur2(n: number) {
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
@@ -65,11 +67,13 @@ export default function DepensesPage() {
   const [search, setSearch] = useState("");
   const [isKmOpen, setIsKmOpen] = useState(false);
 
-  // FINDING legacy : `depenses.list` n'a PAS d'`.input()` → filtres ignorés côté serveur (cf. couche
-  // application). Les contrôles de filtre restent affichés (parité). À corriger en backend.
+  /*
+   * FINDING legacy : `depenses.list` n'a PAS d'`.input()` → filtres ignorés côté serveur (cf. couche
+   * application). Les contrôles de filtre restent affichés (parité). À corriger en backend.
+   */
   const { depenses, stats, categories, budgets, remove: deleteMut, exportFec: exportFecMut } = useDepenses(mois);
 
-  // Index catégorie → couleur (résolution déléguée au domaine).
+  /** Index catégorie → couleur (résolution déléguée au domaine). */
   const categoriesByNom = indexCategoriesByNom(categories);
 
   const totalBudget = budgetTotal(budgets);
@@ -376,7 +380,7 @@ export default function DepensesPage() {
   );
 }
 
-// Dialog Indemnités kilométriques — barème fiscal 0.529 €/km par défaut.
+/** Dialog Indemnités kilométriques — barème fiscal 0.529 €/km par défaut. */
 function IndemniteKmDialog({
   open, onOpenChange, onSuccess,
 }: {

@@ -1,8 +1,10 @@
 import type { RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `import` (assistant d'import ERP CSV → clients/devis/factures). Parser CSV
-// PUR (séparateur auto + quotes), auto-mapping, catalogues. Les libellés FR des catalogues vivent ici
-// (rendus comme variables → non concernés par la règle i18next sur les littéraux JSX).
+/*
+ * Couche DOMAIN de la feature `import` (assistant d'import ERP CSV → clients/devis/factures). Parser CSV
+ * PUR (séparateur auto + quotes), auto-mapping, catalogues. Les libellés FR des catalogues vivent ici
+ * (rendus comme variables → non concernés par la règle i18next sur les littéraux JSX).
+ */
 
 export type ImportKind = "clients" | "devis" | "factures";
 export type FieldDef = { key: string; label: string; required?: boolean };
@@ -44,14 +46,14 @@ export const KIND_FIELDS: Record<ImportKind, { label: string; fields: FieldDef[]
   ] },
 };
 
-// Séparateur CSV dominant (`;`, `,` ou tab) sur l'échantillon des 5 premières lignes. PUR.
+/** Séparateur CSV dominant (`;`, `,` ou tab) sur l'échantillon des 5 premières lignes. PUR. */
 export function detectSeparator(text: string): string {
   const sample = text.split(/\r?\n/).slice(0, 5).join("\n");
   const counts = { ";": (sample.match(/;/g) || []).length, ",": (sample.match(/,/g) || []).length, "\t": (sample.match(/\t/g) || []).length };
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
-// Découpe une ligne CSV en gérant les guillemets doublés. PUR.
+/** Découpe une ligne CSV en gérant les guillemets doublés. PUR. */
 export function parseCsvLine(line: string, sep: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -66,7 +68,7 @@ export function parseCsvLine(line: string, sep: string): string[] {
   return out.map((s) => s.trim());
 }
 
-// Parse un CSV complet → en-têtes + lignes (objets) + séparateur détecté. PUR.
+/** Parse un CSV complet → en-têtes + lignes (objets) + séparateur détecté. PUR. */
 export function parseCsv(text: string): { headers: string[]; rows: CsvRow[]; sep: string } {
   const sep = detectSeparator(text);
   const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
@@ -81,7 +83,7 @@ export function parseCsv(text: string): { headers: string[]; rows: CsvRow[]; sep
   return { headers, rows, sep };
 }
 
-// Auto-mapping en-tête CSV → champ Operioz (par nom normalisé). PUR.
+/** Auto-mapping en-tête CSV → champ Operioz (par nom normalisé). PUR. */
 export function autoMap(csvHeaders: readonly string[], fields: readonly FieldDef[]): Mapping {
   const auto: Mapping = {};
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
@@ -92,13 +94,13 @@ export function autoMap(csvHeaders: readonly string[], fields: readonly FieldDef
   return auto;
 }
 
-// Tous les champs obligatoires sont-ils mappés ? PUR.
+/** Tous les champs obligatoires sont-ils mappés ? PUR. */
 export function allRequiredMapped(fields: readonly FieldDef[], mapping: Mapping): boolean {
   const mapped = new Set(Object.values(mapping));
   return fields.filter((f) => f.required).every((f) => mapped.has(f.key));
 }
 
-// Taille humaine (o / Ko / Mo). PUR.
+/** Taille humaine (o / Ko / Mo). PUR. */
 export function bytesToHuman(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;

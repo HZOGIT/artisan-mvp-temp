@@ -14,9 +14,11 @@ export class WebAudioCapture implements AudioCapture {
   async start(config: AudioCaptureConfig): Promise<void> {
     vlog('capture.start() requesting getUserMedia…');
     try {
-      // NOTE: do NOT constrain sampleRate — forcing it (and forcing the context
-      // to 16k) makes Chromium's MediaStreamSource emit nothing. We capture at
-      // native rate and downsample to 16k inside the worklet.
+      /*
+       * NOTE: do NOT constrain sampleRate — forcing it (and forcing the context
+       * to 16k) makes Chromium's MediaStreamSource emit nothing. We capture at
+       * native rate and downsample to 16k inside the worklet.
+       */
       this._stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -34,13 +36,15 @@ export class WebAudioCapture implements AudioCapture {
     const settings = (track?.getSettings?.() || {}) as any;
     vlog(`getUserMedia OK — mic="${track?.label || '?'}" enabled=${track?.enabled} muted=${track?.muted} readyState=${track?.readyState} settings.sampleRate=${settings.sampleRate} channelCount=${settings.channelCount}`);
 
-    // Use the SHARED native-rate context (same one playback uses) so we never
-    // open a second context at a different rate — which would suspend this one.
+    /*
+     * Use the SHARED native-rate context (same one playback uses) so we never
+     * open a second context at a different rate — which would suspend this one.
+     */
     this._ctx = await resumeSharedAudioContext();
     vlog(`shared AudioContext state=${this._ctx.state} sampleRate=${this._ctx.sampleRate} (native, shared)`);
 
     try {
-      // Cache-bust: worklet JS is cached very aggressively; force a fresh fetch.
+      /** Cache-bust: worklet JS is cached very aggressively; force a fresh fetch. */
       await this._ctx.audioWorklet.addModule(`/worklets/capture-processor.js?v=${Date.now()}`);
       vlog('capture worklet module loaded');
     } catch (e: any) {
@@ -54,8 +58,10 @@ export class WebAudioCapture implements AudioCapture {
 
     this._node.port.onmessage = (e) => {
       if (e.data.pcm) {
-        // Encode raw PCM16 → base64 here (btoa exists on the main thread, not
-        // in the AudioWorkletGlobalScope).
+        /*
+         * Encode raw PCM16 → base64 here (btoa exists on the main thread, not
+         * in the AudioWorkletGlobalScope).
+         */
         const bytes = new Uint8Array(e.data.pcm as ArrayBuffer);
         let binary = '';
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
@@ -69,11 +75,12 @@ export class WebAudioCapture implements AudioCapture {
 
     this._source = this._ctx.createMediaStreamSource(this._stream);
     this._source.connect(this._node);
-    this._node.connect(this._ctx.destination); // needed for worklet to run
+    /** needed for worklet to run */
+    this._node.connect(this._ctx.destination);
     this._active = true;
     vlog(`capture wired up — ctx.state=${this._ctx.state}. If no "sent chunk" lines follow, the worklet isn't running.`);
 
-    // Belt-and-suspenders: some browsers re-suspend; resume again post-wiring.
+    /** Belt-and-suspenders: some browsers re-suspend; resume again post-wiring. */
     if (this._ctx.state === 'suspended') {
       this._ctx.resume().then(() => vlog(`capture ctx resumed late → ${this._ctx?.state}`)).catch(() => {});
     }
@@ -84,8 +91,10 @@ export class WebAudioCapture implements AudioCapture {
     this._source?.disconnect();
     this._node?.disconnect();
     this._stream?.getTracks().forEach(t => t.stop());
-    // Do NOT close the context — it is shared with playback. The session closes
-    // it via closeSharedAudioContext() when the whole voice session ends.
+    /*
+     * Do NOT close the context — it is shared with playback. The session closes
+     * it via closeSharedAudioContext() when the whole voice session ends.
+     */
     this._ctx = null;
     this._stream = null;
     this._node = null;

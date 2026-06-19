@@ -1,8 +1,10 @@
 import type { RouterInputs, RouterOutputs } from "@/shared/trpc";
 
-// Couche DOMAIN de la feature `modeles-email-transactionnels` (modèles d'emails automatisés ; même
-// source `modelesEmail` que la feature `modeles-email`, UI distincte avec modèles prédéfinis).
-// Types dérivés du routeur, données/règles pures testables. 0 dépendance React/tRPC.
+/*
+ * Couche DOMAIN de la feature `modeles-email-transactionnels` (modèles d'emails automatisés ; même
+ * source `modelesEmail` que la feature `modeles-email`, UI distincte avec modèles prédéfinis).
+ * Types dérivés du routeur, données/règles pures testables. 0 dépendance React/tRPC.
+ */
 
 export type Modele = RouterOutputs["modelesEmail"]["list"][number];
 export type EmailType = RouterInputs["modelesEmail"]["create"]["type"];
@@ -10,13 +12,17 @@ export type CreateInput = RouterInputs["modelesEmail"]["create"];
 
 export type ModeleForm = { nom: string; type: EmailType; sujet: string; contenu: string };
 
-// Options du sélecteur de type (libellés via i18n `typeOption.<value>`). ⚠️ Correctif de parité : le
-// legacy envoyait des valeurs HORS enum ("relance"/"confirmation"/"rappel") → rejetées par le backend.
-// On mappe ici les libellés visibles sur des valeurs VALIDES de l'enum (bug latent corrigé).
+/*
+ * Options du sélecteur de type (libellés via i18n `typeOption.<value>`). ⚠️ Correctif de parité : le
+ * legacy envoyait des valeurs HORS enum ("relance"/"confirmation"/"rappel") → rejetées par le backend.
+ * On mappe ici les libellés visibles sur des valeurs VALIDES de l'enum (bug latent corrigé).
+ */
 export const TYPE_OPTIONS: readonly EmailType[] = ["relance_devis", "envoi_facture", "rappel_paiement", "autre"];
 
-// Variables insérables (noms camelCase sans accolades, parité legacy) — descriptions via i18n
-// `variable.<name>`. Le code affiché/inséré = `{{<name>}}` (cf. `varCode`).
+/*
+ * Variables insérables (noms camelCase sans accolades, parité legacy) — descriptions via i18n
+ * `variable.<name>`. Le code affiché/inséré = `{{<name>}}` (cf. `varCode`).
+ */
 export const VARIABLES_DISPONIBLES = [
   "nomClient", "prenomClient", "numeroDevis", "numeroFacture", "montant",
   "dateEcheance", "nomEntreprise", "telephoneEntreprise", "emailEntreprise",
@@ -25,8 +31,10 @@ export function varCode(name: string): string {
   return `{{${name}}}`;
 }
 
-// Modèles prédéfinis à ajouter en un clic (le `nom` est un libellé i18n `defaut.<key>.nom`, le corps
-// est un contenu d'exemple injecté tel quel dans la création).
+/*
+ * Modèles prédéfinis à ajouter en un clic (le `nom` est un libellé i18n `defaut.<key>.nom`, le corps
+ * est un contenu d'exemple injecté tel quel dans la création).
+ */
 export type ModeleDefaut = { key: string; type: EmailType; sujet: string; contenu: string };
 export const MODELES_PAR_DEFAUT: readonly ModeleDefaut[] = [
   {
@@ -49,7 +57,7 @@ export const MODELES_PAR_DEFAUT: readonly ModeleDefaut[] = [
   },
 ];
 
-// Convertit un modèle prédéfini en input de création (nom résolu via i18n côté appelant). PUR.
+/** Convertit un modèle prédéfini en input de création (nom résolu via i18n côté appelant). PUR. */
 export function defautToCreateInput(d: ModeleDefaut, nom: string): CreateInput {
   return { nom, type: d.type, sujet: d.sujet, contenu: d.contenu };
 }

@@ -8,8 +8,10 @@ import { Search, Download, LayoutDashboard, Users, FileText, Receipt, Wrench, Sh
 import { generateGuidePDF } from "@/shared/lib/generateGuidePDF";
 import { DOC_SECTIONS, filterSections } from "../domain/documentation-content";
 
-// Page `documentation` (guide d'utilisation) — migration clean-archi de `pages/Documentation.tsx`. Le
-// CONTENU (catalogue) vit en domain ; l'UI résout `iconKey` → icône et i18n le chrome. Markup à l'identique.
+/*
+ * Page `documentation` (guide d'utilisation) — migration clean-archi de `pages/Documentation.tsx`. Le
+ * CONTENU (catalogue) vit en domain ; l'UI résout `iconKey` → icône et i18n le chrome. Markup à l'identique.
+ */
 const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   LayoutDashboard, Users, FileText, Receipt, Wrench, ShoppingCart, Package, Sparkles, Globe, Lightbulb,
 };

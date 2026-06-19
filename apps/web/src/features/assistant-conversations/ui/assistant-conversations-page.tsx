@@ -5,10 +5,12 @@ import { Button } from "@/shared/ui/button";
 import { useAssistantThreads } from "../application/use-assistant-threads";
 import { relativeTime, type RelativeTime } from "../domain/assistant-conversations";
 
-// Page `assistant-conversations` (historique MonAssistant) — migration clean-archi de
-// `pages/AssistantConversations.tsx`. Navigation DIRECTE vers `/assistant` (et non `/assistant`) : le
-// round-trip legacy `/assistant` → redirect `/assistant` PERDAIT la query `?thread=X` → on ouvrait une
-// NOUVELLE conversation au lieu de celle cliquée. En ciblant `/assistant` directement, `?thread=X` est conservé.
+/*
+ * Page `assistant-conversations` (historique MonAssistant) — migration clean-archi de
+ * `pages/AssistantConversations.tsx`. Navigation DIRECTE vers `/assistant` (et non `/assistant`) : le
+ * round-trip legacy `/assistant` → redirect `/assistant` PERDAIT la query `?thread=X` → on ouvrait une
+ * NOUVELLE conversation au lieu de celle cliquée. En ciblant `/assistant` directement, `?thread=X` est conservé.
+ */
 function goAssistant(query = "") {
   window.location.href = `/assistant${query}`;
 }
