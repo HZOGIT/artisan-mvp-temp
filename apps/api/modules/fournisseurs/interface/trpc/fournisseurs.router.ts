@@ -48,7 +48,11 @@ export function createFournisseursRouter(repo: IFournisseurRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerFournisseur(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerFournisseur(repo, ctx.tenant, input);
+        ctx.log.info({ event: "fournisseur_cree", fournisseurId: result.id, hasEmail: input.email != null }, "Fournisseur créé");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -61,6 +65,7 @@ export function createFournisseursRouter(repo: IFournisseurRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerFournisseur(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "fournisseur_supprime", fournisseurId: input.id }, "Fournisseur supprimé — commandes liées potentiellement orphelines");
         return { success: true };
       }),
 
