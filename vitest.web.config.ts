@@ -1,7 +1,6 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
-/** Gate de tests du frontend React (`apps/web/src/**`). Exécution : `pnpm exec vitest run -c vitest.web.config.ts`. */
 const root = path.resolve(import.meta.dirname);
 
 export default defineConfig({

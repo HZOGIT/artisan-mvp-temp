@@ -1,5 +1,4 @@
 {
-  "//": "Gate typecheck du backend Fastify/tRPC (apps/api/** + schéma PG). Lancer : pnpm exec tsc -p tsconfig.api.json --noEmit",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
@@ -7,6 +6,5 @@
     "tsBuildInfoFile": null
   },
   "include": ["apps/api/**/*", "drizzle/schema.pg.ts"],
-  "//exclude": "src/shared/legacy = dette PDF/email portée telle quelle (jsPDF/Resend), bundlée en sidecar esbuild (legacy-*.mjs, type-only erased). Hors scope du gate clean comme l'était server/_core — sera ré-incluse au legacy-finish.",
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "apps/api/shared/legacy"]
 }

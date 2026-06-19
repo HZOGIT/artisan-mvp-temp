@@ -1,5 +1,5 @@
 {
-  "//": "Gate typecheck strict du frontend React (apps/web/src/**). Lancer : pnpm exec tsc -p tsconfig.web.json --noEmit. `types` ajoute `@fastify/cookie` car tsc suit les imports transitifs AppRouter → source backend qui augmente le module fastify (setCookie/cookies).",
+  "//": "@fastify/cookie dans types : tsc suit AppRouter → source backend → augmentation declare module 'fastify' (setCookie/cookies).",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
