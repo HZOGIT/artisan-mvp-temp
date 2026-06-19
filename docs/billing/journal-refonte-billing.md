@@ -73,6 +73,14 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 14 — 2026-06-19
+**Cible :** L1 — comportement de revokePaymentMethod vis-à-vis de la subscription
+**Cas ajoutés (2) :**
+- `revokePaymentMethod` lié à une sub → `sub.payment_method_id` inchangé : documente que le use-case ne touche pas `billing_subscriptions`. La sub reste liée au PM révoqué — le scheduler Phase 2 doit vérifier si le PM est actif avant de prélever.
+- `getBillingInfo` après révocation → PM révoquée absente de `paymentMethods` : prouve que `listPaymentMethods` filtre `revoked_at IS NULL`, vue depuis le point d'entrée `getBillingInfo` (pas seulement depuis `revokePaymentMethod`)
+**Résultat :** 33/33 ✅ (L1 sans DB)
+**Total billing :** 94 tests (92 → 94)
+
 ### Itération 13 — 2026-06-19
 **Cible :** L2 — contrats de bas niveau non prouvés à DB réel
 **Cas ajoutés (2) :**

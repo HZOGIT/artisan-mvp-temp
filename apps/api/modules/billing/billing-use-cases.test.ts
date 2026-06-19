@@ -319,6 +319,22 @@ describe("getBillingInfo", () => {
     const infoB = await getBillingInfo(deps, B);
     expect(infoB.paymentMethods).toHaveLength(0);
   });
+
+  it("PM révoquée absente de paymentMethods — revoked_at filtré par listPaymentMethods", async () => {
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_revoked_info",
+      stripeCustomerId: "cus_test",
+      setAsDefault: false,
+      consentedAt: new Date(),
+    });
+    expect((await getBillingInfo(deps, A)).paymentMethods).toHaveLength(1);
+
+    await revokePaymentMethod(deps, A, pm.id);
+
+    const info = await getBillingInfo(deps, A);
+    expect(info.paymentMethods).toHaveLength(0);
+  });
 });
 
 // ── confirmPaymentMethod — cas setAsDefault=false ────────────────────────────
@@ -382,6 +398,30 @@ describe("revokePaymentMethod — carte default", () => {
     // appartient à la Phase 2 scheduler, pas au use-case de révocation)
     expect(await deps.repo.findDefaultPaymentMethod(A)).toBeNull();
     expect(await deps.repo.listPaymentMethods(A)).toHaveLength(1);
+  });
+
+  it("révoquer un PM lié à une sub → sub.payment_method_id inchangé (Phase 2 scheduler en charge)", async () => {
+    // revokePaymentMethod ne touche PAS billing_subscriptions.payment_method_id.
+    // La sub reste référencer le PM révoqué : le scheduler Phase 2 doit vérifier
+    // si le PM lié est actif avant de tenter un prélèvement.
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_sub_revoke",
+      stripeCustomerId: "cus_test",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+    expect((await deps.repo.findSubscription(A))?.payment_method_id).toBe(pm.id);
+
+    await revokePaymentMethod(deps, A, pm.id);
+
+    // Sub toujours liée au PM révoqué (payment_method_id inchangé)
+    expect((await deps.repo.findSubscription(A))?.payment_method_id).toBe(pm.id);
   });
 });
 
