@@ -9,8 +9,8 @@ FROM node:alpine AS builder
 WORKDIR /app
 ENV CI=true
 # pnpm (corepack absent de node:alpine récent) ; version alignée sur packageManager.
-RUN npm install -g pnpm@10.4.1
-COPY package.json pnpm-lock.yaml .npmrc ./
+RUN npm install -g pnpm@11.5.1
+COPY package.json pnpm-lock.yaml .npmrc pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 # Sources nécessaires au bundle (src + schéma Drizzle importé en relatif).
 COPY tsconfig*.json ./
@@ -27,8 +27,8 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEW_STACK_PORT=3001 \
     HOST=0.0.0.0
-RUN npm install -g pnpm@10.4.1
-COPY package.json pnpm-lock.yaml .npmrc ./
+RUN npm install -g pnpm@11.5.1
+COPY package.json pnpm-lock.yaml .npmrc pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile && pnpm store prune
 COPY --from=builder /app/dist-newstack ./dist-newstack
 # Tini-less : on lance node directement ; le nouveau stack gère son arrêt.
