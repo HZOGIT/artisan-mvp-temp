@@ -62,6 +62,7 @@ export async function soumettreDemandeIA(deps: SoumettreDemandeIADeps, token: st
     questions: [],
   };
 
+  const t0 = Date.now();
   try {
     const prompt = `Un client (${clientName}) decrit son besoin sur le portail :
 """
@@ -73,6 +74,8 @@ Tache : structure cette demande pour l'artisan. Donne un titre court, reformule 
 Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
 {"titre":"court","description_reformulee":"clair","type_travaux":"libelle","urgence":"normale","estimation_min":0,"estimation_max":0,"questions":["q1","q2"]}`;
     const text = await deps.llm.complete(prompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1200 });
+    const llmDuration = Date.now() - t0;
+    log?.info({ event: "llm_complete", useCase: "soumettreDemandeIA", llmDuration }, `LLM portail terminé en ${llmDuration}ms`);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
@@ -85,8 +88,8 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte avant/apres) :
       structured.questions = Array.isArray(data.questions) ? data.questions.slice(0, 5).map((q) => String(q).slice(0, 200)) : [];
     }
   } catch (e) {
-    /** dégradation : on garde `structured` par défaut */
-    log?.warn({ event: "portail_ia_llm_error", error: sanitizeIaError(e) }, "Erreur LLM soumettreDemandeIA — dégradation silencieuse");
+    const llmDuration = Date.now() - t0;
+    log?.warn({ event: "portail_ia_llm_error", llmDuration, error: sanitizeIaError(e) }, "Erreur LLM soumettreDemandeIA — dégradation silencieuse");
   }
 
   const fourchette = structured.estimationMin && structured.estimationMax ? `${structured.estimationMin}-${structured.estimationMax} €` : "à chiffrer";

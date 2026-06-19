@@ -46,18 +46,21 @@ export async function getConseilsIA(deps: ConseilsIaDeps, ctx: TenantContext, lo
   const moisLabel = now.toLocaleDateString("fr-FR", { month: "long" });
   const prompt = buildConseilsPrompt({ nomEntreprise: artisan.nomEntreprise, metier, stats, moisLabel });
 
+  const t0 = Date.now();
   try {
     const text = await deps.llm.complete(prompt, {
       system: getContexteMetier(metier),
       temperature: 0.6,
       maxOutputTokens: 800,
     });
+    const llmDuration = Date.now() - t0;
     const conseils = parseConseils(text);
+    log?.info({ event: "llm_complete", useCase: "conseilsIA", llmDuration, conseils: conseils.length }, `LLM conseilsIA terminé en ${llmDuration}ms`);
     if (conseils.length === 0) return CONSEILS_VIDE;
     return { conseils, genereLe: now.toISOString() };
   } catch (e) {
-     
-    log?.warn({ event: "conseils_ia_llm_error", error: sanitizeIaError(e) }, "Erreur LLM conseilsIA — retour vide");
+    const llmDuration = Date.now() - t0;
+    log?.warn({ event: "conseils_ia_llm_error", llmDuration, error: sanitizeIaError(e) }, "Erreur LLM conseilsIA — retour vide");
     return CONSEILS_VIDE;
   }
 }

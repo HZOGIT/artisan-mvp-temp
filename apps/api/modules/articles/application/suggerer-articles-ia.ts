@@ -65,10 +65,13 @@ Reponds UNIQUEMENT en JSON pur (pas de markdown, pas de texte autour) :
 {"articles":[{"designation":"nom","reference":"REF-XXX","unite":"u|m|m²|ml|kg|L|h","prixUnitaire":0,"description":"courte","categorie":"cat"}]}`;
 
   let text: string;
+  const t0 = Date.now();
   try {
     text = await deps.llm.complete(userPrompt, { system: contexteMetier, temperature: 0.4, maxOutputTokens: 1000 });
+    const llmDuration = Date.now() - t0;
+    log?.info({ event: "llm_complete", useCase: "suggererArticlesIA", llmDuration }, `LLM articles terminé en ${llmDuration}ms`);
   } catch (e) {
-    log?.warn({ event: "articles_ia_llm_error", error: sanitizeIaError(e) }, "Erreur LLM suggererArticlesIA — retour vide");
+    log?.warn({ event: "articles_ia_llm_error", llmDuration: Date.now() - t0, error: sanitizeIaError(e) }, "Erreur LLM suggererArticlesIA — retour vide");
     return [];
   }
 
