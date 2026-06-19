@@ -127,7 +127,11 @@ export function createDevisRouter(
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerDevis(repo, ctx.tenant, { ...input, dateValidite: toDate(input.dateValidite) })),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerDevis(repo, ctx.tenant, { ...input, dateValidite: toDate(input.dateValidite) });
+        ctx.log.info({ event: "devis_created", devisId: result.id, clientId: input.clientId }, "Devis créé");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -167,15 +171,27 @@ export function createDevisRouter(
     /** Transitions de statut (machine à états dans le use-case : Conflict→409 si invalide). */
     envoyer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "envoye")),
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "envoye");
+        ctx.log.info({ event: "devis_envoye", devisId: input.id }, "Devis envoyé au client");
+        return result;
+      }),
 
     accepter: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "accepte")),
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "accepte");
+        ctx.log.info({ event: "devis_accepte", devisId: input.id }, "Devis accepté");
+        return result;
+      }),
 
     refuser: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => changerStatutDevis(repo, ctx.tenant, input.id, "refuse")),
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerStatutDevis(repo, ctx.tenant, input.id, "refuse");
+        ctx.log.warn({ event: "devis_refuse", devisId: input.id }, "Devis refusé");
+        return result;
+      }),
 
     expirer: protectedProcedure
       .input(z.object({ id: z.number().int() }))
