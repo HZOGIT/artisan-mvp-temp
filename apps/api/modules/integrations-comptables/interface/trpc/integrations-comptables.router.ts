@@ -35,10 +35,23 @@ export function createIntegrationsComptablesRouter(repo: IIntegrationsComptables
     getExports: protectedProcedure.query(({ ctx }) => getExports(repo, ctx.tenant)),
     genererExport: protectedProcedure
       .input(z.object({ logiciel: logicielEnum, formatExport: formatEnum, dateDebut: z.string(), dateFin: z.string() }))
-      .mutation(({ ctx, input }) => genererExport({ repo, fec }, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await genererExport({ repo, fec }, ctx.tenant, input);
+        /** FEC = document légal obligatoire (contrôle fiscal) — toute génération doit être tracée. */
+        ctx.log.warn({ event: "comptabilite_export_genere", logiciel: input.logiciel, format: input.formatExport, dateDebut: input.dateDebut, dateFin: input.dateFin }, "Export comptable généré");
+        return result;
+      }),
     getSyncLogs: protectedProcedure.query(({ ctx }) => getSyncLogs(repo, ctx.tenant)),
     getPendingItems: protectedProcedure.query(({ ctx }) => getPendingItems(repo, ctx.tenant)),
-    lancerSync: protectedProcedure.mutation(({ ctx }) => lancerSync(repo, ctx.tenant)),
-    retrySync: protectedProcedure.input(z.object({ type: z.enum(["facture", "paiement"]), id: z.number().int().positive() })).mutation(({ ctx, input }) => retrySync(repo, ctx.tenant, input.id)),
+    lancerSync: protectedProcedure.mutation(async ({ ctx }) => {
+      const result = await lancerSync(repo, ctx.tenant);
+      ctx.log.info({ event: "comptabilite_sync_lancee" }, "Sync comptable déclenchée manuellement");
+      return result;
+    }),
+    retrySync: protectedProcedure.input(z.object({ type: z.enum(["facture", "paiement"]), id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const result = await retrySync(repo, ctx.tenant, input.id);
+      ctx.log.info({ event: "comptabilite_sync_retry", type: input.type, id: input.id }, "Retry sync comptable");
+      return result;
+    }),
   });
 }
