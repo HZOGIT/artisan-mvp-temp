@@ -85,16 +85,18 @@ export function createCommandesRouter(
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) =>
-        creerCommande(repo, ctx.tenant, {
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerCommande(repo, ctx.tenant, {
           fournisseurId: input.fournisseurId,
           reference: input.reference ?? null,
           dateLivraisonPrevue: input.dateLivraisonPrevue ? new Date(input.dateLivraisonPrevue) : null,
           adresseLivraison: input.adresseLivraison ?? null,
           notes: input.notes ?? null,
           lignes: toCreateLignes(input.lignes),
-        }),
-      ),
+        });
+        ctx.log.info({ event: "commande_creee", commandeId: result.id, fournisseurId: input.fournisseurId, nbLignes: input.lignes.length }, "Commande fournisseur créée");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -108,21 +110,25 @@ export function createCommandesRouter(
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerCommande(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "commande_supprimee", commandeId: input.id }, "Commande fournisseur supprimée");
         return { success: true };
       }),
 
     /** ── Transitions de statut + indicateur retard ── */
     updateStatut: protectedProcedure
       .input(z.object({ id: z.number().int(), statut: statutEnum, dateLivraisonReelle: z.string().datetime().nullish() }))
-      .mutation(({ ctx, input }) =>
-        changerStatutCommande(
+      .mutation(async ({ ctx, input }) => {
+        const result = await changerStatutCommande(
           repo,
           ctx.tenant,
           input.id,
           input.statut,
           input.dateLivraisonReelle ? new Date(input.dateLivraisonReelle) : undefined,
-        ),
-      ),
+        );
+        const level = input.statut === "annulee" ? "warn" : "info";
+        ctx.log[level]({ event: "commande_statut_changed", commandeId: input.id, newStatut: input.statut }, `Commande statut → ${input.statut}`);
+        return result;
+      }),
 
     getEnRetard: protectedProcedure.query(({ ctx }) => listerCommandesEnRetard(repo, ctx.tenant)),
 
@@ -147,14 +153,16 @@ export function createCommandesRouter(
             .max(500),
         }),
       )
-      .mutation(({ ctx, input }) =>
-        recevoirCommande(
+      .mutation(async ({ ctx, input }) => {
+        const result = await recevoirCommande(
           repo,
           ctx.tenant,
           input.id,
           input.lignes.map((l) => ({ ligneId: l.ligneId, quantiteRecue: l.quantiteRecue })),
-        ),
-      ),
+        );
+        ctx.log.info({ event: "commande_recue", commandeId: input.id, nbLignesRecues: input.lignes.length }, "Réception commande fournisseur enregistrée");
+        return result;
+      }),
 
     setStatutFacturation: protectedProcedure
       .input(
