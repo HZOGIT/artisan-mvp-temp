@@ -73,6 +73,16 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 9 — 2026-06-19
+**Source :** recherche web (idempotency, race conditions, event sourcing in payment systems)
+**Cible :** L1 — idempotence double-revoke, rotation de carte, ordre liste
+**Cas ajoutés (3) :**
+- `revokePaymentMethod` idempotent : révoquer 2× la même carte ne lève pas d'erreur — `findPaymentMethodById` ne filtre pas `revoked_at`, garantie pour idempotence webhooks
+- `confirmPaymentMethod setAsDefault=true` rotation : remplace l'ancien PM sur la sub (pm1 → pm2, sub pointe vers pm2)
+- `listPaymentMethods` ordre : carte default en premier (is_default DESC) — critique pour l'UI
+**Résultat :** 29/29 ✅ (L1 sans DB)
+**Total billing :** 84 tests (81 → 84)
+
 ### Itération 8 — 2026-06-19
 **Source :** recherche web sur edge cases billing/Stripe (dunning, expiry, boundary conditions)
 **Cible :** L1 use-cases + domaine — chemins non couverts identifiés par la recherche

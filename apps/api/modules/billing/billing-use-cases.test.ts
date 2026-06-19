@@ -93,6 +93,34 @@ describe("confirmPaymentMethod", () => {
     expect(sub?.payment_method_id).toBe(result.paymentMethod.id);
   });
 
+  it("setAsDefault=true remplace l'ancien PM de la sub (rotation de carte)", async () => {
+    // Un artisan enregistre une 1ère carte (default), puis en ajoute une 2ème (nouvelle default).
+    // La sub doit pointer vers la 2ème carte après la rotation.
+    const deps = makeDeps();
+    const { paymentMethod: pm1 } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_old",
+      stripeCustomerId: "cus_test",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+    // Sub mise à jour avec pm1 via setDefaultPaymentMethod implicite
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: pm1.id,
+    });
+
+    const { paymentMethod: pm2 } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_new",
+      stripeCustomerId: "cus_test",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+
+    expect((await deps.repo.findSubscription(A))?.payment_method_id).toBe(pm2.id);
+    expect((await deps.repo.findDefaultPaymentMethod(A))?.id).toBe(pm2.id);
+  });
+
   it("trace un événement payment_method.confirmed", async () => {
     const deps = makeDeps();
     await confirmPaymentMethod(deps, A, {
@@ -142,6 +170,20 @@ describe("revokePaymentMethod", () => {
     await revokePaymentMethod(deps, A, pm.id);
     expect(deps.repo.events.some(e => e.event_type === "payment_method.revoked")).toBe(true);
   });
+
+  it("idempotent — révoquer deux fois la même carte ne lève pas d'erreur", async () => {
+    // findPaymentMethodById ne filtre PAS revoked_at : un PM révoqué reste trouvable.
+    // Important pour l'idempotence des webhooks (Stripe peut renvoyer le même événement).
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_idem",
+      stripeCustomerId: "cus_test",
+      setAsDefault: false,
+      consentedAt: new Date(),
+    });
+    await revokePaymentMethod(deps, A, pm.id);
+    await expect(revokePaymentMethod(deps, A, pm.id)).resolves.toBeUndefined();
+  });
 });
 
 // ── setDefaultPaymentMethod ───────────────────────────────────────────────────
@@ -158,6 +200,19 @@ describe("setDefaultPaymentMethod", () => {
     const defaults = pms.filter(p => p.is_default);
     expect(defaults).toHaveLength(1);
     expect(defaults[0]!.id).toBe(pm2.id);
+  });
+
+  it("listPaymentMethods : la carte default apparaît en premier (tri is_default DESC)", async () => {
+    // L'UI affiche toujours la carte par défaut en tête de liste — vérifier le tri repo.
+    const deps = makeDeps();
+    const { paymentMethod: pm1 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_ord_1", stripeCustomerId: "cus_test", setAsDefault: false, consentedAt: new Date() });
+    const { paymentMethod: pm2 } = await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_ord_2", stripeCustomerId: "cus_test", setAsDefault: false, consentedAt: new Date() });
+
+    await setDefaultPaymentMethod(deps, A, pm1.id);
+
+    const pms = await deps.repo.listPaymentMethods(A);
+    expect(pms[0]!.id).toBe(pm1.id);
+    expect(pms[0]!.is_default).toBe(true);
   });
 
   it("NotFoundError si la carte n'appartient pas au tenant", async () => {
