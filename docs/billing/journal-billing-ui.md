@@ -12,11 +12,11 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 | Use case | Procédure tRPC | État |
 |---|---|---|
-| Voir abonnement + cartes | `billing.getBillingInfo` | ❌ |
+| Voir abonnement + cartes | `billing.getBillingInfo` | ✅ |
 | Ajouter une carte | `billing.createSetupIntent` + Stripe Elements + `billing.confirmPaymentMethod` | ❌ |
 | Supprimer une carte | `billing.revokePaymentMethod` | ❌ |
 | Changer carte par défaut | `billing.setDefaultPaymentMethod` | ❌ |
-| Voir factures récentes | `billing.getBillingInfo` → `recentInvoices` | ❌ |
+| Voir factures récentes | `billing.getBillingInfo` → `recentInvoices` | ✅ |
 
 ## Plan par phase (une phase = 1–2 itérations)
 
@@ -60,9 +60,19 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 2** — `billing-maison-section.tsx` : affichage lecture seule (abonnement + cartes + factures)
+**Phase 3** — actions simples dans `BillingMaisonSection` : boutons "Supprimer" + "Définir par défaut" avec dialog de confirmation et toast feedback
 
 ## Log d'itérations
+
+### Itération 2 — 2026-06-19
+**Phase 2 — Affichage lecture seule**
+- `billing-maison-section.tsx` créé : 3 cartes (abonnement, moyens de paiement, factures récentes)
+- Carte abonnement : plan résolu, statut avec Badge coloré, période en cours, fin d'essai si trialing
+- Carte cartes : liste avec brand (label lisible), last4, expiry, badge "Par défaut" ; nullable fields gérés (brand/last4/exp_month/exp_year nullable en schema)
+- Carte factures : number ou #id, date (paid_at ?? created_at), montant formaté, statut
+- État loading (Loader2 spinner) + erreur + billingInfo null
+- Gate `tsc -p tsconfig.web.json --noEmit` ✅ ; build vite échoue sur erreur pré-existante `app.tsx` (import `@/shared/ui-kit/sonner` manquant — refonte en cours, hors périmètre)
+**Prochaine cible :** Phase 3 — actions revoke + set-default avec dialogs
 
 ### Itération 1 — 2026-06-19
 **Phase 1 — Fondations**
