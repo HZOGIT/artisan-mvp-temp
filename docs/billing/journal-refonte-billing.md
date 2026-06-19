@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 22 — 2026-06-19
+**Cible :** L2 — `trial_ends_at` jamais vérifié en round-trip depuis la DB
+**Cas ajoutés (1) :**
+- L2 : `saveSubscription` → `trial_ends_at` non-null persiste via Drizzle et est retrouvable par `findSubscription` — le test existant (iter 9) créait une sub avec `trialEndsAt: new Date("2026-06-15")` mais n'assertait que `sub.artisan_id` et `findSubscription(...).id` ; `trial_ends_at` n'était jamais relu depuis la DB. Le scheduler Phase 2 lit ce champ pour décider si l'essai est expiré (comparaison date). Un bug de coercition Drizzle (Date → string UTC drift) ferait rater cette comparaison. Comparaison via `.toISOString().slice(0, 10)` pour éviter les variantes de timezone.
+**Résultat :** L2 26/26 ✅
+**Total billing :** 109 tests (108 → 109)
+
 ### Itération 21 — 2026-06-19
 **Cible :** L2 — contrainte `chk_pm_required` non testée
 **Cas ajoutés (1) :**

@@ -490,6 +490,21 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(found?.id).toBe(updated.id);
   });
 
+  it("saveSubscription : trial_ends_at non-null persiste et round-trippe via findSubscription (coercition Date Drizzle)", async () => {
+    // Le scheduler Phase 2 lit trial_ends_at pour décider si l'essai est expiré et s'il faut
+    // activer la subscription. Un bug de coercition Drizzle (Date → string ou UTC drift) ferait
+    // rater la comparaison et bloquerait l'activation ou la facturerait en double.
+    const trialEnd = new Date("2026-09-15T00:00:00.000Z");
+    await repo.saveSubscription({
+      artisanId: A, planId: "pro", billingMode: "maison", status: "trialing",
+      currentPeriodStart: new Date("2026-09-01"), currentPeriodEnd: new Date("2026-10-01"),
+      trialEndsAt: trialEnd, paymentMethodId: null,
+    });
+    const found = await repo.findSubscription(ctx(A));
+    expect(found?.trial_ends_at).not.toBeNull();
+    expect(new Date(found!.trial_ends_at!).toISOString().slice(0, 10)).toBe("2026-09-15");
+  });
+
   it("listPaymentMethods : ordre is_default DESC à DB level — carte default en tête", async () => {
     // pm1 → not default ; pm2 → promu default → doit être en premier dans la liste
     const pm1 = await repo.savePaymentMethod({
