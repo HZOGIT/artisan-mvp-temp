@@ -37,6 +37,20 @@ const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
   return result;
 });
 
+/**
+ * Mesure le temps d'exécution de chaque procédure tRPC. Log en warn si > 500ms pour identifier
+ * la procédure lente dans un batch sans attendre le log HTTP de fin de batch.
+ */
+const logProcedureTiming = t.middleware(async ({ next, path, ctx }) => {
+  const t0 = Date.now();
+  const result = await next();
+  const duration = Date.now() - t0;
+  if (duration > 500) {
+    ctx.log.warn({ event: "trpc_slow_procedure", procedure: path, duration }, `Procédure lente: ${path} (${duration}ms)`);
+  }
+  return result;
+});
+
 /** Exige un TenantContext résolu (sinon UNAUTHORIZED) + narrowe `tenant` non-null. */
 const requireTenant = t.middleware(({ ctx, next }) => {
   if (!ctx.tenant) {
@@ -66,13 +80,13 @@ const requireAdmin = t.middleware(({ ctx, next }) => {
  * domaine (NotFound→404, Validation→400…) mais SANS exigence de tenant. Le scoping est porté par la
  * capacité (token) côté use-case/RLS, jamais par un cookie tenant.
  */
-export const publicProcedure = t.procedure.use(mapDomainErrors);
+export const publicProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors);
 
 /** Procédure protégée : mapping erreurs domaine + exigence de tenant. */
-export const protectedProcedure = t.procedure.use(mapDomainErrors).use(requireTenant);
+export const protectedProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireTenant);
 
 /** Procédure ADMIN (staff Operioz) : mapping erreurs domaine + exigence du rôle admin (sans tenant). */
-export const adminProcedure = t.procedure.use(mapDomainErrors).use(requireAdmin);
+export const adminProcedure = t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireAdmin);
 
 /*
  * Fabrique de middleware d'autorisation PAR PERMISSION (parité legacy `requirePermission`) : le rôle
@@ -101,5 +115,5 @@ function requirePermission(...requiredPerms: string[]) {
  * `comptabilite.voir`, exports `exports.voir`…).
  */
 export function permissionProcedure(...perms: string[]) {
-  return t.procedure.use(mapDomainErrors).use(requireTenant).use(requirePermission(...perms));
+  return t.procedure.use(logProcedureTiming).use(mapDomainErrors).use(requireTenant).use(requirePermission(...perms));
 }
