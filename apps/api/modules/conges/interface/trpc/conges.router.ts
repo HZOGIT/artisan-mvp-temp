@@ -56,7 +56,11 @@ export function createCongesRouter(repo: ICongeRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerConge(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerConge(repo, ctx.tenant, input);
+        ctx.log.info({ event: "conge_demande", congeId: result.id, technicienId: input.technicienId, type: input.type, dateDebut: input.dateDebut, dateFin: input.dateFin }, "Congé demandé");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -69,20 +73,33 @@ export function createCongesRouter(repo: ICongeRepository) {
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerConge(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "conge_supprime", congeId: input.id }, "Congé supprimé");
         return { success: true };
       }),
 
     /** Workflow d'approbation. ⚠️ anti self-approbation porté par le use-case (403 si self). */
     approuver: protectedProcedure
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
-      .mutation(({ ctx, input }) => approuverConge(repo, ctx.tenant, input.id, input.commentaire)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await approuverConge(repo, ctx.tenant, input.id, input.commentaire);
+        ctx.log.info({ event: "conge_approuve", congeId: input.id }, "Congé approuvé");
+        return result;
+      }),
 
     refuser: protectedProcedure
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
-      .mutation(({ ctx, input }) => refuserConge(repo, ctx.tenant, input.id, input.commentaire)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await refuserConge(repo, ctx.tenant, input.id, input.commentaire);
+        ctx.log.warn({ event: "conge_refuse", congeId: input.id }, "Congé refusé");
+        return result;
+      }),
 
     annuler: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => annulerConge(repo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await annulerConge(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "conge_annule", congeId: input.id }, "Congé annulé");
+        return result;
+      }),
   });
 }
