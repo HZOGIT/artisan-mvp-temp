@@ -16,11 +16,12 @@ import { ValidationError, TooManyRequestsError } from "../../../../shared/errors
 /**
  * Schéma Zod de l'union discriminée des événements émis par la subscription `stream`.
  * Doit rester en parité avec `AssistantAgentEvent` (assistant-agent-use-cases.ts).
+ * Utilisé pour la validation runtime de chaque événement avant envoi au client.
  */
-const assistantStreamEventSchema = z.union([
+export const assistantStreamEventSchema = z.union([
   z.object({ threadId: z.number().int() }),
   z.object({ content: z.string() }),
-  z.object({ toolStart: z.object({ name: z.string(), args: z.record(z.unknown()) }) }),
+  z.object({ toolStart: z.object({ name: z.string(), args: z.record(z.string(), z.unknown()) }) }),
   z.object({ toolEnd: z.object({ name: z.string(), ok: z.boolean(), error: z.string().optional() }) }),
   z.object({ invalidate: z.array(z.string()) }),
   z.object({ navigate: z.string(), filtre: z.string().optional(), message: z.string().optional() }),
@@ -60,10 +61,11 @@ export function createAssistantRouter(
           threadId: z.number().int().optional(),
         }),
       )
-      .output(assistantStreamEventSchema)
       .subscription(async function* ({ ctx, input }) {
         try {
-          yield* runAssistantAgent(agentDeps, ctx.tenant!, input);
+          for await (const ev of runAssistantAgent(agentDeps, ctx.tenant!, input)) {
+            yield assistantStreamEventSchema.parse(ev);
+          }
         } catch (e) {
           if (e instanceof ValidationError) throw new TRPCError({ code: "BAD_REQUEST", message: e.message });
           if (e instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: e.message });
