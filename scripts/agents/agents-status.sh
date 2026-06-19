@@ -3,7 +3,7 @@
 # agents-status.sh — list active agents (screen sessions) and their bus state.
 #
 # Usage:
-#   ./devtools/agents/agents-status.sh
+#   ./scripts/agents/agents-status.sh
 #
 # Shows, for every running `screen` session: its name, pid, attached/detached
 # state, start time, and how many unread messages sit in its bus inbox.

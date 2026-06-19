@@ -10,7 +10,7 @@
 # déployé séparément par git push origin staging (build Pages). Ce script ne gère QUE le
 # backend conteneurisé du nouveau stack.
 #
-# Usage : ./devtools/deploy-staging-newstack.sh
+# Usage : ./scripts/deploy-staging-newstack.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -48,8 +48,8 @@ done
 [ "$fail" = "0" ] || { echo "✖ Smoke KO — le nouveau stack ne sert pas tous les domaines activés."; exit 1; }
 
 # Smoke AUTHENTIFIÉ (faux users staging + JWT) : prouve que les endpoints répondent 200 pour de
-# vrais utilisateurs, pas seulement 401. Cf. devtools/smoke-staging-newstack.sh.
+# vrais utilisateurs, pas seulement 401. Cf. scripts/smoke-staging-newstack.sh.
 echo "▶ Smoke authentifié (faux users staging)…"
-./devtools/smoke-staging-newstack.sh
+./scripts/smoke-staging-newstack.sh
 
-echo "✓ Nouveau stack déployé + smoke (anonyme & authentifié) OK ($NEWSTACK_URL). Routage trafic = ./devtools/deploy-staging-pages.sh (wrangler)."
+echo "✓ Nouveau stack déployé + smoke (anonyme & authentifié) OK ($NEWSTACK_URL). Routage trafic = ./scripts/deploy-staging-pages.sh (wrangler)."

@@ -16,11 +16,11 @@ On veut mettre en place un système d'agents de code autonomes qui :
 Explore le projet et documente ce qui existe déjà :
 
 ### Infrastructure d'agents
-- Examine `devtools/` : quels scripts existent ? Comment fonctionnent-ils ?
+- Examine `scripts/` : quels scripts existent ? Comment fonctionnent-ils ?
 - Y a-t-il des sessions screen existantes ? (`screen -ls`)
 - Y a-t-il des cron jobs, des scheduled tasks, des boucles de fond ?
 - Regarde `.claude/` (settings, hooks, agents, plugins) — qu'est-ce qui est configuré ?
-- Y a-t-il des prompts d'agents existants dans `devtools/prompts/` ?
+- Y a-t-il des prompts d'agents existants dans `scripts/prompts/` ?
 
 ### Outillage disponible
 - Quels outils MCP sont configurés ? (Linear, autres ?)
@@ -50,7 +50,7 @@ Propose une architecture concrète pour la factory, adaptée à ce projet :
 - Comment les lancer et les superviser (screen, cron, supervisord, autre ?) ?
 - Quel protocole de communication (Linear issues/comments, fichiers de lock, queues ?) ?
 - Comment gérer les worktrees git pour éviter les conflits ?
-- Quelle structure de dossiers pour la factory (`devtools/agents/`, `devtools/orchestrator/`, etc.) ?
+- Quelle structure de dossiers pour la factory (`scripts/agents/`, `scripts/orchestrator/`, etc.) ?
 - Quels mécanismes de sécurité (pas de push direct, PR obligatoire, review humaine) ?
 
 ## Livrable

@@ -4,7 +4,7 @@
 # inside a `screen` so it survives the parent shell.
 #
 # Usage:
-#   ./devtools/launch-claude-bg.sh <session-name> [model]
+#   ./scripts/launch-claude-bg.sh <session-name> [model]
 #
 #   <session-name>  screen session + Claude --remote-control name (required)
 #   [model]         Claude model id (default: claude-sonnet-4-6)
@@ -14,9 +14,9 @@
 #                   (optional; plain interactive session if unset)
 #
 # Examples:
-#   ./devtools/launch-claude-bg.sh project-manager
-#   ./devtools/launch-claude-bg.sh reviewer claude-opus-4-8
-#   INIT_PROMPT=./prompts/pm.md ./devtools/launch-claude-bg.sh project-manager
+#   ./scripts/launch-claude-bg.sh project-manager
+#   ./scripts/launch-claude-bg.sh reviewer claude-opus-4-8
+#   INIT_PROMPT=./prompts/pm.md ./scripts/launch-claude-bg.sh project-manager
 #
 set -euo pipefail
 

@@ -5,7 +5,7 @@
 # répertoire statique + le dossier `functions/` (la Pages Function `api/[[path]].js` = dispatcher
 # qui route /api/* vers legacy ou new-stack selon functions/_lib/dispatch.mjs).
 #
-# Credentials Cloudflare lus depuis .env (NON committé). Usage : ./devtools/deploy-staging-pages.sh
+# Credentials Cloudflare lus depuis .env (NON committé). Usage : ./scripts/deploy-staging-pages.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

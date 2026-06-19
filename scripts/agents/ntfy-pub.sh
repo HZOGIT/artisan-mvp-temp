@@ -3,7 +3,7 @@
 #
 # Public topic (operioz-claude-code-2026): NEVER send secrets/PII — status, issue refs, links only.
 #
-# Usage: ./devtools/agents/ntfy-pub.sh "<title>" "<message>" [tags]
+# Usage: ./scripts/agents/ntfy-pub.sh "<title>" "<message>" [tags]
 #   tags examples: rocket white_check_mark warning rotating_light gear hammer
 set -euo pipefail
 TOPIC="operioz-claude-code-2026"

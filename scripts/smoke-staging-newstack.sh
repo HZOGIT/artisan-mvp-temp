@@ -5,7 +5,7 @@
 # vraiment, pas juste 401) ET l'isolation cross-tenant (B ne voit pas forcément les données de A).
 #
 # Lancé après deploy-staging-newstack.sh à chaque itération qui active/ajoute des endpoints.
-# Aucun secret n'est affiché. Usage : ./devtools/smoke-staging-newstack.sh
+# Aucun secret n'est affiché. Usage : ./scripts/smoke-staging-newstack.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,8 +29,8 @@ read -r UA AA < <(ensure_user "smoke+a@operioz.test")
 read -r UB AB < <(ensure_user "smoke+b@operioz.test")
 echo "▶ Faux users staging : A=user $UA/artisan $AA · B=user $UB/artisan $AB"
 
-TOKEN_A=$(JWT_SECRET="$JWT_SECRET" node devtools/mint-jwt.mjs "$UA" "smoke+a@operioz.test")
-TOKEN_B=$(JWT_SECRET="$JWT_SECRET" node devtools/mint-jwt.mjs "$UB" "smoke+b@operioz.test")
+TOKEN_A=$(JWT_SECRET="$JWT_SECRET" node scripts/mint-jwt.mjs "$UA" "smoke+a@operioz.test")
+TOKEN_B=$(JWT_SECRET="$JWT_SECRET" node scripts/mint-jwt.mjs "$UB" "smoke+b@operioz.test")
 
 # Le user A représente un PROPRIÉTAIRE dans le smoke « 200 attendu » : on lui accorde (idempotent)
 # les permissions des routers gatés par permission (clients/contrats/interventions = .voir, rdv = .gerer),

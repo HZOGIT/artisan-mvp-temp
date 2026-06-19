@@ -6,7 +6,7 @@
 # Garde anti-chevauchement : si une itération est en cours (lock frais < STALE_MIN), on ne réveille pas
 # (2 min < durée d'une itération). L'agent touche le lock au début et le retire à la fin de l'itération.
 #
-# Usage (cron) : */2 * * * * /home/developer/artisan-mvp-temp/devtools/refonte-loop/wake.sh >> /tmp/refonte-loop-wake.log 2>&1
+# Usage (cron) : */2 * * * * /home/developer/artisan-mvp-temp/scripts/refonte-loop/wake.sh >> /tmp/refonte-loop-wake.log 2>&1
 set -euo pipefail
 
 SESSION="ope-403-refonte-frontend"

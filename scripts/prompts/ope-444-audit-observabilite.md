@@ -35,7 +35,7 @@ grep -rn "requestId\|request_id\|x-request-id\|correlationId\|traceId" src/ --in
 ### 5. Infrastructure staging
 ```bash
 cat docker-compose*.yml 2>/dev/null || cat compose*.yml 2>/dev/null
-cat devtools/deploy-staging-newstack.sh | grep -i "log\|monitor\|health"
+cat scripts/deploy-staging-newstack.sh | grep -i "log\|monitor\|health"
 ```
 
 ## Méthode

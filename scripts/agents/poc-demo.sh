@@ -10,7 +10,7 @@
 #
 # and watch each hop land. Self-contained, leaves no screens behind.
 #
-# Run:  ./devtools/agents/poc-demo.sh
+# Run:  ./scripts/agents/poc-demo.sh
 # ---------------------------------------------------------------------------
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

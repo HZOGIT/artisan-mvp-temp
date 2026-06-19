@@ -3,7 +3,7 @@
 # notify.sh — send a message to another agent on the bus.
 #
 # Usage:
-#   ./devtools/agents/notify.sh <to> <type> <payload...>
+#   ./scripts/agents/notify.sh <to> <type> <payload...>
 #
 #   <to>        recipient agent name (= its screen session name), or "human"
 #   <type>      one of: TASK_DELEGATE TASK_DONE REQUEST_REVIEW BLOCKED ALERT ACK
@@ -32,7 +32,7 @@
 #   AGENT_BUS_NTFY_HUMAN_TOPIC  topic for human/ALERT push (optional)
 #
 # Example:
-#   ./devtools/agents/notify.sh unit-tests TASK_DELEGATE \
+#   ./scripts/agents/notify.sh unit-tests TASK_DELEGATE \
 #       "Auth module done on branch feat/auth — please write the unit tests."
 # ---------------------------------------------------------------------------
 set -euo pipefail
@@ -168,7 +168,7 @@ if [[ "$WAKE" -eq 1 && "$TO" != "$BUS_HUMAN" ]]; then
       #    accept `\n`; real agents run the TUI, hence this dance.)
       if bus_screen_exists "$TO"; then
         NUDGE="📨 [agent-bus] Nouveau message de '${FROM}' (type ${TYPE}). "
-        NUDGE+="Lis ta boite avec: ./devtools/agents/listen.sh ${TO} --drain "
+        NUDGE+="Lis ta boite avec: ./scripts/agents/listen.sh ${TO} --drain "
         NUDGE+="puis agis selon le type et le payload."
         screen -S "$TO" -X stuff "$NUDGE"
         sleep "${AGENT_BUS_WAKE_DELAY:-1}"

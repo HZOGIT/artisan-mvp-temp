@@ -1,12 +1,12 @@
 # Skill : lancer une session agent en arrière-plan
 
-Lance `devtools/launch-claude-bg.sh` dans un `screen` détaché avec remote-control et permissions auto.
+Lance `scripts/launch-claude-bg.sh` dans un `screen` détaché avec remote-control et permissions auto.
 
 ## Commande
 
 ```bash
-INIT_PROMPT=./devtools/prompts/<prompt-file>.md \
-  ./devtools/launch-claude-bg.sh <session-name> [model]
+INIT_PROMPT=./scripts/prompts/<prompt-file>.md \
+  ./scripts/launch-claude-bg.sh <session-name> [model]
 ```
 
 ## Paramètres
@@ -41,4 +41,4 @@ screen -S <session-name> -X quit    # tuer
 
 ## Prompts d'init
 
-Stockés dans `devtools/prompts/`. Chaque fichier doit être **auto-suffisant** : la session accomplit sa mission sans accès à la conversation qui l'a lancée.
+Stockés dans `scripts/prompts/`. Chaque fichier doit être **auto-suffisant** : la session accomplit sa mission sans accès à la conversation qui l'a lancée.

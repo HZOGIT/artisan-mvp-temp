@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # cron-daemon.sh — substitut de cron (cette machine n'a pas `crontab`). Boucle qui réveille la session
 # de refonte toutes les 120 s via wake.sh. À lancer DÉTACHÉ dans son propre screen :
-#   screen -dmS refonte-cron /home/developer/artisan-mvp-temp/devtools/refonte-loop/cron-daemon.sh
+#   screen -dmS refonte-cron /home/developer/artisan-mvp-temp/scripts/refonte-loop/cron-daemon.sh
 # Stop : screen -S refonte-cron -X quit
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

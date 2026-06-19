@@ -61,7 +61,7 @@ Choisis le mécanisme optimal (ou une combinaison) et propose :
 - Convention de nommage des canaux/topics/fichiers
 
 ### Scripts helpers
-Écris les scripts dans `devtools/agents/` :
+Écris les scripts dans `scripts/agents/` :
 - `notify.sh <to> <type> <payload>` — envoyer un message à un agent
 - `listen.sh <agent-name>` — écouter les messages entrants (mode bloquant)
 - `agents-status.sh` — lister les agents actifs (screen sessions) et leur état
@@ -90,4 +90,4 @@ Implémente un PoC minimal mais fonctionnel :
 5. Section CLAUDE.md prête à copier-coller
 6. Instructions pour le PoC
 
-Ensuite, crée les fichiers helpers dans `devtools/agents/` et poste un commentaire sur l'issue OPE-185 dans Linear avec le résumé de la recommandation et le lien vers le document.
+Ensuite, crée les fichiers helpers dans `scripts/agents/` et poste un commentaire sur l'issue OPE-185 dans Linear avec le résumé de la recommandation et le lien vers le document.

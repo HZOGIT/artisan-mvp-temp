@@ -21,10 +21,10 @@
 #   AGENT_BUS_NTFY_TOKEN=tk_xxx \
 #   AGENT_BUS_SECRET=... \
 #   AGENT_BUS_NTFY_PREFIX=agentic-factory \
-#     ./devtools/agents/ntfy-inbox-bridge.sh <agent-name>
+#     ./scripts/agents/ntfy-inbox-bridge.sh <agent-name>
 #
 # Run it detached, one per agent, e.g. from launch:
-#   screen -dmS bridge-<agent> ./devtools/agents/ntfy-inbox-bridge.sh <agent>
+#   screen -dmS bridge-<agent> ./scripts/agents/ntfy-inbox-bridge.sh <agent>
 # ---------------------------------------------------------------------------
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -58,7 +58,7 @@ deliver() {
   printf '%s\n' "$json" >>"$BUS_LOG"
   # wake the TUI: nudge text, pause, then a lone CR to submit
   if bus_screen_exists "$AGENT"; then
-    screen -S "$AGENT" -X stuff "📨 [agent-bus] Nouveau message. Lis: ./devtools/agents/listen.sh ${AGENT} --drain puis agis."
+    screen -S "$AGENT" -X stuff "📨 [agent-bus] Nouveau message. Lis: ./scripts/agents/listen.sh ${AGENT} --drain puis agis."
     sleep "${AGENT_BUS_WAKE_DELAY:-1}"
     screen -S "$AGENT" -X stuff $'\r'
     echo "[bridge] -> woke '${AGENT}' ($id)"

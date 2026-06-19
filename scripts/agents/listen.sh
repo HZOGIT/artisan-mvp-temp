@@ -3,7 +3,7 @@
 # listen.sh — read messages addressed to an agent.
 #
 # Usage:
-#   ./devtools/agents/listen.sh <agent> [mode]
+#   ./scripts/agents/listen.sh <agent> [mode]
 #
 #   <agent>   the inbox to read (= this agent's name)
 #

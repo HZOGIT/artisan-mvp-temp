@@ -12,7 +12,7 @@ Plusieurs agents Claude Code travaillent en parallèle, chacun sur son propre do
 - Chaque worktree est **self-contained** : process, ports, instance Puppeteer/Playwright, DB de test propres — sans perturber les autres agents
 - Un **agent central de merge** récolte le travail prêt via un cron (toutes les 5 min), vérifie la mergeabilité, merge sur la branche principale, déploie sur staging, et notifie
 
-La communication inter-agents existe déjà : voir `docs/architecture/ope-185-inter-agent-communication.md` et la section "Communication inter-agents" de `CLAUDE.md` (bus de messages `~/.agent-bus/`, scripts `devtools/agents/notify.sh`, `listen.sh`, `agents-status.sh`). Réutilise ce bus pour la signalisation (`TASK_DONE`, `REQUEST_REVIEW`, `BLOCKED`, `ALERT`).
+La communication inter-agents existe déjà : voir `docs/architecture/ope-185-inter-agent-communication.md` et la section "Communication inter-agents" de `CLAUDE.md` (bus de messages `~/.agent-bus/`, scripts `scripts/agents/notify.sh`, `listen.sh`, `agents-status.sh`). Réutilise ce bus pour la signalisation (`TASK_DONE`, `REQUEST_REVIEW`, `BLOCKED`, `ALERT`).
 
 ## Étape 0 — État des lieux
 
@@ -20,7 +20,7 @@ Avant de proposer quoi que ce soit, comprends l'existant :
 - Stack technique du projet (package manager : npm/pnpm/yarn ? framework ? DB ? regarde `package.json`, `docker-compose*.yml`, `.env*`, scripts de test)
 - Comment les tests tournent aujourd'hui (e2e existants ? Puppeteer/Playwright déjà présent ?)
 - Comment staging est déployé aujourd'hui (regarde `terraform/`, scripts de deploy, CI/CD `.github/`)
-- Le bus d'agents existant dans `devtools/agents/`
+- Le bus d'agents existant dans `scripts/agents/`
 
 Documente ce que tu trouves. Sois honnête sur ce qui n'existe pas.
 
@@ -79,9 +79,9 @@ Documente le cycle de bout en bout :
 
 3. **Fichiers** :
    - `docker-compose.dev.yml`
-   - Script(s) d'allocation de ports (`devtools/agents/alloc-ports.sh` ou équivalent)
-   - Script de création de worktree d'agent (`devtools/agents/new-worktree.sh`)
-   - Script de l'agent de merge (`devtools/agents/merge-agent.sh`) + entrée cron (documentée, pas installée sans validation)
+   - Script(s) d'allocation de ports (`scripts/agents/alloc-ports.sh` ou équivalent)
+   - Script de création de worktree d'agent (`scripts/agents/new-worktree.sh`)
+   - Script de l'agent de merge (`scripts/agents/merge-agent.sh`) + entrée cron (documentée, pas installée sans validation)
    - Scripts de teardown/nettoyage
 
 4. **Skill** : crée `.claude/skills/agent-worktree.md` (ou mets à jour un skill existant) avec la procédure pour qu'un agent démarre, teste et signale son worktree. Référence-le depuis `CLAUDE.md` (garde CLAUDE.md court).
