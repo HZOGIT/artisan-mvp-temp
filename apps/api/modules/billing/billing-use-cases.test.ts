@@ -205,6 +205,22 @@ describe("revokePaymentMethod", () => {
     expect(deps.repo.events.some(e => e.event_type === "payment_method.revoked")).toBe(true);
   });
 
+  it("payload de l'événement payment_method.revoked contient last4 et brand (audit trail scheduler)", async () => {
+    // Le scheduler Phase 2 et les webhooks Stripe lisent le payload pour identifier la carte.
+    // setDefaultPaymentMethod vérifie déjà son payload (last4) — revokePaymentMethod ne l'était pas.
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_payload_chk",
+      stripeCustomerId: "cus_test",
+      setAsDefault: false,
+      consentedAt: new Date(),
+    });
+    await revokePaymentMethod(deps, A, pm.id);
+    const ev = deps.repo.events.find(e => e.event_type === "payment_method.revoked");
+    expect(ev?.payload).toMatchObject({ last4: pm.last4, brand: pm.brand });
+    expect(ev?.entity_id).toBe(pm.id);
+  });
+
   it("idempotent — révoquer deux fois la même carte ne lève pas d'erreur", async () => {
     // findPaymentMethodById ne filtre PAS revoked_at : un PM révoqué reste trouvable.
     // Important pour l'idempotence des webhooks (Stripe peut renvoyer le même événement).

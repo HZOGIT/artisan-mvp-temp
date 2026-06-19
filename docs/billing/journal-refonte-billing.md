@@ -73,6 +73,14 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 19 — 2026-06-19
+**Cible :** L1 (1 test) + L3 (1 test) — payloads d'événements non assertés
+**Cas ajoutés (2) :**
+- L1 : `revokePaymentMethod` event payload contient `last4` + `brand` + `entity_id` — `some(e => event_type==='revoked')` ne vérifiait pas le contenu ; symétrique avec `setDefaultPaymentMethod` qui assertait déjà `payload.last4`
+- L3 : `setDefaultPaymentMethod` → event `payment_method.set_default` persisté en DB — symétrique avec le test revoke ajouté en iter 18 ; vérifie la chaîne HTTP → appendEvent → billing_events pour les deux mutations non-Stripe
+**Résultat :** L1 36/36 ✅ · L3 11/11 ✅
+**Total billing :** 106 tests (104 → 106)
+
 ### Itération 18 — 2026-06-19
 **Cible :** L2 (1 test) + L3 (1 test) — shape de createCycle et audit trail event
 **Cas ajoutés (2) :**

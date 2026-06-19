@@ -233,4 +233,27 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
     expect(evts).toHaveLength(1);
     expect(evts[0]!.actor).toBe(`user:${UID}`);
   });
+
+  it("setDefaultPaymentMethod : event payment_method.set_default persisté en DB", async () => {
+    // Symétrique avec le test revoke : vérifie que setDefaultPaymentMethod écrit aussi en billing_events.
+    const { rows } = await admin.query<{ id: number }>(
+      `insert into billing_payment_methods
+         (artisan_id, stripe_customer_id, stripe_payment_method_id, brand, last4, exp_month, exp_year, is_default, consented_at)
+       values ($1,'cus_evt2','pm_evt_def','visa','5555',1,2030,false,now())
+       returning id`,
+      [ARTISAN_ID],
+    );
+    const pmDefId = rows[0]!.id;
+
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "billing.setDefaultPaymentMethod", { paymentMethodId: pmDefId }, tok);
+    expect(res.statusCode).toBe(200);
+
+    const { rows: evts } = await admin.query<{ entity_id: number; event_type: string; actor: string }>(
+      "select entity_id, event_type, actor from billing_events where entity_id=$1 and event_type='payment_method.set_default'",
+      [pmDefId],
+    );
+    expect(evts).toHaveLength(1);
+    expect(evts[0]!.actor).toBe(`user:${UID}`);
+  });
 });
