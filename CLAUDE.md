@@ -23,6 +23,27 @@ docs/
   skills/                 # Skills et conventions pour les agents
 ```
 
+## Provisionner la base (schéma + RLS)
+
+Stack 100% PostgreSQL. Le schéma **ET** la sécurité niveau ligne (RLS) sont provisionnés par
+**une seule chaîne de migrations Drizzle** (`drizzle/pg/`) — y compris l'isolation multi-tenant
+(`0003_rls-tenant-isolation`) et l'accès public par token (`0004_rls-public-token`). Une base neuve
+n'a donc plus besoin d'aucun script RLS manuel.
+
+**Ordre pour une base NEUVE :**
+1. **Bootstrap du rôle applicatif** (non-superuser, soumis à la RLS) — *hors migrations* (mot de passe
+   + GRANTs point-in-time) : `task db:bootstrap` (= `node scripts/rls/setup-app-role.mjs`). À faire **une fois**.
+2. **Migrations** : `task db:migrate` (= `drizzle-kit migrate`) → applique schéma + RLS en owner (`artisan_user`).
+
+⚠️ `drizzle-kit migrate` **ne crée PAS** le rôle `app_tenant` : sans l'étape (1), `migrate` réussit mais
+l'app ne peut pas se connecter. Le runtime se connecte en `app_tenant` (RLS active) ; les migrations en owner.
+
+**Faire évoluer la RLS** (ne JAMAIS éditer une migration appliquée — toujours une nouvelle migration custom append) :
+- **Tenant** (nouvelle table avec `artisanId`/`artisan_id`) : `node scripts/rls/generate-tenant-rls.mjs`
+  réintrospecte et crée une nouvelle migration custom **seulement si l'ensemble a changé** (sinon no-op).
+- **Public-token** : éditer `drizzle/rls/public-token.sql` (référence) puis créer une migration custom à la main
+  (cf. `0004`). `drizzle-kit generate --custom --name=… ` crée le fichier vide + l'entrée `_journal.json` à remplir.
+
 ## Communication inter-agents
 
 Tu peux faire partie d'une « Agentic Factory » : plusieurs sessions Claude Code

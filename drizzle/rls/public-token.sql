@@ -2,7 +2,9 @@
 -- Le token (64 car., unique) EST la capacité : une connexion qui présente le bon token via la GUC
 -- `app.public_token` ne voit QUE la ligne correspondante. Policy PERMISSIVE (s'OR avec
 -- `tenant_isolation` → le tenant garde son accès normal ; un public ne voit rien sans le bon token).
--- Idempotent. À appliquer en plus de `tenant-isolation.sql` (cf. scripts/rls/apply-public-token.mjs).
+-- Idempotent. Source de référence (écrite à la main) ; figée dans la migration
+-- drizzle/pg/0004_rls-public-token.sql et appliquée par `drizzle-kit migrate` (plus de script d'apply).
+-- Pour modifier ces policies : éditer ici PUIS créer une nouvelle migration custom (cf. 0004).
 
 -- demandes_avis : lecture publique de LA demande dont le token est présenté (portail d'avis client).
 drop policy if exists public_token_select on "demandes_avis";
