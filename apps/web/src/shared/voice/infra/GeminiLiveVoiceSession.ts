@@ -3,6 +3,7 @@ import { WebAudioCapture } from './WebAudioCapture';
 import { WebAudioOutput } from './WebAudioOutput';
 import { vlog } from './voiceDebug';
 import { closeSharedAudioContext } from './sharedAudioContext';
+import { BACKEND_URL } from '@/shared/backend-url';
 
 export class GeminiLiveVoiceSession implements VoiceSession {
   private _ws: WebSocket | null = null;
@@ -270,7 +271,7 @@ export class GeminiLiveVoiceSession implements VoiceSession {
       vlog(`🔧 toolCall ${fc.name}(${JSON.stringify(fc.args || {})})`);
       let response: any;
       try {
-        const r = await fetch('/api/voice/tool', {
+        const r = await fetch(`${BACKEND_URL}/api/voice/tool`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

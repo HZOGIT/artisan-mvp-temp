@@ -78,7 +78,7 @@ const DASHBOARD_UNBATCHED = new Set([
   'contrats.getAFacturer',
   'stocks.getLowStock',
 ])
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? ""
+import { BACKEND_URL } from "./shared/backend-url"
 const trpcClient = trpc.createClient({
   links: [
     splitLink({

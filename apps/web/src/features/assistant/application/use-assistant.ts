@@ -1,5 +1,6 @@
 import { skipToken } from "@tanstack/react-query";
 import { trpc } from "@/shared/trpc";
+import { BACKEND_URL } from "@/shared/backend-url";
 import { parseStreamData, splitSseBuffer, sseDataLine, type Message, type StreamEvent, type DevisLigne, type Relances } from "../domain/assistant";
 
 /*
@@ -11,7 +12,7 @@ export async function streamMessage(
   onEvent: (ev: StreamEvent) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const res = await fetch("/api/assistant/stream", {
+  const res = await fetch(`${BACKEND_URL}/api/assistant/stream`, {
     method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
     body: JSON.stringify(body), signal,
   });

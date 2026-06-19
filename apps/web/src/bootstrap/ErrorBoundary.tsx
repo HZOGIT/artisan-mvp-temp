@@ -1,5 +1,6 @@
 import { AlertTriangle, Home, RotateCcw } from "lucide-react";
 import { Component, ErrorInfo, ReactNode } from "react";
+import { BACKEND_URL } from "@/shared/backend-url";
 
 interface Props {
   children: ReactNode;
@@ -38,7 +39,7 @@ class ErrorBoundary extends Component<Props, State> {
           `componentStack: ${(info?.componentStack || "").split("\n").slice(0, 4).join(" | ")}`,
         ],
       });
-      navigator.sendBeacon?.("/api/voice/debug", new Blob([payload], { type: "application/json" }));
+      navigator.sendBeacon?.(`${BACKEND_URL}/api/voice/debug`, new Blob([payload], { type: "application/json" }));
     } catch { /* ignore */ }
   }
 

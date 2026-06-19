@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { VoiceState } from '@/shared/voice/domain/VoiceSession';
 import { GeminiLiveVoiceSession } from '@/shared/voice/infra/GeminiLiveVoiceSession';
 import { vlog } from '@/shared/voice/infra/voiceDebug';
+import { BACKEND_URL } from '@/shared/backend-url';
 
 export interface UseVoiceSessionOptions {
   threadId?: number;
@@ -55,7 +56,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
       vlog(`=== startVoice() clicked, threadId=${options.threadId ?? 'none'} ===`);
 
       /** Fetch ephemeral token from server */
-      const res = await fetch('/api/voice/token', {
+      const res = await fetch(`${BACKEND_URL}/api/voice/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -96,7 +97,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions = {}): UseVoiceS
             /** Persist this voice turn — the Live session never touches our server. */
             const tid = threadIdRef.current;
             if (tid && ((u && u.trim()) || (a && a.trim()))) {
-              fetch('/api/voice/persist', {
+              fetch(`${BACKEND_URL}/api/voice/persist`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

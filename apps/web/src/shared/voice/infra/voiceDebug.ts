@@ -1,8 +1,5 @@
-/*
- * Voice diagnostics: log to the browser console AND ship to the server so we
- * can watch the (otherwise invisible) browser↔Google voice session in the
- * server logs. Batches lines to avoid hammering the endpoint.
- */
+import { BACKEND_URL } from '@/shared/backend-url';
+
 let _buffer: string[] = [];
 let _timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -11,8 +8,7 @@ function flush() {
   if (_buffer.length === 0) return;
   const events = _buffer;
   _buffer = [];
-  /** Fire-and-forget; never block the audio path on logging. */
-  fetch('/api/voice/debug', {
+  fetch(`${BACKEND_URL}/api/voice/debug`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
