@@ -29,6 +29,8 @@ const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
   if (cause instanceof ForbiddenError) throw new TRPCError({ code: "FORBIDDEN", message: cause.message });
   if (cause instanceof ConflictError) throw new TRPCError({ code: "CONFLICT", message: cause.message });
   if (cause instanceof TooManyRequestsError) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: cause.message });
+  /** TRPCError déjà formé (requireTenant, requireAdmin, requirePermission…) — on laisse passer sans logger. */
+  if (cause instanceof TRPCError) return result;
   const errMsg = cause instanceof Error ? cause.message : String(cause);
   ctx.log.error({ event: "trpc_unhandled_error", error: errMsg }, "Erreur tRPC non mappée");
   return result;
