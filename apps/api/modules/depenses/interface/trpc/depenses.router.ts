@@ -332,8 +332,9 @@ export function createDepensesRouter(
         for (const depenseId of input.depenseIds ?? []) {
           await noteRepo.addDepenseLink(ctx.tenant, note.id, depenseId);
         }
-        /** Relit pour renvoyer le `montant_total` à jour (recalculé par addDepenseLink). */
-        return (await noteRepo.getById(ctx.tenant, note.id)) ?? note;
+        const result = (await noteRepo.getById(ctx.tenant, note.id)) ?? note;
+        ctx.log.info({ event: "note_frais_creee", noteId: result.id, depenseCount: input.depenseIds?.length ?? 0 }, "Note de frais créée");
+        return result;
       }),
 
     /*
@@ -343,7 +344,11 @@ export function createDepensesRouter(
      */
     soumettreNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => soumettreNoteDeFrais(noteRepo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await soumettreNoteDeFrais(noteRepo, ctx.tenant, input.id);
+        ctx.log.info({ event: "note_frais_soumise", noteId: input.id }, "Note de frais soumise à approbation");
+        return result;
+      }),
 
     /*
      * Approbation/rejet d'une note de frais (parité client). ⚠️ INVARIANT SENSIBLE — **anti
@@ -353,11 +358,19 @@ export function createDepensesRouter(
      */
     approuverNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int(), commentaire: z.string().max(2000).nullish() }))
-      .mutation(({ ctx, input }) => approuverNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire ?? undefined)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await approuverNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire ?? undefined);
+        ctx.log.info({ event: "note_frais_approuvee", noteId: input.id }, "Note de frais approuvée");
+        return result;
+      }),
 
     rejeterNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int(), commentaire: z.string().min(1).max(2000) }))
-      .mutation(({ ctx, input }) => rejeterNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await rejeterNoteDeFrais(noteRepo, ctx.tenant, input.id, input.commentaire);
+        ctx.log.warn({ event: "note_frais_rejetee", noteId: input.id }, "Note de frais rejetée");
+        return result;
+      }),
 
     /*
      * Paiement d'une note de frais (parité client). Transition `approuvee→payee` + datePaiement ;
@@ -365,7 +378,11 @@ export function createDepensesRouter(
      */
     payerNoteFrais: protectedProcedure
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => payerNoteDeFrais(noteRepo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await payerNoteDeFrais(noteRepo, ctx.tenant, input.id);
+        ctx.log.info({ event: "note_frais_payee", noteId: input.id }, "Note de frais payée");
+        return result;
+      }),
 
     /*
      * ⚠️ Parité behavior-preserving : le legacy renvoie `null` si introuvable/hors tenant (PAS 404).
