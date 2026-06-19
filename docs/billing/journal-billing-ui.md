@@ -13,7 +13,7 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 | Use case | Procédure tRPC | État |
 |---|---|---|
 | Voir abonnement + cartes | `billing.getBillingInfo` | ✅ |
-| Ajouter une carte | `billing.createSetupIntent` + Stripe Elements + `billing.confirmPaymentMethod` | ❌ |
+| Ajouter une carte | `billing.createSetupIntent` + Stripe Elements + `billing.confirmPaymentMethod` | ✅ |
 | Supprimer une carte | `billing.revokePaymentMethod` | ✅ |
 | Changer carte par défaut | `billing.setDefaultPaymentMethod` | ✅ |
 | Voir factures récentes | `billing.getBillingInfo` → `recentInvoices` | ✅ |
@@ -60,9 +60,21 @@ Backend 100% complet (84 tests) — `billing.*` tRPC prêt côté API.
 
 ## Prochaine cible
 
-**Phase 4** — `add-card-dialog.tsx` : Stripe Elements SetupIntent flow (createSetupIntent → stripe.confirmSetup → confirmPaymentMethod)
+**Phase 5** — Intégration dans la page : ajouter bouton "Ajouter une carte" dans `billing-maison-section.tsx` + `AddCardDialog`, puis wire `BillingMaisonSection` dans `parametres-page.tsx`
 
 ## Log d'itérations
+
+### Itération 4 — 2026-06-19
+**Phase 4 — Ajout de carte (Stripe Elements)**
+- `add-card-dialog.tsx` créé : dialog en 2 phases — loading (createSetupIntent) → Elements form (PaymentElement)
+- `stripePromise` singleton initialisé hors composant avec `loadStripe(VITE_STRIPE_PUBLISHABLE_KEY)`
+- `useEffect([open])` → appel `createSetupIntent` à l'ouverture du dialog, cleanup si fermé avant résolution
+- `stripe.confirmSetup({ redirect: 'if_required' })` → évite la redirection, reste sur la page
+- Extraction `payment_method` : `typeof pm === 'string' ? pm : pm.id` (gère string | PaymentMethod | null)
+- `confirmPaymentMethod({ stripePaymentMethodId, stripeCustomerId, setAsDefault: true })` → toast succès
+- Gestion erreurs Stripe (`result.error.message`) + erreur réseau (catch) → toast destructif
+- Gate `tsc --noEmit` ✅
+**Prochaine cible :** Phase 5 — intégration dans la page (bouton "Ajouter une carte" + wire dans parametres-page)
 
 ### Itération 3 — 2026-06-19
 **Phase 3 — Actions simples (sans Stripe)**
