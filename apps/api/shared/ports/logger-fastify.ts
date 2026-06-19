@@ -3,6 +3,8 @@ import type { PinoLoggerOptions } from "fastify/types/logger";
 const SERVICE_BASE = {
   service: "operioz-api",
   env: process.env.NODE_ENV ?? "development",
+  pid: process.pid,
+  node: process.version,
 };
 
 /*
