@@ -52,19 +52,29 @@ export function createTechniciensRouter(repo: ITechnicienRepository) {
 
     create: protectedProcedure
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerTechnicien(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerTechnicien(repo, ctx.tenant, input);
+        ctx.log.info({ event: "technicien_cree", technicienId: result.id, specialite: input.specialite ?? null, lieuUserId: input.userId ?? null }, "Technicien créé");
+        return result;
+      }),
 
     update: protectedProcedure
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, ...data } = input;
-        return modifierTechnicien(repo, ctx.tenant, id, data);
+        const result = await modifierTechnicien(repo, ctx.tenant, id, data);
+        if (data.statut) {
+          const level = data.statut === "inactif" ? "warn" : "info";
+          ctx.log[level]({ event: "technicien_statut_changed", technicienId: id, newStatut: data.statut }, `Technicien statut → ${data.statut}`);
+        }
+        return result;
       }),
 
     delete: protectedProcedure
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerTechnicien(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "technicien_supprime", technicienId: input.id }, "Technicien supprimé");
         return { success: true };
       }),
 
