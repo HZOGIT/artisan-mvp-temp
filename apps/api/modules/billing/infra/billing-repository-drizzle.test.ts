@@ -190,6 +190,35 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
 
   // ── Cycles ────────────────────────────────────────────────────────────────
 
+  it("createCycle shape complète : amount_cents / period_start / period_end / currency retournés", async () => {
+    // Le scheduler Phase 2 lit ces champs pour savoir quoi prélever et sur quelle période.
+    // Un bug de coercition de date ou de type Drizzle ferait charger le mauvais montant.
+    const sub = await repo.saveSubscription({
+      artisanId: B,
+      planId: "pro",
+      billingMode: "maison",
+      status: "trialing",
+      currentPeriodStart: new Date("2026-10-01"),
+      currentPeriodEnd: new Date("2026-11-01"),
+      trialEndsAt: null,
+      paymentMethodId: null,
+    });
+    const cycle = await repo.createCycle({
+      subscriptionId: sub.id,
+      periodStart: new Date("2026-10-01"),
+      periodEnd: new Date("2026-11-01"),
+      amountCents: 4900,
+      currency: "eur",
+    });
+    expect(cycle.amount_cents).toBe(4900);
+    expect(cycle.currency).toBe("eur");
+    expect(new Date(cycle.period_start).toISOString().slice(0, 10)).toBe("2026-10-01");
+    expect(new Date(cycle.period_end).toISOString().slice(0, 10)).toBe("2026-11-01");
+    // Marquer paid immédiatement pour ne pas parasiter findPendingCycle dans les tests suivants
+    // (saveSubscription utilise onConflictDoUpdate → sub.id réutilisé par tous les tests sur B)
+    await admin.query("update billing_cycles set status='paid' where id=$1", [cycle.id]);
+  });
+
   it("createCycle + findPendingCycle : retourne le cycle pending de la subscription", async () => {
     const sub = await repo.saveSubscription({
       artisanId: A,

@@ -208,4 +208,29 @@ describe.skipIf(!URL)("billing.router e2e (billing maison protégé)", () => {
       expect(target?.is_default).toBe(true);
     });
   });
+
+  it("revokePaymentMethod : event payment_method.revoked persisté en DB (audit trail complet)", async () => {
+    // Vérifie la chaîne complète HTTP → use-case → repo.appendEvent → billing_events.
+    // Les tests 200 + PM disparaît de getBillingInfo prouvent le chemin positif,
+    // mais pas que l'événement d'audit est bien stocké (event sourcing / scheduler zombie recovery).
+    const { rows } = await admin.query<{ id: number }>(
+      `insert into billing_payment_methods
+         (artisan_id, stripe_customer_id, stripe_payment_method_id, brand, last4, exp_month, exp_year, is_default, consented_at)
+       values ($1,'cus_evt','pm_evt_audit','amex','0005',3,2029,false,now())
+       returning id`,
+      [ARTISAN_ID],
+    );
+    const pmEvtId = rows[0]!.id;
+
+    const tok = await jwt(UID);
+    const res = await injectTrpc(app, "POST", "billing.revokePaymentMethod", { paymentMethodId: pmEvtId }, tok);
+    expect(res.statusCode).toBe(200);
+
+    const { rows: evts } = await admin.query<{ entity_id: number; event_type: string; actor: string }>(
+      "select entity_id, event_type, actor from billing_events where entity_id=$1 and event_type='payment_method.revoked'",
+      [pmEvtId],
+    );
+    expect(evts).toHaveLength(1);
+    expect(evts[0]!.actor).toBe(`user:${UID}`);
+  });
 });

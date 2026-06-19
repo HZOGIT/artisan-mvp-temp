@@ -73,6 +73,14 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 18 — 2026-06-19
+**Cible :** L2 (1 test) + L3 (1 test) — shape de createCycle et audit trail event
+**Cas ajoutés (2) :**
+- L2 : `createCycle` shape complète — `amount_cents`, `currency`, `period_start`, `period_end` vérifiés à DB réel ; seuls `id`, `status`, `subscription_id` étaient assertés ; le scheduler Phase 2 lit ces 4 champs pour charger le bon montant sur la bonne période (piège coercition Drizzle dates). Note : cycle marqué 'paid' en fin de test car `saveSubscription` utilise `onConflictDoUpdate` → sub.id réutilisé par tous les tests sur artisan B.
+- L3 : `revokePaymentMethod` → event `payment_method.revoked` persisté en DB (audit trail complet) — les tests précédents vérifiaient 200 + PM disparaît de getBillingInfo, mais pas que `appendEvent` a écrit en DB ; teste la chaîne HTTP → use-case → repo → `billing_events`
+**Résultat :** L2 24/24 ✅ · L3 10/10 ✅
+**Total billing :** 104 tests (102 → 104)
+
 ### Itération 17 — 2026-06-19
 **Cible :** L2 (1 test) + L3 (1 test) — ordering et shape HTTP non assertés
 **Cas ajoutés (2) :**
