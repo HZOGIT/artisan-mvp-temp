@@ -1,4 +1,5 @@
 import type { StripePort } from "../../../shared/ports/stripe";
+import type { AppLogger } from "../../../shared/ports/logger";
 import {
   artisanIdFromMetadata,
   mapSubscriptionUpsert,
@@ -17,6 +18,7 @@ export interface StripeWebhookDeps {
   readonly notifier: SubscriptionEventNotifier;
   readonly webhookSecret: string;
   readonly appUrl: string;
+  readonly log?: AppLogger;
 }
 
 /** Résultat HTTP du traitement (le routeur le mappe en réponse Fastify). `body` est sérialisé JSON. */
@@ -53,6 +55,8 @@ export async function processStripeWebhook(
 
   if (event.id.startsWith("evt_test_")) return { http: 200, body: { verified: true } };
 
+  deps.log?.info({ event: "stripe_webhook_received", stripeEvent: event.type, eventId: event.id }, `Stripe webhook: ${event.type}`);
+
   try {
     if (SUBSCRIPTION_UPSERT.has(event.type)) {
       await handleUpsert(deps, event.data.object);
@@ -71,7 +75,8 @@ export async function processStripeWebhook(
     }
     /** Tous les events legacy sont désormais gérés (abonnement + paiement/facture + invoice + trial). */
     return { http: 200, body: { received: true } };
-  } catch {
+  } catch (e) {
+    deps.log?.error({ event: "stripe_webhook_handler_error", stripeEvent: event.type, error: e instanceof Error ? e.message : String(e) }, "Stripe webhook handler failed");
     return { http: 500, body: { error: "Webhook handler failed" } };
   }
 }
@@ -88,12 +93,14 @@ async function handleUpsert(deps: StripeWebhookDeps, sub: Record<string, unknown
   /** artisanId introuvable → skip (parité legacy) */
   if (!artisanId) return;
   await deps.writer.applyUpsert(artisanId, mapSubscriptionUpsert(sub));
+  deps.log?.info({ event: "stripe_subscription_upserted", artisanId, status: sub.status }, `Abonnement Stripe mis à jour (artisan ${artisanId})`);
 }
 
 async function handleDeleted(deps: StripeWebhookDeps, sub: Record<string, unknown>): Promise<void> {
   const artisanId = await resolveArtisanId(deps, sub);
   if (!artisanId) return;
   await deps.writer.applyDeleted(artisanId, deletedUpsertFields());
+  deps.log?.warn({ event: "stripe_subscription_deleted", artisanId }, `Abonnement Stripe annulé (artisan ${artisanId})`);
 }
 
 /*
@@ -113,6 +120,7 @@ async function handleCheckoutCompleted(deps: StripeWebhookDeps, session: Record<
     factureId: resolved.factureId,
     stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : "",
   });
+  deps.log?.info({ event: "stripe_checkout_completed", artisanId: resolved.artisanId, factureId: resolved.factureId }, `Paiement portail complété (artisan ${resolved.artisanId})`);
 }
 
 /** `payment_intent.payment_failed` (parité legacy) : paiement par token → echoue. */
@@ -123,14 +131,15 @@ async function handlePaymentFailed(deps: StripeWebhookDeps, pi: Record<string, u
   const resolved = await deps.paymentWriter.resolvePaiement(token);
   if (!resolved) return;
   await deps.paymentWriter.failPaiement({ artisanId: resolved.artisanId, paiementId: resolved.paiementId });
+  deps.log?.warn({ event: "stripe_payment_failed", artisanId: resolved.artisanId, paiementId: resolved.paiementId }, `Paiement Stripe échoué (artisan ${resolved.artisanId})`);
 }
 
 /** Notifs/emails best-effort : ne JAMAIS faire échouer le webhook (parité legacy). */
-async function bestEffort(fn: () => Promise<void>): Promise<void> {
+async function bestEffort(fn: () => Promise<void>, log?: AppLogger, context?: string): Promise<void> {
   try {
     await fn();
-  } catch {
-    /* best-effort */
+  } catch (e) {
+    log?.warn({ event: "stripe_best_effort_error", context, error: e instanceof Error ? e.message : String(e) }, `Erreur best-effort webhook Stripe${context ? ` (${context})` : ""}`);
   }
 }
 
@@ -147,6 +156,7 @@ async function handleInvoicePaid(deps: StripeWebhookDeps, invoice: Record<string
 
   const sub = await deps.stripe.retrieveSubscription(subscriptionId);
   await deps.writer.setStatusAndPeriod(artisanId, { status: "active", currentPeriodStart: sub.currentPeriodStart, currentPeriodEnd: sub.currentPeriodEnd });
+  deps.log?.info({ event: "stripe_invoice_paid", artisanId, subscriptionId }, `Renouvellement abonnement encaissé (artisan ${artisanId})`);
 
   await bestEffort(async () => {
     const periodLabel = sub.currentPeriodEnd ? sub.currentPeriodEnd.toLocaleDateString("fr-FR") : "—";
@@ -155,7 +165,7 @@ async function handleInvoicePaid(deps: StripeWebhookDeps, invoice: Record<string
       "Paiement confirme — Bienvenue sur Operioz",
       subscriptionEmail({ title: "Paiement confirme", body: `Merci ! Votre abonnement Operioz est actif. Prochain renouvellement le ${periodLabel}.`, ctaLabel: "Acceder a mon espace", ctaUrl: `${deps.appUrl}/dashboard` }),
     );
-  });
+  }, deps.log, "invoice_paid_email");
 }
 
 /** `invoice.payment_failed` (parité legacy) : facture d'abonnement → past_due + notif erreur + email. */
@@ -167,6 +177,7 @@ async function handleInvoiceFailed(deps: StripeWebhookDeps, invoice: Record<stri
   if (!artisanId) return;
 
   await deps.writer.setStatus(artisanId, "past_due");
+  deps.log?.warn({ event: "stripe_invoice_failed", artisanId, subscriptionId }, `Paiement abonnement échoué → past_due (artisan ${artisanId})`);
   await bestEffort(async () => {
     await deps.notifier.notifyArtisan(artisanId, { type: "erreur", titre: "Paiement echoue", message: "Votre dernier paiement Operioz a echoue. Mettez a jour votre carte pour eviter la suspension.", lien: "/parametres?tab=abonnement" });
     await deps.notifier.emailArtisanOwner(
@@ -174,7 +185,7 @@ async function handleInvoiceFailed(deps: StripeWebhookDeps, invoice: Record<stri
       "Probleme de paiement — Action requise",
       subscriptionEmail({ title: "Echec de paiement", body: "Le paiement de votre abonnement Operioz n'a pas pu etre effectue. Merci de mettre a jour votre moyen de paiement sous 7 jours pour eviter une suspension du service.", ctaLabel: "Mettre a jour ma carte", ctaUrl: `${deps.appUrl}/parametres?tab=abonnement` }),
     );
-  });
+  }, deps.log, "invoice_failed_notif");
 }
 
 /** `customer.subscription.trial_will_end` (parité legacy, J-3) : notif info + email rappel (best-effort). */
