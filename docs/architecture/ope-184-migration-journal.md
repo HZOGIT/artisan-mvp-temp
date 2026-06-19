@@ -8,12 +8,12 @@
 - **Déploiement** : à chaque itération déployable → commit sur `staging`, `git push origin staging`, puis `task staging:deploy`. Cible : **staging uniquement** (`staging.operioz.com`), prod intouchée.
 - **Politique d'échec** : si tests rouges / deploy KO / migration KO → **notifier + s'arrêter** (PAS de rollback auto, PAS de modif d'état). L'humain inspecte.
 - **Cadence** : événementielle (reprise à la complétion du travail de fond) + **fallback 5 min / 300 s** (ScheduleWakeup) — demandé par l'humain le 2026-06-13.
-- **Notification** : `curl https://ntfy.sh/operioz-claude-code-2026` (topic **PUBLIC** → aucune donnée sensible, seulement état/refs/liens). Helper : `devtools/agents/ntfy-pub.sh "<titre>" "<msg>" [tags]`.
+- **Notification** : `curl https://ntfy.sh/operioz-claude-code-2026` (topic **PUBLIC** → aucune donnée sensible, seulement état/refs/liens). Helper : `scripts/agents/ntfy-pub.sh "<titre>" "<msg>" [tags]`.
 - **DB cible** : PostgreSQL **18**. ORM : Drizzle (dialect `pg`). Tests : Vitest + PG18 jetable (Testcontainers).
 - **Tests** : refonte des anciens tests sprint en tests alignés clean archi (unit par use-case + e2e sur PG18) au fil des domaines.
 
 ## Commandes utiles
-- Notifier : `./devtools/agents/ntfy-pub.sh "Titre" "Message" tag`
+- Notifier : `./scripts/agents/ntfy-pub.sh "Titre" "Message" tag`
 - Déployer staging : `task staging:deploy`
 - Migrations : `task db:migrate` / `task db:generate`
 - Tests : `pnpm test`

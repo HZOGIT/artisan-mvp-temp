@@ -26,9 +26,9 @@ Une itération **avance la colonne d'UNE feature** (1 à 3 fichiers ; grosse fea
 ## Canaux de documentation (4)
 1. **Journal** (ce fichier) — log d'itérations en bas.
 2. **Linear** — issue de suivi **OPE-318** (commentaires par itération/jalon).
-3. **ntfy** — `devtools/agents/ntfy-pub.sh` (topic public `operioz-claude-code-2026`).
-4. **Bus inter-agents** — `devtools/agents/notify.sh` (→ human).
-   → Helper unique pour 1+3+4 : `devtools/testing-loop/broadcast.sh <tag> <titre> <message>`.
+3. **ntfy** — `scripts/agents/ntfy-pub.sh` (topic public `operioz-claude-code-2026`).
+4. **Bus inter-agents** — `scripts/agents/notify.sh` (→ human).
+   → Helper unique pour 1+3+4 : `scripts/testing-loop/broadcast.sh <tag> <titre> <message>`.
 
 ## Runbook d'une itération (idempotent)
 ```bash
@@ -36,7 +36,7 @@ cd /home/developer/artisan-mvp-temp
 export DOCKER_HOST=${DOCKER_HOST:-unix:///run/user/1001/docker.sock}
 export DATABASE_URL="postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp"  # PG local bootstrappé (app_tenant + RLS)
 git fetch origin && git rebase origin/staging      # se resynchroniser (coordination multi-agents)
-./devtools/agents/listen.sh ope-316-spike-testing --drain   # lire mes messages, agir si besoin
+./scripts/agents/listen.sh ope-316-spike-testing --drain   # lire mes messages, agir si besoin
 ```
 1. **Prendre la FEATURE en tête du backlog critique** (cf. « Backlog par criticité ») et identifier le
    **niveau de colonne manquant le plus prioritaire** (L2 RLS / L3 router / L1 / L4). Vérifier qu'aucun
@@ -50,12 +50,12 @@ git fetch origin && git rebase origin/staging      # se resynchroniser (coordina
    - Rouge à cause du test → corriger le test.
    - Rouge à cause d'un **vrai bug** dans `src/` → fix **minimal**, le signaler (tag `fix`), et **déployer**.
 4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante.
-5. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (ajoute aussi la ligne
+5. **Diffuser** : `./scripts/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (ajoute aussi la ligne
    de log au journal — d'où l'ordre : broadcast AVANT le commit, pour éviter un arbre sale au prochain rebase).
 6. **Commit UNIQUE** (scope strict : `git add <mes test(s)> docs/testing/journal-tests-manquants.md`,
    **jamais** `-A`) sur `staging`, puis push + RE-VÉRIFIER `origin/staging`.
    Message : `test(<module>): <quoi>` + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-7. **Déployer** sur staging **uniquement si un fix `src/` a été livré** : `./devtools/deploy-staging-newstack.sh`.
+7. **Déployer** sur staging **uniquement si un fix `src/` a été livré** : `./scripts/deploy-staging-newstack.sh`.
    (Un ajout de test pur ne change pas le runtime → pas de déploiement.)
 8. **Créer l'issue Linear** enfant de OPE-318 (« test(<module>): … », Done).
 

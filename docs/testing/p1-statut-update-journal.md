@@ -66,7 +66,7 @@ Règle CLAUDE.md ajoutée : tout fix livre un test e2e/anti-régression persista
 6. **Vérifier la repro au VRAI navigateur** (`./scripts/pw-run.sh`) : changer le statut d'un devis/facture
    sur https://staging.operioz.com, confirmer que le statut **persiste** après refetch. Puis rejouer
    `./scripts/pw-run.sh scripts/staging-e2e-sweep.mjs` (0 issue attendu).
-7. Mettre à jour ce journal (état du module = ✅) + ntfy (`devtools/agents/ntfy-pub.sh`).
+7. Mettre à jour ce journal (état du module = ✅) + ntfy (`scripts/agents/ntfy-pub.sh`).
 
 ## Invariants à préserver
 Machine à états (transitions valides, Conflict 409 si invalide), intégrité financière (numérotation,

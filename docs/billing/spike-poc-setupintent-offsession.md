@@ -141,7 +141,7 @@ sequenceDiagram
 
 ## 6. Harnais de validation (prêt à exécuter sur sandbox)
 
-À placer en `devtools/poc/setupintent-offsession.ts`, lancé avec `STRIPE_SECRET_KEY` de test
+À placer en `scripts/poc/setupintent-offsession.ts`, lancé avec `STRIPE_SECRET_KEY` de test
 (**hors `src/`** : c'est un PoC jetable, pas du code applicatif — cf. mission « ne rien coder »
 dans `src/`). Squelette :
 

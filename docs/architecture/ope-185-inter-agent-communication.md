@@ -1,7 +1,7 @@
 # OPE-185 — Communication inter-agents (Agentic Factory)
 
 > **Statut** : proposition + PoC fonctionnel (2026-06-12)
-> **Scripts** : [`devtools/agents/`](../../devtools/agents/)
+> **Scripts** : [`scripts/agents/`](../../scripts/agents/)
 > **Contrainte forte** : la communication doit être **sécurisée** — pas de canal
 > public en clair.
 > **Auteur** : session `ope-185-inter-agent-comm` (Claude Code 2.1.175)
@@ -231,16 +231,16 @@ premier plan**, par défense en profondeur :
 
 ## 6. Scripts helpers
 
-Tous dans [`devtools/agents/`](../../devtools/agents/) :
+Tous dans [`scripts/agents/`](../../scripts/agents/) :
 
 | Script | Rôle |
 |---|---|
-| [`notify.sh`](../../devtools/agents/notify.sh) | `notify.sh [--no-wake] <to> <type> <payload…>` — dépose le message (inbox+log durables), puis **réveille** : transport `file` → `screen -X stuff` (recette `\r`) ; transport `ntfy` → publie **chiffré+authentifié**. Push humain sur `human`/`ALERT`. |
-| [`listen.sh`](../../devtools/agents/listen.sh) | `listen.sh <agent> [--drain\|--once\|--follow\|--peek]` — lit la boîte. `--drain` (défaut) : vide+archive et sort ; `--once` : bloque jusqu'à 1 msg ; `--follow` : boucle bloquante ; `--peek` : lecture seule. |
-| [`ntfy-inbox-bridge.sh`](../../devtools/agents/ntfy-inbox-bridge.sh) | Pont **sécurisé** ntfy→screen (1 par agent) : abonnement authentifié, **backfill `since=<id>` + dédup** (zéro perte), **déchiffrement E2E**, puis réveil du TUI (texte+`\r`). |
-| [`agents-status.sh`](../../devtools/agents/agents-status.sh) | Liste les screens actifs (nom, pid, état, démarrage) + messages en attente par inbox + inbox orphelines. |
-| [`_bus_common.sh`](../../devtools/agents/_bus_common.sh) | Helpers partagés : chemins, perms `700/600`, identité, JSON, **`bus_encrypt`/`bus_decrypt`** (AES-256). Sourcé. |
-| [`poc-demo.sh`](../../devtools/agents/poc-demo.sh) | PoC auto-contenu : 3 mini-agents relaient un message. |
+| [`notify.sh`](../../scripts/agents/notify.sh) | `notify.sh [--no-wake] <to> <type> <payload…>` — dépose le message (inbox+log durables), puis **réveille** : transport `file` → `screen -X stuff` (recette `\r`) ; transport `ntfy` → publie **chiffré+authentifié**. Push humain sur `human`/`ALERT`. |
+| [`listen.sh`](../../scripts/agents/listen.sh) | `listen.sh <agent> [--drain\|--once\|--follow\|--peek]` — lit la boîte. `--drain` (défaut) : vide+archive et sort ; `--once` : bloque jusqu'à 1 msg ; `--follow` : boucle bloquante ; `--peek` : lecture seule. |
+| [`ntfy-inbox-bridge.sh`](../../scripts/agents/ntfy-inbox-bridge.sh) | Pont **sécurisé** ntfy→screen (1 par agent) : abonnement authentifié, **backfill `since=<id>` + dédup** (zéro perte), **déchiffrement E2E**, puis réveil du TUI (texte+`\r`). |
+| [`agents-status.sh`](../../scripts/agents/agents-status.sh) | Liste les screens actifs (nom, pid, état, démarrage) + messages en attente par inbox + inbox orphelines. |
+| [`_bus_common.sh`](../../scripts/agents/_bus_common.sh) | Helpers partagés : chemins, perms `700/600`, identité, JSON, **`bus_encrypt`/`bus_decrypt`** (AES-256). Sourcé. |
+| [`poc-demo.sh`](../../scripts/agents/poc-demo.sh) | PoC auto-contenu : 3 mini-agents relaient un message. |
 
 **Variables d'environnement**
 
@@ -273,13 +273,13 @@ bus de messages **sécurisé** (`~/.agent-bus/`, local par défaut). Ton nom
 d'agent = le nom de ta session screen (auto-détecté).
 
 ### Envoyer un message
-    ./devtools/agents/notify.sh <destinataire> <TYPE> "<message>"
-Ex. : ./devtools/agents/notify.sh unit-tests TASK_DELEGATE "Module auth fini sur feat/auth, écris les tests unitaires."
+    ./scripts/agents/notify.sh <destinataire> <TYPE> "<message>"
+Ex. : ./scripts/agents/notify.sh unit-tests TASK_DELEGATE "Module auth fini sur feat/auth, écris les tests unitaires."
 Le destinataire `human` notifie l'humain.
 
 ### Recevoir un message
 Quand on te réveille avec « 📨 [agent-bus] Nouveau message… », lis ta boîte :
-    ./devtools/agents/listen.sh <ton-nom> --drain
+    ./scripts/agents/listen.sh <ton-nom> --drain
 Chaque message est une ligne JSON {from,to,type,payload,timestamp}. Agis selon
 le TYPE, puis, si une étape suivante existe, renotifie l'agent concerné.
 
@@ -289,7 +289,7 @@ REQUEST_REVIEW (relis/valide) · BLOCKED (je suis bloqué) · ALERT (incident) �
 ACK (accusé de réception, optionnel).
 
 ### Superviser
-    ./devtools/agents/agents-status.sh   # agents actifs + messages en attente
+    ./scripts/agents/agents-status.sh   # agents actifs + messages en attente
 
 ### Sécurité
 Par défaut tout reste LOCAL (aucun réseau ; ~/.agent-bus en chmod 700). Le mode
@@ -298,11 +298,11 @@ jamais un ntfy public en clair.
 
 ### Exemple de délégation (chaîne type)
 1. feature-dev finit de coder :
-   ./devtools/agents/notify.sh unit-tests TASK_DONE "feature X mergée sur feat/x"
+   ./scripts/agents/notify.sh unit-tests TASK_DONE "feature X mergée sur feat/x"
 2. unit-tests (réveillé) écrit les tests, puis :
-   ./devtools/agents/notify.sh qa-browser REQUEST_REVIEW "tests prêts pour feature X"
+   ./scripts/agents/notify.sh qa-browser REQUEST_REVIEW "tests prêts pour feature X"
 3. qa-browser fait le QA navigateur, puis prévient l'humain :
-   ./devtools/agents/notify.sh human TASK_DONE "QA OK sur feature X, prêt à merger"
+   ./scripts/agents/notify.sh human TASK_DONE "QA OK sur feature X, prêt à merger"
 ```
 
 ---
@@ -312,7 +312,7 @@ jamais un ntfy public en clair.
 ### 8.1 PoC automatisé (3 agents, transport file, ~10 s)
 
 ```bash
-./devtools/agents/poc-demo.sh
+./scripts/agents/poc-demo.sh
 ```
 
 Lance 3 mini-agents `screen`, déclenche
@@ -328,9 +328,9 @@ PoC OK ✅  — message delivered across 3 agents.
 ### 8.2 Réveil d'un vrai TUI Claude (transport file)
 
 ```bash
-./devtools/launch-claude-bg.sh demo-agent claude-haiku-4-5-20251001
+./scripts/launch-claude-bg.sh demo-agent claude-haiku-4-5-20251001
 sleep 12
-./devtools/agents/notify.sh demo-agent TASK_DELEGATE \
+./scripts/agents/notify.sh demo-agent TASK_DELEGATE \
   "Crée le fichier /tmp/preuve.txt contenant OK, directement."
 sleep 20
 cat /tmp/preuve.txt           # -> OK   (réveil + action validés)
@@ -349,20 +349,20 @@ export AGENT_BUS_NTFY_TOKEN=tk_xxx
 export AGENT_BUS_SECRET="clé-pré-partagée-longue"
 export AGENT_BUS_NTFY_PREFIX=agentic-factory
 # un bridge par agent récepteur :
-screen -dmS bridge-unit-tests ./devtools/agents/ntfy-inbox-bridge.sh unit-tests
+screen -dmS bridge-unit-tests ./scripts/agents/ntfy-inbox-bridge.sh unit-tests
 # émission (chiffrée + authentifiée) :
-./devtools/agents/notify.sh unit-tests TASK_DELEGATE "tests à écrire pour feat/x"
+./scripts/agents/notify.sh unit-tests TASK_DELEGATE "tests à écrire pour feat/x"
 ```
 
 ### 8.4 Test minimal du transport local (sans réveil) + sécurité
 
 ```bash
-AGENT_NAME=alice ./devtools/agents/notify.sh --no-wake bob TASK_DELEGATE "ping"
-./devtools/agents/listen.sh bob --drain        # affiche le JSON puis archive
+AGENT_NAME=alice ./scripts/agents/notify.sh --no-wake bob TASK_DELEGATE "ping"
+./scripts/agents/listen.sh bob --drain        # affiche le JSON puis archive
 # refus attendu d'un ntfy public :
 AGENT_BUS_TRANSPORT=ntfy AGENT_BUS_NTFY_URL=https://ntfy.sh \
 AGENT_BUS_NTFY_PREFIX=x AGENT_BUS_NTFY_TOKEN=tk AGENT_BUS_SECRET=k \
-  ./devtools/agents/notify.sh bob ALERT "x"    # -> ERROR: refusing public ntfy.sh
+  ./scripts/agents/notify.sh bob ALERT "x"    # -> ERROR: refusing public ntfy.sh
 ```
 
 ---

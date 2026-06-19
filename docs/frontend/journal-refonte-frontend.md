@@ -115,7 +115,7 @@ dans le rapport + ntfy. Mesuré : ~6-7 min/itération (sweep par route).
 cd /home/developer/artisan-mvp-temp
 git fetch origin && git rebase origin/staging || true     # resync ; en cas de conflit sur un fichier
                                                           # d'un autre agent → garder SES versions, que les miennes
-./devtools/agents/listen.sh ope-403-refonte-frontend --drain
+./scripts/agents/listen.sh ope-403-refonte-frontend --drain
 ```
 1. **Choisir la cible** = en tête du backlog ci-dessous (vague courante). Le périmètre d'une itération
    est **à ta main** : 1 page simple, ou 1 slice d'une page complexe (liste → détail → formulaire).
@@ -178,14 +178,14 @@ git fetch origin && git rebase origin/staging || true     # resync ; en cas de c
    `pnpm exec eslint -c eslint.client.config.mjs client/src/modern | grep -c no-trpc-in-ui` (doit décroître).
 4. **Mettre à jour ce journal** : cocher la cible, fixer la suivante, noter tout split/blocage **+ consigner
    le résultat de l'audit 3bis** (les 6 cases).
-5. **Diffuser** : `./devtools/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (journal+ntfy+bus).
+5. **Diffuser** : `./scripts/testing-loop/broadcast.sh <tag> "<titre>" "<message>"` (journal+ntfy+bus).
    **Le message DOIT inclure un % de progression** (demande humaine) — format `📊 X% (N/M pages)` où
    `N` = pages migrées, `M` = total legacy. Calcul :
    `N=$(ls client/src/modern/features/*/ui/*-page.tsx | grep -v _demo | wc -l)`,
    `M=$(ls client/src/pages/*.tsx | wc -l)`, `X=$((N*100/M))`.
 6. **Commit UNIQUE chirurgical** (`git add <mes chemins>`) → `git push origin staging` → **re-vérifier
    `origin/staging`**. Message `feat(front-v2): <quoi>` + `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
-7. **Déployer le SPA** si le bundle a changé (page migrée) : `./devtools/deploy-staging-pages.sh`.
+7. **Déployer le SPA** si le bundle a changé (page migrée) : `./scripts/deploy-staging-pages.sh`.
    (Squelette/tsconfig/test pur → pas de déploiement.)
 8. **Linear** : commentaire « migré: <page> ✅ » sur l'issue de la vague (OPE-421→424).
 
@@ -1046,7 +1046,7 @@ commandes · stocks · depenses · comptabilite · signature · paiement. Puis *
 2. Dette batchée : e2e mutation (modal édition Clients).
 3. Enrichir le gate ESLint v2 au fil des specs (ex. interdire `@/components/*` hors UI, imports relatifs profonds, etc.).
 
-> Note coordination boucle : pilotée par **CronCreate natif Claude** (job `834543d1`, toutes les 2 min, session-only → vit tant que le screen `ope-403-refonte-frontend` tourne). Le daemon bash `devtools/refonte-loop/*` est **désactivé** (ne pas le relancer).
+> Note coordination boucle : pilotée par **CronCreate natif Claude** (job `834543d1`, toutes les 2 min, session-only → vit tant que le screen `ope-403-refonte-frontend` tourne). Le daemon bash `scripts/refonte-loop/*` est **désactivé** (ne pas le relancer).
 
 ---
 

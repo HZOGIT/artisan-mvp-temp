@@ -10,7 +10,7 @@
 
 Operioz dispose **déjà** d'un embryon d'usine à agents qui fonctionne en production de fait :
 des sessions Claude Code détachées dans `screen`, lancées par un script
-(`devtools/launch-claude-bg.sh`), pilotées par prompts (`devtools/prompts/`), coordonnées via
+(`scripts/launch-claude-bg.sh`), pilotées par prompts (`scripts/prompts/`), coordonnées via
 **Linear** (1 équipe, 7+ projets), et déjà productives — **317 documents d'audit** générés et
 des correctifs poussés directement sur `staging`. Un mécanisme de **routines planifiées**
 (« cron toutes les 7 min », projet Odoo benchmark) tourne via une session Claude longue durée.
@@ -42,7 +42,7 @@ humaine avant tout merge. Plan en 4 phases ci-dessous.
 
 ### 2.1 Infrastructure d'agents
 
-**Script de lancement — `devtools/launch-claude-bg.sh`**
+**Script de lancement — `scripts/launch-claude-bg.sh`**
 Lance une session Claude Code détachée dans `screen`, survivant au shell parent :
 
 ```
@@ -70,7 +70,7 @@ détient `scheduled_tasks.lock` et `~/.claude/tasks/<session>/`. C'est ce qui fa
 benchmark Odoo « toutes les 7 min ». **Conséquence importante** : si la session `operioz` meurt,
 toutes les routines s'arrêtent silencieusement — point de défaillance unique non supervisé.
 
-**Prompts d'agents — `devtools/prompts/`** : un fichier markdown par mission
+**Prompts d'agents — `scripts/prompts/`** : un fichier markdown par mission
 (`ope-184-stack-analysis.md`, `agentic-factory-etat-des-lieux.md`). Convention naissante :
 prompt = spec de mission. Pas encore de prompts « rôle » réutilisables (un par domaine).
 
@@ -236,7 +236,7 @@ nouvelle plateforme.
                                        │
         ┌──────────────────────────────┴──────────────────────────────┐
         │                    ORCHESTRATEUR (superviseur)                │
-        │  devtools/orchestrator/                                       │
+        │  scripts/orchestrator/                                       │
         │  - registre des agents (registry.json)                       │
         │  - health-check + restart screen morts                       │
         │  - dispatch des issues Linear "Ready" → agent owner          │
@@ -278,9 +278,9 @@ Les agents codeurs par domaine (compta, techniciens, notifications…) ne sont a
 Raison : `screen` + `launch-claude-bg.sh` marchent déjà et chaque agent EST un processus Claude
 longue durée. Plutôt qu'ajouter `supervisord`/`systemd`, on écrit un **orchestrateur Node/bash**
 qui :
-1. lit `devtools/agents/<name>/agent.yaml` (modèle, prompt rôle, domaine, droits) ;
+1. lit `scripts/agents/<name>/agent.yaml` (modèle, prompt rôle, domaine, droits) ;
 2. (re)lance les sessions `screen` manquantes via `launch-claude-bg.sh` ;
-3. tient un **registre** `devtools/orchestrator/registry.json` (agent, pid, branche, worktree,
+3. tient un **registre** `scripts/orchestrator/registry.json` (agent, pid, branche, worktree,
    issue en cours, dernière activité) ;
 4. tourne lui-même comme une **routine planifiée** (le mécanisme « cron 7 min » déjà utilisé) au
    lieu de dépendre d'une session interactive non supervisée.
@@ -324,7 +324,7 @@ JSON suffisent jusqu'à ~10 agents.
 ### 4.6 Structure de dossiers de la factory
 
 ```
-devtools/
+scripts/
 ├── launch-claude-bg.sh          # existant — réutilisé
 ├── prompts/                     # existant — specs de mission ponctuelles
 ├── agents/                      # NOUVEAU — un dossier par agent
@@ -362,7 +362,7 @@ devtools/
    bloquants + la barrière PR (l'autonomie s'exerce dans le worktree, pas sur les branches cibles).
 
 > **Next steps — Architecture**
-> 1. Écrire `devtools/factory/OWNERSHIP.md`, `PROTOCOL.md`, `GUARDRAILS.md` (squelettes).
+> 1. Écrire `scripts/factory/OWNERSHIP.md`, `PROTOCOL.md`, `GUARDRAILS.md` (squelettes).
 > 2. Implémenter `supervise.mjs` minimal (registry + relance des sessions manquantes).
 > 3. Ajouter un hook `PreToolUse` qui bloque `git push origin staging|main`.
 > 4. Activer la branch protection GitHub sur `main` et `staging`.
@@ -378,7 +378,7 @@ devtools/
 - **Sortie** : impossible pour un agent de pousser/merger sans PR + revue.
 
 ### Phase 1 — Fondations factory (1-2 semaines, P0/P1)
-- `devtools/factory/` (OWNERSHIP, PROTOCOL, GUARDRAILS).
+- `scripts/factory/` (OWNERSHIP, PROTOCOL, GUARDRAILS).
 - `orchestrator/supervise.mjs` + `registry.json` + health-check/restart.
 - Agents `orchestrator` + `reviewer` opérationnels ; protocole Linear (états/labels/claim) appliqué.
 - 1 worktree de démo + 1 PR de bout en bout (claim → branche → PR → revue → merge).
