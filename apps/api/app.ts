@@ -355,8 +355,19 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     const elapsed = Math.round(reply.elapsedTime);
     const isSlow = elapsed > 1000;
     const level = reply.statusCode >= 500 ? "error" : reply.statusCode >= 400 || isSlow ? "warn" : "info";
+    const TRPC = "/api/trpc/";
+    const procedures = path.startsWith(TRPC) ? path.slice(TRPC.length).split(",") : undefined;
+    const clientIp = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.socket.remoteAddress;
     req.log[level](
-      { method: req.method, path, statusCode: reply.statusCode, responseTime: elapsed, ...(isSlow ? { event: "slow_request" } : {}) },
+      {
+        method: req.method,
+        path,
+        statusCode: reply.statusCode,
+        responseTime: elapsed,
+        clientIp,
+        ...(procedures ? { procedures } : {}),
+        ...(isSlow ? { event: "slow_request" } : {}),
+      },
       isSlow ? `SLOW ${req.method} ${path} ${reply.statusCode} (${elapsed}ms)` : `${req.method} ${path} ${reply.statusCode}`,
     );
     done();
