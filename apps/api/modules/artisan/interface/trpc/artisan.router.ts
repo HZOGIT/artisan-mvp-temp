@@ -42,6 +42,20 @@ export function createArtisanRouter(repo: IArtisanRepository) {
 
     updateProfile: protectedProcedure
       .input(updateSchema)
-      .mutation(({ ctx, input }) => updateProfile(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await updateProfile(repo, ctx.tenant, input);
+        const changedFields = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
+        ctx.log.warn(
+          {
+            event: "artisan_profile_updated",
+            changedFields,
+            siretChanged: "siret" in input && input.siret !== undefined,
+            ibanChanged: "iban" in input && input.iban !== undefined,
+            logoChanged: "logo" in input && input.logo !== undefined,
+          },
+          `Profil artisan mis à jour : ${changedFields.filter((f) => f !== "logo").join(", ")}`,
+        );
+        return result;
+      }),
   });
 }
