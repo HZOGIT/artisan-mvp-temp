@@ -20,12 +20,28 @@ export function createSubscriptionRouter(repo: ISubscriptionRepository, effectDe
 
     createCheckout: protectedProcedure
       .input(checkoutInput)
-      .mutation(({ ctx, input }) => createCheckout(effectDeps, ctx.tenant, ctx.claims?.email, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await createCheckout(effectDeps, ctx.tenant, ctx.claims?.email, input);
+        ctx.log.info({ event: "subscription_checkout_started", plan: input.plan, interval: input.interval, extraUsers: input.extraUsers }, `Checkout abonnement initié (${input.plan} ${input.interval})`);
+        return result;
+      }),
 
-    createPortal: protectedProcedure.mutation(({ ctx }) => createPortal(effectDeps, ctx.tenant)),
+    createPortal: protectedProcedure.mutation(async ({ ctx }) => {
+      const result = await createPortal(effectDeps, ctx.tenant);
+      ctx.log.info({ event: "subscription_portal_opened" }, "Portail facturation Stripe ouvert");
+      return result;
+    }),
 
-    cancel: protectedProcedure.mutation(({ ctx }) => cancelSubscription(effectDeps, ctx.tenant)),
+    cancel: protectedProcedure.mutation(async ({ ctx }) => {
+      const result = await cancelSubscription(effectDeps, ctx.tenant);
+      ctx.log.warn({ event: "subscription_cancelled" }, "Abonnement annulé");
+      return result;
+    }),
 
-    reactivate: protectedProcedure.mutation(({ ctx }) => reactivateSubscription(effectDeps, ctx.tenant)),
+    reactivate: protectedProcedure.mutation(async ({ ctx }) => {
+      const result = await reactivateSubscription(effectDeps, ctx.tenant);
+      ctx.log.info({ event: "subscription_reactivated" }, "Abonnement réactivé");
+      return result;
+    }),
   });
 }

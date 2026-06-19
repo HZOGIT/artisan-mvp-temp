@@ -45,9 +45,17 @@ const tokenInput = z.object({ token: z.string() });
 export function createClientPortalRouter(deps: ClientPortalRouterDeps) {
   return router({
     /** ── ADMIN (protégé) ── */
-    generateAccess: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).mutation(({ ctx, input }) => generateAccess(deps, ctx.tenant, input.clientId, deps.defaultOrigin)),
+    generateAccess: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const result = await generateAccess(deps, ctx.tenant, input.clientId, deps.defaultOrigin);
+      ctx.log.info({ event: "portail_access_created", clientId: input.clientId }, "Accès portail client généré");
+      return result;
+    }),
     getStatus: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).query(({ ctx, input }) => getStatus(deps, ctx.tenant, input.clientId)),
-    deactivate: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).mutation(({ ctx, input }) => deactivate(deps, ctx.tenant, input.clientId)),
+    deactivate: protectedProcedure.input(z.object({ clientId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      const result = await deactivate(deps, ctx.tenant, input.clientId);
+      ctx.log.warn({ event: "portail_access_revoked", clientId: input.clientId }, "Accès portail client révoqué");
+      return result;
+    }),
 
     /** ── PUBLIC (token) — identité + documents ── */
     verifyAccess: publicProcedure.input(tokenInput).query(({ input }) => verifyAccess(deps, input.token)),
