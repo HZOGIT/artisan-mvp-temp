@@ -267,6 +267,16 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return row ?? null;
   }
 
+  async findLastAttemptByCycleId(cycleId: number): Promise<BillingChargeAttempt | null> {
+    const [row] = await this.db
+      .select()
+      .from(billingChargeAttempts)
+      .where(eq(billingChargeAttempts.cycle_id, cycleId))
+      .orderBy(desc(billingChargeAttempts.created_at))
+      .limit(1);
+    return row ?? null;
+  }
+
   async findInvoicesByArtisan(ctx: TenantContext, limit = 24): Promise<BillingInvoice[]> {
     return this.db
       .select()

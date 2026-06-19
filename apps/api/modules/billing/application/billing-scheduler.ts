@@ -30,8 +30,8 @@ export async function chargeOffSessionForCycle(
 
   const allCycles = await deps.repo.findPendingCycle(subscriptionId);
   const cycle = allCycles?.id === cycleId ? allCycles : null;
-  if (!cycle) throw new Error(`Cycle ${cycleId} introuvable ou non-pending`);
-  if (!isDue(cycle as never, now)) return;
+  if (!cycle) return;
+  if (!isDue(cycle, now)) return;
 
   const newAttemptCount = cycle.attempt_count + 1;
   if (newAttemptCount > MAX_DUNNING_ATTEMPTS) throw new MaxAttemptsReachedError(cycleId);
@@ -50,8 +50,8 @@ export async function chargeOffSessionForCycle(
     idempotencyKey,
   });
 
-  const ctx = { artisanId, userId: 0 };
-  const pm = await deps.repo.findDefaultPaymentMethod(ctx as never);
+  const ctx = { artisanId, userId: 0 } as const;
+  const pm = await deps.repo.findDefaultPaymentMethod(ctx);
   const customerId = pm?.stripe_customer_id;
   if (!pm || !customerId) {
     await deps.repo.updateCycleStatus(cycleId, {
@@ -130,9 +130,9 @@ export async function recoverZombies(deps: SchedulerDeps): Promise<void> {
   const zombies = await deps.repo.findZombieCycles(now);
 
   for (const cycle of zombies) {
-    if (!isZombie(cycle as never, now)) continue;
+    if (!isZombie(cycle, now)) continue;
 
-    const lastAttempt = [...([] as { stripe_payment_intent_id: string | null }[])].pop();
+    const lastAttempt = await deps.repo.findLastAttemptByCycleId(cycle.id);
     const piId = lastAttempt?.stripe_payment_intent_id ?? null;
 
     if (!piId) {

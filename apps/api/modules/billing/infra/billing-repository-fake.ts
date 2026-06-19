@@ -251,6 +251,10 @@ export class FakeBillingRepository implements IBillingRepository {
     return this.chargeAttempts.findLast(a => a.stripe_payment_intent_id === paymentIntentId) ?? null;
   }
 
+  async findLastAttemptByCycleId(cycleId: number): Promise<BillingChargeAttempt | null> {
+    return this.chargeAttempts.findLast(a => a.cycle_id === cycleId) ?? null;
+  }
+
   async findStripeCustomerId(artisanId: number): Promise<string | null> {
     return this.customerIds.get(artisanId) ?? null;
   }

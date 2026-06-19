@@ -9,34 +9,34 @@ export type CycleStatus =
 
 export interface BillingCycle {
   readonly id: number;
-  readonly subscriptionId: number;
-  readonly periodStart: Date;
-  readonly periodEnd: Date;
-  readonly amountCents: number;
+  readonly subscription_id: number;
+  readonly period_start: Date;
+  readonly period_end: Date;
+  readonly amount_cents: number;
   readonly currency: string;
-  readonly status: CycleStatus;
-  readonly chargingStartedAt: Date | null;
-  readonly attemptCount: number;
-  readonly nextRetryAt: Date | null;
-  readonly paidAt: Date | null;
-  readonly failedAt: Date | null;
-  readonly createdAt: Date;
-  readonly updatedAt: Date;
+  readonly status: string;
+  readonly charging_started_at: Date | null;
+  readonly attempt_count: number;
+  readonly next_retry_at: Date | null;
+  readonly paid_at: Date | null;
+  readonly failed_at: Date | null;
+  readonly created_at: Date;
+  readonly updated_at: Date;
 }
 
 const ZOMBIE_THRESHOLD_MS = 15 * 60 * 1000;
 
 /** Un cycle est zombie si bloqué en `charging` depuis plus de 15 min (PI perdu, timeout réseau). */
 export function isZombie(cycle: BillingCycle, now: Date): boolean {
-  if (cycle.status !== "charging" || !cycle.chargingStartedAt) return false;
-  return now.getTime() - cycle.chargingStartedAt.getTime() > ZOMBIE_THRESHOLD_MS;
+  if (cycle.status !== "charging" || !cycle.charging_started_at) return false;
+  return now.getTime() - cycle.charging_started_at.getTime() > ZOMBIE_THRESHOLD_MS;
 }
 
 /** Le cycle doit être prélevé maintenant (pending ou failed avec retry échu). */
 export function isDue(cycle: BillingCycle, now: Date): boolean {
   if (cycle.status === "pending") return true;
-  if (cycle.status === "failed" && cycle.nextRetryAt !== null) {
-    return now >= cycle.nextRetryAt;
+  if (cycle.status === "failed" && cycle.next_retry_at !== null) {
+    return now >= cycle.next_retry_at!;
   }
   return false;
 }

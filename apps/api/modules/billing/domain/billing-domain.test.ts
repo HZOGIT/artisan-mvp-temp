@@ -49,19 +49,19 @@ describe("plan — fonctions pures", () => {
 
 const baseCycle = (over: Partial<BillingCycle> = {}): BillingCycle => ({
   id: 1,
-  subscriptionId: 10,
-  periodStart: new Date("2026-06-01"),
-  periodEnd: new Date("2026-07-01"),
-  amountCents: 2900,
+  subscription_id: 10,
+  period_start: new Date("2026-06-01"),
+  period_end: new Date("2026-07-01"),
+  amount_cents: 2900,
   currency: "eur",
   status: "pending",
-  chargingStartedAt: null,
-  attemptCount: 0,
-  nextRetryAt: null,
-  paidAt: null,
-  failedAt: null,
-  createdAt: new Date("2026-06-01"),
-  updatedAt: new Date("2026-06-01"),
+  charging_started_at: null,
+  attempt_count: 0,
+  next_retry_at: null,
+  paid_at: null,
+  failed_at: null,
+  created_at: new Date("2026-06-01"),
+  updated_at: new Date("2026-06-01"),
   ...over,
 });
 
@@ -75,29 +75,29 @@ describe("isZombie", () => {
   it("false si charging mais < 15 min", () => {
     const started = new Date();
     const now = new Date(started.getTime() + 14 * 60 * 1000);
-    expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: started }), now)).toBe(false);
+    expect(isZombie(baseCycle({ status: "charging", charging_started_at: started }), now)).toBe(false);
   });
 
   it("true si charging depuis > 15 min", () => {
     const started = new Date();
     const now = new Date(started.getTime() + 16 * 60 * 1000);
-    expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: started }), now)).toBe(true);
+    expect(isZombie(baseCycle({ status: "charging", charging_started_at: started }), now)).toBe(true);
   });
 
-  it("false si charging sans chargingStartedAt (donnée corrompue)", () => {
-    expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: null }), new Date())).toBe(false);
+  it("false si charging sans charging_started_at (donnée corrompue)", () => {
+    expect(isZombie(baseCycle({ status: "charging", charging_started_at: null }), new Date())).toBe(false);
   });
 
   it("false à EXACTEMENT 15 min (seuil strict `>`, non `>=`)", () => {
     const started = new Date("2026-06-01T12:00:00.000Z");
     const exact15 = new Date(started.getTime() + 15 * 60 * 1000);
-    expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: started }), exact15)).toBe(false);
+    expect(isZombie(baseCycle({ status: "charging", charging_started_at: started }), exact15)).toBe(false);
   });
 
   it("true à 15 min + 1 ms (juste après le seuil)", () => {
     const started = new Date("2026-06-01T12:00:00.000Z");
     const justAfter = new Date(started.getTime() + 15 * 60 * 1000 + 1);
-    expect(isZombie(baseCycle({ status: "charging", chargingStartedAt: started }), justAfter)).toBe(true);
+    expect(isZombie(baseCycle({ status: "charging", charging_started_at: started }), justAfter)).toBe(true);
   });
 });
 
@@ -123,21 +123,21 @@ describe("isDue", () => {
 
   it("true si failed et nextRetryAt échu", () => {
     const past = new Date(Date.now() - 1000);
-    expect(isDue(baseCycle({ status: "failed", nextRetryAt: past }), new Date())).toBe(true);
+    expect(isDue(baseCycle({ status: "failed", next_retry_at: past }), new Date())).toBe(true);
   });
 
   it("false si failed mais nextRetryAt dans le futur", () => {
     const future = new Date(Date.now() + 60_000);
-    expect(isDue(baseCycle({ status: "failed", nextRetryAt: future }), new Date())).toBe(false);
+    expect(isDue(baseCycle({ status: "failed", next_retry_at: future }), new Date())).toBe(false);
   });
 
   it("false si failed sans nextRetryAt (abandon définitif)", () => {
-    expect(isDue(baseCycle({ status: "failed", nextRetryAt: null }), new Date())).toBe(false);
+    expect(isDue(baseCycle({ status: "failed", next_retry_at: null }), new Date())).toBe(false);
   });
 
   it("true si nextRetryAt EXACTEMENT égal à now (borne >=, pas strictement >)", () => {
     const exactlyNow = new Date("2026-06-01T12:00:00.000Z");
-    expect(isDue(baseCycle({ status: "failed", nextRetryAt: exactlyNow }), exactlyNow)).toBe(true);
+    expect(isDue(baseCycle({ status: "failed", next_retry_at: exactlyNow }), exactlyNow)).toBe(true);
   });
 });
 

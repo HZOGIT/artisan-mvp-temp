@@ -95,6 +95,7 @@ export interface IBillingRepository {
   createChargeAttempt(params: CreateChargeAttemptParams): Promise<BillingChargeAttempt>;
   updateChargeAttempt(id: number, params: UpdateChargeAttemptParams): Promise<void>;
   findChargeAttemptByPaymentIntentId(paymentIntentId: string): Promise<BillingChargeAttempt | null>;
+  findLastAttemptByCycleId(cycleId: number): Promise<BillingChargeAttempt | null>;
 
   /** Factures */
   findInvoicesByArtisan(ctx: TenantContext, limit?: number): Promise<BillingInvoice[]>;
