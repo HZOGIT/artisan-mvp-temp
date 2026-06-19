@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import { randomUUID } from "node:crypto";
 import { buildFastifyLoggerConfig } from "./shared/ports/logger-fastify";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
@@ -333,7 +334,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
    * reçoit un 404 sur tout le lot (dashboard widgets sans données, portail `valid` undefined →
    * « expiré »). On relève la limite pour couvrir les gros batchs (≈150 procédures).
    */
-  const app = Fastify({ maxParamLength: 5000, logger: buildFastifyLoggerConfig() });
+  const app = Fastify({
+    maxParamLength: 5000,
+    logger: buildFastifyLoggerConfig(),
+    genReqId: (req) => (req.headers["x-request-id"] as string | undefined) ?? randomUUID().slice(0, 8),
+  });
 
   app.register(cookie);
   app.register(cors, {
@@ -342,7 +347,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
-  app.get("/health", async () => ({ status: "ok" }));
+  app.get("/health", { logLevel: "silent" }, async () => ({ status: "ok" }));
 
   const vehiculeRepo = deps.vehiculeRepo ?? new VehiculeRepositoryDrizzle(getDbHandle().db);
   const avis = createAvisModule({
@@ -724,6 +729,13 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
       dataReader: new AssistantDataReaderDrizzle(getDbHandle().db),
+    },
+    streamDeps: {
+      llm: deps.llm ?? new GeminiLlmAdapter(),
+      rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+      artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+      statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
+      threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
     },
   });
   /*
