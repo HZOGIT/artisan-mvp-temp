@@ -73,6 +73,14 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 13 — 2026-06-19
+**Cible :** L2 — contrats de bas niveau non prouvés à DB réel
+**Cas ajoutés (2) :**
+- `findPaymentMethodById` sur PM révoquée → retourne la carte (revoked_at non filtré à DB level) — documente et protège le contrat qui rend le double-revoke idempotent ; contraste explicite avec `listPaymentMethods` qui filtre `revoked_at IS NULL`
+- `saveStripeCustomerId` no-op réellement prouvé : appeler la méthode n'écrase pas le résultat de `findStripeCustomerId` (décision architecturale — customer ID porté par billing_payment_methods, pas de table centrale)
+**Résultat :** 21/21 ✅ (L2 PG)
+**Total billing :** 92 tests (90 → 92)
+
 ### Itération 12 — 2026-06-19
 **Cible :** L2 + L3 — findDefaultPaymentMethod après revoke + Zod setAsDefault non-boolean
 **Cas ajoutés (1 test L2 + 2 assertions L3) :**

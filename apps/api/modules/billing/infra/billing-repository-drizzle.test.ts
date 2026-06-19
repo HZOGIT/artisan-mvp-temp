@@ -145,6 +145,30 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(await repo.findPaymentMethodById(ctx(B), pm.id)).toBeNull();
   });
 
+  it("findPaymentMethodById : retourne une PM révoquée (pas de filtre revoked_at) — contrat idempotence double-revoke", async () => {
+    // findPaymentMethodById ne filtre PAS revoked_at (contrairement à listPaymentMethods).
+    // Ceci est intentionnel : revokePaymentMethod appelle findPaymentMethodById avant de révoquer,
+    // ce qui rend le double-revoke idempotent (pas de NotFoundError au 2e appel).
+    // Ce test documente et protège ce contrat à DB level.
+    const pm = await repo.savePaymentMethod({
+      artisanId: A,
+      stripeCustomerId: "cus_revoked_find",
+      stripePaymentMethodId: "pm_revoked_find",
+      brand: "visa",
+      last4: "7777",
+      expMonth: 9,
+      expYear: 2029,
+      consentedAt: new Date(),
+    });
+    await repo.revokePaymentMethod(ctx(A), pm.id);
+    // Après révocation : listPaymentMethods ne voit plus la carte...
+    expect(await repo.listPaymentMethods(ctx(A)).then(l => l.some(p => p.id === pm.id))).toBe(false);
+    // ...mais findPaymentMethodById la retourne toujours (revoked_at non filtré)
+    const found = await repo.findPaymentMethodById(ctx(A), pm.id);
+    expect(found?.id).toBe(pm.id);
+    expect(found?.revoked_at).toBeTruthy();
+  });
+
   // ── Abonnements ──────────────────────────────────────────────────────────
 
   it("saveSubscription + findSubscription scopé au tenant", async () => {
@@ -312,6 +336,14 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(await repo.findStripeCustomerId(A)).toBe("cus_canonical");
     // Artisan sans aucun PM → null
     expect(await repo.findStripeCustomerId(99999)).toBeNull();
+  });
+
+  it("saveStripeCustomerId est no-op : n'écrase pas le customer ID porté par les PMs", async () => {
+    // saveStripeCustomerId ne doit rien écrire en DB — le customer ID vit sur billing_payment_methods.
+    // Si quelqu'un rend cette méthode non-no-op, findStripeCustomerId doit continuer à retourner
+    // la valeur portée par le PM (cus_canonical) et non une valeur externe injectée.
+    await repo.saveStripeCustomerId(A, "cus_should_be_ignored");
+    expect(await repo.findStripeCustomerId(A)).toBe("cus_canonical"); // inchangé
   });
 
   it("findStripeCustomerId : fallback table subscriptions legacy (migration billing Stripe → maison)", async () => {
