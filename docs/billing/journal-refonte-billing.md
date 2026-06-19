@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 25 — 2026-06-19
+**Cible :** L2 — payload JSONB de `appendEvent` jamais asserté
+**Cas ajoutés (1) :**
+- L2 : `appendEvent` payload JSONB round-trip (clés imbriquées retrouvables depuis DB) — les tests existants vérifiaient `ev.id`, `ev.event_type`, `ev.actor` mais jamais `ev.payload`. Double vérification : (1) objet retourné par `appendEvent` contient le payload, (2) requête admin directe sur `billing_events` confirme la persistance JSONB. Le scheduler Phase 2 zombie recovery lit `payload.setupIntentId` pour réconcilier les SetupIntents orphelins — si Drizzle tronque ou omet le payload, la récupération zombie échoue silencieusement.
+**Résultat :** L2 29/29 ✅
+**Total billing :** 112 tests (111 → 112)
+
 ### Itération 24 — 2026-06-19
 **Cible :** L2 — shape complète PM jamais vérifiée (champs scheduler Phase 2)
 **Cas ajoutés (1) :**

@@ -596,6 +596,29 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(ev.actor).toBe("user:1");
   });
 
+  it("appendEvent : payload JSONB round-trip — les clés imbriquées sont retrouvables (zombie recovery)", async () => {
+    // Le scheduler Phase 2 zombie recovery lit payload.setupIntentId depuis billing_events
+    // pour réconcilier les SetupIntents orphelins. Si Drizzle ne sérialise pas correctement
+    // le JSONB ou tronque les clés, la récupération zombie échoue silencieusement.
+    const ev = await repo.appendEvent({
+      entityType: "artisan",
+      entityId: A,
+      eventType: "setup_intent.created",
+      payload: { setupIntentId: "seti_test_roundtrip", stripeCustomerId: "cus_zombie_test" },
+      actor: "system:scheduler",
+    });
+    expect(ev.payload).toMatchObject({
+      setupIntentId: "seti_test_roundtrip",
+      stripeCustomerId: "cus_zombie_test",
+    });
+    // Vérification depuis la DB via admin (pas seulement le retour INSERT)
+    const { rows } = await admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from billing_events where id=$1",
+      [ev.id],
+    );
+    expect(rows[0]?.payload).toMatchObject({ setupIntentId: "seti_test_roundtrip" });
+  });
+
   it("updateSubscriptionStatus vers 'active' sans PM → viole chk_pm_required (garde-fou scheduler)", async () => {
     // La contrainte DB chk_pm_required garantit que le scheduler Phase 2 ne peut pas activer
     // une subscription sans PM. Le scheduler doit séquencer : updateSubscriptionPaymentMethod
