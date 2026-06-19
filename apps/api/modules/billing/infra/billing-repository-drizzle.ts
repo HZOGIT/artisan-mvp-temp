@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import {
   billingPaymentMethods,
   billingSubscriptions,
@@ -28,7 +28,7 @@ export class BillingRepositoryDrizzle implements IBillingRepository {
     return this.db
       .select()
       .from(billingPaymentMethods)
-      .where(and(eq(billingPaymentMethods.artisan_id, ctx.artisanId), eq(billingPaymentMethods.revoked_at, null as unknown as Date)))
+      .where(and(eq(billingPaymentMethods.artisan_id, ctx.artisanId), isNull(billingPaymentMethods.revoked_at)))
       .orderBy(desc(billingPaymentMethods.is_default), desc(billingPaymentMethods.created_at));
   }
 

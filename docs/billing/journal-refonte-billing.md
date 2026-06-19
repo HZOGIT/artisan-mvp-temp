@@ -71,6 +71,22 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 - **Phase 3** : Migration depuis Stripe Subscriptions
 - **Phase 4** : Cleanup StripePort (retirer createCheckoutSession, createBillingPortalSession, etc.)
 
+## Tests — itérations cron
+
+### Itération 1 — 2026-06-19
+**Cible :** L2 Drizzle — cas manquants sur `billing-repository-drizzle.ts`
+**Cas ajoutés (6 nouveaux tests) :**
+- `createCycle + findPendingCycle` : cycle créé retrouvé en pending
+- `findPendingCycle null` : retourne null quand le seul cycle est paid
+- `updateSubscriptionStatus` : trialing → active (avec PM), B non touché
+- `updateSubscriptionPaymentMethod` : lie PM au bon tenant
+- `findInvoicesByArtisan` : scope + isolation cross-tenant
+- `findInvoicesByArtisan limit` : respecte le paramètre limit
+**Bugs corrigés en repo :**
+- `listPaymentMethods` : `eq(revoked_at, null)` → `isNull(revoked_at)` (WHERE = NULL toujours faux)
+- Cleanup tests : FK RESTRICT + chk_pm_required → UPDATE atomique status+PM avant DELETE
+**Résultat :** 13/13 ✅ (L2 PG) — commit `pending`
+
 ## Décisions clés
 
 - Numérotation : `OPE-YYYY-NNNNN` (factures), `AV-YYYY-NNNNN` (avoirs) — séquentielle globale, allouée à la finalisation uniquement
