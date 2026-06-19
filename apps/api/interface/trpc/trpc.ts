@@ -37,15 +37,17 @@ const mapDomainErrors = t.middleware(async ({ next, ctx }) => {
 });
 
 /**
- * Mesure le temps d'exécution de chaque procédure tRPC. Log en warn si > 500ms pour identifier
- * la procédure lente dans un batch sans attendre le log HTTP de fin de batch.
+ * Bind le nom de la procédure dans le child logger avant d'appeler next(), puis mesure le temps
+ * d'exécution. Chaque log émis dans la procédure (ex. note_frais_approuvee) portera automatiquement
+ * { procedure } comme champ indexé dans BetterStack — filtrable sans chercher dans le message.
  */
 const logProcedureTiming = t.middleware(async ({ next, path, ctx }) => {
+  const log = ctx.log.child({ procedure: path });
   const t0 = Date.now();
-  const result = await next();
+  const result = await next({ ctx: { ...ctx, log } });
   const duration = Date.now() - t0;
   if (duration > 500) {
-    ctx.log.warn({ event: "trpc_slow_procedure", procedure: path, duration }, `Procédure lente: ${path} (${duration}ms)`);
+    log.warn({ event: "trpc_slow_procedure", duration }, `Procédure lente: ${path} (${duration}ms)`);
   }
   return result;
 });
