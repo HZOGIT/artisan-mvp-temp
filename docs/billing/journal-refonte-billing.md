@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 26 — 2026-06-19
+**Cible :** L1 — `confirmPaymentMethod` avec `setAsDefault=false` sur sub existante, invariant jamais vérifié
+**Cas ajoutés (1) :**
+- L1 : `confirmPaymentMethod` setAsDefault=false avec sub existante → `sub.payment_method_id` reste null — le test précédent (line 158) utilisait setAsDefault=false mais sans sub dans le repo (fresh makeDeps) ; l'invariant "updateSubscriptionPaymentMethod n'est PAS appelé si setAsDefault=false" n'était pas couvert. Scénario : artisan ajoute une 2ème carte secondaire sans la promouvoir ; la sub doit continuer à charger la carte originale. Ce test protège contre une régression où `if(params.setAsDefault)` serait supprimé par inadvertance.
+**Résultat :** L1 38/38 ✅
+**Total billing :** 113 tests (112 → 113)
+
 ### Itération 25 — 2026-06-19
 **Cible :** L2 — payload JSONB de `appendEvent` jamais asserté
 **Cas ajoutés (1) :**

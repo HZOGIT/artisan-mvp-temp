@@ -181,6 +181,26 @@ describe("confirmPaymentMethod", () => {
     expect(ev?.entity_id).toBe(pm.id);
     expect(ev?.payload).toMatchObject({ brand: pm.brand, last4: pm.last4, isDefault: true });
   });
+
+  it("setAsDefault=false avec sub existante → sub.payment_method_id reste inchangé", async () => {
+    // Un artisan ajoute une 2ème carte sans la définir comme défaut.
+    // La sub doit continuer à pointer vers la carte originale (null ici).
+    // Invariant : confirmPaymentMethod avec setAsDefault=false ne déclenche ni
+    // setDefaultPaymentMethod ni updateSubscriptionPaymentMethod.
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+    await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_secondary",
+      stripeCustomerId: "cus_test",
+      setAsDefault: false,
+      consentedAt: new Date(),
+    });
+    expect((await deps.repo.findSubscription(A))?.payment_method_id).toBeNull();
+  });
 });
 
 // ── revokePaymentMethod ───────────────────────────────────────────────────────
