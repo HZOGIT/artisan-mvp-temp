@@ -16,7 +16,6 @@ import {
 } from "./application/billing-use-cases";
 import type { TenantContext } from "../../shared/tenant";
 
-// ── Fakes ─────────────────────────────────────────────────────────────────────
 
 const A: TenantContext = { artisanId: 1, userId: 10 };
 const B: TenantContext = { artisanId: 2, userId: 20 };
@@ -35,7 +34,6 @@ function makeDeps(over?: Partial<{ customerId: string }>): BillingDeps & { repo:
   return { repo, billing, stripe: makeStripe(over?.customerId ?? "cus_test") };
 }
 
-// ── createSetupIntent ─────────────────────────────────────────────────────────
 
 describe("createSetupIntent", () => {
   it("crée un Stripe customer si aucun n'existe et retourne un clientSecret", async () => {
@@ -82,7 +80,6 @@ describe("createSetupIntent", () => {
   });
 });
 
-// ── confirmPaymentMethod ──────────────────────────────────────────────────────
 
 describe("confirmPaymentMethod", () => {
   it("persiste la carte avec les infos récupérées depuis Stripe", async () => {
@@ -205,7 +202,6 @@ describe("confirmPaymentMethod", () => {
   });
 });
 
-// ── revokePaymentMethod ───────────────────────────────────────────────────────
 
 describe("revokePaymentMethod", () => {
   it("soft-delete : revoked_at renseigné, carte disparaît de listPaymentMethods", async () => {
@@ -300,7 +296,6 @@ describe("revokePaymentMethod", () => {
   });
 });
 
-// ── setDefaultPaymentMethod ───────────────────────────────────────────────────
 
 describe("setDefaultPaymentMethod", () => {
   it("change la carte par défaut — une seule carte default à la fois", async () => {
@@ -380,7 +375,6 @@ describe("setDefaultPaymentMethod", () => {
   });
 });
 
-// ── getBillingInfo ────────────────────────────────────────────────────────────
 
 describe("getBillingInfo", () => {
   it("retourne subscription null si aucune", async () => {
@@ -437,7 +431,6 @@ describe("getBillingInfo", () => {
   });
 });
 
-// ── confirmPaymentMethod — cas setAsDefault=false ────────────────────────────
 
 describe("confirmPaymentMethod — setAsDefault=false", () => {
   it("PM persisté mais subscription.payment_method_id non modifié", async () => {
@@ -463,7 +456,6 @@ describe("confirmPaymentMethod — setAsDefault=false", () => {
   });
 });
 
-// ── revokePaymentMethod — carte default ──────────────────────────────────────
 
 describe("revokePaymentMethod — carte default", () => {
   it("révoquer la carte default → findDefaultPaymentMethod retourne null", async () => {
@@ -525,7 +517,6 @@ describe("revokePaymentMethod — carte default", () => {
   });
 });
 
-// ── createSetupIntent — fallback customer legacy ──────────────────────────────
 
 describe("createSetupIntent — customer pré-existant (legacy ou maison)", () => {
   it("customer trouvé via repo → createCustomer Stripe jamais appelé", async () => {
@@ -547,7 +538,6 @@ describe("createSetupIntent — customer pré-existant (legacy ou maison)", () =
   });
 });
 
-// ── getBillingInfo — factures récentes ───────────────────────────────────────
 
 describe("getBillingInfo — factures récentes", () => {
   it("recentInvoices retourne les factures du tenant (isolation cross-tenant)", async () => {
@@ -601,7 +591,6 @@ describe("getBillingInfo — factures récentes", () => {
   });
 });
 
-// ── changePlan use-case ───────────────────────────────────────────────────────
 
 describe("changePlan", () => {
   it("upgrade starter→pro : subscription.plan_id mis à jour + event subscription.plan_changed émis", async () => {
@@ -661,7 +650,6 @@ describe("changePlan", () => {
   });
 });
 
-// ── Changements de plan (prorata — logique domaine) ───────────────────────────
 
 describe("changements de plan — nextCycleAmount", () => {
   it("upgrade starter→pro : le montant du prochain cycle augmente", async () => {
