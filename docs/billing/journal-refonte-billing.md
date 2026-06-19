@@ -73,6 +73,15 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 2 — 2026-06-19
+**Cible :** L1 use-cases manquants (4 scénarios, 6 nouveaux tests)
+**Cas ajoutés :**
+- `confirmPaymentMethod setAsDefault=false` : PM persisté, sub.payment_method_id non modifié, aucune carte promue default
+- `revokePaymentMethod carte default` (×2) : findDefaultPaymentMethod→null après révocation ; 2ème carte non promue automatiquement
+- `createSetupIntent customer legacy/maison` : createCustomer Stripe jamais appelé si customer déjà dans repo
+- `getBillingInfo recentInvoices` (×2) : factures retournées + isolation cross-tenant ; limite 12 respectée
+**Résultat :** 23/23 ✅ (L1 sans DB) — commit pending
+
 ### Itération 1 — 2026-06-19
 **Cible :** L2 Drizzle — cas manquants sur `billing-repository-drizzle.ts`
 **Cas ajoutés (6 nouveaux tests) :**

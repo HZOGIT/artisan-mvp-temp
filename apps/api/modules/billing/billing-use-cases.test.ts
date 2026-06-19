@@ -3,6 +3,7 @@ import { FakeBillingRepository } from "./infra/billing-repository-fake";
 import { FakeBillingPort } from "../../shared/ports/billing-adapter";
 import type { StripePort } from "../../shared/ports/stripe";
 import type { BillingDeps } from "./application/billing-use-cases";
+import type { BillingInvoice } from "../../../../drizzle/schema.pg";
 import {
   createSetupIntent,
   confirmPaymentMethod,
@@ -190,6 +191,146 @@ describe("getBillingInfo", () => {
     await confirmPaymentMethod(deps, A, { stripePaymentMethodId: "pm_a", stripeCustomerId: "cus_a", setAsDefault: false, consentedAt: new Date() });
     const infoB = await getBillingInfo(deps, B);
     expect(infoB.paymentMethods).toHaveLength(0);
+  });
+});
+
+// ── confirmPaymentMethod — cas setAsDefault=false ────────────────────────────
+
+describe("confirmPaymentMethod — setAsDefault=false", () => {
+  it("PM persisté mais subscription.payment_method_id non modifié", async () => {
+    const deps = makeDeps();
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "trialing", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: null,
+    });
+
+    const result = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_no_def",
+      stripeCustomerId: "cus_test",
+      setAsDefault: false,
+      consentedAt: new Date(),
+    });
+
+    expect(result.paymentMethod.id).toBeGreaterThan(0);
+    // Sub pas touchée
+    expect((await deps.repo.findSubscription(A))?.payment_method_id).toBeNull();
+    // Aucune carte default
+    expect(await deps.repo.findDefaultPaymentMethod(A)).toBeNull();
+  });
+});
+
+// ── revokePaymentMethod — carte default ──────────────────────────────────────
+
+describe("revokePaymentMethod — carte default", () => {
+  it("révoquer la carte default → findDefaultPaymentMethod retourne null", async () => {
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_def",
+      stripeCustomerId: "cus_test",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+    expect((await deps.repo.findDefaultPaymentMethod(A))?.id).toBe(pm.id);
+
+    await revokePaymentMethod(deps, A, pm.id);
+
+    expect(await deps.repo.findDefaultPaymentMethod(A)).toBeNull();
+  });
+
+  it("révoquer la carte default avec une autre carte présente → l'autre n'est pas promue auto", async () => {
+    const deps = makeDeps();
+    const { paymentMethod: pm1 } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_d1", stripeCustomerId: "cus_test",
+      setAsDefault: true, consentedAt: new Date(),
+    });
+    await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_d2", stripeCustomerId: "cus_test",
+      setAsDefault: false, consentedAt: new Date(),
+    });
+
+    await revokePaymentMethod(deps, A, pm1.id);
+
+    // L'autre carte existe mais n'est pas promue automatiquement (la logique de promotion
+    // appartient à la Phase 2 scheduler, pas au use-case de révocation)
+    expect(await deps.repo.findDefaultPaymentMethod(A)).toBeNull();
+    expect(await deps.repo.listPaymentMethods(A)).toHaveLength(1);
+  });
+});
+
+// ── createSetupIntent — fallback customer legacy ──────────────────────────────
+
+describe("createSetupIntent — customer pré-existant (legacy ou maison)", () => {
+  it("customer trouvé via repo → createCustomer Stripe jamais appelé", async () => {
+    let createCustomerCalls = 0;
+    const trackingStripe = {
+      createCustomer: async () => { createCustomerCalls++; return { id: "cus_new" }; },
+      constructEvent: () => { throw new Error("not used"); },
+      createInvoiceCheckout: async () => ({ url: "" }),
+    } as unknown as StripePort;
+
+    const repo = new FakeBillingRepository();
+    repo.customerIds.set(A.artisanId, "cus_legacy_42");
+    const deps = { repo, billing: new FakeBillingPort(), stripe: trackingStripe };
+
+    const result = await createSetupIntent(deps, A);
+
+    expect(result.stripeCustomerId).toBe("cus_legacy_42");
+    expect(createCustomerCalls).toBe(0);
+  });
+});
+
+// ── getBillingInfo — factures récentes ───────────────────────────────────────
+
+describe("getBillingInfo — factures récentes", () => {
+  it("recentInvoices retourne les factures du tenant (isolation cross-tenant)", async () => {
+    const deps = makeDeps();
+    const invoice: BillingInvoice = {
+      id: 1, artisan_id: A.artisanId,
+      number: "OPE-2026-00001", stripe_invoice_id: null, stripe_invoice_number: null,
+      type: "subscription", status: "paid",
+      subtotal_cents: 2900, tax_cents: 0, total_cents: 2900,
+      credit_amount_cents: 0, refund_amount_cents: 0, currency: "eur",
+      billing_cycle_id: null, original_invoice_id: null,
+      stripe_payment_intent_id: "pi_test", pdf_url: null,
+      buyer_siren: null, buyer_routing_id: null,
+      einvoice_format: null, einvoice_status: null,
+      einvoice_pa_message_id: null, einvoice_hash: null,
+      due_at: null, paid_at: new Date("2026-06-01"), voided_at: null,
+      created_at: new Date("2026-06-01"), updated_at: new Date("2026-06-01"),
+    };
+    deps.repo.invoices.push(invoice);
+
+    const infoA = await getBillingInfo(deps, A);
+    expect(infoA.recentInvoices).toHaveLength(1);
+    expect(infoA.recentInvoices[0]!.number).toBe("OPE-2026-00001");
+    expect(infoA.recentInvoices[0]!.total_cents).toBe(2900);
+
+    // B ne voit pas les factures de A
+    const infoB = await getBillingInfo(deps, B);
+    expect(infoB.recentInvoices).toHaveLength(0);
+  });
+
+  it("recentInvoices respecte la limite de 12", async () => {
+    const deps = makeDeps();
+    for (let i = 1; i <= 15; i++) {
+      deps.repo.invoices.push({
+        id: i, artisan_id: A.artisanId,
+        number: null, stripe_invoice_id: null, stripe_invoice_number: null,
+        type: "subscription", status: "draft",
+        subtotal_cents: 990, tax_cents: 0, total_cents: 990,
+        credit_amount_cents: 0, refund_amount_cents: 0, currency: "eur",
+        billing_cycle_id: null, original_invoice_id: null,
+        stripe_payment_intent_id: null, pdf_url: null,
+        buyer_siren: null, buyer_routing_id: null,
+        einvoice_format: null, einvoice_status: null,
+        einvoice_pa_message_id: null, einvoice_hash: null,
+        due_at: null, paid_at: null, voided_at: null,
+        created_at: new Date(), updated_at: new Date(),
+      });
+    }
+    const info = await getBillingInfo(deps, A);
+    expect(info.recentInvoices.length).toBeLessThanOrEqual(12);
   });
 });
 
