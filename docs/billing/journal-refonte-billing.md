@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 23 — 2026-06-19
+**Cible :** L2 — `consented_at` jamais relu depuis la DB
+**Cas ajoutés (1) :**
+- L2 : `savePaymentMethod` → `consented_at` persisté en DB (RGPD, preuve de consentement MIT) — `consented_at` était transmis à `savePaymentMethod` dans tous les tests mais n'était jamais asserté depuis la DB via `findPaymentMethodById`. Ce champ est la preuve légale du consentement de l'utilisateur aux prélèvements automatiques off-session (MIT). S'il est supprimé silencieusement, l'audit RGPD est cassé. Comparaison sur `.toISOString().slice(0, 16)` (minute précise, sans secondes fractionnaires).
+**Résultat :** L2 27/27 ✅
+**Total billing :** 110 tests (109 → 110)
+
 ### Itération 22 — 2026-06-19
 **Cible :** L2 — `trial_ends_at` jamais vérifié en round-trip depuis la DB
 **Cas ajoutés (1) :**

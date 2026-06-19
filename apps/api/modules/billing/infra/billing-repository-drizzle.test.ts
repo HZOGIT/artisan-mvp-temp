@@ -73,6 +73,27 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(listB.some((p) => p.id === pm.id)).toBe(false);
   });
 
+  it("savePaymentMethod : consented_at persisté en DB (RGPD — preuve de consentement MIT)", async () => {
+    // consented_at documente le moment où l'utilisateur a consenti aux prélèvements automatiques
+    // (MIT = Merchant-Initiated Transactions). Ce champ est l'unique preuve de consentement.
+    // S'il est silencieusement supprimé par Drizzle, l'audit trail RGPD est cassé et les
+    // chargements off-session ne seraient plus défendables en cas de litige Stripe.
+    const consentedAt = new Date("2026-07-01T14:30:00.000Z");
+    const pm = await repo.savePaymentMethod({
+      artisanId: A,
+      stripeCustomerId: "cus_consent_chk",
+      stripePaymentMethodId: "pm_consent_chk",
+      brand: "visa",
+      last4: "9999",
+      expMonth: 6,
+      expYear: 2029,
+      consentedAt,
+    });
+    const found = await repo.findPaymentMethodById(ctx(A), pm.id);
+    expect(found?.consented_at).not.toBeNull();
+    expect(new Date(found!.consented_at!).toISOString().slice(0, 16)).toBe("2026-07-01T14:30");
+  });
+
   it("setDefaultPaymentMethod + findDefaultPaymentMethod", async () => {
     const pm = await repo.savePaymentMethod({
       artisanId: A,
