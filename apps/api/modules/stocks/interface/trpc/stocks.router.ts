@@ -98,9 +98,16 @@ export function createStocksRouter(
           reference: z.string().max(100).nullish(),
         }),
       )
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { stockId, ...mouvement } = input;
-        return ajusterQuantiteStock(repo, ctx.tenant, stockId, mouvement);
+        const result = await ajusterQuantiteStock(repo, ctx.tenant, stockId, mouvement);
+        /** ajustement = correction manuelle sans mouvement physique → plus risqué que entree/sortie. */
+        const level = input.type === "ajustement" ? "warn" : "info";
+        ctx.log[level](
+          { event: "stock_mouvement", stockId, type: input.type, quantite: Number(input.quantite), motif: input.motif ?? null },
+          `Mouvement stock : ${input.type} de ${input.quantite}`,
+        );
+        return result;
       }),
 
     getMouvements: protectedProcedure
