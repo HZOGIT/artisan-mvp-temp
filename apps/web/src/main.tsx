@@ -78,12 +78,13 @@ const DASHBOARD_UNBATCHED = new Set([
   'contrats.getAFacturer',
   'stocks.getLowStock',
 ])
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? ""
 const trpcClient = trpc.createClient({
   links: [
     splitLink({
       condition: (op) => op.path.startsWith('dashboard.') || DASHBOARD_UNBATCHED.has(op.path),
-      true: httpLink({ url: '/api/trpc', transformer: superjson, fetch: fetchWithCreds }),
-      false: httpBatchLink({ url: '/api/trpc', transformer: superjson, fetch: fetchWithCreds }),
+      true: httpLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
+      false: httpBatchLink({ url: `${BACKEND_URL}/api/trpc`, transformer: superjson, fetch: fetchWithCreds }),
     }),
   ],
 })

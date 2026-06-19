@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
 import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
 import { createAppRouter } from "./interface/trpc/router";
 import { makeCreateContext, type ContextDeps } from "./interface/trpc/context";
@@ -334,6 +335,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   const app = Fastify({ logger: false, maxParamLength: 5000 });
 
   app.register(cookie);
+  app.register(cors, {
+    origin: process.env.CORS_ORIGIN ?? process.env.APP_URL ?? false,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  });
 
   app.get("/health", async () => ({ status: "ok" }));
 
