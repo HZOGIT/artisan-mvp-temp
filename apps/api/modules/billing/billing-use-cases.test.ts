@@ -257,6 +257,32 @@ describe("revokePaymentMethod", () => {
     expect(ev?.entity_id).toBe(pm.id);
   });
 
+  it("révoquer la PM liée à la sub → sub.payment_method_id reste inchangé (référence pendante — dunning scheduler)", async () => {
+    // Le use-case revokePaymentMethod ne touche PAS subscription.payment_method_id.
+    // C'est intentionnel : la sub garde une référence pendante vers la PM révoquée.
+    // Le scheduler Phase 2 détecte cette situation (pm.revoked_at IS NOT NULL) et
+    // déclenche le dunning (bloquer, notifier, relancer avec une nouvelle carte).
+    // Ce test documente l'invariant : revokePaymentMethod n'est PAS responsable
+    // de nettoyer la sub — uniquement le scheduler l'est.
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_linked_sub",
+      stripeCustomerId: "cus_test",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+    await deps.repo.saveSubscription({
+      artisanId: A.artisanId, planId: "starter", billingMode: "maison",
+      status: "active", currentPeriodStart: null, currentPeriodEnd: null,
+      trialEndsAt: null, paymentMethodId: pm.id,
+    });
+
+    await revokePaymentMethod(deps, A, pm.id);
+
+    const sub = await deps.repo.findSubscription(A);
+    expect(sub?.payment_method_id).toBe(pm.id);
+  });
+
   it("idempotent — révoquer deux fois la même carte ne lève pas d'erreur", async () => {
     // findPaymentMethodById ne filtre PAS revoked_at : un PM révoqué reste trouvable.
     // Important pour l'idempotence des webhooks (Stripe peut renvoyer le même événement).

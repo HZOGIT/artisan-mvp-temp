@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 27 — 2026-06-19
+**Cible :** L1 — `revokePaymentMethod` sur PM liée à la sub — invariant jamais documenté
+**Cas ajoutés (1) :**
+- L1 : `revokePaymentMethod` sur la PM utilisée par `subscription.payment_method_id` → sub.payment_method_id RESTE inchangé (référence pendante intentionnelle) — le use-case ne touche pas la sub ; c'est le scheduler Phase 2 qui doit détecter `pm.revoked_at IS NOT NULL` et déclencher le dunning. Ce test protège contre une régression où le use-case clearait naïvement `sub.payment_method_id` (ce qui bloquerait le dunning) ou, à l'inverse, contre l'hypothèse incorrecte que la sub est automatiquement mise à jour.
+**Résultat :** L1 39/39 ✅
+**Total billing :** 114 tests (113 → 114)
+
 ### Itération 26 — 2026-06-19
 **Cible :** L1 — `confirmPaymentMethod` avec `setAsDefault=false` sur sub existante, invariant jamais vérifié
 **Cas ajoutés (1) :**
