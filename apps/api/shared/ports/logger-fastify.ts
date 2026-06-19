@@ -1,8 +1,14 @@
+import os from "node:os";
 import type { PinoLoggerOptions } from "fastify/types/logger";
 
+/**
+ * Contexte figé au démarrage : identifie le conteneur/réplica dans BetterStack.
+ * `hostname` = container ID en Docker, pod name en Kubernetes — crucial en multi-réplicas.
+ */
 const SERVICE_BASE = {
   service: "operioz-api",
   env: process.env.NODE_ENV ?? "development",
+  hostname: os.hostname(),
   pid: process.pid,
   nodeVersion: process.version,
 };
