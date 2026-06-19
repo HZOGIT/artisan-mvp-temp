@@ -73,7 +73,11 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
 
     create: gerer
       .input(createSchema)
-      .mutation(({ ctx, input }) => creerContrat(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await creerContrat(repo, ctx.tenant, input);
+        ctx.log.info({ event: "contrat_cree", contratId: result.id, clientId: input.clientId, montantHT: Number(input.montantHT), periodicite: input.periodicite }, "Contrat maintenance créé");
+        return result;
+      }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
@@ -86,25 +90,42 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerContrat(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "contrat_supprime", contratId: input.id }, "Contrat maintenance supprimé");
         return { success: true };
       }),
 
     /** Transitions de statut (état machine) — chacune valide la légalité depuis le statut courant. */
     suspendre: gerer
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => suspendreContrat(repo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await suspendreContrat(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "contrat_suspendu", contratId: input.id }, "Contrat maintenance suspendu");
+        return result;
+      }),
 
     reactiver: gerer
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => reactiverContrat(repo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await reactiverContrat(repo, ctx.tenant, input.id);
+        ctx.log.info({ event: "contrat_reactive", contratId: input.id }, "Contrat maintenance réactivé");
+        return result;
+      }),
 
     terminer: gerer
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => terminerContrat(repo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await terminerContrat(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "contrat_termine", contratId: input.id }, "Contrat maintenance terminé");
+        return result;
+      }),
 
     annuler: gerer
       .input(z.object({ id: z.number().int() }))
-      .mutation(({ ctx, input }) => annulerContrat(repo, ctx.tenant, input.id)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await annulerContrat(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "contrat_annule", contratId: input.id }, "Contrat maintenance annulé — churn signal");
+        return result;
+      }),
 
     /** Contrats arrivés à échéance de facturation (enrichis client/TTC/retard) — parité `getAFacturer`. */
     getAFacturer: voir.query(({ ctx }) => listContratsAFacturer(repo, ctx.tenant)),
@@ -112,7 +133,11 @@ export function createContratsMaintenanceRouter(repo: IContratRepository, factur
     /** Génère une facture émise pour un contrat (récurrente) — parité `generateFacture`. ⚠️ pas d'écriture FEC. */
     generateFacture: gerer
       .input(z.object({ contratId: z.number().int() }))
-      .mutation(({ ctx, input }) => genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await genererFactureContrat(repo, factureGen, ctx.tenant, input.contratId);
+        ctx.log.info({ event: "contrat_facture_generee", contratId: input.contratId, factureId: result.id }, "Facture contrat maintenance générée");
+        return result;
+      }),
 
     /** ── Sous-ressource interventions du contrat (ownership via contrat parent ; anti-IDOR id↔contrat) ── */
     getInterventions: voir
