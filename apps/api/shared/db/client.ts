@@ -22,9 +22,9 @@ export function createDbClient(connectionString: string, max = 10): DbHandle {
 
 /*
  * Client par défaut (lazy) du runtime. Il utilise EXCLUSIVEMENT APP_DATABASE_URL — le rôle
- * applicatif NON-superuser soumis à la RLS. Pas de fallback sur DATABASE_URL (rôle owner) :
- * un mauvais câblage d'environnement ne doit jamais pouvoir servir les requêtes en owner et
- * désactiver silencieusement l'isolation tenant (fail-closed).
+ * applicatif NON-superuser soumis à la RLS. Pas de fallback owner (fail-closed) : un mauvais
+ * câblage ne doit jamais servir les requêtes en owner et désactiver l'isolation tenant. En test,
+ * APP_DATABASE_URL est posé sur le rôle app_tenant par le setup vitest (vitest.setup.api.ts).
  */
 let defaultHandle: DbHandle | null = null;
 export function getDbHandle(): DbHandle {
