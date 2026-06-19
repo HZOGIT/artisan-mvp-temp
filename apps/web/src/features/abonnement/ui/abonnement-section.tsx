@@ -13,6 +13,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Switch } from "@/shared/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/shared/ui/dialog";
 import { useAbonnement } from "../application/use-abonnement";
+import { BillingMaisonSection } from "./billing-maison-section";
 import {
   PLANS, calcPrice, isCurrentPlan, trialColorTier, trialProgressPct, planLabel, relativeTime,
   type Plan, type BillingInterval, type PlanDef,
@@ -246,6 +247,8 @@ export function AbonnementSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BillingMaisonSection />
     </div>
   );
 }

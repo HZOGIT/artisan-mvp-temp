@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import { CreditCard, Calendar, Receipt, Loader2, Trash2, Star } from "lucide-react";
+import { CreditCard, Calendar, Receipt, Loader2, Trash2, Star, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -14,6 +14,7 @@ import {
 } from "@/shared/ui/alert-dialog";
 import { useBillingMaison } from "../application/use-billing-maison";
 import type { BillingPaymentMethod, BillingSubscription, BillingInvoice } from "../application/use-billing-maison";
+import { AddCardDialog } from "./add-card-dialog";
 
 const fmtDate = (d: Date | string | null | undefined): string =>
   d ? format(new Date(d), "dd MMM yyyy", { locale: fr }) : "—";
@@ -107,12 +108,14 @@ function PaymentMethodsCard({
   paymentMethods,
   onRevoke,
   onSetDefault,
+  onAddCard,
   isRevoking,
   isSettingDefault,
 }: {
   paymentMethods: BillingPaymentMethod[];
   onRevoke: (id: number) => Promise<void>;
   onSetDefault: (id: number) => Promise<void>;
+  onAddCard: () => void;
   isRevoking: boolean;
   isSettingDefault: boolean;
 }) {
@@ -144,10 +147,16 @@ function PaymentMethodsCard({
     <>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-            {t("billingMaison.cartes", "Cartes enregistrées")}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+              {t("billingMaison.cartes", "Cartes enregistrées")}
+            </CardTitle>
+            <Button size="sm" variant="outline" onClick={onAddCard} className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              {t("billingMaison.ajouterCarte", "Ajouter")}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {paymentMethods.length === 0 ? (
@@ -286,6 +295,7 @@ export function BillingMaisonSection() {
     revokePaymentMethod, isRevoking,
     setDefaultPaymentMethod, isSettingDefault,
   } = useBillingMaison();
+  const [addCardOpen, setAddCardOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -324,9 +334,11 @@ export function BillingMaisonSection() {
         paymentMethods={paymentMethods}
         onRevoke={revokePaymentMethod}
         onSetDefault={setDefaultPaymentMethod}
+        onAddCard={() => setAddCardOpen(true)}
         isRevoking={isRevoking}
         isSettingDefault={isSettingDefault}
       />
+      <AddCardDialog open={addCardOpen} onOpenChange={setAddCardOpen} />
       <InvoicesCard invoices={recentInvoices} />
     </div>
   );

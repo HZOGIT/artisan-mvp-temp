@@ -73,6 +73,13 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 20 — 2026-06-19
+**Cible :** L1 — payload `payment_method.confirmed` non asserté
+**Cas ajoutés (1) :**
+- L1 : `confirmPaymentMethod` event payload `{ brand, last4, isDefault }` + `entity_id` — l'event existait (iter 14) mais seule la présence `some(e => event_type==='confirmed')` était vérifiée ; même lacune corrigée pour `revokePaymentMethod` en iter 19 ; complète la couverture audit trail des 3 mutations non-scheduleur
+**Résultat :** L1 37/37 ✅
+**Total billing :** 107 tests (106 → 107)
+
 ### Itération 19 — 2026-06-19
 **Cible :** L1 (1 test) + L3 (1 test) — payloads d'événements non assertés
 **Cas ajoutés (2) :**

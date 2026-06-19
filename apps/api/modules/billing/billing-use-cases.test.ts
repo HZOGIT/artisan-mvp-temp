@@ -165,6 +165,22 @@ describe("confirmPaymentMethod", () => {
     });
     expect(deps.repo.events.some(e => e.event_type === "payment_method.confirmed")).toBe(true);
   });
+
+  it("payload de l'événement payment_method.confirmed contient brand, last4, isDefault et entity_id", async () => {
+    // FakeBillingPort.retrievePaymentMethod retourne brand='visa', last4='4242'.
+    // Le payload alimente les alertes webhook et le scheduler Phase 2 (réconciliation).
+    // isDefault=true = la carte est devenue la carte principale après confirmation.
+    const deps = makeDeps();
+    const { paymentMethod: pm } = await confirmPaymentMethod(deps, A, {
+      stripePaymentMethodId: "pm_payload_confirm",
+      stripeCustomerId: "cus_test",
+      setAsDefault: true,
+      consentedAt: new Date(),
+    });
+    const ev = deps.repo.events.find(e => e.event_type === "payment_method.confirmed");
+    expect(ev?.entity_id).toBe(pm.id);
+    expect(ev?.payload).toMatchObject({ brand: pm.brand, last4: pm.last4, isDefault: true });
+  });
 });
 
 // ── revokePaymentMethod ───────────────────────────────────────────────────────
