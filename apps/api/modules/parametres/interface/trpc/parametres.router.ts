@@ -42,6 +42,11 @@ export function createParametresRouter(repo: IParametresRepository) {
 
     update: protectedProcedure
       .input(updateSchema)
-      .mutation(({ ctx, input }) => mettreAJourParametres(repo, ctx.tenant, input)),
+      .mutation(async ({ ctx, input }) => {
+        const result = await mettreAJourParametres(repo, ctx.tenant, input);
+        const changedFields = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
+        ctx.log.warn({ event: "parametres_updated", changedFields }, `Paramètres artisan modifiés : ${changedFields.join(", ")}`);
+        return result;
+      }),
   });
 }
