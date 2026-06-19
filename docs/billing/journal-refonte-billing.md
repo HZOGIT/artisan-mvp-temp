@@ -73,6 +73,19 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 4 — 2026-06-19
+**Cible :** L3 router — chemins positifs (procédures repo-only) + fix régression auth
+**Bug découvert :** Le `beforeAll` billing L3 n'insérait pas dans la table `artisans`.
+`DrizzleTenantResolver` résout `artisanId = artisans.id` (NOT `users.id`) → `tenant = null` → 401 sur tous les tests avec cookie. Fix : insérer dans `artisans` + capturer `ARTISAN_ID`.
+**Cas ajoutés (3 nouveaux) :**
+- `getBillingInfo` → 200 avec PM et subscription réels (2 PMs visibles, plan = starter)
+- `revokePaymentMethod` sur PM valide → 200, PM disparaît de la liste
+- `setDefaultPaymentMethod` sur PM valide → 200, PM promue default
+**Cas bloqués (documentés) :**
+- `createSetupIntent 200` : nécessite `billingPort` override dans `AppDeps` (app.ts hors scope) ou clé Stripe test réelle
+- `confirmPaymentMethod 200` : même blocage (`billing.retrievePaymentMethod` → Stripe réel)
+**Résultat :** 7/7 ✅ (L3 PG) — dont les 4 tests existants enfin verts
+
 ### Itération 3 — 2026-06-19
 **Cible :** Domaine edge cases — `billing-domain.test.ts` (25 → 30 tests)
 **Cas ajoutés (5) :**
