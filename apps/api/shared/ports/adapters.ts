@@ -45,7 +45,11 @@ export class GeminiLlmAdapter implements LlmPort {
 
   async complete(prompt: string, opts?: LlmCompleteOptions): Promise<string> {
     const ai = await this.client();
-    const res = await ai.models.generateContent(this.request(prompt, opts));
+    const req = this.request(prompt, opts);
+    // Thinking models (gemini-3.x+) consume thinking tokens from the maxOutputTokens budget,
+    // starving the actual JSON output. Structured completions don't need chain-of-thought.
+    (req.config as Record<string, unknown>).thinkingConfig = { thinkingBudget: 0 };
+    const res = await ai.models.generateContent(req);
     return res.text ?? "";
   }
 

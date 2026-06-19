@@ -82,30 +82,38 @@ export function createInterventionsRouter(repo: IInterventionRepository, congeRe
 
     create: gerer
       .input(createSchema)
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { dateDebut, dateFin, ...rest } = input;
-        return creerIntervention(repo, ctx.tenant, {
+        const result = await creerIntervention(repo, ctx.tenant, {
           ...rest,
           dateDebut: toDate(dateDebut, "Date de début"),
           dateFin: dateFin != null ? toDate(dateFin, "Date de fin") : dateFin,
         });
+        ctx.log.info({ event: "intervention_created", interventionId: result.id, clientId: input.clientId, statut: input.statut ?? "planifiee" }, "Intervention créée");
+        return result;
       }),
 
     update: gerer
       .input(z.object({ id: z.number().int() }).and(updateSchema))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         const { id, dateDebut, dateFin, ...rest } = input;
-        return modifierIntervention(repo, ctx.tenant, id, {
+        const result = await modifierIntervention(repo, ctx.tenant, id, {
           ...rest,
           dateDebut: dateDebut != null ? toDate(dateDebut, "Date de début") : undefined,
           dateFin: dateFin != null ? toDate(dateFin, "Date de fin") : dateFin,
         });
+        if (rest.statut) {
+          const level = rest.statut === "annulee" ? "warn" : "info";
+          ctx.log[level]({ event: "intervention_statut_changed", interventionId: id, newStatut: rest.statut }, `Intervention statut → ${rest.statut}`);
+        }
+        return result;
       }),
 
     delete: gerer
       .input(z.object({ id: z.number().int() }))
       .mutation(async ({ ctx, input }) => {
         await supprimerIntervention(repo, ctx.tenant, input.id);
+        ctx.log.warn({ event: "intervention_deleted", interventionId: input.id }, "Intervention supprimée");
         return { success: true };
       }),
 
