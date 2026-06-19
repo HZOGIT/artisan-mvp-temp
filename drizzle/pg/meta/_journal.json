@@ -22,6 +22,13 @@
       "when": 1781349160590,
       "tag": "0002_petite_war_machine",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781843848952,
+      "tag": "0003_rls-tenant-isolation",
+      "breakpoints": true
     }
   ]
 }
