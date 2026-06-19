@@ -1,0 +1,12 @@
+packages: []
+allowBuilds:
+  '@google/genai': true
+  '@tailwindcss/oxide': true
+  bcrypt: true
+  core-js: true
+  esbuild: true
+  protobufjs: true
+minimumReleaseAgeExclude:
+  - pnpm@11.8.0
+overrides:
+  tailwindcss>nanoid: 3.3.7
