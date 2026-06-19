@@ -6,9 +6,9 @@ vars:
   DB_USER: '{{.MYSQL_USER | default "artisan_user"}}'
   DB_PASS: '{{.MYSQL_PASSWORD | default "artisan_password"}}'
   DB_NAME: artisan_mvp
-  # DB de dev/test locale (PG sur 5432). Les tâches drizzle/seed tournent depuis le HOST (plus de
-  # conteneur dev `app` bind-mount après l'unification du compose) → DATABASE_URL + DB_DIALECT injectés.
-  DEV_DATABASE_URL: postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp
+  # DB locale (PG sur 5432). Les tâches drizzle/seed tournent depuis le HOST (plus de
+  # conteneur bind-mount après l'unification du compose) → DATABASE_URL + DB_DIALECT injectés.
+  LOCAL_DATABASE_URL: postgres://artisan_user:artisan_password@localhost:5432/artisan_mvp
   # Consolidé : on développe directement sur la branche `staging` dans ce dépôt
   # (plus de worktree séparé). Le déploiement rebuild le conteneur depuis ce checkout.
   STAGING_DIR: /home/developer/artisan-mvp-temp
@@ -22,69 +22,63 @@ dotenv:
   - .env.local
 
 tasks:
-  dev:up:
-    desc: Start all dev containers in background
+  stack:up:
+    desc: Start all stack containers in background
     cmds:
       - '{{.COMPOSE}} up -d'
       - '{{.COMPOSE}} ps'
 
-  dev:down:
-    desc: Stop all dev containers
+  stack:down:
+    desc: Stop all stack containers
     cmds:
       - '{{.COMPOSE}} down'
 
-  dev:logs:
-    desc: Follow dev container logs
+  stack:logs:
+    desc: Follow stack container logs
     cmds:
       - '{{.COMPOSE}} logs -f'
 
-  dev:logs:app:
+  stack:logs:app:
     desc: Follow app container logs only
     cmds:
       - '{{.COMPOSE}} logs -f new-stack'
 
-  dev:restart:
-    desc: Restart all dev containers
+  stack:restart:
+    desc: Restart all stack containers
     cmds:
       - '{{.COMPOSE}} restart'
+
+  stack:status:
+    desc: Show container status
+    cmds:
+      - '{{.COMPOSE}} ps'
 
   db:generate:
     desc: Generate a new migration from schema.ts changes (does NOT touch the DB)
     cmds:
-      - 'DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate'
+      - 'DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate'
 
   db:migrate:
     desc: Apply pending migrations + verify no drift (the ONLY safe way to change the schema)
     cmds:
-      - 'DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate && DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit migrate'
+      - 'DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit generate && DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql pnpm exec drizzle-kit migrate'
 
-  # Deprecated alias — kept so old muscle memory still works. Use db:migrate.
-  dev:migrate:
-    desc: "(deprecated) → use db:migrate"
+  db:seed:
+    desc: Seed user dev@operioz.com / Operioz on the local DB (PostgreSQL, bcrypt)
     cmds:
-      - task: db:migrate
+      - 'DATABASE_URL={{.LOCAL_DATABASE_URL}} DB_DIALECT=postgresql USER_EMAIL=dev@operioz.com USER_PASSWORD=Operioz USER_NAME="Dev Operioz" pnpm exec tsx scripts/create-user.ts'
 
-  dev:seed:
-    desc: Seed dev user dev@operioz.com / Operioz (PostgreSQL, bcrypt)
-    cmds:
-      - 'DATABASE_URL={{.DEV_DATABASE_URL}} DB_DIALECT=postgresql USER_EMAIL=dev@operioz.com USER_PASSWORD=Operioz USER_NAME="Dev Operioz" pnpm exec tsx scripts/create-user.ts'
-
-  dev:seed:show:
-    desc: Show seeded dev users
+  db:seed:show:
+    desc: Show seeded users
     cmds:
       - |
         {{.COMPOSE}} exec postgres psql -U {{.DB_USER}} -d {{.DB_NAME}} \
           -c 'SELECT u.id, u.email, u.role, u.actif, a."nomEntreprise" FROM users u LEFT JOIN artisans a ON a."userId" = u.id;'
 
-  dev:db:shell:
+  db:shell:
     desc: Open PostgreSQL shell
     cmds:
       - '{{.COMPOSE}} exec postgres psql -U {{.DB_USER}} -d {{.DB_NAME}}'
-
-  dev:status:
-    desc: Show container status
-    cmds:
-      - '{{.COMPOSE}} ps'
 
   tf:plan:
     desc: Run terraform plan (with tfsec) — Cloudflare
@@ -123,7 +117,7 @@ tasks:
       - ./run.sh output
 
   # ─── STAGING (public, prod build) ──────────────────────────────────────────
-  # We develop ON the `staging` branch (this working dir = dev env, live).
+  # We develop ON the `staging` branch (this working dir is the live working copy).
   # staging.operioz.com is a separate worktree that builds a snapshot of
   # origin/staging, redeployed ONLY on demand (task staging:deploy).
   # The worktree uses a DETACHED checkout so it never conflicts with the
