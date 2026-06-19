@@ -348,10 +348,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   app.addHook("onResponse", (req, reply, done) => {
     if (req.url === "/health") { done(); return; }
     const path = req.url.split("?")[0] ?? req.url;
-    const level = reply.statusCode >= 500 ? "error" : reply.statusCode >= 400 ? "warn" : "info";
+    const elapsed = Math.round(reply.elapsedTime);
+    const isSlow = elapsed > 1000;
+    const level = reply.statusCode >= 500 ? "error" : reply.statusCode >= 400 || isSlow ? "warn" : "info";
     req.log[level](
-      { method: req.method, path, statusCode: reply.statusCode, responseTime: Math.round(reply.elapsedTime) },
-      `${req.method} ${path} ${reply.statusCode}`,
+      { method: req.method, path, statusCode: reply.statusCode, responseTime: elapsed, ...(isSlow ? { event: "slow_request" } : {}) },
+      isSlow ? `SLOW ${req.method} ${path} ${reply.statusCode} (${elapsed}ms)` : `${req.method} ${path} ${reply.statusCode}`,
     );
     done();
   });
@@ -743,8 +745,44 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     statsReader: new ConseilsStatsReaderDrizzle(getDbHandle().db),
   });
   /*
-   * Assistant IA (lectures threads/messages + 4 générateurs IA request/response). Réutilise le seam
-   * LlmPort (Gemini) + rate-limiter IA partagé (30/h par artisan, parité legacy checkRateLimit).
+   * Registry agentique de l'assistant (function-calling) — partagé entre le module tRPC (subscription
+   * `assistant.stream`) et la route HTTP brute `/api/assistant/stream` (SSE hors-tRPC).
+   * Hoisté ici car le module tRPC est construit avant les routes HTTP.
+   */
+  const agentEmail = deps.emailPort ?? new ResendEmailAdapter();
+  const agentRegistry = buildAssistantAgentRegistry(
+    {
+      clients: clientRepo,
+      factures: factureRepo,
+      devis: devisRepo,
+      stocks: stockRepo,
+      fournisseurs: fournisseurRepo,
+      interventions: interventionRepo,
+      dashboardReader: new DashboardReaderDrizzle(getDbHandle().db),
+    },
+    buildAssistantWriteHandlersFromRepos(
+      { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
+      {
+        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+        commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
+      },
+    ),
+  );
+  const agentLlm = deps.llmAgentic ?? new GeminiAgenticAdapter();
+  const agentDeps = {
+    llm: agentLlm,
+    registry: agentRegistry,
+    rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
+    artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
+    statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
+    threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
+  };
+  /*
+   * Assistant IA (lectures threads/messages + 4 générateurs IA request/response + stream agentique).
+   * La subscription tRPC `assistant.stream` utilise le mode agentique (function-calling) afin de
+   * supporter les outils navigate, invalidate, etc.
    */
   const assistant = createAssistantModule({
     threadsRepo: new AssistantThreadsRepositoryDrizzle(getDbHandle().db),
@@ -754,13 +792,7 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
       artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
       dataReader: new AssistantDataReaderDrizzle(getDbHandle().db),
     },
-    streamDeps: {
-      llm: deps.llm ?? new GeminiLlmAdapter(),
-      rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
-      artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
-      statsReader: new AssistantStatsReaderDrizzle(getDbHandle().db),
-      threadWriter: new AssistantThreadWriterDrizzle(getDbHandle().db),
-    },
+    agentDeps,
   });
   /*
    * Chat support artisan↔client (request/response). Notifier email best-effort (rate-limit anti-spam
@@ -923,33 +955,11 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
     rateLimiter: new SlidingWindowRateLimiter(120, 60 * 1000),
   });
 
-  /** Assistant agentique SSE `/api/assistant/agent` — function-calling, auth cookie + rate-limit IA. */
-  const agentEmail = deps.emailPort ?? new ResendEmailAdapter();
-  const agentRegistry = buildAssistantAgentRegistry(
-    {
-      clients: clientRepo,
-      factures: factureRepo,
-      devis: devisRepo,
-      stocks: stockRepo,
-      fournisseurs: fournisseurRepo,
-      interventions: interventionRepo,
-      dashboardReader: new DashboardReaderDrizzle(getDbHandle().db),
-    },
-    buildAssistantWriteHandlersFromRepos(
-      { clientRepo, interventionRepo, devisRepo, factureRepo, devisReader: new DevisReaderDrizzle(getDbHandle().db), commandeRepo },
-      {
-        /** Mailing deps (parité des routes d'envoi migrées : readers contact + PdfPort/EmailPort legacy + rate-limit). */
-        devis: { artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db), clientReader: new SharedClientReaderDrizzle(getDbHandle().db), signatureReader: new DevisSignatureReaderDrizzle(getDbHandle().db), appUrl: deps.lienBaseUrl ?? process.env.APP_URL ?? "https://www.operioz.com", pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-        facture: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-        relance: { artisanReader: new ArtisanReaderDrizzle(getDbHandle().db), clientReader: new ClientReaderDrizzle(getDbHandle().db), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-        commande: { repo: commandeRepo, fournisseurRepo, artisanReader: new CommandeArtisanReaderDrizzle(getDbHandle().db), pdf: new JsPdfAdapter(), email: agentEmail, rateLimiter: new SlidingWindowRateLimiter(20, 15 * 60 * 1000) },
-      },
-    ),
-  );
+  /** Assistant agentique SSE `/api/assistant/stream` — réutilise agentRegistry/agentLlm hoistés ci-dessus. */
   registerAssistantAgentRoute(app, {
     jwtSecret: deps.jwtSecret ?? process.env.JWT_SECRET ?? "",
     resolver: deps.resolver ?? new DrizzleTenantResolver(getDbHandle().db),
-    llm: deps.llmAgentic ?? new GeminiAgenticAdapter(),
+    llm: agentLlm,
     registry: agentRegistry,
     rateLimiter: deps.iaRateLimiter ?? new SlidingWindowRateLimiter(30, 60 * 60 * 1000),
     artisanReader: new SharedArtisanReaderDrizzle(getDbHandle().db),
