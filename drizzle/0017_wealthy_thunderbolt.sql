@@ -1,1 +1,0 @@
-ALTER TABLE `vehicules` ADD `puissanceFiscale` int;

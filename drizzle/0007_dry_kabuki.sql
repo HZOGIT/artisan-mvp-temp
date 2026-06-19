@@ -1,1 +1,0 @@
-ALTER TABLE `devis` ADD `dateVue` timestamp;

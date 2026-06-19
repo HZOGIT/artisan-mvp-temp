@@ -1,1 +1,0 @@
-ALTER TABLE `devis_lignes` ADD `type` enum('produit','section','note') DEFAULT 'produit';
