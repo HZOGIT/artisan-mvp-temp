@@ -334,6 +334,58 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     }
   });
 
+  it("saveSubscription upsert : 2e appel avec même artisan_id change le plan_id (onConflictDoUpdate)", async () => {
+    // La sub de A est déjà en "starter" depuis le test précédent (même transaction cleanup).
+    // On rappelle saveSubscription avec planId="pro" pour exercer le chemin upsert.
+    const updated = await repo.saveSubscription({
+      artisanId: A,
+      planId: "pro",
+      billingMode: "maison",
+      status: "trialing",
+      currentPeriodStart: new Date("2026-08-01"),
+      currentPeriodEnd: new Date("2026-09-01"),
+      trialEndsAt: null,
+      paymentMethodId: null,
+    });
+    expect(updated.plan_id).toBe("pro");
+    // findSubscription confirme la mise à jour (pas de doublon)
+    const found = await repo.findSubscription(ctx(A));
+    expect(found?.plan_id).toBe("pro");
+    expect(found?.id).toBe(updated.id);
+  });
+
+  it("listPaymentMethods : ordre is_default DESC à DB level — carte default en tête", async () => {
+    // pm1 → not default ; pm2 → promu default → doit être en premier dans la liste
+    const pm1 = await repo.savePaymentMethod({
+      artisanId: B,
+      stripeCustomerId: "cus_ord_b",
+      stripePaymentMethodId: "pm_ord_b1",
+      brand: "visa",
+      last4: "1111",
+      expMonth: 1,
+      expYear: 2030,
+      consentedAt: new Date(),
+    });
+    const pm2 = await repo.savePaymentMethod({
+      artisanId: B,
+      stripeCustomerId: "cus_ord_b",
+      stripePaymentMethodId: "pm_ord_b2",
+      brand: "mastercard",
+      last4: "2222",
+      expMonth: 2,
+      expYear: 2030,
+      consentedAt: new Date(),
+    });
+    await repo.setDefaultPaymentMethod(ctx(B), pm2.id);
+
+    const list = await repo.listPaymentMethods(ctx(B));
+    // pm2 (default) doit précéder pm1 (non-default) — tri is_default DESC
+    const idx1 = list.findIndex(p => p.id === pm1.id);
+    const idx2 = list.findIndex(p => p.id === pm2.id);
+    expect(idx2).toBeLessThan(idx1);
+    expect(list.find(p => p.id === pm2.id)?.is_default).toBe(true);
+  });
+
   // ── Événements (append-only) ──────────────────────────────────────────────
 
   it("appendEvent persiste et est retrouvable", async () => {
@@ -347,5 +399,21 @@ describe.skipIf(!URL)("BillingRepositoryDrizzle (PG, scope explicite artisan_id)
     expect(ev.id).toBeGreaterThan(0);
     expect(ev.event_type).toBe("payment_method.confirmed");
     expect(ev.actor).toBe("user:1");
+  });
+
+  it("appendEvent deux fois → deux événements distincts (append-only — pas de déduplication)", async () => {
+    // billing_events est un ledger immuable : deux appels identiques produisent deux lignes distinctes.
+    // Important pour l'audit : chaque action génère son propre enregistrement.
+    const params = {
+      entityType: "artisan" as const,
+      entityId: B,
+      eventType: "payment_method.set_default",
+      payload: { last4: "1234" },
+      actor: "user:2",
+    };
+    const ev1 = await repo.appendEvent(params);
+    const ev2 = await repo.appendEvent(params);
+    expect(ev1.id).not.toBe(ev2.id);
+    expect(ev2.id).toBeGreaterThan(ev1.id);
   });
 });

@@ -73,6 +73,15 @@ calcul prorata J restants, facturation différentiel dans `billing_invoices`.
 
 ## Tests — itérations cron
 
+### Itération 10 — 2026-06-19
+**Cible :** L2 Drizzle — gaps onConflictDoUpdate, append-only events, ordering DB réel
+**Cas ajoutés (3) :**
+- `saveSubscription` upsert : 2e appel même artisan_id change `plan_id` (`onConflictDoUpdate` branch jamais exercée avant)
+- `listPaymentMethods` ordre DB réel : carte default en tête (is_default DESC) — L1 couvrait le fake, L2 prouve le vrai SQL
+- `appendEvent` deux fois → deux IDs distincts : append-only vérifié à DB level (pas de déduplication silencieuse)
+**Résultat :** 18/18 ✅ (L2 PG)
+**Total billing :** 87 tests (84 → 87)
+
 ### Itération 9 — 2026-06-19
 **Source :** recherche web (idempotency, race conditions, event sourcing in payment systems)
 **Cible :** L1 — idempotence double-revoke, rotation de carte, ordre liste
